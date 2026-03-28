@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://app.d3ftly.com";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.d3ftly.com";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -152,9 +152,7 @@ export interface BillingInfo {
   cancelled_at: string | null;
   limits: {
     tokens: number;
-    plans: number;
     overage_per_1k_tokens_cents: number;
-    overage_per_plan_cents: number;
   };
   current_period: {
     month: string;

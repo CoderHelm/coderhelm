@@ -151,7 +151,6 @@ export default function BillingPage() {
         <StatCard label="Plan" value={canSubscribe ? "Free" : "Pro"} />
         <StatCard label="Status" value={isCancelling ? "Cancelling" : isCancelled ? "Cancelled" : billing.subscription_status || "free"} />
         <StatCard label="Tokens this month" value={formatTokens(billing.current_period.total_tokens)} />
-        <StatCard label="Plans this month" value={`${billing.current_period.total_plans} / ${billing.limits.plans}`} />
       </div>
 
       {/* Usage meters */}
@@ -163,12 +162,6 @@ export default function BillingPage() {
             included={billing.limits.tokens}
             overageCents={billing.limits.overage_per_1k_tokens_cents}
             unit="1K tokens"
-          />
-          <UsageMeter
-            label="Plans"
-            used={billing.current_period.total_plans}
-            included={billing.limits.plans}
-            overageCents={billing.limits.overage_per_plan_cents}
           />
         </div>
       )}
@@ -245,8 +238,7 @@ export default function BillingPage() {
             <span className="text-zinc-600 ml-1">then ${(billing.limits.overage_per_1k_tokens_cents / 100).toFixed(2)}/1K tokens</span>
           </div>
           <div>
-            <span className="text-zinc-200 font-medium">{billing.limits.plans}</span> plans/mo
-            <span className="text-zinc-600 ml-1">then ${(billing.limits.overage_per_plan_cents / 100).toFixed(0)}/plan</span>
+            <span className="text-zinc-200 font-medium">Unlimited</span> AI plans
           </div>
         </div>
       </div>

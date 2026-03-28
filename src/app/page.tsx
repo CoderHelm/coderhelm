@@ -502,10 +502,10 @@ export default function Home() {
                   <span className="text-brand">✓</span> 5M tokens / month
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-brand">✓</span> 5 AI plans / month
+                  <span className="text-brand">✓</span> Unlimited AI plans
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-brand">✓</span> $50/1M token, $10/plan overage
+                  <span className="text-brand">✓</span> $50/1M token overage
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-brand">✓</span> Priority queue
