@@ -16,15 +16,13 @@ const features = [
   {
     accentColor: "#7928ca",
     icon: (
-      // Pipeline: left-to-right connected stages
+      // Pipeline: clear staged lanes
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="3" cy="12" r="2" />
-        <circle cx="12" cy="12" r="2" />
-        <circle cx="21" cy="12" r="2" />
-        <line x1="5" y1="12" x2="10" y2="12" />
-        <line x1="14" y1="12" x2="19" y2="12" />
-        <polyline points="7 8 12 12 7 16" />
-        <polyline points="16 8 21 12 16 16" />
+        <rect x="2" y="4" width="20" height="4" rx="1" />
+        <rect x="2" y="10" width="20" height="4" rx="1" />
+        <rect x="2" y="16" width="20" height="4" rx="1" />
+        <path d="M7 6h10M7 12h10M7 18h10" />
+        <path d="M16 5l2 1-2 1M16 11l2 1-2 1M16 17l2 1-2 1" />
       </svg>
     ),
     title: "Multi-Pass Pipeline",
@@ -198,198 +196,174 @@ export default function Home() {
         </div>
       </section>
 
-      {/* What's new — standalone spotlight section */}
+      {/* AI Plans */}
       <section className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-6xl px-6">
-          <div className="flex items-center gap-3">
-            <div className="h-px flex-1 bg-surface-border" />
-            <span className="text-xs font-semibold uppercase tracking-widest text-text-muted">What&apos;s new</span>
-            <div className="h-px flex-1 bg-surface-border" />
-          </div>
-          <h2 className="mt-6 text-center text-3xl font-bold sm:text-4xl">
-            Plan and understand your codebase
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-center text-text-secondary">
-            Beyond writing code — d3ftly now helps you plan features and audit your infrastructure.
-          </p>
-
-          <div className="mt-14 space-y-6">
-
-            {/* AI Plans */}
-            <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-surface-elevated">
-              <div
-                className="pointer-events-none absolute inset-0"
-                style={{ background: "radial-gradient(ellipse at top left, #a855f715, transparent 60%)" }}
-              />
-              <div className="relative grid md:grid-cols-2">
-                {/* Text */}
-                <div className="flex flex-col justify-center p-8 md:p-10">
-                  <div className="flex items-center gap-3">
-                    {/* Icon: sparkle list — AI-generated plan */}
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-purple-500/30 bg-purple-500/10">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
-                        <rect x="9" y="3" width="6" height="4" rx="1" />
-                        <path d="M9 12h6M9 16h4" />
-                        <path d="M19 3l.5 1.5L21 5l-1.5.5L19 7l-.5-1.5L17 5l1.5-.5z" />
-                      </svg>
-                    </div>
-                    <span className="rounded-full bg-purple-500/15 px-3 py-1 text-xs font-semibold text-purple-400">New</span>
+          <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-surface-elevated">
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{ background: "radial-gradient(ellipse at top left, #a855f715, transparent 60%)" }}
+            />
+            <div className="relative grid md:grid-cols-2">
+              <div className="flex flex-col justify-center p-8 md:p-10">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-purple-500/30 bg-purple-500/10">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+                      <rect x="9" y="3" width="6" height="4" rx="1" />
+                      <path d="M9 12h6M9 16h4" />
+                      <path d="M19 3l.5 1.5L21 5l-1.5.5L19 7l-.5-1.5L17 5l1.5-.5z" />
+                    </svg>
                   </div>
-                  <h3 className="mt-4 text-2xl font-bold">AI Plans</h3>
-                  <p className="mt-3 text-text-secondary leading-relaxed">
-                    Describe a feature in plain English. d3ftly chats with you to scope the work, then generates an ordered list of GitHub issues — each ready to become a PR with one click.
-                  </p>
-                  <ul className="mt-5 space-y-2 text-sm text-text-secondary">
-                    {[
-                      "Conversational scoping — it asks clarifying questions",
-                      "Ordered GitHub issues created automatically",
-                      "One-click Approve → Execute",
-                    ].map((t) => (
-                      <li key={t} className="flex items-start gap-2">
-                        <span className="mt-0.5 shrink-0 text-purple-400">✓</span>
-                        {t}
-                      </li>
-                    ))}
-                  </ul>
+                  <span className="rounded-full bg-purple-500/15 px-3 py-1 text-xs font-semibold text-purple-400">New</span>
                 </div>
+                <h3 className="mt-4 text-2xl font-bold">AI Plans</h3>
+                <p className="mt-3 text-text-secondary leading-relaxed">
+                  Describe a feature in plain English. d3ftly chats with you to scope the work, then generates an ordered list of GitHub issues — each ready to become a PR with one click.
+                </p>
+                <ul className="mt-5 space-y-2 text-sm text-text-secondary">
+                  {[
+                    "Conversational scoping — it asks clarifying questions",
+                    "Ordered GitHub issues created automatically",
+                    "One-click Approve → Execute",
+                  ].map((t) => (
+                    <li key={t} className="flex items-start gap-2">
+                      <span className="mt-0.5 shrink-0 text-purple-400">✓</span>
+                      {t}
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-                {/* Visual mock — chat UI */}
-                <div className="flex items-center justify-center border-t border-purple-500/10 p-6 md:border-l md:border-t-0">
-                  <div className="w-full max-w-sm rounded-xl border border-[#21262d] bg-[#0d1117] p-5">
-                    <div className="mb-3 flex items-center gap-2 border-b border-[#21262d] pb-3">
-                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-purple-500/20 text-[9px] font-bold text-purple-400">P</div>
-                      <span className="text-[11px] font-semibold text-text-secondary">New Plan</span>
-                    </div>
-                    <div className="space-y-3">
-                      {/* User message */}
-                      <div className="flex justify-end">
-                        <div className="max-w-[80%] rounded-lg rounded-tr-none bg-purple-500/20 px-3 py-2 text-[11px] text-purple-200">
-                          Add OAuth login with GitHub and Google
-                        </div>
-                      </div>
-                      {/* Bot response */}
-                      <div className="flex gap-2">
-                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#00d4ff15] text-[9px] font-bold text-brand">d</div>
-                        <div className="rounded-lg rounded-tl-none border border-[#21262d] bg-[#161b22] px-3 py-2.5 text-[11px] text-text-secondary">
-                          <p className="mb-2 text-text-primary">I&apos;ll scope this as 4 tasks:</p>
-                          {[
-                            "#1 Add OAuth provider config",
-                            "#2 Build login / logout flow",
-                            "#3 Protect authenticated routes",
-                            "#4 Session management",
-                          ].map((t) => (
-                            <div key={t} className="flex items-center gap-1.5 text-[10px] leading-5">
-                              <span className="text-green-400">·</span>
-                              <span>{t}</span>
-                            </div>
-                          ))}
-                        </div>
+              <div className="flex items-center justify-center border-t border-purple-500/10 p-6 md:border-l md:border-t-0">
+                <div className="w-full max-w-sm rounded-xl border border-[#21262d] bg-[#0d1117] p-5">
+                  <div className="mb-3 flex items-center gap-2 border-b border-[#21262d] pb-3">
+                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-purple-500/20 text-[9px] font-bold text-purple-400">P</div>
+                    <span className="text-[11px] font-semibold text-text-secondary">New Plan</span>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-end">
+                      <div className="max-w-[80%] rounded-lg rounded-tr-none bg-purple-500/20 px-3 py-2 text-[11px] text-purple-200">
+                        Add OAuth login with GitHub and Google
                       </div>
                     </div>
-                    {/* Approve button */}
-                    <div className="mt-4 flex gap-2">
-                      <div className="flex-1 rounded-md border border-purple-500/30 bg-purple-500/10 py-1.5 text-center text-[10px] font-semibold text-purple-300">
-                        Approve Plan →
-                      </div>
-                      <div className="rounded-md border border-[#21262d] px-3 py-1.5 text-[10px] text-text-muted">
-                        Edit
+                    <div className="flex gap-2">
+                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#00d4ff15] text-[9px] font-bold text-brand">d</div>
+                      <div className="rounded-lg rounded-tl-none border border-[#21262d] bg-[#161b22] px-3 py-2.5 text-[11px] text-text-secondary">
+                        <p className="mb-2 text-text-primary">I&apos;ll scope this as 4 tasks:</p>
+                        {[
+                          "#1 Add OAuth provider config",
+                          "#2 Build login / logout flow",
+                          "#3 Protect authenticated routes",
+                          "#4 Session management",
+                        ].map((t) => (
+                          <div key={t} className="flex items-center gap-1.5 text-[10px] leading-5">
+                            <span className="text-green-400">·</span>
+                            <span>{t}</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
 
-            {/* Infrastructure Analysis */}
-            <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 bg-surface-elevated">
-              <div
-                className="pointer-events-none absolute inset-0"
-                style={{ background: "radial-gradient(ellipse at top right, #14b8a615, transparent 60%)" }}
-              />
-              <div className="relative grid md:grid-cols-2">
-                {/* Visual mock — diagram + findings — LEFT on this card */}
-                <div className="flex items-center justify-center border-b border-teal-500/10 p-6 md:border-b-0 md:border-r md:border-teal-500/10">
-                  <div className="w-full max-w-sm rounded-xl border border-[#21262d] bg-[#0d1117] p-5 text-xs">
-                    <div className="mb-3 flex items-center justify-between border-b border-[#21262d] pb-3">
-                      <span className="text-[11px] font-semibold text-text-secondary">ARCHITECTURE</span>
-                      <span className="rounded-full bg-teal-500/15 px-2 py-0.5 text-[9px] font-semibold text-teal-400">live</span>
-                    </div>
-                    {/* mini architecture diagram */}
-                    <div className="flex flex-col items-center gap-1 font-mono text-[10px]">
-                      <div className="rounded border border-[#21262d] bg-[#161b22] px-4 py-1.5 text-text-secondary">
-                        API Gateway
-                      </div>
-                      <div className="text-text-muted">│</div>
-                      <div className="flex gap-3">
-                        <div className="rounded border border-teal-500/30 bg-teal-500/10 px-3 py-1.5 text-teal-300">Lambda</div>
-                        <div className="rounded border border-teal-500/30 bg-teal-500/10 px-3 py-1.5 text-teal-300">Worker</div>
-                      </div>
-                      <div className="flex gap-8 text-text-muted">
-                        <span>│</span>
-                        <span>│</span>
-                      </div>
-                      <div className="rounded border border-[#21262d] bg-[#161b22] px-4 py-1.5 text-text-secondary">
-                        DynamoDB
-                      </div>
-                    </div>
-                    {/* findings */}
-                    <div className="mt-4 space-y-1.5 border-t border-[#21262d] pt-3">
-                      <p className="mb-2 text-[10px] font-semibold text-text-muted">FINDINGS</p>
-                      {[
-                        { icon: "⚠", color: "#f59e0b", text: "No VPC isolation on Lambda" },
-                        { icon: "⚠", color: "#f59e0b", text: "DynamoDB encryption not set" },
-                        { icon: "ℹ", color: "#3b82f6", text: "Consider reserved concurrency" },
-                      ].map((f) => (
-                        <div key={f.text} className="flex items-center gap-2 text-[10px]">
-                          <span style={{ color: f.color }}>{f.icon}</span>
-                          <span className="text-text-secondary">{f.text}</span>
-                        </div>
-                      ))}
-                    </div>
+      {/* Infrastructure Analysis */}
+      <section className="border-t border-surface-border py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 bg-surface-elevated">
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{ background: "radial-gradient(ellipse at top right, #14b8a615, transparent 60%)" }}
+            />
+            <div className="relative grid md:grid-cols-2">
+              <div className="flex items-center justify-center border-b border-teal-500/10 p-6 md:border-b-0 md:border-r md:border-teal-500/10">
+                <div className="w-full max-w-lg rounded-xl border border-[#21262d] bg-[#0d1117] p-5">
+                  <div className="mb-3 flex items-center justify-between border-b border-[#21262d] pb-3">
+                    <span className="text-[11px] font-semibold text-text-secondary">ARCHITECTURE (MERMAID)</span>
+                    <span className="rounded-full bg-teal-500/15 px-2 py-0.5 text-[9px] font-semibold text-teal-400">live</span>
                   </div>
-                </div>
+                  <pre className="overflow-x-auto text-[10px] leading-5 text-teal-100/90">
+                    <code>{`architecture-beta
+    group edge(logos:aws-cloudfront)[Edge]
+    group compute(logos:aws-lambda)[Compute]
+    group data(logos:aws-dynamodb)[Data]
+    group async(logos:aws-sqs)[Queues]
 
-                {/* Text */}
-                <div className="flex flex-col justify-center p-8 md:p-10">
-                  <div className="flex items-center gap-3">
-                    {/* Icon: magnifying glass over topology nodes */}
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-teal-500/30 bg-teal-500/10">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#14b8a6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="5" cy="6" r="2" />
-                        <circle cx="19" cy="6" r="2" />
-                        <circle cx="12" cy="18" r="2" />
-                        <line x1="7" y1="6" x2="17" y2="6" />
-                        <line x1="5" y1="8" x2="12" y2="16" />
-                        <line x1="19" y1="8" x2="12" y2="16" />
-                        <circle cx="19" cy="6" r="5" />
-                        <line x1="22" y1="9" x2="24" y2="11" />
-                      </svg>
-                    </div>
-                    <span className="rounded-full bg-teal-500/15 px-3 py-1 text-xs font-semibold text-teal-400">New</span>
-                  </div>
-                  <h3 className="mt-4 text-2xl font-bold">Infrastructure Analysis</h3>
-                  <p className="mt-3 text-text-secondary leading-relaxed">
-                    Scan your CDK or Terraform stacks and get a live architecture diagram plus a prioritized list of security, cost, and reliability findings — in seconds.
-                  </p>
-                  <ul className="mt-5 space-y-2 text-sm text-text-secondary">
+    service dns(logos:aws-route53)[Route 53] in edge
+    service cdn(logos:aws-cloudfront)[CloudFront] in edge
+    service api(logos:aws-api-gateway)[API Gateway] in compute
+    service gw(logos:aws-lambda)[Gateway Lambda] in compute
+    service wk(logos:aws-lambda)[Worker Lambda] in compute
+    service db(logos:aws-dynamodb)[DynamoDB] in data
+    service s3(logos:aws-s3)[Artifacts S3] in data
+    service q(logos:aws-sqs)[Ticket Queue] in async
+    service dlq(logos:aws-sqs)[DLQ] in async
+
+    dns:R --> L:cdn
+    cdn:R --> L:api
+    api:R --> L:gw
+    gw:R --> L:db
+    gw:B --> T:q
+    q:R --> L:wk
+    wk:R --> L:s3
+    wk:B --> T:dlq`}</code>
+                  </pre>
+                  <div className="mt-4 space-y-1.5 border-t border-[#21262d] pt-3">
+                    <p className="mb-2 text-[10px] font-semibold text-text-muted">FINDINGS</p>
                     {[
-                      "Live Mermaid architecture diagram",
-                      "Security, cost & reliability findings by severity",
-                      "Cached analysis — refresh on demand",
-                    ].map((t) => (
-                      <li key={t} className="flex items-start gap-2">
-                        <span className="mt-0.5 shrink-0 text-teal-400">✓</span>
-                        {t}
-                      </li>
+                      { icon: "⚠", color: "#f59e0b", text: "No VPC isolation on Lambda" },
+                      { icon: "⚠", color: "#f59e0b", text: "DynamoDB encryption not set" },
+                      { icon: "ℹ", color: "#3b82f6", text: "Consider reserved concurrency" },
+                    ].map((f) => (
+                      <div key={f.text} className="flex items-center gap-2 text-[10px]">
+                        <span style={{ color: f.color }}>{f.icon}</span>
+                        <span className="text-text-secondary">{f.text}</span>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </div>
               </div>
+
+              <div className="flex flex-col justify-center p-8 md:p-10">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-teal-500/30 bg-teal-500/10">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#14b8a6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="5" cy="6" r="2" />
+                      <circle cx="19" cy="6" r="2" />
+                      <circle cx="12" cy="18" r="2" />
+                      <line x1="7" y1="6" x2="17" y2="6" />
+                      <line x1="5" y1="8" x2="12" y2="16" />
+                      <line x1="19" y1="8" x2="12" y2="16" />
+                      <circle cx="19" cy="6" r="5" />
+                      <line x1="22" y1="9" x2="24" y2="11" />
+                    </svg>
+                  </div>
+                  <span className="rounded-full bg-teal-500/15 px-3 py-1 text-xs font-semibold text-teal-400">New</span>
+                </div>
+                <h3 className="mt-4 text-2xl font-bold">Infrastructure Analysis</h3>
+                <p className="mt-3 text-text-secondary leading-relaxed">
+                  Scan your CDK or Terraform stacks and get a live architecture diagram plus a prioritized list of security, cost, and reliability findings — in seconds.
+                </p>
+                <ul className="mt-5 space-y-2 text-sm text-text-secondary">
+                  {[
+                    "Live Mermaid architecture diagram",
+                    "Security, cost & reliability findings by severity",
+                    "Cached analysis — refresh on demand",
+                  ].map((t) => (
+                    <li key={t} className="flex items-start gap-2">
+                      <span className="mt-0.5 shrink-0 text-teal-400">✓</span>
+                      {t}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
-
           </div>
-
         </div>
       </section>
 
