@@ -475,6 +475,9 @@ export default function Home() {
                 <li className="flex items-center gap-2">
                   <span className="text-green-400">✓</span> CI self-healing
                 </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-zinc-600">✗</span> AI plans
+                </li>
               </ul>
               <a
                 href="https://github.com/apps/d3ftly-agent"
