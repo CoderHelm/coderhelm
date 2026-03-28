@@ -3,32 +3,65 @@ import Footer from "@/components/Footer";
 
 const features = [
   {
-    icon: "🎯",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <polygon points="10 8 16 12 10 16 10 8" />
+      </svg>
+    ),
     title: "Assign & Go",
     desc: "Assign an issue to d3ftly or label it — a draft PR appears, no prompting needed.",
   },
   {
-    icon: "🔬",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2L12 22" />
+        <path d="M5 6h14" />
+        <path d="M7 10h10" />
+        <path d="M5 14h14" />
+        <path d="M7 18h10" />
+      </svg>
+    ),
     title: "7-Pass Pipeline",
     desc: "Triage → Plan → Implement → Review → PR → CI Fix → Feedback. Every change is self-reviewed before you see it.",
   },
   {
-    icon: "🔒",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" />
+        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+      </svg>
+    ),
     title: "Zero Data Retention",
     desc: "Your code is processed in-memory. We never store source files or train on your data.",
   },
   {
-    icon: "⚡",
-    title: "Fast & Cheap",
-    desc: "Rust backend on AWS Lambda. Sub-second cold starts, pay only for what you use.",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+      </svg>
+    ),
+    title: "Built in Rust",
+    desc: "Engineered from the ground up in Rust for speed and reliability. Sub-second response times with minimal overhead.",
   },
   {
-    icon: "🧠",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+      </svg>
+    ),
     title: "Context-Aware",
     desc: "Reads your repo structure, AGENTS.md, README, and CI config to match your conventions.",
   },
   {
-    icon: "🔄",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="23 4 23 10 17 10" />
+        <polyline points="1 20 1 14 7 14" />
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+      </svg>
+    ),
     title: "Self-Healing CI",
     desc: "When CI fails on its branch, d3ftly reads the logs and pushes a fix automatically.",
   },
@@ -140,7 +173,7 @@ export default function Home() {
                 key={f.title}
                 className="rounded-xl border border-surface-border bg-surface-elevated p-6 transition-colors hover:border-brand/30"
               >
-                <div className="text-3xl">{f.icon}</div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-surface-border bg-surface text-text-secondary">{f.icon}</div>
                 <h3 className="mt-4 text-lg font-semibold">{f.title}</h3>
                 <p className="mt-2 text-sm text-text-secondary leading-relaxed">{f.desc}</p>
               </div>
