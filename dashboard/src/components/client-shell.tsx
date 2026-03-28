@@ -53,6 +53,7 @@ const navGroups: NavGroup[] = [
       { href: "/settings/guardrails", label: "Guardrails", icon: "⛨" },
       { href: "/settings/instructions", label: "Instructions", icon: "⚙" },
       { href: "/settings/voice", label: "Voice", icon: "✎" },
+      { href: "/settings/jira", label: "Jira", icon: "◧" },
     ],
   },
   {

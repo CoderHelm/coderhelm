@@ -63,6 +63,10 @@ export const api = {
   getNotifications: () => request<NotificationPrefs>("/api/notifications"),
   updateNotifications: (prefs: NotificationPrefs) => request<void>("/api/notifications", { method: "PUT", body: JSON.stringify(prefs) }),
 
+  // Jira integration
+  getJiraCheck: () => request<JiraCheck>("/api/integrations/jira/check"),
+  validateJiraPayload: (payload: Record<string, unknown>) => request<JiraValidation>("/api/integrations/jira/check", { method: "POST", body: JSON.stringify(payload) }),
+
   // Billing
   getBilling: () => request<BillingInfo>("/api/billing"),
   createSubscription: () => request<{ subscription_id: string; client_secret: string }>("/api/billing/subscribe", { method: "POST", body: "{}" }),
@@ -155,6 +159,7 @@ export interface BillingInfo {
   subscription_status: string;
   plan_id: string | null;
   has_payment_method: boolean;
+  stripe_publishable_key: string;
   last_payment_at: string | null;
   payment_retry_count: number;
   last_failure_reason: string | null;
@@ -258,4 +263,23 @@ export interface HealthCheck {
   status: "healthy" | "degraded" | "unhealthy";
   checked_at: string;
   checks: HealthCheckItem[];
+}
+
+export interface JiraCheck {
+  ready: boolean;
+  secret_configured: boolean;
+  configured_repos: { total: number; enabled: number };
+  jira_events_seen: boolean;
+  recommended_flow: string;
+  checklist: string[];
+  payload_template: Record<string, unknown>;
+  check_endpoint: string;
+  intake_endpoint: string;
+}
+
+export interface JiraValidation {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+  resolved: Record<string, string>;
 }
