@@ -3,18 +3,70 @@
 import { useEffect, useState } from "react";
 import { api, type Stats, type MonthStats } from "@/lib/api";
 import {
+  AreaChart,
+  Area,
   BarChart,
   Bar,
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from "recharts";
 import { CardSkeleton, ChartSkeleton } from "@/components/skeleton";
+
+const COLORS = {
+  green: { stroke: "#22c55e", fill: "url(#greenGrad)" },
+  red: { stroke: "#ef4444", fill: "url(#redGrad)" },
+  purple: { stroke: "#a78bfa", fill: "url(#purpleGrad)" },
+  blue: { stroke: "#60a5fa", fill: "url(#blueGrad)" },
+  cyan: { stroke: "#22d3ee", fill: "url(#cyanGrad)" },
+};
+
+function GradientDefs() {
+  return (
+    <defs>
+      {[
+        ["greenGrad", "#22c55e"],
+        ["redGrad", "#ef4444"],
+        ["purpleGrad", "#a78bfa"],
+        ["blueGrad", "#60a5fa"],
+        ["cyanGrad", "#22d3ee"],
+      ].map(([id, color]) => (
+        <linearGradient key={id} id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+          <stop offset="100%" stopColor={color} stopOpacity={0} />
+        </linearGradient>
+      ))}
+    </defs>
+  );
+}
+
+// eslint-disable-next-line
+function ChartTooltip({ active, payload, label, formatter }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-950/90 backdrop-blur-sm px-3 py-2 shadow-xl">
+      <p className="text-[11px] text-zinc-500 mb-1">{label}</p>
+      {payload.map((entry: { name: string; value: number; color: string }) => (
+        <div key={entry.name} className="flex items-center gap-2 text-xs">
+          <span className="h-2 w-2 rounded-full" style={{ background: entry.color }} />
+          <span className="text-zinc-400">{entry.name}</span>
+          <span className="ml-auto font-medium text-zinc-200">
+            {formatter ? formatter(entry.value as number, entry.name as string) : entry.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const axisProps = {
+  stroke: "transparent",
+  tick: { fill: "#52525b", fontSize: 11 },
+  tickLine: false,
+  axisLine: false,
+};
 
 export default function AnalyticsPage() {
   const [stats, setStats] = useState<{ month: Stats; all_time: Stats } | null>(null);
@@ -59,116 +111,80 @@ export default function AnalyticsPage() {
 
   const chartData = history.map((m) => ({
     ...m,
-    // Display as "Mar" instead of "2026-03"
     label: new Date(m.period + "-01").toLocaleDateString("en", { month: "short" }),
     tokens: m.total_tokens_in + m.total_tokens_out,
+    merge_rate: m.total_runs > 0 ? (m.completed / m.total_runs) * 100 : 0,
   }));
 
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Analytics</h1>
 
-      {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <KpiCard label="Runs this month" value={month.total_runs} />
         <KpiCard label="Merge rate" value={`${(month.merge_rate * 100).toFixed(0)}%`} />
         <KpiCard label="Cost this month" value={`$${month.total_cost_usd.toFixed(2)}`} />
-        <KpiCard
-          label="Tokens this month"
-          value={formatNumber(month.total_tokens_in + month.total_tokens_out)}
-        />
+        <KpiCard label="Tokens this month" value={formatNumber(month.total_tokens_in + month.total_tokens_out)} />
         <KpiCard label="All-time runs" value={all_time.total_runs} />
         <KpiCard label="All-time merge rate" value={`${(all_time.merge_rate * 100).toFixed(0)}%`} />
         <KpiCard label="All-time cost" value={`$${all_time.total_cost_usd.toFixed(2)}`} />
-        <KpiCard
-          label="All-time tokens"
-          value={formatNumber(all_time.total_tokens_in + all_time.total_tokens_out)}
-        />
+        <KpiCard label="All-time tokens" value={formatNumber(all_time.total_tokens_in + all_time.total_tokens_out)} />
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartCard title="Runs per month">
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-              <XAxis dataKey="label" stroke="#71717a" fontSize={12} />
-              <YAxis stroke="#71717a" fontSize={12} allowDecimals={false} />
-              <Tooltip
-                contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8 }}
-                labelStyle={{ color: "#a1a1aa" }}
-              />
-              <Legend />
-              <Bar dataKey="completed" name="Completed" fill="#22c55e" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="failed" name="Failed" fill="#ef4444" radius={[4, 4, 0, 0]} />
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={chartData} barGap={2}>
+              <GradientDefs />
+              <CartesianGrid vertical={false} stroke="#27272a" strokeDasharray="3 3" />
+              <XAxis dataKey="label" {...axisProps} />
+              <YAxis {...axisProps} allowDecimals={false} width={32} />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+              <Bar dataKey="completed" name="Completed" fill={COLORS.green.stroke} radius={[4, 4, 0, 0]} maxBarSize={28} />
+              <Bar dataKey="failed" name="Failed" fill={COLORS.red.stroke} radius={[4, 4, 0, 0]} maxBarSize={28} />
             </BarChart>
           </ResponsiveContainer>
+          <Legend items={[{ label: "Completed", color: COLORS.green.stroke }, { label: "Failed", color: COLORS.red.stroke }]} />
         </ChartCard>
 
-        <ChartCard title="Cost per month ($)">
-          <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-              <XAxis dataKey="label" stroke="#71717a" fontSize={12} />
-              <YAxis stroke="#71717a" fontSize={12} />
-              <Tooltip
-                contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8 }}
-                labelStyle={{ color: "#a1a1aa" }}
-                formatter={(v) => [`$${Number(v).toFixed(2)}`, "Cost"]}
-              />
-              <Line
-                type="monotone"
-                dataKey="total_cost_usd"
-                name="Cost"
-                stroke="#8b5cf6"
-                strokeWidth={2}
-                dot={{ fill: "#8b5cf6", r: 4 }}
-              />
-            </LineChart>
+        <ChartCard title="Cost per month">
+          <ResponsiveContainer width="100%" height={240}>
+            <AreaChart data={chartData}>
+              <GradientDefs />
+              <CartesianGrid vertical={false} stroke="#27272a" strokeDasharray="3 3" />
+              <XAxis dataKey="label" {...axisProps} />
+              <YAxis {...axisProps} width={40} tickFormatter={(v: number) => `$${v}`} />
+              <Tooltip content={<ChartTooltip formatter={(v: number) => `$${v.toFixed(2)}`} />} cursor={{ stroke: "#3f3f46" }} />
+              <Area type="monotone" dataKey="total_cost_usd" name="Cost" stroke={COLORS.purple.stroke} fill={COLORS.purple.fill} strokeWidth={2} />
+            </AreaChart>
           </ResponsiveContainer>
         </ChartCard>
 
         <ChartCard title="Tokens per month">
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-              <XAxis dataKey="label" stroke="#71717a" fontSize={12} />
-              <YAxis stroke="#71717a" fontSize={12} tickFormatter={formatNumber} />
-              <Tooltip
-                contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8 }}
-                labelStyle={{ color: "#a1a1aa" }}
-                formatter={(v) => [formatNumber(Number(v)), ""]}
-              />
-              <Legend />
-              <Bar dataKey="total_tokens_in" name="Input" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="total_tokens_out" name="Output" fill="#06b6d4" radius={[4, 4, 0, 0]} />
-            </BarChart>
+          <ResponsiveContainer width="100%" height={240}>
+            <AreaChart data={chartData}>
+              <GradientDefs />
+              <CartesianGrid vertical={false} stroke="#27272a" strokeDasharray="3 3" />
+              <XAxis dataKey="label" {...axisProps} />
+              <YAxis {...axisProps} width={40} tickFormatter={formatNumber} />
+              <Tooltip content={<ChartTooltip formatter={(v: number) => formatNumber(v)} />} cursor={{ stroke: "#3f3f46" }} />
+              <Area type="monotone" dataKey="total_tokens_in" name="Input" stroke={COLORS.blue.stroke} fill={COLORS.blue.fill} strokeWidth={2} stackId="tokens" />
+              <Area type="monotone" dataKey="total_tokens_out" name="Output" stroke={COLORS.cyan.stroke} fill={COLORS.cyan.fill} strokeWidth={2} stackId="tokens" />
+            </AreaChart>
           </ResponsiveContainer>
+          <Legend items={[{ label: "Input", color: COLORS.blue.stroke }, { label: "Output", color: COLORS.cyan.stroke }]} />
         </ChartCard>
 
         <ChartCard title="Merge rate trend">
-          <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={chartData.map((d) => ({
-              ...d,
-              merge_rate: d.total_runs > 0 ? (d.completed / d.total_runs) * 100 : 0,
-            }))}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-              <XAxis dataKey="label" stroke="#71717a" fontSize={12} />
-              <YAxis stroke="#71717a" fontSize={12} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-              <Tooltip
-                contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8 }}
-                labelStyle={{ color: "#a1a1aa" }}
-                formatter={(v) => [`${Number(v).toFixed(0)}%`, "Merge rate"]}
-              />
-              <Line
-                type="monotone"
-                dataKey="merge_rate"
-                name="Merge rate"
-                stroke="#22c55e"
-                strokeWidth={2}
-                dot={{ fill: "#22c55e", r: 4 }}
-              />
-            </LineChart>
+          <ResponsiveContainer width="100%" height={240}>
+            <AreaChart data={chartData}>
+              <GradientDefs />
+              <CartesianGrid vertical={false} stroke="#27272a" strokeDasharray="3 3" />
+              <XAxis dataKey="label" {...axisProps} />
+              <YAxis {...axisProps} width={36} domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} />
+              <Tooltip content={<ChartTooltip formatter={(v: number) => `${v.toFixed(0)}%`} />} cursor={{ stroke: "#3f3f46" }} />
+              <Area type="monotone" dataKey="merge_rate" name="Merge rate" stroke={COLORS.green.stroke} fill={COLORS.green.fill} strokeWidth={2} />
+            </AreaChart>
           </ResponsiveContainer>
         </ChartCard>
       </div>
@@ -179,8 +195,8 @@ export default function AnalyticsPage() {
 function KpiCard({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg">
-      <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">{label}</p>
-      <p className="text-xl font-bold">{value}</p>
+      <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-xl font-bold tabular-nums">{value}</p>
     </div>
   );
 }
@@ -188,8 +204,21 @@ function KpiCard({ label, value }: { label: string; value: string | number }) {
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-lg">
-      <h3 className="text-sm font-medium text-zinc-400 mb-4">{title}</h3>
+      <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-4">{title}</h3>
       {children}
+    </div>
+  );
+}
+
+function Legend({ items }: { items: { label: string; color: string }[] }) {
+  return (
+    <div className="flex items-center gap-4 mt-3 ml-1">
+      {items.map((item) => (
+        <div key={item.label} className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+          <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
+          {item.label}
+        </div>
+      ))}
     </div>
   );
 }
