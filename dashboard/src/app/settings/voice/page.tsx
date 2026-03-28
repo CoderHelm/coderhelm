@@ -6,48 +6,130 @@ import { useToast } from "@/components/toast";
 import { TextareaSkeleton } from "@/components/skeleton";
 import { RepoCombobox } from "@/components/repo-combobox";
 
+function Tab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+        active ? "border-zinc-100 text-zinc-100" : "border-transparent text-zinc-500 hover:text-zinc-300"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function VoiceEditor({
+  content,
+  setContent,
+  saving,
+  onSave,
+  regenerating,
+  onRegenerate,
+  loading,
+}: {
+  content: string;
+  setContent: (v: string) => void;
+  saving: boolean;
+  onSave: () => void;
+  regenerating?: boolean;
+  onRegenerate?: () => void;
+  loading: boolean;
+}) {
+  if (loading) return <TextareaSkeleton />;
+  return (
+    <>
+      <textarea
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        rows={20}
+        placeholder={`# Team Voice\n\n## Tone\nCasual and direct. No emojis in code.\n\n## Commit Messages\nConventional commits (feat:, fix:, chore:). Imperative mood.\n\n## PR Descriptions\nStructured with Problem, Changes, Risk, Verification sections.\n\n## Language\nTechnical but concise. Avoid jargon.`}
+        className="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 font-mono placeholder-zinc-700 focus:outline-none focus:border-zinc-500 resize-y"
+      />
+      <div className="flex items-center gap-3 mt-3">
+        <button
+          onClick={onSave}
+          disabled={saving}
+          className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 transition-colors"
+        >
+          {saving ? "Saving..." : "Save"}
+        </button>
+        {onRegenerate && (
+          <button
+            onClick={onRegenerate}
+            disabled={regenerating}
+            className="px-4 py-2 bg-zinc-800 text-zinc-300 rounded-lg text-sm font-medium hover:bg-zinc-700 disabled:opacity-50 transition-colors border border-zinc-700"
+          >
+            {regenerating ? "Regenerating..." : "Regenerate"}
+          </button>
+        )}
+        <span className="text-xs text-zinc-600">Applied to PR description pass.</span>
+      </div>
+    </>
+  );
+}
+
 export default function VoicePage() {
-  const [repos, setRepos] = useState<Repo[]>([]);
-  const [selectedRepo, setSelectedRepo] = useState("");
-  const [content, setContent] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [regenerating, setRegenerating] = useState(false);
+  const [tab, setTab] = useState<"global" | "repo">("global");
   const { toast } = useToast();
 
+  const [globalContent, setGlobalContent] = useState("");
+  const [globalLoading, setGlobalLoading] = useState(true);
+  const [globalSaving, setGlobalSaving] = useState(false);
+
+  const [repos, setRepos] = useState<Repo[]>([]);
+  const [selectedRepo, setSelectedRepo] = useState("");
+  const [repoContent, setRepoContent] = useState("");
+  const [repoLoading, setRepoLoading] = useState(false);
+  const [repoSaving, setRepoSaving] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+
   useEffect(() => {
+    api.getGlobalVoice().then((data) => {
+      setGlobalContent(data.content);
+      setGlobalLoading(false);
+    }).catch(() => setGlobalLoading(false));
+
     api.listRepos().then((data) => {
       const enabled = data.repos.filter((r) => r.enabled);
       setRepos(enabled);
-      if (enabled.length > 0) {
-        setSelectedRepo(enabled[0].name);
-      }
-      setLoading(false);
-    }).catch(() => setLoading(false));
+      if (enabled.length > 0) setSelectedRepo(enabled[0].name);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
     if (!selectedRepo) return;
-    setLoading(true);
+    setRepoLoading(true);
     api.getRepoVoice(selectedRepo).then((data) => {
-      setContent(data.content);
-      setLoading(false);
+      setRepoContent(data.content);
+      setRepoLoading(false);
     }).catch(() => {
-      setContent("");
-      setLoading(false);
+      setRepoContent("");
+      setRepoLoading(false);
     });
   }, [selectedRepo]);
 
-  const save = async () => {
-    if (!selectedRepo) return;
-    setSaving(true);
+  const saveGlobal = async () => {
+    setGlobalSaving(true);
     try {
-      await api.updateRepoVoice(selectedRepo, content);
+      await api.updateGlobalVoice(globalContent);
+      toast("Global voice saved");
+    } catch {
+      toast("Failed to save voice", "error");
+    }
+    setGlobalSaving(false);
+  };
+
+  const saveRepo = async () => {
+    if (!selectedRepo) return;
+    setRepoSaving(true);
+    try {
+      await api.updateRepoVoice(selectedRepo, repoContent);
       toast("Voice saved");
     } catch {
       toast("Failed to save voice", "error");
     }
-    setSaving(false);
+    setRepoSaving(false);
   };
 
   const regenerate = async () => {
@@ -60,7 +142,7 @@ export default function VoicePage() {
       setTimeout(async () => {
         try {
           const data = await api.getRepoVoice(selectedRepo);
-          setContent(data.content);
+          setRepoContent(data.content);
         } catch { /* ignore */ }
         setRegenerating(false);
       }, 15000);
@@ -75,52 +157,37 @@ export default function VoicePage() {
       <h1 className="text-2xl font-bold mb-2">Team Voice</h1>
       <p className="text-zinc-400 text-sm mb-6">
         Define how d3ftly writes PR descriptions, commit messages, and code comments.
-        This is auto-generated during onboarding by analyzing your team&apos;s existing PRs and commits — but you can edit it anytime.
+        Global voice applies to all repos. Per-repo voice overrides it for a specific repo and is auto-generated during onboarding.
       </p>
 
-      {!loading && repos.length === 0 ? (
+      <div className="flex gap-1 border-b border-zinc-800 mb-6">
+        <Tab label="Global" active={tab === "global"} onClick={() => setTab("global")} />
+        <Tab label="Per Repo" active={tab === "repo"} onClick={() => setTab("repo")} />
+      </div>
+
+      {tab === "global" ? (
+        <VoiceEditor
+          content={globalContent}
+          setContent={setGlobalContent}
+          saving={globalSaving}
+          onSave={saveGlobal}
+          loading={globalLoading}
+        />
+      ) : repos.length === 0 ? (
         <p className="text-zinc-500 text-sm">No enabled repos. Enable repos in Settings → Repos first.</p>
       ) : (
         <>
-          {repos.length > 0 && (
-            <RepoCombobox
-              repos={repos}
-              selected={selectedRepo}
-              onSelect={setSelectedRepo}
-            />
-          )}
-
-          {loading ? (
-            <TextareaSkeleton />
-          ) : (
-        <>
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            rows={20}
-            placeholder={`# Team Voice\n\n## Tone\nCasual and direct. No emojis in code.\n\n## Commit Messages\nConventional commits (feat:, fix:, chore:). Imperative mood.\n\n## PR Descriptions\nStructured with Problem, Changes, Risk, Verification sections.\n\n## Language\nTechnical but concise. Avoid jargon.`}
-            className="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 font-mono placeholder-zinc-700 focus:outline-none focus:border-zinc-500 resize-y"
+          <RepoCombobox repos={repos} selected={selectedRepo} onSelect={setSelectedRepo} />
+          <VoiceEditor
+            content={repoContent}
+            setContent={setRepoContent}
+            saving={repoSaving}
+            onSave={saveRepo}
+            regenerating={regenerating}
+            onRegenerate={regenerate}
+            loading={repoLoading}
           />
-          <div className="flex items-center gap-3 mt-3">
-            <button
-              onClick={save}
-              disabled={saving}
-              className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 transition-colors"
-            >
-              {saving ? "Saving..." : "Save"}
-            </button>
-            <button
-              onClick={regenerate}
-              disabled={regenerating}
-              className="px-4 py-2 bg-zinc-800 text-zinc-300 rounded-lg text-sm font-medium hover:bg-zinc-700 disabled:opacity-50 transition-colors border border-zinc-700"
-            >
-              {regenerating ? "Regenerating..." : "Regenerate"}
-            </button>
-            <span className="text-xs text-zinc-600">Applied to PR description pass.</span>
-          </div>
         </>
-      )}
-      </>
       )}
     </div>
   );
