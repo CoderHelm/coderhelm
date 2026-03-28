@@ -43,6 +43,8 @@ export const api = {
   updateRepoRules: (repo: string, rules: string[]) => request<void>(`/api/rules/repo/${encodeURIComponent(repo)}`, { method: "PUT", body: JSON.stringify({ rules }) }),
 
   // Voice
+  getGlobalVoice: () => request<{ content: string }>("/api/voice/global"),
+  updateGlobalVoice: (content: string) => request<void>("/api/voice/global", { method: "PUT", body: JSON.stringify({ content }) }),
   getRepoVoice: (repo: string) => request<{ content: string }>(`/api/voice/repo/${encodeURIComponent(repo)}`),
   updateRepoVoice: (repo: string, content: string) => request<void>(`/api/voice/repo/${encodeURIComponent(repo)}`, { method: "PUT", body: JSON.stringify({ content }) }),
 
