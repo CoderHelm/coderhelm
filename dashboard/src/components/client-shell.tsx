@@ -68,11 +68,11 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    Promise.all([api.me(), api.getBilling()])
-      .then(([u, b]) => {
+    api.me()
+      .then((u) => {
         setUser(u);
-        setBilling(b);
         setAuthChecked(true);
+        api.getBilling().then(setBilling).catch(() => {});
       })
       .catch(() => {
         window.location.href = `${API_BASE}/auth/login`;
