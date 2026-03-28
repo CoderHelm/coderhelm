@@ -11,8 +11,8 @@ const features = [
         <polygon points="10 8 16 12 10 16 10 8" />
       </svg>
     ),
-    title: "Assign & Go",
-    desc: "Assign a GitHub issue — d3ftly creates a branch, opens a draft PR, and marks it ready when CI passes.",
+    title: "GitHub Or Jira Intake",
+    desc: "Assign a GitHub issue or Jira ticket — d3ftly creates a branch, opens a draft PR, and marks it ready when CI passes.",
   },
   {
     accentColor: "#7928ca",
@@ -149,7 +149,7 @@ export default function Home() {
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg text-text-secondary sm:text-xl">
-            Assign a GitHub issue → get a production-ready PR. An autonomous
+            Assign a GitHub issue or Jira ticket → get a production-ready PR. An autonomous
             AI agent that reads your codebase, plans changes, implements them,
             and self-reviews — all in minutes.
           </p>
@@ -250,7 +250,7 @@ export default function Home() {
                 </div>
                 <h3 className="mt-4 text-2xl font-bold">AI Plans</h3>
                 <p className="mt-3 text-text-secondary leading-relaxed">
-                  Describe a feature in plain English. d3ftly chats with you to scope the work, then generates an ordered list of GitHub issues — each ready to become a PR with one click.
+                  Describe a feature in plain English. d3ftly chats with you to scope the work, then generates an ordered list of GitHub issues or Jira tickets — each ready to become a PR with one click.
                 </p>
                 <ul className="mt-5 space-y-2 text-sm text-text-secondary">
                   {[
