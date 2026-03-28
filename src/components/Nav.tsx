@@ -26,7 +26,7 @@ export default function Nav() {
             Pricing
           </a>
           <a
-            href="https://api.d3ftly.com/api/auth/github"
+            href="https://api.d3ftly.com/auth/login"
             className="text-sm text-text-secondary hover:text-text-primary transition-colors"
           >
             Login
@@ -69,7 +69,7 @@ export default function Nav() {
               Pricing
             </a>
             <a
-              href="https://api.d3ftly.com/api/auth/github"
+              href="https://api.d3ftly.com/auth/login"
               className="text-sm text-text-secondary"
             >
               Login

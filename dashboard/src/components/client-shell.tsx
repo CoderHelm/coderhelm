@@ -72,7 +72,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         setAuthChecked(true);
       })
       .catch(() => {
-        window.location.href = `${API_BASE}/api/auth/github`;
+        window.location.href = `${API_BASE}/auth/login`;
       });
   }, []);
 
