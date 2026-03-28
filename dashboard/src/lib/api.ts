@@ -53,6 +53,11 @@ export const api = {
   // Instructions
   getGlobalInstructions: () => request<{ content: string }>("/api/instructions/global"),
   updateGlobalInstructions: (content: string) => request<void>("/api/instructions/global", { method: "PUT", body: JSON.stringify({ content }) }),
+  getRepoInstructions: (repo: string) => request<{ content: string }>(`/api/instructions/repo/${encodeURIComponent(repo)}`),
+  updateRepoInstructions: (repo: string, content: string) => request<void>(`/api/instructions/repo/${encodeURIComponent(repo)}`, { method: "PUT", body: JSON.stringify({ content }) }),
+
+  // Regenerate (re-run onboard for a repo)
+  regenerateRepo: (repo: string) => request<{ status: string }>(`/api/repos/${encodeURIComponent(repo)}/regenerate`, { method: "POST" }),
 
   // Notifications
   getNotifications: () => request<NotificationPrefs>("/api/notifications"),
