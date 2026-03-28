@@ -502,7 +502,7 @@ export default function Home() {
                   <span className="text-brand">✓</span> 5M tokens / month
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-brand">✓</span> Unlimited AI plans
+                  <span className="text-brand">✓</span> AI plans
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-brand">✓</span> $50/1M token overage
