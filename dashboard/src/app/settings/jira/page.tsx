@@ -1,17 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type JiraCheck, type Repo } from "@/lib/api";
+import { api, type JiraCheck } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { Skeleton } from "@/components/skeleton";
-import { RepoCombobox } from "@/components/repo-combobox";
 
 type Tab = "app" | "webhook";
 
 export default function JiraPage() {
   const [check, setCheck] = useState<JiraCheck | null>(null);
-  const [repos, setRepos] = useState<Repo[]>([]);
-  const [selectedRepo, setSelectedRepo] = useState("");
   const [loading, setLoading] = useState(true);
   const [secret, setSecret] = useState<string | null>(null);
   const [generatingSecret, setGeneratingSecret] = useState(false);
@@ -20,14 +17,8 @@ export default function JiraPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    Promise.all([api.getJiraCheck(), api.listRepos()])
-      .then(([c, r]) => {
-        setCheck(c);
-        const enabled = r.repos.filter((repo) => repo.enabled);
-        setRepos(enabled);
-        if (enabled.length > 0) setSelectedRepo(enabled[0].name);
-        setLoading(false);
-      })
+    api.getJiraCheck()
+      .then((c) => { setCheck(c); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
@@ -117,9 +108,6 @@ export default function JiraPage() {
         <WebhookTab
           check={check}
           setCheck={setCheck}
-          repos={repos}
-          selectedRepo={selectedRepo}
-          setSelectedRepo={setSelectedRepo}
           secret={secret}
           generatingSecret={generatingSecret}
           generateSecret={generateSecret}
@@ -158,14 +146,16 @@ function ForgeAppTab({ check, copy, copied }: { check: JiraCheck | null; copy: (
           </a>
         </Step>
 
-        <Step number={2} title="Configure in Jira">
+        <Step number={2} title="Paste your Installation ID in Jira">
           <p className="text-zinc-400 text-sm mb-2">
-            After installing, go to <strong className="text-zinc-200">Jira → Apps → d3ftly Settings</strong> and enter your Installation ID:
+            After installing, go to <strong className="text-zinc-200">Jira → Apps → d3ftly Settings</strong> and paste this ID:
           </p>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-zinc-500">Installation ID:</span>
-            <code className="px-2 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-emerald-400 font-mono text-xs">{check?.installation_id ?? "—"}</code>
-            <button onClick={() => copy(String(check?.installation_id ?? ""), "installId")} className="text-xs text-zinc-500 hover:text-zinc-300 underline">
+          <div className="flex items-center gap-2">
+            <code className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-emerald-400 font-mono text-sm">{check?.installation_id ?? "—"}</code>
+            <button
+              onClick={() => copy(String(check?.installation_id ?? ""), "installId")}
+              className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
+            >
               {copied === "installId" ? "Copied!" : "Copy"}
             </button>
           </div>
@@ -190,9 +180,6 @@ function ForgeAppTab({ check, copy, copied }: { check: JiraCheck | null; copy: (
 interface WebhookTabProps {
   check: JiraCheck | null;
   setCheck: React.Dispatch<React.SetStateAction<JiraCheck | null>>;
-  repos: Repo[];
-  selectedRepo: string;
-  setSelectedRepo: (v: string) => void;
   secret: string | null;
   generatingSecret: boolean;
   generateSecret: () => void;
@@ -202,16 +189,10 @@ interface WebhookTabProps {
   toast: (msg: string, type?: "error" | "success") => void;
 }
 
-function WebhookTab({ check, setCheck, repos, selectedRepo, setSelectedRepo, secret, generatingSecret, generateSecret, deleteSecret, copy, copied, toast }: WebhookTabProps) {
-  const [repoOwner, repoName] = selectedRepo.includes("/")
-    ? selectedRepo.split("/")
-    : ["your-org", "your-repo"];
-
+function WebhookTab({ check, setCheck, secret, generatingSecret, generateSecret, deleteSecret, copy, copied, toast }: WebhookTabProps) {
   const payloadTemplate = JSON.stringify(
     {
       installation_id: check?.installation_id ?? 0,
-      repo_owner: repoOwner,
-      repo_name: repoName,
       issue: {
         key: "{{issue.key}}",
         fields: {
@@ -294,13 +275,8 @@ function WebhookTab({ check, setCheck, repos, selectedRepo, setSelectedRepo, sec
 
       <Step number={4} title="Set the JSON payload">
         <p className="text-zinc-400 text-sm mb-2">
-          Select the repo this Jira project maps to.
+          d3ftly auto-resolves the repo from the ticket context.
         </p>
-        {repos.length > 0 && (
-          <div className="mb-3">
-            <RepoCombobox repos={repos} selected={selectedRepo} onSelect={setSelectedRepo} />
-          </div>
-        )}
         <div className="relative">
           <pre className="px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300 font-mono overflow-x-auto whitespace-pre">
             {payloadTemplate}
