@@ -323,7 +323,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-6">
           <h2 className="text-center text-3xl font-bold sm:text-4xl">Infrastructure Analysis</h2>
           <p className="mx-auto mt-4 max-w-xl text-center text-text-secondary">
-            Visualize architecture and surface security, cost, and reliability risks fast.
+            Visualize architecture and surface security and reliability risks fast.
           </p>
 
           <div className="mt-10 relative overflow-hidden rounded-2xl border border-teal-500/20 bg-surface-elevated">
@@ -372,12 +372,12 @@ export default function Home() {
                 </div>
                 <h3 className="mt-4 text-2xl font-bold">Infrastructure Analysis</h3>
                 <p className="mt-3 text-text-secondary leading-relaxed">
-                  Scan your CDK or Terraform stacks and get a live architecture diagram plus a prioritized list of security, cost, and reliability findings — in seconds.
+                  Scan your CDK or Terraform stacks and get a live architecture diagram plus a prioritized list of security and reliability findings — in seconds.
                 </p>
                 <ul className="mt-5 space-y-2 text-sm text-text-secondary">
                   {[
                     "Live Mermaid architecture diagram",
-                    "Security, cost & reliability findings by severity",
+                    "Security & reliability findings by severity",
                   ].map((t) => (
                     <li key={t} className="flex items-start gap-2">
                       <span className="mt-0.5 shrink-0 text-teal-400">✓</span>
