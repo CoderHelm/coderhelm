@@ -11,6 +11,12 @@ const STRIPE_PK = process.env.NEXT_PUBLIC_STRIPE_PK || "";
 const PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || "";
 const stripePromise = STRIPE_PK ? loadStripe(STRIPE_PK) : null;
 
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+  return n.toString();
+}
+
 export default function BillingPage() {
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -144,7 +150,7 @@ export default function BillingPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard label="Plan" value={canSubscribe ? "Free" : "Pro"} />
         <StatCard label="Status" value={isCancelling ? "Cancelling" : isCancelled ? "Cancelled" : billing.subscription_status || "free"} />
-        <StatCard label="Runs this month" value={`${billing.current_period.total_runs} / ${billing.limits.runs}`} />
+        <StatCard label="Tokens this month" value={formatTokens(billing.current_period.total_tokens)} />
         <StatCard label="Plans this month" value={`${billing.current_period.total_plans} / ${billing.limits.plans}`} />
       </div>
 
@@ -152,10 +158,11 @@ export default function BillingPage() {
       {isActive && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <UsageMeter
-            label="Runs"
-            used={billing.current_period.total_runs}
-            included={billing.limits.runs}
-            overageCents={billing.limits.overage_per_run_cents}
+            label="Tokens"
+            used={billing.current_period.total_tokens}
+            included={billing.limits.tokens}
+            overageCents={billing.limits.overage_per_1k_tokens_cents}
+            unit="1K tokens"
           />
           <UsageMeter
             label="Plans"
@@ -234,8 +241,8 @@ export default function BillingPage() {
         <p className="text-sm font-semibold text-zinc-100 mb-3">Pro — $199/mo includes</p>
         <div className="grid grid-cols-2 gap-4 text-sm text-zinc-400">
           <div>
-            <span className="text-zinc-200 font-medium">{billing.limits.runs}</span> runs/mo
-            <span className="text-zinc-600 ml-1">then ${(billing.limits.overage_per_run_cents / 100).toFixed(0)}/run</span>
+            <span className="text-zinc-200 font-medium">{formatTokens(billing.limits.tokens)}</span> tokens/mo
+            <span className="text-zinc-600 ml-1">then ${(billing.limits.overage_per_1k_tokens_cents / 100).toFixed(2)}/1K tokens</span>
           </div>
           <div>
             <span className="text-zinc-200 font-medium">{billing.limits.plans}</span> plans/mo
@@ -421,18 +428,22 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function UsageMeter({ label, used, included, overageCents }: { label: string; used: number; included: number; overageCents: number }) {
+function UsageMeter({ label, used, included, overageCents, unit }: { label: string; used: number; included: number; overageCents: number; unit?: string }) {
   const pct = included > 0 ? Math.min((used / included) * 100, 100) : 0;
   const over = Math.max(used - included, 0);
   const isOver = used > included;
+  const fmt = label === "Tokens" ? formatTokens : (n: number) => n.toString();
+  const overageAmount = unit
+    ? ((over / 1000) * overageCents) / 100
+    : (over * overageCents) / 100;
 
   return (
     <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg">
       <div className="flex items-center justify-between mb-2">
         <p className="text-sm font-medium text-zinc-200">{label}</p>
         <p className="text-xs text-zinc-500">
-          {used} / {included}
-          {isOver && <span className="text-yellow-400 ml-1">(+{over} overage)</span>}
+          {fmt(used)} / {fmt(included)}
+          {isOver && <span className="text-yellow-400 ml-1">(+{fmt(over)} overage)</span>}
         </p>
       </div>
       <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
@@ -443,7 +454,7 @@ function UsageMeter({ label, used, included, overageCents }: { label: string; us
       </div>
       {isOver && (
         <p className="text-xs text-yellow-400/70 mt-1.5">
-          +${((over * overageCents) / 100).toFixed(2)} overage
+          +${overageAmount.toFixed(2)} overage
         </p>
       )}
     </div>

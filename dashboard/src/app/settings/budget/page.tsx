@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/toast";
 
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+  return n.toString();
+}
+
 export default function BudgetPage() {
   const [maxBudget, setMaxBudget] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -65,15 +71,15 @@ export default function BudgetPage() {
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs">/month</span>
           </div>
           <p className="text-xs text-zinc-600 mt-1.5">
-            Includes base subscription ($199) + overage charges. Set to 0 or empty for no cap.
+            Includes base subscription ($199) + token overage charges. Set to 0 or empty for no cap.
           </p>
         </div>
 
         <div className="flex items-center justify-between pt-2">
           <p className="text-xs text-zinc-500">
             {maxBudget && parseFloat(maxBudget) > 0
-              ? `d3ftly will stop after ~${Math.max(Math.floor((parseFloat(maxBudget) * 100 - 19900) / 500), 0) + 30} runs/month`
-              : "No spending limit — runs will continue with overage billing"}
+              ? `d3ftly will stop after ~${formatTokens(Math.max(Math.floor((parseFloat(maxBudget) * 100 - 19900) / 5 * 1000), 0) + 5_000_000)} tokens/month`
+              : "No spending limit — usage will continue with overage billing"}
           </p>
           <button
             onClick={handleSave}
