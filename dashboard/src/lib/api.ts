@@ -110,6 +110,10 @@ export const api = {
   getInfrastructure: () => request<InfraAnalysis>("/api/infrastructure"),
   refreshInfrastructure: () =>
     request<{ status: string }>("/api/infrastructure/refresh", { method: "POST" }),
+  getRepoInfrastructure: (repo: string) =>
+    request<InfraAnalysis>(`/api/infrastructure/repo/${repo}`),
+  refreshRepoInfrastructure: (repo: string) =>
+    request<{ status: string }>(`/api/infrastructure/repo/${repo}/refresh`, { method: "POST" }),
 };
 
 export interface Run {
