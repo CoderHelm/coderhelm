@@ -87,12 +87,12 @@ export default function AnalyticsPage() {
     return (
       <div>
         <h1 className="text-2xl font-bold mb-6">Analytics</h1>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <CardSkeleton /><CardSkeleton /><CardSkeleton /><CardSkeleton />
-          <CardSkeleton /><CardSkeleton /><CardSkeleton /><CardSkeleton />
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+          <CardSkeleton /><CardSkeleton /><CardSkeleton />
+          <CardSkeleton /><CardSkeleton /><CardSkeleton />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ChartSkeleton /><ChartSkeleton /><ChartSkeleton /><ChartSkeleton />
+          <ChartSkeleton /><ChartSkeleton /><ChartSkeleton />
         </div>
       </div>
     );
@@ -120,14 +120,12 @@ export default function AnalyticsPage() {
     <div>
       <h1 className="text-2xl font-bold mb-6">Analytics</h1>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
         <KpiCard label="Runs this month" value={month.total_runs} />
         <KpiCard label="Merge rate" value={`${(month.merge_rate * 100).toFixed(0)}%`} />
-        <KpiCard label="Cost this month" value={`$${month.total_cost_usd.toFixed(2)}`} />
         <KpiCard label="Tokens this month" value={formatNumber(month.total_tokens_in + month.total_tokens_out)} />
         <KpiCard label="All-time runs" value={all_time.total_runs} />
         <KpiCard label="All-time merge rate" value={`${(all_time.merge_rate * 100).toFixed(0)}%`} />
-        <KpiCard label="All-time cost" value={`$${all_time.total_cost_usd.toFixed(2)}`} />
         <KpiCard label="All-time tokens" value={formatNumber(all_time.total_tokens_in + all_time.total_tokens_out)} />
       </div>
 
@@ -145,19 +143,6 @@ export default function AnalyticsPage() {
             </BarChart>
           </ResponsiveContainer>
           <Legend items={[{ label: "Completed", color: COLORS.green.stroke }, { label: "Failed", color: COLORS.red.stroke }]} />
-        </ChartCard>
-
-        <ChartCard title="Cost per month">
-          <ResponsiveContainer width="100%" height={240}>
-            <AreaChart data={chartData}>
-              <GradientDefs />
-              <CartesianGrid vertical={false} stroke="#27272a" strokeDasharray="3 3" />
-              <XAxis dataKey="label" {...axisProps} />
-              <YAxis {...axisProps} width={40} tickFormatter={(v: number) => `$${v}`} />
-              <Tooltip content={<ChartTooltip formatter={(v: number) => `$${v.toFixed(2)}`} />} cursor={{ stroke: "#3f3f46" }} />
-              <Area type="monotone" dataKey="total_cost_usd" name="Cost" stroke={COLORS.purple.stroke} fill={COLORS.purple.fill} strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
         </ChartCard>
 
         <ChartCard title="Tokens per month">

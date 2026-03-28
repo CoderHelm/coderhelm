@@ -15,9 +15,10 @@ export default function VoicePage() {
 
   useEffect(() => {
     api.listRepos().then((data) => {
-      setRepos(data.repos);
-      if (data.repos.length > 0) {
-        setSelectedRepo(data.repos[0].name);
+      const enabled = data.repos.filter((r) => r.enabled);
+      setRepos(enabled);
+      if (enabled.length > 0) {
+        setSelectedRepo(enabled[0].name);
       }
       setLoading(false);
     }).catch(() => setLoading(false));
