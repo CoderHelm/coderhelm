@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+html {
+  font-size: 15px;
+}
+
 @keyframes slide-in {
   from {
     opacity: 0;

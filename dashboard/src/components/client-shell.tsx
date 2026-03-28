@@ -132,7 +132,7 @@ function Sidebar({
         {navGroups.map((group, index) => (
           <div key={index}>
             {group.label && (
-              <p className="px-2 mb-1 text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">
+              <p className="px-2 mb-1 text-xs font-semibold text-zinc-600 uppercase tracking-widest">
                 {group.label}
               </p>
             )}
@@ -151,7 +151,7 @@ function Sidebar({
                     }`}
                   >
                     <span className="flex items-center gap-2.5">
-                      <span className="w-4 text-center text-xs">{item.icon}</span>
+                      <span className="w-4 text-center text-sm">{item.icon}</span>
                       {item.label}
                     </span>
                   </Link>
@@ -207,8 +207,8 @@ function Sidebar({
             </span>
           )}
           <div className="min-w-0">
-            <p className="text-xs text-zinc-300 truncate">{user.github_login}</p>
-            <p className="text-[10px] text-zinc-500 truncate">{user.email}</p>
+            <p className="text-sm text-zinc-300 truncate">{user.github_login}</p>
+            <p className="text-xs text-zinc-500 truncate">{user.email}</p>
           </div>
         </div>
       )}

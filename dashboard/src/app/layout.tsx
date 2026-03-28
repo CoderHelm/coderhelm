@@ -5,6 +5,7 @@ import { ClientShell } from "@/components/client-shell";
 export const metadata: Metadata = {
   title: "d3ftly — Dashboard",
   description: "Manage your d3ftly settings and monitor runs",
+  icons: { icon: "/favicon.svg" },
 };
 
 export default function RootLayout({
