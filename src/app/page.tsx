@@ -234,7 +234,7 @@ export default function Home() {
             Turn a rough idea into an ordered set of executable GitHub issues.
           </p>
 
-          <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-surface-elevated">
+          <div className="mt-12 relative overflow-hidden rounded-2xl border border-purple-500/20 bg-surface-elevated">
             <div
               className="pointer-events-none absolute inset-0"
               style={{ background: "radial-gradient(ellipse at top left, #a855f715, transparent 60%)" }}
@@ -250,7 +250,6 @@ export default function Home() {
                       <path d="M19 3l.5 1.5L21 5l-1.5.5L19 7l-.5-1.5L17 5l1.5-.5z" />
                     </svg>
                   </div>
-                  <span className="rounded-full bg-purple-500/15 px-3 py-1 text-xs font-semibold text-purple-400">New</span>
                 </div>
                 <h3 className="mt-4 text-2xl font-bold">AI Plans</h3>
                 <p className="mt-3 text-text-secondary leading-relaxed">
