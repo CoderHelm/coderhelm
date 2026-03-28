@@ -68,6 +68,8 @@ export const api = {
   // Jira integration
   getJiraCheck: () => request<JiraCheck>("/api/integrations/jira/check"),
   validateJiraPayload: (payload: Record<string, unknown>) => request<JiraValidation>("/api/integrations/jira/check", { method: "POST", body: JSON.stringify(payload) }),
+  generateJiraSecret: () => request<{ secret: string }>("/api/integrations/jira/secret", { method: "POST" }),
+  deleteJiraSecret: () => request<void>("/api/integrations/jira/secret", { method: "DELETE" }),
 
   // Billing
   getBilling: () => request<BillingInfo>("/api/billing"),
@@ -271,17 +273,17 @@ export interface JiraCheck {
   ready: boolean;
   secret_configured: boolean;
   configured_repos: { total: number; enabled: number };
+  enabled_repos: string[];
   jira_events_seen: boolean;
-  recommended_flow: string;
+  installation_id: number;
+  tenant_id: string;
+  webhook_url: string;
   checklist: string[];
-  payload_template: Record<string, unknown>;
-  check_endpoint: string;
-  intake_endpoint: string;
 }
 
 export interface JiraValidation {
   valid: boolean;
-  errors: string[];
-  warnings: string[];
-  resolved: Record<string, string>;
+  missing: string[];
+  normalized_preview: Record<string, unknown>;
+  next_step: string;
 }
