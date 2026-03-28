@@ -1,34 +1,6 @@
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 
-const spotlightFeatures = [
-  {
-    accentColor: "#a855f7",
-    badge: "New",
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        <path d="M8 9h8M8 13h4" />
-      </svg>
-    ),
-    title: "AI Plans",
-    desc: "Describe a feature in plain English. d3ftly chats with you to scope the work, then generates an ordered list of GitHub issues — each one ready to become a PR with one click.",
-  },
-  {
-    accentColor: "#14b8a6",
-    badge: "New",
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="3" width="20" height="14" rx="2" />
-        <path d="M8 21h8M12 17v4" />
-        <path d="M7 8h2M11 8h6M7 11h4M15 11h2" />
-      </svg>
-    ),
-    title: "Infrastructure Analysis",
-    desc: "Scan your CDK or Terraform stacks and get a live architecture diagram plus a prioritized list of security, cost, and reliability findings — in seconds.",
-  },
-];
-
 const features = [
   {
     accentColor: "#00d4ff",
@@ -231,43 +203,160 @@ export default function Home() {
             Not a code suggestion tool — a full autonomous agent that ships code end-to-end.
           </p>
 
-          {/* Spotlight: new capabilities */}
-          <div className="mt-16 grid gap-6 sm:grid-cols-2">
-            {spotlightFeatures.map((f) => (
+          {/* Spotlight: new capabilities — full-width visual showcase cards */}
+          <div className="mt-16 space-y-6">
+
+            {/* AI Plans */}
+            <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-surface-elevated">
               <div
-                key={f.title}
-                className="relative overflow-hidden rounded-xl border p-8 transition-all"
-                style={{ borderColor: f.accentColor + "40" }}
-              >
-                {/* ambient glow */}
-                <div
-                  className="pointer-events-none absolute inset-0"
-                  style={{
-                    background: `radial-gradient(ellipse at top left, ${f.accentColor}12, transparent 65%)`,
-                  }}
-                />
-                <div className="relative">
-                  <span
-                    className="inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                    style={{ color: f.accentColor, backgroundColor: f.accentColor + "1a" }}
-                  >
-                    {f.badge}
+                className="pointer-events-none absolute inset-0"
+                style={{ background: "radial-gradient(ellipse at top left, #a855f715, transparent 60%)" }}
+              />
+              <div className="relative grid md:grid-cols-2">
+                {/* Text */}
+                <div className="flex flex-col justify-center p-8 md:p-10">
+                  <span className="inline-block w-fit rounded-full bg-purple-500/15 px-3 py-1 text-xs font-semibold text-purple-400">
+                    New
                   </span>
-                  <div
-                    className="mt-4 flex h-12 w-12 items-center justify-center rounded-xl border"
-                    style={{
-                      color: f.accentColor,
-                      backgroundColor: f.accentColor + "1a",
-                      borderColor: f.accentColor + "40",
-                    }}
-                  >
-                    {f.icon}
+                  <h3 className="mt-4 text-2xl font-bold">AI Plans</h3>
+                  <p className="mt-3 text-text-secondary leading-relaxed">
+                    Describe a feature in plain English. d3ftly chats with you to scope the work, then generates an ordered list of GitHub issues — each ready to become a PR with one click.
+                  </p>
+                  <ul className="mt-5 space-y-2 text-sm text-text-secondary">
+                    {[
+                      "Conversational scoping — it asks clarifying questions",
+                      "Ordered GitHub issues created automatically",
+                      "One-click Approve → Execute",
+                    ].map((t) => (
+                      <li key={t} className="flex items-start gap-2">
+                        <span className="mt-0.5 shrink-0 text-purple-400">✓</span>
+                        {t}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Visual mock — chat UI */}
+                <div className="flex items-center justify-center border-t border-purple-500/10 p-6 md:border-l md:border-t-0">
+                  <div className="w-full max-w-sm rounded-xl border border-[#21262d] bg-[#0d1117] p-5">
+                    <div className="mb-3 flex items-center gap-2 border-b border-[#21262d] pb-3">
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-purple-500/20 text-[9px] font-bold text-purple-400">P</div>
+                      <span className="text-[11px] font-semibold text-text-secondary">New Plan</span>
+                    </div>
+                    <div className="space-y-3">
+                      {/* User message */}
+                      <div className="flex justify-end">
+                        <div className="max-w-[80%] rounded-lg rounded-tr-none bg-purple-500/20 px-3 py-2 text-[11px] text-purple-200">
+                          Add OAuth login with GitHub and Google
+                        </div>
+                      </div>
+                      {/* Bot response */}
+                      <div className="flex gap-2">
+                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#00d4ff15] text-[9px] font-bold text-brand">d</div>
+                        <div className="rounded-lg rounded-tl-none border border-[#21262d] bg-[#161b22] px-3 py-2.5 text-[11px] text-text-secondary">
+                          <p className="mb-2 text-text-primary">I&apos;ll scope this as 4 tasks:</p>
+                          {[
+                            "#1 Add OAuth provider config",
+                            "#2 Build login / logout flow",
+                            "#3 Protect authenticated routes",
+                            "#4 Session management",
+                          ].map((t) => (
+                            <div key={t} className="flex items-center gap-1.5 text-[10px] leading-5">
+                              <span className="text-green-400">·</span>
+                              <span>{t}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    {/* Approve button */}
+                    <div className="mt-4 flex gap-2">
+                      <div className="flex-1 rounded-md border border-purple-500/30 bg-purple-500/10 py-1.5 text-center text-[10px] font-semibold text-purple-300">
+                        Approve Plan →
+                      </div>
+                      <div className="rounded-md border border-[#21262d] px-3 py-1.5 text-[10px] text-text-muted">
+                        Edit
+                      </div>
+                    </div>
                   </div>
-                  <h3 className="mt-4 text-xl font-bold">{f.title}</h3>
-                  <p className="mt-2 text-sm text-text-secondary leading-relaxed">{f.desc}</p>
                 </div>
               </div>
-            ))}
+            </div>
+
+            {/* Infrastructure Analysis */}
+            <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 bg-surface-elevated">
+              <div
+                className="pointer-events-none absolute inset-0"
+                style={{ background: "radial-gradient(ellipse at top right, #14b8a615, transparent 60%)" }}
+              />
+              <div className="relative grid md:grid-cols-2">
+                {/* Visual mock — diagram + findings */}
+                <div className="flex items-center justify-center border-b border-teal-500/10 p-6 md:border-b-0 md:border-r md:border-teal-500/10">
+                  <div className="w-full max-w-sm rounded-xl border border-[#21262d] bg-[#0d1117] p-5 text-xs">
+                    <div className="mb-3 flex items-center justify-between border-b border-[#21262d] pb-3">
+                      <span className="text-[11px] font-semibold text-text-secondary">ARCHITECTURE</span>
+                      <span className="rounded-full bg-teal-500/15 px-2 py-0.5 text-[9px] font-semibold text-teal-400">live</span>
+                    </div>
+                    {/* mini architecture diagram */}
+                    <div className="flex flex-col items-center gap-1 font-mono text-[10px]">
+                      <div className="rounded border border-[#21262d] bg-[#161b22] px-4 py-1.5 text-text-secondary">
+                        API Gateway
+                      </div>
+                      <div className="text-text-muted">│</div>
+                      <div className="flex gap-3">
+                        <div className="rounded border border-teal-500/30 bg-teal-500/10 px-3 py-1.5 text-teal-300">Lambda</div>
+                        <div className="rounded border border-teal-500/30 bg-teal-500/10 px-3 py-1.5 text-teal-300">Worker</div>
+                      </div>
+                      <div className="flex gap-8 text-text-muted">
+                        <span>│</span>
+                        <span>│</span>
+                      </div>
+                      <div className="rounded border border-[#21262d] bg-[#161b22] px-4 py-1.5 text-text-secondary">
+                        DynamoDB
+                      </div>
+                    </div>
+                    {/* findings */}
+                    <div className="mt-4 space-y-1.5 border-t border-[#21262d] pt-3">
+                      <p className="mb-2 text-[10px] font-semibold text-text-muted">FINDINGS</p>
+                      {[
+                        { icon: "⚠", color: "#f59e0b", text: "No VPC isolation on Lambda" },
+                        { icon: "⚠", color: "#f59e0b", text: "DynamoDB encryption not set" },
+                        { icon: "ℹ", color: "#3b82f6", text: "Consider reserved concurrency" },
+                      ].map((f) => (
+                        <div key={f.text} className="flex items-center gap-2 text-[10px]">
+                          <span style={{ color: f.color }}>{f.icon}</span>
+                          <span className="text-text-secondary">{f.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Text */}
+                <div className="flex flex-col justify-center p-8 md:p-10">
+                  <span className="inline-block w-fit rounded-full bg-teal-500/15 px-3 py-1 text-xs font-semibold text-teal-400">
+                    New
+                  </span>
+                  <h3 className="mt-4 text-2xl font-bold">Infrastructure Analysis</h3>
+                  <p className="mt-3 text-text-secondary leading-relaxed">
+                    Scan your CDK or Terraform stacks and get a live architecture diagram plus a prioritized list of security, cost, and reliability findings — in seconds.
+                  </p>
+                  <ul className="mt-5 space-y-2 text-sm text-text-secondary">
+                    {[
+                      "Live Mermaid architecture diagram",
+                      "Security, cost & reliability findings by severity",
+                      "Cached analysis — refresh on demand",
+                    ].map((t) => (
+                      <li key={t} className="flex items-start gap-2">
+                        <span className="mt-0.5 shrink-0 text-teal-400">✓</span>
+                        {t}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+
           </div>
 
           {/* Regular feature grid */}
