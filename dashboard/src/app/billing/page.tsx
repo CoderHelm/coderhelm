@@ -144,9 +144,35 @@ export default function BillingPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard label="Plan" value={canSubscribe ? "Free" : "Pro"} />
         <StatCard label="Status" value={isCancelling ? "Cancelling" : isCancelled ? "Cancelled" : billing.subscription_status || "free"} />
-        <StatCard label="Runs this month" value={billing.current_period.total_runs} />
-        <StatCard label="Cost this month" value={`$${billing.current_period.usage_cost.toFixed(2)}`} />
+        <StatCard label="Runs this month" value={`${billing.current_period.total_runs} / ${billing.limits.runs}`} />
+        <StatCard label="Plans this month" value={`${billing.current_period.total_plans} / ${billing.limits.plans}`} />
       </div>
+
+      {/* Usage meters */}
+      {isActive && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <UsageMeter
+            label="Runs"
+            used={billing.current_period.total_runs}
+            included={billing.limits.runs}
+            overageCents={billing.limits.overage_per_run_cents}
+          />
+          <UsageMeter
+            label="Plans"
+            used={billing.current_period.total_plans}
+            included={billing.limits.plans}
+            overageCents={billing.limits.overage_per_plan_cents}
+          />
+        </div>
+      )}
+
+      {/* Estimated overage */}
+      {isActive && billing.current_period.estimated_overage_cents > 0 && (
+        <div className="p-4 mb-6 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-yellow-400 text-sm">
+          Estimated overage this month: <span className="font-semibold">${(billing.current_period.estimated_overage_cents / 100).toFixed(2)}</span>
+          {" "}— this will be added to your next invoice.
+        </div>
+      )}
 
       {/* Past due warning */}
       {isPastDue && (
@@ -203,39 +229,18 @@ export default function BillingPage() {
         )}
       </div>
 
-      {/* Add-ons */}
+      {/* Pricing info */}
       <div className="mb-8 border border-zinc-800 rounded-lg p-4 bg-zinc-900/30">
-        <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-semibold text-zinc-100 mb-3">Pro — $199/mo includes</p>
+        <div className="grid grid-cols-2 gap-4 text-sm text-zinc-400">
           <div>
-            <p className="text-sm font-semibold text-zinc-100">Plans Add-on</p>
-            <p className="text-xs text-zinc-500 mt-1">
-              Unlock AI planning, task approval workflows, and plan execution.
-            </p>
+            <span className="text-zinc-200 font-medium">{billing.limits.runs}</span> runs/mo
+            <span className="text-zinc-600 ml-1">then ${(billing.limits.overage_per_run_cents / 100).toFixed(0)}/run</span>
           </div>
-          {isActive ? (
-            <span className="px-2 py-0.5 rounded-full text-[11px] border border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
-              Included in Pro
-            </span>
-          ) : (
-            <span className="px-2 py-0.5 rounded-full text-[11px] border border-yellow-500/30 text-yellow-400 bg-yellow-500/10">
-              Paid feature
-            </span>
-          )}
-        </div>
-        <div className="mt-3 flex items-center justify-between text-xs text-zinc-500">
-          <span>Price: $49/mo as standalone add-on (or included with Pro)</span>
-          <button
-            onClick={() => {
-              if (isActive) {
-                toast("Plans is included in your Pro subscription");
-              } else {
-                toast("Upgrade to Pro or contact support to enable standalone add-on");
-              }
-            }}
-            className="px-3 py-1.5 rounded-md border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
-          >
-            {isActive ? "Included" : "Enable add-on"}
-          </button>
+          <div>
+            <span className="text-zinc-200 font-medium">{billing.limits.plans}</span> plans/mo
+            <span className="text-zinc-600 ml-1">then ${(billing.limits.overage_per_plan_cents / 100).toFixed(0)}/plan</span>
+          </div>
         </div>
       </div>
 
@@ -412,6 +417,35 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
     <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg">
       <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">{label}</p>
       <p className="text-lg font-bold">{value}</p>
+    </div>
+  );
+}
+
+function UsageMeter({ label, used, included, overageCents }: { label: string; used: number; included: number; overageCents: number }) {
+  const pct = included > 0 ? Math.min((used / included) * 100, 100) : 0;
+  const over = Math.max(used - included, 0);
+  const isOver = used > included;
+
+  return (
+    <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm font-medium text-zinc-200">{label}</p>
+        <p className="text-xs text-zinc-500">
+          {used} / {included}
+          {isOver && <span className="text-yellow-400 ml-1">(+{over} overage)</span>}
+        </p>
+      </div>
+      <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${isOver ? "bg-yellow-500" : pct > 80 ? "bg-orange-500" : "bg-emerald-500"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      {isOver && (
+        <p className="text-xs text-yellow-400/70 mt-1.5">
+          +${((over * overageCents) / 100).toFixed(2)} overage
+        </p>
+      )}
     </div>
   );
 }
