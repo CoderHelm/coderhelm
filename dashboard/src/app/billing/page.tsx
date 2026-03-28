@@ -237,7 +237,7 @@ export default function BillingPage() {
             <span className="text-zinc-600 ml-1">then ${(billing.limits.overage_per_1k_tokens_cents / 100).toFixed(2)}/1K tokens</span>
           </div>
           <div>
-            <span className="text-zinc-200 font-medium">Unlimited</span> AI plans
+            <span className="text-zinc-200 font-medium">Unlimited</span> plans (no count limit)
           </div>
         </div>
       </div>
