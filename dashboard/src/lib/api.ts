@@ -205,6 +205,7 @@ export interface Task {
   acceptance_criteria: string;
   status: "draft" | "approved" | "rejected" | "queued" | "running" | "done" | string;
   order: number;
+  repo?: string;
   issue_number?: number;
   issue_url?: string;
   run_id?: string;
