@@ -249,7 +249,6 @@ function WebhookTab({ check, setCheck, secret, generatingSecret, generateSecret,
         </p>
       </Step>
 
-      <TestPayload toast={toast} />
     </div>
   );
 }
@@ -268,55 +267,4 @@ function Step({ number, title, children }: { number: number; title: string; chil
   );
 }
 
-function TestPayload({ toast }: { toast: (msg: string, type?: "error" | "success") => void }) {
-  const [payload, setPayload] = useState("");
-  const [testing, setTesting] = useState(false);
-  const [result, setResult] = useState<{ valid: boolean; missing: string[]; next_step: string } | null>(null);
 
-  const test = async () => {
-    setTesting(true);
-    setResult(null);
-    try {
-      const parsed = JSON.parse(payload);
-      const res = await api.validateJiraPayload(parsed);
-      setResult(res);
-    } catch {
-      toast("Invalid JSON payload", "error");
-    }
-    setTesting(false);
-  };
-
-  return (
-    <div className="border border-zinc-800 rounded-lg p-4 bg-zinc-900/30">
-      <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3">Test your payload</h3>
-      <textarea
-        value={payload}
-        onChange={(e) => setPayload(e.target.value)}
-        rows={6}
-        placeholder='Paste your Jira automation payload JSON here...'
-        className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 font-mono placeholder-zinc-700 focus:outline-none focus:border-zinc-500 resize-y mb-3"
-      />
-      <button
-        onClick={test}
-        disabled={testing || !payload.trim()}
-        className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 transition-colors"
-      >
-        {testing ? "Validating..." : "Validate payload"}
-      </button>
-
-      {result && (
-        <div className={`mt-3 p-3 rounded-lg border text-sm ${
-          result.valid
-            ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-400"
-            : "bg-red-500/5 border-red-500/20 text-red-400"
-        }`}>
-          <p className="font-medium mb-1">{result.valid ? "✓ Payload is valid" : "✗ Payload has issues"}</p>
-          {result.missing.map((m, i) => (
-            <p key={i} className="text-xs text-red-400">Missing: {m}</p>
-          ))}
-          <p className="text-xs text-zinc-400 mt-1">{result.next_step}</p>
-        </div>
-      )}
-    </div>
-  );
-}

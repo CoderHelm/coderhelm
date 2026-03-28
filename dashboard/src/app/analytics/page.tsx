@@ -120,7 +120,7 @@ function groupRunsByDay(runs: Run[], range: Range): { label: string; completed: 
 
   // Fill in all days in the range so x-axis has a tick per day
   const days: string[] = [];
-  const numDays = range === "7d" ? 7 : 30;
+  const numDays = range === "7d" ? 7 : range === "month" ? new Date().getDate() : 30;
   const now = new Date();
   for (let i = numDays - 1; i >= 0; i--) {
     const d = new Date(now.getTime() - i * 86_400_000);
@@ -168,7 +168,7 @@ export default function AnalyticsPage() {
     return statsFromRuns(filteredRuns);
   }, [range, stats, filteredRuns]);
 
-  const useDaily = range === "7d" || range === "30d";
+  const useDaily = range === "7d" || range === "30d" || range === "month";
   const chartData = useMemo(() => {
     if (useDaily) return groupRunsByDay(filteredRuns, range);
     return history.map((m) => ({
