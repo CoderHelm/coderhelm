@@ -1,5 +1,6 @@
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
+import MermaidDiagram from "@/components/MermaidDiagram";
 
 const features = [
   {
@@ -92,6 +93,31 @@ const steps = [
     desc: "d3ftly opens a draft PR, runs CI, and marks it ready when checks pass. Review, comment, merge.",
   },
 ];
+
+const infraMermaid = `architecture-beta
+  group edge(logos:aws-cloudfront)[Edge]
+  group compute(logos:aws-lambda)[Compute]
+  group data(logos:aws-dynamodb)[Data]
+  group async(logos:aws-sqs)[Queues]
+
+  service dns(logos:aws-route53)[Route 53] in edge
+  service cdn(logos:aws-cloudfront)[CloudFront] in edge
+  service api(logos:aws-api-gateway)[API Gateway] in compute
+  service gw(logos:aws-lambda)[Gateway Lambda] in compute
+  service wk(logos:aws-lambda)[Worker Lambda] in compute
+  service db(logos:aws-dynamodb)[DynamoDB] in data
+  service s3(logos:aws-s3)[Artifacts S3] in data
+  service q(logos:aws-sqs)[Ticket Queue] in async
+  service dlq(logos:aws-sqs)[DLQ] in async
+
+  dns:R --> L:cdn
+  cdn:R --> L:api
+  api:R --> L:gw
+  gw:R --> L:db
+  gw:B --> T:q
+  q:R --> L:wk
+  wk:R --> L:s3
+  wk:B --> T:dlq`;
 
 export default function Home() {
   return (
@@ -199,6 +225,11 @@ export default function Home() {
       {/* AI Plans */}
       <section className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-6xl px-6">
+          <h2 className="text-center text-3xl font-bold sm:text-4xl">AI Plans</h2>
+          <p className="mx-auto mt-4 max-w-xl text-center text-text-secondary">
+            Turn a rough idea into an ordered set of executable GitHub issues.
+          </p>
+
           <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-surface-elevated">
             <div
               className="pointer-events-none absolute inset-0"
@@ -275,6 +306,11 @@ export default function Home() {
       {/* Infrastructure Analysis */}
       <section className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-6xl px-6">
+          <h2 className="text-center text-3xl font-bold sm:text-4xl">Infrastructure Analysis</h2>
+          <p className="mx-auto mt-4 max-w-xl text-center text-text-secondary">
+            Visualize architecture and surface security, cost, and reliability risks fast.
+          </p>
+
           <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 bg-surface-elevated">
             <div
               className="pointer-events-none absolute inset-0"
@@ -287,32 +323,7 @@ export default function Home() {
                     <span className="text-[11px] font-semibold text-text-secondary">ARCHITECTURE (MERMAID)</span>
                     <span className="rounded-full bg-teal-500/15 px-2 py-0.5 text-[9px] font-semibold text-teal-400">live</span>
                   </div>
-                  <pre className="overflow-x-auto text-[10px] leading-5 text-teal-100/90">
-                    <code>{`architecture-beta
-    group edge(logos:aws-cloudfront)[Edge]
-    group compute(logos:aws-lambda)[Compute]
-    group data(logos:aws-dynamodb)[Data]
-    group async(logos:aws-sqs)[Queues]
-
-    service dns(logos:aws-route53)[Route 53] in edge
-    service cdn(logos:aws-cloudfront)[CloudFront] in edge
-    service api(logos:aws-api-gateway)[API Gateway] in compute
-    service gw(logos:aws-lambda)[Gateway Lambda] in compute
-    service wk(logos:aws-lambda)[Worker Lambda] in compute
-    service db(logos:aws-dynamodb)[DynamoDB] in data
-    service s3(logos:aws-s3)[Artifacts S3] in data
-    service q(logos:aws-sqs)[Ticket Queue] in async
-    service dlq(logos:aws-sqs)[DLQ] in async
-
-    dns:R --> L:cdn
-    cdn:R --> L:api
-    api:R --> L:gw
-    gw:R --> L:db
-    gw:B --> T:q
-    q:R --> L:wk
-    wk:R --> L:s3
-    wk:B --> T:dlq`}</code>
-                  </pre>
+                  <MermaidDiagram chart={infraMermaid} className="overflow-x-auto rounded-md bg-[#0b0f14] p-2" />
                   <div className="mt-4 space-y-1.5 border-t border-[#21262d] pt-3">
                     <p className="mb-2 text-[10px] font-semibold text-text-muted">FINDINGS</p>
                     {[
