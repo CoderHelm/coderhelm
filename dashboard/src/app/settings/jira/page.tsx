@@ -146,28 +146,13 @@ function ForgeAppTab({ check, copy, copied }: { check: JiraCheck | null; copy: (
           </a>
         </Step>
 
-        <Step number={2} title="Paste your Installation ID in Jira">
-          <p className="text-zinc-400 text-sm mb-2">
-            After installing, go to <strong className="text-zinc-200">Jira → Apps → d3ftly Settings</strong> and paste this ID:
-          </p>
-          <div className="flex items-center gap-2">
-            <code className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-emerald-400 font-mono text-sm">{check?.installation_id ?? "—"}</code>
-            <button
-              onClick={() => copy(String(check?.installation_id ?? ""), "installId")}
-              className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
-            >
-              {copied === "installId" ? "Copied!" : "Copy"}
-            </button>
-          </div>
-        </Step>
-
-        <Step number={3} title="Label and assign">
+        <Step number={2} title="Label and assign">
           <p className="text-zinc-400 text-sm">
             Add a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">d3ftly</code> label to any Jira issue, then assign it. d3ftly picks the right repo automatically based on the ticket.
           </p>
         </Step>
 
-        <Step number={4} title="Check the Runs page">
+        <Step number={3} title="Check the Runs page">
           <p className="text-zinc-400 text-sm">
             A new run should appear within a minute. d3ftly creates a branch, implements the change, and opens a draft PR.
           </p>
@@ -190,21 +175,6 @@ interface WebhookTabProps {
 }
 
 function WebhookTab({ check, setCheck, secret, generatingSecret, generateSecret, deleteSecret, copy, copied, toast }: WebhookTabProps) {
-  const payloadTemplate = JSON.stringify(
-    {
-      installation_id: check?.installation_id ?? 0,
-      issue: {
-        key: "{{issue.key}}",
-        fields: {
-          summary: "{{issue.summary}}",
-          description: "{{issue.description}}",
-        },
-      },
-    },
-    null,
-    2,
-  );
-
   return (
     <div className="space-y-6 mb-8">
       <p className="text-zinc-400 text-sm">
@@ -273,24 +243,7 @@ function WebhookTab({ check, setCheck, secret, generatingSecret, generateSecret,
         </div>
       </Step>
 
-      <Step number={4} title="Set the JSON payload">
-        <p className="text-zinc-400 text-sm mb-2">
-          d3ftly auto-resolves the repo from the ticket context.
-        </p>
-        <div className="relative">
-          <pre className="px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300 font-mono overflow-x-auto whitespace-pre">
-            {payloadTemplate}
-          </pre>
-          <button
-            onClick={() => copy(payloadTemplate, "payload")}
-            className="absolute top-2 right-2 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
-          >
-            {copied === "payload" ? "Copied!" : "Copy"}
-          </button>
-        </div>
-      </Step>
-
-      <Step number={5} title="Enable and test">
+      <Step number={4} title="Enable and test">
         <p className="text-zinc-400 text-sm">
           Save the rule, create a test issue, and check the Runs page.
         </p>
