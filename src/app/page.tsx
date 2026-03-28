@@ -33,7 +33,7 @@ const features = [
       </svg>
     ),
     title: "Guardrails",
-    desc: "Define must-rules like \"never push to main\" or \"always add tests\". d3ftly enforces them on every run.",
+    desc: "d3ftly never pushes to main — that's built in. Add your own must-rules like \"always add tests\" or \"never delete migrations\". Enforced on every run.",
   },
   {
     icon: (
