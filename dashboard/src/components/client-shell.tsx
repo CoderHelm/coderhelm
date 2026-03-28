@@ -142,6 +142,7 @@ function Sidebar({
                   <Link
                     key={item.href}
                     href={item.href}
+                    prefetch={false}
                     className={`flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors ${
                       isActive(item.href)
                         ? "text-zinc-100 bg-zinc-800"
