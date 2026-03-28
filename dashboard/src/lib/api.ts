@@ -50,6 +50,7 @@ export const api = {
   updateRepoVoice: (repo: string, content: string) => request<void>(`/api/voice/repo/${repo}`, { method: "PUT", body: JSON.stringify({ content }) }),
 
   // Agents
+  getGlobalAgents: () => request<{ content: string }>("/api/agents/global"),
   getRepoAgents: (repo: string) => request<{ content: string }>(`/api/agents/repo/${repo}`),
   updateRepoAgents: (repo: string, content: string) => request<void>(`/api/agents/repo/${repo}`, { method: "PUT", body: JSON.stringify({ content }) }),
 
