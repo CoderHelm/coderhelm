@@ -26,6 +26,8 @@ export default function InstructionsPage() {
   const [globalContent, setGlobalContent] = useState("");
   const [globalLoading, setGlobalLoading] = useState(true);
   const [globalSaving, setGlobalSaving] = useState(false);
+  const [globalGenerated, setGlobalGenerated] = useState("");
+  const [globalGeneratedExpanded, setGlobalGeneratedExpanded] = useState(false);
 
   const [repos, setRepos] = useState<Repo[]>([]);
   const [selectedRepo, setSelectedRepo] = useState("");
@@ -36,8 +38,12 @@ export default function InstructionsPage() {
   const [generatedExpanded, setGeneratedExpanded] = useState(false);
 
   useEffect(() => {
-    api.getGlobalInstructions().then((data) => {
-      setGlobalContent(data.content);
+    Promise.all([
+      api.getGlobalInstructions().then((d) => d.content).catch(() => ""),
+      api.getGlobalAgents().then((d) => d.content).catch(() => ""),
+    ]).then(([custom, generated]) => {
+      setGlobalContent(custom);
+      setGlobalGenerated(generated);
       setGlobalLoading(false);
     }).catch(() => setGlobalLoading(false));
 
@@ -105,6 +111,26 @@ export default function InstructionsPage() {
       {tab === "global" ? (
         globalLoading ? <TextareaSkeleton /> : (
           <>
+            {globalGenerated && (
+              <div className="mb-4 border border-zinc-800 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setGlobalGeneratedExpanded(!globalGeneratedExpanded)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-zinc-900/50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">Generated</span>
+                    <span className="text-sm text-zinc-300">Organization overview</span>
+                  </div>
+                  <span className="text-zinc-600 text-xs">{globalGeneratedExpanded ? "Collapse" : "Expand"}</span>
+                </button>
+                {globalGeneratedExpanded && (
+                  <pre className="px-4 py-3 border-t border-zinc-800 bg-zinc-950 text-xs text-zinc-400 font-mono whitespace-pre-wrap leading-relaxed max-h-96 overflow-auto">
+                    {globalGenerated}
+                  </pre>
+                )}
+              </div>
+            )}
+            <p className="text-xs text-zinc-600 mb-2">Custom instructions (optional)</p>
             <textarea
               value={globalContent}
               onChange={(e) => setGlobalContent(e.target.value)}
