@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { api, type Repo } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { TextareaSkeleton } from "@/components/skeleton";
+import { RepoCombobox } from "@/components/repo-combobox";
 
 export default function VoicePage() {
   const [repos, setRepos] = useState<Repo[]>([]);
@@ -11,6 +12,7 @@ export default function VoicePage() {
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [regenerating, setRegenerating] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -48,6 +50,26 @@ export default function VoicePage() {
     setSaving(false);
   };
 
+  const regenerate = async () => {
+    if (!selectedRepo) return;
+    if (!confirm("This will re-analyze your repo and regenerate the voice profile. Your edits will be replaced. Continue?")) return;
+    setRegenerating(true);
+    try {
+      await api.regenerateRepo(selectedRepo);
+      toast("Regeneration started — this may take a minute");
+      setTimeout(async () => {
+        try {
+          const data = await api.getRepoVoice(selectedRepo);
+          setContent(data.content);
+        } catch { /* ignore */ }
+        setRegenerating(false);
+      }, 15000);
+    } catch {
+      toast("Failed to start regeneration", "error");
+      setRegenerating(false);
+    }
+  };
+
   return (
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-2">Team Voice</h1>
@@ -56,7 +78,7 @@ export default function VoicePage() {
         This is auto-generated during onboarding by analyzing your team&apos;s existing PRs and commits — but you can edit it anytime.
       </p>
 
-      {repos.length > 1 && (
+      {repos.length > 0 && (
         <RepoCombobox
           repos={repos}
           selected={selectedRepo}
@@ -83,95 +105,16 @@ export default function VoicePage() {
             >
               {saving ? "Saving..." : "Save"}
             </button>
-            <span className="text-xs text-zinc-600">Markdown format. Applied to PR description pass.</span>
+            <button
+              onClick={regenerate}
+              disabled={regenerating}
+              className="px-4 py-2 bg-zinc-800 text-zinc-300 rounded-lg text-sm font-medium hover:bg-zinc-700 disabled:opacity-50 transition-colors border border-zinc-700"
+            >
+              {regenerating ? "Regenerating..." : "Regenerate"}
+            </button>
+            <span className="text-xs text-zinc-600">Applied to PR description pass.</span>
           </div>
         </>
-      )}
-    </div>
-  );
-}
-
-function RepoCombobox({
-  repos,
-  selected,
-  onSelect,
-}: {
-  repos: Repo[];
-  selected: string;
-  onSelect: (name: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const filtered = repos.filter((r) =>
-    r.name.toLowerCase().includes(search.toLowerCase())
-  );
-  const display = filtered.slice(0, 50);
-
-  return (
-    <div ref={ref} className="relative mb-4">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 hover:border-zinc-500 transition-colors"
-      >
-        <span className="font-mono truncate">{selected || "Select repo..."}</span>
-        <svg className={`w-4 h-4 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="absolute z-50 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden">
-          <div className="p-2 border-b border-zinc-800">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search repos..."
-              autoFocus
-              className="w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
-            />
-          </div>
-          <div className="max-h-60 overflow-y-auto">
-            {display.length === 0 ? (
-              <p className="px-3 py-2 text-sm text-zinc-500">No repos found</p>
-            ) : (
-              display.map((r) => (
-                <button
-                  key={r.name}
-                  type="button"
-                  onClick={() => {
-                    onSelect(r.name);
-                    setOpen(false);
-                    setSearch("");
-                  }}
-                  className={`w-full text-left px-3 py-2 text-sm transition-colors ${
-                    r.name === selected
-                      ? "bg-zinc-800 text-zinc-100"
-                      : "text-zinc-300 hover:bg-zinc-800/50"
-                  }`}
-                >
-                  <span className="font-mono">{r.name}</span>
-                </button>
-              ))
-            )}
-            {filtered.length > 50 && (
-              <p className="px-3 py-2 text-xs text-zinc-600 border-t border-zinc-800">
-                {filtered.length - 50} more — type to narrow results
-              </p>
-            )}
-          </div>
-        </div>
       )}
     </div>
   );
