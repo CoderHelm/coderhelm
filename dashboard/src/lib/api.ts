@@ -145,10 +145,18 @@ export interface BillingInfo {
   last_failure_reason: string | null;
   access_until: string | null;
   cancelled_at: string | null;
+  limits: {
+    runs: number;
+    plans: number;
+    overage_per_run_cents: number;
+    overage_per_plan_cents: number;
+  };
   current_period: {
     month: string;
     usage_cost: number;
     total_runs: number;
+    total_plans: number;
+    estimated_overage_cents: number;
   };
   recent_payments: Payment[];
 }
