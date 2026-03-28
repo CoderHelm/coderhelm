@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export const metadata = {
   title: "Terms of Service — d3ftly",
 };
@@ -86,7 +88,7 @@ export default function Terms() {
       <h2>6. Pricing, Payment &amp; Billing</h2>
       <h3>6.1 Plans</h3>
       <p>The Service offers a free tier with 5 runs per month and a paid Pro plan with
-        100 runs per month. Current pricing is displayed on the <a href="/#pricing">pricing page</a>.</p>
+        100 runs per month. Current pricing is displayed on the <Link href="/#pricing">pricing page</Link>.</p>
       <h3>6.2 Billing</h3>
       <p>Paid plans are billed monthly in advance via Stripe. By subscribing, you authorize us
         to charge the payment method on file for recurring monthly fees until you cancel.</p>
