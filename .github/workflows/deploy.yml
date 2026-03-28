@@ -43,16 +43,6 @@ jobs:
           role-to-assume: arn:aws:iam::654654210434:role/d3ftly-github-deploy
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Cleanup orphaned app bucket (one-time)
-        run: |
-          if aws s3api head-bucket --bucket d3ftly-prod-app 2>/dev/null; then
-            aws s3 rm s3://d3ftly-prod-app --recursive
-            aws s3api delete-bucket --bucket d3ftly-prod-app --region us-east-1
-            echo "Deleted orphaned bucket d3ftly-prod-app"
-          else
-            echo "Bucket d3ftly-prod-app not found, skipping"
-          fi
-
       - working-directory: infra
         run: npm ci
       - working-directory: infra
