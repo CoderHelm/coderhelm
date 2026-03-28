@@ -109,7 +109,7 @@ function filterRunsByRange(runs: Run[], range: Range): Run[] {
   return runs.filter((r) => new Date(r.created_at) >= cutoff);
 }
 
-function groupRunsByDay(runs: Run[]): { label: string; completed: number; failed: number; total_tokens_in: number; total_tokens_out: number; merge_rate: number }[] {
+function groupRunsByDay(runs: Run[], range: Range): { label: string; completed: number; failed: number; total_tokens_in: number; total_tokens_out: number; merge_rate: number }[] {
   const map = new Map<string, Run[]>();
   for (const r of runs) {
     const day = r.created_at.slice(0, 10);
@@ -117,21 +117,30 @@ function groupRunsByDay(runs: Run[]): { label: string; completed: number; failed
     arr.push(r);
     map.set(day, arr);
   }
-  return Array.from(map.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([day, dayRuns]) => {
-      const completed = dayRuns.filter((r) => r.status === "completed" || r.status === "merged").length;
-      const failed = dayRuns.filter((r) => r.status === "failed" || r.status === "error").length;
-      const total = dayRuns.length;
-      return {
-        label: new Date(day + "T00:00:00").toLocaleDateString("en", { month: "short", day: "numeric" }),
-        completed,
-        failed,
-        total_tokens_in: dayRuns.reduce((s, r) => s + (r.tokens_in ?? 0), 0),
-        total_tokens_out: dayRuns.reduce((s, r) => s + (r.tokens_out ?? 0), 0),
-        merge_rate: total > 0 ? (completed / total) * 100 : 0,
-      };
-    });
+
+  // Fill in all days in the range so x-axis has a tick per day
+  const days: string[] = [];
+  const numDays = range === "7d" ? 7 : 30;
+  const now = new Date();
+  for (let i = numDays - 1; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 86_400_000);
+    days.push(d.toISOString().slice(0, 10));
+  }
+
+  return days.map((day) => {
+    const dayRuns = map.get(day) ?? [];
+    const completed = dayRuns.filter((r) => r.status === "completed" || r.status === "merged").length;
+    const failed = dayRuns.filter((r) => r.status === "failed" || r.status === "error").length;
+    const total = dayRuns.length;
+    return {
+      label: new Date(day + "T00:00:00").toLocaleDateString("en", { month: "short", day: "numeric" }),
+      completed,
+      failed,
+      total_tokens_in: dayRuns.reduce((s, r) => s + (r.tokens_in ?? 0), 0),
+      total_tokens_out: dayRuns.reduce((s, r) => s + (r.tokens_out ?? 0), 0),
+      merge_rate: total > 0 ? (completed / total) * 100 : 0,
+    };
+  });
 }
 
 export default function AnalyticsPage() {
@@ -161,7 +170,7 @@ export default function AnalyticsPage() {
 
   const useDaily = range === "7d" || range === "30d";
   const chartData = useMemo(() => {
-    if (useDaily) return groupRunsByDay(filteredRuns);
+    if (useDaily) return groupRunsByDay(filteredRuns, range);
     return history.map((m) => ({
       ...m,
       label: new Date(m.period + "-01").toLocaleDateString("en", { month: "short" }),
@@ -219,7 +228,7 @@ export default function AnalyticsPage() {
             <BarChart data={chartData} barGap={2}>
               <GradientDefs />
               <CartesianGrid vertical={false} stroke="#27272a" strokeDasharray="3 3" />
-              <XAxis dataKey="label" {...axisProps} />
+              <XAxis dataKey="label" {...axisProps} interval={range === "7d" ? 0 : "preserveStartEnd"} />
               <YAxis {...axisProps} allowDecimals={false} width={32} />
               <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
               <Bar dataKey="completed" name="Completed" fill={COLORS.green.stroke} radius={[4, 4, 0, 0]} maxBarSize={28} />
@@ -234,7 +243,7 @@ export default function AnalyticsPage() {
             <AreaChart data={chartData}>
               <GradientDefs />
               <CartesianGrid vertical={false} stroke="#27272a" strokeDasharray="3 3" />
-              <XAxis dataKey="label" {...axisProps} />
+              <XAxis dataKey="label" {...axisProps} interval={range === "7d" ? 0 : "preserveStartEnd"} />
               <YAxis {...axisProps} width={40} tickFormatter={formatNumber} />
               <Tooltip content={<ChartTooltip formatter={(v: number) => formatNumber(v)} />} cursor={{ stroke: "#3f3f46" }} />
               <Area type="monotone" dataKey="total_tokens_in" name="Input" stroke={COLORS.blue.stroke} fill={COLORS.blue.fill} strokeWidth={2} stackId="tokens" />
@@ -249,7 +258,7 @@ export default function AnalyticsPage() {
             <AreaChart data={chartData}>
               <GradientDefs />
               <CartesianGrid vertical={false} stroke="#27272a" strokeDasharray="3 3" />
-              <XAxis dataKey="label" {...axisProps} />
+              <XAxis dataKey="label" {...axisProps} interval={range === "7d" ? 0 : "preserveStartEnd"} />
               <YAxis {...axisProps} width={36} domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} />
               <Tooltip content={<ChartTooltip formatter={(v: number) => `${v.toFixed(0)}%`} />} cursor={{ stroke: "#3f3f46" }} />
               <Area type="monotone" dataKey="merge_rate" name="Merge rate" stroke={COLORS.green.stroke} fill={COLORS.green.fill} strokeWidth={2} />
