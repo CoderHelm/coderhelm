@@ -109,6 +109,9 @@ export default function VoicePage() {
     });
   }, [selectedRepo]);
 
+  const selectedRepoData = repos.find((r) => r.name === selectedRepo);
+  const isGenerating = selectedRepoData?.onboard_status === "pending" && !repoContent;
+
   const saveGlobal = async () => {
     setGlobalSaving(true);
     try {
@@ -178,15 +181,37 @@ export default function VoicePage() {
       ) : (
         <>
           <RepoCombobox repos={repos} selected={selectedRepo} onSelect={setSelectedRepo} />
-          <VoiceEditor
-            content={repoContent}
-            setContent={setRepoContent}
-            saving={repoSaving}
-            onSave={saveRepo}
-            regenerating={regenerating}
-            onRegenerate={regenerate}
-            loading={repoLoading}
-          />
+          {isGenerating ? (
+            <div className="flex flex-col items-center justify-center py-16 border border-zinc-800 rounded-lg">
+              <div className="w-6 h-6 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin mb-3" />
+              <p className="text-zinc-400 text-sm">Generating voice profile...</p>
+              <p className="text-zinc-600 text-xs mt-1">Analyzing PRs and commits for communication patterns</p>
+            </div>
+          ) : selectedRepoData?.onboard_status === "failed" && !repoContent ? (
+            <div className="border border-red-500/20 bg-red-500/5 rounded-lg p-4">
+              <p className="text-red-400 text-sm font-medium">Voice generation failed</p>
+              {selectedRepoData.onboard_error && (
+                <p className="text-red-400/70 text-xs mt-1">{selectedRepoData.onboard_error.slice(0, 200)}</p>
+              )}
+              <button
+                onClick={regenerate}
+                disabled={regenerating}
+                className="mt-3 px-3 py-1.5 bg-zinc-800 text-zinc-300 rounded-lg text-sm hover:bg-zinc-700 transition-colors border border-zinc-700"
+              >
+                Retry
+              </button>
+            </div>
+          ) : (
+            <VoiceEditor
+              content={repoContent}
+              setContent={setRepoContent}
+              saving={repoSaving}
+              onSave={saveRepo}
+              regenerating={regenerating}
+              onRegenerate={regenerate}
+              loading={repoLoading}
+            />
+          )}
         </>
       )}
     </div>

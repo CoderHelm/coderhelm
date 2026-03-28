@@ -74,7 +74,7 @@ function InfrastructureContent() {
     setRefreshing(true);
     try {
       await api.refreshInfrastructure();
-      setAnalysis((prev) => prev ? { ...prev, status: "pending" } : null);
+      setAnalysis((prev) => prev ? { ...prev, status: "pending", error: undefined } : null);
       toast("Analysis started — this takes about 30 seconds");
     } catch {
       toast("Failed to start analysis", "error");
@@ -167,6 +167,39 @@ function InfrastructureContent() {
           <div className="w-8 h-8 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin mb-4" />
           <p className="text-zinc-400 text-sm">Analyzing your infrastructure...</p>
           <p className="text-zinc-600 text-xs mt-1">Scanning repos for CDK/Terraform/Serverless code and generating diagram</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Failed analysis
+  if (analysis.status === "failed") {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">Infrastructure</h1>
+            <p className="text-zinc-500 text-sm mt-1">Architecture diagram and analysis of your connected repos</p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="px-4 py-2 text-sm border border-zinc-700 rounded-lg text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors disabled:opacity-50"
+          >
+            {refreshing ? "Retrying..." : "Retry"}
+          </button>
+        </div>
+        <div className="max-w-xl mx-auto mt-16 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4 text-2xl">✕</div>
+          <h2 className="text-lg font-semibold text-red-400 mb-2">Analysis failed</h2>
+          <p className="text-zinc-500 text-sm mb-2">
+            Something went wrong while scanning your infrastructure code.
+          </p>
+          {analysis.error && (
+            <p className="text-red-400/70 text-xs font-mono bg-zinc-900 border border-zinc-800 rounded-lg p-3 inline-block max-w-md">
+              {analysis.error.slice(0, 300)}
+            </p>
+          )}
         </div>
       </div>
     );

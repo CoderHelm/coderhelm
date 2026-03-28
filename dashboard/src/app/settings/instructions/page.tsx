@@ -58,6 +58,9 @@ export default function InstructionsPage() {
     });
   }, [selectedRepo]);
 
+  const selectedRepoData = repos.find((r) => r.name === selectedRepo);
+  const isGenerating = selectedRepoData?.onboard_status === "pending" && !repoContent;
+
   const saveGlobal = async () => {
     setGlobalSaving(true);
     try {
@@ -121,7 +124,20 @@ export default function InstructionsPage() {
       ) : (
         <>
           <RepoCombobox repos={repos} selected={selectedRepo} onSelect={setSelectedRepo} />
-          {repoLoading ? <TextareaSkeleton /> : (
+          {isGenerating ? (
+            <div className="flex flex-col items-center justify-center py-16 border border-zinc-800 rounded-lg">
+              <div className="w-6 h-6 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin mb-3" />
+              <p className="text-zinc-400 text-sm">Generating repo instructions...</p>
+              <p className="text-zinc-600 text-xs mt-1">Analyzing repository structure and conventions</p>
+            </div>
+          ) : selectedRepoData?.onboard_status === "failed" && !repoContent ? (
+            <div className="border border-red-500/20 bg-red-500/5 rounded-lg p-4">
+              <p className="text-red-400 text-sm font-medium">Instruction generation failed</p>
+              {selectedRepoData.onboard_error && (
+                <p className="text-red-400/70 text-xs mt-1">{selectedRepoData.onboard_error.slice(0, 200)}</p>
+              )}
+            </div>
+          ) : repoLoading ? <TextareaSkeleton /> : (
             <>
               <textarea
                 value={repoContent}

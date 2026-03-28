@@ -21,11 +21,20 @@ export default function ReposPage() {
     }).catch(() => setLoading(false));
   }, []);
 
+  // Poll while any repo is pending
+  useEffect(() => {
+    if (!repos.some((r) => r.onboard_status === "pending")) return;
+    const timer = setInterval(() => {
+      api.listRepos().then((data) => setRepos(data.repos)).catch(() => {});
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [repos]);
+
   const handleToggle = async (repo: Repo) => {
     setToggling(repo.name);
     try {
       await api.toggleRepo(repo.name, !repo.enabled);
-      setRepos((prev) => prev.map((r) => r.name === repo.name ? { ...r, enabled: !r.enabled } : r));
+      setRepos((prev) => prev.map((r) => r.name === repo.name ? { ...r, enabled: !r.enabled, onboard_status: !repo.enabled ? "pending" : undefined } : r));
     } catch { /* ignore */ }
     setToggling(null);
   };
@@ -112,6 +121,20 @@ export default function ReposPage() {
                   </button>
                   <div className="min-w-0">
                     <span className="text-sm font-mono text-zinc-200 truncate block">{repo.name}</span>
+                    {repo.enabled && repo.onboard_status === "pending" && (
+                      <span className="text-[11px] text-yellow-400/80 flex items-center gap-1 mt-0.5">
+                        <span className="inline-block w-3 h-3 border border-yellow-400/60 border-t-yellow-300 rounded-full animate-spin" />
+                        Analyzing...
+                      </span>
+                    )}
+                    {repo.enabled && repo.onboard_status === "failed" && (
+                      <span className="text-[11px] text-red-400 mt-0.5 block" title={repo.onboard_error}>
+                        ✕ Analysis failed{repo.onboard_error ? `: ${repo.onboard_error.slice(0, 80)}` : ""}
+                      </span>
+                    )}
+                    {repo.enabled && repo.onboard_status === "ready" && (
+                      <span className="text-[11px] text-green-400/70 mt-0.5 block">✓ Ready</span>
+                    )}
                   </div>
                 </div>
                 <button
