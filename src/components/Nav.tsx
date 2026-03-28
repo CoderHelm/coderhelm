@@ -10,7 +10,7 @@ export default function Nav() {
     <nav className="fixed top-0 z-50 w-full border-b border-surface-border bg-surface/80 backdrop-blur-lg">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
         <Link href="/" className="flex items-center gap-2 text-lg font-bold">
-          <span className="gradient-text">///</span>
+          <span className="gradient-text">{"///"}</span>
           <span>d3ftly</span>
         </Link>
 

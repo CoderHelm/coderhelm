@@ -7,7 +7,7 @@ export default function Footer() {
         <div className="grid gap-8 md:grid-cols-4">
           <div>
             <div className="flex items-center gap-2 text-lg font-bold">
-              <span className="gradient-text">///</span>
+              <span className="gradient-text">{"///"}</span>
               <span>d3ftly</span>
             </div>
             <p className="mt-3 text-sm text-text-secondary">
