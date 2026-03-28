@@ -180,6 +180,7 @@ function handler(event) {
       destinationBucket: siteBucket,
       distribution,
       distributionPaths: ["/*"],
+      exclude: ["errors/*"],
     });
 
     // Deploy error pages

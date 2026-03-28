@@ -163,6 +163,7 @@ export class FrontendStack extends cdk.Stack {
       destinationBucket: siteBucket,
       distribution,
       distributionPaths: ["/*"],
+      exclude: ["errors/*"],
     });
 
     // Deploy error pages to /errors/ prefix

@@ -6,21 +6,245 @@
   <title>Page Not Found — d3ftly</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0f;color:#e0e0e8;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:2rem}
-    .container{text-align:center;max-width:480px}
-    .code{font-size:8rem;font-weight:800;line-height:1;background:linear-gradient(135deg,#6366f1,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-    h1{font-size:1.5rem;margin:1rem 0 .5rem;color:#f0f0f5}
-    p{color:#9090a0;line-height:1.6;margin-bottom:2rem}
-    a{display:inline-block;padding:.75rem 2rem;background:#6366f1;color:#fff;text-decoration:none;border-radius:.5rem;font-weight:600;transition:background .2s}
+    body{font-family:'Courier New',monospace;background:#0a0a0f;color:#e0e0e8;min-height:100vh;overflow:hidden;image-rendering:pixelated}
+    canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+    .overlay{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:10;pointer-events:none}
+    .dialog{background:#0a0a0f;border:4px solid #6366f1;border-radius:12px;padding:2rem 2.5rem;pointer-events:auto;box-shadow:0 0 60px rgba(99,102,241,.15)}
+    .code{font-size:5rem;font-weight:800;line-height:1;background:linear-gradient(135deg,#6366f1,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:.5rem}
+    h1{font-size:1.1rem;margin-bottom:.5rem;color:#f0f0f5}
+    p{color:#7070a0;font-size:.85rem;line-height:1.6;margin-bottom:1.5rem}
+    a{display:inline-block;padding:.6rem 1.8rem;background:#6366f1;color:#fff;text-decoration:none;border-radius:6px;font-weight:700;font-family:inherit;font-size:.85rem;transition:background .2s;border:2px solid #818cf8}
     a:hover{background:#4f46e5}
+    .blink{animation:blink 1s step-end infinite}
+    @keyframes blink{50%{opacity:0}}
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="code">404</div>
-    <h1>Page not found</h1>
-    <p>The page you're looking for doesn't exist or has been moved.</p>
-    <a href="/">Back to Home</a>
+  <canvas id="c"></canvas>
+  <div class="overlay">
+    <div class="dialog">
+      <div class="code">404</div>
+      <h1>Wild page appeared!</h1>
+      <p>But it fled before you could catch it.<span class="blink">▊</span></p>
+      <a href="/">← Return to Town</a>
+    </div>
   </div>
+  <script>
+    const C=document.getElementById('c'),X=C.getContext('2d');
+    let W,H;
+    function resize(){W=C.width=innerWidth;H=C.height=innerHeight}
+    resize();addEventListener('resize',resize);
+
+    // Tile colors
+    const GRASS=['#1a2f1a','#1e3a1e','#1a331a','#162e16'];
+    const PATH='#2a2520';
+    const TILE=24;
+
+    // Random seeded grass map
+    function tileAt(tx,ty){
+      const h=((tx*374761393+ty*668265263)^(tx*ty*961748927))>>>0;
+      if(Math.abs(tx)<=1)return'path';
+      return'grass';
+    }
+    function grassColor(tx,ty){
+      const h=(((tx+500)*2654435761+(ty+500)*40503)>>>0)%GRASS.length;
+      return GRASS[h];
+    }
+    // Flower/detail on some tiles
+    function hasFlower(tx,ty){return(((tx*7+ty*13+tx*ty*3)>>>0)%12)===0}
+    function hasRock(tx,ty){return(((tx*11+ty*7)>>>0)%20)===0}
+
+    // Sprites (pixel art drawn procedurally)
+    function drawSprite(x,y,frame,pal,dir){
+      const s=3; // pixel size
+      // Simple 8x8 character sprite
+      const sprites={
+        down:[
+          '..0110..',
+          '.011110.',
+          '.1EFFE1.',
+          '.1FEFF1.',
+          '..1111..',
+          '.2BBBB2.',
+          '.2B22B2.',
+          '..3..3..',
+        ],
+        up:[
+          '..0110..',
+          '.011110.',
+          '.111111.',
+          '.111111.',
+          '..1111..',
+          '.2BBBB2.',
+          '.2B22B2.',
+          '..3..3..',
+        ],
+        left:[
+          '..0110..',
+          '.011110.',
+          '.1EFF11.',
+          '.1FEF11.',
+          '..1111..',
+          '.2BBBB2.',
+          '.2B22B2.',
+          '.3...3..',
+        ],
+        right:[
+          '..0110..',
+          '.011110.',
+          '.11FFE1.',
+          '.11FEF1.',
+          '..1111..',
+          '.2BBBB2.',
+          '.2B22B2.',
+          '..3...3.',
+        ],
+      };
+      // Walk animation: shift legs
+      const sp=sprites[dir]||sprites.down;
+      const colors={'0':pal[0],'1':pal[1],'E':'#fff','F':'#222','B':pal[2],'2':pal[2],'3':pal[3]||'#3a2a1a'};
+      const bob=frame%2===0?0:-s;
+      for(let r=0;r<sp.length;r++){
+        for(let c=0;c<sp[r].length;c++){
+          const ch=sp[r][c];
+          if(ch==='.')continue;
+          // Leg animation
+          let offX=0;
+          if(r>=6&&frame%2===1){offX=c<4?s:-s}
+          X.fillStyle=colors[ch]||'#f0f';
+          X.fillRect(x+c*s+offX,y+r*s+bob,s,s);
+        }
+      }
+    }
+
+    // NPCs walking around
+    const npcs=[];
+    for(let i=0;i<12;i++){
+      const palettes=[
+        ['#4a3728','#e8d0a0','#c44','#5a3a2a'],  // red trainer
+        ['#2a3a5a','#a0c0e8','#48a','#3a3a3a'],  // blue trainer
+        ['#3a4a2a','#b0d890','#6a4','#4a3a2a'],  // green trainer
+        ['#5a3050','#e0a0d0','#a4c','#4a3a3a'],  // purple trainer
+        ['#5a4020','#f0d070','#da3','#3a2a1a'],  // gold trainer
+        ['#2a4a4a','#80d8d0','#4aa','#3a3a3a'],  // teal trainer
+      ];
+      npcs.push({
+        x:(Math.random()-.5)*W*2,
+        y:(Math.random()-.5)*H*2,
+        dir:['up','down','left','right'][Math.floor(Math.random()*4)],
+        speed:.4+Math.random()*.6,
+        timer:0,
+        changeDirAt:60+Math.floor(Math.random()*120),
+        frame:0,
+        pal:palettes[i%palettes.length],
+      });
+    }
+
+    // Camera
+    let camX=0,camY=0;
+    const keys={};
+    addEventListener('keydown',e=>keys[e.key]=true);
+    addEventListener('keyup',e=>keys[e.key]=false);
+
+    let playerX=0,playerY=0,playerDir='down',playerFrame=0,moving=false;
+
+    function update(){
+      // Player movement
+      const spd=1.5;
+      moving=false;
+      if(keys.ArrowUp||keys.w){playerY-=spd;playerDir='up';moving=true}
+      if(keys.ArrowDown||keys.s){playerY+=spd;playerDir='down';moving=true}
+      if(keys.ArrowLeft||keys.a){playerX-=spd;playerDir='left';moving=true}
+      if(keys.ArrowRight||keys.d){playerX+=spd;playerDir='right';moving=true}
+      if(moving)playerFrame++;
+
+      // Camera follows player
+      camX+=(playerX-camX)*.08;
+      camY+=(playerY-camY)*.08;
+
+      // NPC AI
+      for(const n of npcs){
+        n.timer++;
+        if(n.timer>=n.changeDirAt){
+          n.dir=['up','down','left','right'][Math.floor(Math.random()*4)];
+          n.timer=0;
+          n.changeDirAt=60+Math.floor(Math.random()*180);
+          if(Math.random()<.3)n.speed=0; // sometimes idle
+          else n.speed=.3+Math.random()*.5;
+        }
+        if(n.speed>0){
+          if(n.dir==='up')n.y-=n.speed;
+          if(n.dir==='down')n.y+=n.speed;
+          if(n.dir==='left')n.x-=n.speed;
+          if(n.dir==='right')n.x+=n.speed;
+          n.frame++;
+        }
+      }
+    }
+
+    function draw(){
+      X.fillStyle='#0a0a0f';
+      X.fillRect(0,0,W,H);
+
+      const ox=W/2-camX*TILE;
+      const oy=H/2-camY*TILE;
+
+      // Determine visible tile range
+      const startTX=Math.floor((camX-W/2/TILE)-1);
+      const endTX=Math.ceil((camX+W/2/TILE)+1);
+      const startTY=Math.floor((camY-H/2/TILE)-1);
+      const endTY=Math.ceil((camY+H/2/TILE)+1);
+
+      // Draw tiles
+      for(let ty=startTY;ty<=endTY;ty++){
+        for(let tx=startTX;tx<=endTX;tx++){
+          const sx=ox+tx*TILE;
+          const sy=oy+ty*TILE;
+          const t=tileAt(tx,ty);
+          if(t==='path'){
+            X.fillStyle=PATH;
+            X.fillRect(sx,sy,TILE,TILE);
+            // path edges
+            X.fillStyle='#332820';
+            X.fillRect(sx,sy,TILE,1);
+          } else {
+            X.fillStyle=grassColor(tx,ty);
+            X.fillRect(sx,sy,TILE,TILE);
+            // Grass detail
+            if(hasFlower(tx,ty)){
+              const fcolors=['#e06060','#e0e060','#6060e0','#e0a0d0'];
+              X.fillStyle=fcolors[((tx*3+ty*7)>>>0)%fcolors.length];
+              X.fillRect(sx+10,sy+8,4,4);
+              X.fillStyle='#2a5a2a';
+              X.fillRect(sx+11,sy+12,2,4);
+            }
+            if(hasRock(tx,ty)){
+              X.fillStyle='#3a3a40';
+              X.fillRect(sx+6,sy+10,12,8);
+              X.fillStyle='#4a4a50';
+              X.fillRect(sx+7,sy+9,10,7);
+            }
+          }
+        }
+      }
+
+      // Draw NPCs
+      for(const n of npcs){
+        const sx=ox+n.x*TILE;
+        const sy=oy+n.y*TILE;
+        if(sx>-50&&sx<W+50&&sy>-50&&sy<H+50){
+          drawSprite(sx,sy,Math.floor(n.frame/8),n.pal,n.dir);
+        }
+      }
+
+      // Draw player
+      const px=ox+playerX*TILE;
+      const py=oy+playerY*TILE;
+      drawSprite(px,py,Math.floor(playerFrame/8),['#2a2a3a','#e0e0f0','#6366f1','#3a3a4a'],playerDir);
+    }
+
+    function loop(){update();draw();requestAnimationFrame(loop)}
+    loop();
+  </script>
 </body>
 </html>
