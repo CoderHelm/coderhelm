@@ -94,8 +94,15 @@ export default function Home() {
 
       {/* Hero */}
       <section className="relative flex min-h-screen items-center justify-center overflow-hidden pt-16">
-        {/* Background glow */}
-        <div className="pointer-events-none absolute top-1/4 left-1/2 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand/5 blur-[120px]" />
+        {/* Aurora background — animated color blobs */}
+        <div className="aurora-container" aria-hidden="true">
+          <div className="aurora-blob aurora-blob-1" />
+          <div className="aurora-blob aurora-blob-2" />
+          <div className="aurora-blob aurora-blob-3" />
+          <div className="aurora-blob aurora-blob-4" />
+          {/* Vignette to keep text readable */}
+          <div className="aurora-vignette" />
+        </div>
 
         <div className="relative mx-auto max-w-4xl px-6 text-center">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-surface-border bg-surface-elevated px-4 py-1.5 text-sm text-text-secondary">
