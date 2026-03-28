@@ -4,6 +4,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     credentials: "include",
+    cache: "no-store",
     headers: {
       "Content-Type": "application/json",
       ...options?.headers,
@@ -150,15 +151,16 @@ export interface BillingInfo {
   access_until: string | null;
   cancelled_at: string | null;
   limits: {
-    runs: number;
+    tokens: number;
     plans: number;
-    overage_per_run_cents: number;
+    overage_per_1k_tokens_cents: number;
     overage_per_plan_cents: number;
   };
   current_period: {
     month: string;
     usage_cost: number;
     total_runs: number;
+    total_tokens: number;
     total_plans: number;
     estimated_overage_cents: number;
   };

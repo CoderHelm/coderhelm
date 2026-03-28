@@ -8,6 +8,12 @@ import { ToastProvider } from "./toast";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.d3ftly.com";
 
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+  return n.toString();
+}
+
 interface User {
   github_login: string;
   email: string;
@@ -164,31 +170,31 @@ function Sidebar({
         ))}
       </div>
 
-      {/* Runs remaining */}
+      {/* Tokens remaining */}
       {billing && (
         <div className="mx-2 mt-3 pt-3 border-t border-zinc-800/60">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-zinc-500">Runs left</span>
+            <span className="text-zinc-500">Tokens left</span>
             <span className={`font-medium ${
-              billing.current_period.total_runs >= billing.limits.runs
+              billing.current_period.total_tokens >= billing.limits.tokens
                 ? "text-red-400"
-                : billing.current_period.total_runs >= billing.limits.runs * 0.8
+                : billing.current_period.total_tokens >= billing.limits.tokens * 0.8
                   ? "text-yellow-400"
                   : "text-zinc-300"
             }`}>
-              {Math.max(billing.limits.runs - billing.current_period.total_runs, 0)} / {billing.limits.runs}
+              {formatTokens(Math.max(billing.limits.tokens - billing.current_period.total_tokens, 0))} / {formatTokens(billing.limits.tokens)}
             </span>
           </div>
           <div className="mt-1.5 h-1 bg-zinc-800 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all ${
-                billing.current_period.total_runs >= billing.limits.runs
+                billing.current_period.total_tokens >= billing.limits.tokens
                   ? "bg-red-500"
-                  : billing.current_period.total_runs >= billing.limits.runs * 0.8
+                  : billing.current_period.total_tokens >= billing.limits.tokens * 0.8
                     ? "bg-yellow-500"
                     : "bg-emerald-500"
               }`}
-              style={{ width: `${Math.min((billing.current_period.total_runs / billing.limits.runs) * 100, 100)}%` }}
+              style={{ width: `${Math.min((billing.current_period.total_tokens / billing.limits.tokens) * 100, 100)}%` }}
             />
           </div>
         </div>

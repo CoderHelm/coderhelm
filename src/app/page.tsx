@@ -464,7 +464,7 @@ export default function Home() {
               </div>
               <ul className="mt-6 space-y-3 text-sm text-text-secondary">
                 <li className="flex items-center gap-2">
-                  <span className="text-green-400">✓</span> 5 runs / month
+                  <span className="text-green-400">✓</span> 500K tokens / month
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-green-400">✓</span> Public &amp; private repos
@@ -499,13 +499,13 @@ export default function Home() {
               </div>
               <ul className="mt-6 space-y-3 text-sm text-text-secondary">
                 <li className="flex items-center gap-2">
-                  <span className="text-brand">✓</span> 30 runs / month
+                  <span className="text-brand">✓</span> 5M tokens / month
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-brand">✓</span> 5 AI plans / month
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-brand">✓</span> $5/run, $10/plan overage
+                  <span className="text-brand">✓</span> $50/1M token, $10/plan overage
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-brand">✓</span> Priority queue
