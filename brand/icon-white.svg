@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    d3ftly — Icon Mark (white on transparent)
+    Three forward-slash parallelograms. Lean: ~12° from vertical.
+    Represents: the "3" in d3ftly, speed, precision, code.
+  -->
+  <!-- Slash 1 -->
+  <polygon points="106,416 158,416 226,96 174,96" fill="white"/>
+  <!-- Slash 2 -->
+  <polygon points="196,416 248,416 316,96 264,96" fill="white"/>
+  <!-- Slash 3 -->
+  <polygon points="286,416 338,416 406,96 354,96" fill="white"/>
+</svg>
