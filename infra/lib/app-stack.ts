@@ -36,11 +36,8 @@ export class AppStack extends cdk.Stack {
       bucketName: `${prefix}-app`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
-      removalPolicy:
-        props.stage === "prod"
-          ? cdk.RemovalPolicy.RETAIN
-          : cdk.RemovalPolicy.DESTROY,
-      autoDeleteObjects: props.stage !== "prod",
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
     });
 
     // CloudFront OAC
