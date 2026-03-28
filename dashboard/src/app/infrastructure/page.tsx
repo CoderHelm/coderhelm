@@ -1,24 +1,25 @@
 "use client";
 
 import { Suspense, useEffect, useState, useCallback } from "react";
-import { api, type InfraAnalysis, type InfraFinding } from "@/lib/api";
+import { api, type InfraAnalysis, type InfraFinding, type Repo } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { Skeleton } from "@/components/skeleton";
 import { MermaidDiagram } from "@/components/mermaid-diagram";
+import { RepoCombobox } from "@/components/repo-combobox";
 
-const SEVERITY_STYLES = {
+const SEVERITY_STYLES: Record<string, string> = {
   error: "border-red-500/20 bg-red-500/5 text-red-400",
   warning: "border-yellow-500/20 bg-yellow-500/5 text-yellow-400",
   info: "border-zinc-700 bg-zinc-900/50 text-zinc-400",
 };
 
-const SEVERITY_ICONS = {
+const SEVERITY_ICONS: Record<string, string> = {
   error: "✕",
   warning: "⚠",
   info: "ℹ",
 };
 
-const CATEGORY_LABELS = {
+const CATEGORY_LABELS: Record<string, string> = {
   security: "Security",
   performance: "Performance",
   reliability: "Reliability",
@@ -42,200 +43,112 @@ function FindingCard({ finding }: { finding: InfraFinding }) {
   );
 }
 
-function InfrastructureContent() {
-  const [analysis, setAnalysis] = useState<InfraAnalysis | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+function ScopeTab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+        active ? "border-zinc-100 text-zinc-100" : "border-transparent text-zinc-500 hover:text-zinc-300"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+/** Renders the diagram + findings for a given analysis result. */
+function AnalysisView({
+  analysis,
+  refreshing,
+  onRefresh,
+}: {
+  analysis: InfraAnalysis;
+  refreshing: boolean;
+  onRefresh: () => void;
+}) {
   const [activeTab, setActiveTab] = useState<"diagram" | "findings">("diagram");
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
-  const load = useCallback(() => {
-    api.getInfrastructure()
-      .then(setAnalysis)
-      .catch(() => toast("Failed to load infrastructure analysis", "error"))
-      .finally(() => setLoading(false));
-  }, [toast]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  // Poll while pending
-  useEffect(() => {
-    if (analysis?.status !== "pending") return;
-    const timer = setInterval(() => {
-      api.getInfrastructure().then(setAnalysis).catch(() => {});
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [analysis?.status]);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await api.refreshInfrastructure();
-      setAnalysis((prev) => prev ? { ...prev, status: "pending", error: undefined } : null);
-      toast("Analysis started — this takes about 30 seconds");
-    } catch {
-      toast("Failed to start analysis", "error");
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  const handleCopyPrompt = () => {
-    if (!analysis?.suggested_prompt) return;
-    navigator.clipboard.writeText(analysis.suggested_prompt).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }).catch(() => {
-      toast("Failed to copy to clipboard", "error");
-    });
-  };
-
-  if (loading) {
+  // No infra
+  if (analysis.status === "no_infra") {
+    const handleCopy = () => {
+      if (!analysis.suggested_prompt) return;
+      navigator.clipboard.writeText(analysis.suggested_prompt).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }).catch(() => toast("Failed to copy to clipboard", "error"));
+    };
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-4 w-96" />
-        <Skeleton className="h-96 w-full rounded-xl" />
-      </div>
-    );
-  }
-
-  // No infrastructure code found
-  if (!analysis || analysis.status === "no_infra") {
-    return (
-      <div>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold">Infrastructure</h1>
-            <p className="text-zinc-500 text-sm mt-1">Architecture diagram and analysis of your connected repos</p>
-          </div>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="px-4 py-2 text-sm border border-zinc-700 rounded-lg text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors disabled:opacity-50"
-          >
-            {refreshing ? "Scanning..." : "Scan repos"}
-          </button>
-        </div>
-
-        <div className="max-w-xl mx-auto mt-16 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4 text-2xl">⬡</div>
-          <h2 className="text-lg font-semibold mb-2">No infrastructure code found</h2>
-          <p className="text-zinc-500 text-sm mb-6">
-            d3ftly scanned your connected repos and could not find any CDK, Terraform, or Serverless files.
-            Use the prompt below to create a Plan and generate your infrastructure from scratch.
-          </p>
-
-          {analysis?.suggested_prompt && (
-            <div className="text-left">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs text-zinc-500 uppercase tracking-wider">Suggested plan prompt</p>
-                <button onClick={handleCopyPrompt} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
-                  {copied ? "Copied!" : "Copy"}
-                </button>
-              </div>
-              <pre className="p-4 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-400 font-mono whitespace-pre-wrap leading-relaxed text-left overflow-auto max-h-64">
-                {analysis.suggested_prompt}
-              </pre>
-              <a
-                href="/plans/new"
-                className="mt-4 inline-block px-5 py-2.5 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors"
-              >
-                Create a Plan →
-              </a>
+      <div className="max-w-xl mx-auto mt-12 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4 text-2xl">⬡</div>
+        <h2 className="text-lg font-semibold mb-2">No infrastructure code found</h2>
+        <p className="text-zinc-500 text-sm mb-6">
+          No CDK, Terraform, or Serverless files detected. Click <b>Scan</b> to retry, or use the prompt below to generate infrastructure.
+        </p>
+        {analysis.suggested_prompt && (
+          <div className="text-left">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-zinc-500 uppercase tracking-wider">Suggested plan prompt</p>
+              <button onClick={handleCopy} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+                {copied ? "Copied!" : "Copy"}
+              </button>
             </div>
-          )}
-        </div>
+            <pre className="p-4 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-400 font-mono whitespace-pre-wrap leading-relaxed text-left overflow-auto max-h-64">
+              {analysis.suggested_prompt}
+            </pre>
+          </div>
+        )}
       </div>
     );
   }
 
-  // Pending analysis
+  // Pending
   if (analysis.status === "pending") {
     return (
-      <div>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold">Infrastructure</h1>
-            <p className="text-zinc-500 text-sm mt-1">Architecture diagram and analysis of your connected repos</p>
-          </div>
-        </div>
-        <div className="flex flex-col items-center justify-center py-32">
-          <div className="w-8 h-8 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin mb-4" />
-          <p className="text-zinc-400 text-sm">Analyzing your infrastructure...</p>
-          <p className="text-zinc-600 text-xs mt-1">Scanning repos for CDK/Terraform/Serverless code and generating diagram</p>
-        </div>
+      <div className="flex flex-col items-center justify-center py-24">
+        <div className="w-8 h-8 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin mb-4" />
+        <p className="text-zinc-400 text-sm">Analyzing your infrastructure...</p>
+        <p className="text-zinc-600 text-xs mt-1">Scanning for CDK/Terraform/Serverless code and generating diagram</p>
       </div>
     );
   }
 
-  // Failed analysis
+  // Failed
   if (analysis.status === "failed") {
     return (
-      <div>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold">Infrastructure</h1>
-            <p className="text-zinc-500 text-sm mt-1">Architecture diagram and analysis of your connected repos</p>
-          </div>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="px-4 py-2 text-sm border border-zinc-700 rounded-lg text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors disabled:opacity-50"
-          >
-            {refreshing ? "Retrying..." : "Retry"}
-          </button>
-        </div>
-        <div className="max-w-xl mx-auto mt-16 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4 text-2xl">✕</div>
-          <h2 className="text-lg font-semibold text-red-400 mb-2">Analysis failed</h2>
-          <p className="text-zinc-500 text-sm mb-2">
-            Something went wrong while scanning your infrastructure code.
+      <div className="max-w-xl mx-auto mt-12 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4 text-2xl">✕</div>
+        <h2 className="text-lg font-semibold text-red-400 mb-2">Analysis failed</h2>
+        <p className="text-zinc-500 text-sm mb-2">Something went wrong while scanning your infrastructure code.</p>
+        {analysis.error && (
+          <p className="text-red-400/70 text-xs font-mono bg-zinc-900 border border-zinc-800 rounded-lg p-3 inline-block max-w-md">
+            {analysis.error.slice(0, 300)}
           </p>
-          {analysis.error && (
-            <p className="text-red-400/70 text-xs font-mono bg-zinc-900 border border-zinc-800 rounded-lg p-3 inline-block max-w-md">
-              {analysis.error.slice(0, 300)}
-            </p>
-          )}
-        </div>
+        )}
       </div>
     );
   }
 
-  // Has analysis
+  // Ready — diagram + findings
   const errorCount = analysis.findings?.filter((f) => f.severity === "error").length ?? 0;
   const warnCount = analysis.findings?.filter((f) => f.severity === "warning").length ?? 0;
   const infoCount = analysis.findings?.filter((f) => f.severity === "info").length ?? 0;
 
   return (
-    <div>
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Infrastructure</h1>
-          <div className="flex items-center gap-3 mt-1">
-            <p className="text-zinc-500 text-sm">{analysis.diagram_title ?? "Architecture"}</p>
-            {analysis.scanned_repos && analysis.scanned_repos.length > 0 && (
-              <span className="text-xs text-zinc-600">
-                {analysis.scanned_repos.length} repo{analysis.scanned_repos.length !== 1 ? "s" : ""} scanned
-              </span>
-            )}
-            {analysis.cached_at && (
-              <span className="text-xs text-zinc-700">
-                cached {new Date(analysis.cached_at).toLocaleDateString()}
-              </span>
-            )}
-          </div>
-        </div>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="px-4 py-2 text-sm border border-zinc-700 rounded-lg text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors disabled:opacity-50"
-        >
-          {refreshing ? "Refreshing..." : "Refresh"}
-        </button>
+    <>
+      {/* Meta: scanned repos, cache date */}
+      <div className="flex items-center gap-3 mb-4">
+        {analysis.scanned_repos && analysis.scanned_repos.length > 0 && (
+          <span className="text-xs text-zinc-600">
+            {analysis.scanned_repos.length} file{analysis.scanned_repos.length !== 1 ? "s" : ""} scanned
+          </span>
+        )}
+        {analysis.cached_at && (
+          <span className="text-xs text-zinc-700">
+            cached {new Date(analysis.cached_at).toLocaleDateString()}
+          </span>
+        )}
       </div>
 
       {/* Summary badges */}
@@ -259,16 +172,14 @@ function InfrastructureContent() {
         </div>
       )}
 
-      {/* Tabs */}
+      {/* Diagram / Findings tabs */}
       <div className="flex gap-1 mb-4 p-1 bg-zinc-900 border border-zinc-800 rounded-lg w-fit">
         {(["diagram", "findings"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-1.5 rounded-md text-sm transition-colors capitalize ${
-              activeTab === tab
-                ? "bg-zinc-700 text-zinc-100"
-                : "text-zinc-500 hover:text-zinc-300"
+              activeTab === tab ? "bg-zinc-700 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
             {tab}
@@ -297,7 +208,6 @@ function InfrastructureContent() {
             </div>
           ) : (
             <>
-              {/* Group by severity */}
               {(["error", "warning", "info"] as const).map((sev) => {
                 const group = analysis.findings!.filter((f) => f.severity === sev);
                 if (group.length === 0) return null;
@@ -317,6 +227,111 @@ function InfrastructureContent() {
             </>
           )}
         </div>
+      )}
+    </>
+  );
+}
+
+function InfrastructureContent() {
+  const [scope, setScope] = useState<"all" | "repo">("all");
+  const [repos, setRepos] = useState<Repo[]>([]);
+  const [selectedRepo, setSelectedRepo] = useState("");
+  const [analysis, setAnalysis] = useState<InfraAnalysis | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    api.listRepos().then((data) => {
+      const enabled = data.repos.filter((r) => r.enabled);
+      setRepos(enabled);
+      if (enabled.length > 0) setSelectedRepo(enabled[0].name);
+    }).catch(() => {});
+  }, []);
+
+  const loadAnalysis = useCallback(() => {
+    setLoading(true);
+    const fetcher = scope === "all"
+      ? api.getInfrastructure()
+      : selectedRepo
+        ? api.getRepoInfrastructure(selectedRepo)
+        : Promise.resolve(null);
+    fetcher
+      .then(setAnalysis)
+      .catch(() => toast("Failed to load infrastructure analysis", "error"))
+      .finally(() => setLoading(false));
+  }, [scope, selectedRepo, toast]);
+
+  useEffect(() => { loadAnalysis(); }, [loadAnalysis]);
+
+  // Poll while pending
+  useEffect(() => {
+    if (analysis?.status !== "pending") return;
+    const fetcher = scope === "all"
+      ? () => api.getInfrastructure()
+      : selectedRepo
+        ? () => api.getRepoInfrastructure(selectedRepo)
+        : null;
+    if (!fetcher) return;
+    const timer = setInterval(() => { fetcher().then(setAnalysis).catch(() => {}); }, 5000);
+    return () => clearInterval(timer);
+  }, [analysis?.status, scope, selectedRepo]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      if (scope === "all") {
+        await api.refreshInfrastructure();
+      } else if (selectedRepo) {
+        await api.refreshRepoInfrastructure(selectedRepo);
+      }
+      setAnalysis((prev) => prev ? { ...prev, status: "pending", error: undefined } : null);
+      toast("Analysis started — this takes about 30 seconds");
+    } catch {
+      toast("Failed to start analysis", "error");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const refreshLabel = analysis?.status === "failed" ? "Retry" :
+    (!analysis || analysis.status === "no_infra") ? "Scan repos" : "Refresh";
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-start justify-between mb-2">
+        <div>
+          <h1 className="text-2xl font-bold">Infrastructure</h1>
+          <p className="text-zinc-500 text-sm mt-1">Architecture diagram and analysis of your connected repos</p>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing || (analysis?.status === "pending")}
+          className="px-4 py-2 text-sm border border-zinc-700 rounded-lg text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors disabled:opacity-50"
+        >
+          {refreshing ? "Starting..." : refreshLabel}
+        </button>
+      </div>
+
+      {/* Scope tabs */}
+      <div className="flex gap-1 border-b border-zinc-800 mb-5">
+        <ScopeTab label="All Repos" active={scope === "all"} onClick={() => setScope("all")} />
+        <ScopeTab label="Per Repo" active={scope === "repo"} onClick={() => setScope("repo")} />
+      </div>
+
+      {/* Repo selector (per-repo scope only) */}
+      {scope === "repo" && repos.length > 0 && (
+        <RepoCombobox repos={repos} selected={selectedRepo} onSelect={setSelectedRepo} />
+      )}
+
+      {/* Content */}
+      {loading ? (
+        <Skeleton className="h-96 w-full rounded-xl" />
+      ) : analysis ? (
+        <AnalysisView analysis={analysis} refreshing={refreshing} onRefresh={handleRefresh} />
+      ) : (
+        <div className="text-center py-16 text-zinc-600 text-sm">No data</div>
       )}
     </div>
   );
