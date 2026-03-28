@@ -98,33 +98,30 @@ const steps = [
   },
 ];
 
-const infraMermaid = `flowchart LR
-  subgraph Edge
-    dns[Route 53]
-    cdn[CloudFront]
-  end
+const infraMermaid = `architecture-beta
+  group edge(logos:aws-cloudfront)[Edge]
+  group compute(logos:aws-lambda)[Compute]
+  group data(logos:aws-dynamodb)[Data]
+  group async(logos:aws-sqs)[Queues]
 
-  subgraph Compute
-    api[API Gateway]
-    gw[Gateway Lambda]
-    wk[Worker Lambda]
-  end
+  service dns(logos:aws-route53)[Route 53] in edge
+  service cdn(logos:aws-cloudfront)[CloudFront] in edge
+  service api(logos:aws-api-gateway)[API Gateway] in compute
+  service gw(logos:aws-lambda)[Gateway Lambda] in compute
+  service wk(logos:aws-lambda)[Worker Lambda] in compute
+  service db(logos:aws-dynamodb)[DynamoDB] in data
+  service s3(logos:aws-s3)[Artifacts S3] in data
+  service q(logos:aws-sqs)[Ticket Queue] in async
+  service dlq(logos:aws-sqs)[DLQ] in async
 
-  subgraph Data
-    db[DynamoDB]
-    s3[Artifacts S3]
-  end
-
-  subgraph Queues
-    q[Ticket Queue]
-    dlq[DLQ]
-  end
-
-  dns --> cdn --> api --> gw
-  gw --> db
-  gw --> q --> wk
-  wk --> s3
-  wk --> dlq`;
+  dns:R --> L:cdn
+  cdn:R --> L:api
+  api:R --> L:gw
+  gw:R --> L:db
+  gw:B --> T:q
+  q:R --> L:wk
+  wk:R --> L:s3
+  wk:B --> T:dlq`;
 
 export default function Home() {
   return (
