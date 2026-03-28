@@ -35,5 +35,7 @@ jobs:
           cache-dependency-path: infra/package-lock.json
       - run: npm ci
       - name: Create placeholder build output for synth
-        run: mkdir -p ../out && touch ../out/index.html
+        run: |
+          mkdir -p ../out && touch ../out/index.html
+          mkdir -p ../dashboard/out && touch ../dashboard/out/index.html
       - run: npx cdk synth --quiet
