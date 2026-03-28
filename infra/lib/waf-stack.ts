@@ -4,6 +4,7 @@ import { Construct } from "constructs";
 
 interface WafStackProps extends cdk.StackProps {
   stage: string;
+  target?: "site" | "app";
 }
 
 /**
@@ -19,14 +20,15 @@ export class WafStack extends cdk.Stack {
     super(scope, id, props);
 
     const prefix = `d3ftly-${props.stage}`;
+    const target = props.target ?? "site";
 
     const webAcl = new wafv2.CfnWebACL(this, "WebAcl", {
-      name: `${prefix}-site-waf`,
+      name: `${prefix}-${target}-waf`,
       scope: "CLOUDFRONT",
       defaultAction: { allow: {} },
       visibilityConfig: {
         cloudWatchMetricsEnabled: true,
-        metricName: `${prefix}-site-waf`,
+        metricName: `${prefix}-${target}-waf`,
         sampledRequestsEnabled: true,
       },
       rules: [
@@ -43,7 +45,7 @@ export class WafStack extends cdk.Stack {
           },
           visibilityConfig: {
             cloudWatchMetricsEnabled: true,
-            metricName: `${prefix}-site-rate-limit`,
+            metricName: `${prefix}-${target}-rate-limit`,
             sampledRequestsEnabled: true,
           },
         },
@@ -61,7 +63,7 @@ export class WafStack extends cdk.Stack {
           },
           visibilityConfig: {
             cloudWatchMetricsEnabled: true,
-            metricName: `${prefix}-site-common-rules`,
+            metricName: `${prefix}-${target}-common-rules`,
             sampledRequestsEnabled: true,
           },
         },
@@ -79,7 +81,7 @@ export class WafStack extends cdk.Stack {
           },
           visibilityConfig: {
             cloudWatchMetricsEnabled: true,
-            metricName: `${prefix}-site-bad-inputs`,
+            metricName: `${prefix}-${target}-bad-inputs`,
             sampledRequestsEnabled: true,
           },
         },
@@ -97,7 +99,7 @@ export class WafStack extends cdk.Stack {
           },
           visibilityConfig: {
             cloudWatchMetricsEnabled: true,
-            metricName: `${prefix}-site-ip-reputation`,
+            metricName: `${prefix}-${target}-ip-reputation`,
             sampledRequestsEnabled: true,
           },
         },
@@ -123,7 +125,7 @@ export class WafStack extends cdk.Stack {
           },
           visibilityConfig: {
             cloudWatchMetricsEnabled: true,
-            metricName: `${prefix}-site-bad-bots`,
+            metricName: `${prefix}-${target}-bad-bots`,
             sampledRequestsEnabled: true,
           },
         },
