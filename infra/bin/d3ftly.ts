@@ -2,6 +2,7 @@
 import "source-map-support/register";
 import * as cdk from "aws-cdk-lib";
 import { FrontendStack } from "../lib/frontend-stack";
+import { AppStack } from "../lib/app-stack";
 import { WafStack } from "../lib/waf-stack";
 
 const app = new cdk.App();
@@ -19,6 +20,14 @@ const prefix = `d3ftly-${stage}`;
 const waf = new WafStack(app, `${prefix}-landing-waf`, {
   env: { account: env.account, region: "us-east-1" },
   stage,
+  target: "site",
+  crossRegionReferences: true,
+});
+
+const appWaf = new WafStack(app, `${prefix}-app-waf`, {
+  env: { account: env.account, region: "us-east-1" },
+  stage,
+  target: "app",
   crossRegionReferences: true,
 });
 
@@ -28,5 +37,12 @@ new FrontendStack(app, `${prefix}-frontend`, {
   env,
   stage,
   webAclArn: waf.webAclArn,
+  crossRegionReferences: true,
+});
+
+new AppStack(app, `${prefix}-app`, {
+  env,
+  stage,
+  webAclArn: appWaf.webAclArn,
   crossRegionReferences: true,
 });
