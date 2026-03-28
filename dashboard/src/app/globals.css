@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 html {
-  font-size: 15px;
+  font-size: 18px;
 }
 
 @keyframes slide-in {
