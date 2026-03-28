@@ -139,7 +139,7 @@ function ForgeAppTab({ check, copy, copied }: { check: JiraCheck | null; copy: (
   return (
     <div className="space-y-6">
       <p className="text-zinc-400 text-sm">
-        Install the d3ftly Forge app on your Jira site. It automatically triggers runs when you assign an issue with a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">d3ftly:owner/repo</code> label.
+        Install the d3ftly Forge app on your Jira site. No CLI or manual configuration needed — everything is set up through the Jira admin UI.
       </p>
 
       <div className="space-y-6">
@@ -158,51 +158,42 @@ function ForgeAppTab({ check, copy, copied }: { check: JiraCheck | null; copy: (
           </a>
         </Step>
 
-        <Step number={2} title="Configure the connection">
+        <Step number={2} title="Configure in Jira">
           <p className="text-zinc-400 text-sm mb-2">
-            After installing, run these commands in your terminal to link the app to your d3ftly account:
+            After installing, go to <strong className="text-zinc-200">Jira → Apps → d3ftly Settings</strong> and enter:
           </p>
-          <div className="space-y-2">
-            <CommandBlock label="Set installation ID" command={`forge storage:set --key d3ftly-config --value '{"installationId":"${check?.installation_id ?? 0}","tenantId":"${check?.tenant_id ?? ""}"}'  --environment production`} copy={copy} copied={copied} />
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-500">Installation ID:</span>
+              <code className="px-2 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-emerald-400 font-mono text-xs">{check?.installation_id ?? "—"}</code>
+              <button onClick={() => copy(String(check?.installation_id ?? ""), "installId")} className="text-xs text-zinc-500 hover:text-zinc-300 underline">
+                {copied === "installId" ? "Copied!" : "Copy"}
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-500">Default Repo:</span>
+              <span className="text-zinc-400 text-xs">Set this to your primary GitHub repo (e.g. <code className="text-zinc-300">acme/backend</code>)</span>
+            </div>
           </div>
           <p className="text-zinc-500 text-xs mt-2">
-            Requires <code className="text-zinc-400">@forge/cli</code> installed globally. Run <code className="text-zinc-400">npm i -g @forge/cli</code> if needed.
+            The settings page is built into the Forge app — no CLI commands needed.
           </p>
         </Step>
 
-        <Step number={3} title="Label issues to trigger runs">
+        <Step number={3} title="Label and assign">
           <p className="text-zinc-400 text-sm mb-2">
-            Add a label to your Jira issues in the format:
+            Add a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">d3ftly</code> label to any Jira issue, then assign it. d3ftly uses your default repo.
           </p>
-          <code className="block px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-emerald-400 font-mono">
-            d3ftly:owner/repo
-          </code>
-          <p className="text-zinc-500 text-xs mt-2">
-            For example, <code className="text-zinc-400">d3ftly:nambok/d3ftly-platform</code>. When you assign someone to the issue, d3ftly picks it up and creates a PR.
+          <p className="text-zinc-500 text-xs">
+            To target a specific repo, use <code className="text-zinc-400">d3ftly:owner/repo</code> instead. This overrides the default.
           </p>
         </Step>
 
-        <Step number={4} title="Assign and test">
+        <Step number={4} title="Check the Runs page">
           <p className="text-zinc-400 text-sm">
-            Create a Jira issue with the label, assign it, and a new run should appear on the Runs page within a minute.
+            A new run should appear within a minute. d3ftly creates a branch, implements the change, and opens a draft PR.
           </p>
         </Step>
-      </div>
-    </div>
-  );
-}
-
-function CommandBlock({ label, command, copy, copied }: { label: string; command: string; copy: (t: string, l: string) => void; copied: string | null }) {
-  return (
-    <div>
-      <p className="text-xs text-zinc-500 mb-1">{label}</p>
-      <div className="flex items-center gap-2">
-        <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300 font-mono overflow-x-auto whitespace-nowrap">
-          {command}
-        </code>
-        <button onClick={() => copy(command, label)} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors shrink-0">
-          {copied === label ? "Copied!" : "Copy"}
-        </button>
       </div>
     </div>
   );
