@@ -110,10 +110,9 @@ export default function Privacy() {
           <tr><th>Provider</th><th>Purpose</th><th>Data Processed</th></tr>
         </thead>
         <tbody>
-          <tr><td>Amazon Web Services (AWS)</td><td>Infrastructure hosting, compute, data storage, AI model inference</td><td>All service data</td></tr>
+          <tr><td>Amazon Web Services (AWS)</td><td>Infrastructure hosting, compute, data storage, AI processing, and transactional email delivery</td><td>All service data</td></tr>
           <tr><td>GitHub</td><td>Authentication, repository access, webhook delivery</td><td>Account data, repository metadata</td></tr>
           <tr><td>Stripe</td><td>Payment processing, subscription management</td><td>Billing information</td></tr>
-          <tr><td>Amazon SES</td><td>Transactional email delivery</td><td>Email addresses, notification content</td></tr>
         </tbody>
       </table>
       <p>Each sub-processor operates under its own privacy policy and is bound by data
