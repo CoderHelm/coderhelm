@@ -17,13 +17,17 @@ const features = [
   {
     accentColor: "#7928ca",
     icon: (
-      // Pipeline: clear staged lanes
+      // Pipeline: directed workflow graph (common pattern used for orchestration UX)
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="4" width="20" height="4" rx="1" />
-        <rect x="2" y="10" width="20" height="4" rx="1" />
-        <rect x="2" y="16" width="20" height="4" rx="1" />
-        <path d="M7 6h10M7 12h10M7 18h10" />
-        <path d="M16 5l2 1-2 1M16 11l2 1-2 1M16 17l2 1-2 1" />
+        <rect x="2.5" y="3" width="6" height="6" rx="1.5" />
+        <rect x="15.5" y="3" width="6" height="6" rx="1.5" />
+        <rect x="9" y="15" width="6" height="6" rx="1.5" />
+        <path d="M8.5 6h7" />
+        <path d="M12 9.5v5" />
+        <path d="M18.5 9l1.8-1.8" />
+        <path d="M10.5 14.5l-1.8-1.8" />
+        <path d="M11 13.5l-1.2 1.2" />
+        <path d="M13 13.5l1.2 1.2" />
       </svg>
     ),
     title: "Multi-Pass Pipeline",
@@ -80,7 +84,7 @@ const steps = [
   {
     step: "01",
     title: "Install the GitHub App",
-    desc: "One click — choose which repos to enable. Connect Jira for ticket sync. d3ftly generates an AGENTS.md to learn your codebase.",
+    desc: "One click — choose repos, then connect Jira via webhook/automation. Run the Jira integration check endpoint to validate your payload before go-live.",
   },
   {
     step: "02",
@@ -94,30 +98,33 @@ const steps = [
   },
 ];
 
-const infraMermaid = `architecture-beta
-  group edge(logos:aws-cloudfront)[Edge]
-  group compute(logos:aws-lambda)[Compute]
-  group data(logos:aws-dynamodb)[Data]
-  group async(logos:aws-sqs)[Queues]
+const infraMermaid = `flowchart LR
+  subgraph Edge
+    dns[Route 53]
+    cdn[CloudFront]
+  end
 
-  service dns(logos:aws-route53)[Route 53] in edge
-  service cdn(logos:aws-cloudfront)[CloudFront] in edge
-  service api(logos:aws-api-gateway)[API Gateway] in compute
-  service gw(logos:aws-lambda)[Gateway Lambda] in compute
-  service wk(logos:aws-lambda)[Worker Lambda] in compute
-  service db(logos:aws-dynamodb)[DynamoDB] in data
-  service s3(logos:aws-s3)[Artifacts S3] in data
-  service q(logos:aws-sqs)[Ticket Queue] in async
-  service dlq(logos:aws-sqs)[DLQ] in async
+  subgraph Compute
+    api[API Gateway]
+    gw[Gateway Lambda]
+    wk[Worker Lambda]
+  end
 
-  dns:R --> L:cdn
-  cdn:R --> L:api
-  api:R --> L:gw
-  gw:R --> L:db
-  gw:B --> T:q
-  q:R --> L:wk
-  wk:R --> L:s3
-  wk:B --> T:dlq`;
+  subgraph Data
+    db[DynamoDB]
+    s3[Artifacts S3]
+  end
+
+  subgraph Queues
+    q[Ticket Queue]
+    dlq[DLQ]
+  end
+
+  dns --> cdn --> api --> gw
+  gw --> db
+  gw --> q --> wk
+  wk --> s3
+  wk --> dlq`;
 
 export default function Home() {
   return (
@@ -311,7 +318,7 @@ export default function Home() {
             Visualize architecture and surface security, cost, and reliability risks fast.
           </p>
 
-          <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 bg-surface-elevated">
+          <div className="mt-10 relative overflow-hidden rounded-2xl border border-teal-500/20 bg-surface-elevated">
             <div
               className="pointer-events-none absolute inset-0"
               style={{ background: "radial-gradient(ellipse at top right, #14b8a615, transparent 60%)" }}
@@ -354,7 +361,6 @@ export default function Home() {
                       <line x1="22" y1="9" x2="24" y2="11" />
                     </svg>
                   </div>
-                  <span className="rounded-full bg-teal-500/15 px-3 py-1 text-xs font-semibold text-teal-400">New</span>
                 </div>
                 <h3 className="mt-4 text-2xl font-bold">Infrastructure Analysis</h3>
                 <p className="mt-3 text-text-secondary leading-relaxed">
@@ -364,7 +370,6 @@ export default function Home() {
                   {[
                     "Live Mermaid architecture diagram",
                     "Security, cost & reliability findings by severity",
-                    "Cached analysis — refresh on demand",
                   ].map((t) => (
                     <li key={t} className="flex items-start gap-2">
                       <span className="mt-0.5 shrink-0 text-teal-400">✓</span>
