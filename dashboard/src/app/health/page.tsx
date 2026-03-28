@@ -78,7 +78,8 @@ export default function HealthPage() {
 
 function CheckCard({ check }: { check: HealthCheckItem }) {
   const label: Record<string, string> = {
-    stale_runs: "Stale Runs",
+    crashed_runs: "Crashed Runs",
+    stale_queued: "Stale Queued",
     dlq: "Dead Letter Queue",
     tickets: "Ticket Queue",
     ci_fix: "CI Fix Queue",
