@@ -211,11 +211,11 @@ export default function GuardrailsPage() {
         <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3">Platform Security (always on)</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {[
-            { icon: "🔏", label: "Webhook signature verification", detail: "GitHub, Stripe, and Jira webhooks are HMAC-verified" },
+            { icon: "🔏", label: "Webhook signature verification", detail: "GitHub and Jira webhooks are HMAC-verified" },
             { icon: "🔒", label: "Worker isolation", detail: "Agent tooling is GitHub API only — no shell, no AWS SDK access" },
             { icon: "🛡", label: "Input validation", detail: "Repo paths, payloads, and rules are validated and size-capped at 10KB" },
-            { icon: "🔑", label: "Secret scoping", detail: "Worker only has access to GitHub credentials, not Stripe or JWT secrets" },
-            { icon: "♻️", label: "Replay protection", detail: "Stripe webhooks are idempotency-checked to prevent double-processing" },
+            { icon: "🔑", label: "Secret scoping", detail: "Worker only has access to GitHub credentials, not billing or JWT secrets" },
+            { icon: "♻️", label: "Replay protection", detail: "Webhooks are idempotency-checked to prevent double-processing" },
             { icon: "📝", label: "Audit trail", detail: "Every run is logged with full token usage, pass results, and timing" },
           ].map(({ icon, label, detail }) => (
             <div key={label} className="flex items-start gap-2 p-2 rounded-md">
