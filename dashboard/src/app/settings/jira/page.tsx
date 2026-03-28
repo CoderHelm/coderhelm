@@ -139,7 +139,7 @@ function ForgeAppTab({ check, copy, copied }: { check: JiraCheck | null; copy: (
   return (
     <div className="space-y-6">
       <p className="text-zinc-400 text-sm">
-        Install the d3ftly Forge app on your Jira site. No CLI or manual configuration needed — everything is set up through the Jira admin UI.
+        Install the d3ftly Forge app on your Jira site. When you assign a ticket with a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">d3ftly</code> label, d3ftly determines the right repo from the ticket context and starts working.
       </p>
 
       <div className="space-y-6">
@@ -160,32 +160,20 @@ function ForgeAppTab({ check, copy, copied }: { check: JiraCheck | null; copy: (
 
         <Step number={2} title="Configure in Jira">
           <p className="text-zinc-400 text-sm mb-2">
-            After installing, go to <strong className="text-zinc-200">Jira → Apps → d3ftly Settings</strong> and enter:
+            After installing, go to <strong className="text-zinc-200">Jira → Apps → d3ftly Settings</strong> and enter your Installation ID:
           </p>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-zinc-500">Installation ID:</span>
-              <code className="px-2 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-emerald-400 font-mono text-xs">{check?.installation_id ?? "—"}</code>
-              <button onClick={() => copy(String(check?.installation_id ?? ""), "installId")} className="text-xs text-zinc-500 hover:text-zinc-300 underline">
-                {copied === "installId" ? "Copied!" : "Copy"}
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-zinc-500">Default Repo:</span>
-              <span className="text-zinc-400 text-xs">Set this to your primary GitHub repo (e.g. <code className="text-zinc-300">acme/backend</code>)</span>
-            </div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-zinc-500">Installation ID:</span>
+            <code className="px-2 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-emerald-400 font-mono text-xs">{check?.installation_id ?? "—"}</code>
+            <button onClick={() => copy(String(check?.installation_id ?? ""), "installId")} className="text-xs text-zinc-500 hover:text-zinc-300 underline">
+              {copied === "installId" ? "Copied!" : "Copy"}
+            </button>
           </div>
-          <p className="text-zinc-500 text-xs mt-2">
-            The settings page is built into the Forge app — no CLI commands needed.
-          </p>
         </Step>
 
         <Step number={3} title="Label and assign">
-          <p className="text-zinc-400 text-sm mb-2">
-            Add a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">d3ftly</code> label to any Jira issue, then assign it. d3ftly uses your default repo.
-          </p>
-          <p className="text-zinc-500 text-xs">
-            To target a specific repo, use <code className="text-zinc-400">d3ftly:owner/repo</code> instead. This overrides the default.
+          <p className="text-zinc-400 text-sm">
+            Add a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">d3ftly</code> label to any Jira issue, then assign it. d3ftly picks the right repo automatically based on the ticket.
           </p>
         </Step>
 
