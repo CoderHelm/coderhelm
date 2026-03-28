@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api, type Stats, type MonthStats } from "@/lib/api";
+import { useEffect, useMemo, useState } from "react";
+import { api, type Stats, type MonthStats, type Run } from "@/lib/api";
 import {
   AreaChart,
   Area,
@@ -14,6 +14,15 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { CardSkeleton, ChartSkeleton } from "@/components/skeleton";
+
+type Range = "7d" | "30d" | "month" | "all";
+
+const RANGES: { key: Range; label: string }[] = [
+  { key: "7d", label: "7 days" },
+  { key: "30d", label: "30 days" },
+  { key: "month", label: "This month" },
+  { key: "all", label: "All time" },
+];
 
 const COLORS = {
   green: { stroke: "#22c55e", fill: "url(#greenGrad)" },
@@ -68,27 +77,104 @@ const axisProps = {
   axisLine: false,
 };
 
+function statsFromRuns(runs: Run[]): Stats {
+  const total = runs.length;
+  const completed = runs.filter((r) => r.status === "completed" || r.status === "merged").length;
+  const failed = runs.filter((r) => r.status === "failed" || r.status === "error").length;
+  const tokensIn = runs.reduce((s, r) => s + (r.tokens_in ?? 0), 0);
+  const tokensOut = runs.reduce((s, r) => s + (r.tokens_out ?? 0), 0);
+  return {
+    total_runs: total,
+    completed,
+    failed,
+    in_progress: total - completed - failed,
+    total_cost_usd: runs.reduce((s, r) => s + (r.cost_usd ?? 0), 0),
+    total_tokens_in: tokensIn,
+    total_tokens_out: tokensOut,
+    merge_rate: total > 0 ? completed / total : 0,
+  };
+}
+
+function filterRunsByRange(runs: Run[], range: Range): Run[] {
+  if (range === "all") return runs;
+  const now = new Date();
+  let cutoff: Date;
+  if (range === "7d") {
+    cutoff = new Date(now.getTime() - 7 * 86_400_000);
+  } else if (range === "30d") {
+    cutoff = new Date(now.getTime() - 30 * 86_400_000);
+  } else {
+    cutoff = new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+  return runs.filter((r) => new Date(r.created_at) >= cutoff);
+}
+
+function groupRunsByDay(runs: Run[]): { label: string; completed: number; failed: number; total_tokens_in: number; total_tokens_out: number; merge_rate: number }[] {
+  const map = new Map<string, Run[]>();
+  for (const r of runs) {
+    const day = r.created_at.slice(0, 10);
+    const arr = map.get(day) ?? [];
+    arr.push(r);
+    map.set(day, arr);
+  }
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, dayRuns]) => {
+      const completed = dayRuns.filter((r) => r.status === "completed" || r.status === "merged").length;
+      const failed = dayRuns.filter((r) => r.status === "failed" || r.status === "error").length;
+      const total = dayRuns.length;
+      return {
+        label: new Date(day + "T00:00:00").toLocaleDateString("en", { month: "short", day: "numeric" }),
+        completed,
+        failed,
+        total_tokens_in: dayRuns.reduce((s, r) => s + (r.tokens_in ?? 0), 0),
+        total_tokens_out: dayRuns.reduce((s, r) => s + (r.tokens_out ?? 0), 0),
+        merge_rate: total > 0 ? (completed / total) * 100 : 0,
+      };
+    });
+}
+
 export default function AnalyticsPage() {
   const [stats, setStats] = useState<{ month: Stats; all_time: Stats } | null>(null);
   const [history, setHistory] = useState<MonthStats[]>([]);
+  const [runs, setRuns] = useState<Run[]>([]);
   const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState<Range>("30d");
 
   useEffect(() => {
-    Promise.all([api.getStats(), api.getStatsHistory()])
-      .then(([s, h]) => {
+    Promise.all([api.getStats(), api.getStatsHistory(), api.listRuns()])
+      .then(([s, h, r]) => {
         setStats(s);
         setHistory(h.months);
+        setRuns(r.runs);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  const filteredRuns = useMemo(() => filterRunsByRange(runs, range), [runs, range]);
+  const kpi = useMemo(() => {
+    if (range === "month" && stats) return stats.month;
+    if (range === "all" && stats) return stats.all_time;
+    return statsFromRuns(filteredRuns);
+  }, [range, stats, filteredRuns]);
+
+  const useDaily = range === "7d" || range === "30d";
+  const chartData = useMemo(() => {
+    if (useDaily) return groupRunsByDay(filteredRuns);
+    return history.map((m) => ({
+      ...m,
+      label: new Date(m.period + "-01").toLocaleDateString("en", { month: "short" }),
+      tokens: m.total_tokens_in + m.total_tokens_out,
+      merge_rate: m.total_runs > 0 ? (m.completed / m.total_runs) * 100 : 0,
+    }));
+  }, [useDaily, filteredRuns, history]);
 
   if (loading) {
     return (
       <div>
         <h1 className="text-2xl font-bold mb-6">Analytics</h1>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-          <CardSkeleton /><CardSkeleton /><CardSkeleton />
           <CardSkeleton /><CardSkeleton /><CardSkeleton />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -107,30 +193,28 @@ export default function AnalyticsPage() {
     );
   }
 
-  const { month, all_time } = stats;
-
-  const chartData = history.map((m) => ({
-    ...m,
-    label: new Date(m.period + "-01").toLocaleDateString("en", { month: "short" }),
-    tokens: m.total_tokens_in + m.total_tokens_out,
-    merge_rate: m.total_runs > 0 ? (m.completed / m.total_runs) * 100 : 0,
-  }));
-
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Analytics</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Analytics</h1>
+        <div className="flex gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-lg">
+          {RANGES.map((r) => (
+            <button key={r.key} onClick={() => setRange(r.key)} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${range === r.key ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}>
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-        <KpiCard label="Runs this month" value={month.total_runs} />
-        <KpiCard label="Merge rate" value={`${(month.merge_rate * 100).toFixed(0)}%`} />
-        <KpiCard label="Tokens this month" value={formatNumber(month.total_tokens_in + month.total_tokens_out)} />
-        <KpiCard label="All-time runs" value={all_time.total_runs} />
-        <KpiCard label="All-time merge rate" value={`${(all_time.merge_rate * 100).toFixed(0)}%`} />
-        <KpiCard label="All-time tokens" value={formatNumber(all_time.total_tokens_in + all_time.total_tokens_out)} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <KpiCard label="Runs" value={kpi.total_runs} />
+        <KpiCard label="Merge rate" value={`${(kpi.merge_rate * 100).toFixed(0)}%`} />
+        <KpiCard label="Tokens" value={formatNumber(kpi.total_tokens_in + kpi.total_tokens_out)} />
+        <KpiCard label="In progress" value={kpi.in_progress} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ChartCard title="Runs per month">
+        <ChartCard title={useDaily ? "Runs per day" : "Runs per month"}>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={chartData} barGap={2}>
               <GradientDefs />
@@ -145,7 +229,7 @@ export default function AnalyticsPage() {
           <Legend items={[{ label: "Completed", color: COLORS.green.stroke }, { label: "Failed", color: COLORS.red.stroke }]} />
         </ChartCard>
 
-        <ChartCard title="Tokens per month">
+        <ChartCard title={useDaily ? "Tokens per day" : "Tokens per month"}>
           <ResponsiveContainer width="100%" height={240}>
             <AreaChart data={chartData}>
               <GradientDefs />
