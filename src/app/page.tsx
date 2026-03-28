@@ -16,10 +16,15 @@ const features = [
   {
     accentColor: "#7928ca",
     icon: (
+      // Pipeline: left-to-right connected stages
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M9 18V5l12-2v13" />
-        <circle cx="6" cy="18" r="3" />
-        <circle cx="18" cy="16" r="3" />
+        <circle cx="3" cy="12" r="2" />
+        <circle cx="12" cy="12" r="2" />
+        <circle cx="21" cy="12" r="2" />
+        <line x1="5" y1="12" x2="10" y2="12" />
+        <line x1="14" y1="12" x2="19" y2="12" />
+        <polyline points="7 8 12 12 7 16" />
+        <polyline points="16 8 21 12 16 16" />
       </svg>
     ),
     title: "Multi-Pass Pipeline",
@@ -193,18 +198,22 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Features */}
-      <section id="features" className="border-t border-surface-border py-24">
+      {/* What's new — standalone spotlight section */}
+      <section className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-6xl px-6">
-          <h2 className="text-center text-3xl font-bold sm:text-4xl">
-            Built for real engineering teams
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-surface-border" />
+            <span className="text-xs font-semibold uppercase tracking-widest text-text-muted">What&apos;s new</span>
+            <div className="h-px flex-1 bg-surface-border" />
+          </div>
+          <h2 className="mt-6 text-center text-3xl font-bold sm:text-4xl">
+            Plan and understand your codebase
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-center text-text-secondary">
-            Not a code suggestion tool — a full autonomous agent that ships code end-to-end.
+            Beyond writing code — d3ftly now helps you plan features and audit your infrastructure.
           </p>
 
-          {/* Spotlight: new capabilities — full-width visual showcase cards */}
-          <div className="mt-16 space-y-6">
+          <div className="mt-14 space-y-6">
 
             {/* AI Plans */}
             <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-surface-elevated">
@@ -215,9 +224,18 @@ export default function Home() {
               <div className="relative grid md:grid-cols-2">
                 {/* Text */}
                 <div className="flex flex-col justify-center p-8 md:p-10">
-                  <span className="inline-block w-fit rounded-full bg-purple-500/15 px-3 py-1 text-xs font-semibold text-purple-400">
-                    New
-                  </span>
+                  <div className="flex items-center gap-3">
+                    {/* Icon: sparkle list — AI-generated plan */}
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-purple-500/30 bg-purple-500/10">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+                        <rect x="9" y="3" width="6" height="4" rx="1" />
+                        <path d="M9 12h6M9 16h4" />
+                        <path d="M19 3l.5 1.5L21 5l-1.5.5L19 7l-.5-1.5L17 5l1.5-.5z" />
+                      </svg>
+                    </div>
+                    <span className="rounded-full bg-purple-500/15 px-3 py-1 text-xs font-semibold text-purple-400">New</span>
+                  </div>
                   <h3 className="mt-4 text-2xl font-bold">AI Plans</h3>
                   <p className="mt-3 text-text-secondary leading-relaxed">
                     Describe a feature in plain English. d3ftly chats with you to scope the work, then generates an ordered list of GitHub issues — each ready to become a PR with one click.
@@ -290,7 +308,7 @@ export default function Home() {
                 style={{ background: "radial-gradient(ellipse at top right, #14b8a615, transparent 60%)" }}
               />
               <div className="relative grid md:grid-cols-2">
-                {/* Visual mock — diagram + findings */}
+                {/* Visual mock — diagram + findings — LEFT on this card */}
                 <div className="flex items-center justify-center border-b border-teal-500/10 p-6 md:border-b-0 md:border-r md:border-teal-500/10">
                   <div className="w-full max-w-sm rounded-xl border border-[#21262d] bg-[#0d1117] p-5 text-xs">
                     <div className="mb-3 flex items-center justify-between border-b border-[#21262d] pb-3">
@@ -334,9 +352,22 @@ export default function Home() {
 
                 {/* Text */}
                 <div className="flex flex-col justify-center p-8 md:p-10">
-                  <span className="inline-block w-fit rounded-full bg-teal-500/15 px-3 py-1 text-xs font-semibold text-teal-400">
-                    New
-                  </span>
+                  <div className="flex items-center gap-3">
+                    {/* Icon: magnifying glass over topology nodes */}
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-teal-500/30 bg-teal-500/10">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#14b8a6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="5" cy="6" r="2" />
+                        <circle cx="19" cy="6" r="2" />
+                        <circle cx="12" cy="18" r="2" />
+                        <line x1="7" y1="6" x2="17" y2="6" />
+                        <line x1="5" y1="8" x2="12" y2="16" />
+                        <line x1="19" y1="8" x2="12" y2="16" />
+                        <circle cx="19" cy="6" r="5" />
+                        <line x1="22" y1="9" x2="24" y2="11" />
+                      </svg>
+                    </div>
+                    <span className="rounded-full bg-teal-500/15 px-3 py-1 text-xs font-semibold text-teal-400">New</span>
+                  </div>
                   <h3 className="mt-4 text-2xl font-bold">Infrastructure Analysis</h3>
                   <p className="mt-3 text-text-secondary leading-relaxed">
                     Scan your CDK or Terraform stacks and get a live architecture diagram plus a prioritized list of security, cost, and reliability findings — in seconds.
@@ -359,8 +390,21 @@ export default function Home() {
 
           </div>
 
+        </div>
+      </section>
+
+      {/* Features */}
+      <section id="features" className="border-t border-surface-border py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <h2 className="text-center text-3xl font-bold sm:text-4xl">
+            Built for real engineering teams
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-center text-text-secondary">
+            Not a code suggestion tool — a full autonomous agent that ships code end-to-end.
+          </p>
+
           {/* Regular feature grid */}
-          <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {features.map((f) => (
               <div
                 key={f.title}
