@@ -20,6 +20,9 @@ export const api = {
   // Auth
   me: () => request<{ user_id: string; tenant_id: string; github_login: string; email: string; avatar_url: string }>("/api/me"),
 
+  // Health
+  getHealth: () => request<HealthCheck>("/api/health"),
+
   // Runs
   listRuns: () => request<{ runs: Run[] }>("/api/runs"),
   getRun: (id: string) => request<Run>(`/api/runs/${id}`),
@@ -232,4 +235,20 @@ export interface InfraAnalysis {
   suggested_prompt?: string;
   cached_at?: string;
   scanned_repos?: string[];
+}
+
+export interface HealthCheckItem {
+  name: string;
+  status: "ok" | "warning" | "critical";
+  count?: number;
+  depth?: number;
+  visible?: number;
+  in_flight?: number;
+  items?: { run_id?: string; title?: string; status?: string; error?: string; created_at?: string }[];
+}
+
+export interface HealthCheck {
+  status: "healthy" | "degraded" | "unhealthy";
+  checked_at: string;
+  checks: HealthCheckItem[];
 }
