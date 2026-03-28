@@ -131,6 +131,8 @@ export interface Repo {
   name: string;
   enabled: boolean;
   ticket_source: string;
+  onboard_status?: "pending" | "ready" | "failed";
+  onboard_error?: string;
 }
 
 export interface Stats {
@@ -244,7 +246,7 @@ export interface InfraFinding {
 }
 
 export interface InfraAnalysis {
-  status: "pending" | "ready" | "no_infra";
+  status: "pending" | "ready" | "no_infra" | "failed";
   has_infra: boolean;
   diagram?: string;
   diagram_title?: string;
@@ -252,6 +254,7 @@ export interface InfraAnalysis {
   suggested_prompt?: string;
   cached_at?: string;
   scanned_repos?: string[];
+  error?: string;
 }
 
 export interface HealthCheckItem {
