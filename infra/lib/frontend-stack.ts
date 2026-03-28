@@ -114,8 +114,8 @@ export class FrontendStack extends cdk.Stack {
       errorResponses: [
         {
           httpStatus: 403,
-          responseHttpStatus: 403,
-          responsePagePath: "/errors/403.html",
+          responseHttpStatus: 404,
+          responsePagePath: "/errors/404.html",
           ttl: cdk.Duration.minutes(5),
         },
         {
