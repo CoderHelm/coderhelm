@@ -32,6 +32,8 @@ export default function InstructionsPage() {
   const [repoContent, setRepoContent] = useState("");
   const [repoLoading, setRepoLoading] = useState(false);
   const [repoSaving, setRepoSaving] = useState(false);
+  const [generatedContent, setGeneratedContent] = useState("");
+  const [generatedExpanded, setGeneratedExpanded] = useState(false);
 
   useEffect(() => {
     api.getGlobalInstructions().then((data) => {
@@ -49,11 +51,14 @@ export default function InstructionsPage() {
   useEffect(() => {
     if (!selectedRepo) return;
     setRepoLoading(true);
-    api.getRepoInstructions(selectedRepo).then((data) => {
-      setRepoContent(data.content);
-      setRepoLoading(false);
-    }).catch(() => {
-      setRepoContent("");
+    setGeneratedContent("");
+    setGeneratedExpanded(false);
+    Promise.all([
+      api.getRepoInstructions(selectedRepo).then((d) => d.content).catch(() => ""),
+      api.getRepoAgents(selectedRepo).then((d) => d.content).catch(() => ""),
+    ]).then(([custom, generated]) => {
+      setRepoContent(custom);
+      setGeneratedContent(generated);
       setRepoLoading(false);
     });
   }, [selectedRepo]);
@@ -139,11 +144,31 @@ export default function InstructionsPage() {
             </div>
           ) : repoLoading ? <TextareaSkeleton /> : (
             <>
+              {generatedContent && (
+                <div className="mb-4 border border-zinc-800 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setGeneratedExpanded(!generatedExpanded)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-zinc-900/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">Generated</span>
+                      <span className="text-sm text-zinc-300">Codebase analysis</span>
+                    </div>
+                    <span className="text-zinc-600 text-xs">{generatedExpanded ? "Collapse" : "Expand"}</span>
+                  </button>
+                  {generatedExpanded && (
+                    <pre className="px-4 py-3 border-t border-zinc-800 bg-zinc-950 text-xs text-zinc-400 font-mono whitespace-pre-wrap leading-relaxed max-h-96 overflow-auto">
+                      {generatedContent}
+                    </pre>
+                  )}
+                </div>
+              )}
+              <p className="text-xs text-zinc-600 mb-2">Custom instructions (optional)</p>
               <textarea
                 value={repoContent}
                 onChange={(e) => setRepoContent(e.target.value)}
-                rows={16}
-                placeholder={`Repo-specific instructions, e.g.:\n- This is a React Native app, use Expo patterns\n- Use Prisma for all database operations\n- Follow the error handling in src/utils/errors.ts`}
+                rows={12}
+                placeholder={`Add repo-specific conventions, e.g.:\n- This is a React Native app, use Expo patterns\n- Use Prisma for all database operations\n- Follow the error handling in src/utils/errors.ts`}
                 className="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 font-mono placeholder-zinc-700 focus:outline-none focus:border-zinc-500 resize-y"
               />
               <div className="flex items-center gap-3 mt-3">
