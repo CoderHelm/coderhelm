@@ -61,6 +61,10 @@ export const api = {
   listInvoices: () => request<{ invoices: Invoice[] }>("/api/billing/invoices"),
   getInvoicePdf: (id: string) => request<{ pdf_url: string }>(`/api/billing/invoices/${id}/pdf`),
 
+  // Budget
+  getBudget: () => request<{ max_budget_cents: number }>("/api/settings/budget"),
+  updateBudget: (max_budget_cents: number) => request<void>("/api/settings/budget", { method: "PUT", body: JSON.stringify({ max_budget_cents }) }),
+
   // Plans
   listPlans: () => request<{ plans: Plan[] }>("/api/plans"),
   createPlan: (body: { title: string; description?: string; repo?: string; tasks?: Partial<Task>[] }) =>

@@ -90,7 +90,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
       <div className="flex min-h-screen bg-zinc-950">
-        <Sidebar plansEnabled={canUsePlans(billing)} user={user} />
+        <Sidebar plansEnabled={canUsePlans(billing)} billing={billing} user={user} />
         <main className="flex-1 p-8">{children}</main>
       </div>
     </ToastProvider>
@@ -99,9 +99,11 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
 function Sidebar({
   plansEnabled,
+  billing,
   user,
 }: {
   plansEnabled: boolean;
+  billing: BillingInfo | null;
   user: User | null;
 }) {
   const pathname = usePathname();
@@ -161,6 +163,36 @@ function Sidebar({
           </div>
         ))}
       </div>
+
+      {/* Runs remaining */}
+      {billing && (
+        <div className="mx-2 mt-3 pt-3 border-t border-zinc-800/60">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-zinc-500">Runs left</span>
+            <span className={`font-medium ${
+              billing.current_period.total_runs >= billing.limits.runs
+                ? "text-red-400"
+                : billing.current_period.total_runs >= billing.limits.runs * 0.8
+                  ? "text-yellow-400"
+                  : "text-zinc-300"
+            }`}>
+              {Math.max(billing.limits.runs - billing.current_period.total_runs, 0)} / {billing.limits.runs}
+            </span>
+          </div>
+          <div className="mt-1.5 h-1 bg-zinc-800 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${
+                billing.current_period.total_runs >= billing.limits.runs
+                  ? "bg-red-500"
+                  : billing.current_period.total_runs >= billing.limits.runs * 0.8
+                    ? "bg-yellow-500"
+                    : "bg-emerald-500"
+              }`}
+              style={{ width: `${Math.min((billing.current_period.total_runs / billing.limits.runs) * 100, 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {user && (
         <div className="mt-3 pt-3 border-t border-zinc-800/60 flex items-center gap-2">
