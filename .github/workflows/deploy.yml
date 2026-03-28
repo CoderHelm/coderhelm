@@ -24,11 +24,19 @@ jobs:
         with:
           node-version: lts/*
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            infra/package-lock.json
+            dashboard/package-lock.json
 
       - run: npm ci
       - run: npm run build
         env:
           NEXT_PUBLIC_APP_URL: https://app.d3ftly.com
+
+      - name: Build dashboard
+        working-directory: dashboard
+        run: npm ci && npm run build
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
