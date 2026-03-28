@@ -8,7 +8,6 @@ import { useToast } from "@/components/toast";
 import { CardSkeleton, TableSkeleton } from "@/components/skeleton";
 
 const STRIPE_PK = process.env.NEXT_PUBLIC_STRIPE_PK || "";
-const PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || "";
 const stripePromise = STRIPE_PK ? loadStripe(STRIPE_PK) : null;
 
 function formatTokens(n: number): string {
@@ -44,7 +43,7 @@ export default function BillingPage() {
   const handleSubscribe = async () => {
     setActionLoading(true);
     try {
-      const { client_secret } = await api.createSubscription(PRICE_ID);
+      const { client_secret } = await api.createSubscription();
       setClientSecret(client_secret);
       setShowSubscribe(true);
     } catch {
