@@ -26,7 +26,7 @@ export default function Nav() {
             Pricing
           </a>
           <a
-            href="https://github.com/apps/d3ftly"
+            href="https://github.com/apps/d3ftly-agent"
             className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90"
           >
             Install on GitHub
@@ -63,7 +63,7 @@ export default function Nav() {
               Pricing
             </a>
             <a
-              href="https://github.com/apps/d3ftly"
+              href="https://github.com/apps/d3ftly-agent"
               className="rounded-lg bg-white px-4 py-2 text-center text-sm font-semibold text-black"
             >
               Install on GitHub
