@@ -29,8 +29,8 @@ export const api = {
 
   // Repos
   listRepos: () => request<{ repos: Repo[] }>("/api/repos"),
-  toggleRepo: (repo: string, enabled: boolean) => request<void>(`/api/repos/${repo}`, { method: "POST", body: JSON.stringify({ enabled }) }),
-  deleteRepo: (repo: string) => request<void>(`/api/repos/${repo}`, { method: "DELETE" }),
+  toggleRepo: (repo: string, enabled: boolean) => request<void>(`/api/repos/${encodeURIComponent(repo)}`, { method: "POST", body: JSON.stringify({ enabled }) }),
+  deleteRepo: (repo: string) => request<void>(`/api/repos/${encodeURIComponent(repo)}`, { method: "DELETE" }),
 
   // Stats
   getStats: () => request<{ month: Stats; all_time: Stats }>("/api/stats"),
@@ -39,16 +39,16 @@ export const api = {
   // Rules (guardrails)
   getGlobalRules: () => request<{ rules: string[] }>("/api/rules/global"),
   updateGlobalRules: (rules: string[]) => request<void>("/api/rules/global", { method: "PUT", body: JSON.stringify({ rules }) }),
-  getRepoRules: (repo: string) => request<{ rules: string[] }>(`/api/rules/repo/${repo}`),
-  updateRepoRules: (repo: string, rules: string[]) => request<void>(`/api/rules/repo/${repo}`, { method: "PUT", body: JSON.stringify({ rules }) }),
+  getRepoRules: (repo: string) => request<{ rules: string[] }>(`/api/rules/repo/${encodeURIComponent(repo)}`),
+  updateRepoRules: (repo: string, rules: string[]) => request<void>(`/api/rules/repo/${encodeURIComponent(repo)}`, { method: "PUT", body: JSON.stringify({ rules }) }),
 
   // Voice
-  getRepoVoice: (repo: string) => request<{ content: string }>(`/api/voice/repo/${repo}`),
-  updateRepoVoice: (repo: string, content: string) => request<void>(`/api/voice/repo/${repo}`, { method: "PUT", body: JSON.stringify({ content }) }),
+  getRepoVoice: (repo: string) => request<{ content: string }>(`/api/voice/repo/${encodeURIComponent(repo)}`),
+  updateRepoVoice: (repo: string, content: string) => request<void>(`/api/voice/repo/${encodeURIComponent(repo)}`, { method: "PUT", body: JSON.stringify({ content }) }),
 
   // Agents
-  getRepoAgents: (repo: string) => request<{ content: string }>(`/api/agents/repo/${repo}`),
-  updateRepoAgents: (repo: string, content: string) => request<void>(`/api/agents/repo/${repo}`, { method: "PUT", body: JSON.stringify({ content }) }),
+  getRepoAgents: (repo: string) => request<{ content: string }>(`/api/agents/repo/${encodeURIComponent(repo)}`),
+  updateRepoAgents: (repo: string, content: string) => request<void>(`/api/agents/repo/${encodeURIComponent(repo)}`, { method: "PUT", body: JSON.stringify({ content }) }),
 
   // Instructions
   getGlobalInstructions: () => request<{ content: string }>("/api/instructions/global"),
