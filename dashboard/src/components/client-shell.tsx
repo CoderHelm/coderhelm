@@ -61,11 +61,6 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-function canUsePlans(billing: BillingInfo | null): boolean {
-  if (!billing) return false;
-  return billing.subscription_status === "active";
-}
-
 export function ClientShell({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [billing, setBilling] = useState<BillingInfo | null>(null);
@@ -97,7 +92,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
       <div className="flex min-h-screen bg-zinc-950">
-        <Sidebar plansEnabled={canUsePlans(billing)} billing={billing} user={user} />
+        <Sidebar billing={billing} user={user} />
         <main className="flex-1 p-8">{children}</main>
       </div>
     </ToastProvider>
@@ -105,11 +100,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 }
 
 function Sidebar({
-  plansEnabled,
   billing,
   user,
 }: {
-  plansEnabled: boolean;
   billing: BillingInfo | null;
   user: User | null;
 }) {
@@ -126,9 +119,11 @@ function Sidebar({
         href="/"
         className="flex items-center gap-2.5 px-2 py-2.5 mb-2 rounded-md"
       >
-        <span className="inline-flex w-6 h-6 items-center justify-center rounded bg-white text-black text-xs font-bold">
-          d
-        </span>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" className="w-5 h-5 flex-shrink-0">
+          <polygon points="106,416 158,416 226,96 174,96" fill="white"/>
+          <polygon points="196,416 248,416 316,96 264,96" fill="#3B82F6"/>
+          <polygon points="286,416 338,416 406,96 354,96" fill="white"/>
+        </svg>
         <span className="text-sm font-semibold text-zinc-100">d3ftly</span>
       </Link>
 
@@ -143,11 +138,10 @@ function Sidebar({
 
             <div className="space-y-1">
               {group.items.map((item) => {
-                const locked = item.href === "/plans" && !plansEnabled;
                 return (
                   <Link
                     key={item.href}
-                    href={locked ? "/billing" : item.href}
+                    href={item.href}
                     className={`flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors ${
                       isActive(item.href)
                         ? "text-zinc-100 bg-zinc-800"
@@ -158,11 +152,6 @@ function Sidebar({
                       <span className="w-4 text-center text-xs">{item.icon}</span>
                       {item.label}
                     </span>
-                    {locked && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full border border-yellow-500/30 text-yellow-400">
-                        Pro
-                      </span>
-                    )}
                   </Link>
                 );
               })}
