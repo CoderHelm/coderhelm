@@ -225,7 +225,7 @@ export default function Home() {
               </div>
               <ul className="mt-6 space-y-3 text-sm text-text-secondary">
                 <li className="flex items-center gap-2">
-                  <span className="text-green-400">✓</span> 20 runs / month
+                  <span className="text-green-400">✓</span> 5 runs / month
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-green-400">✓</span> Public &amp; private repos
@@ -245,19 +245,19 @@ export default function Home() {
               </a>
             </div>
 
-            {/* Supporter */}
+            {/* Pro */}
             <div className="relative rounded-xl border border-brand/40 bg-surface-elevated p-8 glow">
               <div className="absolute -top-3 left-6 rounded-full gradient-brand px-3 py-0.5 text-xs font-semibold">
-                Supporter
+                Pro
               </div>
-              <h3 className="text-lg font-semibold">Supporter</h3>
+              <h3 className="text-lg font-semibold">Pro</h3>
               <div className="mt-4">
-                <span className="text-4xl font-bold">$29</span>
+                <span className="text-4xl font-bold">$199</span>
                 <span className="text-text-secondary">/month</span>
               </div>
               <ul className="mt-6 space-y-3 text-sm text-text-secondary">
                 <li className="flex items-center gap-2">
-                  <span className="text-brand">✓</span> Unlimited runs
+                  <span className="text-brand">✓</span> 100 runs / month
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-brand">✓</span> Priority queue
@@ -266,7 +266,7 @@ export default function Home() {
                   <span className="text-brand">✓</span> Custom instructions
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-brand">✓</span> Support the project
+                  <span className="text-brand">✓</span> Email support
                 </li>
               </ul>
               <a

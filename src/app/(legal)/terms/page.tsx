@@ -7,76 +7,234 @@ export default function Terms() {
     <>
       <h1>Terms of Service</h1>
       <p><strong>Effective date:</strong> July 14, 2025</p>
+      <p><strong>Last updated:</strong> March 28, 2026</p>
 
       <p>
-        These Terms of Service (&quot;Terms&quot;) govern your use of the d3ftly website and GitHub
-        App (the &quot;Service&quot;) operated by d3ftly (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;).
-        By installing the GitHub App or accessing the Service, you agree to these Terms.
+        These Terms of Service (&quot;Terms&quot;) constitute a legally binding agreement between
+        you (individually or on behalf of an entity, &quot;you&quot; or &quot;your&quot;) and d3ftly
+        (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) governing your use of the d3ftly website
+        at d3ftly.com, the d3ftly GitHub App, the d3ftly dashboard, and all related services
+        (collectively, the &quot;Service&quot;). By installing the GitHub App, accessing the dashboard,
+        or otherwise using the Service, you agree to be bound by these Terms.
+      </p>
+      <p>
+        If you do not agree to these Terms, do not install or use the Service.
       </p>
 
       <h2>1. Eligibility</h2>
-      <p>You must be at least 16 years old and have the authority to bind the organization
-        (if applicable) to use this Service. By installing the GitHub App on an organization,
-        you represent that you have the necessary permissions.</p>
+      <p>You must be at least 16 years of age to use the Service. If you are using the Service on
+        behalf of an organization, you represent and warrant that you have the authority to bind
+        that organization to these Terms. By installing the GitHub App on an organization account,
+        you confirm that you have the necessary administrative permissions.</p>
 
       <h2>2. Description of Service</h2>
-      <p>d3ftly is an autonomous AI coding agent delivered as a GitHub App. It reads issues
-        assigned to it, analyzes your codebase, generates code changes, and opens pull requests.
-        The Service is provided on an &quot;as is&quot; and &quot;as available&quot; basis.</p>
-
-      <h2>3. Your Responsibilities</h2>
+      <p>d3ftly is an autonomous AI coding agent delivered as a GitHub App. When you assign a
+        GitHub issue to d3ftly or apply a designated label, the Service:</p>
       <ul>
-        <li>You are responsible for reviewing all code changes made by d3ftly before merging.</li>
+        <li>Reads your repository files and structure to understand context</li>
+        <li>Analyzes the issue and generates a plan for code changes</li>
+        <li>Implements the changes across one or more files</li>
+        <li>Self-reviews the changes through multiple automated passes</li>
+        <li>Opens a draft pull request for your review</li>
+        <li>Optionally detects and fixes CI failures on its branch</li>
+      </ul>
+      <p>The Service is provided on an &quot;as is&quot; and &quot;as available&quot; basis.
+        We do not guarantee that the Service will be uninterrupted, error-free, or available
+        at all times.</p>
+
+      <h2>3. Account &amp; Access</h2>
+      <p>Access to the Service is managed through your GitHub account and the d3ftly GitHub App
+        installation. You are responsible for:</p>
+      <ul>
+        <li>Maintaining the security of your GitHub account credentials</li>
+        <li>All activity that occurs under your installation, whether authorized by you or not</li>
+        <li>Promptly notifying us of any unauthorized use of the Service</li>
+      </ul>
+      <p>We reserve the right to suspend or disable access if we reasonably believe your
+        account has been compromised.</p>
+
+      <h2>4. Your Responsibilities</h2>
+      <ul>
+        <li>You are solely responsible for reviewing all code changes made by d3ftly before
+          merging them into any branch</li>
         <li>You must not use the Service to generate malicious code, malware, or code that
-          violates any law or third-party rights.</li>
-        <li>You must comply with GitHub&apos;s Terms of Service and Acceptable Use Policies.</li>
+          violates any applicable law or third-party rights</li>
+        <li>You must comply with GitHub&apos;s Terms of Service and Acceptable Use Policies</li>
+        <li>You must comply with our <a href="/acceptable-use">Acceptable Use Policy</a></li>
         <li>You are responsible for any consequences of merging d3ftly-generated code into
-          your repositories.</li>
+          your repositories, including but not limited to bugs, security vulnerabilities,
+          data loss, or service outages</li>
+        <li>You acknowledge that AI-generated code may contain errors and should be treated
+          as a draft requiring human review</li>
       </ul>
 
-      <h2>4. Intellectual Property</h2>
+      <h2>5. Intellectual Property</h2>
+      <h3>5.1 Your Code</h3>
       <p>Code generated by d3ftly for your repositories belongs to you. We claim no ownership
-        of your code, repositories, or the output produced by the Service. The Service itself,
-        including its name, brand, and underlying technology, remains our intellectual property.</p>
+        of your code, your repositories, the input you provide (issue descriptions, comments),
+        or the output produced by the Service on your behalf.</p>
+      <h3>5.2 Our Service</h3>
+      <p>The Service itself — including its name, branding, logos, underlying technology,
+        algorithms, user interface, documentation, and all related intellectual property —
+        remains our exclusive property. Nothing in these Terms grants you any right, title,
+        or interest in the Service beyond the limited right to use it as described herein.</p>
+      <h3>5.3 Feedback</h3>
+      <p>If you provide feedback, suggestions, or ideas about the Service, you grant us a
+        non-exclusive, royalty-free, worldwide, perpetual license to use and incorporate
+        such feedback without obligation to you.</p>
 
-      <h2>5. Pricing and Payment</h2>
-      <p>The free tier includes a limited number of runs per month. Paid plans are billed
-        monthly via Stripe. Prices may change with 30 days&apos; notice. You may cancel your
-        subscription at any time; access continues until the end of the billing period.</p>
+      <h2>6. Pricing, Payment &amp; Billing</h2>
+      <h3>6.1 Plans</h3>
+      <p>The Service offers a free tier with 5 runs per month and a paid Pro plan with
+        100 runs per month. Current pricing is displayed on the <a href="/#pricing">pricing page</a>.</p>
+      <h3>6.2 Billing</h3>
+      <p>Paid plans are billed monthly in advance via Stripe. By subscribing, you authorize us
+        to charge the payment method on file for recurring monthly fees until you cancel.</p>
+      <h3>6.3 Price Changes</h3>
+      <p>We may change plan prices with at least 30 days&apos; prior notice. If you do not agree
+        to a price change, you may cancel your subscription before the new price takes effect.</p>
+      <h3>6.4 Cancellation &amp; Refunds</h3>
+      <p>You may cancel your subscription at any time through the billing portal or by contacting
+        support. Upon cancellation, you retain access to paid features until the end of your
+        current billing period. We do not provide prorated refunds for partial months. If you
+        believe you were charged in error, contact{" "}
+        <a href="mailto:support@d3ftly.com">support@d3ftly.com</a> within 30 days.</p>
+      <h3>6.5 Overdue Payments</h3>
+      <p>If a payment fails, we will attempt to retry the charge. If payment remains outstanding
+        for more than 14 days, we may downgrade your account to the free tier until the balance
+        is resolved.</p>
 
-      <h2>6. Limitation of Liability</h2>
-      <p>TO THE MAXIMUM EXTENT PERMITTED BY LAW, d3ftly SHALL NOT BE LIABLE FOR ANY INDIRECT,
-        INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOSS OF PROFITS,
-        DATA, OR GOODWILL, ARISING OUT OF YOUR USE OF THE SERVICE. OUR TOTAL LIABILITY SHALL
-        NOT EXCEED THE AMOUNT YOU PAID US IN THE 12 MONTHS PRECEDING THE CLAIM.</p>
+      <h2>7. Service Availability &amp; Modifications</h2>
+      <p>We may modify, suspend, or discontinue any part of the Service at any time, with or
+        without notice. We will make reasonable efforts to provide advance notice of material
+        changes. We are not liable for any modification, suspension, or discontinuation of
+        the Service.</p>
 
-      <h2>7. Disclaimer of Warranties</h2>
-      <p>THE SERVICE IS PROVIDED &quot;AS IS&quot; WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR
-        IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
-        NON-INFRINGEMENT. WE DO NOT WARRANT THAT THE CODE GENERATED BY THE SERVICE WILL BE
-        ERROR-FREE, SECURE, OR SUITABLE FOR ANY PURPOSE.</p>
+      <h2>8. Data &amp; Privacy</h2>
+      <p>Your use of the Service is also governed by our <a href="/privacy">Privacy Policy</a>,
+        which describes how we collect, use, and protect your data. By using the Service, you
+        acknowledge that you have read and understood the Privacy Policy.</p>
 
-      <h2>8. Indemnification</h2>
-      <p>You agree to indemnify and hold harmless d3ftly from any claims, damages, or expenses
-        arising from your use of the Service, including any code merged into your repositories.</p>
+      <h2>9. Confidentiality</h2>
+      <p>We treat your source code and repository content as confidential information. Source
+        code is processed in-memory only and is never persisted to durable storage. We will
+        not access your repositories for any purpose other than providing the Service as you
+        have directed.</p>
 
-      <h2>9. Termination</h2>
-      <p>We may suspend or terminate your access to the Service at any time for violation of
-        these Terms or for any other reason with reasonable notice. You may terminate by
-        uninstalling the GitHub App at any time.</p>
+      <h2>10. Disclaimer of Warranties</h2>
+      <p>THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; WITHOUT WARRANTIES
+        OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, INCLUDING BUT NOT LIMITED
+        TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND
+        NON-INFRINGEMENT.</p>
+      <p>WITHOUT LIMITING THE FOREGOING, WE DO NOT WARRANT THAT:</p>
+      <ul>
+        <li>THE CODE GENERATED BY THE SERVICE WILL BE ERROR-FREE, SECURE, COMPLETE, OR
+          SUITABLE FOR ANY PARTICULAR PURPOSE</li>
+        <li>THE SERVICE WILL MEET YOUR REQUIREMENTS OR EXPECTATIONS</li>
+        <li>THE SERVICE WILL BE UNINTERRUPTED, TIMELY, OR FREE FROM ERRORS OR HARMFUL
+          COMPONENTS</li>
+        <li>ANY ERRORS IN THE SERVICE WILL BE CORRECTED</li>
+      </ul>
+      <p>YOU ACKNOWLEDGE THAT AI-GENERATED CODE MAY CONTAIN BUGS, SECURITY VULNERABILITIES,
+        OR OTHER DEFECTS, AND THAT YOU ARE SOLELY RESPONSIBLE FOR TESTING AND REVIEWING ALL
+        OUTPUT BEFORE USE IN PRODUCTION.</p>
 
-      <h2>10. Governing Law</h2>
-      <p>These Terms are governed by the laws of the State of New York, without regard to
-        conflict of law provisions.</p>
+      <h2>11. Limitation of Liability</h2>
+      <p>TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW:</p>
+      <ul>
+        <li>d3ftly SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL,
+          EXEMPLARY, OR PUNITIVE DAMAGES, INCLUDING BUT NOT LIMITED TO LOSS OF PROFITS, LOSS
+          OF DATA, LOSS OF GOODWILL, BUSINESS INTERRUPTION, OR COST OF SUBSTITUTE SERVICES,
+          ARISING OUT OF OR RELATING TO YOUR USE OF OR INABILITY TO USE THE SERVICE, REGARDLESS
+          OF THE THEORY OF LIABILITY (CONTRACT, TORT, STRICT LIABILITY, OR OTHERWISE), EVEN IF
+          WE HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES</li>
+        <li>OUR TOTAL AGGREGATE LIABILITY FOR ALL CLAIMS ARISING OUT OF OR RELATING TO THESE
+          TERMS OR THE SERVICE SHALL NOT EXCEED THE GREATER OF (A) THE AMOUNT YOU PAID US IN
+          THE 12 MONTHS PRECEDING THE EVENT GIVING RISE TO THE CLAIM, OR (B) ONE HUNDRED
+          DOLLARS ($100)</li>
+      </ul>
+      <p>SOME JURISDICTIONS DO NOT ALLOW THE EXCLUSION OR LIMITATION OF CERTAIN DAMAGES. IN
+        SUCH JURISDICTIONS, OUR LIABILITY IS LIMITED TO THE MAXIMUM EXTENT PERMITTED BY LAW.</p>
 
-      <h2>11. Changes to Terms</h2>
-      <p>We may modify these Terms at any time. Material changes will be communicated via the
-        Service or by email. Continued use after changes constitutes acceptance.</p>
+      <h2>12. Indemnification</h2>
+      <p>You agree to indemnify, defend, and hold harmless d3ftly and its officers, directors,
+        employees, agents, and affiliates from and against any and all claims, damages, losses,
+        liabilities, costs, and expenses (including reasonable attorneys&apos; fees) arising out
+        of or relating to:</p>
+      <ul>
+        <li>Your use of the Service</li>
+        <li>Code generated by the Service that you choose to merge, deploy, or distribute</li>
+        <li>Your violation of these Terms or any applicable law</li>
+        <li>Your violation of any third-party rights</li>
+        <li>Any claim by a third party related to code produced by the Service on your behalf</li>
+      </ul>
 
-      <h2>12. Contact</h2>
-      <p>Questions about these Terms? Contact us at{" "}
-        <a href="mailto:legal@d3ftly.com">legal@d3ftly.com</a>.
-      </p>
+      <h2>13. Termination</h2>
+      <h3>13.1 By You</h3>
+      <p>You may terminate your use of the Service at any time by uninstalling the d3ftly
+        GitHub App. If you have a paid subscription, cancellation terms in Section 6.4 apply.</p>
+      <h3>13.2 By Us</h3>
+      <p>We may suspend or terminate your access to the Service immediately if:</p>
+      <ul>
+        <li>You violate these Terms or the Acceptable Use Policy</li>
+        <li>Your use poses a security risk to the Service or other users</li>
+        <li>Required by law or legal process</li>
+        <li>Your account has been inactive for more than 12 months</li>
+      </ul>
+      <p>We will make reasonable efforts to notify you before or promptly after suspension
+        or termination, unless doing so would compromise security or violate the law.</p>
+      <h3>13.3 Effect of Termination</h3>
+      <p>Upon termination, your right to use the Service ceases immediately. Sections that by
+        their nature should survive termination will survive, including but not limited to
+        Intellectual Property, Disclaimer of Warranties, Limitation of Liability,
+        Indemnification, and Governing Law.</p>
+
+      <h2>14. Governing Law &amp; Dispute Resolution</h2>
+      <h3>14.1 Governing Law</h3>
+      <p>These Terms are governed by and construed in accordance with the laws of the State
+        of New York, United States, without regard to its conflict of law provisions.</p>
+      <h3>14.2 Dispute Resolution</h3>
+      <p>Any dispute arising out of or relating to these Terms or the Service shall first be
+        attempted to be resolved through good-faith negotiation. If the dispute is not resolved
+        within 30 days, either party may bring a claim in the state or federal courts located
+        in New York County, New York, and you consent to the exclusive jurisdiction and venue
+        of such courts.</p>
+      <h3>14.3 Class Action Waiver</h3>
+      <p>TO THE EXTENT PERMITTED BY LAW, ALL CLAIMS MUST BE BROUGHT IN THE PARTIES&apos;
+        INDIVIDUAL CAPACITY AND NOT AS A PLAINTIFF OR CLASS MEMBER IN ANY PURPORTED CLASS,
+        COLLECTIVE, OR REPRESENTATIVE ACTION.</p>
+
+      <h2>15. General Provisions</h2>
+      <ul>
+        <li><strong>Entire Agreement:</strong> These Terms, together with the Privacy Policy
+          and Acceptable Use Policy, constitute the entire agreement between you and d3ftly
+          regarding the Service</li>
+        <li><strong>Severability:</strong> If any provision of these Terms is found to be
+          unenforceable, the remaining provisions will continue in full force and effect</li>
+        <li><strong>Waiver:</strong> Our failure to enforce any right or provision of these
+          Terms will not be deemed a waiver of such right or provision</li>
+        <li><strong>Assignment:</strong> You may not assign or transfer these Terms without our
+          prior written consent. We may assign these Terms in connection with a merger,
+          acquisition, or sale of assets</li>
+        <li><strong>Force Majeure:</strong> We are not liable for any failure or delay in
+          performance due to causes beyond our reasonable control, including natural disasters,
+          war, terrorism, pandemics, strikes, government actions, or internet or infrastructure
+          failures</li>
+      </ul>
+
+      <h2>16. Changes to These Terms</h2>
+      <p>We may modify these Terms at any time. When we make material changes, we will update
+        the &quot;Last updated&quot; date and notify you by email or through the Service at least
+        30 days before the changes take effect. Your continued use of the Service after the
+        effective date constitutes acceptance of the revised Terms. If you do not agree to the
+        revised Terms, you must stop using the Service.</p>
+
+      <h2>17. Contact</h2>
+      <p>If you have questions about these Terms, contact us at:</p>
+      <ul>
+        <li>Legal inquiries: <a href="mailto:legal@d3ftly.com">legal@d3ftly.com</a></li>
+        <li>General support: <a href="mailto:support@d3ftly.com">support@d3ftly.com</a></li>
+      </ul>
     </>
   );
 }
