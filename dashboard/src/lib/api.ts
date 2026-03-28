@@ -29,6 +29,8 @@ export const api = {
 
   // Repos
   listRepos: () => request<{ repos: Repo[] }>("/api/repos"),
+  toggleRepo: (repo: string, enabled: boolean) => request<void>(`/api/repos/${repo}`, { method: "POST", body: JSON.stringify({ enabled }) }),
+  deleteRepo: (repo: string) => request<void>(`/api/repos/${repo}`, { method: "DELETE" }),
 
   // Stats
   getStats: () => request<{ month: Stats; all_time: Stats }>("/api/stats"),
