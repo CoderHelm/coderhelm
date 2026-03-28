@@ -21,7 +21,6 @@ const SEVERITY_ICONS = {
 const CATEGORY_LABELS = {
   security: "Security",
   performance: "Performance",
-  cost: "Cost",
   reliability: "Reliability",
 };
 
@@ -126,7 +125,7 @@ function InfrastructureContent() {
           <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4 text-2xl">⬡</div>
           <h2 className="text-lg font-semibold mb-2">No infrastructure code found</h2>
           <p className="text-zinc-500 text-sm mb-6">
-            d3ftly scanned your connected repos and could not find any CDK or Terraform files.
+            d3ftly scanned your connected repos and could not find any CDK, Terraform, or Serverless files.
             Use the prompt below to create a Plan and generate your infrastructure from scratch.
           </p>
 
@@ -167,7 +166,7 @@ function InfrastructureContent() {
         <div className="flex flex-col items-center justify-center py-32">
           <div className="w-8 h-8 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin mb-4" />
           <p className="text-zinc-400 text-sm">Analyzing your infrastructure...</p>
-          <p className="text-zinc-600 text-xs mt-1">Scanning repos for CDK/Terraform code and generating diagram</p>
+          <p className="text-zinc-600 text-xs mt-1">Scanning repos for CDK/Terraform/Serverless code and generating diagram</p>
         </div>
       </div>
     );

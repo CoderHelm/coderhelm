@@ -222,7 +222,7 @@ export interface Task {
 
 export interface InfraFinding {
   severity: "error" | "warning" | "info";
-  category: "security" | "performance" | "cost" | "reliability";
+  category: "security" | "performance" | "reliability";
   title: string;
   detail: string;
   file?: string;

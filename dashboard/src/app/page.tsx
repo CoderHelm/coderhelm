@@ -43,7 +43,6 @@ export default function RunsPage() {
                 <th className="px-4 py-3 font-medium">Title</th>
                 <th className="px-4 py-3 font-medium">Repo</th>
                 <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Cost</th>
                 <th className="px-4 py-3 font-medium">Time</th>
               </tr>
             </thead>
@@ -57,7 +56,6 @@ export default function RunsPage() {
                   <td className="px-4 py-3">
                     <StatusBadge status={run.status} />
                   </td>
-                  <td className="px-4 py-3 text-zinc-400">{run.cost_usd ? `$${run.cost_usd.toFixed(2)}` : "—"}</td>
                   <td className="px-4 py-3 text-zinc-400">{run.duration_s ? `${run.duration_s}s` : "—"}</td>
                 </tr>
               ))}
