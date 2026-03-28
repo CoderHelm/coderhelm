@@ -10,7 +10,7 @@ const features = [
       </svg>
     ),
     title: "Assign & Go",
-    desc: "Assign an issue to d3ftly or label it — a draft PR appears, no prompting needed.",
+    desc: "Assign a GitHub issue or Jira ticket — d3ftly creates a branch, opens a draft PR, and marks it ready when CI passes.",
   },
   {
     icon: (
@@ -22,27 +22,29 @@ const features = [
         <path d="M7 18h10" />
       </svg>
     ),
-    title: "7-Pass Pipeline",
+    title: "Multi-Pass Pipeline",
     desc: "Triage → Plan → Implement → Review → PR → CI Fix → Feedback. Every change is self-reviewed before you see it.",
   },
   {
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="11" width="18" height="11" rx="2" />
-        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        <path d="M9 12l2 2 4-4" />
       </svg>
     ),
-    title: "Zero Data Retention",
-    desc: "Your code is processed in-memory. We never store source files or train on your data.",
+    title: "Guardrails",
+    desc: "Define must-rules like \"never push to main\" or \"always add tests\". d3ftly enforces them on every run.",
   },
   {
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        <path d="M8 9h8" />
+        <path d="M8 13h4" />
       </svg>
     ),
-    title: "Built in Rust",
-    desc: "Engineered from the ground up in Rust for speed and reliability. Sub-second response times with minimal overhead.",
+    title: "Team Voice",
+    desc: "Learns from your existing PRs, commits, and reviews. Writes descriptions that sound like your team, not a bot.",
   },
   {
     icon: (
@@ -71,17 +73,17 @@ const steps = [
   {
     step: "01",
     title: "Install the GitHub App",
-    desc: "One click — choose which repos to enable. d3ftly generates an AGENTS.md to learn your codebase.",
+    desc: "One click — choose which repos to enable. Connect Jira for ticket sync. d3ftly generates an AGENTS.md to learn your codebase.",
   },
   {
     step: "02",
     title: "Create an issue",
-    desc: 'Write a GitHub issue describing what you need. Assign it to d3ftly[bot] or add the "d3ftly" label.',
+    desc: 'Write a GitHub issue or Jira ticket describing what you need. Assign it to d3ftly[bot] or add the "d3ftly" label.',
   },
   {
     step: "03",
     title: "Review the PR",
-    desc: "d3ftly opens a draft PR with implementation, tests, and a summary. Review, comment, merge.",
+    desc: "d3ftly opens a draft PR, runs CI, and marks it ready when checks pass. Review, comment, merge.",
   },
 ];
 
@@ -115,7 +117,7 @@ export default function Home() {
 
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <a
-              href="https://github.com/apps/d3ftly"
+              href="https://github.com/apps/d3ftly-agent"
               className="gradient-brand rounded-xl px-8 py-3.5 text-base font-semibold text-white shadow-lg transition-transform hover:scale-[1.02]"
             >
               Install on GitHub — Free
@@ -231,14 +233,14 @@ export default function Home() {
                   <span className="text-green-400">✓</span> Public &amp; private repos
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-green-400">✓</span> All 7 passes
+                  <span className="text-green-400">✓</span> All passes
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-green-400">✓</span> CI self-healing
                 </li>
               </ul>
               <a
-                href="https://github.com/apps/d3ftly"
+                href="https://github.com/apps/d3ftly-agent"
                 className="mt-8 block rounded-lg border border-surface-border bg-transparent px-6 py-3 text-center text-sm font-semibold transition-colors hover:bg-surface-border"
               >
                 Get started
@@ -270,7 +272,7 @@ export default function Home() {
                 </li>
               </ul>
               <a
-                href="https://github.com/apps/d3ftly"
+                href="https://github.com/apps/d3ftly-agent"
                 className="mt-8 block rounded-lg gradient-brand px-6 py-3 text-center text-sm font-semibold text-white transition-transform hover:scale-[1.02]"
               >
                 Upgrade
@@ -290,7 +292,7 @@ export default function Home() {
             Install d3ftly in 30 seconds. No credit card, no config.
           </p>
           <a
-            href="https://github.com/apps/d3ftly"
+            href="https://github.com/apps/d3ftly-agent"
             className="mt-8 inline-block gradient-brand rounded-xl px-8 py-3.5 text-base font-semibold text-white shadow-lg transition-transform hover:scale-[1.02]"
           >
             Install on GitHub — Free
