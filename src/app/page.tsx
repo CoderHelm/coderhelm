@@ -119,7 +119,7 @@ const infraMermaid = `architecture-beta
   api:R --> L:gw
   gw:R --> L:db
   gw:B --> T:q
-  q:R --> L:wk
+  q:T --> B:wk
   wk:R --> L:s3
   wk:B --> T:dlq`;
 
