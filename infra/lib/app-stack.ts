@@ -91,7 +91,7 @@ export class AppStack extends cdk.Stack {
       }
     );
 
-    // SPA rewrite: deep links → /index.html, real files pass through
+    // SPA rewrite: append index.html for directory paths
     const spaRewrite = new cloudfront.Function(this, "SpaRewrite", {
       functionName: `${prefix}-app-spa-rewrite`,
       code: cloudfront.FunctionCode.fromInline(`
@@ -99,8 +99,10 @@ function handler(event) {
   var request = event.request;
   var uri = request.uri;
   if (uri.startsWith('/errors/')) return request;
-  if (uri === '/' || uri.indexOf('.') === -1) {
-    request.uri = '/index.html';
+  if (uri.endsWith('/')) {
+    request.uri = uri + 'index.html';
+  } else if (uri.indexOf('.') === -1) {
+    request.uri = uri + '/index.html';
   }
   return request;
 }
