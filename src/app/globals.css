@@ -40,6 +40,102 @@ body {
   box-shadow: 0 0 80px rgba(0, 212, 255, 0.15);
 }
 
+/* ── Aurora hero background ───────────────────────────────────────────────── */
+
+/* Each blob animates independently so they drift and pulse. */
+@keyframes aurora-drift-1 {
+  0%, 100% { transform: translate(0%, 0%) scale(1); opacity: 0.55; }
+  33%       { transform: translate(8%, -12%) scale(1.15); opacity: 0.7; }
+  66%       { transform: translate(-6%, 10%) scale(0.9); opacity: 0.45; }
+}
+@keyframes aurora-drift-2 {
+  0%, 100% { transform: translate(0%, 0%) scale(1); opacity: 0.45; }
+  40%       { transform: translate(-10%, 8%) scale(1.2); opacity: 0.65; }
+  70%       { transform: translate(12%, -6%) scale(0.85); opacity: 0.35; }
+}
+@keyframes aurora-drift-3 {
+  0%, 100% { transform: translate(0%, 0%) scale(1); opacity: 0.4; }
+  50%       { transform: translate(6%, 14%) scale(1.1); opacity: 0.6; }
+}
+@keyframes aurora-drift-4 {
+  0%, 100% { transform: translate(0%, 0%) scale(1); opacity: 0.3; }
+  30%       { transform: translate(-8%, -10%) scale(1.25); opacity: 0.5; }
+  60%       { transform: translate(10%, 8%) scale(0.8); opacity: 0.2; }
+}
+
+.aurora-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Noise texture overlay for film-grain depth */
+.aurora-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 200px 200px;
+  opacity: 0.35;
+  mix-blend-mode: overlay;
+}
+
+.aurora-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  will-change: transform, opacity;
+}
+
+/* Cyan — brand primary */
+.aurora-blob-1 {
+  width: 640px;
+  height: 640px;
+  top: -15%;
+  left: 20%;
+  background: radial-gradient(ellipse at center, #00d4ff55 0%, transparent 70%);
+  animation: aurora-drift-1 12s ease-in-out infinite;
+}
+
+/* Purple */
+.aurora-blob-2 {
+  width: 580px;
+  height: 580px;
+  top: 10%;
+  right: 10%;
+  background: radial-gradient(ellipse at center, #7928ca55 0%, transparent 70%);
+  animation: aurora-drift-2 16s ease-in-out infinite;
+}
+
+/* Electric blue */
+.aurora-blob-3 {
+  width: 480px;
+  height: 480px;
+  bottom: 5%;
+  left: 30%;
+  background: radial-gradient(ellipse at center, #2563eb44 0%, transparent 70%);
+  animation: aurora-drift-3 18s ease-in-out infinite;
+}
+
+/* Emerald accent — subtle */
+.aurora-blob-4 {
+  width: 420px;
+  height: 420px;
+  top: 40%;
+  left: -5%;
+  background: radial-gradient(ellipse at center, #10b98133 0%, transparent 70%);
+  animation: aurora-drift-4 14s ease-in-out infinite;
+}
+
+/* Radial vignette so the dark page bg shows through at edges */
+.aurora-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 40%, transparent 20%, #0a0a0a 75%);
+}
+
 /* Code window styling */
 .code-window {
   background: #0d1117;
