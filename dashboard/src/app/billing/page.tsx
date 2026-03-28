@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api, type BillingInfo, type Invoice } from "@/lib/api";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { useToast } from "@/components/toast";
 import { CardSkeleton, TableSkeleton } from "@/components/skeleton";
+import { useSearchParams } from "next/navigation";
 
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -17,13 +18,12 @@ export default function BillingPage() {
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showSubscribe, setShowSubscribe] = useState(false);
   const [showUpdateCard, setShowUpdateCard] = useState(false);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [setupSecret, setSetupSecret] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const { toast } = useToast();
+  const searchParams = useSearchParams();
 
   const refresh = useCallback(() => {
     setLoading(true);
@@ -41,15 +41,20 @@ export default function BillingPage() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  useEffect(() => {
+    if (searchParams.get("success") === "true") {
+      toast("Subscription activated!", "success");
+      window.history.replaceState({}, "", "/billing/");
+    }
+  }, [searchParams, toast]);
+
   const handleSubscribe = async () => {
     setActionLoading(true);
     try {
-      const { client_secret } = await api.createSubscription();
-      setClientSecret(client_secret);
-      setShowSubscribe(true);
+      const { url } = await api.createSubscription();
+      window.location.href = url;
     } catch {
       toast("Failed to start subscription. Please try again.", "error");
-    } finally {
       setActionLoading(false);
     }
   };
@@ -125,16 +130,6 @@ export default function BillingPage() {
   return (
     <div className="max-w-3xl">
       <h1 className="text-2xl font-bold mb-6">Billing</h1>
-
-      {/* Stripe Elements modal for subscribing */}
-      {showSubscribe && clientSecret && stripePromise && (
-        <Modal onClose={() => { setShowSubscribe(false); setClientSecret(null); }}>
-          <h2 className="text-lg font-bold mb-4">Subscribe to Pro</h2>
-          <Elements stripe={stripePromise} options={{ clientSecret, appearance: stripeAppearance }}>
-            <SubscribeForm onSuccess={() => { setShowSubscribe(false); setClientSecret(null); refresh(); }} />
-          </Elements>
-        </Modal>
-      )}
 
       {/* Stripe Elements modal for updating card */}
       {showUpdateCard && setupSecret && stripePromise && (
@@ -327,41 +322,6 @@ export default function BillingPage() {
 }
 
 // ─── Sub-components ───────────────────────────────────────────────
-
-function SubscribeForm({ onSuccess }: { onSuccess: () => void }) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!stripe || !elements) return;
-    setSubmitting(true);
-    setError(null);
-    const result = await stripe.confirmPayment({ elements, redirect: "if_required" });
-    if (result.error) {
-      setError(result.error.message || "Payment failed");
-      setSubmitting(false);
-    } else {
-      onSuccess();
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <PaymentElement />
-      {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
-      <button
-        type="submit"
-        disabled={!stripe || submitting}
-        className="mt-4 w-full px-4 py-2.5 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-50"
-      >
-        {submitting ? "Processing..." : "Subscribe — $199/mo"}
-      </button>
-    </form>
-  );
-}
 
 function UpdateCardForm({ onSuccess }: { onSuccess: () => void }) {
   const stripe = useStripe();
