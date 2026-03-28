@@ -1,14 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { api, type BillingInfo, type Invoice } from "@/lib/api";
-import { loadStripe } from "@stripe/stripe-js";
+import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { useToast } from "@/components/toast";
 import { CardSkeleton, TableSkeleton } from "@/components/skeleton";
-
-const STRIPE_PK = process.env.NEXT_PUBLIC_STRIPE_PK || "";
-const stripePromise = STRIPE_PK ? loadStripe(STRIPE_PK) : null;
 
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -25,6 +22,7 @@ export default function BillingPage() {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [setupSecret, setSetupSecret] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const { toast } = useToast();
 
   const refresh = useCallback(() => {
@@ -33,10 +31,13 @@ export default function BillingPage() {
       .then(([b, i]) => {
         setBilling(b);
         setInvoices(i.invoices);
+        if (b.stripe_publishable_key && !stripePromise) {
+          setStripePromise(loadStripe(b.stripe_publishable_key));
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [stripePromise]);
 
   useEffect(() => { refresh(); }, [refresh]);
 

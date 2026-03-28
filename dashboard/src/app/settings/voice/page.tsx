@@ -78,17 +78,21 @@ export default function VoicePage() {
         This is auto-generated during onboarding by analyzing your team&apos;s existing PRs and commits — but you can edit it anytime.
       </p>
 
-      {repos.length > 0 && (
-        <RepoCombobox
-          repos={repos}
-          selected={selectedRepo}
-          onSelect={setSelectedRepo}
-        />
-      )}
-
-      {loading ? (
-        <TextareaSkeleton />
+      {!loading && repos.length === 0 ? (
+        <p className="text-zinc-500 text-sm">No enabled repos. Enable repos in Settings → Repos first.</p>
       ) : (
+        <>
+          {repos.length > 0 && (
+            <RepoCombobox
+              repos={repos}
+              selected={selectedRepo}
+              onSelect={setSelectedRepo}
+            />
+          )}
+
+          {loading ? (
+            <TextareaSkeleton />
+          ) : (
         <>
           <textarea
             value={content}
@@ -115,6 +119,8 @@ export default function VoicePage() {
             <span className="text-xs text-zinc-600">Applied to PR description pass.</span>
           </div>
         </>
+      )}
+      </>
       )}
     </div>
   );
