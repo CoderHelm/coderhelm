@@ -3,10 +3,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, type BillingInfo, type Invoice } from "@/lib/api";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
-import { Elements, PaymentElement, useStripe, useElements, EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { useToast } from "@/components/toast";
 import { CardSkeleton, TableSkeleton } from "@/components/skeleton";
-import { useSearchParams } from "next/navigation";
 
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -25,7 +24,6 @@ export default function BillingPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const { toast } = useToast();
-  const searchParams = useSearchParams();
 
   const refresh = useCallback(() => {
     setLoading(true);
@@ -42,13 +40,6 @@ export default function BillingPage() {
   }, [stripePromise]);
 
   useEffect(() => { refresh(); }, [refresh]);
-
-  useEffect(() => {
-    if (searchParams.get("success") === "true") {
-      toast("Subscription activated!", "success");
-      window.history.replaceState({}, "", "/billing/");
-    }
-  }, [searchParams, toast]);
 
   const handleSubscribe = async () => {
     setActionLoading(true);
@@ -145,12 +136,14 @@ export default function BillingPage() {
         </Modal>
       )}
 
-      {/* Embedded Stripe Checkout for subscribing */}
+      {/* Subscribe modal with Stripe Elements */}
       {showCheckout && checkoutSecret && stripePromise && (
-        <Modal wide onClose={() => { setShowCheckout(false); setCheckoutSecret(null); }}>
-          <EmbeddedCheckoutProvider stripe={stripePromise} options={{ clientSecret: checkoutSecret, onComplete: () => { setShowCheckout(false); setCheckoutSecret(null); toast("Subscription activated!", "success"); refresh(); } }}>
-            <EmbeddedCheckout />
-          </EmbeddedCheckoutProvider>
+        <Modal onClose={() => { setShowCheckout(false); setCheckoutSecret(null); }}>
+          <h2 className="text-lg font-bold mb-1">Subscribe to Pro</h2>
+          <p className="text-zinc-400 text-sm mb-4">$199/mo · 5M tokens included · cancel anytime</p>
+          <Elements stripe={stripePromise} options={{ clientSecret: checkoutSecret, appearance: stripeAppearance }}>
+            <SubscribeForm onSuccess={() => { setShowCheckout(false); setCheckoutSecret(null); toast("Subscription activated!", "success"); refresh(); }} />
+          </Elements>
         </Modal>
       )}
 
@@ -367,6 +360,42 @@ function UpdateCardForm({ onSuccess }: { onSuccess: () => void }) {
       >
         {submitting ? "Saving..." : "Update payment method"}
       </button>
+    </form>
+  );
+}
+
+function SubscribeForm({ onSuccess }: { onSuccess: () => void }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+    setSubmitting(true);
+    setError(null);
+    const result = await stripe.confirmPayment({ elements, redirect: "if_required" });
+    if (result.error) {
+      setError(result.error.message || "Payment failed");
+      setSubmitting(false);
+    } else {
+      onSuccess();
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <PaymentElement />
+      {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
+      <button
+        type="submit"
+        disabled={!stripe || submitting}
+        className="mt-4 w-full px-4 py-2.5 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-50"
+      >
+        {submitting ? "Processing..." : "Subscribe — $199/mo"}
+      </button>
+      <p className="text-xs text-zinc-600 text-center mt-2">Powered by Stripe · Secure payment</p>
     </form>
   );
 }
