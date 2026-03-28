@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, type BillingInfo, type Invoice } from "@/lib/api";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
-import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { Elements, PaymentElement, useStripe, useElements, EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
 import { useToast } from "@/components/toast";
 import { CardSkeleton, TableSkeleton } from "@/components/skeleton";
 import { useSearchParams } from "next/navigation";
@@ -20,6 +20,8 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [showUpdateCard, setShowUpdateCard] = useState(false);
   const [setupSecret, setSetupSecret] = useState<string | null>(null);
+  const [checkoutSecret, setCheckoutSecret] = useState<string | null>(null);
+  const [showCheckout, setShowCheckout] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const { toast } = useToast();
@@ -51,10 +53,12 @@ export default function BillingPage() {
   const handleSubscribe = async () => {
     setActionLoading(true);
     try {
-      const { url } = await api.createSubscription();
-      window.location.href = url;
+      const { client_secret } = await api.createSubscription();
+      setCheckoutSecret(client_secret);
+      setShowCheckout(true);
     } catch {
       toast("Failed to start subscription. Please try again.", "error");
+    } finally {
       setActionLoading(false);
     }
   };
@@ -138,6 +142,15 @@ export default function BillingPage() {
           <Elements stripe={stripePromise} options={{ clientSecret: setupSecret, appearance: stripeAppearance }}>
             <UpdateCardForm onSuccess={() => { setShowUpdateCard(false); setSetupSecret(null); refresh(); }} />
           </Elements>
+        </Modal>
+      )}
+
+      {/* Embedded Stripe Checkout for subscribing */}
+      {showCheckout && checkoutSecret && stripePromise && (
+        <Modal wide onClose={() => { setShowCheckout(false); setCheckoutSecret(null); }}>
+          <EmbeddedCheckoutProvider stripe={stripePromise} options={{ clientSecret: checkoutSecret, onComplete: () => { setShowCheckout(false); setCheckoutSecret(null); toast("Subscription activated!", "success"); refresh(); } }}>
+            <EmbeddedCheckout />
+          </EmbeddedCheckoutProvider>
         </Modal>
       )}
 
@@ -358,10 +371,10 @@ function UpdateCardForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-function Modal({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+function Modal({ onClose, children, wide }: { onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+      <div className={`bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full ${wide ? "max-w-2xl max-h-[90vh] overflow-y-auto" : "max-w-md"}`} onClick={(e) => e.stopPropagation()}>
         {children}
         <button onClick={onClose} className="mt-4 w-full text-center text-sm text-zinc-500 hover:text-zinc-300">
           Cancel
