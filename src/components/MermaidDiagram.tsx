@@ -7,6 +7,8 @@ interface MermaidDiagramProps {
   className?: string;
 }
 
+let iconPackRegistered = false;
+
 export default function MermaidDiagram({ chart, className }: MermaidDiagramProps) {
   const id = useId().replace(/:/g, "");
   const [svg, setSvg] = useState<string>("");
@@ -18,6 +20,16 @@ export default function MermaidDiagram({ chart, className }: MermaidDiagramProps
     async function render() {
       try {
         const mermaid = (await import("mermaid")).default;
+        if (!iconPackRegistered) {
+          mermaid.registerIconPacks([
+            {
+              name: "logos",
+              loader: () => import("@iconify-json/logos").then((module) => module.icons),
+            },
+          ]);
+          iconPackRegistered = true;
+        }
+
         mermaid.initialize({
           startOnLoad: false,
           securityLevel: "strict",
