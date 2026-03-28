@@ -3,9 +3,10 @@
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { api, type BillingInfo, type Plan, type Task } from "@/lib/api";
+import { api, type BillingInfo, type Plan, type Task, type Repo } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { Skeleton, TableSkeleton } from "@/components/skeleton";
+import { RepoCombobox } from "@/components/repo-combobox";
 
 const TASK_STATUS_STYLES: Record<string, string> = {
   draft: "bg-zinc-800 text-zinc-400 border-zinc-700",
@@ -42,7 +43,14 @@ function PlanDetail() {
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTask, setNewTask] = useState({ title: "", description: "", acceptance_criteria: "", repo: "" });
   const [executing, setExecuting] = useState(false);
+  const [repos, setRepos] = useState<Repo[]>([]);
   const { toast } = useToast();
+
+  useEffect(() => {
+    api.listRepos().then((data) => {
+      setRepos(data.repos.filter((r) => r.enabled));
+    }).catch(() => {});
+  }, []);
 
   const refresh = useCallback(() => {
     if (!planId) return;
@@ -249,7 +257,14 @@ function PlanDetail() {
                 <input value={editForm.title ?? task.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 focus:outline-none focus:border-zinc-500" />
                 <textarea value={editForm.description ?? task.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} rows={3} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 resize-y" placeholder="Description" />
                 <textarea value={editForm.acceptance_criteria ?? task.acceptance_criteria} onChange={(e) => setEditForm((f) => ({ ...f, acceptance_criteria: e.target.value }))} rows={3} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 resize-y" placeholder="Acceptance criteria" />
-                <input value={editForm.repo ?? task.repo ?? ""} onChange={(e) => setEditForm((f) => ({ ...f, repo: e.target.value }))} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Repo override (owner/repo) — blank uses plan default" />
+                {repos.length > 0 ? (
+                  <div>
+                    <label className="text-xs text-zinc-500 mb-1 block">Repo override (blank uses plan default)</label>
+                    <RepoCombobox repos={repos} selected={editForm.repo ?? task.repo ?? ""} onSelect={(v) => setEditForm((f) => ({ ...f, repo: v }))} />
+                  </div>
+                ) : (
+                  <input value={editForm.repo ?? task.repo ?? ""} onChange={(e) => setEditForm((f) => ({ ...f, repo: e.target.value }))} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Repo override (owner/repo) — blank uses plan default" />
+                )}
                 <div className="flex gap-2">
                   <button onClick={() => handleSaveEdit(task.task_id)} disabled={actionLoading === task.task_id + ":save"} className="px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded text-xs font-medium hover:bg-white disabled:opacity-50">Save</button>
                   <button onClick={() => setEditingTask(null)} className="px-3 py-1.5 text-zinc-500 hover:text-zinc-300 text-xs">Cancel</button>
@@ -303,7 +318,14 @@ function PlanDetail() {
               <input autoFocus value={newTask.title} onChange={(e) => setNewTask((t) => ({ ...t, title: e.target.value }))} onKeyDown={(e) => e.key === "Enter" && handleAddTask()} placeholder="Task title" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
               <textarea value={newTask.description} onChange={(e) => setNewTask((t) => ({ ...t, description: e.target.value }))} rows={2} placeholder="Description (optional)" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 font-mono placeholder-zinc-600 focus:outline-none focus:border-zinc-500 resize-none" />
               <textarea value={newTask.acceptance_criteria} onChange={(e) => setNewTask((t) => ({ ...t, acceptance_criteria: e.target.value }))} rows={2} placeholder="Acceptance criteria (optional)" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 font-mono placeholder-zinc-600 focus:outline-none focus:border-zinc-500 resize-none" />
-              <input value={newTask.repo} onChange={(e) => setNewTask((t) => ({ ...t, repo: e.target.value }))} placeholder="Repo override (owner/repo) — blank uses plan default" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
+              {repos.length > 0 ? (
+                <div>
+                  <label className="text-xs text-zinc-500 mb-1 block">Repo override (blank uses plan default)</label>
+                  <RepoCombobox repos={repos} selected={newTask.repo} onSelect={(v) => setNewTask((t) => ({ ...t, repo: v }))} />
+                </div>
+              ) : (
+                <input value={newTask.repo} onChange={(e) => setNewTask((t) => ({ ...t, repo: e.target.value }))} placeholder="Repo override (owner/repo) — blank uses plan default" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
+              )}
               <div className="flex gap-2">
                 <button onClick={handleAddTask} disabled={!newTask.title.trim() || actionLoading === "add"} className="px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded text-xs font-medium hover:bg-white disabled:opacity-50">Add task</button>
                 <button onClick={() => setShowAddTask(false)} className="px-3 py-1.5 text-zinc-500 hover:text-zinc-300 text-xs">Cancel</button>
