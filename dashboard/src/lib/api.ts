@@ -69,7 +69,6 @@ export const api = {
 
   // Jira integration
   getJiraCheck: () => request<JiraCheck>("/api/integrations/jira/check"),
-  validateJiraPayload: (payload: Record<string, unknown>) => request<JiraValidation>("/api/integrations/jira/check", { method: "POST", body: JSON.stringify(payload) }),
   generateJiraSecret: () => request<{ secret: string }>("/api/integrations/jira/secret", { method: "POST" }),
   deleteJiraSecret: () => request<void>("/api/integrations/jira/secret", { method: "DELETE" }),
 
@@ -290,9 +289,4 @@ export interface JiraCheck {
   checklist: string[];
 }
 
-export interface JiraValidation {
-  valid: boolean;
-  missing: string[];
-  normalized_preview: Record<string, unknown>;
-  next_step: string;
-}
+
