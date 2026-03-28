@@ -153,10 +153,10 @@ export default function Home() {
             </div>
             <div className="p-6 text-left font-mono text-sm leading-relaxed">
               <p className="text-text-muted">
-                $ <span className="text-brand">d3ftly</span> run --issue 42
+                <span className="text-brand">@you</span> opened issue <span className="text-white">#42</span>
               </p>
               <p className="mt-0.5 text-text-muted text-xs">
-                &nbsp;&nbsp;→ &quot;Add dark mode toggle to the settings page&quot;
+                &nbsp;&nbsp;&quot;Add dark mode toggle to the settings page&quot;
               </p>
               <div className="mt-4 space-y-1.5">
                 {[
@@ -182,7 +182,7 @@ export default function Home() {
           {/* Stats strip */}
           <div className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm">
             <span className="text-text-muted">
-              <span className="font-bold text-brand">~5 min</span> average run
+              <span className="font-bold text-brand">~ 5 min</span> average run
             </span>
             <span className="hidden h-4 w-px bg-surface-border sm:block" />
             <span className="text-text-muted">
