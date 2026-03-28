@@ -58,7 +58,7 @@ export const api = {
 
   // Billing
   getBilling: () => request<BillingInfo>("/api/billing"),
-  createSubscription: (priceId: string) => request<{ subscription_id: string; client_secret: string }>("/api/billing/subscribe", { method: "POST", body: JSON.stringify({ price_id: priceId }) }),
+  createSubscription: () => request<{ subscription_id: string; client_secret: string }>("/api/billing/subscribe", { method: "POST", body: "{}" }),
   cancelSubscription: () => request<{ status: string }>("/api/billing/cancel", { method: "POST" }),
   reactivateSubscription: () => request<{ status: string }>("/api/billing/reactivate", { method: "POST" }),
   createSetupIntent: () => request<{ client_secret: string }>("/api/billing/payment-method", { method: "POST" }),
