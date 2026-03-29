@@ -180,6 +180,7 @@ export interface NotificationPrefs {
 
 export interface BillingInfo {
   subscription_status: string;
+  previous_status: string | null;
   plan_id: string | null;
   has_payment_method: boolean;
   stripe_publishable_key: string;
