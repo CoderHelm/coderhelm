@@ -179,9 +179,8 @@ export default function Home() {
           </div>
 
           <h1 className="text-5xl font-extrabold leading-tight tracking-tight sm:text-7xl">
-            Your code,{" "}
-            <span className="gradient-text">Coderhelm</span>{" "}
-            handled.
+            <span className="gradient-text">Ship code,</span>{" "}
+            not tickets.
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg text-text-secondary sm:text-xl">
