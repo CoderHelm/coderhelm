@@ -142,24 +142,44 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
           ))}
-          {billing && (billing.subscription_status === "past_due" || billing.subscription_status === "cancelled" || billing.subscription_status === "canceled") && (
+          {billing && billing.subscription_status === "past_due" && (
             <div className="bg-red-900/80 border-b border-red-700 px-6 py-3 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <span className="text-red-300 text-lg">⚠</span>
-                <div>
-                  <p className="text-sm font-medium text-red-100">
-                    {billing.subscription_status === "past_due"
-                      ? "Your payment is past due. Please update your payment method to continue using Coderhelm."
-                      : "Your subscription has been cancelled. Subscribe again to continue using Coderhelm."}
-                  </p>
-                </div>
+                <p className="text-sm font-medium text-red-100">
+                  Your payment is past due. Please update your payment method to continue using Coderhelm.
+                </p>
               </div>
               <a
                 href="/billing"
                 className="shrink-0 rounded-md bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-500 transition-colors"
               >
-                {billing.subscription_status === "past_due" ? "Update Payment" : "Go to Billing"}
+                Update Payment
               </a>
+            </div>
+          )}
+          {billing && (billing.subscription_status === "free" && billing.previous_status === "cancelled") && !dismissedBanners.has("cancelled-banner") && (
+            <div className="bg-yellow-900/60 border-b border-yellow-700 px-6 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-yellow-300 text-lg">⚡</span>
+                <p className="text-sm font-medium text-yellow-100">
+                  Your subscription has been cancelled. You&apos;re on the free plan. Subscribe again for full access.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <a
+                  href="/billing"
+                  className="rounded-md bg-yellow-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-yellow-500 transition-colors"
+                >
+                  Go to Billing
+                </a>
+                <button
+                  onClick={() => setDismissedBanners((prev) => new Set(prev).add("cancelled-banner"))}
+                  className="text-yellow-300 text-lg leading-none opacity-60 hover:opacity-100 transition-opacity"
+                >
+                  ×
+                </button>
+              </div>
             </div>
           )}
           <main className="flex-1 p-8">{children}</main>
