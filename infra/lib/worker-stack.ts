@@ -24,12 +24,12 @@ export class WorkerStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: WorkerStackProps) {
     super(scope, id, props);
 
-    const prefix = `d3ftly-${props.stage}`;
+    const prefix = `coderhelm-${props.stage}`;
 
     const secrets = secretsmanager.Secret.fromSecretNameV2(
       this,
       "Secrets",
-      `d3ftly/${props.stage}/secrets`
+      `coderhelm/${props.stage}/secrets`
     );
 
     // --- Worker Lambda (Rust) ---
@@ -48,7 +48,7 @@ export class WorkerStack extends cdk.Stack {
         STAGE: props.stage,
         TABLE_NAME: props.table.tableName,
         BUCKET_NAME: props.bucket.bucketName,
-        SECRETS_NAME: `d3ftly/${props.stage}/secrets`,
+        SECRETS_NAME: `coderhelm/${props.stage}/secrets`,
         MODEL_ID: process.env.MODEL_ID!,
         RUST_LOG: "info",
       },

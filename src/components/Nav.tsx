@@ -11,7 +11,7 @@ export default function Nav() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
         <Link href="/" className="flex items-center gap-2 text-lg font-bold">
           <span className="gradient-text">{"///"}</span>
-          <span>d3ftly</span>
+          <span>Coderhelm</span>
         </Link>
 
         {/* Desktop */}
@@ -26,19 +26,19 @@ export default function Nav() {
             Pricing
           </a>
           <a
-            href="https://app.d3ftly.com"
+            href="https://app.coderhelm.com"
             className="text-sm text-text-secondary hover:text-text-primary transition-colors"
           >
             Dashboard
           </a>
           <a
-            href="https://api.d3ftly.com/auth/login"
+            href="https://api.coderhelm.com/auth/login"
             className="text-sm text-text-secondary hover:text-text-primary transition-colors"
           >
             Login
           </a>
           <a
-            href="https://github.com/apps/d3ftly-agent"
+            href="https://github.com/apps/coderhelm-agent"
             className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90"
           >
             Install on GitHub
@@ -75,19 +75,19 @@ export default function Nav() {
               Pricing
             </a>
             <a
-              href="https://app.d3ftly.com"
+              href="https://app.coderhelm.com"
               className="text-sm text-text-secondary"
             >
               Dashboard
             </a>
             <a
-              href="https://api.d3ftly.com/auth/login"
+              href="https://api.coderhelm.com/auth/login"
               className="text-sm text-text-secondary"
             >
               Login
             </a>
             <a
-              href="https://github.com/apps/d3ftly-agent"
+              href="https://github.com/apps/coderhelm-agent"
               className="rounded-lg bg-white px-4 py-2 text-center text-sm font-semibold text-black"
             >
               Install on GitHub

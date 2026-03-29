@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { api, type BillingInfo, type Banner } from "@/lib/api";
 import { ToastProvider } from "./toast";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.d3ftly.com";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
 
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -145,10 +145,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                 <div>
                   <p className="text-sm font-medium text-red-100">
                     {billing.subscription_status === "past_due"
-                      ? "Your payment is past due. Please update your payment method to continue using d3ftly."
+                      ? "Your payment is past due. Please update your payment method to continue using Coderhelm."
                       : billing.subscription_status === "cancelled" || billing.subscription_status === "canceled"
-                        ? "Your subscription has been cancelled. Subscribe again to continue using d3ftly."
-                        : "Your subscription is inactive. Please subscribe to use d3ftly."}
+                        ? "Your subscription has been cancelled. Subscribe again to continue using Coderhelm."
+                        : "Your subscription is inactive. Please subscribe to use Coderhelm."}
                   </p>
                 </div>
               </div>
@@ -192,7 +192,7 @@ function Sidebar({
           <polygon points="196,416 248,416 316,96 264,96" fill="#3B82F6"/>
           <polygon points="286,416 338,416 406,96 354,96" fill="white"/>
         </svg>
-        <span className="text-sm font-semibold text-zinc-100">d3ftly</span>
+        <span className="text-sm font-semibold text-zinc-100">Coderhelm</span>
       </Link>
 
       <div className="flex-1 space-y-4">

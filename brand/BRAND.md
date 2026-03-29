@@ -1,18 +1,18 @@
-# d3ftly Brand Guidelines
+# Coderhelm Brand Guidelines
 
 ## The Name
-- **Product**: d3ftly
+- **Product**: Coderhelm
 - **Pronunciation**: "deftly" (like the English adverb)
 - **Meaning**: "in a skillful, clever, and quick way"
-- **Bot name**: `d3ftly[bot]`
-- **Domain**: d3ftly.com
+- **Bot name**: `Coderhelm[bot]`
+- **Domain**: Coderhelm.com
 
 ## The Mark
 
 Three forward-leaning parallelogram slashes: **///**
 
 The mark represents:
-- **The "3"** in d3ftly (three strokes)
+- **The "3"** in Coderhelm (three strokes)
 - **Forward momentum** (leaning right)
 - **Precision** (parallel, uniform, geometric)
 - **Code** (forward slashes are native to programming)

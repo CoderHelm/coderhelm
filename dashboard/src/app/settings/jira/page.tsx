@@ -70,7 +70,7 @@ export default function JiraPage() {
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-2">Jira Integration</h1>
       <p className="text-zinc-400 text-sm mb-6">
-        Connect Jira so assigning or transitioning issues triggers d3ftly automatically.
+        Connect Jira so assigning or transitioning issues triggers Coderhelm automatically.
       </p>
 
       {/* Status */}
@@ -127,13 +127,13 @@ function JiraAppTab({ check, copy, copied }: { check: JiraCheck | null; copy: (t
   return (
     <div className="space-y-6">
       <p className="text-zinc-400 text-sm">
-        Install the d3ftly Jira app on your Jira site. When you assign a ticket with a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">d3ftly</code> label, d3ftly determines the right repo from the ticket context and starts working.
+        Install the Coderhelm Jira app on your Jira site. When you assign a ticket with a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">Coderhelm</code> label, Coderhelm determines the right repo from the ticket context and starts working.
       </p>
 
       <div className="space-y-6">
         <Step number={1} title="Install the Jira app">
           <p className="text-zinc-400 text-sm mb-3">
-            Click the button below to install d3ftly on your Jira site. You need to be a Jira admin.
+            Click the button below to install Coderhelm on your Jira site. You need to be a Jira admin.
           </p>
           <a
             href={installUrl}
@@ -148,13 +148,13 @@ function JiraAppTab({ check, copy, copied }: { check: JiraCheck | null; copy: (t
 
         <Step number={2} title="Label and assign">
           <p className="text-zinc-400 text-sm">
-            Add a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">d3ftly</code> label to any Jira issue, then assign it. d3ftly picks the right repo automatically based on the ticket.
+            Add a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">Coderhelm</code> label to any Jira issue, then assign it. Coderhelm picks the right repo automatically based on the ticket.
           </p>
         </Step>
 
         <Step number={3} title="Check the Runs page">
           <p className="text-zinc-400 text-sm">
-            A new run should appear within a minute. d3ftly creates a branch, implements the change, and opens a draft PR.
+            A new run should appear within a minute. Coderhelm creates a branch, implements the change, and opens a draft PR.
           </p>
         </Step>
       </div>
@@ -178,7 +178,7 @@ function WebhookTab({ check, setCheck, secret, generatingSecret, generateSecret,
   return (
     <div className="space-y-6 mb-8">
       <p className="text-zinc-400 text-sm">
-        Alternatively, use a Jira Automation rule to send webhooks to d3ftly when issues are created or transitioned.
+        Alternatively, use a Jira Automation rule to send webhooks to Coderhelm when issues are created or transitioned.
       </p>
 
       <Step number={1} title="Generate webhook secret">
@@ -228,9 +228,9 @@ function WebhookTab({ check, setCheck, secret, generatingSecret, generateSecret,
         <div className="mt-2">
           <div className="flex items-center gap-2">
             <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono">
-              {check?.webhook_url ?? "https://api.d3ftly.com/webhooks/jira"}
+              {check?.webhook_url ?? "https://api.coderhelm.com/webhooks/jira"}
             </code>
-            <button onClick={() => copy(check?.webhook_url ?? "https://api.d3ftly.com/webhooks/jira", "url")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors">
+            <button onClick={() => copy(check?.webhook_url ?? "https://api.coderhelm.com/webhooks/jira", "url")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors">
               {copied === "url" ? "Copied!" : "Copy"}
             </button>
           </div>

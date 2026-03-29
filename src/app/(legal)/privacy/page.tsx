@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Privacy Policy — d3ftly",
+  title: "Privacy Policy — Coderhelm",
 };
 
 export default function Privacy() {
@@ -10,8 +10,8 @@ export default function Privacy() {
       <p><strong>Last updated:</strong> March 28, 2026</p>
 
       <p>
-        d3ftly (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) operates the d3ftly.com website and
-        the d3ftly GitHub App (collectively, the &quot;Service&quot;). This Privacy Policy explains
+        Coderhelm (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) operates the coderhelm.com website and
+        the Coderhelm GitHub App (collectively, the &quot;Service&quot;). This Privacy Policy explains
         how we collect, use, disclose, and safeguard your information when you use our Service. Please
         read this policy carefully. By using the Service, you consent to the practices described herein.
       </p>
@@ -19,7 +19,7 @@ export default function Privacy() {
       <h2>1. Information We Collect</h2>
 
       <h3>1.1 Account &amp; Authentication Data</h3>
-      <p>When you install the d3ftly GitHub App, we receive the following via the GitHub API:</p>
+      <p>When you install the Coderhelm GitHub App, we receive the following via the GitHub API:</p>
       <ul>
         <li>GitHub username and associated email address</li>
         <li>GitHub user ID and avatar URL</li>
@@ -31,7 +31,7 @@ export default function Privacy() {
         your tenant and authenticate dashboard sessions.</p>
 
       <h3>1.2 Source Code &amp; Repository Content</h3>
-      <p>When d3ftly processes a GitHub issue, it reads repository files, directory structures, and
+      <p>When Coderhelm processes a GitHub issue, it reads repository files, directory structures, and
         CI configurations via the GitHub API to understand your codebase. <strong>Source code is processed
         entirely in-memory and is never persisted</strong> — it is not written to databases, object storage,
         log files, or any durable medium. Once a run completes, all in-memory code data is discarded.</p>
@@ -53,7 +53,7 @@ export default function Privacy() {
         subscription status, and invoice summaries. We never see or store your full card number.</p>
 
       <h3>1.5 Automatically Collected Data</h3>
-      <p>When you visit d3ftly.com, we may automatically collect:</p>
+      <p>When you visit coderhelm.com, we may automatically collect:</p>
       <ul>
         <li>IP address and approximate geographic location</li>
         <li>Browser type, operating system, and device information</li>
@@ -98,7 +98,7 @@ export default function Privacy() {
         <li><strong>Legal requirements:</strong> When required by law, regulation, legal process,
           or governmental request</li>
         <li><strong>Safety &amp; security:</strong> To protect the rights, property, or safety of
-          d3ftly, our users, or the public</li>
+          Coderhelm, our users, or the public</li>
         <li><strong>Business transfers:</strong> In connection with a merger, acquisition, or sale
           of all or a portion of our assets, with notice to affected users</li>
       </ul>
@@ -156,7 +156,7 @@ export default function Privacy() {
         information, we cannot guarantee absolute security.</p>
 
       <h2>9. Cookies &amp; Tracking</h2>
-      <p>The d3ftly.com website uses a session cookie (<code>d3ftly_session</code>) to maintain
+      <p>The coderhelm.com website uses a session cookie (<code>coderhelm_session</code>) to maintain
         your authenticated dashboard session. This is a strictly necessary cookie and does not
         require consent under ePrivacy regulations.</p>
       <p>We do not use advertising cookies, third-party tracking pixels, or analytics services
@@ -164,7 +164,7 @@ export default function Privacy() {
         cross-site tracking.</p>
 
       <h2>10. AI &amp; Automated Processing</h2>
-      <p>d3ftly uses large language models (LLMs) to analyze code and generate pull requests.
+      <p>Coderhelm uses large language models (LLMs) to analyze code and generate pull requests.
         This processing is automated and occurs on your behalf when you assign an issue. Key points:</p>
       <ul>
         <li>Your source code is sent to an AI model provider for inference only — it is not used
@@ -210,7 +210,7 @@ export default function Privacy() {
       </ul>
 
       <p>To exercise any of these rights, email us at{" "}
-        <a href="mailto:privacy@d3ftly.com">privacy@d3ftly.com</a>. We will respond within
+        <a href="mailto:privacy@coderhelm.com">privacy@coderhelm.com</a>. We will respond within
         30 days (or as required by applicable law).</p>
 
       <h2>12. Children&apos;s Privacy</h2>
@@ -232,8 +232,8 @@ export default function Privacy() {
       <h2>15. Contact Us</h2>
       <p>If you have questions or concerns about this Privacy Policy or our data practices:</p>
       <ul>
-        <li>Email: <a href="mailto:privacy@d3ftly.com">privacy@d3ftly.com</a></li>
-        <li>General support: <a href="mailto:support@d3ftly.com">support@d3ftly.com</a></li>
+        <li>Email: <a href="mailto:privacy@coderhelm.com">privacy@coderhelm.com</a></li>
+        <li>General support: <a href="mailto:support@coderhelm.com">support@coderhelm.com</a></li>
       </ul>
     </>
   );

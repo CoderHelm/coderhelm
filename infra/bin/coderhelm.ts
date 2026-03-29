@@ -13,7 +13,7 @@ const env = {
 };
 
 const stage = app.node.tryGetContext("stage") ?? "prod";
-const prefix = `d3ftly-${stage}`;
+const prefix = `coderhelm-${stage}`;
 
 // --- WAF (must be us-east-1 for CloudFront) ---
 

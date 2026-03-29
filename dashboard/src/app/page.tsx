@@ -33,7 +33,7 @@ export default function RunsPage() {
       ) : runs.length === 0 ? (
         <div className="text-zinc-500 border border-zinc-800 rounded-lg p-8 text-center">
           <p className="text-lg mb-2">No runs yet</p>
-          <p className="text-sm">Assign an issue to the d3ftly bot to start a run.</p>
+          <p className="text-sm">Assign an issue to the Coderhelm bot to start a run.</p>
         </div>
       ) : (
         <div className="border border-zinc-800 rounded-lg overflow-hidden">

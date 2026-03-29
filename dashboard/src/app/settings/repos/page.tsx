@@ -51,7 +51,7 @@ export default function ReposPage() {
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-2">Repositories</h1>
       <p className="text-zinc-400 text-sm mb-6">
-        Repos connected via the GitHub App. Enable the ones you want d3ftly to work on.
+        Repos connected via the GitHub App. Enable the ones you want Coderhelm to work on.
       </p>
 
       {loading ? (
@@ -64,7 +64,7 @@ export default function ReposPage() {
         <div className="text-zinc-500 border border-zinc-800 rounded-lg p-8 text-center">
           <p>No repos connected yet.</p>
           <a
-            href="https://github.com/apps/d3ftly-agent"
+            href="https://github.com/apps/coderhelm-agent"
             className="text-zinc-300 underline mt-2 inline-block"
           >
             Install the GitHub App

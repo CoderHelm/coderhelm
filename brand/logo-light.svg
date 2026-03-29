@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 512" fill="none">
   <!--
-    d3ftly — Full Logo (light variant: black on white)
+    Coderhelm — Full Logo (light variant: black on white)
     Mark (three slashes) + wordmark
   -->
   <rect width="960" height="512" rx="0" fill="white"/>
@@ -12,7 +12,7 @@
     <polygon points="286,416 338,416 406,96 354,96" fill="#000000"/>
   </g>
 
-  <!-- Wordmark: d3ftly -->
+  <!-- Wordmark: Coderhelm -->
   <text
     x="520"
     y="290"
@@ -21,5 +21,5 @@
     font-weight="600"
     fill="#000000"
     letter-spacing="-2"
-  >d3ftly</text>
+  >Coderhelm</text>
 </svg>

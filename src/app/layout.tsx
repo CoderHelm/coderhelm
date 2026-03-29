@@ -8,20 +8,20 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "d3ftly — Your code, d3ftly handled",
+  title: "Coderhelm — Ship code, not tickets",
   description:
     "Autonomous AI coding agent. Assign a GitHub issue, get a production-ready PR.",
   openGraph: {
-    title: "d3ftly — Your code, d3ftly handled",
+    title: "Coderhelm — Ship code, not tickets",
     description:
       "Autonomous AI coding agent. Assign a GitHub issue, get a production-ready PR.",
-    url: "https://d3ftly.com",
-    siteName: "d3ftly",
+    url: "https://coderhelm.com",
+    siteName: "Coderhelm",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "d3ftly",
+    title: "Coderhelm",
     description:
       "Autonomous AI coding agent. Assign a GitHub issue, get a production-ready PR.",
   },
