@@ -58,12 +58,12 @@ export default function BillingPage() {
 
   // Poll billing until status changes (for webhook-driven updates like checkout)
   const pollRefresh = useCallback(async () => {
-    const currentStatus = billing?.status;
+    const currentStatus = billing?.subscription_status;
     for (let i = 0; i < 6; i++) {
       await new Promise(r => setTimeout(r, 2000));
       try {
         const [b, inv] = await Promise.all([api.getBilling(), api.listInvoices()]);
-        if (b.status !== currentStatus) {
+        if (b.subscription_status !== currentStatus) {
           setBilling(b);
           setInvoices(inv.invoices);
           if (b.has_payment_method) {
@@ -75,7 +75,7 @@ export default function BillingPage() {
       } catch { /* retry */ }
     }
     refresh(); // fallback
-  }, [billing?.status, refresh]);
+  }, [billing?.subscription_status, refresh]);
 
   const handleSubscribe = async () => {
     setActionLoading(true);
