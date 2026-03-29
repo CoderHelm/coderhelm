@@ -64,7 +64,7 @@ export default function ReposPage() {
         <div className="text-zinc-500 border border-zinc-800 rounded-lg p-8 text-center">
           <p>No repos connected yet.</p>
           <a
-            href="https://github.com/apps/coderhelm-agent"
+            href="https://github.com/apps/coderhelm"
             className="text-zinc-300 underline mt-2 inline-block"
           >
             Install the GitHub App

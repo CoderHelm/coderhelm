@@ -191,7 +191,7 @@ export default function Home() {
 
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <a
-              href="https://github.com/apps/coderhelm-agent"
+              href="https://github.com/apps/coderhelm"
               className="gradient-brand rounded-xl px-8 py-3.5 text-base font-semibold text-white shadow-lg transition-transform hover:scale-[1.02]"
             >
               Install on GitHub — Free
@@ -567,7 +567,7 @@ export default function Home() {
                 </li>
               </ul>
               <a
-                href="https://github.com/apps/coderhelm-agent"
+                href="https://github.com/apps/coderhelm"
                 className="mt-8 block rounded-lg border border-surface-border bg-transparent px-6 py-3 text-center text-sm font-semibold transition-colors hover:bg-surface-border"
               >
                 Get started
@@ -605,7 +605,7 @@ export default function Home() {
                 </li>
               </ul>
               <a
-                href="https://github.com/apps/coderhelm-agent"
+                href="https://github.com/apps/coderhelm"
                 className="mt-8 block rounded-lg gradient-brand px-6 py-3 text-center text-sm font-semibold text-white transition-transform hover:scale-[1.02]"
               >
                 Upgrade
@@ -630,7 +630,7 @@ export default function Home() {
             Install Coderhelm in 30 seconds. No credit card, no config.
           </p>
           <a
-            href="https://github.com/apps/coderhelm-agent"
+            href="https://github.com/apps/coderhelm"
             className="mt-8 inline-block gradient-brand rounded-xl px-8 py-3.5 text-base font-semibold text-white shadow-lg transition-transform hover:scale-[1.02]"
           >
             Install on GitHub — Free
