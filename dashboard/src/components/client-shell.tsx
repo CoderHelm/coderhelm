@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { api, type BillingInfo } from "@/lib/api";
+import { api, type BillingInfo, type Banner } from "@/lib/api";
 import { ToastProvider } from "./toast";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.d3ftly.com";
@@ -65,6 +65,8 @@ const navGroups: NavGroup[] = [
 export function ClientShell({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [billing, setBilling] = useState<BillingInfo | null>(null);
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [dismissedBanners, setDismissedBanners] = useState<Set<string>>(new Set());
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
@@ -73,6 +75,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         setUser(u);
         setAuthChecked(true);
         api.getBilling().then(setBilling).catch(() => {});
+        api.getBanners().then((r) => setBanners(r.banners)).catch(() => {});
       })
       .catch(() => {
         window.location.href = `${API_BASE}/auth/login`;
@@ -95,6 +98,46 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen bg-zinc-950">
         <Sidebar billing={billing} user={user} />
         <div className="flex-1 flex flex-col">
+          {banners.filter((b) => !dismissedBanners.has(b.id)).map((banner) => (
+            <div
+              key={banner.id}
+              className={`border-b px-6 py-3 flex items-center justify-between ${
+                banner.type === "error"
+                  ? "bg-red-900/80 border-red-700"
+                  : banner.type === "warning"
+                    ? "bg-yellow-900/80 border-yellow-700"
+                    : "bg-blue-900/80 border-blue-700"
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <span className={`text-lg shrink-0 ${
+                  banner.type === "error" ? "text-red-300" : banner.type === "warning" ? "text-yellow-300" : "text-blue-300"
+                }`}>
+                  {banner.type === "error" ? "⚠" : banner.type === "warning" ? "⚡" : "ℹ"}
+                </span>
+                <p className={`text-sm font-medium ${
+                  banner.type === "error" ? "text-red-100" : banner.type === "warning" ? "text-yellow-100" : "text-blue-100"
+                }`}>
+                  {banner.message}
+                  {banner.link_url && banner.link_text && (
+                    <a href={banner.link_url} className="ml-2 underline hover:no-underline">
+                      {banner.link_text}
+                    </a>
+                  )}
+                </p>
+              </div>
+              {banner.dismissible && (
+                <button
+                  onClick={() => setDismissedBanners((prev) => new Set(prev).add(banner.id))}
+                  className={`shrink-0 ml-4 text-lg leading-none opacity-60 hover:opacity-100 transition-opacity ${
+                    banner.type === "error" ? "text-red-300" : banner.type === "warning" ? "text-yellow-300" : "text-blue-300"
+                  }`}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          ))}
           {billing && billing.subscription_status !== "active" && billing.subscription_status !== "none" && (
             <div className="bg-red-900/80 border-b border-red-700 px-6 py-3 flex items-center justify-between">
               <div className="flex items-center gap-3">
