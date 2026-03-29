@@ -97,13 +97,13 @@ export default function JiraPage() {
       <div className="flex gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-lg mb-6 w-fit">
         {(["app", "webhook"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === t ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}>
-            {t === "app" ? "Forge App" : "Webhook"}
+            {t === "app" ? "Jira App" : "Webhook"}
           </button>
         ))}
       </div>
 
       {tab === "app" ? (
-        <ForgeAppTab check={check} copy={copy} copied={copied} />
+        <JiraAppTab check={check} copy={copy} copied={copied} />
       ) : (
         <WebhookTab
           check={check}
@@ -121,17 +121,17 @@ export default function JiraPage() {
   );
 }
 
-function ForgeAppTab({ check, copy, copied }: { check: JiraCheck | null; copy: (t: string, l: string) => void; copied: string | null }) {
+function JiraAppTab({ check, copy, copied }: { check: JiraCheck | null; copy: (t: string, l: string) => void; copied: string | null }) {
   const installUrl = "https://developer.atlassian.com/console/install/0f707126-f6c4-4cae-9332-d736617d4d53?signature=AYABeK8ie1a%2BTEeiPiM3T34MbZ0AAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4IOp8r3eKNYw8z2v%2FEq3%2FfvrZguoGsXpNSaDveR%2FF%2Fo0BLruyVn8r%2FEOK5h8zi1R8RgAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDOwhe7cajq6Kgf30AgIBEIA7g6njzGaMjLWQyz%2BCDOQNFhkv1Ghs8zFsfBdFyAvBn%2FBzsFg5WiL%2FGR2qcsFcIlAEiiqP02TVMaE7Y2kAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHijmwVTMt6Oj3F%2B0%2B0cVrojrS8yZ9ktpdfDxqPMSIkvHAHG51UcQbI0xcGuuDtvUzJqAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMcjwGpZCf3N2rvLLrAgEQgDsbrPOc%2FNcsNH7s%2F4VR%2FWHVwx3PlPH0N3ECm3npY13Nb%2FdShsRRInN4SIU3UnDNjFHQxozi8SY65YXnjgAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeLKa7Dfn9BgbXaQmJGrkKztjV4vrreTkqr7wGwhqIYs5AUgWk554l4fXM9HqT0ByV70AAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAyhb0F6qjUivcDxj6oCARCAOz9RXk9GwPGp7n3Re50PKAi18EmdnrKe9QXFaBC2XlmEPMU%2FdfyAb43jE3uE2aOzp74GG6mb4q9XZfYrAgAAAAAMAAAQAAAAAAAAAAAAAAAAACsLtWLW%2Fsef6SMqv5DtUiX%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADKjtj7iA2wG62JAY42sMdcdN14Kj4fecUhXoAwxaA0oFCWepgmVkD3w4J4O3Nqtkx9cBmtjrK1gYmQIJpPW9N%2Fd278%3D&product=jira";
 
   return (
     <div className="space-y-6">
       <p className="text-zinc-400 text-sm">
-        Install the d3ftly Forge app on your Jira site. When you assign a ticket with a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">d3ftly</code> label, d3ftly determines the right repo from the ticket context and starts working.
+        Install the d3ftly Jira app on your Jira site. When you assign a ticket with a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">d3ftly</code> label, d3ftly determines the right repo from the ticket context and starts working.
       </p>
 
       <div className="space-y-6">
-        <Step number={1} title="Install the Forge app">
+        <Step number={1} title="Install the Jira app">
           <p className="text-zinc-400 text-sm mb-3">
             Click the button below to install d3ftly on your Jira site. You need to be a Jira admin.
           </p>
