@@ -61,6 +61,16 @@ export default function Footer() {
             <h4 className="mb-3 text-sm font-semibold">Connect</h4>
             <ul className="space-y-2 text-sm text-text-secondary">
               <li>
+                <Link href="/contact" className="hover:text-text-primary transition-colors">
+                  Contact
+                </Link>
+              </li>
+              <li>
+                <a href="https://app.d3ftly.com" className="hover:text-text-primary transition-colors">
+                  Dashboard
+                </a>
+              </li>
+              <li>
                 <a href="mailto:support@d3ftly.com" className="hover:text-text-primary transition-colors">
                   support@d3ftly.com
                 </a>
