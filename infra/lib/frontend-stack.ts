@@ -95,6 +95,25 @@ export class FrontendStack extends cdk.Stack {
       }
     );
 
+    // Rewrite directory paths to index.html (e.g. /contact/ → /contact/index.html)
+    const urlRewrite = new cloudfront.Function(this, "UrlRewrite", {
+      functionName: `${prefix}-site-url-rewrite`,
+      code: cloudfront.FunctionCode.fromInline(`
+function handler(event) {
+  var request = event.request;
+  var uri = request.uri;
+  if (uri.startsWith('/errors/')) return request;
+  if (uri.endsWith('/')) {
+    request.uri = uri + 'index.html';
+  } else if (uri.indexOf('.') === -1) {
+    request.uri = uri + '/index.html';
+  }
+  return request;
+}
+      `),
+      runtime: cloudfront.FunctionRuntime.JS_2_0,
+    });
+
     // CloudFront distribution
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       defaultBehavior: {
@@ -105,6 +124,12 @@ export class FrontendStack extends cdk.Stack {
           cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         responseHeadersPolicy,
+        functionAssociations: [
+          {
+            function: urlRewrite,
+            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+          },
+        ],
       },
       defaultRootObject: "index.html",
       webAclId: props.webAclArn,
