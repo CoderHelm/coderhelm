@@ -38,7 +38,7 @@ export default function Nav() {
             Login
           </a>
           <a
-            href="https://github.com/apps/coderhelm-agent"
+            href="https://github.com/apps/coderhelm"
             className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90"
           >
             Install on GitHub
@@ -87,7 +87,7 @@ export default function Nav() {
               Login
             </a>
             <a
-              href="https://github.com/apps/coderhelm-agent"
+              href="https://github.com/apps/coderhelm"
               className="rounded-lg bg-white px-4 py-2 text-center text-sm font-semibold text-black"
             >
               Install on GitHub
