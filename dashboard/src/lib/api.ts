@@ -97,6 +97,8 @@ export const api = {
 
   // Plans
   listPlans: () => request<{ plans: Plan[] }>("/api/plans"),
+  planChat: (messages: { role: string; content: string }[]) =>
+    request<{ content: string }>("/api/plans/chat", { method: "POST", body: JSON.stringify({ messages }) }),
   createPlan: (body: { title: string; description?: string; repo?: string; tasks?: Partial<Task>[] }) =>
     request<{ plan_id: string }>("/api/plans", { method: "POST", body: JSON.stringify(body) }),
   getPlan: (planId: string) => request<Plan & { tasks: Task[] }>(`/api/plans/${planId}`),
