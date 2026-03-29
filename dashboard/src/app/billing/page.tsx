@@ -266,7 +266,7 @@ export default function BillingPage() {
               Cancel
             </button>
           </div>
-          <Elements stripe={stripePromise} options={{ clientSecret: checkoutSecret, appearance: stripeAppearance, paymentMethodOrder: ["card", "us_bank_account"] } as any}>
+          <Elements stripe={stripePromise} options={{ clientSecret: checkoutSecret, appearance: stripeAppearance, locale: "en", paymentMethodOrder: ["card", "us_bank_account"] } as any}>
             <SubscribeForm onSuccess={() => { setShowCheckout(false); setCheckoutSecret(null); toast("Subscription activated!", "success"); refresh(); }} />
           </Elements>
         </div>
@@ -281,7 +281,7 @@ export default function BillingPage() {
               Cancel
             </button>
           </div>
-          <Elements stripe={stripePromise} options={{ clientSecret: setupSecret, appearance: stripeAppearance, paymentMethodOrder: ["card", "us_bank_account"] } as any}>
+          <Elements stripe={stripePromise} options={{ clientSecret: setupSecret, appearance: stripeAppearance, locale: "en", paymentMethodOrder: ["card", "us_bank_account"] } as any}>
             <UpdateCardForm onSuccess={() => { setShowUpdateCard(false); setSetupSecret(null); refresh(); }} />
           </Elements>
         </div>
@@ -591,7 +591,7 @@ const stripeAppearance = {
     colorTextSecondary: "#71717a",
     colorTextPlaceholder: "#52525b",
     borderRadius: "8px",
-    fontFamily: "inherit",
+    fontFamily: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
     spacingUnit: "4px",
     fontSizeBase: "14px",
   },
