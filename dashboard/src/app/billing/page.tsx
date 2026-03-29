@@ -126,27 +126,6 @@ export default function BillingPage() {
     <div className="max-w-3xl">
       <h1 className="text-2xl font-bold mb-6">Billing</h1>
 
-      {/* Stripe Elements modal for updating card */}
-      {showUpdateCard && setupSecret && stripePromise && (
-        <Modal onClose={() => { setShowUpdateCard(false); setSetupSecret(null); }}>
-          <h2 className="text-lg font-bold mb-4">Update payment method</h2>
-          <Elements stripe={stripePromise} options={{ clientSecret: setupSecret, appearance: stripeAppearance }}>
-            <UpdateCardForm onSuccess={() => { setShowUpdateCard(false); setSetupSecret(null); refresh(); }} />
-          </Elements>
-        </Modal>
-      )}
-
-      {/* Subscribe modal with Stripe Elements */}
-      {showCheckout && checkoutSecret && stripePromise && (
-        <Modal onClose={() => { setShowCheckout(false); setCheckoutSecret(null); }}>
-          <h2 className="text-lg font-bold mb-1">Subscribe to Pro</h2>
-          <p className="text-zinc-400 text-sm mb-4">$199/mo · 5M tokens included · cancel anytime</p>
-          <Elements stripe={stripePromise} options={{ clientSecret: checkoutSecret, appearance: stripeAppearance }}>
-            <SubscribeForm onSuccess={() => { setShowCheckout(false); setCheckoutSecret(null); toast("Subscription activated!", "success"); refresh(); }} />
-          </Elements>
-        </Modal>
-      )}
-
       {/* Plan + Usage */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard label="Plan" value={canSubscribe ? "Free" : "Pro"} />
@@ -200,8 +179,8 @@ export default function BillingPage() {
       )}
 
       {/* Action buttons */}
-      <div className="flex gap-3 mb-8">
-        {canSubscribe && (
+      <div className="flex gap-3 mb-6">
+        {canSubscribe && !showCheckout && (
           <button
             onClick={handleSubscribe}
             disabled={actionLoading}
@@ -210,7 +189,7 @@ export default function BillingPage() {
             {actionLoading ? "..." : isCancelled ? "Re-subscribe to Pro — $199/mo" : "Subscribe to Pro — $199/mo"}
           </button>
         )}
-        {(isActive || isPastDue) && !isCancelling && (
+        {(isActive || isPastDue) && !isCancelling && !showUpdateCard && (
           <>
             <button
               onClick={handleUpdateCard}
@@ -229,6 +208,39 @@ export default function BillingPage() {
           </>
         )}
       </div>
+
+      {/* Inline subscribe form */}
+      {showCheckout && checkoutSecret && stripePromise && (
+        <div className="mb-6 border border-zinc-800 rounded-lg bg-zinc-900/50 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-bold">Subscribe to Pro</h2>
+              <p className="text-zinc-400 text-sm">$199/mo · 5M tokens · cancel anytime</p>
+            </div>
+            <button onClick={() => { setShowCheckout(false); setCheckoutSecret(null); }} className="text-zinc-500 hover:text-zinc-300 text-sm">
+              Cancel
+            </button>
+          </div>
+          <Elements stripe={stripePromise} options={{ clientSecret: checkoutSecret, appearance: stripeAppearance, paymentMethodOrder: ["card", "us_bank_account"] }}>
+            <SubscribeForm onSuccess={() => { setShowCheckout(false); setCheckoutSecret(null); toast("Subscription activated!", "success"); refresh(); }} />
+          </Elements>
+        </div>
+      )}
+
+      {/* Inline update payment method form */}
+      {showUpdateCard && setupSecret && stripePromise && (
+        <div className="mb-6 border border-zinc-800 rounded-lg bg-zinc-900/50 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold">Update payment method</h2>
+            <button onClick={() => { setShowUpdateCard(false); setSetupSecret(null); }} className="text-zinc-500 hover:text-zinc-300 text-sm">
+              Cancel
+            </button>
+          </div>
+          <Elements stripe={stripePromise} options={{ clientSecret: setupSecret, appearance: stripeAppearance, paymentMethodOrder: ["card", "us_bank_account"] }}>
+            <UpdateCardForm onSuccess={() => { setShowUpdateCard(false); setSetupSecret(null); refresh(); }} />
+          </Elements>
+        </div>
+      )}
 
       {/* Pricing info */}
       <div className="mb-8 border border-zinc-800 rounded-lg p-4 bg-zinc-900/30">
@@ -395,21 +407,7 @@ function SubscribeForm({ onSuccess }: { onSuccess: () => void }) {
       >
         {submitting ? "Processing..." : "Subscribe — $199/mo"}
       </button>
-      <p className="text-xs text-zinc-600 text-center mt-2">Powered by Stripe · Secure payment</p>
     </form>
-  );
-}
-
-function Modal({ onClose, children, wide }: { onClose: () => void; children: React.ReactNode; wide?: boolean }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className={`bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full ${wide ? "max-w-2xl max-h-[90vh] overflow-y-auto" : "max-w-md"}`} onClick={(e) => e.stopPropagation()}>
-        {children}
-        <button onClick={onClose} className="mt-4 w-full text-center text-sm text-zinc-500 hover:text-zinc-300">
-          Cancel
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -458,10 +456,52 @@ function UsageMeter({ label, used, included, overageCents, unit }: { label: stri
 const stripeAppearance = {
   theme: "night" as const,
   variables: {
-    colorPrimary: "#ffffff",
-    colorBackground: "#18181b",
+    colorPrimary: "#e4e4e7",
+    colorBackground: "#09090b",
     colorText: "#e4e4e7",
     colorDanger: "#ef4444",
+    colorTextSecondary: "#71717a",
+    colorTextPlaceholder: "#52525b",
     borderRadius: "8px",
+    fontFamily: "inherit",
+    spacingUnit: "4px",
+    fontSizeBase: "14px",
+  },
+  rules: {
+    ".Input": {
+      backgroundColor: "#18181b",
+      border: "1px solid #27272a",
+      boxShadow: "none",
+      color: "#e4e4e7",
+      transition: "border-color 0.15s ease",
+    },
+    ".Input:focus": {
+      border: "1px solid #3f3f46",
+      boxShadow: "none",
+    },
+    ".Label": {
+      color: "#a1a1aa",
+      fontSize: "13px",
+      fontWeight: "500",
+    },
+    ".Tab": {
+      backgroundColor: "#18181b",
+      border: "1px solid #27272a",
+      color: "#a1a1aa",
+      boxShadow: "none",
+    },
+    ".Tab:hover": {
+      backgroundColor: "#27272a",
+      color: "#e4e4e7",
+    },
+    ".Tab--selected": {
+      backgroundColor: "#27272a",
+      border: "1px solid #3f3f46",
+      color: "#e4e4e7",
+      boxShadow: "none",
+    },
+    ".TabIcon--selected": {
+      fill: "#e4e4e7",
+    },
   },
 };
