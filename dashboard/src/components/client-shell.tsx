@@ -138,7 +138,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
           ))}
-          {billing && billing.subscription_status !== "active" && billing.subscription_status !== "none" && (
+          {billing && (billing.subscription_status === "past_due" || billing.subscription_status === "cancelled" || billing.subscription_status === "canceled") && (
             <div className="bg-red-900/80 border-b border-red-700 px-6 py-3 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <span className="text-red-300 text-lg">⚠</span>
@@ -146,9 +146,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                   <p className="text-sm font-medium text-red-100">
                     {billing.subscription_status === "past_due"
                       ? "Your payment is past due. Please update your payment method to continue using Coderhelm."
-                      : billing.subscription_status === "cancelled" || billing.subscription_status === "canceled"
-                        ? "Your subscription has been cancelled. Subscribe again to continue using Coderhelm."
-                        : "Your subscription is inactive. Please subscribe to use Coderhelm."}
+                      : "Your subscription has been cancelled. Subscribe again to continue using Coderhelm."}
                   </p>
                 </div>
               </div>
