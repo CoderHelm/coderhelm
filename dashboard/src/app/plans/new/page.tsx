@@ -38,46 +38,6 @@ function parsePlan(text: string): DraftPlan | null {
   }
 }
 
-function generateSystemPrompt(): string {
-  return `You are a planning assistant for Coderhelm, an autonomous AI coding agent.
-Your job is to help the user break down a feature, epic, or large piece of work into a structured plan.
-
-When the user describes what they want to build, you should:
-1. Ask clarifying questions to understand scope, tech stack, repo, constraints
-2. Once you have enough context, generate a structured plan
-
-When generating the final plan, output it in this EXACT format:
-
-\`\`\`json
-{
-  "title": "Short epic title",
-  "description": "1-2 sentence overview of the epic",
-  "repo": "owner/repo",
-  "tasks": [
-    {
-      "title": "Concise task title",
-      "description": "What needs to be built and why. Be specific about files, APIs, UI components.",
-      "acceptance_criteria": "- Bullet list\\n- Of verifiable criteria\\n- That define done",
-      "order": 0
-    }
-  ]
-}
-\`\`\`
-
-Rules:
-- Tasks should be independently implementable (one PR each)
-- Order matters — Coderhelm works on them sequentially
-- Each task title should be a GitHub issue title (imperative, max 60 chars)
-- Acceptance criteria should be machine-verifiable where possible
-- 3-10 tasks is ideal; break up anything larger
-- Ask for repo name if not provided`;
-}
-
-const DEMO_RESPONSES: string[] = [
-  "I can help you break that down into a structured plan. Could you tell me a bit more about:\n\n1. Which repository this will live in?\n2. What's the tech stack?\n3. Do you have any existing patterns I should follow?\n4. What's the rough scope — MVP or full feature?",
-  "Great! Let me put together a plan based on what you've described. I'll generate the tasks now...",
-];
-
 export default function NewPlanPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -95,7 +55,6 @@ export default function NewPlanPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { toast } = useToast();
-  const demoIdx = useRef(0);
 
   useEffect(() => {
     api
@@ -117,63 +76,30 @@ export default function NewPlanPage() {
     setInput("");
     setSending(true);
 
-    setMessages((prev) => [...prev, { role: "user", content: userMsg }]);
+    const updatedMessages: Message[] = [...messages, { role: "user", content: userMsg }];
+    setMessages(updatedMessages);
 
-    // In production this calls an AI endpoint. For now, simulate with demo responses.
-    await new Promise((r) => setTimeout(r, 800));
+    try {
+      // Send full conversation history (skip the initial greeting) to the backend
+      const chatMessages = updatedMessages
+        .slice(1) // skip the initial assistant greeting
+        .map((m) => ({ role: m.role, content: m.content }));
 
-    const isLastDemo = demoIdx.current >= DEMO_RESPONSES.length - 1;
-    let response: string;
+      const { content } = await api.planChat(chatMessages);
 
-    if (isLastDemo) {
-      // Generate a plan demo based on user input
-      const planTitle = userMsg.length > 50 ? userMsg.slice(0, 50) + "..." : userMsg;
-      response = `Here's the structured plan I've generated:\n\n\`\`\`json\n${JSON.stringify({
-        title: planTitle,
-        description: `Implement: ${userMsg}`,
-        repo: "",
-        tasks: [
-          {
-            title: "Set up data model and migrations",
-            description: "Define the database schema and any migrations needed for this feature. Include indexes for expected query patterns.",
-            acceptance_criteria: "- Schema created and applied\n- Migration scripts committed\n- Tests pass",
-            order: 0,
-          },
-          {
-            title: "Build API endpoints",
-            description: "Implement the backend API endpoints required. Follow existing REST patterns and add auth middleware.",
-            acceptance_criteria: "- All endpoints return correct status codes\n- Auth enforced on protected routes\n- Input validation in place",
-            order: 1,
-          },
-          {
-            title: "Build UI components",
-            description: "Create the frontend UI for this feature. Match existing design system patterns.",
-            acceptance_criteria: "- Components render without errors\n- Loading and error states handled\n- Responsive layout",
-            order: 2,
-          },
-          {
-            title: "Write tests",
-            description: "Add unit and integration tests for the new feature.",
-            acceptance_criteria: "- Test coverage >80%\n- All tests passing in CI",
-            order: 3,
-          },
-        ],
-      }, null, 2)}\n\`\`\`\n\nFeel free to edit the tasks above before approving. Once you're happy with the plan, save it and approve the tasks you want Coderhelm to work on!`;
-    } else {
-      response = DEMO_RESPONSES[demoIdx.current];
-      demoIdx.current++;
+      const assistantMsg: Message = { role: "assistant", content };
+      setMessages((prev) => [...prev, assistantMsg]);
+
+      // Parse any plan from the response
+      const parsed = parsePlan(content);
+      if (parsed) {
+        setDraft(parsed);
+      }
+    } catch {
+      toast("Failed to get AI response", "error");
+    } finally {
+      setSending(false);
     }
-
-    const assistantMsg: Message = { role: "assistant", content: response };
-    setMessages((prev) => [...prev, assistantMsg]);
-
-    // Parse any plan from the response
-    const parsed = parsePlan(response);
-    if (parsed) {
-      setDraft(parsed);
-    }
-
-    setSending(false);
   };
 
   const savePlan = async () => {
