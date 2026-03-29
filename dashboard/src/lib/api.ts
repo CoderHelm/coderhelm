@@ -78,6 +78,10 @@ export const api = {
   cancelSubscription: () => request<{ status: string }>("/api/billing/cancel", { method: "POST" }),
   reactivateSubscription: () => request<{ status: string }>("/api/billing/reactivate", { method: "POST" }),
   createSetupIntent: () => request<{ client_secret: string }>("/api/billing/payment-method", { method: "POST" }),
+  listPaymentMethods: () => request<{ payment_methods: PaymentMethod[] }>("/api/billing/payment-methods"),
+  deletePaymentMethod: (pmId: string) => request<{ status: string }>(`/api/billing/payment-methods/${pmId}`, { method: "DELETE" }),
+  getBillingCustomer: () => request<{ email: string | null; name: string | null }>("/api/billing/customer"),
+  updateBillingEmail: (email: string) => request<{ email: string }>("/api/billing/email", { method: "PUT", body: JSON.stringify({ email }) }),
   listInvoices: () => request<{ invoices: Invoice[] }>("/api/billing/invoices"),
   getInvoicePdf: (id: string) => request<{ pdf_url: string }>(`/api/billing/invoices/${id}/pdf`),
 
@@ -205,6 +209,22 @@ export interface Invoice {
   period: string | null;
   status: string | null;
   created_at: string | null;
+}
+
+export interface PaymentMethod {
+  id: string;
+  type: "card" | "us_bank_account" | string;
+  card?: {
+    brand: string;
+    last4: string;
+    exp_month: number;
+    exp_year: number;
+  };
+  us_bank_account?: {
+    bank_name: string;
+    last4: string;
+    account_type: string;
+  };
 }
 
 export interface Plan {

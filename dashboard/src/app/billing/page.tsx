@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { api, type BillingInfo, type Invoice } from "@/lib/api";
+import { api, type BillingInfo, type Invoice, type PaymentMethod } from "@/lib/api";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { useToast } from "@/components/toast";
@@ -23,6 +23,10 @@ export default function BillingPage() {
   const [showCheckout, setShowCheckout] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [billingEmail, setBillingEmail] = useState<string>("");
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [emailDraft, setEmailDraft] = useState("");
   const { toast } = useToast();
 
   const refresh = useCallback(() => {
@@ -33,6 +37,14 @@ export default function BillingPage() {
         setInvoices(i.invoices);
         if (b.stripe_publishable_key && !stripePromise) {
           setStripePromise(loadStripe(b.stripe_publishable_key));
+        }
+        // Load payment methods and customer details if they have a subscription
+        if (b.has_payment_method) {
+          api.listPaymentMethods().then(r => setPaymentMethods(r.payment_methods)).catch(() => {});
+          api.getBillingCustomer().then(r => {
+            setBillingEmail(r.email || "");
+            setEmailDraft(r.email || "");
+          }).catch(() => {});
         }
       })
       .catch(() => {})
@@ -89,6 +101,38 @@ export default function BillingPage() {
       setShowUpdateCard(true);
     } catch {
       toast("Failed to start card update. Please try again.", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeletePaymentMethod = async (pmId: string) => {
+    if (!confirm("Remove this payment method?")) return;
+    setActionLoading(true);
+    try {
+      await api.deletePaymentMethod(pmId);
+      setPaymentMethods(prev => prev.filter(pm => pm.id !== pmId));
+      toast("Payment method removed");
+    } catch {
+      toast("Failed to remove payment method.", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSaveEmail = async () => {
+    if (!emailDraft || !emailDraft.includes("@")) {
+      toast("Please enter a valid email.", "error");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const { email } = await api.updateBillingEmail(emailDraft);
+      setBillingEmail(email);
+      setEditingEmail(false);
+      toast("Billing email updated");
+    } catch {
+      toast("Failed to update email.", "error");
     } finally {
       setActionLoading(false);
     }
@@ -221,7 +265,7 @@ export default function BillingPage() {
               Cancel
             </button>
           </div>
-          <Elements stripe={stripePromise} options={{ clientSecret: checkoutSecret, appearance: stripeAppearance, paymentMethodOrder: ["card", "us_bank_account"] }}>
+          <Elements stripe={stripePromise} options={{ clientSecret: checkoutSecret, appearance: stripeAppearance, paymentMethodOrder: ["card", "us_bank_account"] } as any}>
             <SubscribeForm onSuccess={() => { setShowCheckout(false); setCheckoutSecret(null); toast("Subscription activated!", "success"); refresh(); }} />
           </Elements>
         </div>
@@ -236,9 +280,92 @@ export default function BillingPage() {
               Cancel
             </button>
           </div>
-          <Elements stripe={stripePromise} options={{ clientSecret: setupSecret, appearance: stripeAppearance, paymentMethodOrder: ["card", "us_bank_account"] }}>
+          <Elements stripe={stripePromise} options={{ clientSecret: setupSecret, appearance: stripeAppearance, paymentMethodOrder: ["card", "us_bank_account"] } as any}>
             <UpdateCardForm onSuccess={() => { setShowUpdateCard(false); setSetupSecret(null); refresh(); }} />
           </Elements>
+        </div>
+      )}
+
+      {/* Payment methods on file */}
+      {paymentMethods.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Payment methods</h2>
+          <div className="space-y-2">
+            {paymentMethods.map(pm => (
+              <div key={pm.id} className="flex items-center justify-between border border-zinc-800 rounded-lg p-4 bg-zinc-900/30">
+                <div className="flex items-center gap-3">
+                  {pm.type === "card" && pm.card && (
+                    <>
+                      <span className="text-zinc-200 font-medium capitalize">{pm.card.brand}</span>
+                      <span className="text-zinc-400">····</span>
+                      <span className="text-zinc-200 font-mono">{pm.card.last4}</span>
+                      <span className="text-zinc-500 text-sm">
+                        exp {String(pm.card.exp_month).padStart(2, "0")}/{pm.card.exp_year}
+                      </span>
+                    </>
+                  )}
+                  {pm.type === "us_bank_account" && pm.us_bank_account && (
+                    <>
+                      <span className="text-zinc-200 font-medium">{pm.us_bank_account.bank_name}</span>
+                      <span className="text-zinc-400">····</span>
+                      <span className="text-zinc-200 font-mono">{pm.us_bank_account.last4}</span>
+                      <span className="text-zinc-500 text-sm capitalize">{pm.us_bank_account.account_type}</span>
+                    </>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleDeletePaymentMethod(pm.id)}
+                  disabled={actionLoading}
+                  className="text-zinc-500 hover:text-red-400 text-sm transition-colors disabled:opacity-50"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Billing email */}
+      {billing.has_payment_method && (
+        <div className="mb-6">
+          <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Billing email</h2>
+          <div className="border border-zinc-800 rounded-lg p-4 bg-zinc-900/30">
+            {editingEmail ? (
+              <div className="flex items-center gap-3">
+                <input
+                  type="email"
+                  value={emailDraft}
+                  onChange={e => setEmailDraft(e.target.value)}
+                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500"
+                  placeholder="billing@example.com"
+                />
+                <button
+                  onClick={handleSaveEmail}
+                  disabled={actionLoading}
+                  className="px-3 py-1.5 bg-white text-zinc-900 rounded-lg text-sm font-medium hover:bg-zinc-200 transition-colors disabled:opacity-50"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => { setEditingEmail(false); setEmailDraft(billingEmail); }}
+                  className="text-zinc-500 hover:text-zinc-300 text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-200 text-sm">{billingEmail || "Not set"}</span>
+                <button
+                  onClick={() => setEditingEmail(true)}
+                  className="text-zinc-500 hover:text-zinc-300 text-sm transition-colors"
+                >
+                  Edit
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
