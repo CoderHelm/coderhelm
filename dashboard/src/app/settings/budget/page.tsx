@@ -49,13 +49,13 @@ export default function BudgetPage() {
     <div className="max-w-xl">
       <h1 className="text-2xl font-bold mb-2">Budget</h1>
       <p className="text-sm text-zinc-500 mb-6">
-        Set a monthly spending cap. When reached, Coderhelm will stop picking up new issues and post a comment explaining why.
+        Set a cap on monthly overage charges. When reached, Coderhelm will stop picking up new issues and post a comment explaining why.
       </p>
 
       <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-lg space-y-4">
         <div>
           <label className="block text-sm font-medium text-zinc-300 mb-1.5">
-            Monthly budget cap
+            Monthly overage cap
           </label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">$</span>
@@ -71,14 +71,14 @@ export default function BudgetPage() {
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs">/month</span>
           </div>
           <p className="text-xs text-zinc-600 mt-1.5">
-            Includes base subscription ($199) + token overage charges. Set to 0 or empty for no cap.
+            Caps overage charges only (base subscription not included). Set to 0 or empty for no cap.
           </p>
         </div>
 
         <div className="flex items-center justify-between pt-2">
           <p className="text-xs text-zinc-500">
             {maxBudget && parseFloat(maxBudget) > 0
-              ? `Coderhelm will stop after ~${formatTokens(Math.max(Math.floor((parseFloat(maxBudget) * 100 - 19900) / 5 * 1000), 0) + 5_000_000)} tokens/month`
+              ? `Coderhelm will stop after ~${formatTokens(Math.floor(parseFloat(maxBudget) * 100 / 5 * 1000) + 5_000_000)} tokens/month`
               : "No spending limit — usage will continue with overage billing"}
           </p>
           <button
