@@ -94,7 +94,31 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     <ToastProvider>
       <div className="flex min-h-screen bg-zinc-950">
         <Sidebar billing={billing} user={user} />
-        <main className="flex-1 p-8">{children}</main>
+        <div className="flex-1 flex flex-col">
+          {billing && billing.subscription_status !== "active" && billing.subscription_status !== "none" && (
+            <div className="bg-red-900/80 border-b border-red-700 px-6 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-red-300 text-lg">⚠</span>
+                <div>
+                  <p className="text-sm font-medium text-red-100">
+                    {billing.subscription_status === "past_due"
+                      ? "Your payment is past due. Please update your payment method to continue using d3ftly."
+                      : billing.subscription_status === "cancelled" || billing.subscription_status === "canceled"
+                        ? "Your subscription has been cancelled. Subscribe again to continue using d3ftly."
+                        : "Your subscription is inactive. Please subscribe to use d3ftly."}
+                  </p>
+                </div>
+              </div>
+              <a
+                href="/billing"
+                className="shrink-0 rounded-md bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-500 transition-colors"
+              >
+                {billing.subscription_status === "past_due" ? "Update Payment" : "Go to Billing"}
+              </a>
+            </div>
+          )}
+          <main className="flex-1 p-8">{children}</main>
+        </div>
       </div>
     </ToastProvider>
   );

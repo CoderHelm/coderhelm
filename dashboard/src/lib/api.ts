@@ -11,6 +11,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     },
   });
   if (!res.ok) {
+    if (res.status === 402) {
+      throw new Error("Your subscription is inactive. Please update your billing to continue.");
+    }
     throw new Error(`API ${res.status}: ${res.statusText}`);
   }
   const text = await res.text();
