@@ -133,7 +133,6 @@ function AnalysisView({
   // Ready — diagram + findings
   const errorCount = analysis.findings?.filter((f) => f.severity === "error").length ?? 0;
   const warnCount = analysis.findings?.filter((f) => f.severity === "warning").length ?? 0;
-  const infoCount = analysis.findings?.filter((f) => f.severity === "info").length ?? 0;
 
   return (
     <>
@@ -162,11 +161,6 @@ function AnalysisView({
           {warnCount > 0 && (
             <span className="px-2.5 py-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 rounded-full text-xs">
               {warnCount} warning{warnCount !== 1 ? "s" : ""}
-            </span>
-          )}
-          {infoCount > 0 && (
-            <span className="px-2.5 py-1 bg-zinc-800 border border-zinc-700 text-zinc-500 rounded-full text-xs">
-              {infoCount} note{infoCount !== 1 ? "s" : ""}
             </span>
           )}
         </div>
@@ -208,7 +202,7 @@ function AnalysisView({
             </div>
           ) : (
             <>
-              {(["error", "warning", "info"] as const).map((sev) => {
+              {(["error", "warning"] as const).map((sev) => {
                 const group = analysis.findings!.filter((f) => f.severity === sev);
                 if (group.length === 0) return null;
                 return (
@@ -257,7 +251,15 @@ function InfrastructureContent() {
         ? api.getRepoInfrastructure(selectedRepo)
         : Promise.resolve(null);
     fetcher
-      .then(setAnalysis)
+      .then((data) => {
+        setAnalysis(data);
+        // Auto-trigger scan for per-repo when no analysis exists yet
+        if (data?.status === "no_infra" && scope === "repo" && selectedRepo) {
+          api.refreshRepoInfrastructure(selectedRepo).then(() => {
+            setAnalysis((prev) => prev ? { ...prev, status: "pending" } : null);
+          }).catch(() => {});
+        }
+      })
       .catch(() => toast("Failed to load infrastructure analysis", "error"))
       .finally(() => setLoading(false));
   }, [scope, selectedRepo, toast]);

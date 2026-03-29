@@ -20,6 +20,11 @@ export function MermaidDiagram({ chart, className = "" }: Props) {
     (async () => {
       try {
         const mermaid = (await import("mermaid")).default;
+
+        // Register AWS icon pack so architecture-beta diagrams render logos:aws-* icons
+        const logosIcons = await import("@iconify-json/logos").then((m) => m.icons);
+        mermaid.registerIconPacks([{ name: "logos", icons: logosIcons }]);
+
         mermaid.initialize({
           startOnLoad: false,
           theme: "dark",
