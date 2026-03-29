@@ -163,8 +163,9 @@ export default function BillingPage() {
   const isCancelling = billing.subscription_status === "active" && billing.access_until;
   const isPastDue = billing.subscription_status === "past_due";
   const isCancelled = billing.subscription_status === "cancelled";
+  const isIncomplete = billing.subscription_status === "incomplete" || billing.subscription_status === "incomplete_expired";
   const isFree = billing.subscription_status === "none" || !billing.subscription_status;
-  const canSubscribe = isFree || isCancelled;
+  const canSubscribe = isFree || isCancelled || isIncomplete;
 
   return (
     <div className="max-w-3xl">
@@ -173,7 +174,7 @@ export default function BillingPage() {
       {/* Plan + Usage */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard label="Plan" value={canSubscribe ? "Free" : "Pro"} />
-        <StatCard label="Status" value={isCancelling ? "Cancelling" : isCancelled ? "Cancelled" : isFree ? "Free" : billing.subscription_status} />
+        <StatCard label="Status" value={isCancelling ? "Cancelling" : isCancelled ? "Cancelled" : (isFree || isIncomplete) ? "Free" : isPastDue ? "Past due" : billing.subscription_status} />
         <StatCard label="Tokens this month" value={formatTokens(billing.current_period.total_tokens)} />
       </div>
 
