@@ -12,7 +12,7 @@ const features = [
       </svg>
     ),
     title: "GitHub Or Jira Intake",
-    desc: "Assign a GitHub issue or Jira ticket — d3ftly creates a branch, opens a draft PR, and marks it ready when CI passes.",
+    desc: "Assign a GitHub issue or Jira ticket — Coderhelm creates a branch, opens a draft PR, and marks it ready when CI passes.",
   },
   {
     accentColor: "#7928ca",
@@ -76,7 +76,7 @@ const features = [
       </svg>
     ),
     title: "Self-Healing CI",
-    desc: "When CI fails on its branch, d3ftly reads the logs and pushes a fix automatically.",
+    desc: "When CI fails on its branch, Coderhelm reads the logs and pushes a fix automatically.",
   },
   {
     accentColor: "#8b5cf6",
@@ -101,12 +101,12 @@ const steps = [
   {
     step: "02",
     title: "Create an issue",
-    desc: 'Write a GitHub issue or Jira ticket describing what you need. Assign it to d3ftly[bot] or add the "d3ftly" label.',
+    desc: 'Write a GitHub issue or Jira ticket describing what you need. Assign it to Coderhelm[bot] or add the "Coderhelm" label.',
   },
   {
     step: "03",
     title: "Review the PR",
-    desc: "d3ftly opens a draft PR, runs CI, and marks it ready when checks pass. Review, comment, merge.",
+    desc: "Coderhelm opens a draft PR, runs CI, and marks it ready when checks pass. Review, comment, merge.",
   },
 ];
 
@@ -180,7 +180,7 @@ export default function Home() {
 
           <h1 className="text-5xl font-extrabold leading-tight tracking-tight sm:text-7xl">
             Your code,{" "}
-            <span className="gradient-text">d3ftly</span>{" "}
+            <span className="gradient-text">Coderhelm</span>{" "}
             handled.
           </h1>
 
@@ -192,7 +192,7 @@ export default function Home() {
 
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <a
-              href="https://github.com/apps/d3ftly-agent"
+              href="https://github.com/apps/coderhelm-agent"
               className="gradient-brand rounded-xl px-8 py-3.5 text-base font-semibold text-white shadow-lg transition-transform hover:scale-[1.02]"
             >
               Install on GitHub — Free
@@ -211,7 +211,7 @@ export default function Home() {
               <div className="code-dot bg-[#ff5f57]" />
               <div className="code-dot bg-[#febc2e]" />
               <div className="code-dot bg-[#28c840]" />
-              <span className="ml-3 text-xs text-text-muted">d3ftly · issue #42</span>
+              <span className="ml-3 text-xs text-text-muted">Coderhelm · issue #42</span>
             </div>
             <div className="p-6 text-left font-mono text-sm leading-relaxed">
               <p className="text-text-muted">
@@ -285,7 +285,7 @@ export default function Home() {
                 </div>
                 <h3 className="mt-4 text-2xl font-bold">AI Plans</h3>
                 <p className="mt-3 text-text-secondary leading-relaxed">
-                  Describe a feature in plain English. d3ftly chats with you to scope the work, then generates an ordered list of GitHub issues or Jira tickets — each ready to become a PR with one click.
+                  Describe a feature in plain English. Coderhelm chats with you to scope the work, then generates an ordered list of GitHub issues or Jira tickets — each ready to become a PR with one click.
                 </p>
                 <ul className="mt-5 space-y-2 text-sm text-text-secondary">
                   {[
@@ -373,7 +373,7 @@ export default function Home() {
                 </div>
                 <h3 className="mt-4 text-2xl font-bold">Per-Repo Workflow</h3>
                 <p className="mt-3 text-text-secondary leading-relaxed">
-                  Each repository gets an autonomous pipeline. d3ftly triages, plans, implements, self-reviews with your guardrails, opens a PR, and fixes CI failures — all without human intervention.
+                  Each repository gets an autonomous pipeline. Coderhelm triages, plans, implements, self-reviews with your guardrails, opens a PR, and fixes CI failures — all without human intervention.
                 </p>
                 <ul className="mt-5 space-y-2 text-sm text-text-secondary">
                   {[
@@ -568,7 +568,7 @@ export default function Home() {
                 </li>
               </ul>
               <a
-                href="https://github.com/apps/d3ftly-agent"
+                href="https://github.com/apps/coderhelm-agent"
                 className="mt-8 block rounded-lg border border-surface-border bg-transparent px-6 py-3 text-center text-sm font-semibold transition-colors hover:bg-surface-border"
               >
                 Get started
@@ -606,7 +606,7 @@ export default function Home() {
                 </li>
               </ul>
               <a
-                href="https://github.com/apps/d3ftly-agent"
+                href="https://github.com/apps/coderhelm-agent"
                 className="mt-8 block rounded-lg gradient-brand px-6 py-3 text-center text-sm font-semibold text-white transition-transform hover:scale-[1.02]"
               >
                 Upgrade
@@ -628,10 +628,10 @@ export default function Home() {
             Ready to <span className="gradient-text">ship faster</span>?
           </h2>
           <p className="mt-4 text-text-secondary">
-            Install d3ftly in 30 seconds. No credit card, no config.
+            Install Coderhelm in 30 seconds. No credit card, no config.
           </p>
           <a
-            href="https://github.com/apps/d3ftly-agent"
+            href="https://github.com/apps/coderhelm-agent"
             className="mt-8 inline-block gradient-brand rounded-xl px-8 py-3.5 text-base font-semibold text-white shadow-lg transition-transform hover:scale-[1.02]"
           >
             Install on GitHub — Free

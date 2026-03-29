@@ -17,18 +17,18 @@ export class FrontendStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: FrontendStackProps) {
     super(scope, id, props);
 
-    const prefix = `d3ftly-${props.stage}`;
-    const domainNames = ["d3ftly.com", "www.d3ftly.com"];
+    const prefix = `coderhelm-${props.stage}`;
+    const domainNames = ["coderhelm.com", "www.coderhelm.com"];
 
     // Route53 hosted zone (must exist in the account)
     const hostedZone = route53.HostedZone.fromLookup(this, "Zone", {
-      domainName: "d3ftly.com",
+      domainName: "coderhelm.com",
     });
 
     // ACM certificate (must be us-east-1 for CloudFront — this stack deploys to us-east-1)
     const certificate = new acm.Certificate(this, "Certificate", {
-      domainName: "d3ftly.com",
-      subjectAlternativeNames: ["www.d3ftly.com"],
+      domainName: "coderhelm.com",
+      subjectAlternativeNames: ["www.coderhelm.com"],
       validation: acm.CertificateValidation.fromDns(hostedZone),
     });
 
@@ -139,19 +139,19 @@ export class FrontendStack extends cdk.Stack {
       ],
     });
 
-    // DNS: d3ftly.com → CloudFront
+    // DNS: coderhelm.com → CloudFront
     new route53.ARecord(this, "ApexAlias", {
       zone: hostedZone,
-      recordName: "d3ftly.com",
+      recordName: "coderhelm.com",
       target: route53.RecordTarget.fromAlias(
         new targets.CloudFrontTarget(distribution)
       ),
     });
 
-    // DNS: www.d3ftly.com → CloudFront
+    // DNS: www.coderhelm.com → CloudFront
     new route53.ARecord(this, "WwwAlias", {
       zone: hostedZone,
-      recordName: "www.d3ftly.com",
+      recordName: "www.coderhelm.com",
       target: route53.RecordTarget.fromAlias(
         new targets.CloudFrontTarget(distribution)
       ),

@@ -173,7 +173,7 @@ export default function BillingPage() {
       {/* Plan + Usage */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard label="Plan" value={canSubscribe ? "Free" : "Pro"} />
-        <StatCard label="Status" value={isCancelling ? "Cancelling" : isCancelled ? "Cancelled" : billing.subscription_status || "free"} />
+        <StatCard label="Status" value={isCancelling ? "Cancelling" : isCancelled ? "Cancelled" : isFree ? "Free" : billing.subscription_status} />
         <StatCard label="Tokens this month" value={formatTokens(billing.current_period.total_tokens)} />
       </div>
 
@@ -218,7 +218,7 @@ export default function BillingPage() {
       {/* Cancelled notice */}
       {isCancelled && (
         <div className="p-4 mb-6 bg-zinc-500/10 border border-zinc-500/30 rounded-lg text-zinc-400 text-sm">
-          Your subscription has ended. Subscribe again to continue using d3ftly Pro.
+          Your subscription has ended. Subscribe again to continue using Coderhelm Pro.
         </div>
       )}
 
@@ -338,7 +338,7 @@ export default function BillingPage() {
                   value={emailDraft}
                   onChange={e => setEmailDraft(e.target.value)}
                   className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500"
-                  placeholder="billing@example.com"
+                  placeholder="billing@coderhelm.com"
                 />
                 <button
                   onClick={handleSaveEmail}

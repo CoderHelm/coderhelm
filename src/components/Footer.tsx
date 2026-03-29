@@ -8,10 +8,10 @@ export default function Footer() {
           <div>
             <div className="flex items-center gap-2 text-lg font-bold">
               <span className="gradient-text">{"///"}</span>
-              <span>d3ftly</span>
+              <span>Coderhelm</span>
             </div>
             <p className="mt-3 text-sm text-text-secondary">
-              Your code, d3ftly handled.
+              Ship code, not tickets.
             </p>
           </div>
 
@@ -66,13 +66,13 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <a href="https://app.d3ftly.com" className="hover:text-text-primary transition-colors">
+                <a href="https://app.coderhelm.com" className="hover:text-text-primary transition-colors">
                   Dashboard
                 </a>
               </li>
               <li>
-                <a href="mailto:support@d3ftly.com" className="hover:text-text-primary transition-colors">
-                  support@d3ftly.com
+                <a href="mailto:support@coderhelm.com" className="hover:text-text-primary transition-colors">
+                  support@coderhelm.com
                 </a>
               </li>
             </ul>
@@ -80,7 +80,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-12 border-t border-surface-border pt-6 text-center text-xs text-text-muted">
-          &copy; {new Date().getFullYear()} d3ftly. All rights reserved.
+          &copy; {new Date().getFullYear()} Coderhelm. All rights reserved.
         </div>
       </div>
     </footer>

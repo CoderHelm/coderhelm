@@ -32,7 +32,7 @@ jobs:
       - run: npm ci
       - run: npm run build
         env:
-          NEXT_PUBLIC_APP_URL: https://app.d3ftly.com
+          NEXT_PUBLIC_APP_URL: https://app.coderhelm.com
 
       - name: Build dashboard
         working-directory: dashboard
@@ -40,7 +40,7 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::REDACTED_AWS_ACCOUNT_ID:role/d3ftly-github-deploy
+          role-to-assume: arn:aws:iam::REDACTED_AWS_ACCOUNT_ID:role/REDACTED_ROLE_NAME
           aws-region: ${{ env.AWS_REGION }}
 
       - working-directory: infra

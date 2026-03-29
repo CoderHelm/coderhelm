@@ -36,7 +36,7 @@ export default function PlansPage() {
         <div>
           <h1 className="text-2xl font-bold">Plans</h1>
           <p className="text-sm text-zinc-500 mt-1">
-            Chat with d3ftly to break work into epics and ordered tasks, then approve and execute.
+            Chat with Coderhelm to break work into epics and ordered tasks, then approve and execute.
           </p>
         </div>
         {plansEnabled ? (
@@ -83,7 +83,7 @@ export default function PlansPage() {
         <div className="border border-zinc-800 rounded-lg p-12 text-center text-zinc-500">
           <p className="text-lg mb-2">No plans yet</p>
           <p className="text-sm mb-4">
-            Create a plan to break a feature or epic into ordered GitHub issues that d3ftly will implement.
+            Create a plan to break a feature or epic into ordered GitHub issues that Coderhelm will implement.
           </p>
           <Link href="/plans/new" className="text-zinc-300 underline text-sm">
             Create your first plan

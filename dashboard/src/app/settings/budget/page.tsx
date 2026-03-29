@@ -49,7 +49,7 @@ export default function BudgetPage() {
     <div className="max-w-xl">
       <h1 className="text-2xl font-bold mb-2">Budget</h1>
       <p className="text-sm text-zinc-500 mb-6">
-        Set a monthly spending cap. When reached, d3ftly will stop picking up new issues and post a comment explaining why.
+        Set a monthly spending cap. When reached, Coderhelm will stop picking up new issues and post a comment explaining why.
       </p>
 
       <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-lg space-y-4">
@@ -78,7 +78,7 @@ export default function BudgetPage() {
         <div className="flex items-center justify-between pt-2">
           <p className="text-xs text-zinc-500">
             {maxBudget && parseFloat(maxBudget) > 0
-              ? `d3ftly will stop after ~${formatTokens(Math.max(Math.floor((parseFloat(maxBudget) * 100 - 19900) / 5 * 1000), 0) + 5_000_000)} tokens/month`
+              ? `Coderhelm will stop after ~${formatTokens(Math.max(Math.floor((parseFloat(maxBudget) * 100 - 19900) / 5 * 1000), 0) + 5_000_000)} tokens/month`
               : "No spending limit — usage will continue with overage billing"}
           </p>
           <button

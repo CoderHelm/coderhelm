@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Acceptable Use Policy — d3ftly",
+  title: "Acceptable Use Policy — Coderhelm",
 };
 
 export default function AcceptableUse() {
@@ -10,8 +10,8 @@ export default function AcceptableUse() {
       <p><strong>Last updated:</strong> March 28, 2026</p>
 
       <p>
-        This Acceptable Use Policy (&quot;AUP&quot;) is part of your agreement with d3ftly and
-        applies to all users of the d3ftly website, GitHub App, and dashboard (the &quot;Service&quot;).
+        This Acceptable Use Policy (&quot;AUP&quot;) is part of your agreement with Coderhelm and
+        applies to all users of the Coderhelm website, GitHub App, and dashboard (the &quot;Service&quot;).
         This AUP describes prohibited and restricted uses of the Service. Violations may result
         in immediate suspension or permanent termination of your access without prior notice.
       </p>
@@ -79,7 +79,7 @@ export default function AcceptableUse() {
         stated limits.</p>
 
       <h2>3. Content Standards</h2>
-      <p>While d3ftly generates code based on your issue descriptions and codebase, you are
+      <p>While Coderhelm generates code based on your issue descriptions and codebase, you are
         responsible for ensuring that your inputs (issue titles, descriptions, comments, and
         repository content) do not:</p>
       <ul>
@@ -92,7 +92,7 @@ export default function AcceptableUse() {
 
       <h2>4. Reporting Violations</h2>
       <p>If you become aware of any violation of this AUP, please report it promptly to{" "}
-        <a href="mailto:abuse@d3ftly.com">abuse@d3ftly.com</a>. Include as much detail as
+        <a href="mailto:abuse@coderhelm.com">abuse@coderhelm.com</a>. Include as much detail as
         possible, including the nature of the violation and any supporting evidence. We will
         investigate all credible reports and take appropriate action.</p>
 
@@ -129,8 +129,8 @@ export default function AcceptableUse() {
       <h2>8. Contact</h2>
       <p>Questions about this Acceptable Use Policy? Contact us at:</p>
       <ul>
-        <li>Abuse reports: <a href="mailto:abuse@d3ftly.com">abuse@d3ftly.com</a></li>
-        <li>General inquiries: <a href="mailto:support@d3ftly.com">support@d3ftly.com</a></li>
+        <li>Abuse reports: <a href="mailto:abuse@coderhelm.com">abuse@coderhelm.com</a></li>
+        <li>General inquiries: <a href="mailto:support@coderhelm.com">support@coderhelm.com</a></li>
       </ul>
     </>
   );
