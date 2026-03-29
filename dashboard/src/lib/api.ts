@@ -27,6 +27,9 @@ export const api = {
   // Health
   getHealth: () => request<HealthCheck>("/api/health"),
 
+  // Banners
+  getBanners: () => request<{ banners: Banner[] }>("/api/banners"),
+
   // Runs
   listRuns: () => request<{ runs: Run[] }>("/api/runs"),
   getRun: (id: string) => request<Run>(`/api/runs/${id}`),
@@ -203,6 +206,15 @@ export interface Payment {
   amount_cents: number | null;
   status: string | null;
   created_at: string | null;
+}
+
+export interface Banner {
+  id: string;
+  message: string;
+  type: "info" | "warning" | "error";
+  dismissible: boolean;
+  link_text?: string;
+  link_url?: string;
 }
 
 export interface Invoice {
