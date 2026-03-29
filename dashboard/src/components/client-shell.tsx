@@ -54,11 +54,15 @@ const navGroups: NavGroup[] = [
       { href: "/settings/instructions", label: "Instructions", icon: "⚙" },
       { href: "/settings/voice", label: "Voice", icon: "✎" },
       { href: "/settings/jira", label: "Jira", icon: "◧" },
+      { href: "/settings/notifications", label: "Notifications", icon: "🔔" },
     ],
   },
   {
     label: "Account",
-    items: [{ href: "/billing", label: "Billing", icon: "$" }],
+    items: [
+      { href: "/billing", label: "Billing", icon: "$" },
+      { href: "/settings/budget", label: "Budget", icon: "◎" },
+    ],
   },
 ];
 
