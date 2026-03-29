@@ -26,6 +26,12 @@ export default function Nav() {
             Pricing
           </a>
           <a
+            href="https://app.d3ftly.com"
+            className="text-sm text-text-secondary hover:text-text-primary transition-colors"
+          >
+            Dashboard
+          </a>
+          <a
             href="https://api.d3ftly.com/auth/login"
             className="text-sm text-text-secondary hover:text-text-primary transition-colors"
           >
@@ -67,6 +73,12 @@ export default function Nav() {
             </a>
             <a href="#pricing" onClick={() => setOpen(false)} className="text-sm text-text-secondary">
               Pricing
+            </a>
+            <a
+              href="https://app.d3ftly.com"
+              className="text-sm text-text-secondary"
+            >
+              Dashboard
             </a>
             <a
               href="https://api.d3ftly.com/auth/login"
