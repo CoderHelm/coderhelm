@@ -13,6 +13,8 @@ function formatTokens(n: number): string {
   return n.toString();
 }
 
+const INVOICES_PER_PAGE = 5;
+
 export default function BillingPage() {
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -27,6 +29,7 @@ export default function BillingPage() {
   const [billingEmail, setBillingEmail] = useState<string>("");
   const [editingEmail, setEditingEmail] = useState(false);
   const [emailDraft, setEmailDraft] = useState("");
+  const [invoicePage, setInvoicePage] = useState(1);
   const { toast } = useToast();
 
   const refresh = useCallback(() => {
@@ -52,6 +55,27 @@ export default function BillingPage() {
   }, [stripePromise]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  // Poll billing until status changes (for webhook-driven updates like checkout)
+  const pollRefresh = useCallback(async () => {
+    const currentStatus = billing?.status;
+    for (let i = 0; i < 6; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        const [b, inv] = await Promise.all([api.getBilling(), api.listInvoices()]);
+        if (b.status !== currentStatus) {
+          setBilling(b);
+          setInvoices(inv.invoices);
+          if (b.has_payment_method) {
+            api.listPaymentMethods().then(r => setPaymentMethods(r.payment_methods)).catch(() => {});
+            api.getBillingCustomer().then(r => { setBillingEmail(r.email || ""); setEmailDraft(r.email || ""); }).catch(() => {});
+          }
+          return;
+        }
+      } catch { /* retry */ }
+    }
+    refresh(); // fallback
+  }, [billing?.status, refresh]);
 
   const handleSubscribe = async () => {
     setActionLoading(true);
@@ -191,14 +215,6 @@ export default function BillingPage() {
         </div>
       )}
 
-      {/* Estimated overage */}
-      {isActive && billing.current_period.estimated_overage_cents > 0 && (
-        <div className="p-4 mb-6 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-yellow-400 text-sm">
-          Estimated overage this month: <span className="font-semibold">${(billing.current_period.estimated_overage_cents / 100).toFixed(2)}</span>
-          {" "}— this will be added to your next invoice.
-        </div>
-      )}
-
       {/* Past due warning */}
       {isPastDue && (
         <div className="p-4 mb-6 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
@@ -267,7 +283,7 @@ export default function BillingPage() {
             </button>
           </div>
           <Elements stripe={stripePromise} options={{ clientSecret: checkoutSecret, appearance: stripeAppearance, locale: "en", paymentMethodOrder: ["card", "us_bank_account"] } as any}>
-            <SubscribeForm onSuccess={() => { setShowCheckout(false); setCheckoutSecret(null); toast("Subscription activated!", "success"); refresh(); }} />
+            <SubscribeForm onSuccess={() => { setShowCheckout(false); setCheckoutSecret(null); toast("Subscription activated!", "success"); pollRefresh(); }} />
           </Elements>
         </div>
       )}
@@ -370,18 +386,43 @@ export default function BillingPage() {
         </div>
       )}
 
+      {/* Monthly total */}
+      {isActive && (
+        <div className="mb-6 border border-zinc-800 rounded-lg p-4 bg-zinc-900/30">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-semibold text-zinc-100">This month</p>
+            <span className="text-xs text-zinc-500">{billing.current_period.month}</span>
+          </div>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between text-zinc-400">
+              <span>Base subscription</span>
+              <span className="text-zinc-200">$199.00</span>
+            </div>
+            {billing.current_period.estimated_overage_cents > 0 && (
+              <div className="flex justify-between text-zinc-400">
+                <span>Token overage ({formatTokens(Math.max(billing.current_period.total_tokens - billing.limits.tokens, 0))} tokens)</span>
+                <span className="text-yellow-400">${(billing.current_period.estimated_overage_cents / 100).toFixed(2)}</span>
+              </div>
+            )}
+            <div className="border-t border-zinc-800 pt-2 flex justify-between font-medium">
+              <span className="text-zinc-200">Estimated total</span>
+              <span className="text-zinc-100">${((19900 + billing.current_period.estimated_overage_cents) / 100).toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Pricing info */}
       <div className="mb-8 border border-zinc-800 rounded-lg p-4 bg-zinc-900/30">
         <p className="text-sm font-semibold text-zinc-100 mb-3">Pro — $199/mo includes</p>
-        <div className="grid grid-cols-2 gap-4 text-sm text-zinc-400">
-          <div>
-            <span className="text-zinc-200 font-medium">{formatTokens(billing.limits.tokens)}</span> tokens/mo
-            <span className="text-zinc-600 ml-1">then ${(billing.limits.overage_per_1k_tokens_cents / 100).toFixed(2)}/1K tokens</span>
-          </div>
-          <div>
-            <span className="text-zinc-200 font-medium">Unlimited</span> plans (no count limit)
-          </div>
-        </div>
+        <p className="text-sm text-zinc-400">
+          <span className="text-zinc-200 font-medium">{formatTokens(billing.limits.tokens)}</span> tokens/mo
+          <span className="text-zinc-600 ml-1">— then ${(billing.limits.overage_per_1k_tokens_cents / 100).toFixed(2)}/1K tokens overage</span>
+        </p>
+        <p className="text-xs text-zinc-600 mt-2">
+          All activity (plans, runs, analysis) counts towards token usage.
+          <a href="/settings/budget" className="text-zinc-400 hover:text-zinc-200 ml-1 underline">Set a spending cap →</a>
+        </p>
       </div>
 
       {/* Recent Payments */}
@@ -434,7 +475,7 @@ export default function BillingPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800">
-                {invoices.map((inv, i) => (
+                {invoices.slice((invoicePage - 1) * INVOICES_PER_PAGE, invoicePage * INVOICES_PER_PAGE).map((inv, i) => (
                   <tr key={i} className="hover:bg-zinc-900/50">
                     <td className="px-4 py-2.5 text-zinc-300 font-mono text-xs">{inv.invoice_number || "—"}</td>
                     <td className="px-4 py-2.5 text-zinc-400">{inv.period || "—"}</td>
@@ -461,6 +502,30 @@ export default function BillingPage() {
               </tbody>
             </table>
           </div>
+          {/* Pagination */}
+          {invoices.length > INVOICES_PER_PAGE && (
+            <div className="flex items-center justify-between mt-3">
+              <p className="text-xs text-zinc-500">
+                {(invoicePage - 1) * INVOICES_PER_PAGE + 1}–{Math.min(invoicePage * INVOICES_PER_PAGE, invoices.length)} of {invoices.length}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setInvoicePage(p => Math.max(1, p - 1))}
+                  disabled={invoicePage === 1}
+                  className="px-3 py-1 text-xs border border-zinc-700 rounded text-zinc-400 hover:text-zinc-200 disabled:opacity-30"
+                >
+                  Prev
+                </button>
+                <button
+                  onClick={() => setInvoicePage(p => Math.min(Math.ceil(invoices.length / INVOICES_PER_PAGE), p + 1))}
+                  disabled={invoicePage >= Math.ceil(invoices.length / INVOICES_PER_PAGE)}
+                  className="px-3 py-1 text-xs border border-zinc-700 rounded text-zinc-400 hover:text-zinc-200 disabled:opacity-30"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
