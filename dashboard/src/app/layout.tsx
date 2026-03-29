@@ -3,8 +3,8 @@ import "./globals.css";
 import { ClientShell } from "@/components/client-shell";
 
 export const metadata: Metadata = {
-  title: "d3ftly — Dashboard",
-  description: "Manage your d3ftly settings and monitor runs",
+  title: "Coderhelm — Dashboard",
+  description: "Manage your Coderhelm settings and monitor runs",
   icons: { icon: "/favicon.svg" },
 };
 

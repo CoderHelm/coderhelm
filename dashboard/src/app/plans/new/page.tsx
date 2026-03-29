@@ -39,7 +39,7 @@ function parsePlan(text: string): DraftPlan | null {
 }
 
 function generateSystemPrompt(): string {
-  return `You are a planning assistant for d3ftly, an autonomous AI coding agent.
+  return `You are a planning assistant for Coderhelm, an autonomous AI coding agent.
 Your job is to help the user break down a feature, epic, or large piece of work into a structured plan.
 
 When the user describes what they want to build, you should:
@@ -66,7 +66,7 @@ When generating the final plan, output it in this EXACT format:
 
 Rules:
 - Tasks should be independently implementable (one PR each)
-- Order matters — d3ftly works on them sequentially
+- Order matters — Coderhelm works on them sequentially
 - Each task title should be a GitHub issue title (imperative, max 60 chars)
 - Acceptance criteria should be machine-verifiable where possible
 - 3-10 tasks is ideal; break up anything larger
@@ -82,7 +82,7 @@ export default function NewPlanPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Hi! Tell me what you want to build and I'll help you break it into an ordered plan of GitHub issues that d3ftly can implement one by one.",
+      content: "Hi! Tell me what you want to build and I'll help you break it into an ordered plan of GitHub issues that Coderhelm can implement one by one.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -158,7 +158,7 @@ export default function NewPlanPage() {
             order: 3,
           },
         ],
-      }, null, 2)}\n\`\`\`\n\nFeel free to edit the tasks above before approving. Once you're happy with the plan, save it and approve the tasks you want d3ftly to work on!`;
+      }, null, 2)}\n\`\`\`\n\nFeel free to edit the tasks above before approving. Once you're happy with the plan, save it and approve the tasks you want Coderhelm to work on!`;
     } else {
       response = DEMO_RESPONSES[demoIdx.current];
       demoIdx.current++;

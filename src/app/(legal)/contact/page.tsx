@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Contact — d3ftly",
+  title: "Contact — Coderhelm",
 };
 
 export default function Contact() {
@@ -16,7 +16,7 @@ export default function Contact() {
         For product questions, bug reports, or account help:
       </p>
       <p>
-        <a href="mailto:support@d3ftly.com">support@d3ftly.com</a>
+        <a href="mailto:support@coderhelm.com">support@coderhelm.com</a>
       </p>
 
       <h2>Legal &amp; Privacy</h2>
@@ -24,7 +24,7 @@ export default function Contact() {
         For legal inquiries, data requests, or privacy-related questions:
       </p>
       <p>
-        <a href="mailto:legal@d3ftly.com">legal@d3ftly.com</a>
+        <a href="mailto:legal@coderhelm.com">legal@coderhelm.com</a>
       </p>
 
       <h2>Security</h2>
@@ -32,7 +32,7 @@ export default function Contact() {
         To report a vulnerability or security concern:
       </p>
       <p>
-        <a href="mailto:security@d3ftly.com">security@d3ftly.com</a>
+        <a href="mailto:security@coderhelm.com">security@coderhelm.com</a>
       </p>
     </>
   );

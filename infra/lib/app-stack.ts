@@ -17,12 +17,12 @@ export class AppStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: AppStackProps) {
     super(scope, id, props);
 
-    const prefix = `d3ftly-${props.stage}`;
-    const domainName = "app.d3ftly.com";
+    const prefix = `coderhelm-${props.stage}`;
+    const domainName = "app.coderhelm.com";
 
     // Route53 hosted zone (must exist in the account)
     const hostedZone = route53.HostedZone.fromLookup(this, "Zone", {
-      domainName: "d3ftly.com",
+      domainName: "coderhelm.com",
     });
 
     // ACM certificate (must be us-east-1 for CloudFront)
@@ -75,7 +75,7 @@ export class AppStack extends cdk.Stack {
           },
           contentSecurityPolicy: {
             contentSecurityPolicy:
-              "default-src 'self'; script-src 'self' 'unsafe-inline' https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.d3ftly.com https://api.stripe.com; frame-src https://js.stripe.com; font-src 'self'",
+              "default-src 'self'; script-src 'self' 'unsafe-inline' https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.coderhelm.com https://api.stripe.com; frame-src https://js.stripe.com; font-src 'self'",
             override: true,
           },
         },
@@ -165,7 +165,7 @@ function handler(event) {
       ],
     });
 
-    // DNS: app.d3ftly.com → CloudFront
+    // DNS: app.coderhelm.com → CloudFront
     new route53.ARecord(this, "AliasRecord", {
       zone: hostedZone,
       recordName: domainName,

@@ -19,7 +19,7 @@ export class WafStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: WafStackProps) {
     super(scope, id, props);
 
-    const prefix = `d3ftly-${props.stage}`;
+    const prefix = `coderhelm-${props.stage}`;
     const target = props.target ?? "site";
 
     const webAcl = new wafv2.CfnWebACL(this, "WebAcl", {

@@ -159,7 +159,7 @@ export default function VoicePage() {
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-2">Team Voice</h1>
       <p className="text-zinc-400 text-sm mb-6">
-        Define how d3ftly writes PR descriptions, commit messages, and code comments.
+        Define how Coderhelm writes PR descriptions, commit messages, and code comments.
         Global voice applies to all repos. Per-repo voice overrides it for a specific repo and is auto-generated during onboarding.
       </p>
 

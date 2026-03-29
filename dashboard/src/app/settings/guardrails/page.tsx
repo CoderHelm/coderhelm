@@ -182,7 +182,7 @@ export default function GuardrailsPage() {
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-2">Guardrails</h1>
       <p className="text-zinc-400 text-sm mb-6">
-        Must-rules that d3ftly enforces on every run. Global rules apply to all repos.
+        Must-rules that Coderhelm enforces on every run. Global rules apply to all repos.
         Per-repo rules add repo-specific constraints on top.
       </p>
 

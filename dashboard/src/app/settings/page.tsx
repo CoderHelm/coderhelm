@@ -2,8 +2,8 @@ import Link from "next/link";
 
 export default function SettingsPage() {
   const sections = [
-    { href: "/settings/guardrails", title: "Guardrails", description: "Must-rules d3ftly always follows. Never pushes to main." },
-    { href: "/settings/voice", title: "Team Voice", description: "Control how d3ftly writes — tone, commit style, PR format." },
+    { href: "/settings/guardrails", title: "Guardrails", description: "Must-rules Coderhelm always follows. Never pushes to main." },
+    { href: "/settings/voice", title: "Team Voice", description: "Control how Coderhelm writes — tone, commit style, PR format." },
     { href: "/settings/instructions", title: "Custom Instructions", description: "Global conventions and preferences for all repos." },
     { href: "/settings/repos", title: "Repositories", description: "Connected repos and their status." },
     { href: "/settings/budget", title: "Budget", description: "Set a monthly spending cap to control overage costs." },

@@ -1,6 +1,6 @@
-# d3ftly
+# Coderhelm
 
-> Your code, d3ftly handled.
+> Your code, Coderhelm handled.
 
 Autonomous AI coding agent — assign a GitHub issue, get a draft PR.
 
@@ -43,6 +43,6 @@ cd infra && cdk deploy --all
 ## Manual Steps (one-time)
 
 1. Register a GitHub App at https://github.com/settings/apps/new
-2. Buy `d3ftly.com` domain
+2. Buy `Coderhelm.com` domain
 3. Create AWS Secrets Manager entries (see infra/README.md)
 4. Deploy: `cd infra && cdk deploy --all`
