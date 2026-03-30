@@ -28,16 +28,19 @@ function StatusBadge({ status }: { status: string }) {
 function PassProgress({ currentPass, status }: { currentPass?: string; status: string }) {
   const doneIdx = status === "completed" ? PASSES.length : PASSES.indexOf(currentPass ?? "");
   return (
-    <div className="flex flex-col items-start">
-      {/* Circles row with connecting lines */}
-      <div className="flex items-center">
-        {PASSES.map((pass, i) => {
-          const done = i < doneIdx;
-          const active = i === doneIdx && status === "running";
-          const failed = status === "failed" && i === doneIdx;
-          return (
-            <div key={pass} className="flex items-center">
-              {i > 0 && <div className={`w-10 h-0.5 ${done ? "bg-emerald-500/60" : "bg-zinc-700"}`} />}
+    <div className="flex items-start">
+      {PASSES.map((pass, i) => {
+        const done = i < doneIdx;
+        const active = i === doneIdx && status === "running";
+        const failed = status === "failed" && i === doneIdx;
+        return (
+          <div key={pass} className="flex items-center">
+            {i > 0 && (
+              <div className="flex items-center h-8">
+                <div className={`w-8 h-0.5 ${done ? "bg-emerald-500/60" : "bg-zinc-700"}`} />
+              </div>
+            )}
+            <div className="flex flex-col items-center gap-2">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium border ${
                   done
@@ -51,26 +54,13 @@ function PassProgress({ currentPass, status }: { currentPass?: string; status: s
               >
                 {done ? "✓" : i + 1}
               </div>
-            </div>
-          );
-        })}
-      </div>
-      {/* Labels row */}
-      <div className="flex">
-        {PASSES.map((pass, i) => {
-          const done = i < doneIdx;
-          const active = i === doneIdx && status === "running";
-          const failed = status === "failed" && i === doneIdx;
-          return (
-            <div key={pass} className="flex items-center">
-              {i > 0 && <div className="w-10" />}
-              <span className={`w-8 text-center text-xs ${done ? "text-emerald-400" : active ? "text-blue-400" : failed ? "text-red-400" : "text-zinc-600"}`}>
+              <span className={`text-xs whitespace-nowrap ${done ? "text-emerald-400" : active ? "text-blue-400" : failed ? "text-red-400" : "text-zinc-600"}`}>
                 {pass}
               </span>
             </div>
-          );
-        })}
-      </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
