@@ -177,7 +177,7 @@ function RunDetailInner() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-sm font-medium text-red-400 mb-1">Error</p>
-              <pre className="text-sm text-red-300/80 whitespace-pre-wrap font-mono leading-relaxed">{run.error}</pre>
+              <pre className="text-sm text-red-300/80 whitespace-pre-wrap font-mono leading-relaxed">{sanitizeError(run.error)}</pre>
             </div>
             {run.status === "failed" && run.current_pass === "feedback" && run.pr_url && (
               <button
@@ -391,6 +391,18 @@ function StatCard({ label, value }: { label: string; value: string }) {
       <p className="text-lg font-semibold text-zinc-100">{value}</p>
     </div>
   );
+}
+
+function sanitizeError(msg: string): string {
+  // Strip model IDs, internal service names, and Bedrock details
+  return msg
+    .replace(/\(model=[^)]+\)/gi, "")
+    .replace(/us\.anthropic\.[\w.-]+/gi, "")
+    .replace(/anthropic\.claude[\w.-]*/gi, "")
+    .replace(/Bedrock converse error/gi, "An error occurred during processing")
+    .replace(/service error/gi, "service temporarily unavailable")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function TrailEntry({ label, time, status }: { label: string; time?: string; status: "done" | "active" | "failed" }) {
