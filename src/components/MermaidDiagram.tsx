@@ -40,6 +40,11 @@ export default function MermaidDiagram({ chart, className }: MermaidDiagramProps
             lineColor: "#14b8a6",
             tertiaryColor: "#0d1117",
           },
+          architecture: {
+            padding: 16,
+            iconSize: 32,
+            fontSize: 11,
+          },
         });
 
         const result = await mermaid.render(`landing-${id}`, chart);
@@ -69,9 +74,14 @@ export default function MermaidDiagram({ chart, className }: MermaidDiagramProps
 
   return (
     <div
-      className={className}
+      className={`mermaid-diagram ${className ?? ""}`}
       dangerouslySetInnerHTML={{ __html: svg }}
       aria-label="Rendered Mermaid architecture diagram"
+      style={{
+        // tame architecture-beta defaults: shrink fonts and spacing
+        // @ts-expect-error CSS custom properties
+        "--mermaid-font-size": "11px",
+      }}
     />
   );
 }

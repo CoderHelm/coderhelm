@@ -284,7 +284,7 @@ export default function BillingPage() {
               Cancel
             </button>
           </div>
-          <Elements stripe={stripePromise} options={{ clientSecret: checkoutSecret, appearance: stripeAppearance, locale: "en", paymentMethodOrder: ["card", "us_bank_account"] } as any}>
+          <Elements stripe={stripePromise} options={{ clientSecret: checkoutSecret, appearance: stripeAppearance, locale: "en", paymentMethodOrder: ["card"] } as any}>
             <SubscribeForm onSuccess={() => { setShowCheckout(false); setCheckoutSecret(null); toast("Subscription activated!", "success"); pollRefresh(); }} />
           </Elements>
         </div>
@@ -299,7 +299,7 @@ export default function BillingPage() {
               Cancel
             </button>
           </div>
-          <Elements stripe={stripePromise} options={{ clientSecret: setupSecret, appearance: stripeAppearance, locale: "en", paymentMethodOrder: ["card", "us_bank_account"] } as any}>
+          <Elements stripe={stripePromise} options={{ clientSecret: setupSecret, appearance: stripeAppearance, locale: "en", paymentMethodOrder: ["card"] } as any}>
             <UpdateCardForm onSuccess={() => { setShowUpdateCard(false); setSetupSecret(null); refresh(); }} />
           </Elements>
         </div>
@@ -323,14 +323,7 @@ export default function BillingPage() {
                       </span>
                     </>
                   )}
-                  {pm.type === "us_bank_account" && pm.us_bank_account && (
-                    <>
-                      <span className="text-zinc-200 font-medium">{pm.us_bank_account.bank_name}</span>
-                      <span className="text-zinc-400">····</span>
-                      <span className="text-zinc-200 font-mono">{pm.us_bank_account.last4}</span>
-                      <span className="text-zinc-500 text-sm capitalize">{pm.us_bank_account.account_type}</span>
-                    </>
-                  )}
+
                 </div>
                 <button
                   onClick={() => handleDeletePaymentMethod(pm.id)}
@@ -440,59 +433,6 @@ export default function BillingPage() {
           </>
         )}
       </div>
-
-      {/* Recent Payments */}
-      {billing.recent_payments.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Recent payments</h2>
-          <div className="border border-zinc-800 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-zinc-900 text-zinc-400 text-left">
-                <tr>
-                  <th className="px-4 py-2.5 font-medium">Invoice</th>
-                  <th className="px-4 py-2.5 font-medium">Amount</th>
-                  <th className="px-4 py-2.5 font-medium">Status</th>
-                  <th className="px-4 py-2.5 font-medium">Date</th>
-                  <th className="px-4 py-2.5 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800">
-                {billing.recent_payments.map((p, i) => (
-                  <tr key={i} className="hover:bg-zinc-900/50">
-                    <td className="px-4 py-2.5 text-zinc-300 font-mono text-xs">{p.invoice_number || "—"}</td>
-                    <td className="px-4 py-2.5">{p.amount_cents ? `$${(p.amount_cents / 100).toFixed(2)}` : "—"}</td>
-                    <td className="px-4 py-2.5">
-                      <span className={`px-2 py-0.5 rounded-full text-xs border ${
-                        p.status === "paid"
-                          ? "bg-green-500/10 text-green-400 border-green-500/20"
-                          : "bg-zinc-800 text-zinc-400 border-zinc-700"
-                      }`}>{p.status || "—"}</span>
-                    </td>
-                    <td className="px-4 py-2.5 text-zinc-400">{p.created_at ? new Date(p.created_at).toLocaleDateString() : "—"}</td>
-                    <td className="px-4 py-2.5">
-                      {p.invoice_id && (
-                        <button
-                          onClick={async () => {
-                            try {
-                              const { pdf_url } = await api.getInvoicePdf(p.invoice_id!);
-                              window.open(pdf_url, "_blank");
-                            } catch {
-                              toast("Failed to download invoice", "error");
-                            }
-                          }}
-                          className="text-blue-400 hover:underline text-xs cursor-pointer"
-                        >
-                          PDF
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {/* Invoices */}
       {invoices.length > 0 && (

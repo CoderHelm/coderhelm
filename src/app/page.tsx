@@ -155,29 +155,26 @@ const workflowMermaid = `flowchart LR
   fb -->|No| merge["Merge"]`;
 
 const infraMermaid = `architecture-beta
-  group edge(logos:aws-cloudfront)[Edge]
+  group ingress(logos:aws-cloudfront)[Ingress]
   group compute(logos:aws-lambda)[Compute]
-  group data(logos:aws-dynamodb)[Data]
-  group async(logos:aws-sqs)[Queues]
+  group storage(logos:aws-dynamodb)[Storage]
 
-  service dns(logos:aws-route53)[Route 53] in edge
-  service cdn(logos:aws-cloudfront)[CloudFront] in edge
-  service api(logos:aws-api-gateway)[API Gateway] in compute
-  service gw(logos:aws-lambda)[Gateway Lambda] in compute
-  service wk(logos:aws-lambda)[Worker Lambda] in compute
-  service db(logos:aws-dynamodb)[DynamoDB] in data
-  service s3(logos:aws-s3)[Artifacts S3] in data
-  service q(logos:aws-sqs)[Ticket Queue] in async
-  service dlq(logos:aws-sqs)[DLQ] in async
+  service dns(logos:aws-route53)[Route 53] in ingress
+  service cdn(logos:aws-cloudfront)[CloudFront] in ingress
+  service api(logos:aws-api-gateway)[API GW] in compute
+  service gw(logos:aws-lambda)[Gateway] in compute
+  service wk(logos:aws-lambda)[Worker] in compute
+  service q(logos:aws-sqs)[Queue] in compute
+  service db(logos:aws-dynamodb)[DynamoDB] in storage
+  service s3(logos:aws-s3)[S3] in storage
 
   dns:R --> L:cdn
   cdn:R --> L:api
   api:R --> L:gw
-  gw:R --> L:db
   gw:B --> T:q
-  q:T --> B:wk
-  wk:R --> L:s3
-  wk:B --> T:dlq`;
+  q:R --> L:wk
+  gw:R --> L:db
+  wk:R --> L:s3`;
 
 export default function Home() {
   return (
