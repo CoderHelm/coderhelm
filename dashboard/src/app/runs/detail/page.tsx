@@ -157,6 +157,8 @@ function RunDetailInner() {
     return () => clearInterval(interval);
   }, [run?.status, fetchRun]);
 
+  const taskItems = useMemo(() => parseTaskItems(openspec?.tasks), [openspec?.tasks]);
+
   if (!runId) {
     return (
       <div className="max-w-3xl">
@@ -192,7 +194,6 @@ function RunDetailInner() {
     ? (Object.keys(openspec) as (keyof Openspec)[]).filter((k) => openspec[k] && k !== "tasks")
     : [];
 
-  const taskItems = useMemo(() => parseTaskItems(openspec?.tasks), [openspec?.tasks]);
   const implementStarted = PASSES.indexOf(run.current_pass ?? "") >= 2 || run.status === "completed" || run.status === "failed";
   const showTaskSidebar = taskItems.length > 0 && implementStarted;
   const filesModified = run.files_modified ?? [];
