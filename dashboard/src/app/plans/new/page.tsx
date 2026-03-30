@@ -209,7 +209,19 @@ export default function NewPlanPage() {
                       : "bg-zinc-900 border border-zinc-800 text-zinc-200"
                   }`}
                 >
-                  {msg.content.replace(/```json\n[\s\S]*?\n```/g, "(structured plan generated →)")}
+                  {msg.content.includes("```json")
+                    ? msg.content.split(/```json\n[\s\S]*?\n```/).map((part, j, arr) => (
+                        <span key={j}>
+                          {part}
+                          {j < arr.length - 1 && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 my-1 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-emerald-400 text-xs font-medium">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                              Plan generated — see preview
+                            </span>
+                          )}
+                        </span>
+                      ))
+                    : msg.content}
                 </div>
               </div>
             ))}
