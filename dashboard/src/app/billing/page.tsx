@@ -188,7 +188,7 @@ export default function BillingPage() {
   const isPastDue = billing.subscription_status === "past_due";
   const isCancelled = billing.subscription_status === "cancelled";
   const isIncomplete = billing.subscription_status === "incomplete" || billing.subscription_status === "incomplete_expired";
-  const isFree = billing.subscription_status === "none" || !billing.subscription_status;
+  const isFree = billing.subscription_status === "none" || billing.subscription_status === "free" || !billing.subscription_status;
   const canSubscribe = isFree || isCancelled || isIncomplete;
 
   return (
@@ -414,15 +414,29 @@ export default function BillingPage() {
 
       {/* Pricing info */}
       <div className="mb-8 border border-zinc-800 rounded-lg p-4 bg-zinc-900/30">
-        <p className="text-sm font-semibold text-zinc-100 mb-3">Pro — $199/mo includes</p>
-        <p className="text-sm text-zinc-400">
-          <span className="text-zinc-200 font-medium">{formatTokens(billing.limits.tokens)}</span> tokens/mo
-          <span className="text-zinc-600 ml-1">— then ${(billing.limits.overage_per_1k_tokens_cents / 100).toFixed(2)}/1K tokens overage</span>
-        </p>
-        <p className="text-xs text-zinc-600 mt-2">
-          All activity (plans, runs, analysis) counts towards token usage.
-          <a href="/settings/budget" className="text-zinc-400 hover:text-zinc-200 ml-1 underline">Set a spending cap →</a>
-        </p>
+        {isActive ? (
+          <>
+            <p className="text-sm font-semibold text-zinc-100 mb-3">Pro — $199/mo includes</p>
+            <p className="text-sm text-zinc-400">
+              <span className="text-zinc-200 font-medium">{formatTokens(billing.limits.tokens)}</span> tokens/mo
+              <span className="text-zinc-600 ml-1">— then ${(billing.limits.overage_per_1k_tokens_cents / 100).toFixed(2)}/1K tokens overage</span>
+            </p>
+            <p className="text-xs text-zinc-600 mt-2">
+              All activity (plans, runs, analysis) counts towards token usage.
+              <a href="/settings/budget" className="text-zinc-400 hover:text-zinc-200 ml-1 underline">Set a spending cap →</a>
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-semibold text-zinc-100 mb-3">Free plan</p>
+            <p className="text-sm text-zinc-400">
+              <span className="text-zinc-200 font-medium">{formatTokens(500_000)}</span> tokens/mo
+            </p>
+            <p className="text-xs text-zinc-600 mt-2">
+              <a href="/billing" onClick={handleSubscribe} className="text-zinc-400 hover:text-zinc-200 underline">Upgrade to Pro →</a> for {formatTokens(billing.limits.tokens)} tokens/mo + overage billing.
+            </p>
+          </>
+        )}
       </div>
 
       {/* Recent Payments */}
@@ -437,6 +451,7 @@ export default function BillingPage() {
                   <th className="px-4 py-2.5 font-medium">Amount</th>
                   <th className="px-4 py-2.5 font-medium">Status</th>
                   <th className="px-4 py-2.5 font-medium">Date</th>
+                  <th className="px-4 py-2.5 font-medium"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800">
@@ -452,6 +467,23 @@ export default function BillingPage() {
                       }`}>{p.status || "—"}</span>
                     </td>
                     <td className="px-4 py-2.5 text-zinc-400">{p.created_at ? new Date(p.created_at).toLocaleDateString() : "—"}</td>
+                    <td className="px-4 py-2.5">
+                      {p.invoice_id && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              const { pdf_url } = await api.getInvoicePdf(p.invoice_id!);
+                              window.open(pdf_url, "_blank");
+                            } catch {
+                              toast("Failed to download invoice", "error");
+                            }
+                          }}
+                          className="text-blue-400 hover:underline text-xs"
+                        >
+                          PDF
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -5,6 +5,10 @@ import { api, type Repo } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { Skeleton } from "@/components/skeleton";
 import { RepoCombobox } from "@/components/repo-combobox";
+import {
+  ShieldCheckIcon, LockIcon, ShieldAlertIcon,
+  KeyIcon, RepeatIcon, ClipboardIcon, ScanIcon,
+} from "@/components/icons";
 
 const BUILT_IN_RULES = [
   "Never push directly to the default/main branch",
@@ -198,7 +202,7 @@ export default function GuardrailsPage() {
 
       <div className="border border-emerald-900/30 rounded-lg p-4 mb-6 bg-emerald-950/20">
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-emerald-400">⛨</span>
+          <span className="text-emerald-400"><ScanIcon /></span>
           <h3 className="text-xs font-medium text-emerald-400 uppercase tracking-wider">Safety Agent</h3>
         </div>
         <p className="text-zinc-400 text-sm">
@@ -209,20 +213,20 @@ export default function GuardrailsPage() {
 
       <div className="border border-zinc-800 rounded-lg p-4 mb-6 bg-zinc-900/30">
         <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3">Platform Security (always on)</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
-            { icon: "🔏", label: "Webhook signature verification", detail: "GitHub and Jira webhooks are HMAC-verified" },
-            { icon: "🔒", label: "Worker isolation", detail: "Agent tooling is GitHub API only — no shell, no AWS SDK access" },
-            { icon: "🛡", label: "Input validation", detail: "Repo paths, payloads, and rules are validated and size-capped at 10KB" },
-            { icon: "🔑", label: "Secret scoping", detail: "Worker only has access to GitHub credentials, not billing or JWT secrets" },
-            { icon: "♻️", label: "Replay protection", detail: "Webhooks are idempotency-checked to prevent double-processing" },
-            { icon: "📝", label: "Audit trail", detail: "Every run is logged with full token usage, pass results, and timing" },
+            { icon: <ShieldCheckIcon />, label: "Webhook signature verification", detail: "GitHub and Jira webhooks are HMAC-verified" },
+            { icon: <LockIcon />, label: "Worker isolation", detail: "Agent tooling is GitHub API only — no shell, no AWS SDK access" },
+            { icon: <ShieldAlertIcon />, label: "Input validation", detail: "Repo paths, payloads, and rules are validated and size-capped at 10KB" },
+            { icon: <KeyIcon />, label: "Secret scoping", detail: "Worker only has access to GitHub credentials, not billing or JWT secrets" },
+            { icon: <RepeatIcon />, label: "Replay protection", detail: "Webhooks are idempotency-checked to prevent double-processing" },
+            { icon: <ClipboardIcon />, label: "Audit trail", detail: "Every run is logged with full token usage, pass results, and timing" },
           ].map(({ icon, label, detail }) => (
-            <div key={label} className="flex items-start gap-2 p-2 rounded-md">
-              <span className="text-sm mt-0.5">{icon}</span>
+            <div key={label} className="flex items-start gap-3 p-3 rounded-lg bg-zinc-900/40">
+              <span className="text-zinc-500 mt-0.5 shrink-0">{icon}</span>
               <div>
-                <p className="text-sm text-zinc-300">{label}</p>
-                <p className="text-xs text-zinc-600">{detail}</p>
+                <p className="text-sm font-medium text-zinc-200">{label}</p>
+                <p className="text-xs text-zinc-500 mt-0.5">{detail}</p>
               </div>
             </div>
           ))}
