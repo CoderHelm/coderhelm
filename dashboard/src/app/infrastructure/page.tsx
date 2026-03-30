@@ -33,10 +33,10 @@ function FindingCard({ finding }: { finding: InfraFinding }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-semibold">{finding.title}</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 border border-zinc-700">{CATEGORY_LABELS[finding.category] ?? finding.category}</span>
+            <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 border border-zinc-700">{CATEGORY_LABELS[finding.category] ?? finding.category}</span>
           </div>
           <p className="text-xs text-zinc-500 mt-1 leading-relaxed">{finding.detail}</p>
-          {finding.file && <p className="text-[10px] text-zinc-600 font-mono mt-1">{finding.file}</p>}
+          {finding.file && <p className="text-xs text-zinc-600 font-mono mt-1">{finding.file}</p>}
         </div>
       </div>
     </div>
@@ -207,7 +207,7 @@ function AnalysisView({
                 if (group.length === 0) return null;
                 return (
                   <div key={sev}>
-                    <p className="text-[10px] text-zinc-600 uppercase tracking-wider mb-1.5 mt-3">
+                    <p className="text-xs text-zinc-600 uppercase tracking-wider mb-1.5 mt-3">
                       {sev === "error" ? "Issues" : sev === "warning" ? "Warnings" : "Notes"}
                     </p>
                     <div className="space-y-1.5">

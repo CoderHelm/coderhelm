@@ -56,7 +56,7 @@ function ChartTooltip({ active, payload, label, formatter }: any) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-950/90 backdrop-blur-sm px-3 py-2 shadow-xl">
-      <p className="text-[11px] text-zinc-500 mb-1">{label}</p>
+      <p className="text-xs text-zinc-500 mb-1">{label}</p>
       {payload.map((entry: { name: string; value: number; color: string }) => (
         <div key={entry.name} className="flex items-center gap-2 text-xs">
           <span className="h-2 w-2 rounded-full" style={{ background: entry.color }} />
@@ -278,7 +278,7 @@ export default function AnalyticsPage() {
 function KpiCard({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg">
-      <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">{label}</p>
       <p className="text-xl font-bold tabular-nums">{value}</p>
     </div>
   );
@@ -297,7 +297,7 @@ function Legend({ items }: { items: { label: string; color: string }[] }) {
   return (
     <div className="flex items-center gap-4 mt-3 ml-1">
       {items.map((item) => (
-        <div key={item.label} className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+        <div key={item.label} className="flex items-center gap-1.5 text-xs text-zinc-500">
           <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
           {item.label}
         </div>
