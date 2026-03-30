@@ -205,6 +205,7 @@ export interface BillingInfo {
 }
 
 export interface Payment {
+  invoice_id: string | null;
   invoice_number: string | null;
   amount_cents: number | null;
   status: string | null;
