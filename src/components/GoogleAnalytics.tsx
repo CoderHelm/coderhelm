@@ -10,15 +10,18 @@ declare global {
   }
 }
 
-const GA_MEASUREMENT_ID = "G-XTM8Y82LX9";
+const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
 export function GoogleAnalytics() {
   const pathname = usePathname();
 
   useEffect(() => {
+    if (!GA_MEASUREMENT_ID) return;
     if (typeof window.gtag !== "function") return;
     window.gtag("event", "page_view", { page_path: pathname });
   }, [pathname]);
+
+  if (!GA_MEASUREMENT_ID) return null;
 
   return (
     <>
