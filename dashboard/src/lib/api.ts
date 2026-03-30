@@ -255,6 +255,8 @@ export interface Plan {
   repo: string;
   status: "draft" | "executing" | "done" | string;
   task_count: number;
+  tokens_in?: number;
+  tokens_out?: number;
   created_at: string;
   updated_at: string;
   executed_at?: string;
