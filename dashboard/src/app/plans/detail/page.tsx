@@ -66,6 +66,17 @@ function PlanDetail() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  // Auto-poll when tasks are queued or running
+  useEffect(() => {
+    if (!plan) return;
+    const hasActive = plan.tasks.some((t) => t.status === "queued" || t.status === "running");
+    if (!hasActive && plan.status !== "executing") return;
+    const interval = setInterval(() => {
+      api.getPlan(planId).then(setPlan).catch(() => {});
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [plan, planId]);
+
   const handleReject = async (taskId: string) => {
     setActionLoading(taskId + ":reject");
     try {
