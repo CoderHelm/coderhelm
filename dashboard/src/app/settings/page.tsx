@@ -7,6 +7,7 @@ export default function SettingsPage() {
     { href: "/settings/instructions", title: "Custom Instructions", description: "Global conventions and preferences for all repos." },
     { href: "/settings/repos", title: "Repositories", description: "Connected repos and their status." },
     { href: "/settings/budget", title: "Budget", description: "Set a monthly spending cap to control overage costs." },
+    { href: "/settings/workflow", title: "Workflow", description: "Openspec output, commit behavior, and pipeline preferences." },
     { href: "/settings/notifications", title: "Notifications", description: "Choose which emails Coderhelm sends you." },
   ];
 
