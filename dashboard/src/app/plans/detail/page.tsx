@@ -289,17 +289,17 @@ function PlanDetail() {
                     <span className="flex-shrink-0 w-6 h-6 rounded-full bg-zinc-800 text-zinc-500 flex items-center justify-center text-xs mt-0.5">{idx + 1}</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm font-semibold text-zinc-100">{task.title}</h3>
-                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] border ${TASK_STATUS_STYLES[task.status] || TASK_STATUS_STYLES.draft}`}>{task.status}</span>
-                        {task.issue_url && <a href={task.issue_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline">#{task.issue_number}</a>}
-                        {task.repo && <span className="text-[10px] text-zinc-600 font-mono">{task.repo}</span>}
-                        {task.approved_by && <span className="text-[10px] text-zinc-600">approved by {task.approved_by}</span>}
+                        <h3 className="text-base font-semibold text-zinc-100">{task.title}</h3>
+                        <span className={`px-1.5 py-0.5 rounded-full text-xs border ${TASK_STATUS_STYLES[task.status] || TASK_STATUS_STYLES.draft}`}>{task.status}</span>
+                        {task.issue_url && <a href={task.issue_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline">#{task.issue_number}</a>}
+                        {task.repo && <span className="text-xs text-zinc-600 font-mono">{task.repo}</span>}
+                        {task.approved_by && <span className="text-xs text-zinc-600">approved by {task.approved_by}</span>}
                       </div>
-                      {task.description && <p className="text-xs text-zinc-500 mt-1.5 leading-relaxed">{task.description}</p>}
+                      {task.description && <p className="text-sm text-zinc-400 mt-2 leading-relaxed">{task.description}</p>}
                       {task.acceptance_criteria && (
-                        <div className="mt-2">
-                          <p className="text-[10px] text-zinc-600 uppercase tracking-wider mb-1">Acceptance criteria</p>
-                          <pre className="text-xs text-zinc-500 font-mono whitespace-pre-wrap leading-relaxed">{task.acceptance_criteria}</pre>
+                        <div className="mt-3">
+                          <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Acceptance criteria</p>
+                          <pre className="text-sm text-zinc-400 font-mono whitespace-pre-wrap leading-relaxed">{task.acceptance_criteria}</pre>
                         </div>
                       )}
                     </div>

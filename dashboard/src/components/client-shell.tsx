@@ -8,7 +8,7 @@ import { ToastProvider } from "./toast";
 import {
   PlayIcon, CircleDotIcon, BarChartIcon, HexagonIcon, HeartIcon,
   GitBranchIcon, ShieldIcon, GearIcon, PenIcon, SquareIcon,
-  BellIcon, DollarIcon, TargetIcon,
+  BellIcon, DollarIcon, TargetIcon, RepeatIcon,
 } from "./icons";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
@@ -59,6 +59,7 @@ const navGroups: NavGroup[] = [
       { href: "/settings/instructions", label: "Instructions", icon: <GearIcon /> },
       { href: "/settings/voice", label: "Voice", icon: <PenIcon /> },
       { href: "/settings/jira", label: "Jira", icon: <SquareIcon /> },
+      { href: "/settings/workflow", label: "Workflow", icon: <RepeatIcon /> },
       { href: "/settings/notifications", label: "Notifications", icon: <BellIcon /> },
     ],
   },
