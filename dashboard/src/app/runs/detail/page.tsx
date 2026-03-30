@@ -179,7 +179,26 @@ function RunDetailInner() {
               <p className="text-sm font-medium text-red-400 mb-1">Error</p>
               <pre className="text-sm text-red-300/80 whitespace-pre-wrap font-mono leading-relaxed">{run.error}</pre>
             </div>
-            {run.status === "failed" && (
+            {run.status === "failed" && run.current_pass === "feedback" && run.pr_url && (
+              <button
+                onClick={async () => {
+                  setReReviewing(true);
+                  try {
+                    await api.reReviewRun(runId);
+                    toast("Re-review started");
+                    setTimeout(() => window.location.reload(), 1500);
+                  } catch {
+                    toast("Failed to re-review", "error");
+                    setReReviewing(false);
+                  }
+                }}
+                disabled={reReviewing}
+                className="flex-shrink-0 ml-4 px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 cursor-pointer"
+              >
+                {reReviewing ? "Re-reviewing…" : "Re-review"}
+              </button>
+            )}
+            {run.status === "failed" && run.current_pass !== "feedback" && (
               <button
                 onClick={async () => {
                   setRetrying(true);
@@ -202,8 +221,8 @@ function RunDetailInner() {
         </div>
       )}
 
-      {/* Retry for runs that failed without an error message */}
-      {run.status === "failed" && !run.error && (
+      {/* Retry for runs that failed without an error message (not feedback) */}
+      {run.status === "failed" && !run.error && run.current_pass !== "feedback" && (
         <div className="mb-6">
           <button
             onClick={async () => {
