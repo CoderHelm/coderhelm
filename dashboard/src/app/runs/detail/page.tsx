@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, type RunDetail, type Openspec } from "@/lib/api";
@@ -87,6 +87,42 @@ export default function RunDetailPage() {
   );
 }
 
+interface TaskItem {
+  text: string;
+  section: string;
+  filePaths: string[];
+}
+
+/** Parse openspec tasks markdown into structured checklist items. */
+function parseTaskItems(tasks?: string): TaskItem[] {
+  if (!tasks) return [];
+  const items: TaskItem[] = [];
+  let currentSection = "";
+  for (const line of tasks.split("\n")) {
+    const sectionMatch = line.match(/^#+\s+(.+)/);
+    if (sectionMatch) {
+      currentSection = sectionMatch[1].trim();
+      continue;
+    }
+    const taskMatch = line.match(/^\s*-\s+\[[ x]\]\s+(.+)/);
+    if (taskMatch) {
+      const text = taskMatch[1].trim();
+      // Extract file paths mentioned with backticks
+      const paths = Array.from(text.matchAll(/`([^`]+\.[a-z]{1,4}[x]?)`/gi)).map((m) => m[1]);
+      items.push({ text, section: currentSection, filePaths: paths });
+    }
+  }
+  return items;
+}
+
+/** Check if a task item is done by matching its mentioned files against modified files. */
+function isTaskDone(task: TaskItem, filesModified: string[]): boolean {
+  if (task.filePaths.length === 0) return false;
+  return task.filePaths.some((tp) =>
+    filesModified.some((fm) => fm.endsWith(tp) || tp.endsWith(fm) || fm.includes(tp.replace(/^.*\//, "")))
+  );
+}
+
 function RunDetailInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -99,12 +135,11 @@ function RunDetailInner() {
   const [specTab, setSpecTab] = useState<keyof Openspec>("proposal");
   const { toast } = useToast();
 
-  useEffect(() => {
+  const fetchRun = useCallback(() => {
     if (!runId) return;
     api.getRun(runId)
       .then((r) => {
         setRun(r);
-        // Load openspec only for completed/failed runs that went past triage
         if (r.status !== "running" || PASSES.indexOf(r.current_pass ?? "") >= 1) {
           api.getRunOpenspec(runId).then(setOpenspec).catch(() => {});
         }
@@ -112,6 +147,15 @@ function RunDetailInner() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [runId]);
+
+  useEffect(() => { fetchRun(); }, [fetchRun]);
+
+  // Auto-poll running runs every 5s
+  useEffect(() => {
+    if (!run || run.status !== "running") return;
+    const interval = setInterval(fetchRun, 5000);
+    return () => clearInterval(interval);
+  }, [run?.status, fetchRun]);
 
   if (!runId) {
     return (
@@ -145,11 +189,19 @@ function RunDetailInner() {
   }
 
   const specTabs = openspec
-    ? (Object.keys(openspec) as (keyof Openspec)[]).filter((k) => openspec[k])
+    ? (Object.keys(openspec) as (keyof Openspec)[]).filter((k) => openspec[k] && k !== "tasks")
     : [];
 
+  const taskItems = useMemo(() => parseTaskItems(openspec?.tasks), [openspec?.tasks]);
+  const implementStarted = PASSES.indexOf(run.current_pass ?? "") >= 2 || run.status === "completed" || run.status === "failed";
+  const showTaskSidebar = taskItems.length > 0 && implementStarted;
+  const filesModified = run.files_modified ?? [];
+
+  const doneCount = taskItems.filter((t) => isTaskDone(t, filesModified)).length;
+
   return (
-    <div className="max-w-3xl">
+    <div className={showTaskSidebar ? "max-w-6xl flex gap-6" : "max-w-3xl"}>
+    <div className={showTaskSidebar ? "flex-1 min-w-0" : ""}>
       <Link href="/" className="text-zinc-500 hover:text-zinc-300 text-sm">← Runs</Link>
 
       {/* Header */}
@@ -298,7 +350,7 @@ function RunDetailInner() {
         </div>
       )}
 
-      {/* Openspec */}
+      {/* Openspec tabs (excluding tasks — those go in sidebar) */}
       {specTabs.length > 0 && (
         <div className="mb-6">
           <h2 className="text-sm font-medium text-zinc-300 mb-2">OpenSpec</h2>
@@ -380,6 +432,67 @@ function RunDetailInner() {
         <p>Created: {new Date(run.created_at).toLocaleString()}</p>
         {run.updated_at && <p>Updated: {new Date(run.updated_at).toLocaleString()}</p>}
       </div>
+    </div>
+
+    {/* Task checklist sidebar */}
+    {showTaskSidebar && (
+      <div className="w-80 flex-shrink-0">
+        <div className="sticky top-4">
+          <div className="border border-zinc-800 rounded-lg bg-zinc-900/50 overflow-hidden">
+            <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+              <h3 className="text-sm font-medium text-zinc-300">Tasks</h3>
+              <span className="text-xs text-zinc-500">
+                {doneCount}/{taskItems.length}
+              </span>
+            </div>
+            {/* Progress bar */}
+            <div className="h-1 bg-zinc-800">
+              <div
+                className="h-full bg-emerald-500 transition-all duration-500"
+                style={{ width: `${taskItems.length > 0 ? (doneCount / taskItems.length) * 100 : 0}%` }}
+              />
+            </div>
+            <div className="p-3 max-h-[calc(100vh-12rem)] overflow-y-auto space-y-1">
+              {(() => {
+                let lastSection = "";
+                return taskItems.map((task, i) => {
+                  const done = isTaskDone(task, filesModified);
+                  const sectionHeader = task.section !== lastSection ? task.section : null;
+                  lastSection = task.section;
+                  return (
+                    <div key={i}>
+                      {sectionHeader && (
+                        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mt-3 mb-1.5 first:mt-0">
+                          {sectionHeader}
+                        </p>
+                      )}
+                      <div className="flex items-start gap-2 py-1 group">
+                        <div className={`mt-0.5 w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border transition-colors ${
+                          done
+                            ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+                            : "border-zinc-700 text-transparent"
+                        }`}>
+                          {done && (
+                            <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                        <span className={`text-xs leading-relaxed ${
+                          done ? "text-zinc-500 line-through" : "text-zinc-400"
+                        }`}>
+                          {task.text.length > 120 ? task.text.slice(0, 120) + "…" : task.text}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 }
