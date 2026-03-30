@@ -32,7 +32,7 @@ export const api = {
 
   // Runs
   listRuns: () => request<{ runs: Run[] }>("/api/runs"),
-  listJiraEvents: () => request<{ runs: Run[] }>("/api/runs?source=jira&limit=20"),
+  listJiraEvents: () => request<{ events: JiraEvent[] }>("/api/integrations/jira/events?limit=20"),
   getRun: (id: string) => request<RunDetail>(`/api/runs/${id}`),
   getRunOpenspec: (id: string) => request<Openspec>(`/api/runs/${id}/openspec`),
   retryRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/retry`, { method: "POST" }),
@@ -371,6 +371,17 @@ export interface JiraCheck {
   installation_id: number;
   tenant_id: string;
   webhook_url?: string;
+  webhook_secret?: string;
+}
+
+export interface JiraEvent {
+  event_id: string;
+  event_type: string;
+  ticket_key: string;
+  title: string;
+  status: string;
+  repo: string;
+  created_at: string;
 }
 
 export interface JiraConfig {
