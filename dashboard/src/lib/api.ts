@@ -95,6 +95,10 @@ export const api = {
   getBudget: () => request<{ max_budget_cents: number }>("/api/settings/budget"),
   updateBudget: (max_budget_cents: number) => request<void>("/api/settings/budget", { method: "PUT", body: JSON.stringify({ max_budget_cents }) }),
 
+  // Workflow
+  getWorkflowSettings: () => request<WorkflowSettings>("/api/settings/workflow"),
+  updateWorkflowSettings: (settings: WorkflowSettings) => request<void>("/api/settings/workflow", { method: "PUT", body: JSON.stringify(settings) }),
+
   // Plans
   listPlans: (cursor?: string) => request<{ plans: Plan[]; next_cursor?: string }>(`/api/plans${cursor ? `?cursor=${cursor}` : ""}`),
   planChat: (messages: { role: string; content: string }[]) =>
@@ -178,6 +182,10 @@ export interface NotificationPrefs {
   email_run_complete: boolean;
   email_run_failed: boolean;
   email_weekly_summary: boolean;
+}
+
+export interface WorkflowSettings {
+  commit_openspec: boolean;
 }
 
 export interface BillingInfo {
