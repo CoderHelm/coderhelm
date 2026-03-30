@@ -440,7 +440,7 @@ function WebhookTab({ check, setCheck, secret, generatingSecret, generateSecret,
       <Step number={3} title="Paste the webhook URL">
         <div className="mt-2">
           <div className="flex items-center gap-2">
-            <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono">
+            <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono truncate">
               {check?.webhook_url ?? "https://api.coderhelm.com/webhooks/jira"}
             </code>
             <button onClick={() => copy(check?.webhook_url ?? "https://api.coderhelm.com/webhooks/jira", "url")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer">
@@ -448,10 +448,7 @@ function WebhookTab({ check, setCheck, secret, generatingSecret, generateSecret,
             </button>
           </div>
           <p className="text-zinc-500 text-xs mt-2">
-            Method: <strong className="text-zinc-300">POST</strong> · Headers: <strong className="text-zinc-300">Content-Type: application/json</strong>
-            {(secret || check?.secret_configured) && (
-              <span> · <strong className="text-zinc-300">x-hub-signature-256: sha256=&lt;hmac&gt;</strong></span>
-            )}
+            This URL is unique to your account.
           </p>
         </div>
       </Step>
