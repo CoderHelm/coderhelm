@@ -96,7 +96,7 @@ export default function JiraPage() {
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-lg mb-6 w-fit">
         {(["app", "webhook"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === t ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}>
+          <button key={t} onClick={() => setTab(t)} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer ${tab === t ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}>
             {t === "app" ? "Jira App" : "Webhook"}
           </button>
         ))}
@@ -139,7 +139,7 @@ function JiraAppTab({ check, copy, copied }: { check: JiraCheck | null; copy: (t
             href={installUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white transition-colors cursor-pointer"
           >
             Install on Jira
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
@@ -191,7 +191,7 @@ function WebhookTab({ check, setCheck, secret, generatingSecret, generateSecret,
               <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-emerald-400 font-mono truncate">
                 {secret}
               </code>
-              <button onClick={() => copy(secret, "secret")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors shrink-0">
+              <button onClick={() => copy(secret, "secret")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors shrink-0 cursor-pointer">
                 {copied === "secret" ? "Copied!" : "Copy"}
               </button>
             </div>
@@ -200,15 +200,15 @@ function WebhookTab({ check, setCheck, secret, generatingSecret, generateSecret,
         ) : check?.secret_configured ? (
           <div className="flex items-center gap-3">
             <span className="text-sm text-emerald-400">✓ Secret configured</span>
-            <button onClick={generateSecret} disabled={generatingSecret} className="text-xs text-zinc-500 hover:text-zinc-300 underline">
+            <button onClick={generateSecret} disabled={generatingSecret} className="text-xs text-zinc-500 hover:text-zinc-300 underline cursor-pointer">
               {generatingSecret ? "Generating..." : "Regenerate"}
             </button>
-            <button onClick={deleteSecret} className="text-xs text-zinc-600 hover:text-red-400 underline">
+            <button onClick={deleteSecret} className="text-xs text-zinc-600 hover:text-red-400 underline cursor-pointer">
               Remove
             </button>
           </div>
         ) : (
-          <button onClick={generateSecret} disabled={generatingSecret} className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 transition-colors">
+          <button onClick={generateSecret} disabled={generatingSecret} className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 transition-colors cursor-pointer">
             {generatingSecret ? "Generating..." : "Generate secret"}
           </button>
         )}
@@ -230,7 +230,7 @@ function WebhookTab({ check, setCheck, secret, generatingSecret, generateSecret,
             <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono">
               {check?.webhook_url ?? "https://api.coderhelm.com/webhooks/jira"}
             </code>
-            <button onClick={() => copy(check?.webhook_url ?? "https://api.coderhelm.com/webhooks/jira", "url")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors">
+            <button onClick={() => copy(check?.webhook_url ?? "https://api.coderhelm.com/webhooks/jira", "url")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer">
               {copied === "url" ? "Copied!" : "Copy"}
             </button>
           </div>
