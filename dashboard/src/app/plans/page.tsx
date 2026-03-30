@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { api, type BillingInfo, type Plan } from "@/lib/api";
 import { TableSkeleton } from "@/components/skeleton";
@@ -15,18 +15,32 @@ export default function PlansPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [loading, setLoading] = useState(true);
-
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | undefined>();
   const [error, setError] = useState(false);
 
   useEffect(() => {
     Promise.all([api.listPlans(), api.getBilling()])
       .then(([data, b]) => {
         setPlans(data.plans);
+        setNextCursor(data.next_cursor ?? undefined);
         setBilling(b);
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
+
+  const loadMore = useCallback(() => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    api.listPlans(nextCursor)
+      .then((data) => {
+        setPlans((prev) => [...prev, ...data.plans]);
+        setNextCursor(data.next_cursor ?? undefined);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingMore(false));
+  }, [nextCursor, loadingMore]);
 
   const plansEnabled = billing?.subscription_status === "active";
 
@@ -126,6 +140,13 @@ export default function PlansPage() {
               ))}
             </tbody>
           </table>
+          {nextCursor && (
+            <div className="px-4 py-3 border-t border-zinc-800 text-center">
+              <button onClick={loadMore} disabled={loadingMore} className="text-sm text-zinc-400 hover:text-zinc-200 disabled:opacity-50">
+                {loadingMore ? "Loading..." : "Load more"}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

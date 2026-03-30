@@ -96,7 +96,7 @@ export const api = {
   updateBudget: (max_budget_cents: number) => request<void>("/api/settings/budget", { method: "PUT", body: JSON.stringify({ max_budget_cents }) }),
 
   // Plans
-  listPlans: () => request<{ plans: Plan[] }>("/api/plans"),
+  listPlans: (cursor?: string) => request<{ plans: Plan[]; next_cursor?: string }>(`/api/plans${cursor ? `?cursor=${cursor}` : ""}`),
   planChat: (messages: { role: string; content: string }[]) =>
     request<{ content: string }>("/api/plans/chat", { method: "POST", body: JSON.stringify({ messages }) }),
   createPlan: (body: { title: string; description?: string; repo?: string; tasks?: Partial<Task>[] }) =>
@@ -117,6 +117,8 @@ export const api = {
     request<void>(`/api/plans/${planId}/tasks/${taskId}/reject`, { method: "POST" }),
   executePlan: (planId: string) =>
     request<{ status: string; tasks_queued: number }>(`/api/plans/${planId}/execute`, { method: "POST" }),
+  approveAllAndExecute: (planId: string) =>
+    request<{ status: string; tasks_queued: number }>(`/api/plans/${planId}/approve-and-execute`, { method: "POST" }),
 
   // Infrastructure
   getInfrastructure: () => request<InfraAnalysis>("/api/infrastructure"),

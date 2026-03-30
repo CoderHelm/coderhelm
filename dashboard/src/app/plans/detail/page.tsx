@@ -66,19 +66,6 @@ function PlanDetail() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  const handleApprove = async (taskId: string) => {
-    setActionLoading(taskId + ":approve");
-    try {
-      await api.approveTask(planId, taskId);
-      toast("Task approved");
-      refresh();
-    } catch {
-      toast("Failed to approve task", "error");
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
   const handleReject = async (taskId: string) => {
     setActionLoading(taskId + ":reject");
     try {
@@ -137,14 +124,9 @@ function PlanDetail() {
   };
 
   const handleExecute = async () => {
-    const approvedCount = plan?.tasks.filter((t) => t.status === "approved").length ?? 0;
-    if (approvedCount === 0) {
-      toast("Approve at least one task before executing", "error");
-      return;
-    }
     setExecuting(true);
     try {
-      const result = await api.executePlan(planId);
+      const result = await api.approveAllAndExecute(planId);
       toast(`Executing — ${result.tasks_queued} task${result.tasks_queued !== 1 ? "s" : ""} queued`);
       refresh();
     } catch {
@@ -154,9 +136,36 @@ function PlanDetail() {
     }
   };
 
+  const handleApprove = async (taskId: string) => {
+    setActionLoading(taskId + ":approve");
+    try {
+      await api.approveTask(planId, taskId);
+      toast("Task approved");
+      const updated = await api.getPlan(planId);
+      setPlan(updated);
+      // Auto-execute if all tasks are now approved (no drafts left)
+      const remaining = updated.tasks.filter((t) => t.status === "draft").length;
+      if (remaining === 0 && updated.status === "draft") {
+        setExecuting(true);
+        try {
+          const result = await api.executePlan(planId);
+          toast(`All approved — ${result.tasks_queued} task${result.tasks_queued !== 1 ? "s" : ""} queued`);
+          refresh();
+        } catch {
+          toast("Failed to auto-execute", "error");
+        } finally {
+          setExecuting(false);
+        }
+      }
+    } catch {
+      toast("Failed to approve task", "error");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const approvedCount = plan?.tasks.filter((t) => t.status === "approved").length ?? 0;
   const draftCount = plan?.tasks.filter((t) => t.status === "draft").length ?? 0;
-  const isExecutable = plan?.status === "draft" && approvedCount > 0;
   const plansEnabled = billing?.subscription_status === "active";
 
   if (!planId) {
@@ -222,13 +231,13 @@ function PlanDetail() {
             <span className="text-xs text-zinc-600">{plan.tasks.length} tasks</span>
           </div>
         </div>
-        {plan.status === "draft" && (
+        {plan.status === "draft" && draftCount > 0 && (
           <button
             onClick={handleExecute}
-            disabled={!isExecutable || executing}
+            disabled={executing}
             className="px-5 py-2.5 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-40"
           >
-            {executing ? "Executing..." : `Execute${approvedCount > 0 ? ` (${approvedCount})` : ""}`}
+            {executing ? "Executing..." : `Approve all & go${plan.tasks.length > 0 ? ` (${draftCount + approvedCount})` : ""}`}
           </button>
         )}
       </div>
@@ -338,7 +347,7 @@ function PlanDetail() {
       </div>
 
       {draftCount > 0 && plan.status === "draft" && (
-        <p className="text-xs text-zinc-600 mt-6">Approve the tasks you want Coderhelm to work on, then click Execute to create GitHub issues and start the runs in order.</p>
+        <p className="text-xs text-zinc-600 mt-6">Approve individual tasks or click &ldquo;Approve all & go&rdquo; to start. Approving the last task auto-triggers execution.</p>
       )}
     </div>
   );
