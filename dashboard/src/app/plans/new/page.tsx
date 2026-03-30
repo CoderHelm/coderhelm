@@ -241,7 +241,7 @@ export default function NewPlanPage() {
             <button
               onClick={sendMessage}
               disabled={!input.trim() || sending}
-              className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 transition-colors self-end"
+              className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 transition-colors self-end cursor-pointer"
             >
               Send
             </button>
@@ -287,7 +287,7 @@ export default function NewPlanPage() {
               <button
                 onClick={savePlan}
                 disabled={saving}
-                className="w-full px-4 py-2.5 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-50"
+                className="w-full px-4 py-2.5 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-50 cursor-pointer"
               >
                 {saving ? "Saving..." : "Save plan"}
               </button>
