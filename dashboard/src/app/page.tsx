@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { api, type Run } from "@/lib/api";
 import { TableSkeleton } from "@/components/skeleton";
 
@@ -48,9 +49,11 @@ export default function RunsPage() {
             </thead>
             <tbody className="divide-y divide-zinc-800">
               {runs.map((run) => (
-                <tr key={run.run_id} className="hover:bg-zinc-900/50">
+                <tr key={run.run_id} className="hover:bg-zinc-900/50 cursor-pointer">
                   <td className="px-4 py-3">
-                    <span className="text-zinc-100">{run.title}</span>
+                    <Link href={`/runs/detail?id=${run.run_id}`} className="text-zinc-100 hover:underline font-medium">
+                      {run.title}
+                    </Link>
                   </td>
                   <td className="px-4 py-3 text-zinc-400 font-mono text-xs">{run.repo}</td>
                   <td className="px-4 py-3">
