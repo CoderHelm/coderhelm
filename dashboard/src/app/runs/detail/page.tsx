@@ -90,6 +90,7 @@ export default function RunDetailPage() {
 interface TaskItem {
   text: string;
   section: string;
+  checked: boolean;
   filePaths: string[];
 }
 
@@ -104,12 +105,13 @@ function parseTaskItems(tasks?: string): TaskItem[] {
       currentSection = sectionMatch[1].trim();
       continue;
     }
-    const taskMatch = line.match(/^\s*-\s+\[[ x]\]\s+(.+)/);
+    const taskMatch = line.match(/^\s*-\s+\[([ x])\]\s+(.+)/);
     if (taskMatch) {
-      const text = taskMatch[1].trim();
+      const checked = taskMatch[1] === "x";
+      const text = taskMatch[2].trim();
       // Extract file paths mentioned with backticks
       const paths = Array.from(text.matchAll(/`([^`]+\.[a-z]{1,4}[x]?)`/gi)).map((m) => m[1]);
-      items.push({ text, section: currentSection, filePaths: paths });
+      items.push({ text, section: currentSection, checked, filePaths: paths });
     }
   }
   return items;
@@ -128,13 +130,11 @@ function isTaskDone(
   const isVerification = section.includes("verification") && !isPostDeploy;
   const isPrereq = section.includes("prerequisit");
 
-  // Post-deploy tasks are always manual
-  if (isPostDeploy) return false;
+  // If the openspec itself marks it checked, it's done
+  if (task.checked) return true;
 
-  // For completed runs: prereqs, implementation, and verification are all done
-  if (runStatus === "completed") {
-    return !isPostDeploy;
-  }
+  // For completed runs: all non-post-deploy tasks are done
+  if (runStatus === "completed" && !isPostDeploy) return true;
 
   // Prerequisites done once we're past plan
   if (isPrereq && passIdx >= 2) return true;
