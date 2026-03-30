@@ -43,6 +43,7 @@ export default function PlansPage() {
   }, [nextCursor, loadingMore]);
 
   const plansEnabled = billing?.subscription_status === "active";
+  const activePlan = plans.find((p) => p.status === "draft" || p.status === "executing");
 
   return (
     <div>
@@ -54,12 +55,21 @@ export default function PlansPage() {
           </p>
         </div>
         {plansEnabled ? (
-          <Link
-            href="/plans/new"
-            className="px-4 py-2 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors"
-          >
-            + New plan
-          </Link>
+          activePlan ? (
+            <Link
+              href={`/plans/detail?id=${activePlan.plan_id}`}
+              className="px-4 py-2 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors"
+            >
+              Continue plan
+            </Link>
+          ) : (
+            <Link
+              href="/plans/new"
+              className="px-4 py-2 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors"
+            >
+              + New plan
+            </Link>
+          )
         ) : (
           <Link
             href="/billing"
