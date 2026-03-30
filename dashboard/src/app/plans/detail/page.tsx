@@ -255,7 +255,7 @@ function PlanDetail() {
           ].map(({ label, count, style }) => (
             <div key={label} className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg text-center">
               <p className={`text-xl font-bold ${style}`}>{count}</p>
-              <p className="text-[10px] text-zinc-600 uppercase tracking-wider mt-0.5">{label}</p>
+              <p className="text-xs text-zinc-600 uppercase tracking-wider mt-0.5">{label}</p>
             </div>
           ))}
         </div>
