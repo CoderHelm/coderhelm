@@ -114,13 +114,11 @@ export default function JiraPage() {
         <WebhookTab
           check={check}
           setCheck={setCheck}
-          secret={secret}
           generatingSecret={generatingSecret}
           generateSecret={generateSecret}
           deleteSecret={deleteSecret}
           copy={copy}
           copied={copied}
-          toast={toast}
         />
       ) : tab === "events" ? (
         <EventsTab />
@@ -380,78 +378,62 @@ function SettingsTab({ config, setConfig, toast }: {
 interface WebhookTabProps {
   check: JiraCheck | null;
   setCheck: React.Dispatch<React.SetStateAction<JiraCheck | null>>;
-  secret: string | null;
   generatingSecret: boolean;
   generateSecret: () => void;
   deleteSecret: () => void;
   copy: (text: string, label: string) => void;
   copied: string | null;
-  toast: (msg: string, type?: "error" | "success") => void;
 }
 
-function WebhookTab({ check, setCheck, secret, generatingSecret, generateSecret, deleteSecret, copy, copied, toast }: WebhookTabProps) {
+function WebhookTab({ check, generatingSecret, generateSecret, deleteSecret, copy, copied }: WebhookTabProps) {
   return (
     <div className="space-y-6 mb-8">
       <p className="text-zinc-400 text-sm">
         Use a native Jira webhook to send events to Coderhelm when issues are updated.
       </p>
 
-      <Step number={1} title="Generate webhook secret">
+      <Step number={1} title="Generate webhook URL">
         <p className="text-zinc-400 text-sm mb-3">
-          Required — this secret authenticates Jira webhooks. It will be embedded in your webhook URL.
+          Generate a unique webhook URL for your account. This URL acts as your credential — anyone with it can trigger runs.
         </p>
-        {secret ? (
-          <div className="space-y-2">
-            <p className="text-sm text-emerald-400">✓ Secret generated — your webhook URL below is ready to use.</p>
-            <p className="text-xs text-yellow-400">The secret is embedded in the URL. Keep it private.</p>
-          </div>
-        ) : check?.secret_configured ? (
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-emerald-400">✓ Secret configured</span>
-            <button onClick={generateSecret} disabled={generatingSecret} className="text-xs text-zinc-500 hover:text-zinc-300 underline cursor-pointer">
-              {generatingSecret ? "Generating..." : "Regenerate"}
-            </button>
-            <button onClick={deleteSecret} className="text-xs text-zinc-600 hover:text-red-400 underline cursor-pointer">
-              Remove
-            </button>
+        {check?.webhook_url ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-emerald-400">✓ Webhook URL configured</span>
+              <button onClick={generateSecret} disabled={generatingSecret} className="text-xs text-zinc-500 hover:text-zinc-300 underline cursor-pointer">
+                {generatingSecret ? "Regenerating..." : "Regenerate"}
+              </button>
+              <button onClick={deleteSecret} className="text-xs text-zinc-600 hover:text-red-400 underline cursor-pointer">
+                Remove
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono truncate">
+                {check.webhook_url}
+              </code>
+              <button onClick={() => copy(check.webhook_url!, "url")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer">
+                {copied === "url" ? "Copied!" : "Copy"}
+              </button>
+            </div>
+            <p className="text-zinc-500 text-xs">Keep this URL private. Regenerating will invalidate the old URL.</p>
           </div>
         ) : (
           <button onClick={generateSecret} disabled={generatingSecret} className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 transition-colors cursor-pointer">
-            {generatingSecret ? "Generating..." : "Generate secret"}
+            {generatingSecret ? "Generating..." : "Generate webhook URL"}
           </button>
         )}
       </Step>
 
-      <Step number={2} title="Copy the webhook URL">
-        {check?.secret_configured ? (
-          <div className="mt-2">
-            <div className="flex items-center gap-2">
-              <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono truncate">
-                {check?.webhook_url ?? ""}
-              </code>
-              <button onClick={() => copy(check?.webhook_url ?? "", "url")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer">
-                {copied === "url" ? "Copied!" : "Copy"}
-              </button>
-            </div>
-            <p className="text-zinc-500 text-xs mt-2">
-              This URL contains your secret. Do not share it publicly.
-            </p>
-          </div>
-        ) : (
-          <p className="text-zinc-500 text-sm mt-1">Generate a secret first to get your webhook URL.</p>
-        )}
-      </Step>
-
-      <Step number={3} title="Add the webhook in Jira">
+      <Step number={2} title="Add the webhook in Jira">
         <p className="text-zinc-400 text-sm">
           Go to <strong className="text-zinc-200">https://&lt;your-site&gt;.atlassian.net/plugins/servlet/webhooks</strong> and create a new webhook.
         </p>
         <p className="text-zinc-500 text-xs mt-1">
-          Paste the URL from step 2. Under events, enable <strong className="text-zinc-300">Issue → updated</strong>.
+          Paste the URL from step 1. Under events, enable <strong className="text-zinc-300">Issue → updated</strong>.
         </p>
       </Step>
 
-      <Step number={4} title="Test">
+      <Step number={3} title="Test">
         <p className="text-zinc-400 text-sm">
           Update a Jira issue with your trigger label and check the Events tab.
         </p>
