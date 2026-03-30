@@ -302,7 +302,7 @@ export default function NewPlanPage() {
               >
                 {saving ? "Saving..." : "Save plan"}
               </button>
-              <p className="text-xs text-zinc-500 text-center">You can edit tasks after saving</p>
+              <p className="text-xs text-zinc-500 text-center">You can edit tasks before executing</p>
             </div>
           </div>
         )}
