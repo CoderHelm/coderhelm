@@ -71,6 +71,7 @@ const navGroups: NavGroup[] = [
 ];
 
 export function ClientShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -89,6 +90,13 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         setAuthChecked(true);
       });
   }, []);
+
+  // Refresh billing on route changes so token count stays current
+  useEffect(() => {
+    if (user) {
+      api.getBilling().then(setBilling).catch(() => {});
+    }
+  }, [pathname, user]);
 
   if (!authChecked) {
     return (
