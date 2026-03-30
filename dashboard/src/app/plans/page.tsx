@@ -117,7 +117,7 @@ export default function PlansPage() {
             </thead>
             <tbody className="divide-y divide-zinc-800">
               {plans.map((plan) => (
-                <tr key={plan.plan_id} className="hover:bg-zinc-900/50">
+                <tr key={plan.plan_id} className="hover:bg-zinc-900/50 cursor-pointer">
                   <td className="px-4 py-3">
                     <Link href={`/plans/detail?id=${plan.plan_id}`} className="text-zinc-100 hover:underline font-medium">
                       {plan.title}

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api, type RunDetail, type Openspec } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
+import { useToast } from "@/components/toast";
 
 const PASSES = ["triage", "plan", "implement", "review", "pr"];
 
@@ -93,7 +94,9 @@ function RunDetailInner() {
   const [run, setRun] = useState<RunDetail | null>(null);
   const [openspec, setOpenspec] = useState<Openspec | null>(null);
   const [loading, setLoading] = useState(true);
+  const [retrying, setRetrying] = useState(false);
   const [specTab, setSpecTab] = useState<keyof Openspec>("proposal");
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!runId) return;
@@ -170,8 +173,54 @@ function RunDetailInner() {
       {/* Error banner */}
       {run.error && (
         <div className="mb-6 rounded-lg border border-red-500/20 bg-red-500/5 p-4">
-          <p className="text-sm font-medium text-red-400 mb-1">Error</p>
-          <pre className="text-sm text-red-300/80 whitespace-pre-wrap font-mono leading-relaxed">{run.error}</pre>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm font-medium text-red-400 mb-1">Error</p>
+              <pre className="text-sm text-red-300/80 whitespace-pre-wrap font-mono leading-relaxed">{run.error}</pre>
+            </div>
+            {run.status === "failed" && (
+              <button
+                onClick={async () => {
+                  setRetrying(true);
+                  try {
+                    await api.retryRun(runId);
+                    toast("Run retried — a new run has been queued");
+                  } catch {
+                    toast("Failed to retry run", "error");
+                  } finally {
+                    setRetrying(false);
+                  }
+                }}
+                disabled={retrying}
+                className="flex-shrink-0 ml-4 px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 cursor-pointer"
+              >
+                {retrying ? "Retrying..." : "Retry"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Retry for runs that failed without an error message */}
+      {run.status === "failed" && !run.error && (
+        <div className="mb-6">
+          <button
+            onClick={async () => {
+              setRetrying(true);
+              try {
+                await api.retryRun(runId);
+                toast("Run retried — a new run has been queued");
+              } catch {
+                toast("Failed to retry run", "error");
+              } finally {
+                setRetrying(false);
+              }
+            }}
+            disabled={retrying}
+            className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-semibold hover:bg-white disabled:opacity-50 cursor-pointer"
+          >
+            {retrying ? "Retrying..." : "Retry this run"}
+          </button>
         </div>
       )}
 

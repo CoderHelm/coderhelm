@@ -34,6 +34,7 @@ export const api = {
   listRuns: () => request<{ runs: Run[] }>("/api/runs"),
   getRun: (id: string) => request<RunDetail>(`/api/runs/${id}`),
   getRunOpenspec: (id: string) => request<Openspec>(`/api/runs/${id}/openspec`),
+  retryRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/retry`, { method: "POST" }),
 
   // Repos
   listRepos: () => request<{ repos: Repo[] }>("/api/repos"),
