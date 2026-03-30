@@ -180,7 +180,6 @@ export default function NewPlanPage() {
     <div className="max-w-4xl flex flex-col h-[calc(100vh-4rem)]">
       <div className="flex items-center gap-3 mb-4">
         <a href="/plans" className="text-zinc-500 hover:text-zinc-300 text-sm">← Plans</a>
-        <h1 className="text-xl font-bold">New plan</h1>
         {messages.length > 1 && (
           <button
             onClick={() => {
