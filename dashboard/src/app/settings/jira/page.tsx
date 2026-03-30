@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type JiraCheck } from "@/lib/api";
+import { api, type JiraCheck, type JiraConfig, type JiraProject } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { Skeleton } from "@/components/skeleton";
 
-type Tab = "app" | "webhook";
+type Tab = "app" | "webhook" | "settings";
 
 export default function JiraPage() {
   const [check, setCheck] = useState<JiraCheck | null>(null);
+  const [config, setConfig] = useState<JiraConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [secret, setSecret] = useState<string | null>(null);
   const [generatingSecret, setGeneratingSecret] = useState(false);
@@ -17,9 +18,10 @@ export default function JiraPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    api.getJiraCheck()
-      .then((c) => { setCheck(c); setLoading(false); })
-      .catch(() => setLoading(false));
+    Promise.all([api.getJiraCheck(), api.getJiraConfig()])
+      .then(([c, cfg]) => { setCheck(c); setConfig(cfg); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   const copy = (text: string, label: string) => {
@@ -95,16 +97,16 @@ export default function JiraPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-lg mb-6 w-fit">
-        {(["app", "webhook"] as const).map((t) => (
+        {(["app", "webhook", "settings"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer ${tab === t ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}>
-            {t === "app" ? "Jira App" : "Webhook"}
+            {t === "app" ? "Jira App" : t === "webhook" ? "Webhook" : "Settings"}
           </button>
         ))}
       </div>
 
       {tab === "app" ? (
-        <JiraAppTab check={check} copy={copy} copied={copied} />
-      ) : (
+        <JiraAppTab />
+      ) : tab === "webhook" ? (
         <WebhookTab
           check={check}
           setCheck={setCheck}
@@ -116,12 +118,14 @@ export default function JiraPage() {
           copied={copied}
           toast={toast}
         />
+      ) : (
+        <SettingsTab config={config} setConfig={setConfig} toast={toast} />
       )}
     </div>
   );
 }
 
-function JiraAppTab({ check, copy, copied }: { check: JiraCheck | null; copy: (t: string, l: string) => void; copied: string | null }) {
+function JiraAppTab() {
   const installUrl = "https://developer.atlassian.com/console/install/0f707126-f6c4-4cae-9332-d736617d4d53?signature=AYABeK8ie1a%2BTEeiPiM3T34MbZ0AAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4IOp8r3eKNYw8z2v%2FEq3%2FfvrZguoGsXpNSaDveR%2FF%2Fo0BLruyVn8r%2FEOK5h8zi1R8RgAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDOwhe7cajq6Kgf30AgIBEIA7g6njzGaMjLWQyz%2BCDOQNFhkv1Ghs8zFsfBdFyAvBn%2FBzsFg5WiL%2FGR2qcsFcIlAEiiqP02TVMaE7Y2kAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHijmwVTMt6Oj3F%2B0%2B0cVrojrS8yZ9ktpdfDxqPMSIkvHAHG51UcQbI0xcGuuDtvUzJqAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMcjwGpZCf3N2rvLLrAgEQgDsbrPOc%2FNcsNH7s%2F4VR%2FWHVwx3PlPH0N3ECm3npY13Nb%2FdShsRRInN4SIU3UnDNjFHQxozi8SY65YXnjgAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeLKa7Dfn9BgbXaQmJGrkKztjV4vrreTkqr7wGwhqIYs5AUgWk554l4fXM9HqT0ByV70AAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAyhb0F6qjUivcDxj6oCARCAOz9RXk9GwPGp7n3Re50PKAi18EmdnrKe9QXFaBC2XlmEPMU%2FdfyAb43jE3uE2aOzp74GG6mb4q9XZfYrAgAAAAAMAAAQAAAAAAAAAAAAAAAAACsLtWLW%2Fsef6SMqv5DtUiX%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADKjtj7iA2wG62JAY42sMdcdN14Kj4fecUhXoAwxaA0oFCWepgmVkD3w4J4O3Nqtkx9cBmtjrK1gYmQIJpPW9N%2Fd278%3D&product=jira";
 
   return (
@@ -146,18 +150,219 @@ function JiraAppTab({ check, copy, copied }: { check: JiraCheck | null; copy: (t
           </a>
         </Step>
 
-        <Step number={2} title="Label and assign">
+        <Step number={2} title="Configure trigger URLs">
+          <p className="text-zinc-400 text-sm">
+            After installing, open the Coderhelm app settings in Jira. Copy the <strong className="text-zinc-200">List Projects</strong> and <strong className="text-zinc-200">Create Ticket</strong> URLs, then paste them in the <strong className="text-zinc-200">Settings</strong> tab.
+          </p>
+        </Step>
+
+        <Step number={3} title="Label and assign">
           <p className="text-zinc-400 text-sm">
             Add a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">Coderhelm</code> label to any Jira issue, then assign it. Coderhelm picks the right repo automatically based on the ticket.
           </p>
         </Step>
 
-        <Step number={3} title="Check the Runs page">
+        <Step number={4} title="Check the Runs page">
           <p className="text-zinc-400 text-sm">
-            A new run should appear within a minute. Coderhelm creates a branch, implements the change, and opens a draft PR.
+            A new run should appear within a minute. Coderhelm creates a branch, implements the change, and opens a PR.
           </p>
         </Step>
       </div>
+    </div>
+  );
+}
+
+function SettingsTab({ config, setConfig, toast }: {
+  config: JiraConfig | null;
+  setConfig: React.Dispatch<React.SetStateAction<JiraConfig | null>>;
+  toast: (msg: string, type?: "error" | "success") => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  const [listProjectsUrl, setListProjectsUrl] = useState(config?.list_projects_url ?? "");
+  const [createTicketUrl, setCreateTicketUrl] = useState(config?.create_ticket_url ?? "");
+  const [triggerLabel, setTriggerLabel] = useState(config?.trigger_label || "coderhelm");
+  const [defaultProject, setDefaultProject] = useState(config?.default_project ?? "");
+  const [projects, setProjects] = useState<JiraProject[]>(config?.projects ?? []);
+
+  const saveConfig = async () => {
+    setSaving(true);
+    try {
+      await api.updateJiraConfig({
+        list_projects_url: listProjectsUrl,
+        create_ticket_url: createTicketUrl,
+        trigger_label: triggerLabel,
+        default_project: defaultProject,
+      });
+      setConfig((c) => c ? { ...c, list_projects_url: listProjectsUrl, create_ticket_url: createTicketUrl, trigger_label: triggerLabel, default_project: defaultProject } : c);
+      toast("Settings saved");
+    } catch {
+      toast("Failed to save settings", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const fetchProjects = async () => {
+    if (!listProjectsUrl) {
+      toast("Paste the List Projects URL first", "error");
+      return;
+    }
+    setFetching(true);
+    try {
+      const { projects: fetched } = await api.fetchJiraProjects();
+      // Merge with existing enabled state
+      const existing = new Map(projects.map((p) => [p.key, p.enabled]));
+      const merged = fetched.map((p) => ({
+        ...p,
+        enabled: existing.get(p.key) ?? false,
+      }));
+      setProjects(merged);
+      toast(`Found ${merged.length} project${merged.length !== 1 ? "s" : ""}`);
+    } catch {
+      toast("Failed to fetch projects — check the URL", "error");
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  const toggleProject = (key: string) => {
+    setProjects((prev) => prev.map((p) => p.key === key ? { ...p, enabled: !p.enabled } : p));
+  };
+
+  const saveProjects = async () => {
+    setSaving(true);
+    try {
+      await api.updateJiraProjects(projects);
+      setConfig((c) => c ? { ...c, projects } : c);
+      toast("Projects saved");
+    } catch {
+      toast("Failed to save projects", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const enabledProjects = projects.filter((p) => p.enabled);
+
+  return (
+    <div className="space-y-8 mb-8">
+      {/* Forge trigger URLs */}
+      <section>
+        <h3 className="text-sm font-semibold text-zinc-100 mb-1">Forge Trigger URLs</h3>
+        <p className="text-xs text-zinc-500 mb-3">
+          Copy these from Coderhelm Settings in your Jira site (Apps → Coderhelm Settings → Web Trigger URLs).
+        </p>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs text-zinc-500 mb-1 block">List Projects URL</label>
+            <input
+              value={listProjectsUrl}
+              onChange={(e) => setListProjectsUrl(e.target.value)}
+              placeholder="https://…webtrigger…/list-projects-trigger"
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-zinc-500 mb-1 block">Create Ticket URL</label>
+            <input
+              value={createTicketUrl}
+              onChange={(e) => setCreateTicketUrl(e.target.value)}
+              placeholder="https://…webtrigger…/create-ticket-trigger"
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Trigger label */}
+      <section>
+        <h3 className="text-sm font-semibold text-zinc-100 mb-1">Trigger Label</h3>
+        <p className="text-xs text-zinc-500 mb-3">
+          Only Jira tickets with this label will trigger Coderhelm. Leave as &ldquo;coderhelm&rdquo; for the default.
+        </p>
+        <input
+          value={triggerLabel}
+          onChange={(e) => setTriggerLabel(e.target.value)}
+          placeholder="coderhelm"
+          className="w-64 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
+        />
+      </section>
+
+      {/* Projects */}
+      <section>
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-sm font-semibold text-zinc-100">Jira Projects</h3>
+          <button
+            onClick={fetchProjects}
+            disabled={fetching || !listProjectsUrl}
+            className="px-3 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded text-zinc-300 hover:bg-zinc-700 disabled:opacity-50 transition-colors cursor-pointer"
+          >
+            {fetching ? "Fetching..." : "Fetch from Jira"}
+          </button>
+        </div>
+        <p className="text-xs text-zinc-500 mb-3">
+          Enable the projects Coderhelm should process. Only tickets from enabled projects will trigger runs.
+        </p>
+        {projects.length > 0 ? (
+          <div className="space-y-1.5">
+            {projects.map((p) => (
+              <label
+                key={p.key}
+                className="flex items-center gap-3 px-3 py-2 bg-zinc-900/50 border border-zinc-800 rounded-lg cursor-pointer hover:bg-zinc-900"
+              >
+                <input
+                  type="checkbox"
+                  checked={p.enabled}
+                  onChange={() => toggleProject(p.key)}
+                  className="accent-emerald-500"
+                />
+                <span className="text-sm text-zinc-200 font-mono">{p.key}</span>
+                <span className="text-sm text-zinc-400">{p.name}</span>
+                {p.lead && <span className="text-xs text-zinc-600 ml-auto">{p.lead}</span>}
+              </label>
+            ))}
+            <button
+              onClick={saveProjects}
+              disabled={saving}
+              className="mt-2 px-4 py-1.5 bg-zinc-100 text-zinc-900 rounded text-sm font-medium hover:bg-white disabled:opacity-50 transition-colors cursor-pointer"
+            >
+              {saving ? "Saving..." : "Save projects"}
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-zinc-600 italic">No projects loaded. Click &ldquo;Fetch from Jira&rdquo; to import.</p>
+        )}
+      </section>
+
+      {/* Default project */}
+      {enabledProjects.length > 0 && (
+        <section>
+          <h3 className="text-sm font-semibold text-zinc-100 mb-1">Default Project</h3>
+          <p className="text-xs text-zinc-500 mb-3">
+            When creating Jira tickets from plans, this project is used unless overridden per task.
+          </p>
+          <select
+            value={defaultProject}
+            onChange={(e) => setDefaultProject(e.target.value)}
+            className="w-64 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-100 focus:outline-none focus:border-zinc-600"
+          >
+            <option value="">None</option>
+            {enabledProjects.map((p) => (
+              <option key={p.key} value={p.key}>{p.key} — {p.name}</option>
+            ))}
+          </select>
+        </section>
+      )}
+
+      {/* Save */}
+      <button
+        onClick={saveConfig}
+        disabled={saving}
+        className="px-5 py-2.5 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-40 cursor-pointer"
+      >
+        {saving ? "Saving..." : "Save settings"}
+      </button>
     </div>
   );
 }

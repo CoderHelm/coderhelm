@@ -80,6 +80,12 @@ export const api = {
   getJiraCheck: () => request<JiraCheck>("/api/integrations/jira/check"),
   generateJiraSecret: () => request<{ secret: string }>("/api/integrations/jira/secret", { method: "POST" }),
   deleteJiraSecret: () => request<void>("/api/integrations/jira/secret", { method: "DELETE" }),
+  getJiraConfig: () => request<JiraConfig>("/api/integrations/jira/config"),
+  updateJiraConfig: (body: Partial<JiraConfig>) =>
+    request<void>("/api/integrations/jira/config", { method: "PUT", body: JSON.stringify(body) }),
+  fetchJiraProjects: () => request<{ projects: JiraProject[] }>("/api/integrations/jira/projects/fetch"),
+  updateJiraProjects: (projects: JiraProject[]) =>
+    request<void>("/api/integrations/jira/projects", { method: "PUT", body: JSON.stringify({ projects }) }),
 
   // Billing
   getBilling: () => request<BillingInfo>("/api/billing"),
@@ -301,8 +307,12 @@ export interface Task {
   status: "draft" | "approved" | "rejected" | "queued" | "running" | "done" | string;
   order: number;
   repo?: string;
+  destination?: "github" | "jira" | string;
+  jira_project?: string;
   issue_number?: number;
   issue_url?: string;
+  jira_ticket_key?: string;
+  jira_ticket_url?: string;
   run_id?: string;
   approved_at?: string;
   approved_by?: string;
@@ -358,6 +368,22 @@ export interface JiraCheck {
   tenant_id: string;
   webhook_url: string;
   checklist: string[];
+}
+
+export interface JiraConfig {
+  default_project: string;
+  trigger_label: string;
+  list_projects_url: string;
+  create_ticket_url: string;
+  projects: JiraProject[];
+}
+
+export interface JiraProject {
+  key: string;
+  name: string;
+  enabled: boolean;
+  lead?: string | null;
+  style?: string;
 }
 
 
