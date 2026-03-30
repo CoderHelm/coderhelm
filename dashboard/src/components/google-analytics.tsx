@@ -17,7 +17,7 @@ export function GoogleAnalytics() {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!GA_MEASUREMENT_ID) return;
+    if (!GA_MEASUREMENT_ID || typeof window.gtag !== "function") return;
     window.gtag("event", "page_view", { page_path: pathname });
   }, [pathname]);
 
