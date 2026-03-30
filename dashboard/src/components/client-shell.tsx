@@ -86,7 +86,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         api.getBanners().then((r) => setBanners(r.banners)).catch(() => {});
       })
       .catch(() => {
-        window.location.href = `${API_BASE}/auth/login`;
+        setAuthChecked(true);
       });
   }, []);
 
@@ -96,6 +96,25 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         <div className="flex flex-col items-center gap-3">
           <div className="w-5 h-5 border-2 border-zinc-700 border-t-zinc-300 rounded-full animate-spin" />
           <span className="text-zinc-500 text-sm">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+        <div className="flex flex-col items-center gap-6">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl font-bold text-white tracking-tight">coderhelm</span>
+          </div>
+          <p className="text-zinc-400 text-sm">Sign in with GitHub to continue</p>
+          <a
+            href={`${API_BASE}/auth/login`}
+            className="rounded-lg bg-white px-6 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-200 transition-colors"
+          >
+            Sign in with GitHub
+          </a>
         </div>
       </div>
     );
