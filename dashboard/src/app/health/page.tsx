@@ -39,9 +39,11 @@ export default function HealthPage() {
 
   useEffect(() => {
     refresh();
-    const interval = setInterval(refresh, 30_000);
+    // Poll faster (5s) when unhealthy/degraded, normal (30s) otherwise
+    const ms = health && health.status !== "healthy" ? 5_000 : 30_000;
+    const interval = setInterval(refresh, ms);
     return () => clearInterval(interval);
-  }, [refresh]);
+  }, [refresh, health?.status]);
 
   const s = health ? STATUS_COLOR[health.status] || STATUS_COLOR.ok : STATUS_COLOR.ok;
 
@@ -50,7 +52,9 @@ export default function HealthPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold">System Health</h1>
-          <p className="text-sm text-zinc-500 mt-1">Auto-refreshes every 30 seconds</p>
+          <p className="text-sm text-zinc-500 mt-1">
+            Auto-refreshes every {health && health.status !== "healthy" ? "5" : "30"} seconds
+          </p>
         </div>
         <button
           onClick={refresh}
