@@ -28,6 +28,9 @@ export function MermaidDiagram({ chart, className = "" }: Props) {
         mermaid.initialize({
           startOnLoad: false,
           theme: "dark",
+          architecture: {
+            padding: 56,
+          },
           themeVariables: {
             background: "#09090b",
             primaryColor: "#27272a",
@@ -35,6 +38,7 @@ export function MermaidDiagram({ chart, className = "" }: Props) {
             lineColor: "#52525b",
             edgeLabelBackground: "#18181b",
             tertiaryColor: "#18181b",
+            fontSize: "13px",
           },
         });
 
@@ -49,6 +53,10 @@ export function MermaidDiagram({ chart, className = "" }: Props) {
             svgEl.style.width = "100%";
             svgEl.style.height = "auto";
             svgEl.style.maxWidth = "100%";
+            // Scale down architecture service labels to prevent overlap
+            svgEl.querySelectorAll<SVGTextElement>(".architecture-service-label, .architecture-group-label").forEach((el) => {
+              el.style.fontSize = "12px";
+            });
           }
           setRendered(true);
           setError(null);
