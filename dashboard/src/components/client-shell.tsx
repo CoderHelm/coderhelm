@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
 import { api, type BillingInfo, type Banner } from "@/lib/api";
+import { pushToDataLayer } from "@/lib/gtm";
 import { ToastProvider } from "./toast";
 import {
   PlayIcon, CircleDotIcon, BarChartIcon, HexagonIcon, HeartIcon,
@@ -20,6 +21,8 @@ function formatTokens(n: number): string {
 }
 
 interface User {
+  user_id: string;
+  tenant_id: string;
   github_login: string;
   email: string;
   avatar_url: string;
@@ -82,6 +85,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     api.me()
       .then((u) => {
         setUser(u);
+        pushToDataLayer({ event: "identify", user_id: u.user_id, tenant_id: u.tenant_id });
         setAuthChecked(true);
         api.getBilling().then(setBilling).catch(() => {});
         api.getBanners().then((r) => setBanners(r.banners)).catch(() => {});
