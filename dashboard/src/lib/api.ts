@@ -364,6 +364,8 @@ export interface JiraCheck {
   configured_repos: { total: number; enabled: number };
   enabled_repos: string[];
   jira_events_seen: boolean;
+  last_jira_event_at?: string;
+  jira_event_count?: number;
   installation_id: number;
   tenant_id: string;
   webhook_url: string;

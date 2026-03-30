@@ -91,7 +91,9 @@ export default function JiraPage() {
         </div>
         <div className="text-xs text-zinc-500 mt-1 space-y-0.5">
           <p>{(check?.configured_repos.enabled ?? 0) > 0 ? "✓" : "○"} {check?.configured_repos.enabled ?? 0} enabled repo(s)</p>
-          <p>{check?.jira_events_seen ? "✓" : "○"} Jira events received</p>
+          <p>{check?.jira_events_seen ? "✓" : "○"} Jira events received{check?.last_jira_event_at && (
+            <span className="text-zinc-600 ml-1">· last {new Date(check.last_jira_event_at).toLocaleString()}{check.jira_event_count ? ` · ${check.jira_event_count} total` : ""}</span>
+          )}</p>
         </div>
       </div>
 
@@ -419,13 +421,12 @@ function WebhookTab({ check, setCheck, secret, generatingSecret, generateSecret,
         )}
       </Step>
 
-      <Step number={2} title="Create a Jira Automation rule">
+      <Step number={2} title="Add a webhook in Jira">
         <p className="text-zinc-400 text-sm">
-          In your Jira project: <strong className="text-zinc-200">Project Settings → Automation → Create rule</strong>
+          Go to <strong className="text-zinc-200">https://&lt;your-site&gt;.atlassian.net/plugins/servlet/webhooks</strong> and create a new webhook.
         </p>
         <p className="text-zinc-500 text-xs mt-1">
-          Trigger: <strong className="text-zinc-300">Issue created</strong> or <strong className="text-zinc-300">Issue transitioned</strong>.
-          Action: <strong className="text-zinc-300">Send web request</strong>.
+          Paste the URL from step 3 below. Under events, enable <strong className="text-zinc-300">Issue → updated</strong>.
         </p>
       </Step>
 
