@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type JiraCheck, type JiraConfig, type JiraProject } from "@/lib/api";
+import { api, type Run, type JiraCheck, type JiraConfig, type JiraProject } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { Skeleton } from "@/components/skeleton";
+import Link from "next/link";
 
-type Tab = "app" | "webhook" | "settings";
+type Tab = "app" | "webhook" | "events" | "settings";
 
 export default function JiraPage() {
   const [check, setCheck] = useState<JiraCheck | null>(null);
@@ -99,9 +100,9 @@ export default function JiraPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-lg mb-6 w-fit">
-        {(["app", "webhook", "settings"] as const).map((t) => (
+        {(["app", "webhook", "events", "settings"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer ${tab === t ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}>
-            {t === "app" ? "Jira App" : t === "webhook" ? "Webhook" : "Settings"}
+            {t === "app" ? "Jira App" : t === "webhook" ? "Webhook" : t === "events" ? "Events" : "Settings"}
           </button>
         ))}
       </div>
@@ -120,6 +121,8 @@ export default function JiraPage() {
           copied={copied}
           toast={toast}
         />
+      ) : tab === "events" ? (
+        <EventsTab />
       ) : (
         <SettingsTab config={config} setConfig={setConfig} toast={toast} />
       )}
@@ -459,6 +462,67 @@ function WebhookTab({ check, setCheck, secret, generatingSecret, generateSecret,
         </p>
       </Step>
 
+    </div>
+  );
+}
+
+function EventsTab() {
+  const [events, setEvents] = useState<Run[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.listJiraEvents()
+      .then((res) => setEvents(res.runs))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const statusColor: Record<string, string> = {
+    running: "text-blue-400",
+    completed: "text-emerald-400",
+    failed: "text-red-400",
+    pending: "text-yellow-400",
+  };
+
+  if (loading) {
+    return <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>;
+  }
+
+  if (events.length === 0) {
+    return <p className="text-zinc-500 text-sm">No Jira events received yet.</p>;
+  }
+
+  return (
+    <div className="mb-8">
+      <p className="text-zinc-400 text-sm mb-4">Last {events.length} runs triggered from Jira.</p>
+      <div className="border border-zinc-800 rounded-lg overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-zinc-800 bg-zinc-900/50">
+              <th className="text-left px-4 py-2 text-zinc-500 font-medium">Ticket</th>
+              <th className="text-left px-4 py-2 text-zinc-500 font-medium">Title</th>
+              <th className="text-left px-4 py-2 text-zinc-500 font-medium">Status</th>
+              <th className="text-left px-4 py-2 text-zinc-500 font-medium">Repo</th>
+              <th className="text-left px-4 py-2 text-zinc-500 font-medium">Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            {events.map((e) => (
+              <tr key={e.run_id} className="border-b border-zinc-800/50 hover:bg-zinc-900/50">
+                <td className="px-4 py-2 text-zinc-300 font-mono text-xs">{e.ticket_id}</td>
+                <td className="px-4 py-2">
+                  <Link href={`/runs/detail?id=${e.run_id}`} className="text-zinc-100 hover:underline">
+                    {e.title || "—"}
+                  </Link>
+                </td>
+                <td className={`px-4 py-2 text-xs ${statusColor[e.status] ?? "text-zinc-400"}`}>{e.status}</td>
+                <td className="px-4 py-2 text-zinc-400 font-mono text-xs">{e.repo}</td>
+                <td className="px-4 py-2 text-zinc-500 text-xs">{new Date(e.created_at).toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

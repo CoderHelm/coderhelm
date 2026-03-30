@@ -32,6 +32,7 @@ export const api = {
 
   // Runs
   listRuns: () => request<{ runs: Run[] }>("/api/runs"),
+  listJiraEvents: () => request<{ runs: Run[] }>("/api/runs?source=jira&limit=20"),
   getRun: (id: string) => request<RunDetail>(`/api/runs/${id}`),
   getRunOpenspec: (id: string) => request<Openspec>(`/api/runs/${id}/openspec`),
   retryRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/retry`, { method: "POST" }),
@@ -146,6 +147,7 @@ export const api = {
 export interface Run {
   run_id: string;
   status: string;
+  ticket_source?: string;
   ticket_id: string;
   title: string;
   repo: string;
