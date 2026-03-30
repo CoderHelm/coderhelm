@@ -50,9 +50,11 @@ export function MermaidDiagram({ chart, className = "" }: Props) {
           // Make SVG responsive
           const svgEl = ref.current.querySelector("svg");
           if (svgEl) {
-            svgEl.style.width = "100%";
-            svgEl.style.height = "auto";
             svgEl.style.maxWidth = "100%";
+            svgEl.style.maxHeight = "600px";
+            svgEl.style.width = "auto";
+            svgEl.style.height = "auto";
+            svgEl.setAttribute("preserveAspectRatio", "xMidYMid meet");
             // Scale down architecture service labels to prevent overlap
             svgEl.querySelectorAll<SVGTextElement>(".architecture-service-label, .architecture-group-label").forEach((el) => {
               el.style.fontSize = "12px";
@@ -87,7 +89,7 @@ export function MermaidDiagram({ chart, className = "" }: Props) {
           <div className="w-5 h-5 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin" />
         </div>
       )}
-      <div ref={ref} className="w-full" />
+      <div ref={ref} className="w-full overflow-auto" />
     </div>
   );
 }
