@@ -115,12 +115,44 @@ function parseTaskItems(tasks?: string): TaskItem[] {
   return items;
 }
 
-/** Check if a task item is done by matching its mentioned files against modified files. */
-function isTaskDone(task: TaskItem, filesModified: string[]): boolean {
-  if (task.filePaths.length === 0) return false;
-  return task.filePaths.some((tp) =>
-    filesModified.some((fm) => fm.endsWith(tp) || tp.endsWith(fm) || fm.includes(tp.replace(/^.*\//, "")))
-  );
+/** Check if a task item is done based on run state and file matching. */
+function isTaskDone(
+  task: TaskItem,
+  filesModified: string[],
+  runStatus: string,
+  currentPass: string | undefined,
+): boolean {
+  const passIdx = PASSES.indexOf(currentPass ?? "");
+  const section = task.section.toLowerCase();
+  const isPostDeploy = section.includes("post-deploy");
+  const isVerification = section.includes("verification") && !isPostDeploy;
+  const isPrereq = section.includes("prerequisit");
+
+  // Post-deploy tasks are always manual
+  if (isPostDeploy) return false;
+
+  // For completed runs: prereqs, implementation, and verification are all done
+  if (runStatus === "completed") {
+    return !isPostDeploy;
+  }
+
+  // Prerequisites done once we're past plan
+  if (isPrereq && passIdx >= 2) return true;
+
+  // Verification done once review pass completed
+  if (isVerification && (passIdx >= 4 || runStatus === "completed")) return true;
+
+  // File-path matching for real-time progress during implement
+  if (task.filePaths.length > 0) {
+    return task.filePaths.some((tp) =>
+      filesModified.some((fm) => fm.endsWith(tp) || tp.endsWith(fm) || fm.includes(tp.replace(/^.*\//, "")))
+    );
+  }
+
+  // Implementation tasks without file paths: done if we're past implement
+  if (passIdx >= 3) return true;
+
+  return false;
 }
 
 function RunDetailInner() {
@@ -198,7 +230,7 @@ function RunDetailInner() {
   const showTaskSidebar = taskItems.length > 0 && implementStarted;
   const filesModified = run.files_modified ?? [];
 
-  const doneCount = taskItems.filter((t) => isTaskDone(t, filesModified)).length;
+  const doneCount = taskItems.filter((t) => isTaskDone(t, filesModified, run.status, run.current_pass)).length;
 
   return (
     <div className={showTaskSidebar ? "max-w-6xl flex gap-6" : "max-w-3xl"}>
@@ -457,7 +489,7 @@ function RunDetailInner() {
               {(() => {
                 let lastSection = "";
                 return taskItems.map((task, i) => {
-                  const done = isTaskDone(task, filesModified);
+                  const done = isTaskDone(task, filesModified, run.status, run.current_pass);
                   const sectionHeader = task.section !== lastSection ? task.section : null;
                   lastSection = task.section;
                   return (
