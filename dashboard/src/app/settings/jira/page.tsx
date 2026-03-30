@@ -253,7 +253,9 @@ function SettingsTab({ config, setConfig, toast }: {
       <section>
         <h3 className="text-sm font-semibold text-zinc-100 mb-1">Forge Trigger URLs</h3>
         <p className="text-xs text-zinc-500 mb-3">
-          Copy these from Coderhelm Settings in your Jira site (Apps → Coderhelm Settings → Web Trigger URLs).
+          {listProjectsUrl && createTicketUrl
+            ? "Auto-configured by the Forge app."
+            : "These are registered automatically when you save settings in the Jira Forge app. You can also paste them manually."}
         </p>
         <div className="space-y-3">
           <div>
@@ -261,8 +263,9 @@ function SettingsTab({ config, setConfig, toast }: {
             <input
               value={listProjectsUrl}
               onChange={(e) => setListProjectsUrl(e.target.value)}
-              placeholder="https://…webtrigger…/list-projects-trigger"
-              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
+              readOnly={!!config?.list_projects_url}
+              placeholder="Auto-configured by Forge app"
+              className={`w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600${config?.list_projects_url ? " opacity-60" : ""}`}
             />
           </div>
           <div>
@@ -270,8 +273,9 @@ function SettingsTab({ config, setConfig, toast }: {
             <input
               value={createTicketUrl}
               onChange={(e) => setCreateTicketUrl(e.target.value)}
-              placeholder="https://…webtrigger…/create-ticket-trigger"
-              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
+              readOnly={!!config?.create_ticket_url}
+              placeholder="Auto-configured by Forge app"
+              className={`w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600${config?.create_ticket_url ? " opacity-60" : ""}`}
             />
           </div>
         </div>
