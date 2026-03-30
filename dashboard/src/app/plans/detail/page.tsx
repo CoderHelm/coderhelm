@@ -292,6 +292,7 @@ function PlanDetail() {
                         <h3 className="text-base font-semibold text-zinc-100">{task.title}</h3>
                         <span className={`px-1.5 py-0.5 rounded-full text-xs border ${TASK_STATUS_STYLES[task.status] || TASK_STATUS_STYLES.draft}`}>{task.status}</span>
                         {task.issue_url && <a href={task.issue_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline">#{task.issue_number}</a>}
+                        {task.run_id && <Link href={`/runs/detail?id=${task.run_id}`} className="text-xs text-blue-400 hover:underline">View run →</Link>}
                         {task.repo && <span className="text-xs text-zinc-600 font-mono">{task.repo}</span>}
                         {task.approved_by && <span className="text-xs text-zinc-600">approved by {task.approved_by}</span>}
                       </div>

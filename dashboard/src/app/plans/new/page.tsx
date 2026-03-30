@@ -254,28 +254,28 @@ export default function NewPlanPage() {
             <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-4 overflow-y-auto flex-1">
               <div>
                 <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Generated plan</p>
-                <h3 className="text-sm font-bold text-zinc-100">{draft.title}</h3>
-                {draft.description && <p className="text-xs text-zinc-400 mt-1 leading-relaxed">{draft.description}</p>}
-                {draft.repo && <p className="text-xs text-zinc-600 mt-1 font-mono">{draft.repo}</p>}
-                <p className="text-[10px] text-zinc-600 mt-2">{draft.tasks.length} task{draft.tasks.length !== 1 ? "s" : ""}</p>
+                <h3 className="text-base font-bold text-zinc-100">{draft.title}</h3>
+                {draft.description && <p className="text-sm text-zinc-400 mt-1 leading-relaxed">{draft.description}</p>}
+                {draft.repo && <p className="text-xs text-zinc-500 mt-1 font-mono">{draft.repo}</p>}
+                <p className="text-xs text-zinc-500 mt-2">{draft.tasks.length} task{draft.tasks.length !== 1 ? "s" : ""}</p>
               </div>
 
               <div className="space-y-3">
                 {draft.tasks.map((task, i) => (
                   <div key={i} className="border border-zinc-800 rounded-lg p-3">
-                    <div className="flex gap-2.5 text-xs">
-                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-zinc-800 text-zinc-500 flex items-center justify-center text-[10px] mt-0.5">
+                    <div className="flex gap-2.5">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-zinc-800 text-zinc-500 flex items-center justify-center text-xs mt-0.5">
                         {i + 1}
                       </span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-zinc-200 font-medium">{task.title}</p>
+                        <p className="text-sm text-zinc-200 font-medium">{task.title}</p>
                         {task.description && (
-                          <p className="text-zinc-500 mt-1.5 leading-relaxed whitespace-pre-wrap">{task.description}</p>
+                          <p className="text-sm text-zinc-400 mt-1.5 leading-relaxed whitespace-pre-wrap">{task.description}</p>
                         )}
                         {task.acceptance_criteria && (
                           <div className="mt-2">
-                            <p className="text-[10px] text-zinc-600 uppercase tracking-wider mb-1">Acceptance criteria</p>
-                            <pre className="text-[11px] text-zinc-500 font-mono whitespace-pre-wrap leading-relaxed">{task.acceptance_criteria}</pre>
+                            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Acceptance criteria</p>
+                            <pre className="text-xs text-zinc-400 font-mono whitespace-pre-wrap leading-relaxed">{task.acceptance_criteria}</pre>
                           </div>
                         )}
                       </div>
@@ -291,7 +291,7 @@ export default function NewPlanPage() {
               >
                 {saving ? "Saving..." : "Save plan"}
               </button>
-              <p className="text-[10px] text-zinc-600 text-center">You can edit tasks after saving</p>
+              <p className="text-xs text-zinc-500 text-center">You can edit tasks after saving</p>
             </div>
           </div>
         )}

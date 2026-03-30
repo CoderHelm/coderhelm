@@ -32,7 +32,8 @@ export const api = {
 
   // Runs
   listRuns: () => request<{ runs: Run[] }>("/api/runs"),
-  getRun: (id: string) => request<Run>(`/api/runs/${id}`),
+  getRun: (id: string) => request<RunDetail>(`/api/runs/${id}`),
+  getRunOpenspec: (id: string) => request<Openspec>(`/api/runs/${id}/openspec`),
 
   // Repos
   listRepos: () => request<{ repos: Repo[] }>("/api/repos"),
@@ -147,6 +148,22 @@ export interface Run {
   duration_s?: number;
   created_at: string;
   current_pass?: string;
+}
+
+export interface RunDetail extends Run {
+  ticket_source?: string;
+  branch?: string;
+  pr_number?: number;
+  files_modified?: string[];
+  error?: string;
+  updated_at?: string;
+}
+
+export interface Openspec {
+  proposal?: string;
+  design?: string;
+  tasks?: string;
+  spec?: string;
 }
 
 export interface Repo {
