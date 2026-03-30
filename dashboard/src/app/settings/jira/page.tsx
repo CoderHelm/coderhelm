@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type Run, type JiraCheck, type JiraConfig, type JiraProject } from "@/lib/api";
+import { api, type JiraEvent, type JiraCheck, type JiraConfig, type JiraProject } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { Skeleton } from "@/components/skeleton";
-import Link from "next/link";
 
 type Tab = "app" | "webhook" | "events" | "settings";
 
@@ -12,7 +11,6 @@ export default function JiraPage() {
   const [check, setCheck] = useState<JiraCheck | null>(null);
   const [config, setConfig] = useState<JiraConfig | null>(null);
   const [loading, setLoading] = useState(true);
-  const [secret, setSecret] = useState<string | null>(null);
   const [generatingSecret, setGeneratingSecret] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("app");
@@ -37,23 +35,22 @@ export default function JiraPage() {
       await api.generateJiraSecret();
       const c = await api.getJiraCheck();
       setCheck(c);
-      setSecret("generated");
-      toast("Secret generated — your webhook URL is ready");
+      setCheck(c);
+      toast("Webhook URL generated");
     } catch {
-      toast("Failed to generate secret", "error");
+      toast("Failed to generate webhook URL", "error");
     }
     setGeneratingSecret(false);
   };
 
   const deleteSecret = async () => {
-    if (!confirm("Remove the webhook secret? Jira webhooks will no longer be signature-verified.")) return;
+    if (!confirm("Remove the webhook URL? Jira webhooks will stop working until you generate a new one.")) return;
     try {
       await api.deleteJiraSecret();
-      setSecret(null);
-      setCheck((c) => c ? { ...c, secret_configured: false } : c);
-      toast("Secret removed");
+      setCheck((c) => c ? { ...c, secret_configured: false, webhook_url: undefined } : c);
+      toast("Webhook URL removed");
     } catch {
-      toast("Failed to remove secret", "error");
+      toast("Failed to remove webhook URL", "error");
     }
   };
 
@@ -154,9 +151,9 @@ function JiraAppTab() {
           </a>
         </Step>
 
-        <Step number={2} title="Configure trigger URLs">
+        <Step number={2} title="Save settings in the app">
           <p className="text-zinc-400 text-sm">
-            After installing, open the Coderhelm app settings in Jira. Copy the <strong className="text-zinc-200">List Projects</strong> and <strong className="text-zinc-200">Create Ticket</strong> URLs, then paste them in the <strong className="text-zinc-200">Settings</strong> tab.
+            After installing, open the Coderhelm app settings in Jira and click <strong className="text-zinc-200">Save</strong>. The trigger URLs are registered automatically.
           </p>
         </Step>
 
@@ -183,8 +180,8 @@ function SettingsTab({ config, setConfig, toast }: {
 }) {
   const [saving, setSaving] = useState(false);
   const [fetching, setFetching] = useState(false);
-  const [listProjectsUrl, setListProjectsUrl] = useState(config?.list_projects_url ?? "");
-  const [createTicketUrl, setCreateTicketUrl] = useState(config?.create_ticket_url ?? "");
+  const listProjectsUrl = config?.list_projects_url ?? "";
+  const createTicketUrl = config?.create_ticket_url ?? "";
   const [triggerLabel, setTriggerLabel] = useState(config?.trigger_label || "coderhelm");
   const [defaultProject, setDefaultProject] = useState(config?.default_project ?? "");
   const [projects, setProjects] = useState<JiraProject[]>(config?.projects ?? []);
@@ -209,7 +206,7 @@ function SettingsTab({ config, setConfig, toast }: {
 
   const fetchProjects = async () => {
     if (!listProjectsUrl) {
-      toast("Paste the List Projects URL first", "error");
+      toast("List Projects URL not configured — save settings in the Jira app first", "error");
       return;
     }
     setFetching(true);
@@ -255,29 +252,25 @@ function SettingsTab({ config, setConfig, toast }: {
       <section>
         <h3 className="text-sm font-semibold text-zinc-100 mb-1">Forge Trigger URLs</h3>
         <p className="text-xs text-zinc-500 mb-3">
-          {listProjectsUrl && createTicketUrl
-            ? "Auto-configured by the Forge app."
-            : "These are registered automatically when you save settings in the Jira Forge app. You can also paste them manually."}
+          Registered automatically when you save settings in the Jira Forge app.
         </p>
         <div className="space-y-3">
           <div>
             <label className="text-xs text-zinc-500 mb-1 block">List Projects URL</label>
             <input
               value={listProjectsUrl}
-              onChange={(e) => setListProjectsUrl(e.target.value)}
-              readOnly={!!config?.list_projects_url}
-              placeholder="Auto-configured by Forge app"
-              className={`w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600${config?.list_projects_url ? " opacity-60" : ""}`}
+              readOnly
+              placeholder="Not configured yet — save settings in the Jira Forge app"
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-100 placeholder-zinc-600 opacity-60 cursor-default"
             />
           </div>
           <div>
             <label className="text-xs text-zinc-500 mb-1 block">Create Ticket URL</label>
             <input
               value={createTicketUrl}
-              onChange={(e) => setCreateTicketUrl(e.target.value)}
-              readOnly={!!config?.create_ticket_url}
-              placeholder="Auto-configured by Forge app"
-              className={`w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600${config?.create_ticket_url ? " opacity-60" : ""}`}
+              readOnly
+              placeholder="Not configured yet — save settings in the Jira Forge app"
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-100 placeholder-zinc-600 opacity-60 cursor-default"
             />
           </div>
         </div>
@@ -392,14 +385,14 @@ function WebhookTab({ check, generatingSecret, generateSecret, deleteSecret, cop
         Use a native Jira webhook to send events to Coderhelm when issues are updated.
       </p>
 
-      <Step number={1} title="Generate webhook URL">
+      <Step number={1} title="Generate webhook credentials">
         <p className="text-zinc-400 text-sm mb-3">
-          Generate a unique webhook URL for your account. This URL acts as your credential — anyone with it can trigger runs.
+          Generate a unique webhook URL and signing secret for your account.
         </p>
         {check?.webhook_url ? (
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <span className="text-sm text-emerald-400">✓ Webhook URL configured</span>
+              <span className="text-sm text-emerald-400">✓ Webhook configured</span>
               <button onClick={generateSecret} disabled={generatingSecret} className="text-xs text-zinc-500 hover:text-zinc-300 underline cursor-pointer">
                 {generatingSecret ? "Regenerating..." : "Regenerate"}
               </button>
@@ -407,19 +400,35 @@ function WebhookTab({ check, generatingSecret, generateSecret, deleteSecret, cop
                 Remove
               </button>
             </div>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono truncate">
-                {check.webhook_url}
-              </code>
-              <button onClick={() => copy(check.webhook_url!, "url")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer">
-                {copied === "url" ? "Copied!" : "Copy"}
-              </button>
+            <div>
+              <label className="text-xs text-zinc-500 mb-1 block">Webhook URL</label>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono truncate">
+                  {check.webhook_url}
+                </code>
+                <button onClick={() => copy(check.webhook_url!, "url")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer">
+                  {copied === "url" ? "Copied!" : "Copy"}
+                </button>
+              </div>
             </div>
-            <p className="text-zinc-500 text-xs">Keep this URL private. Regenerating will invalidate the old URL.</p>
+            {check.webhook_secret && (
+              <div>
+                <label className="text-xs text-zinc-500 mb-1 block">Webhook Secret</label>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono truncate">
+                    {check.webhook_secret}
+                  </code>
+                  <button onClick={() => copy(check.webhook_secret!, "secret")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer">
+                    {copied === "secret" ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              </div>
+            )}
+            <p className="text-zinc-500 text-xs">Keep both values private. Regenerating will invalidate the previous credentials.</p>
           </div>
         ) : (
           <button onClick={generateSecret} disabled={generatingSecret} className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 transition-colors cursor-pointer">
-            {generatingSecret ? "Generating..." : "Generate webhook URL"}
+            {generatingSecret ? "Generating..." : "Generate webhook credentials"}
           </button>
         )}
       </Step>
@@ -428,8 +437,11 @@ function WebhookTab({ check, generatingSecret, generateSecret, deleteSecret, cop
         <p className="text-zinc-400 text-sm">
           Go to <strong className="text-zinc-200">https://&lt;your-site&gt;.atlassian.net/plugins/servlet/webhooks</strong> and create a new webhook.
         </p>
+        <p className="text-zinc-500 text-xs mt-2">
+          Paste the <strong className="text-zinc-300">Webhook URL</strong> from step 1. Enter the <strong className="text-zinc-300">Webhook Secret</strong> in the secret field. Under events, enable <strong className="text-zinc-300">Issue → updated</strong>.
+        </p>
         <p className="text-zinc-500 text-xs mt-1">
-          Paste the URL from step 1. Under events, enable <strong className="text-zinc-300">Issue → updated</strong>.
+          The secret is used to sign each request with an HMAC-SHA256 signature (<code className="text-zinc-400 bg-zinc-800 px-1 rounded text-xs">X-Hub-Signature</code> header) so Coderhelm can verify it came from Jira.
         </p>
       </Step>
 
@@ -444,21 +456,21 @@ function WebhookTab({ check, generatingSecret, generateSecret, deleteSecret, cop
 }
 
 function EventsTab() {
-  const [events, setEvents] = useState<Run[]>([]);
+  const [events, setEvents] = useState<JiraEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api.listJiraEvents()
-      .then((res) => setEvents(res.runs))
+      .then((res) => setEvents(res.events))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
   const statusColor: Record<string, string> = {
-    running: "text-blue-400",
-    completed: "text-emerald-400",
-    failed: "text-red-400",
-    pending: "text-yellow-400",
+    processed: "text-emerald-400",
+    filtered: "text-zinc-500",
+    error: "text-red-400",
+    signature_rejected: "text-red-400",
   };
 
   if (loading) {
@@ -471,7 +483,7 @@ function EventsTab() {
 
   return (
     <div className="mb-8">
-      <p className="text-zinc-400 text-sm mb-4">Last {events.length} runs triggered from Jira.</p>
+      <p className="text-zinc-400 text-sm mb-4">Last {events.length} webhook events.</p>
       <div className="border border-zinc-800 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -485,15 +497,11 @@ function EventsTab() {
           </thead>
           <tbody>
             {events.map((e) => (
-              <tr key={e.run_id} className="border-b border-zinc-800/50 hover:bg-zinc-900/50">
-                <td className="px-4 py-2 text-zinc-300 font-mono text-xs">{e.ticket_id}</td>
-                <td className="px-4 py-2">
-                  <Link href={`/runs/detail?id=${e.run_id}`} className="text-zinc-100 hover:underline">
-                    {e.title || "—"}
-                  </Link>
-                </td>
+              <tr key={e.event_id} className="border-b border-zinc-800/50 hover:bg-zinc-900/50">
+                <td className="px-4 py-2 text-zinc-300 font-mono text-xs">{e.ticket_key || "—"}</td>
+                <td className="px-4 py-2 text-zinc-100 text-sm">{e.title || "—"}</td>
                 <td className={`px-4 py-2 text-xs ${statusColor[e.status] ?? "text-zinc-400"}`}>{e.status}</td>
-                <td className="px-4 py-2 text-zinc-400 font-mono text-xs">{e.repo}</td>
+                <td className="px-4 py-2 text-zinc-400 font-mono text-xs">{e.repo || "—"}</td>
                 <td className="px-4 py-2 text-zinc-500 text-xs">{new Date(e.created_at).toLocaleString()}</td>
               </tr>
             ))}
