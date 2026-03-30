@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, type RunDetail, type Openspec } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
@@ -99,6 +99,7 @@ export default function RunDetailPage() {
 
 function RunDetailInner() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const runId = searchParams.get("id") ?? "";
   const [run, setRun] = useState<RunDetail | null>(null);
   const [openspec, setOpenspec] = useState<Openspec | null>(null);
@@ -193,10 +194,10 @@ function RunDetailInner() {
                   setRetrying(true);
                   try {
                     await api.retryRun(runId);
-                    toast("Run retried — a new run has been queued");
+                    toast("Run retried — redirecting to runs list");
+                    router.push("/");
                   } catch {
                     toast("Failed to retry run", "error");
-                  } finally {
                     setRetrying(false);
                   }
                 }}
@@ -218,10 +219,10 @@ function RunDetailInner() {
               setRetrying(true);
               try {
                 await api.retryRun(runId);
-                toast("Run retried — a new run has been queued");
+                toast("Run retried — redirecting to runs list");
+                router.push("/");
               } catch {
                 toast("Failed to retry run", "error");
-              } finally {
                 setRetrying(false);
               }
             }}
