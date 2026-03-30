@@ -330,7 +330,7 @@ export default function Home() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#00d4ff15] text-[9px] font-bold text-brand">d</div>
+                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#00d4ff15] text-[9px] font-bold text-brand">c</div>
                       <div className="rounded-lg rounded-tl-none border border-[#21262d] bg-[#161b22] px-3 py-2.5 text-[11px] text-text-secondary">
                         <p className="mb-2 text-text-primary">I&apos;ll scope this as 4 tasks:</p>
                         {[
