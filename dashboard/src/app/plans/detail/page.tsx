@@ -229,6 +229,9 @@ function PlanDetail() {
             {plan.repo && <span className="text-xs text-zinc-600 font-mono">{plan.repo}</span>}
             <span className={`px-2 py-0.5 rounded-full text-xs border ${PLAN_STATUS_STYLES[plan.status] || PLAN_STATUS_STYLES.draft}`}>{plan.status}</span>
             <span className="text-xs text-zinc-600">{plan.tasks.length} tasks</span>
+            {((plan.tokens_in ?? 0) + (plan.tokens_out ?? 0)) > 0 && (
+              <span className="text-xs text-zinc-600">{(((plan.tokens_in ?? 0) + (plan.tokens_out ?? 0)) / 1000).toFixed(1)}K tokens</span>
+            )}
           </div>
         </div>
         {plan.status === "draft" && draftCount > 0 && (

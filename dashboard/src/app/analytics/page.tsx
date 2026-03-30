@@ -80,6 +80,7 @@ const axisProps = {
 function statsFromRuns(runs: Run[]): Stats {
   const total = runs.length;
   const completed = runs.filter((r) => r.status === "completed" || r.status === "merged").length;
+  const merged = runs.filter((r) => r.status === "merged").length;
   const failed = runs.filter((r) => r.status === "failed" || r.status === "error").length;
   const tokensIn = runs.reduce((s, r) => s + (r.tokens_in ?? 0), 0);
   const tokensOut = runs.reduce((s, r) => s + (r.tokens_out ?? 0), 0);
@@ -91,7 +92,7 @@ function statsFromRuns(runs: Run[]): Stats {
     total_cost_usd: runs.reduce((s, r) => s + (r.cost_usd ?? 0), 0),
     total_tokens_in: tokensIn,
     total_tokens_out: tokensOut,
-    merge_rate: total > 0 ? completed / total : 0,
+    merge_rate: completed > 0 ? merged / completed : 0,
   };
 }
 
@@ -130,15 +131,15 @@ function groupRunsByDay(runs: Run[], range: Range): { label: string; completed: 
   return days.map((day) => {
     const dayRuns = map.get(day) ?? [];
     const completed = dayRuns.filter((r) => r.status === "completed" || r.status === "merged").length;
+    const merged = dayRuns.filter((r) => r.status === "merged").length;
     const failed = dayRuns.filter((r) => r.status === "failed" || r.status === "error").length;
-    const total = dayRuns.length;
     return {
       label: new Date(day + "T00:00:00").toLocaleDateString("en", { month: "short", day: "numeric" }),
       completed,
       failed,
       total_tokens_in: dayRuns.reduce((s, r) => s + (r.tokens_in ?? 0), 0),
       total_tokens_out: dayRuns.reduce((s, r) => s + (r.tokens_out ?? 0), 0),
-      merge_rate: total > 0 ? (completed / total) * 100 : 0,
+      merge_rate: completed > 0 ? (merged / completed) * 100 : 0,
     };
   });
 }
