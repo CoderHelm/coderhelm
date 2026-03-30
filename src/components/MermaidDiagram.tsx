@@ -41,9 +41,9 @@ export default function MermaidDiagram({ chart, className }: MermaidDiagramProps
             tertiaryColor: "#0d1117",
           },
           architecture: {
-            padding: 16,
-            iconSize: 32,
-            fontSize: 11,
+            padding: 24,
+            iconSize: 48,
+            fontSize: 12,
           },
         });
 
