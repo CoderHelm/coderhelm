@@ -17,6 +17,24 @@ const TASK_STATUS_STYLES: Record<string, string> = {
   done: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
 };
 
+const TASK_BORDER_COLORS: Record<string, string> = {
+  draft: "border-l-zinc-700",
+  approved: "border-l-green-500/50",
+  rejected: "border-l-red-500/50",
+  queued: "border-l-yellow-500/50",
+  running: "border-l-blue-500",
+  done: "border-l-emerald-500",
+};
+
+const TASK_DOT_COLORS: Record<string, string> = {
+  draft: "bg-zinc-700",
+  approved: "bg-green-500/60",
+  rejected: "bg-red-500/60",
+  queued: "bg-yellow-500/60",
+  running: "bg-blue-500",
+  done: "bg-emerald-500",
+};
+
 const PLAN_STATUS_STYLES: Record<string, string> = {
   draft: "bg-zinc-800 text-zinc-400 border-zinc-700",
   executing: "bg-blue-500/10 text-blue-400 border-blue-500/20",
@@ -256,13 +274,32 @@ function PlanDetail() {
         )}
       </div>
 
-      {plan.tasks.length > 0 && (
+      {plan.tasks.length > 0 && (plan.status === "executing" || plan.status === "done") && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between text-xs mb-2">
+            <span className="text-zinc-500">Execution progress</span>
+            <span className="text-zinc-400 font-medium">
+              {plan.tasks.filter((t) => t.status === "done").length} / {plan.tasks.length} complete
+            </span>
+          </div>
+          <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500 ease-out bg-gradient-to-r from-emerald-500 to-emerald-400"
+              style={{
+                width: `${(plan.tasks.filter((t) => t.status === "done").length / plan.tasks.length) * 100}%`,
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {plan.tasks.length > 0 && plan.status === "draft" && (
         <div className="grid grid-cols-4 gap-3 mb-6">
           {[
             { label: "Draft", count: draftCount, style: "text-zinc-400" },
             { label: "Approved", count: approvedCount, style: "text-green-400" },
-            { label: "Queued/Running", count: plan.tasks.filter((t) => t.status === "queued" || t.status === "running").length, style: "text-blue-400" },
-            { label: "Done", count: plan.tasks.filter((t) => t.status === "done").length, style: "text-emerald-400" },
+            { label: "Rejected", count: plan.tasks.filter((t) => t.status === "rejected").length, style: "text-red-400" },
+            { label: "Total", count: plan.tasks.length, style: "text-zinc-300" },
           ].map(({ label, count, style }) => (
             <div key={label} className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg text-center">
               <p className={`text-xl font-bold ${style}`}>{count}</p>
@@ -272,10 +309,29 @@ function PlanDetail() {
         </div>
       )}
 
-      <div className="space-y-3">
-        {plan.tasks.map((task, idx) => (
-          <div key={task.task_id} className="border border-zinc-800 rounded-lg bg-zinc-900/30">
-            {editingTask === task.task_id ? (
+      <div className="relative">
+        {/* Vertical connector line */}
+        {plan.tasks.length > 1 && (
+          <div className="absolute left-[19px] top-6 bottom-6 w-px bg-zinc-800" />
+        )}
+
+        <div className="space-y-0">
+          {plan.tasks.map((task, idx) => (
+            <div key={task.task_id} className="relative">
+              {/* Timeline dot */}
+              <div className="absolute left-0 top-5 z-10 flex items-center justify-center">
+                <div
+                  className={`w-[10px] h-[10px] rounded-full ring-2 ring-zinc-950 ${TASK_DOT_COLORS[task.status] || TASK_DOT_COLORS.draft} ${
+                    task.status === "running" ? "animate-pulse" : ""
+                  }`}
+                />
+              </div>
+
+              {/* Task card */}
+              <div className={`ml-8 mb-3 border border-zinc-800 rounded-lg bg-zinc-900/30 border-l-2 ${TASK_BORDER_COLORS[task.status] || TASK_BORDER_COLORS.draft} ${
+                task.status === "running" ? "ring-1 ring-blue-500/20" : ""
+              }`}>
+                {editingTask === task.task_id ? (
               <div className="p-4 space-y-3">
                 <input value={editForm.title ?? task.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 focus:outline-none focus:border-zinc-500" />
                 <textarea value={editForm.description ?? task.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} rows={3} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 resize-y" placeholder="Description" />
@@ -296,25 +352,36 @@ function PlanDetail() {
             ) : (
               <div className="p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex gap-3 flex-1 min-w-0">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-zinc-800 text-zinc-500 flex items-center justify-center text-xs mt-0.5">{idx + 1}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-base font-semibold text-zinc-100">{task.title}</h3>
-                        <span className={`px-1.5 py-0.5 rounded-full text-xs border ${TASK_STATUS_STYLES[task.status] || TASK_STATUS_STYLES.draft}`}>{task.status}</span>
-                        {task.issue_url && <a href={task.issue_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline">#{task.issue_number}</a>}
-                        {task.run_id && <Link href={`/runs/detail?id=${task.run_id}`} className="text-xs text-blue-400 hover:underline">View run →</Link>}
-                        {task.repo && <span className="text-xs text-zinc-600 font-mono">{task.repo}</span>}
-                        {task.approved_by && <span className="text-xs text-zinc-600">approved by {task.approved_by}</span>}
-                      </div>
-                      {task.description && <p className="text-sm text-zinc-400 mt-2 leading-relaxed">{task.description}</p>}
-                      {task.acceptance_criteria && (
-                        <div className="mt-3">
-                          <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Acceptance criteria</p>
-                          <pre className="text-sm text-zinc-400 font-mono whitespace-pre-wrap leading-relaxed">{task.acceptance_criteria}</pre>
-                        </div>
-                      )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-zinc-600 font-mono w-5 text-right flex-shrink-0">{idx + 1}</span>
+                      <h3 className={`text-base font-semibold ${task.status === "done" ? "text-zinc-400" : "text-zinc-100"}`}>{task.title}</h3>
+                      <span className={`px-1.5 py-0.5 rounded-full text-xs border ${TASK_STATUS_STYLES[task.status] || TASK_STATUS_STYLES.draft}`}>{task.status}</span>
                     </div>
+                    <div className="flex items-center gap-3 mt-1.5 ml-7">
+                      {task.issue_url && (
+                        <a href={task.issue_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M8 5v3M8 10v1" /></svg>
+                          #{task.issue_number}
+                        </a>
+                      )}
+                      {task.run_id && (
+                        <Link href={`/runs/detail?id=${task.run_id}`} className="text-xs text-blue-400 hover:underline flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5"><path d="M6 3l5 5-5 5" /></svg>
+                          View run
+                        </Link>
+                      )}
+                      {task.repo && <span className="text-xs text-zinc-600 font-mono">{task.repo}</span>}
+                      {task.approved_by && <span className="text-xs text-zinc-600">approved by {task.approved_by}</span>}
+                      {task.status === "running" && <span className="text-xs text-blue-400 animate-pulse">Processing…</span>}
+                    </div>
+                    {task.description && <p className="text-sm text-zinc-400 mt-2 ml-7 leading-relaxed">{task.description}</p>}
+                    {task.acceptance_criteria && (
+                      <div className="mt-3 ml-7">
+                        <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Acceptance criteria</p>
+                        <pre className="text-sm text-zinc-400 font-mono whitespace-pre-wrap leading-relaxed">{task.acceptance_criteria}</pre>
+                      </div>
+                    )}
                   </div>
                   {plan.status === "draft" && (
                     <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
@@ -333,11 +400,15 @@ function PlanDetail() {
                 </div>
               </div>
             )}
-          </div>
-        ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
-        {plan.status === "draft" && (
-          showAddTask ? (
+      {plan.status === "draft" && (
+        <div className="relative ml-8">
+          {showAddTask ? (
             <div className="border border-zinc-700 border-dashed rounded-lg p-4 space-y-3">
               <input autoFocus value={newTask.title} onChange={(e) => setNewTask((t) => ({ ...t, title: e.target.value }))} onKeyDown={(e) => e.key === "Enter" && handleAddTask()} placeholder="Task title" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
               <textarea value={newTask.description} onChange={(e) => setNewTask((t) => ({ ...t, description: e.target.value }))} rows={2} placeholder="Description (optional)" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 font-mono placeholder-zinc-600 focus:outline-none focus:border-zinc-500 resize-none" />
@@ -357,12 +428,12 @@ function PlanDetail() {
             </div>
           ) : (
             <button onClick={() => setShowAddTask(true)} className="w-full py-3 border border-dashed border-zinc-800 rounded-lg text-sm text-zinc-600 hover:text-zinc-400 hover:border-zinc-700 transition-colors">+ Add task</button>
-          )
+          )}
+        </div>
         )}
-      </div>
 
       {draftCount > 0 && plan.status === "draft" && (
-        <p className="text-xs text-zinc-600 mt-6">Approve individual tasks or click &ldquo;Approve all & go&rdquo; to start. Approving the last task auto-triggers execution.</p>
+        <p className="text-xs text-zinc-600 mt-6 ml-8">Approve individual tasks or click &ldquo;Approve all & go&rdquo; to start. Approving the last task auto-triggers execution.</p>
       )}
     </div>
   );
