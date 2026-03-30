@@ -59,7 +59,7 @@ function PlanDetail() {
   const [editingTask, setEditingTask] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Task>>({});
   const [showAddTask, setShowAddTask] = useState(false);
-  const [newTask, setNewTask] = useState({ title: "", description: "", acceptance_criteria: "", repo: "" });
+  const [newTask, setNewTask] = useState({ title: "", description: "", acceptance_criteria: "", repo: "", destination: "github", jira_project: "" });
   const [executing, setExecuting] = useState(false);
   const [repos, setRepos] = useState<Repo[]>([]);
   const { toast } = useToast();
@@ -142,7 +142,7 @@ function PlanDetail() {
       const order = plan?.tasks.length ?? 0;
       await api.addTask(planId, { ...newTask, order });
       toast("Task added");
-      setNewTask({ title: "", description: "", acceptance_criteria: "", repo: "" });
+      setNewTask({ title: "", description: "", acceptance_criteria: "", repo: "", destination: "github", jira_project: "" });
       setShowAddTask(false);
       refresh();
     } catch {
@@ -344,6 +344,19 @@ function PlanDetail() {
                 ) : (
                   <input value={editForm.repo ?? task.repo ?? ""} onChange={(e) => setEditForm((f) => ({ ...f, repo: e.target.value }))} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Repo override (owner/repo) — blank uses plan default" />
                 )}
+                <div>
+                  <label className="text-xs text-zinc-500 mb-1 block">Destination</label>
+                  <div className="flex gap-2">
+                    {(["github", "jira"] as const).map((d) => (
+                      <button key={d} onClick={() => setEditForm((f) => ({ ...f, destination: d }))} className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors cursor-pointer ${(editForm.destination ?? task.destination ?? "github") === d ? "bg-zinc-700 text-zinc-100 border-zinc-600" : "bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-zinc-300"}`}>
+                        {d === "github" ? "GitHub Issue" : "Jira Ticket"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {(editForm.destination ?? task.destination) === "jira" && (
+                  <input value={editForm.jira_project ?? task.jira_project ?? ""} onChange={(e) => setEditForm((f) => ({ ...f, jira_project: e.target.value }))} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Jira project key (e.g. PROJ) — blank uses default" />
+                )}
                 <div className="flex gap-2">
                   <button onClick={() => handleSaveEdit(task.task_id)} disabled={actionLoading === task.task_id + ":save"} className="px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded text-xs font-medium hover:bg-white disabled:opacity-50">Save</button>
                   <button onClick={() => setEditingTask(null)} className="px-3 py-1.5 text-zinc-500 hover:text-zinc-300 text-xs">Cancel</button>
@@ -357,12 +370,21 @@ function PlanDetail() {
                       <span className="text-xs text-zinc-600 font-mono w-5 text-right flex-shrink-0">{idx + 1}</span>
                       <h3 className={`text-base font-semibold ${task.status === "done" ? "text-zinc-400" : "text-zinc-100"}`}>{task.title}</h3>
                       <span className={`px-1.5 py-0.5 rounded-full text-xs border ${TASK_STATUS_STYLES[task.status] || TASK_STATUS_STYLES.draft}`}>{task.status}</span>
+                      {task.destination === "jira" && (
+                        <span className="px-1.5 py-0.5 rounded-full text-xs border bg-blue-500/10 text-blue-300 border-blue-500/20">Jira{task.jira_project ? ` · ${task.jira_project}` : ""}</span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 mt-1.5 ml-7">
                       {task.issue_url && (
                         <a href={task.issue_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-1">
                           <svg className="w-3 h-3" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M8 5v3M8 10v1" /></svg>
                           #{task.issue_number}
+                        </a>
+                      )}
+                      {task.jira_ticket_url && (
+                        <a href={task.jira_ticket_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="2" width="12" height="12" rx="2" /><path d="M6 8h4M8 6v4" /></svg>
+                          {task.jira_ticket_key}
                         </a>
                       )}
                       {task.run_id && (
@@ -420,6 +442,19 @@ function PlanDetail() {
                 </div>
               ) : (
                 <input value={newTask.repo} onChange={(e) => setNewTask((t) => ({ ...t, repo: e.target.value }))} placeholder="Repo override (owner/repo) — blank uses plan default" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
+              )}
+              <div>
+                <label className="text-xs text-zinc-500 mb-1 block">Destination</label>
+                <div className="flex gap-2">
+                  {(["github", "jira"] as const).map((d) => (
+                    <button key={d} onClick={() => setNewTask((t) => ({ ...t, destination: d }))} className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors cursor-pointer ${newTask.destination === d ? "bg-zinc-700 text-zinc-100 border-zinc-600" : "bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-zinc-300"}`}>
+                      {d === "github" ? "GitHub Issue" : "Jira Ticket"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {newTask.destination === "jira" && (
+                <input value={newTask.jira_project} onChange={(e) => setNewTask((t) => ({ ...t, jira_project: e.target.value }))} placeholder="Jira project key (e.g. PROJ) — blank uses default" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
               )}
               <div className="flex gap-2">
                 <button onClick={handleAddTask} disabled={!newTask.title.trim() || actionLoading === "add"} className="px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded text-xs font-medium hover:bg-white disabled:opacity-50">Add task</button>
