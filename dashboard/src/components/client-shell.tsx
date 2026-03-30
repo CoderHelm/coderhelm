@@ -7,7 +7,7 @@ import { api, type BillingInfo, type Banner } from "@/lib/api";
 import { ToastProvider } from "./toast";
 import {
   PlayIcon, CircleDotIcon, BarChartIcon, HexagonIcon, HeartIcon,
-  GitBranchIcon, GearIcon,
+  GitBranchIcon, GearIcon, SquareIcon,
   BellIcon, DollarIcon, TargetIcon, RepeatIcon,
 } from "./icons";
 
@@ -58,6 +58,7 @@ const navGroups: NavGroup[] = [
       { href: "/settings", label: "Settings", icon: <GearIcon /> },
       { href: "/settings/workflow", label: "Workflow", icon: <RepeatIcon /> },
       { href: "/settings/notifications", label: "Notifications", icon: <BellIcon /> },
+      { href: "/settings/jira", label: "Jira", icon: <SquareIcon /> },
     ],
   },
   {

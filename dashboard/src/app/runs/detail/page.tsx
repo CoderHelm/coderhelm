@@ -28,17 +28,17 @@ function StatusBadge({ status }: { status: string }) {
 function PassProgress({ currentPass, status }: { currentPass?: string; status: string }) {
   const doneIdx = status === "completed" ? PASSES.length : PASSES.indexOf(currentPass ?? "");
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-2">
       {PASSES.map((pass, i) => {
         const done = i < doneIdx;
         const active = i === doneIdx && status === "running";
         const failed = status === "failed" && i === doneIdx;
         return (
-          <div key={pass} className="flex items-center gap-1">
-            {i > 0 && <div className={`w-4 h-px ${done ? "bg-emerald-500/50" : "bg-zinc-700"}`} />}
+          <div key={pass} className="flex items-center gap-2">
+            {i > 0 && <div className={`w-8 h-0.5 rounded-full ${done ? "bg-emerald-500/60" : "bg-zinc-700"}`} />}
             <div className="flex flex-col items-center gap-1">
               <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-medium border ${
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium border ${
                   done
                     ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400"
                     : active
@@ -50,7 +50,7 @@ function PassProgress({ currentPass, status }: { currentPass?: string; status: s
               >
                 {done ? "✓" : i + 1}
               </div>
-              <span className={`text-[10px] ${done ? "text-emerald-400" : active ? "text-blue-400" : failed ? "text-red-400" : "text-zinc-600"}`}>
+              <span className={`text-xs ${done ? "text-emerald-400" : active ? "text-blue-400" : failed ? "text-red-400" : "text-zinc-600"}`}>
                 {pass}
               </span>
             </div>
@@ -73,11 +73,6 @@ function formatDuration(seconds?: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
-}
-
-function formatCost(usd?: number): string {
-  if (!usd) return "—";
-  return `$${usd.toFixed(4)}`;
 }
 
 export default function RunDetailPage() {
@@ -225,9 +220,8 @@ function RunDetailInner() {
       )}
 
       {/* Stats cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-3 gap-3 mb-6">
         <StatCard label="Duration" value={formatDuration(run.duration_s)} />
-        <StatCard label="Cost" value={formatCost(run.cost_usd)} />
         <StatCard label="Tokens In" value={formatTokens(run.tokens_in)} />
         <StatCard label="Tokens Out" value={formatTokens(run.tokens_out)} />
       </div>
