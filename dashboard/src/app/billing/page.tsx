@@ -184,7 +184,9 @@ export default function BillingPage() {
   }
 
   const isActive = billing.subscription_status === "active";
-  const isCancelling = billing.subscription_status === "active" && billing.access_until;
+  const accessUntilDate = billing.access_until ? new Date(billing.access_until) : null;
+  const accessUntilValid = accessUntilDate && !isNaN(accessUntilDate.getTime()) && accessUntilDate.getTime() > Date.now();
+  const isCancelling = billing.subscription_status === "active" && accessUntilValid;
   const isPastDue = billing.subscription_status === "past_due";
   const isCancelled = billing.subscription_status === "cancelled";
   const isIncomplete = billing.subscription_status === "incomplete" || billing.subscription_status === "incomplete_expired";
@@ -225,7 +227,7 @@ export default function BillingPage() {
       {/* Cancelling notice */}
       {isCancelling && (
         <div className="p-4 mb-6 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-yellow-400 text-sm">
-          Your subscription will end on {new Date(billing.access_until!).toLocaleDateString()}.
+          Your subscription will end on {accessUntilDate!.toLocaleDateString()}.
           <button onClick={handleReactivate} disabled={actionLoading} className="ml-2 underline hover:no-underline">
             Undo cancellation
           </button>
@@ -478,7 +480,7 @@ export default function BillingPage() {
                               toast("Failed to download invoice", "error");
                             }
                           }}
-                          className="text-blue-400 hover:underline text-xs"
+                          className="text-blue-400 hover:underline text-xs cursor-pointer"
                         >
                           PDF
                         </button>
@@ -523,7 +525,7 @@ export default function BillingPage() {
                                 toast("Failed to download invoice", "error");
                               }
                           }}
-                          className="text-blue-400 hover:underline text-xs"
+                          className="text-blue-400 hover:underline text-xs cursor-pointer"
                         >
                           Download
                         </button>

@@ -38,16 +38,41 @@ function parsePlan(text: string): DraftPlan | null {
   }
 }
 
+const STORAGE_KEY = "coderhelm:plan-chat";
+
+function loadSession(): { messages: Message[]; draft: DraftPlan | null } | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(messages: Message[], draft: DraftPlan | null) {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ messages, draft }));
+  } catch { /* quota exceeded — ignore */ }
+}
+
+function clearSession() {
+  try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+}
+
 export default function NewPlanPage() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content: "Hi! Tell me what you want to build and I'll help you break it into an ordered plan of GitHub issues that Coderhelm can implement one by one.",
-    },
-  ]);
+  const saved = typeof window !== "undefined" ? loadSession() : null;
+  const [messages, setMessages] = useState<Message[]>(
+    saved?.messages ?? [
+      {
+        role: "assistant",
+        content: "Hi! Tell me what you want to build and I'll help you break it into an ordered plan of GitHub issues that Coderhelm can implement one by one.",
+      },
+    ],
+  );
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const [draft, setDraft] = useState<DraftPlan | null>(null);
+  const [draft, setDraft] = useState<DraftPlan | null>(saved?.draft ?? null);
   const [saving, setSaving] = useState(false);
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [billingLoading, setBillingLoading] = useState(true);
@@ -65,6 +90,11 @@ export default function NewPlanPage() {
   }, []);
 
   const plansEnabled = billing?.subscription_status === "active";
+
+  // Persist chat state so navigation doesn't lose progress
+  useEffect(() => {
+    saveSession(messages, draft);
+  }, [messages, draft]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -111,6 +141,7 @@ export default function NewPlanPage() {
     setSaving(true);
     try {
       const { plan_id } = await api.createPlan(draft);
+      clearSession();
       toast("Plan created!");
       router.push(`/plans/detail?id=${plan_id}`);
     } catch {
@@ -150,6 +181,19 @@ export default function NewPlanPage() {
       <div className="flex items-center gap-3 mb-4">
         <a href="/plans" className="text-zinc-500 hover:text-zinc-300 text-sm">← Plans</a>
         <h1 className="text-xl font-bold">New plan</h1>
+        {messages.length > 1 && (
+          <button
+            onClick={() => {
+              clearSession();
+              setMessages([{ role: "assistant", content: "Hi! Tell me what you want to build and I'll help you break it into an ordered plan of GitHub issues that Coderhelm can implement one by one." }]);
+              setDraft(null);
+              setInput("");
+            }}
+            className="ml-auto text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
+          >
+            Start over
+          </button>
+        )}
       </div>
 
       <div className="flex gap-6 flex-1 min-h-0">
