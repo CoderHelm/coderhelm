@@ -189,7 +189,7 @@ export default function NewPlanPage() {
               setDraft(null);
               setInput("");
             }}
-            className="ml-auto px-3 py-1.5 text-sm text-zinc-400 border border-zinc-700 rounded-lg hover:text-zinc-200 hover:border-zinc-600 transition-colors"
+            className="ml-auto px-3 py-1.5 text-sm text-zinc-400 border border-zinc-700 rounded-lg hover:text-zinc-200 hover:border-zinc-600 transition-colors cursor-pointer"
           >
             Start over
           </button>

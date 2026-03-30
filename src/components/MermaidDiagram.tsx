@@ -47,7 +47,16 @@ export default function MermaidDiagram({ chart, className }: MermaidDiagramProps
           },
         });
 
+        // Suppress known cytoscape "no mapping" warnings (mermaid-js/mermaid#6031)
+        const origWarn = console.warn;
+        console.warn = (...args: unknown[]) => {
+          if (typeof args[0] === "string" && args[0].includes("Do not assign mappings")) return;
+          origWarn.apply(console, args);
+        };
+
         const result = await mermaid.render(`landing-${id}`, chart);
+
+        console.warn = origWarn;
         if (!mounted) return;
         setSvg(result.svg);
         setError("");
