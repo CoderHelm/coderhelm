@@ -370,8 +370,7 @@ export interface JiraCheck {
   jira_event_count?: number;
   installation_id: number;
   tenant_id: string;
-  webhook_url: string;
-  checklist: string[];
+  webhook_url?: string;
 }
 
 export interface JiraConfig {
