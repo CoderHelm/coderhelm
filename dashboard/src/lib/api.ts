@@ -159,6 +159,7 @@ export interface RunDetail extends Run {
   files_modified?: string[];
   error?: string;
   updated_at?: string;
+  pass_history?: { pass: string; started_at: string }[];
 }
 
 export interface Openspec {

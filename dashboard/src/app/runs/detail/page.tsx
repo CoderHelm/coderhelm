@@ -327,6 +327,53 @@ function RunDetailInner() {
         </div>
       )}
 
+      {/* Activity trail */}
+      {(run.pass_history?.length || run.created_at) && (
+        <div className="mb-6">
+          <h2 className="text-sm font-medium text-zinc-300 mb-2">Activity</h2>
+          <div className="border border-zinc-800 rounded-lg p-4">
+            <div className="relative">
+              <div className="absolute left-[5px] top-2 bottom-2 w-px bg-zinc-800" />
+              <div className="space-y-3">
+                <TrailEntry
+                  label="Run started"
+                  time={run.created_at}
+                  status="done"
+                />
+                {run.pass_history?.map((entry, i) => (
+                  <TrailEntry
+                    key={i}
+                    label={`${entry.pass.charAt(0).toUpperCase()}${entry.pass.slice(1)} started`}
+                    time={entry.started_at}
+                    status={
+                      run.status === "failed" && i === (run.pass_history?.length ?? 0) - 1
+                        ? "failed"
+                        : run.status === "running" && i === (run.pass_history?.length ?? 0) - 1
+                          ? "active"
+                          : "done"
+                    }
+                  />
+                ))}
+                {run.status === "completed" && (
+                  <TrailEntry
+                    label="Run completed"
+                    time={run.updated_at}
+                    status="done"
+                  />
+                )}
+                {run.status === "failed" && (
+                  <TrailEntry
+                    label="Run failed"
+                    time={run.updated_at}
+                    status="failed"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Metadata */}
       <div className="text-xs text-zinc-600 space-y-1">
         <p>Run ID: {run.run_id}</p>
@@ -342,6 +389,26 @@ function StatCard({ label, value }: { label: string; value: string }) {
     <div className="border border-zinc-800 rounded-lg p-3">
       <p className="text-xs text-zinc-500 mb-1">{label}</p>
       <p className="text-lg font-semibold text-zinc-100">{value}</p>
+    </div>
+  );
+}
+
+function TrailEntry({ label, time, status }: { label: string; time?: string; status: "done" | "active" | "failed" }) {
+  const dotColor =
+    status === "failed" ? "bg-red-400" :
+    status === "active" ? "bg-blue-400 animate-pulse" :
+    "bg-emerald-400";
+  return (
+    <div className="flex items-center gap-3 relative pl-0">
+      <div className={`w-[11px] h-[11px] rounded-full ${dotColor} z-10 flex-shrink-0`} />
+      <span className={`text-sm ${status === "failed" ? "text-red-400" : status === "active" ? "text-blue-400" : "text-zinc-300"}`}>
+        {label}
+      </span>
+      {time && (
+        <span className="text-xs text-zinc-600 ml-auto">
+          {new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+        </span>
+      )}
     </div>
   );
 }
