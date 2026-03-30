@@ -90,6 +90,16 @@ const features = [
     title: "Safety Agent",
     desc: "Every implementation is reviewed by a built-in safety agent before opening a PR. Violations are caught and the code is revised automatically.",
   },
+  {
+    accentColor: "#06b6d4",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+      </svg>
+    ),
+    title: "Review Feedback Loop",
+    desc: "Request changes on a PR and Coderhelm reads every comment, fixes the code, and pushes — no back-and-forth needed.",
+  },
 ];
 
 const steps = [
@@ -106,7 +116,7 @@ const steps = [
   {
     step: "03",
     title: "Review the PR",
-    desc: "Coderhelm opens a draft PR, runs CI, and marks it ready when checks pass. Review, comment, merge.",
+    desc: "Coderhelm opens a draft PR, runs CI, and marks it ready when checks pass. Request changes and it reads your comments, fixes the code, and pushes — iterate until you're happy, then merge.",
   },
 ];
 
