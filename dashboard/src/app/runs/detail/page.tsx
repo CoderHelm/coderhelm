@@ -95,6 +95,7 @@ function RunDetailInner() {
   const [openspec, setOpenspec] = useState<Openspec | null>(null);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
+  const [reReviewing, setReReviewing] = useState(false);
   const [specTab, setSpecTab] = useState<keyof Openspec>("proposal");
   const { toast } = useToast();
 
@@ -233,11 +234,30 @@ function RunDetailInner() {
 
       {/* Links */}
       {(run.pr_url || run.branch) && (
-        <div className="flex gap-4 mb-6">
+        <div className="flex items-center gap-4 mb-6">
           {run.pr_url && (
             <a href={run.pr_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-400 hover:text-blue-300">
               View Pull Request →
             </a>
+          )}
+          {run.pr_url && run.status !== "running" && (
+            <button
+              onClick={async () => {
+                setReReviewing(true);
+                try {
+                  await api.reReviewRun(runId);
+                  toast("Re-review started");
+                  setTimeout(() => window.location.reload(), 1500);
+                } catch {
+                  toast("Failed to re-review", "error");
+                  setReReviewing(false);
+                }
+              }}
+              disabled={reReviewing}
+              className="px-3 py-1 text-sm font-medium text-zinc-300 bg-zinc-800 border border-zinc-700 rounded-lg hover:bg-zinc-700 disabled:opacity-50 cursor-pointer"
+            >
+              {reReviewing ? "Re-reviewing…" : "Re-review"}
+            </button>
           )}
           {run.branch && (
             <span className="text-sm text-zinc-500">
