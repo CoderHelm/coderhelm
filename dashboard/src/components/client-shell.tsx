@@ -7,8 +7,8 @@ import { api, type BillingInfo, type Banner } from "@/lib/api";
 import { ToastProvider } from "./toast";
 import {
   PlayIcon, CircleDotIcon, BarChartIcon, HexagonIcon, HeartIcon,
-  GitBranchIcon, ShieldIcon, GearIcon, PenIcon, SquareIcon,
-  BellIcon, DollarIcon, TargetIcon, RepeatIcon,
+  GitBranchIcon, GearIcon,
+  BellIcon, DollarIcon, TargetIcon,
 } from "./icons";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
@@ -55,11 +55,7 @@ const navGroups: NavGroup[] = [
     label: "Configure",
     items: [
       { href: "/settings/repos", label: "Repos", icon: <GitBranchIcon /> },
-      { href: "/settings/guardrails", label: "Guardrails", icon: <ShieldIcon /> },
-      { href: "/settings/instructions", label: "Instructions", icon: <GearIcon /> },
-      { href: "/settings/voice", label: "Voice", icon: <PenIcon /> },
-      { href: "/settings/jira", label: "Jira", icon: <SquareIcon /> },
-      { href: "/settings/workflow", label: "Workflow", icon: <RepeatIcon /> },
+      { href: "/settings", label: "Settings", icon: <GearIcon /> },
       { href: "/settings/notifications", label: "Notifications", icon: <BellIcon /> },
     ],
   },
@@ -206,6 +202,7 @@ function Sidebar({
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
+    if (href === "/settings") return pathname === "/settings";
     return pathname.startsWith(href);
   };
 
