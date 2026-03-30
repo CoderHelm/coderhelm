@@ -151,12 +151,15 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<Range>("30d");
 
+  const [planTokens, setPlanTokens] = useState(0);
+
   useEffect(() => {
-    Promise.all([api.getStats(), api.getStatsHistory(), api.listRuns()])
-      .then(([s, h, r]) => {
+    Promise.all([api.getStats(), api.getStatsHistory(), api.listRuns(), api.listPlans()])
+      .then(([s, h, r, p]) => {
         setStats(s);
         setHistory(h.months);
         setRuns(r.runs);
+        setPlanTokens(p.plans.reduce((sum, plan) => sum + (plan.tokens_in ?? 0) + (plan.tokens_out ?? 0), 0));
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -216,10 +219,11 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         <KpiCard label="Runs" value={kpi.total_runs} />
         <KpiCard label="Merge rate" value={`${(kpi.merge_rate * 100).toFixed(0)}%`} />
-        <KpiCard label="Tokens" value={formatNumber(kpi.total_tokens_in + kpi.total_tokens_out)} />
+        <KpiCard label="Run tokens" value={formatNumber(kpi.total_tokens_in + kpi.total_tokens_out)} />
+        <KpiCard label="Plan tokens" value={formatNumber(planTokens)} />
         <KpiCard label="In progress" value={kpi.in_progress} />
       </div>
 
