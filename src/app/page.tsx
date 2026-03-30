@@ -98,7 +98,7 @@ const features = [
       </svg>
     ),
     title: "Review Feedback Loop",
-    desc: "Request changes on a PR and Coderhelm reads every comment, fixes the code, and pushes — no back-and-forth needed.",
+    desc: "Request changes, ask questions, or @mention Coderhelm on any PR comment. It reads your feedback, answers questions, fixes the code, and pushes — no back-and-forth needed.",
   },
 ];
 
