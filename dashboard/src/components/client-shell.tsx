@@ -2,9 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { api, type BillingInfo, type Banner } from "@/lib/api";
 import { ToastProvider } from "./toast";
+import {
+  PlayIcon, CircleDotIcon, BarChartIcon, HexagonIcon, HeartIcon,
+  GitBranchIcon, ShieldIcon, GearIcon, PenIcon, SquareIcon,
+  BellIcon, DollarIcon, TargetIcon,
+} from "./icons";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
 
@@ -23,7 +28,7 @@ interface User {
 interface NavItem {
   href: string;
   label: string;
-  icon: string;
+  icon: ReactNode;
 }
 
 interface NavGroup {
@@ -34,34 +39,34 @@ interface NavGroup {
 const navGroups: NavGroup[] = [
   {
     items: [
-      { href: "/", label: "Runs", icon: "▶" },
-      { href: "/plans", label: "Plans", icon: "◉" },
+      { href: "/", label: "Runs", icon: <PlayIcon /> },
+      { href: "/plans", label: "Plans", icon: <CircleDotIcon /> },
     ],
   },
   {
     label: "Insights",
     items: [
-      { href: "/analytics", label: "Analytics", icon: "◪" },
-      { href: "/infrastructure", label: "Infrastructure", icon: "⬡" },
-      { href: "/health", label: "Health", icon: "♥" },
+      { href: "/analytics", label: "Analytics", icon: <BarChartIcon /> },
+      { href: "/infrastructure", label: "Infrastructure", icon: <HexagonIcon /> },
+      { href: "/health", label: "Health", icon: <HeartIcon /> },
     ],
   },
   {
     label: "Configure",
     items: [
-      { href: "/settings/repos", label: "Repos", icon: "◈" },
-      { href: "/settings/guardrails", label: "Guardrails", icon: "⛨" },
-      { href: "/settings/instructions", label: "Instructions", icon: "⚙" },
-      { href: "/settings/voice", label: "Voice", icon: "✎" },
-      { href: "/settings/jira", label: "Jira", icon: "◧" },
-      { href: "/settings/notifications", label: "Notifications", icon: "🔔" },
+      { href: "/settings/repos", label: "Repos", icon: <GitBranchIcon /> },
+      { href: "/settings/guardrails", label: "Guardrails", icon: <ShieldIcon /> },
+      { href: "/settings/instructions", label: "Instructions", icon: <GearIcon /> },
+      { href: "/settings/voice", label: "Voice", icon: <PenIcon /> },
+      { href: "/settings/jira", label: "Jira", icon: <SquareIcon /> },
+      { href: "/settings/notifications", label: "Notifications", icon: <BellIcon /> },
     ],
   },
   {
     label: "Account",
     items: [
-      { href: "/billing", label: "Billing", icon: "$" },
-      { href: "/settings/budget", label: "Budget", icon: "◎" },
+      { href: "/billing", label: "Billing", icon: <DollarIcon /> },
+      { href: "/settings/budget", label: "Budget", icon: <TargetIcon /> },
     ],
   },
 ];
@@ -240,7 +245,7 @@ function Sidebar({
                     }`}
                   >
                     <span className="flex items-center gap-2.5">
-                      <span className="w-4 text-center text-sm">{item.icon}</span>
+                      <span className="w-4 flex items-center justify-center">{item.icon}</span>
                       {item.label}
                     </span>
                   </Link>
