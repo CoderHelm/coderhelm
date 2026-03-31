@@ -311,7 +311,7 @@ export default function BillingPage() {
           <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Payment methods</h2>
           <div className="space-y-2">
             {paymentMethods.map(pm => (
-              <div key={pm.id} className="flex items-center justify-between border border-zinc-800 rounded-lg p-4 bg-zinc-900/30">
+              <div key={pm.id} className={`flex items-center justify-between border rounded-lg p-4 bg-zinc-900/30 ${pm.is_default ? "border-blue-500/30" : "border-zinc-800"}`}>
                 <div className="flex items-center gap-3">
                   {pm.type === "card" && pm.card && (
                     <>
@@ -321,17 +321,39 @@ export default function BillingPage() {
                       <span className="text-zinc-500 text-sm">
                         exp {String(pm.card.exp_month).padStart(2, "0")}/{pm.card.exp_year}
                       </span>
+                      {pm.is_default && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">Default</span>
+                      )}
                     </>
                   )}
 
                 </div>
-                <button
-                  onClick={() => handleDeletePaymentMethod(pm.id)}
-                  disabled={actionLoading}
-                  className="text-zinc-500 hover:text-red-400 text-sm transition-colors disabled:opacity-50"
-                >
-                  Remove
-                </button>
+                <div className="flex items-center gap-3">
+                  {!pm.is_default && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          await api.setDefaultPaymentMethod(pm.id);
+                          setPaymentMethods(prev => prev.map(p => ({ ...p, is_default: p.id === pm.id })));
+                          toast("Default payment method updated");
+                        } catch {
+                          toast("Failed to set default", "error");
+                        }
+                      }}
+                      disabled={actionLoading}
+                      className="text-zinc-500 hover:text-blue-400 text-sm transition-colors disabled:opacity-50"
+                    >
+                      Set default
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDeletePaymentMethod(pm.id)}
+                    disabled={actionLoading}
+                    className="text-zinc-500 hover:text-red-400 text-sm transition-colors disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
             ))}
           </div>

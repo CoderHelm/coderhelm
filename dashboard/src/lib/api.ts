@@ -102,6 +102,7 @@ export const api = {
   createSetupIntent: () => request<{ client_secret: string }>("/api/billing/payment-method", { method: "POST" }),
   listPaymentMethods: () => request<{ payment_methods: PaymentMethod[] }>("/api/billing/payment-methods"),
   deletePaymentMethod: (pmId: string) => request<{ status: string }>(`/api/billing/payment-methods/${pmId}`, { method: "DELETE" }),
+  setDefaultPaymentMethod: (pmId: string) => request<{ status: string }>(`/api/billing/payment-methods/${pmId}/default`, { method: "PUT" }),
   getBillingCustomer: () => request<{ email: string | null; name: string | null }>("/api/billing/customer"),
   updateBillingEmail: (email: string) => request<{ email: string }>("/api/billing/email", { method: "PUT", body: JSON.stringify({ email }) }),
   listInvoices: () => request<{ invoices: Invoice[] }>("/api/billing/invoices"),
@@ -285,6 +286,7 @@ export interface Invoice {
 export interface PaymentMethod {
   id: string;
   type: "card" | "us_bank_account" | string;
+  is_default?: boolean;
   card?: {
     brand: string;
     last4: string;
