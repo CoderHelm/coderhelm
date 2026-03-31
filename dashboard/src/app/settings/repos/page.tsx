@@ -51,9 +51,30 @@ export default function ReposPage() {
   return (
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-2">Repositories</h1>
-      <p className="text-zinc-400 text-sm mb-6">
+      <p className="text-zinc-400 text-sm mb-4">
         Repos connected via the GitHub App. Enable the ones you want Coderhelm to work on.
       </p>
+
+      {!loading && (
+        <div className="flex items-center gap-3 mb-6">
+          <button
+            onClick={async () => {
+              setSyncing(true);
+              try {
+                await api.syncRepos();
+                const data = await api.listRepos();
+                setRepos(data.repos);
+              } catch { /* ignore */ }
+              setSyncing(false);
+            }}
+            disabled={syncing}
+            className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 text-zinc-200 rounded-lg text-sm font-medium hover:bg-zinc-700 transition-colors disabled:opacity-50"
+          >
+            {syncing ? "Syncing..." : "Sync repos"}
+          </button>
+          <span className="text-xs text-zinc-600">Pull latest repos from GitHub</span>
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-2">
@@ -64,29 +85,12 @@ export default function ReposPage() {
       ) : repos.length === 0 ? (
         <div className="text-zinc-500 border border-zinc-800 rounded-lg p-8 text-center">
           <p>No repos connected yet.</p>
-          <div className="flex items-center justify-center gap-4 mt-3">
-            <button
-              onClick={async () => {
-                setSyncing(true);
-                try {
-                  await api.syncRepos();
-                  const data = await api.listRepos();
-                  setRepos(data.repos);
-                } catch { /* ignore */ }
-                setSyncing(false);
-              }}
-              disabled={syncing}
-              className="px-4 py-2 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-50"
-            >
-              {syncing ? "Syncing..." : "Sync repos"}
-            </button>
-            <a
-              href="https://github.com/apps/coderhelm"
-              className="text-zinc-300 underline text-sm"
-            >
-              Install the GitHub App
-            </a>
-          </div>
+          <a
+            href="https://github.com/apps/coderhelm"
+            className="text-zinc-300 underline mt-2 inline-block text-sm"
+          >
+            Install the GitHub App
+          </a>
         </div>
       ) : (
         <>
