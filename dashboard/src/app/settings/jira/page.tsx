@@ -108,7 +108,7 @@ export default function JiraPage() {
       </div>
 
       {tab === "app" ? (
-        <JiraAppTab />
+        <JiraAppTab check={check} />
       ) : tab === "webhook" ? (
         <WebhookTab
           check={check}
@@ -129,7 +129,13 @@ export default function JiraPage() {
   );
 }
 
-function JiraAppTab() {
+function JiraAppTab({ check }: { check: JiraCheck | null }) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const copy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(label);
+    setTimeout(() => setCopied(null), 2000);
+  };
   const installUrl = "https://developer.atlassian.com/console/install/de730821-2955-4d78-836e-55b6e7c23c88?signature=AYABePrR09vSK2DTVLCCzK%2Bt04oAAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4IOp8r3eKNYw8z2v%2FEq3%2FfvrZguoGsXpNSaDveR%2FF%2Fo0BXAmH88tVaInK7U6E2MFkZAAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDJMQ6B1ogvNrk2X41AIBEIA7UEnUW%2FGBqNgbzivPOfH9txPwU4gjvklvkmwbZWb%2FmZoMMd5lsRvkJ7OzWCYtJAbfrF2hZZcREGnfeoMAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHijmwVTMt6Oj3F%2B0%2B0cVrojrS8yZ9ktpdfDxqPMSIkvHAEGa2reJg8L%2FrWqEbgFRPADAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMThkIkAaI7FAPWkeTAgEQgDtGtXT7SzNrjUqpB8Pm474FMrk2aPj2FtBDtjW9vNYK3NZ0oNloPH9XPGbn1uS7YTPJZPTB561JZvBdcgAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeLKa7Dfn9BgbXaQmJGrkKztjV4vrreTkqr7wGwhqIYs5AaBDJ8FvKCFfzHTyolwIyC8AAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAyQ9HvoMmjskgnJCTUCARCAO%2FkpeTKd8IIamduK2tZFv2a8kDZoP7FTtAuky6S0LNmrEoIuYnHoMEyydCQLXHgjex%2FsD71J9OlNG%2Bx9AgAAAAAMAAAQAAAAAAAAAAAAAAAAAMx%2BPlN5fhsnaG9wdl169OP%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADLtyR6xQ9Nnc2%2F0GV7Dz3xCvKwGrAD%2BuvAz%2FU5KYYo7ZAgS%2FpCTSkiLEvuK6Ij5gvJQHM4oYSv%2FXgh40M6Ouxvc4a8%3D&product=jira";
 
   return (
@@ -154,10 +160,39 @@ function JiraAppTab() {
           </a>
         </Step>
 
-        <Step number={2} title="Save settings in the app">
-          <p className="text-zinc-400 text-sm">
-            After installing, open the Coderhelm app settings in Jira and click <strong className="text-zinc-200">Save</strong>. The trigger URLs are registered automatically.
+        <Step number={2} title="Configure the app in Jira">
+          <p className="text-zinc-400 text-sm mb-3">
+            After installing, go to <strong className="text-zinc-200">Jira → Apps → Manage your apps → Coderhelm</strong> and enter the values below.
           </p>
+          {check?.installation_id ? (
+            <div className="space-y-3 p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+              <div>
+                <label className="text-xs text-zinc-500 mb-1 block">Installation ID</label>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono">
+                    {String(check.installation_id)}
+                  </code>
+                  <button onClick={() => copy(String(check.installation_id), "install-id")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer">
+                    {copied === "install-id" ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 mb-1 block">Tenant ID <span className="text-zinc-600">(optional — only if different from Installation ID)</span></label>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono">
+                    {check.tenant_id}
+                  </code>
+                  <button onClick={() => copy(check.tenant_id!, "tenant-id")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer">
+                    {copied === "tenant-id" ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-zinc-600">Paste these into the Coderhelm app settings in Jira, then click <strong className="text-zinc-400">Save</strong>. The trigger URLs are registered automatically.</p>
+            </div>
+          ) : (
+            <p className="text-zinc-500 text-sm italic">Loading your configuration…</p>
+          )}
         </Step>
 
         <Step number={3} title="Label and assign">
