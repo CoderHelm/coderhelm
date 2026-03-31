@@ -154,7 +154,7 @@ export default function Home() {
 
         <div className="relative mx-auto max-w-4xl px-6 text-center">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-surface-border bg-surface-elevated px-4 py-1.5 text-sm text-text-secondary">
-            <span className="h-2 w-2 rounded-full bg-zinc-400" />
+            <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
             Now in public beta
           </div>
 
@@ -172,7 +172,7 @@ export default function Home() {
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <a
               href="https://github.com/apps/coderhelm"
-              className="rounded-xl bg-white px-8 py-3.5 text-base font-semibold text-zinc-900 shadow-lg transition-all hover:bg-zinc-200"
+              className="rounded-xl bg-blue-500 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:bg-blue-600"
             >
               Install on GitHub — Free
             </a>
@@ -223,15 +223,15 @@ export default function Home() {
           {/* Stats strip */}
           <div className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm">
             <span className="text-text-muted">
-              <span className="font-bold text-white">~ 5 min</span> average run
+              <span className="font-bold text-blue-400">~ 5 min</span> average run
             </span>
             <span className="hidden h-4 w-px bg-surface-border sm:block" />
             <span className="text-text-muted">
-              <span className="font-bold text-white">0 pushes</span> to main, ever
+              <span className="font-bold text-blue-400">0 pushes</span> to main, ever
             </span>
             <span className="hidden h-4 w-px bg-surface-border sm:block" />
             <span className="text-text-muted">
-              <span className="font-bold text-white">Any stack</span> — React, Go, Python, Rust
+              <span className="font-bold text-blue-400">Any stack</span> — React, Go, Python, Rust
             </span>
           </div>
         </div>
@@ -542,7 +542,8 @@ export default function Home() {
                 className="rounded-xl border border-surface-border bg-surface-elevated p-6 transition-colors hover:border-zinc-700"
               >
                 <div
-                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg"
+                  style={{ color: f.color, background: f.color + "15", border: `1px solid ${f.color}30` }}
                 >
                   {f.icon}
                 </div>
@@ -572,7 +573,7 @@ export default function Home() {
                 className="rounded-xl border border-surface-border bg-surface-elevated p-6 transition-colors hover:border-zinc-700"
               >
                 <div
-                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-400"
                 >
                   {f.icon}
                 </div>
@@ -594,7 +595,7 @@ export default function Home() {
           <div className="mt-16 space-y-12">
             {steps.map((s) => (
               <div key={s.step} className="flex gap-6">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-zinc-900 text-sm font-bold">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-white text-sm font-bold">
                   {s.step}
                 </div>
                 <div>
@@ -651,8 +652,8 @@ export default function Home() {
             </div>
 
             {/* Pro */}
-            <div className="relative rounded-xl border border-zinc-700 bg-surface-elevated p-8">
-              <div className="absolute -top-3 left-6 rounded-full bg-white px-3 py-0.5 text-xs font-semibold text-zinc-900">
+            <div className="relative rounded-xl border border-blue-500/30 bg-surface-elevated p-8">
+              <div className="absolute -top-3 left-6 rounded-full bg-blue-500 px-3 py-0.5 text-xs font-semibold text-white">
                 Pro
               </div>
               <h3 className="text-lg font-semibold">Pro</h3>
@@ -682,7 +683,7 @@ export default function Home() {
               </ul>
               <a
                 href="https://github.com/apps/coderhelm"
-                className="mt-8 block rounded-lg bg-white px-6 py-3 text-center text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-200"
+                className="mt-8 block rounded-lg bg-blue-500 px-6 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-blue-600"
               >
                 Upgrade
               </a>
@@ -702,7 +703,7 @@ export default function Home() {
           </p>
           <a
             href="https://github.com/apps/coderhelm"
-            className="mt-8 inline-block rounded-xl bg-white px-8 py-3.5 text-base font-semibold text-zinc-900 shadow-lg transition-all hover:bg-zinc-200"
+            className="mt-8 inline-block rounded-xl bg-blue-500 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:bg-blue-600"
           >
             Install on GitHub — Free
           </a>
