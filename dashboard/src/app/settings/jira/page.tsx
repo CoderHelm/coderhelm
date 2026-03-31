@@ -108,7 +108,7 @@ export default function JiraPage() {
       </div>
 
       {tab === "app" ? (
-        <JiraAppTab check={check} />
+        <JiraAppTab check={check} config={config} setConfig={setConfig} toast={toast} />
       ) : tab === "webhook" ? (
         <WebhookTab
           check={check}
@@ -129,14 +129,81 @@ export default function JiraPage() {
   );
 }
 
-function JiraAppTab({ check }: { check: JiraCheck | null }) {
+function JiraAppTab({ check, config, setConfig, toast }: {
+  check: JiraCheck | null;
+  config: JiraConfig | null;
+  setConfig: React.Dispatch<React.SetStateAction<JiraConfig | null>>;
+  toast: (msg: string, type?: "error" | "success") => void;
+}) {
   const [copied, setCopied] = useState<string | null>(null);
+  const [unlinking, setUnlinking] = useState(false);
   const copy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     setCopied(label);
     setTimeout(() => setCopied(null), 2000);
   };
   const installUrl = "https://developer.atlassian.com/console/install/de730821-2955-4d78-836e-55b6e7c23c88?signature=AYABePrR09vSK2DTVLCCzK%2Bt04oAAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4IOp8r3eKNYw8z2v%2FEq3%2FfvrZguoGsXpNSaDveR%2FF%2Fo0BXAmH88tVaInK7U6E2MFkZAAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDJMQ6B1ogvNrk2X41AIBEIA7UEnUW%2FGBqNgbzivPOfH9txPwU4gjvklvkmwbZWb%2FmZoMMd5lsRvkJ7OzWCYtJAbfrF2hZZcREGnfeoMAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHijmwVTMt6Oj3F%2B0%2B0cVrojrS8yZ9ktpdfDxqPMSIkvHAEGa2reJg8L%2FrWqEbgFRPADAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMThkIkAaI7FAPWkeTAgEQgDtGtXT7SzNrjUqpB8Pm474FMrk2aPj2FtBDtjW9vNYK3NZ0oNloPH9XPGbn1uS7YTPJZPTB561JZvBdcgAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeLKa7Dfn9BgbXaQmJGrkKztjV4vrreTkqr7wGwhqIYs5AaBDJ8FvKCFfzHTyolwIyC8AAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAyQ9HvoMmjskgnJCTUCARCAO%2FkpeTKd8IIamduK2tZFv2a8kDZoP7FTtAuky6S0LNmrEoIuYnHoMEyydCQLXHgjex%2FsD71J9OlNG%2Bx9AgAAAAAMAAAQAAAAAAAAAAAAAAAAAMx%2BPlN5fhsnaG9wdl169OP%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADLtyR6xQ9Nnc2%2F0GV7Dz3xCvKwGrAD%2BuvAz%2FU5KYYo7ZAgS%2FpCTSkiLEvuK6Ij5gvJQHM4oYSv%2FXgh40M6Ouxvc4a8%3D&product=jira";
+
+  const forgeLinked = !!(config?.list_projects_url && config?.create_ticket_url);
+
+  const unlink = async () => {
+    if (!confirm("Disconnect the Jira app? You can reconnect it anytime.")) return;
+    setUnlinking(true);
+    try {
+      await api.updateJiraConfig({ list_projects_url: "", create_ticket_url: "" });
+      setConfig((c) => c ? { ...c, list_projects_url: "", create_ticket_url: "" } : c);
+      toast("Jira app disconnected");
+    } catch {
+      toast("Failed to disconnect", "error");
+    } finally {
+      setUnlinking(false);
+    }
+  };
+
+  if (forgeLinked) {
+    return (
+      <div className="space-y-6">
+        <div className="p-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-emerald-400">Jira app linked</p>
+                <p className="text-xs text-zinc-500 mt-0.5">Trigger URLs registered — assigning labeled tickets will start runs.</p>
+              </div>
+            </div>
+            <button
+              onClick={unlink}
+              disabled={unlinking}
+              className="px-3 py-1.5 text-xs text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {unlinking ? "Disconnecting…" : "Disconnect"}
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h3 className="text-sm font-medium text-zinc-100">How to use</h3>
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[10px] font-medium text-zinc-400">1</span>
+              <p className="text-sm text-zinc-400 pt-0.5">Add a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">Coderhelm</code> label to any Jira issue, then assign it.</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[10px] font-medium text-zinc-400">2</span>
+              <p className="text-sm text-zinc-400 pt-0.5">Coderhelm picks the right repo, creates a branch, and opens a PR.</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[10px] font-medium text-zinc-400">3</span>
+              <p className="text-sm text-zinc-400 pt-0.5">Track progress on the <strong className="text-zinc-200">Runs</strong> page.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -162,7 +229,7 @@ function JiraAppTab({ check }: { check: JiraCheck | null }) {
 
         <Step number={2} title="Configure the app in Jira">
           <p className="text-zinc-400 text-sm mb-3">
-            After installing, go to <strong className="text-zinc-200">Jira → Apps → Manage your apps → Coderhelm</strong> and enter the values below.
+            After installing, go to <strong className="text-zinc-200">Jira → Apps → Manage your apps → Coderhelm</strong> and enter your Installation ID.
           </p>
           {check?.installation_id ? (
             <div className="space-y-3 p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
