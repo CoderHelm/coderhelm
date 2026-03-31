@@ -274,6 +274,150 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Integrations */}
+      <section className="border-t border-surface-border py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <h2 className="text-center text-3xl font-bold sm:text-4xl">Works where you work</h2>
+          <p className="mx-auto mt-4 max-w-xl text-center text-text-secondary">
+            Native GitHub and Jira apps — no tokens to paste, no webhooks to wire. Install and go.
+          </p>
+
+          <div className="mt-12 grid gap-6 md:grid-cols-2">
+            {/* GitHub App */}
+            <div className="relative overflow-hidden rounded-2xl border border-[#238636]/30 bg-surface-elevated">
+              <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(ellipse at top left, #23863615, transparent 60%)" }} />
+              <div className="relative p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#238636]/30 bg-[#238636]/10">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#238636" strokeWidth="1.5">
+                      <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold">GitHub App</h3>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-[#21262d] bg-[#0d1117] p-4">
+                    <div className="flex items-center gap-2 text-[11px] text-text-muted mb-3">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                      PR Comment
+                    </div>
+                    <div className="space-y-2.5">
+                      <div className="flex gap-2">
+                        <div className="w-5 h-5 rounded-full bg-[#238636]/20 flex items-center justify-center text-[8px] font-bold text-[#238636] shrink-0 mt-0.5">B</div>
+                        <div className="text-[11px] text-text-secondary leading-relaxed">
+                          <span className="text-text-primary font-medium">coderhelm[bot]</span> commented on <span className="text-[#238636]">#43</span>
+                          <div className="mt-1.5 rounded border border-[#21262d] bg-[#161b22] p-2.5 text-[10px]">
+                            <p className="text-text-primary font-medium mb-1">🔄 Coderhelm is working on this</p>
+                            <div className="space-y-0.5 text-text-muted">
+                              <p>✅ Triage — feature, medium priority</p>
+                              <p>✅ Plan — 5 files, 3 new functions</p>
+                              <p>🔄 Implement — in progress...</p>
+                              <p>⏳ Review</p>
+                              <p>⏳ PR</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center text-[8px] font-bold text-blue-400 shrink-0 mt-0.5">Y</div>
+                        <div className="text-[11px] text-text-secondary leading-relaxed">
+                          <span className="text-text-primary font-medium">@you</span> requested changes
+                          <div className="mt-1.5 rounded border border-[#21262d] bg-[#161b22] p-2.5 text-[10px] text-text-muted">
+                            &quot;Use a custom hook instead of inline state&quot;
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="w-5 h-5 rounded-full bg-[#238636]/20 flex items-center justify-center text-[8px] font-bold text-[#238636] shrink-0 mt-0.5">B</div>
+                        <div className="text-[11px] text-text-secondary leading-relaxed">
+                          <span className="text-text-primary font-medium">coderhelm[bot]</span> pushed 1 commit
+                          <div className="mt-1 text-[10px] text-emerald-400">
+                            ✓ Refactored to useThemeToggle hook — LGTM
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <ul className="space-y-2 text-sm text-text-secondary">
+                    {[
+                      "Assign issues → get PRs automatically",
+                      "Comments on PRs with live progress",
+                      "Reads your feedback, pushes fixes",
+                      "Self-healing CI — reads logs, pushes fix",
+                    ].map((t) => (
+                      <li key={t} className="flex items-start gap-2">
+                        <span className="mt-0.5 shrink-0 text-[#238636]">✓</span>
+                        {t}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Jira App */}
+            <div className="relative overflow-hidden rounded-2xl border border-[#0052CC]/30 bg-surface-elevated">
+              <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(ellipse at top right, #0052CC15, transparent 60%)" }} />
+              <div className="relative p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#0052CC]/30 bg-[#0052CC]/10">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#0052CC">
+                      <path d="M11.53 2c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.94 4.34 4.34 4.35V2.84a.84.84 0 00-.84-.84H11.53zM6.77 6.8a4.36 4.36 0 004.34 4.34h1.8v1.72a4.36 4.36 0 004.34 4.34V7.63a.84.84 0 00-.83-.83H6.77zM2 11.6a4.35 4.35 0 004.35 4.35h1.78v1.71c0 2.4 1.94 4.35 4.34 4.34v-9.56a.84.84 0 00-.84-.84H2z"/>
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold">Jira App</h3>
+                  <span className="rounded-full bg-[#0052CC]/15 px-2 py-0.5 text-[9px] font-semibold text-[#0052CC]">Forge</span>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-[#21262d] bg-[#0d1117] p-4">
+                    <div className="flex items-center gap-2 text-[11px] text-text-muted mb-3">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
+                      Jira Board
+                    </div>
+                    <div className="space-y-2">
+                      {[
+                        { key: "KAN-12", title: "Add OAuth login flow", status: "In Progress", statusColor: "#0052CC" },
+                        { key: "KAN-13", title: "Build settings API", status: "Done", statusColor: "#36B37E" },
+                        { key: "KAN-14", title: "Add rate limiting", status: "In Review", statusColor: "#FF991F" },
+                      ].map((ticket) => (
+                        <div key={ticket.key} className="flex items-center gap-3 rounded border border-[#21262d] bg-[#161b22] px-3 py-2">
+                          <span className="text-[10px] font-mono text-[#0052CC]">{ticket.key}</span>
+                          <span className="text-[11px] text-text-secondary flex-1">{ticket.title}</span>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium" style={{ color: ticket.statusColor, background: ticket.statusColor + "20" }}>
+                            {ticket.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 flex items-center gap-2 text-[10px] text-text-muted border-t border-[#21262d] pt-3">
+                      <span className="text-emerald-400">→</span>
+                      <span>Assign + label <code className="text-[#0052CC] bg-[#0052CC]/10 px-1 rounded text-[9px]">coderhelm</code> = PR created automatically</span>
+                    </div>
+                  </div>
+
+                  <ul className="space-y-2 text-sm text-text-secondary">
+                    {[
+                      "Native Forge app — install from Atlassian Marketplace",
+                      "Auto-detects repo from ticket context",
+                      "Label + assign = Coderhelm starts working",
+                      "Syncs Jira projects from the dashboard",
+                    ].map((t) => (
+                      <li key={t} className="flex items-start gap-2">
+                        <span className="mt-0.5 shrink-0 text-[#0052CC]">✓</span>
+                        {t}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* AI Plans */}
       <section className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-6xl px-6">
