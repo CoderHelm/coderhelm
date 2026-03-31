@@ -322,20 +322,13 @@ function SettingsTab({ config, setConfig, toast }: {
   };
 
   const toggleProject = (key: string) => {
-    setProjects((prev) => prev.map((p) => p.key === key ? { ...p, enabled: !p.enabled } : p));
-  };
-
-  const saveProjects = async () => {
-    setSaving(true);
-    try {
-      await api.updateJiraProjects(projects);
-      setConfig((c) => c ? { ...c, projects } : c);
-      toast("Projects saved");
-    } catch {
-      toast("Failed to save projects", "error");
-    } finally {
-      setSaving(false);
-    }
+    setProjects((prev) => {
+      const updated = prev.map((p) => p.key === key ? { ...p, enabled: !p.enabled } : p);
+      api.updateJiraProjects(updated).then(() => {
+        setConfig((c) => c ? { ...c, projects: updated } : c);
+      }).catch(() => toast("Failed to save projects", "error"));
+      return updated;
+    });
   };
 
   const enabledProjects = projects.filter((p) => p.enabled);
@@ -417,13 +410,6 @@ function SettingsTab({ config, setConfig, toast }: {
                 {p.lead && <span className="text-xs text-zinc-600 ml-auto">{p.lead}</span>}
               </label>
             ))}
-            <button
-              onClick={saveProjects}
-              disabled={saving}
-              className="mt-2 px-4 py-1.5 bg-zinc-100 text-zinc-900 rounded text-sm font-medium hover:bg-white disabled:opacity-50 transition-colors cursor-pointer"
-            >
-              {saving ? "Saving..." : "Save projects"}
-            </button>
           </div>
         ) : (
           <p className="text-xs text-zinc-600 italic">No projects loaded. Click &ldquo;Fetch from Jira&rdquo; to import.</p>
