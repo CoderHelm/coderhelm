@@ -70,6 +70,7 @@ export default function BillingPage() {
             api.listPaymentMethods().then(r => setPaymentMethods(r.payment_methods)).catch(() => {});
             api.getBillingCustomer().then(r => { setBillingEmail(r.email || ""); setEmailDraft(r.email || ""); }).catch(() => {});
           }
+          window.dispatchEvent(new Event("billing-updated"));
           return;
         }
       } catch { /* retry */ }
@@ -83,6 +84,7 @@ export default function BillingPage() {
       const res = await api.createSubscription();
       if (res.already_active) {
         toast("Subscription activated!", "success");
+        window.dispatchEvent(new Event("billing-updated"));
         pollRefresh();
       } else {
         setCheckoutSecret(res.client_secret ?? null);
@@ -101,6 +103,7 @@ export default function BillingPage() {
     try {
       await api.cancelSubscription();
       toast("Subscription cancelled");
+      window.dispatchEvent(new Event("billing-updated"));
       refresh();
     } catch {
       toast("Failed to cancel. Please try again.", "error");
@@ -114,6 +117,7 @@ export default function BillingPage() {
     try {
       await api.reactivateSubscription();
       toast("Subscription reactivated");
+      window.dispatchEvent(new Event("billing-updated"));
       refresh();
     } catch {
       toast("Failed to reactivate. Please try again.", "error");
