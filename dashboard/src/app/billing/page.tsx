@@ -561,6 +561,11 @@ function UpdateCardForm({ onSuccess }: { onSuccess: () => void }) {
       setError(result.error.message || "Failed to update card");
       setSubmitting(false);
     } else {
+      // Set the newly added card as the default payment method
+      const newPmId = result.setupIntent?.payment_method;
+      if (newPmId && typeof newPmId === "string") {
+        await api.setDefaultPaymentMethod(newPmId).catch(() => {});
+      }
       onSuccess();
     }
   };
