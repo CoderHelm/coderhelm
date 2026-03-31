@@ -402,7 +402,7 @@ function Sidebar({
 
       {user && (
         <div className="mt-3 pt-3 border-t border-zinc-800/60">
-          {tenants.length > 1 && (
+          {tenants.filter((t) => t.status !== "deactivated").length > 1 && (
             <div className="mb-3">
               <p className="text-xs text-zinc-600 mb-1.5 px-1">Organization</p>
               <select
@@ -411,9 +411,9 @@ function Sidebar({
                 disabled={switching}
                 className="w-full px-2 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300 focus:outline-none focus:border-zinc-600 disabled:opacity-50"
               >
-                {tenants.map((t) => (
+                {tenants.filter((t) => t.status !== "deactivated").map((t) => (
                   <option key={t.tenant_id} value={t.tenant_id}>
-                    {t.org}{t.status === "deactivated" ? " (inactive)" : ""}
+                    {t.org}
                   </option>
                 ))}
               </select>
