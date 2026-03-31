@@ -696,6 +696,114 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Security & Isolation */}
+      <section className="border-t border-surface-border py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <h2 className="text-center text-3xl font-bold sm:text-4xl">
+            Enterprise-grade security
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-center text-text-secondary">
+            Your code never leaves your control. Every run is fully isolated.
+          </p>
+
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                ),
+                color: "#10b981",
+                title: "Isolated Execution",
+                desc: "Every run executes in its own isolated container. No shared state, no shared filesystem — one tenant cannot access another's data.",
+              },
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  </svg>
+                ),
+                color: "#3b82f6",
+                title: "No Code Storage",
+                desc: "Coderhelm reads your code through the GitHub API on-demand. Your source code is never cloned to disk or stored on our servers.",
+              },
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                ),
+                color: "#a855f7",
+                title: "Tenant Isolation",
+                desc: "All data is partitioned by tenant ID. Every API call is scoped to your organization — cross-tenant access is architecturally impossible.",
+              },
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="16 18 22 12 16 6" />
+                    <polyline points="8 6 2 12 8 18" />
+                  </svg>
+                ),
+                color: "#f59e0b",
+                title: "No Secrets in Code",
+                desc: "All credentials are stored in AWS Secrets Manager and loaded at runtime. Nothing is hardcoded or committed to source control.",
+              },
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    <path d="M9 12l2 2 4-4" />
+                  </svg>
+                ),
+                color: "#00d4ff",
+                title: "Webhook Verification",
+                desc: "Every incoming webhook — GitHub, Stripe, Jira — is cryptographically verified before processing. Spoofed requests are rejected.",
+              },
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 6v6l4 2" />
+                  </svg>
+                ),
+                color: "#f43f5e",
+                title: "Rate-Limited & Audited",
+                desc: "All billing and sensitive endpoints are rate-limited per tenant. Every action is logged for full auditability.",
+              },
+            ].map((f) => (
+              <div
+                key={f.title}
+                className="relative overflow-hidden rounded-xl border border-surface-border bg-surface-elevated p-6 transition-all hover:border-brand/20"
+              >
+                <div
+                  className="absolute inset-x-0 top-0 h-[2px] rounded-t-xl"
+                  style={{
+                    background: `linear-gradient(90deg, transparent, ${f.color}90, transparent)`,
+                  }}
+                />
+                <div
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border"
+                  style={{
+                    color: f.color,
+                    backgroundColor: f.color + "1a",
+                    borderColor: f.color + "33",
+                  }}
+                >
+                  {f.icon}
+                </div>
+                <h3 className="mt-4 text-lg font-semibold">{f.title}</h3>
+                <p className="mt-2 text-sm text-text-secondary leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* CTA */}
       <section className="relative overflow-hidden border-t border-surface-border py-24">
         {/* mini aurora */}
