@@ -445,6 +445,7 @@ export default function BillingPage() {
                   <th className="px-4 py-2.5 font-medium">Invoice</th>
                   <th className="px-4 py-2.5 font-medium">Period</th>
                   <th className="px-4 py-2.5 font-medium">Amount</th>
+                  <th className="px-4 py-2.5 font-medium">Status</th>
                   <th className="px-4 py-2.5 font-medium">PDF</th>
                 </tr>
               </thead>
@@ -453,7 +454,21 @@ export default function BillingPage() {
                   <tr key={i} className="hover:bg-zinc-900/50">
                     <td className="px-4 py-2.5 text-zinc-300 font-mono text-xs">{inv.invoice_number || "—"}</td>
                     <td className="px-4 py-2.5 text-zinc-400">{inv.period || "—"}</td>
-                    <td className="px-4 py-2.5">{inv.amount_cents ? `$${(inv.amount_cents / 100).toFixed(2)}` : "—"}</td>
+                    <td className="px-4 py-2.5">
+                      {inv.amount_cents ? `$${(inv.amount_cents / 100).toFixed(2)}` : "—"}
+                      {inv.amount_refunded_cents ? (
+                        <span className="text-emerald-400 text-xs ml-1.5">-${(inv.amount_refunded_cents / 100).toFixed(2)} refunded</span>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {inv.status === "refunded" ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Refunded</span>
+                      ) : inv.status === "partially_refunded" ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">Partial refund</span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-800 text-zinc-400 border border-zinc-700">Paid</span>
+                      )}
+                    </td>
                     <td className="px-4 py-2.5">
                       {inv.invoice_id && (
                         <button
