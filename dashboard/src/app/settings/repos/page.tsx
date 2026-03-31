@@ -12,6 +12,7 @@ export default function ReposPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     api.listRepos().then((data) => {
@@ -63,12 +64,29 @@ export default function ReposPage() {
       ) : repos.length === 0 ? (
         <div className="text-zinc-500 border border-zinc-800 rounded-lg p-8 text-center">
           <p>No repos connected yet.</p>
-          <a
-            href="https://github.com/apps/coderhelm"
-            className="text-zinc-300 underline mt-2 inline-block"
-          >
-            Install the GitHub App
-          </a>
+          <div className="flex items-center justify-center gap-4 mt-3">
+            <button
+              onClick={async () => {
+                setSyncing(true);
+                try {
+                  await api.syncRepos();
+                  const data = await api.listRepos();
+                  setRepos(data.repos);
+                } catch { /* ignore */ }
+                setSyncing(false);
+              }}
+              disabled={syncing}
+              className="px-4 py-2 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-50"
+            >
+              {syncing ? "Syncing..." : "Sync repos"}
+            </button>
+            <a
+              href="https://github.com/apps/coderhelm"
+              className="text-zinc-300 underline text-sm"
+            >
+              Install the GitHub App
+            </a>
+          </div>
         </div>
       ) : (
         <>
