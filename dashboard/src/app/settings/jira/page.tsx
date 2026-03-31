@@ -177,18 +177,7 @@ function JiraAppTab({ check }: { check: JiraCheck | null }) {
                   </button>
                 </div>
               </div>
-              <div>
-                <label className="text-xs text-zinc-500 mb-1 block">Tenant ID <span className="text-zinc-600">(optional — only if different from Installation ID)</span></label>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono">
-                    {check.tenant_id}
-                  </code>
-                  <button onClick={() => copy(check.tenant_id!, "tenant-id")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer">
-                    {copied === "tenant-id" ? "Copied!" : "Copy"}
-                  </button>
-                </div>
-              </div>
-              <p className="text-xs text-zinc-600">Paste these into the Coderhelm app settings in Jira, then click <strong className="text-zinc-400">Save</strong>. The trigger URLs are registered automatically.</p>
+              <p className="text-xs text-zinc-600">Paste this into the <strong className="text-zinc-400">Installation ID</strong> field in the Coderhelm app settings in Jira, then click <strong className="text-zinc-400">Save</strong>. The trigger URLs are registered automatically.</p>
             </div>
           ) : (
             <p className="text-zinc-500 text-sm italic">Loading your configuration…</p>
