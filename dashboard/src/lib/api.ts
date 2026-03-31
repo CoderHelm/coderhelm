@@ -120,7 +120,7 @@ export const api = {
   listPlans: (cursor?: string) => request<{ plans: Plan[]; next_cursor?: string }>(`/api/plans${cursor ? `?cursor=${cursor}` : ""}`),
   planChat: (messages: { role: string; content: string }[]) =>
     request<{ content: string }>("/api/plans/chat", { method: "POST", body: JSON.stringify({ messages }) }),
-  createPlan: (body: { title: string; description?: string; repo?: string; tasks?: Partial<Task>[] }) =>
+  createPlan: (body: { title: string; description?: string; repo?: string; destination?: "github" | "jira"; tasks?: Partial<Task>[] }) =>
     request<{ plan_id: string }>("/api/plans", { method: "POST", body: JSON.stringify(body) }),
   getPlan: (planId: string) => request<Plan & { tasks: Task[] }>(`/api/plans/${planId}`),
   updatePlan: (planId: string, body: Partial<{ title: string; description: string; status: string }>) =>

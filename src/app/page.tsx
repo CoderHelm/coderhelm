@@ -1,6 +1,5 @@
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
-import MermaidDiagram from "@/components/MermaidDiagram";
 
 const features = [
   {
@@ -133,26 +132,6 @@ const steps = [
     desc: "Coderhelm opens a draft PR, runs CI, and marks it ready when checks pass. Request changes and it reads your comments, fixes the code, and pushes — iterate until you're happy, then merge.",
   },
 ];
-
-const workflowMermaid = `flowchart LR
-  issue["Issue Created"]
-  triage["Triage"]
-  plan["Plan"]
-  impl["Implement"]
-  review["Review + Safety"]
-  pr["Open PR"]
-  ci{"CI"}
-  fix["CI Fix"]
-  ready["Ready for Review"]
-  fb{"Feedback?"}
-  addr["Address Comments"]
-
-  issue --> triage --> plan --> impl --> review --> pr --> ci
-  ci -->|Pass| ready
-  ci -->|Fail| fix --> ci
-  ready --> fb
-  fb -->|Yes| addr --> review
-  fb -->|No| merge["Merge"]`;
 
 
 
@@ -488,64 +467,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      {/* Per-Repo Workflow */}
-      <section className="border-t border-surface-border py-24">
-        <div className="mx-auto max-w-6xl px-6">
-          <h2 className="text-center text-3xl font-bold sm:text-4xl">Per-Repo Workflow</h2>
-          <p className="mx-auto mt-4 max-w-xl text-center text-text-secondary">
-            Every issue follows the same autonomous pipeline — from triage to merge-ready PR.
-          </p>
-
-          <div className="mt-10 relative overflow-hidden rounded-2xl border border-surface-border bg-surface-elevated">
-            <div
-              className="pointer-events-none absolute inset-0"
-              style={{ background: "radial-gradient(ellipse at top left, rgba(255,255,255,0.02), transparent 60%)" }}
-            />
-            <div className="relative grid md:grid-cols-2">
-              <div className="flex items-center justify-center border-b border-surface-border p-6 md:border-b-0 md:border-r md:border-surface-border">
-                <div className="w-full max-w-lg rounded-xl border border-[#21262d] bg-[#0d1117] p-5">
-                  <div className="mb-3 flex items-center justify-between border-b border-[#21262d] pb-3">
-                    <span className="text-[11px] font-semibold text-text-secondary">PIPELINE (MERMAID)</span>
-                    <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[9px] font-semibold text-zinc-400">per repo</span>
-                  </div>
-                  <MermaidDiagram chart={workflowMermaid} className="overflow-x-auto rounded-md bg-[#0b0f14] p-2" />
-                </div>
-              </div>
-
-              <div className="flex flex-col justify-center p-8 md:p-10">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" />
-                      <polyline points="12 6 12 12 16 14" />
-                    </svg>
-                  </div>
-                </div>
-                <h3 className="mt-4 text-2xl font-bold">Per-Repo Workflow</h3>
-                <p className="mt-3 text-text-secondary leading-relaxed">
-                  Each repository gets an autonomous pipeline. Coderhelm triages, plans, implements, self-reviews with your guardrails, opens a PR, and fixes CI failures — all without human intervention.
-                </p>
-                <ul className="mt-5 space-y-2 text-sm text-text-secondary">
-                  {[
-                    "Triage → Plan → Implement → Review → PR",
-                    "Self-healing CI: reads logs, pushes fixes",
-                    "Feedback loop: addresses reviewer comments",
-                    "Guardrails enforced on every pass",
-                  ].map((t) => (
-                    <li key={t} className="flex items-start gap-2">
-                      <span className="mt-0.5 shrink-0 text-zinc-400">✓</span>
-                      {t}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-
 
       {/* Security & Isolation */}
       <section className="border-t border-surface-border py-24">
