@@ -276,6 +276,7 @@ export interface Invoice {
   invoice_id: string | null;
   invoice_number: string | null;
   amount_cents: number | null;
+  amount_refunded_cents: number | null;
   period: string | null;
   status: string | null;
   created_at: string | null;
