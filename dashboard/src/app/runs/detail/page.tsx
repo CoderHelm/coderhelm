@@ -275,8 +275,8 @@ function RunDetailInner() {
                   setReReviewing(true);
                   try {
                     await api.reReviewRun(runId);
+                    setRun((r) => r ? { ...r, status: "running", current_pass: "feedback", error: undefined } : r);
                     toast("Re-review started");
-                    setTimeout(() => window.location.reload(), 1500);
                   } catch {
                     toast("Failed to re-review", "error");
                     setReReviewing(false);
@@ -355,8 +355,8 @@ function RunDetailInner() {
                 setReReviewing(true);
                 try {
                   await api.reReviewRun(runId);
+                  setRun((r) => r ? { ...r, status: "running", current_pass: "feedback", error: undefined } : r);
                   toast("Re-review started");
-                  setTimeout(() => window.location.reload(), 1500);
                 } catch {
                   toast("Failed to re-review", "error");
                   setReReviewing(false);
