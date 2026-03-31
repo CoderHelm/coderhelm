@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
-import { api, type BillingInfo, type Banner } from "@/lib/api";
+import { api, type BillingInfo, type Banner, type TenantInfo } from "@/lib/api";
 import { pushToDataLayer } from "@/lib/gtm";
 import { ToastProvider } from "./toast";
 import {
@@ -26,6 +26,7 @@ interface User {
   github_login: string;
   email: string;
   avatar_url: string;
+  status?: string;
 }
 
 interface NavItem {
@@ -78,6 +79,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [tenants, setTenants] = useState<TenantInfo[]>([]);
   const [dismissedBanners, setDismissedBanners] = useState<Set<string>>(new Set());
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -89,6 +91,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         setAuthChecked(true);
         api.getBilling().then(setBilling).catch(() => {});
         api.getBanners().then((r) => setBanners(r.banners)).catch(() => {});
+        api.listTenants().then((r) => setTenants(r.tenants)).catch(() => {});
       })
       .catch(() => {
         setAuthChecked(true);
@@ -144,10 +147,53 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     );
   }
 
+  if (user.status === "deactivated") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+        <div className="flex flex-col items-center gap-6 max-w-md text-center px-6">
+          <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+            <span className="text-2xl">⚠</span>
+          </div>
+          <h1 className="text-xl font-bold text-zinc-100">GitHub App Uninstalled</h1>
+          <p className="text-sm text-zinc-400">
+            The Coderhelm GitHub App has been removed from your organization.
+            All runs, webhooks, and automation are paused.
+          </p>
+          <p className="text-sm text-zinc-500">
+            To restore access, reinstall the GitHub App and log in again.
+          </p>
+          <a
+            href={`${API_BASE}/auth/login`}
+            className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-200 transition-colors"
+          >
+            Reinstall &amp; Log in
+          </a>
+          {tenants.filter((t) => t.status !== "deactivated").length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs text-zinc-600 mb-2">Or switch to an active organization:</p>
+              {tenants.filter((t) => t.status !== "deactivated" && !t.current).map((t) => (
+                <button
+                  key={t.tenant_id}
+                  onClick={async () => {
+                    await api.switchTenant(t.tenant_id);
+                    window.location.reload();
+                  }}
+                  className="block mx-auto mt-1 text-sm text-zinc-300 hover:text-white underline"
+                >
+                  Switch to {t.org}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <ToastProvider>
       <div className="flex min-h-screen bg-zinc-950">
-        <Sidebar billing={billing} user={user} />
+        <Sidebar billing={billing} user={user} tenants={tenants} />
         <div className="flex-1 flex flex-col">
           {banners.filter((b) => !dismissedBanners.has(b.id)).map((banner) => (
             <div
@@ -239,16 +285,31 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 function Sidebar({
   billing,
   user,
+  tenants,
 }: {
   billing: BillingInfo | null;
   user: User | null;
+  tenants: TenantInfo[];
 }) {
   const pathname = usePathname();
+  const [switching, setSwitching] = useState(false);
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
     if (href === "/settings") return pathname === "/settings";
     return pathname.startsWith(href);
+  };
+
+  const currentTenant = tenants.find((t) => t.current);
+
+  const handleSwitch = async (tenantId: string) => {
+    setSwitching(true);
+    try {
+      await api.switchTenant(tenantId);
+      window.location.reload();
+    } catch {
+      setSwitching(false);
+    }
   };
 
   return (
@@ -330,7 +391,25 @@ function Sidebar({
       )}
 
       {user && (
-        <div className="mt-3 pt-3 border-t border-zinc-800/60 flex items-center gap-2">
+        <div className="mt-3 pt-3 border-t border-zinc-800/60">
+          {tenants.length > 1 && (
+            <div className="mb-3">
+              <p className="text-xs text-zinc-600 mb-1.5 px-1">Organization</p>
+              <select
+                value={currentTenant?.tenant_id ?? ""}
+                onChange={(e) => handleSwitch(e.target.value)}
+                disabled={switching}
+                className="w-full px-2 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300 focus:outline-none focus:border-zinc-600 disabled:opacity-50"
+              >
+                {tenants.map((t) => (
+                  <option key={t.tenant_id} value={t.tenant_id}>
+                    {t.org}{t.status === "deactivated" ? " (inactive)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
           {user.avatar_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -346,6 +425,7 @@ function Sidebar({
           <div className="min-w-0">
             <p className="text-sm text-zinc-300 truncate">{user.github_login}</p>
             <p className="text-xs text-zinc-500 truncate">{user.email}</p>
+          </div>
           </div>
         </div>
       )}
