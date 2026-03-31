@@ -344,7 +344,7 @@ function Sidebar({
   };
 
   return (
-    <nav className="w-56 border-r border-zinc-800/60 bg-zinc-950 p-3 flex flex-col">
+    <nav className="w-56 border-r border-zinc-800/60 bg-zinc-950 p-3 flex flex-col h-screen sticky top-0">
       <Link
         href="/"
         className="flex items-center gap-2.5 px-2 py-2.5 mb-2 rounded-md"
