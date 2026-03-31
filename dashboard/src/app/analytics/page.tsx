@@ -232,7 +232,7 @@ export default function AnalyticsPage() {
             <BarChart data={chartData} barGap={2}>
               <GradientDefs />
               <CartesianGrid vertical={false} stroke="#27272a" strokeDasharray="3 3" />
-              <XAxis dataKey="label" {...axisProps} interval={range === "7d" ? 0 : "preserveStartEnd"} />
+              <XAxis dataKey="label" {...axisProps} interval={range === "30d" ? 2 : 0} />
               <YAxis {...axisProps} allowDecimals={false} width={32} />
               <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
               <Bar dataKey="completed" name="Completed" fill={COLORS.green.stroke} radius={[4, 4, 0, 0]} maxBarSize={28} />
@@ -247,7 +247,7 @@ export default function AnalyticsPage() {
             <AreaChart data={chartData}>
               <GradientDefs />
               <CartesianGrid vertical={false} stroke="#27272a" strokeDasharray="3 3" />
-              <XAxis dataKey="label" {...axisProps} interval={range === "7d" ? 0 : "preserveStartEnd"} />
+              <XAxis dataKey="label" {...axisProps} interval={range === "30d" ? 2 : 0} />
               <YAxis {...axisProps} width={40} tickFormatter={formatNumber} />
               <Tooltip content={<ChartTooltip formatter={(v: number) => formatNumber(v)} />} cursor={{ stroke: "#3f3f46" }} />
               <Area type="monotone" dataKey="total_tokens_in" name="Input" stroke={COLORS.blue.stroke} fill={COLORS.blue.fill} strokeWidth={2} stackId="tokens" />
@@ -262,7 +262,7 @@ export default function AnalyticsPage() {
             <AreaChart data={chartData}>
               <GradientDefs />
               <CartesianGrid vertical={false} stroke="#27272a" strokeDasharray="3 3" />
-              <XAxis dataKey="label" {...axisProps} interval={range === "7d" ? 0 : "preserveStartEnd"} />
+              <XAxis dataKey="label" {...axisProps} interval={range === "30d" ? 2 : 0} />
               <YAxis {...axisProps} width={36} domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} />
               <Tooltip content={<ChartTooltip formatter={(v: number) => `${v.toFixed(0)}%`} />} cursor={{ stroke: "#3f3f46" }} />
               <Area type="monotone" dataKey="merge_rate" name="Merge rate" stroke={COLORS.green.stroke} fill={COLORS.green.fill} strokeWidth={2} />
