@@ -37,7 +37,7 @@ export default function BillingPage() {
     Promise.all([api.getBilling(), api.listInvoices()])
       .then(([b, i]) => {
         setBilling(b);
-        setInvoices(i.invoices);
+        setInvoices(i.invoices.filter((inv: Invoice) => inv.amount_cents && inv.amount_cents > 0));
         if (b.stripe_publishable_key && !stripePromise) {
           setStripePromise(loadStripe(b.stripe_publishable_key));
         }
@@ -65,7 +65,7 @@ export default function BillingPage() {
         const [b, inv] = await Promise.all([api.getBilling(), api.listInvoices()]);
         if (b.subscription_status !== currentStatus) {
           setBilling(b);
-          setInvoices(inv.invoices);
+          setInvoices(inv.invoices.filter((inv: Invoice) => inv.amount_cents && inv.amount_cents > 0));
           if (b.has_payment_method) {
             api.listPaymentMethods().then(r => setPaymentMethods(r.payment_methods)).catch(() => {});
             api.getBillingCustomer().then(r => { setBillingEmail(r.email || ""); setEmailDraft(r.email || ""); }).catch(() => {});
@@ -80,9 +80,14 @@ export default function BillingPage() {
   const handleSubscribe = async () => {
     setActionLoading(true);
     try {
-      const { client_secret } = await api.createSubscription();
-      setCheckoutSecret(client_secret);
-      setShowCheckout(true);
+      const res = await api.createSubscription();
+      if (res.already_active) {
+        toast("Subscription activated!", "success");
+        pollRefresh();
+      } else {
+        setCheckoutSecret(res.client_secret);
+        setShowCheckout(true);
+      }
     } catch {
       toast("Failed to start subscription. Please try again.", "error");
     } finally {
@@ -247,7 +252,7 @@ export default function BillingPage() {
           <button
             onClick={handleSubscribe}
             disabled={actionLoading}
-            className="px-5 py-2.5 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-50"
+            className="px-5 py-2.5 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-50 cursor-pointer"
           >
             {actionLoading ? "..." : isCancelled ? "Re-subscribe to Pro — $199/mo" : "Subscribe to Pro — $199/mo"}
           </button>
@@ -257,14 +262,14 @@ export default function BillingPage() {
             <button
               onClick={handleUpdateCard}
               disabled={actionLoading}
-              className="px-4 py-2 bg-zinc-800 border border-zinc-700 text-zinc-200 rounded-lg text-sm font-medium hover:bg-zinc-700 transition-colors disabled:opacity-50"
+              className="px-4 py-2 bg-zinc-800 border border-zinc-700 text-zinc-200 rounded-lg text-sm font-medium hover:bg-zinc-700 transition-colors disabled:opacity-50 cursor-pointer"
             >
               Update payment method
             </button>
             <button
               onClick={handleCancel}
               disabled={actionLoading}
-              className="px-4 py-2 bg-zinc-900 border border-zinc-800 text-zinc-400 rounded-lg text-sm font-medium hover:text-red-400 hover:border-red-500/30 transition-colors disabled:opacity-50"
+              className="px-4 py-2 bg-zinc-900 border border-zinc-800 text-zinc-400 rounded-lg text-sm font-medium hover:text-red-400 hover:border-red-500/30 transition-colors disabled:opacity-50 cursor-pointer"
             >
               Cancel subscription
             </button>
@@ -341,7 +346,7 @@ export default function BillingPage() {
                         }
                       }}
                       disabled={actionLoading}
-                      className="text-zinc-500 hover:text-blue-400 text-sm transition-colors disabled:opacity-50"
+                      className="text-zinc-500 hover:text-blue-400 text-sm transition-colors disabled:opacity-50 cursor-pointer"
                     >
                       Set default
                     </button>
@@ -349,7 +354,7 @@ export default function BillingPage() {
                   <button
                     onClick={() => handleDeletePaymentMethod(pm.id)}
                     disabled={actionLoading}
-                    className="text-zinc-500 hover:text-red-400 text-sm transition-colors disabled:opacity-50"
+                    className="text-zinc-500 hover:text-red-400 text-sm transition-colors disabled:opacity-50 cursor-pointer"
                   >
                     Remove
                   </button>
@@ -393,7 +398,7 @@ export default function BillingPage() {
                 <span className="text-zinc-200 text-sm">{billingEmail || "Not set"}</span>
                 <button
                   onClick={() => setEditingEmail(true)}
-                  className="text-zinc-500 hover:text-zinc-300 text-sm transition-colors"
+                  className="text-zinc-500 hover:text-zinc-300 text-sm transition-colors cursor-pointer"
                 >
                   Edit
                 </button>
