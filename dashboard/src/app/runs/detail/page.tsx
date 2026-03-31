@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, type RunDetail, type Openspec } from "@/lib/api";
+import { api, type RunDetail, type Openspec, type BillingInfo } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
 
@@ -170,7 +170,11 @@ function RunDetailInner() {
   const [retrying, setRetrying] = useState(false);
   const [reReviewing, setReReviewing] = useState(false);
   const [specTab, setSpecTab] = useState<keyof Openspec>("proposal");
+  const [billing, setBilling] = useState<BillingInfo | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => { api.getBilling().then(setBilling).catch(() => {}); }, []);
+  const tokensExceeded = billing ? billing.current_period.total_tokens >= billing.limits.tokens : false;
 
   const fetchRun = useCallback(() => {
     if (!runId) return;
@@ -282,7 +286,8 @@ function RunDetailInner() {
                     setReReviewing(false);
                   }
                 }}
-                disabled={reReviewing}
+                disabled={reReviewing || tokensExceeded}
+                title={tokensExceeded ? "Token limit reached" : undefined}
                 className="flex-shrink-0 ml-4 px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 cursor-pointer"
               >
                 {reReviewing ? "Re-reviewing…" : "Re-review"}
@@ -301,7 +306,8 @@ function RunDetailInner() {
                     setRetrying(false);
                   }
                 }}
-                disabled={retrying}
+                disabled={retrying || tokensExceeded}
+                title={tokensExceeded ? "Token limit reached" : undefined}
                 className="flex-shrink-0 ml-4 px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 cursor-pointer"
               >
                 {retrying ? "Retrying..." : "Retry"}
@@ -326,7 +332,8 @@ function RunDetailInner() {
                 setRetrying(false);
               }
             }}
-            disabled={retrying}
+            disabled={retrying || tokensExceeded}
+            title={tokensExceeded ? "Token limit reached" : undefined}
             className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-semibold hover:bg-white disabled:opacity-50 cursor-pointer"
           >
             {retrying ? "Retrying..." : "Retry this run"}
