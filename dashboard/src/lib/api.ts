@@ -45,6 +45,7 @@ export const api = {
 
   // Repos
   listRepos: () => request<{ repos: Repo[] }>("/api/repos"),
+  syncRepos: () => request<{ total: number; added: number }>("/api/repos/sync", { method: "POST" }),
   toggleRepo: (repo: string, enabled: boolean) => request<void>(`/api/repos/${repo}`, { method: "POST", body: JSON.stringify({ enabled }) }),
   deleteRepo: (repo: string) => request<void>(`/api/repos/${repo}`, { method: "DELETE" }),
 
