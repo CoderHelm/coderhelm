@@ -14,11 +14,13 @@ export default function BudgetPage() {
   const [maxBudget, setMaxBudget] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isPro, setIsPro] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    api.getBudget().then((data) => {
-      setMaxBudget(data.max_budget_cents > 0 ? (data.max_budget_cents / 100).toString() : "");
+    Promise.all([api.getBudget(), api.getBilling()]).then(([budget, billing]) => {
+      setMaxBudget(budget.max_budget_cents > 0 ? (budget.max_budget_cents / 100).toString() : "");
+      setIsPro(billing.subscription_status === "active");
       setLoading(false);
     });
   }, []);
@@ -52,6 +54,19 @@ export default function BudgetPage() {
         Set a cap on monthly overage charges. When reached, Coderhelm will stop picking up new issues and post a comment explaining why.
       </p>
 
+      {!isPro ? (
+        <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+          <p className="text-sm text-zinc-400 mb-3">
+            Overage caps are available on the <span className="text-zinc-200 font-medium">Pro plan</span>. Free-tier usage stops at the included token limit — there are no overage charges to cap.
+          </p>
+          <a
+            href="/billing"
+            className="inline-block px-4 py-2 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors"
+          >
+            Upgrade to Pro
+          </a>
+        </div>
+      ) : (
       <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-lg space-y-4">
         <div>
           <label className="block text-sm font-medium text-zinc-300 mb-1.5">
@@ -90,6 +105,7 @@ export default function BudgetPage() {
           </button>
         </div>
       </div>
+      )}
     </div>
   );
 }
