@@ -221,6 +221,7 @@ export interface NotificationPrefs {
 
 export interface WorkflowSettings {
   commit_openspec: boolean;
+  default_destination: "github" | "jira";
 }
 
 export interface BillingInfo {
