@@ -525,7 +525,7 @@ function RunDetailInner() {
                           )}
                         </div>
                         <span className={`text-xs leading-relaxed ${
-                          done ? "text-zinc-500 line-through" : "text-zinc-400"
+                          done ? "text-zinc-500" : "text-zinc-400"
                         }`}>
                           {task.text.length > 120 ? task.text.slice(0, 120) + "…" : task.text}
                         </span>
