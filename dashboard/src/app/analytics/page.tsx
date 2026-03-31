@@ -51,7 +51,6 @@ function GradientDefs() {
   );
 }
 
-// eslint-disable-next-line
 function ChartTooltip({ active, payload, label, formatter }: any) {
   if (!active || !payload?.length) return null;
   return (
@@ -181,7 +180,7 @@ export default function AnalyticsPage() {
       tokens: m.total_tokens_in + m.total_tokens_out,
       merge_rate: m.total_runs > 0 ? (m.completed / m.total_runs) * 100 : 0,
     }));
-  }, [useDaily, filteredRuns, history]);
+  }, [useDaily, filteredRuns, history, range]);
 
   if (loading) {
     return (

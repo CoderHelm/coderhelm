@@ -196,6 +196,7 @@ function RunDetailInner() {
     if (!run || run.status !== "running") return;
     const interval = setInterval(fetchRun, 5000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run?.status, fetchRun]);
 
   const taskItems = useMemo(() => parseTaskItems(openspec?.tasks), [openspec?.tasks]);
