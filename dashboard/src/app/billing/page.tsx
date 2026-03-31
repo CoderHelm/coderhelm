@@ -85,7 +85,7 @@ export default function BillingPage() {
         toast("Subscription activated!", "success");
         pollRefresh();
       } else {
-        setCheckoutSecret(res.client_secret);
+        setCheckoutSecret(res.client_secret ?? null);
         setShowCheckout(true);
       }
     } catch {

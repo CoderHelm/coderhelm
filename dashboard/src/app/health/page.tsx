@@ -43,6 +43,7 @@ export default function HealthPage() {
     const ms = health && health.status !== "healthy" ? 5_000 : 30_000;
     const interval = setInterval(refresh, ms);
     return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh, health?.status]);
 
   const s = health ? STATUS_COLOR[health.status] || STATUS_COLOR.ok : STATUS_COLOR.ok;
