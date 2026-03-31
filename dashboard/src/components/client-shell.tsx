@@ -285,6 +285,27 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           )}
+          {billing && billing.current_period.total_tokens >= billing.limits.tokens && (
+            <div className="bg-red-900/90 border-b-2 border-red-500 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-red-300 text-xl">🚫</span>
+                <div>
+                  <p className="text-sm font-bold text-red-100">
+                    Token limit reached — all runs are paused
+                  </p>
+                  <p className="text-xs text-red-300 mt-0.5">
+                    You&apos;ve used {formatTokens(billing.current_period.total_tokens)} of your {formatTokens(billing.limits.tokens)} token limit this period. New GitHub and Jira actions will be skipped until your limit resets or is increased.
+                  </p>
+                </div>
+              </div>
+              <a
+                href="/billing"
+                className="shrink-0 rounded-md bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-500 transition-colors"
+              >
+                Upgrade Plan
+              </a>
+            </div>
+          )}
           <main className="flex-1 p-8">{children}</main>
         </div>
       </div>
