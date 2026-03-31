@@ -105,6 +105,13 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     }
   }, [pathname, user]);
 
+  // Refresh billing when subscription changes (e.g. subscribe/cancel on billing page)
+  useEffect(() => {
+    const handler = () => { api.getBilling().then(setBilling).catch(() => {}); };
+    window.addEventListener("billing-updated", handler);
+    return () => window.removeEventListener("billing-updated", handler);
+  }, []);
+
   if (!authChecked) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">
