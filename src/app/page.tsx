@@ -304,23 +304,27 @@ export default function Home() {
                     </div>
                     <div className="space-y-2.5">
                       <div className="flex gap-2">
-                        <div className="w-5 h-5 rounded-full bg-[#238636]/20 flex items-center justify-center text-[8px] font-bold text-[#238636] shrink-0 mt-0.5">B</div>
+                        <div className="w-5 h-5 rounded-full bg-[#238636]/20 flex items-center justify-center shrink-0 mt-0.5">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#238636" strokeWidth="2.5"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22" /></svg>
+                        </div>
                         <div className="text-[11px] text-text-secondary leading-relaxed">
                           <span className="text-text-primary font-medium">coderhelm[bot]</span> commented on <span className="text-[#238636]">#43</span>
                           <div className="mt-1.5 rounded border border-[#21262d] bg-[#161b22] p-2.5 text-[10px]">
-                            <p className="text-text-primary font-medium mb-1">🔄 Coderhelm is working on this</p>
+                            <p className="text-text-primary font-medium mb-1">Coderhelm is working on this</p>
                             <div className="space-y-0.5 text-text-muted">
-                              <p>✅ Triage — feature, medium priority</p>
-                              <p>✅ Plan — 5 files, 3 new functions</p>
-                              <p>🔄 Implement — in progress...</p>
-                              <p>⏳ Review</p>
-                              <p>⏳ PR</p>
+                              <p className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" /> Triage — feature, medium priority</p>
+                              <p className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" /> Plan — 5 files, 3 new functions</p>
+                              <p className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" /> Implement — in progress...</p>
+                              <p className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-full bg-zinc-600" /> Review</p>
+                              <p className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-full bg-zinc-600" /> PR</p>
                             </div>
                           </div>
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center text-[8px] font-bold text-blue-400 shrink-0 mt-0.5">Y</div>
+                        <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2.5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                        </div>
                         <div className="text-[11px] text-text-secondary leading-relaxed">
                           <span className="text-text-primary font-medium">@you</span> requested changes
                           <div className="mt-1.5 rounded border border-[#21262d] bg-[#161b22] p-2.5 text-[10px] text-text-muted">
@@ -329,11 +333,14 @@ export default function Home() {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <div className="w-5 h-5 rounded-full bg-[#238636]/20 flex items-center justify-center text-[8px] font-bold text-[#238636] shrink-0 mt-0.5">B</div>
+                        <div className="w-5 h-5 rounded-full bg-[#238636]/20 flex items-center justify-center shrink-0 mt-0.5">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#238636" strokeWidth="2.5"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22" /></svg>
+                        </div>
                         <div className="text-[11px] text-text-secondary leading-relaxed">
                           <span className="text-text-primary font-medium">coderhelm[bot]</span> pushed 1 commit
-                          <div className="mt-1 text-[10px] text-emerald-400">
-                            ✓ Refactored to useThemeToggle hook — LGTM
+                          <div className="mt-1 text-[10px] text-emerald-400 flex items-center gap-1">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+                            Refactored to useThemeToggle hook — LGTM
                           </div>
                         </div>
                       </div>
