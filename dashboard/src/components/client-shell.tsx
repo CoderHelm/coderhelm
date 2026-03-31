@@ -336,7 +336,7 @@ function Sidebar({
         <span className="text-sm font-semibold text-zinc-100">Coderhelm</span>
       </Link>
 
-      <div className="flex-1 space-y-4">
+      <div className="flex-1 space-y-4 overflow-y-auto min-h-0">
         {navGroups.map((group, index) => (
           <div key={index}>
             {group.label && (
@@ -372,7 +372,7 @@ function Sidebar({
 
       {/* Tokens remaining */}
       {billing && (
-        <div className="mx-2 mt-3 pt-3 border-t border-zinc-800/60">
+        <div className="mx-2 mt-3 pt-3 border-t border-zinc-800/60 shrink-0">
           <div className="flex items-center justify-between text-xs">
             <span className="text-zinc-500">Tokens left</span>
             <span className={`font-medium ${
@@ -401,7 +401,7 @@ function Sidebar({
       )}
 
       {user && (
-        <div className="mt-3 pt-3 border-t border-zinc-800/60">
+        <div className="mt-3 pt-3 border-t border-zinc-800/60 shrink-0">
           {tenants.filter((t) => t.status !== "deactivated").length > 1 && (
             <div className="mb-3">
               <p className="text-xs text-zinc-600 mb-1.5 px-1">Organization</p>
