@@ -288,7 +288,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           {billing && billing.current_period.total_tokens >= billing.limits.tokens && (
             <div className="bg-red-900/90 border-b-2 border-red-500 px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="text-red-300 text-xl">🚫</span>
+                <span className="text-red-300 text-xl">⚠</span>
                 <div>
                   <p className="text-sm font-bold text-red-100">
                     Token limit reached — all runs are paused

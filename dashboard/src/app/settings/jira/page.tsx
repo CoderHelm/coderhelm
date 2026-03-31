@@ -189,7 +189,7 @@ function JiraAppTab({ check, config, setConfig, toast }: {
           <div className="space-y-3">
             <div className="flex items-start gap-3">
               <span className="flex-shrink-0 w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[10px] font-medium text-zinc-400">1</span>
-              <p className="text-sm text-zinc-400 pt-0.5">Add a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">Coderhelm</code> label to any Jira issue, then assign it.</p>
+              <p className="text-sm text-zinc-400 pt-0.5">Add a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">coderhelm</code> label to any Jira issue, then assign it.</p>
             </div>
             <div className="flex items-start gap-3">
               <span className="flex-shrink-0 w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[10px] font-medium text-zinc-400">2</span>
@@ -208,7 +208,7 @@ function JiraAppTab({ check, config, setConfig, toast }: {
   return (
     <div className="space-y-6">
       <p className="text-zinc-400 text-sm">
-        Install the Coderhelm Jira app on your Jira site. When you assign a ticket with a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">Coderhelm</code> label, Coderhelm determines the right repo from the ticket context and starts working.
+        Install the Coderhelm Jira app on your Jira site. When you assign a ticket with a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">coderhelm</code> label, Coderhelm determines the right repo from the ticket context and starts working.
       </p>
 
       <div className="space-y-6">
@@ -253,7 +253,7 @@ function JiraAppTab({ check, config, setConfig, toast }: {
 
         <Step number={3} title="Label and assign">
           <p className="text-zinc-400 text-sm">
-            Add a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">Coderhelm</code> label to any Jira issue, then assign it. Coderhelm picks the right repo automatically based on the ticket.
+            Add a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">coderhelm</code> label to any Jira issue, then assign it. Coderhelm picks the right repo automatically based on the ticket.
           </p>
         </Step>
 
@@ -276,9 +276,16 @@ function SettingsTab({ config, setConfig, toast }: {
   const [fetching, setFetching] = useState(false);
   const listProjectsUrl = config?.list_projects_url ?? "";
   const createTicketUrl = config?.create_ticket_url ?? "";
-  const [triggerLabel, setTriggerLabel] = useState(config?.trigger_label || "coderhelm");
+  const triggerLabel = "coderhelm";
   const [defaultProject, setDefaultProject] = useState(config?.default_project ?? "");
   const [projects, setProjects] = useState<JiraProject[]>(config?.projects ?? []);
+
+  // Sync projects when config updates (e.g. after re-fetch)
+  useEffect(() => {
+    if (config?.projects && config.projects.length > 0) {
+      setProjects(config.projects);
+    }
+  }, [config?.projects]);
 
   const saveConfig = async () => {
     setSaving(true);
@@ -367,14 +374,12 @@ function SettingsTab({ config, setConfig, toast }: {
       <section>
         <h3 className="text-sm font-semibold text-zinc-100 mb-1">Trigger Label</h3>
         <p className="text-xs text-zinc-500 mb-3">
-          Only Jira tickets with this label will trigger Coderhelm. Leave as &ldquo;coderhelm&rdquo; for the default.
+          Only Jira tickets with this label will trigger Coderhelm. The label is always <code className="text-zinc-300 bg-zinc-800 px-1 rounded">coderhelm</code>.
         </p>
-        <input
-          value={triggerLabel}
-          onChange={(e) => setTriggerLabel(e.target.value)}
-          placeholder="coderhelm"
-          className="w-64 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
-        />
+        <div className="flex items-center gap-2">
+          <code className="px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-100 font-mono">coderhelm</code>
+          <span className="text-xs text-zinc-600">Cannot be changed</span>
+        </div>
       </section>
 
       {/* Projects */}
