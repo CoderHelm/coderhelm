@@ -162,12 +162,22 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           <p className="text-sm text-zinc-500">
             To restore access, reinstall the GitHub App and log in again.
           </p>
-          <a
-            href={`${API_BASE}/auth/login`}
-            className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-200 transition-colors"
-          >
-            Reinstall &amp; Log in
-          </a>
+          <div className="flex flex-col items-center gap-3">
+            <a
+              href="https://github.com/apps/coderhelm/installations/new"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-200 transition-colors"
+            >
+              Reinstall GitHub App
+            </a>
+            <a
+              href={`${API_BASE}/auth/login`}
+              className="text-sm text-zinc-400 hover:text-zinc-200 underline transition-colors"
+            >
+              Then log in here
+            </a>
+          </div>
           {tenants.filter((t) => t.status !== "deactivated").length > 0 && (
             <div className="mt-2">
               <p className="text-xs text-zinc-600 mb-2">Or switch to an active organization:</p>
