@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState, useCallback } from "react";
 import { api, type InfraAnalysis, type InfraFinding, type Repo } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { Skeleton } from "@/components/skeleton";
-import { MermaidDiagram } from "@/components/mermaid-diagram";
+
 import { RepoCombobox } from "@/components/repo-combobox";
 
 const SEVERITY_STYLES: Record<string, string> = {
@@ -66,7 +66,7 @@ function AnalysisView({
   refreshing: boolean;
   onRefresh: () => void;
 }) {
-  const [activeTab, setActiveTab] = useState<"diagram" | "findings">("diagram");
+
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
@@ -109,7 +109,7 @@ function AnalysisView({
       <div className="flex flex-col items-center justify-center py-24">
         <div className="w-8 h-8 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin mb-4" />
         <p className="text-zinc-400 text-sm">Analyzing your infrastructure...</p>
-        <p className="text-zinc-600 text-xs mt-1">Scanning for CDK/Terraform/Serverless code and generating diagram</p>
+        <p className="text-zinc-600 text-xs mt-1">Scanning for CDK/Terraform/Serverless code</p>
       </div>
     );
   }
@@ -166,36 +166,8 @@ function AnalysisView({
         </div>
       )}
 
-      {/* Diagram / Findings tabs */}
-      <div className="flex gap-1 mb-4 p-1 bg-zinc-900 border border-zinc-800 rounded-lg w-fit">
-        {(["diagram", "findings"] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-1.5 rounded-md text-sm transition-colors capitalize ${
-              activeTab === tab ? "bg-zinc-700 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
-            }`}
-          >
-            {tab}
-            {tab === "findings" && analysis.findings && analysis.findings.length > 0 && (
-              <span className="ml-1.5 text-xs text-zinc-600">({analysis.findings.length})</span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === "diagram" && (
-        <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl min-h-64">
-          {analysis.diagram ? (
-            <MermaidDiagram chart={analysis.diagram} />
-          ) : (
-            <p className="text-zinc-600 text-sm text-center py-16">No diagram generated</p>
-          )}
-        </div>
-      )}
-
-      {activeTab === "findings" && (
-        <div className="space-y-2">
+      {/* Findings */}
+      <div className="space-y-2">
           {!analysis.findings || analysis.findings.length === 0 ? (
             <div className="p-6 text-center text-zinc-600 text-sm border border-zinc-800 rounded-xl">
               No findings — looks great!
@@ -221,7 +193,6 @@ function AnalysisView({
             </>
           )}
         </div>
-      )}
     </>
   );
 }
@@ -305,7 +276,7 @@ function InfrastructureContent() {
       <div className="flex items-start justify-between mb-2">
         <div>
           <h1 className="text-2xl font-bold">Infrastructure</h1>
-          <p className="text-zinc-500 text-sm mt-1">Architecture diagram and analysis of your connected repos</p>
+          <p className="text-zinc-500 text-sm mt-1">Security and reliability analysis of your connected repos</p>
         </div>
         <button
           onClick={handleRefresh}
