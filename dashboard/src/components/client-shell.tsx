@@ -23,9 +23,10 @@ function formatTokens(n: number): string {
 interface User {
   user_id: string;
   tenant_id: string;
-  github_login: string;
+  github_login: string | null;
   email: string;
   avatar_url: string;
+  role: string;
   status?: string;
 }
 
@@ -124,34 +125,13 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
-        <div className="flex flex-col items-center gap-6">
-          <div className="flex flex-col items-center gap-3">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" className="w-12 h-12">
-              <rect width="32" height="32" rx="6" fill="#fff" />
-              <polygon points="6.5,26 9.75,26 14,6 10.75,6" fill="#09090b" />
-              <polygon points="12.25,26 15.5,26 19.75,6 16.5,6" fill="#09090b" />
-              <polygon points="18,26 21.25,26 25.5,6 22.25,6" fill="#09090b" />
-            </svg>
-            <span className="text-2xl font-bold text-white tracking-tight">coderhelm</span>
-          </div>
-          <p className="text-zinc-400 text-sm">Sign in with GitHub to continue</p>
-          <a
-            href={`${API_BASE}/auth/login`}
-            className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-200 transition-colors"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" /></svg>
-            Sign in with GitHub
-          </a>
-          <div className="flex gap-3 text-xs text-zinc-600 mt-4">
-            <a href="https://coderhelm.com/terms" className="hover:text-zinc-400 transition-colors">Terms</a>
-            <span>·</span>
-            <a href="https://coderhelm.com/privacy" className="hover:text-zinc-400 transition-colors">Privacy</a>
-          </div>
-        </div>
-      </div>
-    );
+    return <AuthScreen onAuth={(u) => {
+      setUser(u);
+      pushToDataLayer({ event: "identify", user_id: u.user_id, tenant_id: u.tenant_id });
+      api.getBilling().then(setBilling).catch(() => {});
+      api.getBanners().then((r) => setBanners(r.banners)).catch(() => {});
+      api.listTenants().then((r) => setTenants(r.tenants)).catch(() => {});
+    }} />;
   }
 
   if (user.status === "deactivated") {
@@ -452,21 +432,297 @@ function Sidebar({
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={user.avatar_url}
-              alt={user.github_login}
+              alt={user.github_login || user.email}
               className="w-6 h-6 rounded-full"
             />
           ) : (
             <span className="w-6 h-6 rounded-full bg-zinc-800 text-zinc-400 text-xs flex items-center justify-center">
-              {user.github_login.charAt(0).toUpperCase()}
+              {(user.github_login || user.email || "?").charAt(0).toUpperCase()}
             </span>
           )}
           <div className="min-w-0">
-            <p className="text-sm text-zinc-300 truncate">{user.github_login}</p>
-            <p className="text-xs text-zinc-500 truncate">{user.email}</p>
+            <p className="text-sm text-zinc-300 truncate">{user.github_login || user.email}</p>
+            {user.github_login && <p className="text-xs text-zinc-500 truncate">{user.email}</p>}
           </div>
           </div>
         </div>
       )}
     </nav>
+  );
+}
+
+// ── Auth Screen (login / signup / verify / forgot password) ────────
+
+type AuthView = "login" | "signup" | "verify" | "forgot" | "reset" | "mfa";
+
+function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
+  const [view, setView] = useState<AuthView>("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [mfaSession, setMfaSession] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const handleSignup = async () => {
+    setError(""); setLoading(true);
+    try {
+      await api.signup(email, password, name || undefined);
+      setView("verify");
+      setMessage("Check your email for a verification code.");
+    } catch (e: unknown) {
+      setError(e instanceof Error && e.message.includes("409") ? "An account with this email already exists." : "Signup failed. Please try again.");
+    } finally { setLoading(false); }
+  };
+
+  const handleLogin = async () => {
+    setError(""); setLoading(true);
+    try {
+      const result = await api.loginEmail(email, password);
+      if (result.status === "mfa_required" && result.session) {
+        setMfaSession(result.session);
+        setView("mfa");
+      } else {
+        const u = await api.me();
+        onAuth(u);
+      }
+    } catch (e: unknown) {
+      if (e instanceof Error && e.message.includes("403")) {
+        setError("Please verify your email first.");
+        setView("verify");
+      } else {
+        setError("Invalid email or password.");
+      }
+    } finally { setLoading(false); }
+  };
+
+  const handleVerify = async () => {
+    setError(""); setLoading(true);
+    try {
+      await api.verifyEmail(email, code);
+      setMessage("Email verified! You can now log in.");
+      setView("login");
+      setCode("");
+    } catch {
+      setError("Invalid or expired code.");
+    } finally { setLoading(false); }
+  };
+
+  const handleForgot = async () => {
+    setError(""); setLoading(true);
+    try {
+      await api.forgotPassword(email);
+      setView("reset");
+      setMessage("If an account exists, a reset code was sent to your email.");
+    } catch {
+      setError("Something went wrong.");
+    } finally { setLoading(false); }
+  };
+
+  const handleReset = async () => {
+    setError(""); setLoading(true);
+    try {
+      await api.confirmReset(email, code, newPassword);
+      setMessage("Password reset! You can now log in.");
+      setView("login");
+      setCode(""); setNewPassword("");
+    } catch {
+      setError("Invalid code or password too weak.");
+    } finally { setLoading(false); }
+  };
+
+  const handleMfa = async () => {
+    setError(""); setLoading(true);
+    try {
+      await api.mfaVerify(mfaSession, code);
+      const u = await api.me();
+      onAuth(u);
+    } catch {
+      setError("Invalid MFA code.");
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+      <div className="w-full max-w-sm px-6">
+        <div className="flex flex-col items-center gap-6">
+          <div className="flex flex-col items-center gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" className="w-12 h-12">
+              <polygon points="106,416 158,416 226,96 174,96" fill="white"/>
+              <polygon points="196,416 248,416 316,96 264,96" fill="#3B82F6"/>
+              <polygon points="286,416 338,416 406,96 354,96" fill="white"/>
+            </svg>
+            <span className="text-2xl font-bold text-white tracking-tight">coderhelm</span>
+          </div>
+
+          {error && (
+            <div className="w-full rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2.5 text-sm text-red-400">
+              {error}
+            </div>
+          )}
+
+          {message && (
+            <div className="w-full rounded-lg bg-blue-500/10 border border-blue-500/20 px-4 py-2.5 text-sm text-blue-400">
+              {message}
+            </div>
+          )}
+
+          {/* ── Login ── */}
+          {view === "login" && (
+            <div className="w-full space-y-4">
+              <div className="space-y-3">
+                <a
+                  href={`${API_BASE}/auth/google`}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-200 transition-colors"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                  Continue with Google
+                </a>
+                <a
+                  href={`${API_BASE}/auth/github`}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-2.5 text-sm font-medium text-zinc-100 hover:bg-zinc-700 transition-colors"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                  Continue with GitHub
+                </a>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-zinc-800" />
+                <span className="text-xs text-zinc-500">or</span>
+                <div className="flex-1 h-px bg-zinc-800" />
+              </div>
+
+              <div className="space-y-3">
+                <input type="email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); setMessage(""); }}
+                  className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
+                <input type="password" placeholder="Password" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                  className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
+                <button onClick={handleLogin} disabled={loading || !email || !password}
+                  className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed">
+                  {loading ? "Signing in..." : "Sign in"}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between w-full text-xs">
+                <button onClick={() => { setView("signup"); setError(""); setMessage(""); }} className="text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">Create account</button>
+                <button onClick={() => { setView("forgot"); setError(""); setMessage(""); }} className="text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">Forgot password?</button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Signup ── */}
+          {view === "signup" && (
+            <div className="w-full space-y-4">
+              <p className="text-sm text-zinc-400 text-center">Create your account</p>
+              <div className="space-y-3">
+                <input type="text" placeholder="Name (optional)" value={name} onChange={(e) => setName(e.target.value)}
+                  className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
+                <input type="email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                  className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
+                <input type="password" placeholder="Password (8+ chars)" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                  onKeyDown={(e) => e.key === "Enter" && handleSignup()}
+                  className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
+                <button onClick={handleSignup} disabled={loading || !email || password.length < 8}
+                  className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed">
+                  {loading ? "Creating account..." : "Create account"}
+                </button>
+              </div>
+              <button onClick={() => { setView("login"); setError(""); setMessage(""); }} className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">
+                Already have an account? Sign in
+              </button>
+            </div>
+          )}
+
+          {/* ── Verify email ── */}
+          {view === "verify" && (
+            <div className="w-full space-y-4">
+              <p className="text-sm text-zinc-400 text-center">Enter the verification code sent to <span className="text-zinc-200">{email}</span></p>
+              <div className="space-y-3">
+                <input type="text" placeholder="Verification code" value={code} onChange={(e) => { setCode(e.target.value); setError(""); }}
+                  onKeyDown={(e) => e.key === "Enter" && handleVerify()}
+                  className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600 text-center tracking-widest" />
+                <button onClick={handleVerify} disabled={loading || !code}
+                  className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed">
+                  {loading ? "Verifying..." : "Verify email"}
+                </button>
+              </div>
+              <button onClick={() => { setView("login"); setError(""); setMessage(""); }} className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">
+                Back to sign in
+              </button>
+            </div>
+          )}
+
+          {/* ── Forgot password ── */}
+          {view === "forgot" && (
+            <div className="w-full space-y-4">
+              <p className="text-sm text-zinc-400 text-center">Enter your email to receive a reset code</p>
+              <div className="space-y-3">
+                <input type="email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                  onKeyDown={(e) => e.key === "Enter" && handleForgot()}
+                  className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
+                <button onClick={handleForgot} disabled={loading || !email}
+                  className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed">
+                  {loading ? "Sending..." : "Send reset code"}
+                </button>
+              </div>
+              <button onClick={() => { setView("login"); setError(""); setMessage(""); }} className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">
+                Back to sign in
+              </button>
+            </div>
+          )}
+
+          {/* ── Reset password ── */}
+          {view === "reset" && (
+            <div className="w-full space-y-4">
+              <p className="text-sm text-zinc-400 text-center">Enter the code and your new password</p>
+              <div className="space-y-3">
+                <input type="text" placeholder="Reset code" value={code} onChange={(e) => { setCode(e.target.value); setError(""); }}
+                  className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600 text-center tracking-widest" />
+                <input type="password" placeholder="New password (8+ chars)" value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setError(""); }}
+                  onKeyDown={(e) => e.key === "Enter" && handleReset()}
+                  className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
+                <button onClick={handleReset} disabled={loading || !code || newPassword.length < 8}
+                  className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed">
+                  {loading ? "Resetting..." : "Reset password"}
+                </button>
+              </div>
+              <button onClick={() => { setView("login"); setError(""); setMessage(""); }} className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">
+                Back to sign in
+              </button>
+            </div>
+          )}
+
+          {/* ── MFA ── */}
+          {view === "mfa" && (
+            <div className="w-full space-y-4">
+              <p className="text-sm text-zinc-400 text-center">Enter the code from your authenticator app</p>
+              <div className="space-y-3">
+                <input type="text" placeholder="6-digit code" value={code} onChange={(e) => { setCode(e.target.value); setError(""); }}
+                  onKeyDown={(e) => e.key === "Enter" && handleMfa()}
+                  className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600 text-center tracking-widest text-lg" />
+                <button onClick={handleMfa} disabled={loading || code.length < 6}
+                  className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed">
+                  {loading ? "Verifying..." : "Verify"}
+                </button>
+              </div>
+              <button onClick={() => { setView("login"); setError(""); setMessage(""); setCode(""); }} className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">
+                Back to sign in
+              </button>
+            </div>
+          )}
+
+          <div className="flex gap-3 text-xs text-zinc-600 mt-4">
+            <a href="https://coderhelm.com/terms" className="hover:text-zinc-400 transition-colors">Terms</a>
+            <span>·</span>
+            <a href="https://coderhelm.com/privacy" className="hover:text-zinc-400 transition-colors">Privacy</a>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

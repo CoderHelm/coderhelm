@@ -22,7 +22,20 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   // Auth
-  me: () => request<{ user_id: string; tenant_id: string; github_login: string; email: string; avatar_url: string; status?: string }>("/api/me"),
+  me: () => request<{ user_id: string; tenant_id: string; github_login: string | null; email: string; avatar_url: string; role: string; status?: string }>("/api/me"),
+  signup: (email: string, password: string, name?: string) =>
+    request<{ status: string; message: string }>("/auth/signup", { method: "POST", body: JSON.stringify({ email, password, name }) }),
+  loginEmail: (email: string, password: string) =>
+    request<{ status: string; session?: string; tenant_id?: string }>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+  verifyEmail: (email: string, code: string) =>
+    request<{ status: string; message: string }>("/auth/verify-email", { method: "POST", body: JSON.stringify({ email, code }) }),
+  forgotPassword: (email: string) =>
+    request<{ status: string; message: string }>("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }),
+  confirmReset: (email: string, code: string, new_password: string) =>
+    request<{ status: string; message: string }>("/auth/confirm-reset", { method: "POST", body: JSON.stringify({ email, code, new_password }) }),
+  mfaVerify: (session: string, code: string) =>
+    request<{ status: string; tenant_id?: string }>("/auth/mfa/verify", { method: "POST", body: JSON.stringify({ session, code }) }),
+  logout: () => request<void>("/auth/logout", { method: "POST" }),
 
   // Health
   getHealth: () => request<HealthCheck>("/api/health"),
@@ -149,7 +162,34 @@ export const api = {
     request<InfraAnalysis>(`/api/infrastructure/repo/${repo}`),
   refreshRepoInfrastructure: (repo: string) =>
     request<{ status: string }>(`/api/infrastructure/repo/${repo}/refresh`, { method: "POST" }),
+
+  // User management
+  listUsers: () => request<{ users: TeamUser[] }>("/api/users"),
+  inviteUser: (email: string, role?: string) =>
+    request<{ status: string; user_id: string }>("/api/users/invite", { method: "POST", body: JSON.stringify({ email, role }) }),
+  updateUserRole: (userId: string, role: string) =>
+    request<{ status: string }>(`/api/users/${encodeURIComponent(userId)}/role`, { method: "PUT", body: JSON.stringify({ role }) }),
+  removeUser: (userId: string) =>
+    request<{ status: string }>(`/api/users/${encodeURIComponent(userId)}`, { method: "DELETE" }),
+  changePassword: (current_password: string, new_password: string) =>
+    request<{ status: string }>("/api/users/password", { method: "PUT", body: JSON.stringify({ current_password, new_password }) }),
+  mfaSetup: (access_token: string) =>
+    request<{ secret: string; qr_uri: string; session: string }>("/api/users/mfa/setup", { method: "POST", body: JSON.stringify({ access_token }) }),
+  mfaVerifySetup: (access_token: string, code: string, session: string) =>
+    request<{ status: string }>("/api/users/mfa/verify", { method: "POST", body: JSON.stringify({ access_token, code, session }) }),
+  mfaDisable: () => request<{ status: string }>("/api/users/mfa", { method: "DELETE" }),
 };
+
+export interface TeamUser {
+  user_id: string;
+  email: string | null;
+  github_login: string | null;
+  avatar_url: string | null;
+  role: string;
+  name: string | null;
+  status?: string;
+  updated_at: string | null;
+}
 
 export interface Run {
   run_id: string;
