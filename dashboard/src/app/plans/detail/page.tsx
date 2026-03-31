@@ -1,9 +1,9 @@
 "use client";
 
 import { Suspense, useEffect, useState, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, type BillingInfo, type Plan, type Task, type Repo } from "@/lib/api";
+import { api, type BillingInfo, type Plan, type Task, type Repo, type JiraCheck } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { Skeleton, TableSkeleton } from "@/components/skeleton";
 import { RepoCombobox } from "@/components/repo-combobox";
@@ -51,6 +51,7 @@ export default function PlanDetailPage() {
 
 function PlanDetail() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const planId = searchParams.get("id") ?? "";
   const [plan, setPlan] = useState<(Plan & { tasks: Task[] }) | null>(null);
   const [billing, setBilling] = useState<BillingInfo | null>(null);
@@ -62,12 +63,14 @@ function PlanDetail() {
   const [newTask, setNewTask] = useState({ title: "", description: "", acceptance_criteria: "", repo: "", destination: "github", jira_project: "" });
   const [executing, setExecuting] = useState(false);
   const [repos, setRepos] = useState<Repo[]>([]);
+  const [jiraReady, setJiraReady] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     api.listRepos().then((data) => {
       setRepos(data.repos.filter((r) => r.enabled));
     }).catch(() => {});
+    api.getJiraCheck().then((c) => setJiraReady(c.ready)).catch(() => {});
   }, []);
 
   const refresh = useCallback(() => {
@@ -162,6 +165,17 @@ function PlanDetail() {
       toast("Failed to execute plan", "error");
     } finally {
       setExecuting(false);
+    }
+  };
+
+  const handleDeletePlan = async () => {
+    if (!confirm("Delete this plan and all its tasks? This cannot be undone.")) return;
+    try {
+      await api.deletePlan(planId);
+      toast("Plan deleted");
+      router.push("/plans");
+    } catch {
+      toast("Failed to delete plan", "error");
     }
   };
 
@@ -264,12 +278,28 @@ function PlanDetail() {
           </div>
         </div>
         {plan.status === "draft" && draftCount > 0 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDeletePlan}
+              className="px-3 py-2 text-zinc-600 hover:text-red-400 text-sm transition-colors"
+            >
+              Delete
+            </button>
+            <button
+              onClick={handleExecute}
+              disabled={executing}
+              className="px-5 py-2.5 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-40"
+            >
+              {executing ? "Executing..." : "Approve all"}
+            </button>
+          </div>
+        )}
+        {plan.status !== "draft" && (
           <button
-            onClick={handleExecute}
-            disabled={executing}
-            className="px-5 py-2.5 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-40"
+            onClick={handleDeletePlan}
+            className="px-3 py-2 text-zinc-600 hover:text-red-400 text-sm transition-colors"
           >
-            {executing ? "Executing..." : "Approve all"}
+            Delete
           </button>
         )}
       </div>
@@ -348,11 +378,12 @@ function PlanDetail() {
                   <label className="text-xs text-zinc-500 mb-1 block">Destination</label>
                   <div className="flex gap-2">
                     {(["github", "jira"] as const).map((d) => (
-                      <button key={d} onClick={() => setEditForm((f) => ({ ...f, destination: d }))} className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors cursor-pointer ${(editForm.destination ?? task.destination ?? "github") === d ? "bg-zinc-700 text-zinc-100 border-zinc-600" : "bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-zinc-300"}`}>
+                      <button key={d} disabled={d === "jira" && !jiraReady} onClick={() => setEditForm((f) => ({ ...f, destination: d }))} className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${d === "jira" && !jiraReady ? "opacity-40 cursor-not-allowed" : "cursor-pointer"} ${(editForm.destination ?? task.destination ?? "github") === d ? "bg-zinc-700 text-zinc-100 border-zinc-600" : "bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-zinc-300"}`}>
                         {d === "github" ? "GitHub Issue" : "Jira Ticket"}
                       </button>
                     ))}
                   </div>
+                  {!jiraReady && <p className="text-xs text-zinc-600 mt-1">Configure Jira integration in Settings to enable Jira tickets.</p>}
                 </div>
                 {(editForm.destination ?? task.destination) === "jira" && (
                   <input value={editForm.jira_project ?? task.jira_project ?? ""} onChange={(e) => setEditForm((f) => ({ ...f, jira_project: e.target.value }))} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Jira project key (e.g. PROJ) — blank uses default" />
@@ -447,11 +478,12 @@ function PlanDetail() {
                 <label className="text-xs text-zinc-500 mb-1 block">Destination</label>
                 <div className="flex gap-2">
                   {(["github", "jira"] as const).map((d) => (
-                    <button key={d} onClick={() => setNewTask((t) => ({ ...t, destination: d }))} className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors cursor-pointer ${newTask.destination === d ? "bg-zinc-700 text-zinc-100 border-zinc-600" : "bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-zinc-300"}`}>
+                    <button key={d} disabled={d === "jira" && !jiraReady} onClick={() => setNewTask((t) => ({ ...t, destination: d }))} className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${d === "jira" && !jiraReady ? "opacity-40 cursor-not-allowed" : "cursor-pointer"} ${newTask.destination === d ? "bg-zinc-700 text-zinc-100 border-zinc-600" : "bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-zinc-300"}`}>
                       {d === "github" ? "GitHub Issue" : "Jira Ticket"}
                     </button>
                   ))}
                 </div>
+                {!jiraReady && <p className="text-xs text-zinc-600 mt-1">Configure Jira integration in Settings to enable Jira tickets.</p>}
               </div>
               {newTask.destination === "jira" && (
                 <input value={newTask.jira_project} onChange={(e) => setNewTask((t) => ({ ...t, jira_project: e.target.value }))} placeholder="Jira project key (e.g. PROJ) — blank uses default" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />

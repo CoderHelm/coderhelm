@@ -22,13 +22,18 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   // Auth
-  me: () => request<{ user_id: string; tenant_id: string; github_login: string; email: string; avatar_url: string }>("/api/me"),
+  me: () => request<{ user_id: string; tenant_id: string; github_login: string; email: string; avatar_url: string; status?: string }>("/api/me"),
 
   // Health
   getHealth: () => request<HealthCheck>("/api/health"),
 
   // Banners
   getBanners: () => request<{ banners: Banner[] }>("/api/banners"),
+
+  // Account
+  resetAccount: () => request<void>("/api/account/reset", { method: "POST" }),
+  listTenants: () => request<{ tenants: TenantInfo[] }>("/api/tenants"),
+  switchTenant: (tenantId: string) => request<{ tenant_id: string }>("/api/tenants/switch", { method: "POST", body: JSON.stringify({ tenant_id: tenantId }) }),
 
   // Runs
   listRuns: () => request<{ runs: Run[] }>("/api/runs"),
@@ -79,7 +84,7 @@ export const api = {
 
   // Jira integration
   getJiraCheck: () => request<JiraCheck>("/api/integrations/jira/check"),
-  generateJiraSecret: () => request<{ secret: string }>("/api/integrations/jira/secret", { method: "POST" }),
+  generateJiraSecret: () => request<{ token: string; webhook_secret: string }>("/api/integrations/jira/secret", { method: "POST" }),
   deleteJiraSecret: () => request<void>("/api/integrations/jira/secret", { method: "DELETE" }),
   getJiraConfig: () => request<JiraConfig>("/api/integrations/jira/config"),
   updateJiraConfig: (body: Partial<JiraConfig>) =>
@@ -259,6 +264,13 @@ export interface Banner {
   link_url?: string;
 }
 
+export interface TenantInfo {
+  tenant_id: string;
+  org: string;
+  status: string;
+  current: boolean;
+}
+
 export interface Invoice {
   invoice_id: string | null;
   invoice_number: string | null;
@@ -371,7 +383,6 @@ export interface JiraCheck {
   installation_id: number;
   tenant_id: string;
   webhook_url?: string;
-  webhook_secret?: string;
 }
 
 export interface JiraEvent {
