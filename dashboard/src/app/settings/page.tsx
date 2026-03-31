@@ -18,6 +18,8 @@ export default function SettingsPage() {
     { href: "/settings/budget", title: "Budget", description: "Set a monthly spending cap to control overage costs." },
     { href: "/settings/workflow", title: "Workflow", description: "Openspec output, commit behavior, and pipeline preferences." },
     { href: "/settings/notifications", title: "Notifications", description: "Choose which emails Coderhelm sends you." },
+    { href: "/settings/team", title: "Team", description: "Invite members, assign roles, and manage who has access." },
+    { href: "/settings/security", title: "Security", description: "Change your password and enable two-factor authentication." },
   ];
 
   const integrations = [

@@ -1,0 +1,256 @@
+"use client";
+
+import { useState } from "react";
+import { api } from "@/lib/api";
+import { useToast } from "@/components/toast";
+
+export default function SecurityPage() {
+  const { toast } = useToast();
+
+  // Password
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  // MFA
+  const [mfaStep, setMfaStep] = useState<"idle" | "setup" | "verify">("idle");
+  const [mfaSecret, setMfaSecret] = useState("");
+  const [mfaQrUri, setMfaQrUri] = useState("");
+  const [mfaSession, setMfaSession] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaLoading, setMfaLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      toast("Passwords don't match", "error");
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast("Password must be at least 8 characters", "error");
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await api.changePassword(currentPassword, newPassword);
+      toast("Password updated");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch {
+      toast("Failed to change password. Check your current password.", "error");
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const handleMfaSetup = async () => {
+    setMfaLoading(true);
+    try {
+      // For MFA setup we need an access token — the backend will handle via Cognito
+      const result = await api.mfaSetup("");
+      setMfaSecret(result.secret);
+      setMfaQrUri(result.qr_uri);
+      setMfaSession(result.session);
+      setMfaStep("setup");
+    } catch {
+      toast("Failed to start MFA setup", "error");
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const handleMfaVerify = async () => {
+    if (mfaCode.length < 6) return;
+    setMfaLoading(true);
+    try {
+      await api.mfaVerifySetup("", mfaCode, mfaSession);
+      setMfaEnabled(true);
+      setMfaStep("idle");
+      setMfaCode("");
+      toast("Two-factor authentication enabled");
+    } catch {
+      toast("Invalid code. Try again.", "error");
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const handleMfaDisable = async () => {
+    if (!confirm("Disable two-factor authentication? Your account will be less secure.")) return;
+    setMfaLoading(true);
+    try {
+      await api.mfaDisable();
+      setMfaEnabled(false);
+      toast("Two-factor authentication disabled");
+    } catch {
+      toast("Failed to disable MFA", "error");
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const copySecret = () => {
+    navigator.clipboard.writeText(mfaSecret);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="max-w-xl">
+      <a href="/settings" className="text-zinc-500 hover:text-zinc-300 text-sm">← Settings</a>
+      <h1 className="text-2xl font-bold mt-4 mb-2">Security</h1>
+      <p className="text-sm text-zinc-500 mb-6">
+        Manage your password and two-factor authentication.
+      </p>
+
+      {/* Change Password */}
+      <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-lg mb-6">
+        <h3 className="text-sm font-semibold text-zinc-100 mb-4">Change password</h3>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs text-zinc-500 mb-1 block">Current password</label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-zinc-500 mb-1 block">New password</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="8+ characters"
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-zinc-500 mb-1 block">Confirm new password</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleChangePassword()}
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+            />
+          </div>
+          <button
+            onClick={handleChangePassword}
+            disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
+            className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed"
+          >
+            {changingPassword ? "Updating..." : "Update password"}
+          </button>
+        </div>
+      </div>
+
+      {/* Two-Factor Authentication */}
+      <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-sm font-semibold text-zinc-100">Two-factor authentication</h3>
+            <p className="text-xs text-zinc-500 mt-0.5">Add an extra layer of security with a TOTP authenticator app.</p>
+          </div>
+          {mfaEnabled && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-xs font-medium">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              Enabled
+            </span>
+          )}
+        </div>
+
+        {mfaStep === "idle" && !mfaEnabled && (
+          <button
+            onClick={handleMfaSetup}
+            disabled={mfaLoading}
+            className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-40 transition-colors cursor-pointer"
+          >
+            {mfaLoading ? "Setting up..." : "Enable 2FA"}
+          </button>
+        )}
+
+        {mfaStep === "idle" && mfaEnabled && (
+          <button
+            onClick={handleMfaDisable}
+            disabled={mfaLoading}
+            className="px-4 py-2 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/20 disabled:opacity-50 transition-colors cursor-pointer"
+          >
+            {mfaLoading ? "Disabling..." : "Disable 2FA"}
+          </button>
+        )}
+
+        {mfaStep === "setup" && (
+          <div className="space-y-4">
+            <p className="text-sm text-zinc-400">
+              Scan this QR code with your authenticator app (Google Authenticator, Authy, 1Password, etc).
+            </p>
+
+            {/* QR placeholder — show the URI for now, real QR would need a library */}
+            <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+              <p className="text-xs text-zinc-500 mb-2">Authenticator URI:</p>
+              <code className="text-xs text-zinc-300 break-all font-mono">{mfaQrUri}</code>
+            </div>
+
+            <div>
+              <p className="text-xs text-zinc-500 mb-1.5">Or enter this secret manually:</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono tracking-wider">
+                  {mfaSecret}
+                </code>
+                <button
+                  onClick={copySecret}
+                  className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer"
+                >
+                  {copied ? "Copied!" : "Copy"}
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setMfaStep("verify")}
+              className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white transition-colors cursor-pointer"
+            >
+              Next — enter code
+            </button>
+          </div>
+        )}
+
+        {mfaStep === "verify" && (
+          <div className="space-y-4">
+            <p className="text-sm text-zinc-400">
+              Enter the 6-digit code from your authenticator app to verify setup.
+            </p>
+            <input
+              type="text"
+              placeholder="000000"
+              value={mfaCode}
+              onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              onKeyDown={(e) => e.key === "Enter" && handleMfaVerify()}
+              className="w-48 px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 text-center tracking-widest text-lg font-mono"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={handleMfaVerify}
+                disabled={mfaLoading || mfaCode.length < 6}
+                className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed"
+              >
+                {mfaLoading ? "Verifying..." : "Verify & enable"}
+              </button>
+              <button
+                onClick={() => { setMfaStep("idle"); setMfaCode(""); }}
+                className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -585,6 +585,143 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Team & User Management */}
+      <section className="border-t border-surface-border py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <h2 className="text-center text-3xl font-bold sm:text-4xl">
+            Team management built in
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-center text-text-secondary">
+            Invite your team, control access with roles, and secure accounts with multi-factor authentication — all from the dashboard.
+          </p>
+
+          <div className="mt-12 grid gap-6 md:grid-cols-2">
+            {/* Roles & Permissions */}
+            <div className="relative overflow-hidden rounded-2xl border border-surface-border bg-surface-elevated">
+              <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(ellipse at top left, rgba(168,85,247,0.04), transparent 60%)" }} />
+              <div className="relative p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold">Roles &amp; Permissions</h3>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-[#21262d] bg-[#0d1117] p-4">
+                    <div className="flex items-center gap-2 text-[11px] text-text-muted mb-3">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                      Team Members
+                    </div>
+                    <div className="space-y-2">
+                      {[
+                        { name: "Sarah Chen", email: "sarah@team.io", role: "Owner", roleColor: "#f59e0b" },
+                        { name: "Alex Rivera", email: "alex@team.io", role: "Admin", roleColor: "#3b82f6" },
+                        { name: "Jordan Lee", email: "jordan@team.io", role: "Member", roleColor: "#a1a1aa" },
+                        { name: "Casey Kim", email: "casey@team.io", role: "Viewer", roleColor: "#71717a" },
+                      ].map((m) => (
+                        <div key={m.name} className="flex items-center gap-3 rounded border border-[#21262d] bg-[#161b22] px-3 py-2">
+                          <div className="w-6 h-6 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[9px] font-medium text-zinc-400">
+                            {m.name[0]}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-[11px] text-text-primary block truncate">{m.name}</span>
+                            <span className="text-[9px] text-text-muted">{m.email}</span>
+                          </div>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium" style={{ color: m.roleColor, background: m.roleColor + "20" }}>
+                            {m.role}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <ul className="space-y-2 text-sm text-text-secondary">
+                    {[
+                      "Four roles — Owner, Admin, Member, Viewer",
+                      "Invite by email — accounts created automatically",
+                      "Admins manage team, Viewers get read-only access",
+                      "Owner controls billing and workspace settings",
+                    ].map((t) => (
+                      <li key={t} className="flex items-start gap-2">
+                        <span className="mt-0.5 shrink-0 text-purple-400">✓</span>
+                        {t}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Auth & Security */}
+            <div className="relative overflow-hidden rounded-2xl border border-surface-border bg-surface-elevated">
+              <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(ellipse at top right, rgba(16,185,129,0.04), transparent 60%)" }} />
+              <div className="relative p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold">Authentication &amp; 2FA</h3>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-[#21262d] bg-[#0d1117] p-4">
+                    <div className="flex items-center gap-2 text-[11px] text-text-muted mb-3">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                      Sign In
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3 rounded border border-[#21262d] bg-[#161b22] px-3 py-2.5">
+                        <svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                        <span className="text-[11px] text-text-secondary">Continue with Google</span>
+                      </div>
+                      <div className="flex items-center gap-3 rounded border border-[#21262d] bg-[#161b22] px-3 py-2.5">
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="#e4e4e7"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                        <span className="text-[11px] text-text-secondary">Continue with GitHub</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-px bg-[#21262d]" />
+                        <span className="text-[9px] text-text-muted">or</span>
+                        <div className="flex-1 h-px bg-[#21262d]" />
+                      </div>
+                      <div className="rounded border border-[#21262d] bg-[#161b22] px-3 py-2 text-[11px] text-text-muted">
+                        Email &amp; password
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center gap-2 text-[10px] text-text-muted border-t border-[#21262d] pt-3">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                      <span>Optional TOTP 2FA via authenticator app</span>
+                    </div>
+                  </div>
+
+                  <ul className="space-y-2 text-sm text-text-secondary">
+                    {[
+                      "Email/password, Google, and GitHub sign-in",
+                      "Optional TOTP two-factor authentication",
+                      "Secure password reset via email",
+                      "Accounts powered by AWS Cognito",
+                    ].map((t) => (
+                      <li key={t} className="flex items-start gap-2">
+                        <span className="mt-0.5 shrink-0 text-emerald-400">✓</span>
+                        {t}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* How it works */}
       <section id="how-it-works" className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-4xl px-6">
