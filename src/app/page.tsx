@@ -154,23 +154,7 @@ const workflowMermaid = `flowchart LR
   fb -->|Yes| addr --> review
   fb -->|No| merge["Merge"]`;
 
-const infraMermaid = `architecture-beta
-  group edge(logos:aws-cloudfront)[Edge]
-  group compute(logos:aws-lambda)[Compute]
-  group data(logos:aws-dynamodb)[Data]
 
-  service cdn(logos:aws-cloudfront)[CloudFront] in edge
-  service gw(logos:aws-lambda)[Gateway] in compute
-  service q(logos:aws-sqs)[Queue] in compute
-  service wk(logos:aws-lambda)[Worker] in compute
-  service db(logos:aws-dynamodb)[DynamoDB] in data
-  service s3(logos:aws-s3)[S3] in data
-
-  cdn:R --> L:gw
-  gw:B --> T:q
-  q:B --> T:wk
-  gw:R --> L:db
-  wk:R --> L:s3`;
 
 export default function Home() {
   return (
@@ -561,78 +545,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Infrastructure Analysis */}
-      <section className="border-t border-surface-border py-24">
-        <div className="mx-auto max-w-6xl px-6">
-          <h2 className="text-center text-3xl font-bold sm:text-4xl">Infrastructure Analysis</h2>
-          <p className="mx-auto mt-4 max-w-xl text-center text-text-secondary">
-            Visualize architecture and surface security and reliability risks fast.
-          </p>
 
-          <div className="mt-10 relative overflow-hidden rounded-2xl border border-teal-500/20 bg-surface-elevated">
-            <div
-              className="pointer-events-none absolute inset-0"
-              style={{ background: "radial-gradient(ellipse at top right, #14b8a615, transparent 60%)" }}
-            />
-            <div className="relative grid md:grid-cols-2">
-              <div className="flex items-center justify-center border-b border-teal-500/10 p-6 md:border-b-0 md:border-r md:border-teal-500/10">
-                <div className="w-full max-w-lg rounded-xl border border-[#21262d] bg-[#0d1117] p-5">
-                  <div className="mb-3 flex items-center justify-between border-b border-[#21262d] pb-3">
-                    <span className="text-[11px] font-semibold text-text-secondary">ARCHITECTURE (MERMAID)</span>
-                    <span className="rounded-full bg-teal-500/15 px-2 py-0.5 text-[9px] font-semibold text-teal-400">live</span>
-                  </div>
-                  <MermaidDiagram chart={infraMermaid} className="overflow-x-auto rounded-md bg-[#0b0f14] p-2" />
-                  <div className="mt-4 space-y-1.5 border-t border-[#21262d] pt-3">
-                    <p className="mb-2 text-[10px] font-semibold text-text-muted">FINDINGS</p>
-                    {[
-                      { icon: "⚠", color: "#f59e0b", text: "No VPC isolation on Lambda" },
-                      { icon: "⚠", color: "#f59e0b", text: "DynamoDB encryption not set" },
-                      { icon: "ℹ", color: "#3b82f6", text: "Consider reserved concurrency" },
-                    ].map((f) => (
-                      <div key={f.text} className="flex items-center gap-2 text-[10px]">
-                        <span style={{ color: f.color }}>{f.icon}</span>
-                        <span className="text-text-secondary">{f.text}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col justify-center p-8 md:p-10">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-teal-500/30 bg-teal-500/10">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#14b8a6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="5" cy="6" r="2" />
-                      <circle cx="19" cy="6" r="2" />
-                      <circle cx="12" cy="18" r="2" />
-                      <line x1="7" y1="6" x2="17" y2="6" />
-                      <line x1="5" y1="8" x2="12" y2="16" />
-                      <line x1="19" y1="8" x2="12" y2="16" />
-                      <circle cx="19" cy="6" r="5" />
-                      <line x1="22" y1="9" x2="24" y2="11" />
-                    </svg>
-                  </div>
-                </div>
-                <h3 className="mt-4 text-2xl font-bold">Infrastructure Analysis</h3>
-                <p className="mt-3 text-text-secondary leading-relaxed">
-                  Scan your CDK or Terraform stacks and get a live architecture diagram plus a prioritized list of security and reliability findings — in seconds.
-                </p>
-                <ul className="mt-5 space-y-2 text-sm text-text-secondary">
-                  {[
-                    "Live Mermaid architecture diagram",
-                    "Security & reliability findings by severity",
-                  ].map((t) => (
-                    <li key={t} className="flex items-start gap-2">
-                      <span className="mt-0.5 shrink-0 text-teal-400">✓</span>
-                      {t}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* Features */}
       <section id="features" className="border-t border-surface-border py-24">
