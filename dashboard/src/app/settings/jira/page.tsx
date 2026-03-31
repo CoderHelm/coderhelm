@@ -14,6 +14,7 @@ export default function JiraPage() {
   const [generatingSecret, setGeneratingSecret] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("app");
+  const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -32,11 +33,11 @@ export default function JiraPage() {
   const generateSecret = async () => {
     setGeneratingSecret(true);
     try {
-      await api.generateJiraSecret();
+      const result = await api.generateJiraSecret();
       const c = await api.getJiraCheck();
       setCheck(c);
-      setCheck(c);
-      toast("Webhook URL generated");
+      setRevealedSecret(result.webhook_secret);
+      toast("Webhook credentials generated — copy the secret now, it won't be shown again");
     } catch {
       toast("Failed to generate webhook URL", "error");
     }
@@ -48,6 +49,7 @@ export default function JiraPage() {
     try {
       await api.deleteJiraSecret();
       setCheck((c) => c ? { ...c, secret_configured: false, webhook_url: undefined } : c);
+      setRevealedSecret(null);
       toast("Webhook URL removed");
     } catch {
       toast("Failed to remove webhook URL", "error");
@@ -116,6 +118,7 @@ export default function JiraPage() {
           deleteSecret={deleteSecret}
           copy={copy}
           copied={copied}
+          revealedSecret={revealedSecret}
         />
       ) : tab === "events" ? (
         <EventsTab />
@@ -376,9 +379,10 @@ interface WebhookTabProps {
   deleteSecret: () => void;
   copy: (text: string, label: string) => void;
   copied: string | null;
+  revealedSecret: string | null;
 }
 
-function WebhookTab({ check, generatingSecret, generateSecret, deleteSecret, copy, copied }: WebhookTabProps) {
+function WebhookTab({ check, generatingSecret, generateSecret, deleteSecret, copy, copied, revealedSecret }: WebhookTabProps) {
   return (
     <div className="space-y-6 mb-8">
       <p className="text-zinc-400 text-sm">
@@ -411,19 +415,28 @@ function WebhookTab({ check, generatingSecret, generateSecret, deleteSecret, cop
                 </button>
               </div>
             </div>
-            {check.webhook_secret && (
+            {revealedSecret ? (
               <div>
                 <label className="text-xs text-zinc-500 mb-1 block">Webhook Secret</label>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono truncate">
-                    {check.webhook_secret}
+                    {revealedSecret}
                   </code>
-                  <button onClick={() => copy(check.webhook_secret!, "secret")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer">
+                  <button onClick={() => copy(revealedSecret, "secret")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer">
                     {copied === "secret" ? "Copied!" : "Copy"}
                   </button>
                 </div>
+                <p className="text-yellow-500/80 text-xs mt-1">⚠ Copy this secret now — it will not be shown again after you leave this page.</p>
               </div>
-            )}
+            ) : check.secret_configured ? (
+              <div>
+                <label className="text-xs text-zinc-500 mb-1 block">Webhook Secret</label>
+                <p className="px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-500 font-mono">
+                  ••••••••••••••••••••
+                </p>
+                <p className="text-zinc-600 text-xs mt-1">Secret was shown only at generation time. Regenerate to get a new one.</p>
+              </div>
+            ) : null}
             <p className="text-zinc-500 text-xs">Keep both values private. Regenerating will invalidate the previous credentials.</p>
           </div>
         ) : (
