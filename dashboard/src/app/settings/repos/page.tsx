@@ -39,7 +39,7 @@ export default function ReposPage() {
   };
 
   const filtered = repos.filter((r) =>
-    r.name.toLowerCase().includes(search.toLowerCase())
+    r.name?.toLowerCase().includes(search.toLowerCase())
   );
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
