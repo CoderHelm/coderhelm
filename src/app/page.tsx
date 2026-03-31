@@ -762,7 +762,7 @@ export default function Home() {
                 ),
                 color: "#f43f5e",
                 title: "Rate-Limited & Audited",
-                desc: "All billing and sensitive endpoints are rate-limited per tenant. Every action is logged for full auditability.",
+                desc: "Sensitive endpoints are rate-limited per organization. Every action is logged for full auditability.",
               },
             ].map((f) => (
               <div
