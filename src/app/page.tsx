@@ -167,7 +167,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-6">
           <div className="grid gap-12 md:grid-cols-2 md:items-center">
             <div>
-              <p className="text-sm font-semibold text-emerald-400 tracking-wider uppercase">1.0 Intake</p>
+              <p className="text-sm font-semibold text-emerald-400 tracking-wider uppercase">Intake</p>
               <h2 className="mt-3 text-3xl font-bold sm:text-4xl">Works where you work</h2>
               <p className="mt-4 text-text-secondary leading-relaxed">
                 Native GitHub and Jira apps. Assign an issue to Coderhelm or add a label — a PR appears automatically.
@@ -241,7 +241,7 @@ export default function Home() {
       <section className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-6xl px-6">
           <div className="text-center">
-            <p className="text-sm font-semibold text-purple-400 tracking-wider uppercase">2.0 Execute</p>
+            <p className="text-sm font-semibold text-purple-400 tracking-wider uppercase">Execute</p>
             <h2 className="mt-3 text-3xl font-bold sm:text-4xl">Multi-pass pipeline</h2>
             <p className="mx-auto mt-4 max-w-2xl text-text-secondary">
               Triage → Plan → Implement → Review → PR → CI Fix → Feedback. Every change is self-reviewed before you see it.
@@ -357,7 +357,7 @@ export default function Home() {
             </div>
 
             <div className="order-1 md:order-2">
-              <p className="text-sm font-semibold text-cyan-400 tracking-wider uppercase">3.0 Plan</p>
+              <p className="text-sm font-semibold text-cyan-400 tracking-wider uppercase">Plan</p>
               <h2 className="mt-3 text-3xl font-bold sm:text-4xl">AI Plans</h2>
               <p className="mt-4 text-text-secondary leading-relaxed">
                 Describe a feature in plain English. Coderhelm chats with you to scope the work,
