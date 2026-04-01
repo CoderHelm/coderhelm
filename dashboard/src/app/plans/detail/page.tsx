@@ -586,6 +586,29 @@ function PlanDetail() {
                         <pre className="text-sm text-zinc-400 font-mono whitespace-pre-wrap leading-relaxed">{task.acceptance_criteria}</pre>
                       </div>
                     )}
+                    {plan.status === "draft" && plan.tasks.filter((t) => t.task_id !== task.task_id).length > 0 && (
+                      <div className="mt-3 ml-7">
+                        <label className="text-xs text-zinc-500 mb-1 block">Run after</label>
+                        <select
+                          value={task.depends_on ?? ""}
+                          onChange={async (e) => {
+                            const val = e.target.value;
+                            try {
+                              await api.updateTask(plan.plan_id, task.task_id, { depends_on: val });
+                              refresh();
+                            } catch { toast("Failed to update dependency", "error"); }
+                          }}
+                          className="w-full max-w-sm px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300 focus:outline-none focus:border-zinc-600"
+                        >
+                          <option value="">No dependency</option>
+                          {plan.tasks.filter((t) => t.task_id !== task.task_id).map((t, i) => (
+                            <option key={t.task_id} value={t.task_id}>
+                              {i + 1}. {t.title}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                   {plan.status === "draft" && (
                     <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
