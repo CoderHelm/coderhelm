@@ -8,6 +8,7 @@ import { useToast } from "@/components/toast";
 interface Message {
   role: "user" | "assistant";
   content: string;
+  mcp_servers?: string[];
 }
 
 interface DraftTask {
@@ -117,9 +118,9 @@ export default function NewPlanPage() {
         .slice(1) // skip the initial assistant greeting
         .map((m) => ({ role: m.role, content: m.content }));
 
-      const { content } = await api.planChat(chatMessages);
+      const { content, mcp_servers } = await api.planChat(chatMessages);
 
-      const assistantMsg: Message = { role: "assistant", content };
+      const assistantMsg: Message = { role: "assistant", content, mcp_servers };
       setMessages((prev) => [...prev, assistantMsg]);
 
       // Parse any plan from the response
@@ -210,6 +211,16 @@ export default function NewPlanPage() {
                       : "bg-zinc-900 border border-zinc-800 text-zinc-200"
                   }`}
                 >
+                  {msg.mcp_servers && msg.mcp_servers.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {msg.mcp_servers.map((s) => (
+                        <span key={s} className="inline-flex items-center gap-1 px-2 py-0.5 bg-violet-500/10 border border-violet-500/20 rounded text-violet-400 text-xs font-medium">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {msg.content.includes("```json")
                     ? msg.content.split(/```json\n[\s\S]*?\n```/).map((part, j, arr) => (
                         <span key={j}>
