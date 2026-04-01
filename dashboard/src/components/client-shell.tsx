@@ -503,7 +503,6 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const [view, setView] = useState<AuthView>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [mfaSession, setMfaSession] = useState("");
@@ -514,7 +513,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const handleSignup = async () => {
     setError(""); setLoading(true);
     try {
-      await api.signup(email, password, name || undefined);
+      await api.signup(email, password);
       setView("verify");
       setMessage("Check your email for a verification code.");
     } catch (e: unknown) {
@@ -664,8 +663,6 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
             <div className="w-full space-y-4">
               <p className="text-sm text-zinc-400 text-center">Create your account</p>
               <div className="space-y-3">
-                <input type="text" placeholder="Name (optional)" value={name} onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
                 <input type="email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
                 <input type="password" placeholder="Password (8+ chars)" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }}
