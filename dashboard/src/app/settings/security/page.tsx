@@ -33,6 +33,21 @@ export default function SecurityPage() {
 
   const isOAuth = authProvider === "github" || authProvider === "google";
 
+  if (authProvider === null) {
+    return (
+      <div className="max-w-xl">
+        <a href="/settings" className="text-zinc-500 hover:text-zinc-300 text-sm">← Settings</a>
+        <h1 className="text-2xl font-bold mt-4 mb-2">Security</h1>
+        <p className="text-sm text-zinc-500 mb-6">
+          Manage your password and two-factor authentication.
+        </p>
+        <div className="animate-pulse space-y-4">
+          <div className="h-40 bg-zinc-900/50 border border-zinc-800 rounded-lg" />
+        </div>
+      </div>
+    );
+  }
+
   const handleChangePassword = async () => {
     if (newPassword !== confirmPassword) {
       toast("Passwords don't match", "error");
