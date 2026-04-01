@@ -186,7 +186,7 @@ export default function Home() {
                     <ul className="space-y-1.5">
                       {app.items.map((item) => (
                         <li key={item} className="text-xs text-text-secondary flex items-center gap-1.5">
-                          <span style={{ color: app.color }}>✓</span> {item}
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={app.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><polyline points="20 6 9 17 4 12" /></svg> {item}
                         </li>
                       ))}
                     </ul>
@@ -371,7 +371,7 @@ export default function Home() {
                   "Set GitHub or Jira destination for the whole plan",
                 ].map((t) => (
                   <li key={t} className="flex items-start gap-2">
-                    <span className="mt-0.5 shrink-0 text-cyan-400">✓</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="mt-1 shrink-0 text-cyan-400"><polyline points="20 6 9 17 4 12" /></svg>
                     {t}
                   </li>
                 ))}
@@ -401,7 +401,7 @@ export default function Home() {
                   "One click to create an executable plan from any recommendation",
                 ].map((t) => (
                   <li key={t} className="flex items-start gap-2">
-                    <span className="mt-0.5 shrink-0 text-orange-400">✓</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="mt-1 shrink-0 text-orange-400"><polyline points="20 6 9 17 4 12" /></svg>
                     {t}
                   </li>
                 ))}
@@ -418,14 +418,24 @@ export default function Home() {
               </div>
               <div className="space-y-3">
                 {[
-                  { label: "IAM Role", detail: "Read-only CloudWatch Logs — no write access", icon: "🔒" },
-                  { label: "External ID", detail: "Confused deputy prevention built in", icon: "🛡" },
-                  { label: "Temp Credentials", detail: "STS AssumeRole — no stored secrets", icon: "⏱" },
-                  { label: "Token Scrubbing", detail: "Secrets auto-detected and removed from logs", icon: "🧹" },
-                  { label: "Tenant Isolation", detail: "Your data is never shared across accounts", icon: "🏢" },
+                  { label: "IAM Role", detail: "Read-only CloudWatch Logs — no write access", icon: (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
+                  ) },
+                  { label: "External ID", detail: "Confused deputy prevention built in", icon: (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+                  ) },
+                  { label: "Temp Credentials", detail: "STS AssumeRole — no stored secrets", icon: (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                  ) },
+                  { label: "Token Scrubbing", detail: "Secrets auto-detected and removed from logs", icon: (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" /></svg>
+                  ) },
+                  { label: "Tenant Isolation", detail: "Your data is never shared across accounts", icon: (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
+                  ) },
                 ].map((item) => (
                   <div key={item.label} className="flex items-start gap-3 text-[11px]">
-                    <span className="text-sm shrink-0 mt-0.5">{item.icon}</span>
+                    <span className="shrink-0 mt-0.5">{item.icon}</span>
                     <div>
                       <span className="text-text-primary font-medium">{item.label}</span>
                       <span className="text-text-muted ml-1.5">— {item.detail}</span>
@@ -434,8 +444,9 @@ export default function Home() {
                 ))}
               </div>
               <div className="mt-4 pt-3 border-t border-[#21262d]">
-                <div className="rounded bg-orange-500/10 border border-orange-500/20 px-3 py-2 text-[10px] text-orange-300">
-                  💡 We also recommend adding a log filter in your AWS account to strip tokens and secrets before they reach CloudWatch.
+                <div className="rounded bg-orange-500/10 border border-orange-500/20 px-3 py-2 text-[10px] text-orange-300 flex items-start gap-1.5">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-px"><path d="M9 18h6" /><path d="M10 22h4" /><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z" /></svg>
+                  We also recommend adding a log filter in your AWS account to strip tokens and secrets before they reach CloudWatch.
                 </div>
               </div>
             </div>
@@ -521,11 +532,11 @@ export default function Home() {
                 <span className="text-text-secondary">/month</span>
               </div>
               <ul className="mt-6 space-y-3 text-sm text-text-secondary">
-                <li className="flex items-center gap-2"><span className="text-green-400">✓</span> 500K tokens / month</li>
-                <li className="flex items-center gap-2"><span className="text-green-400">✓</span> Public &amp; private repos</li>
-                <li className="flex items-center gap-2"><span className="text-green-400">✓</span> All passes</li>
-                <li className="flex items-center gap-2"><span className="text-green-400">✓</span> CI self-healing</li>
-                <li className="flex items-center gap-2"><span className="text-zinc-600">✗</span> AI plans</li>
+                <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> 500K tokens / month</li>
+                <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> Public &amp; private repos</li>
+                <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> All passes</li>
+                <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> CI self-healing</li>
+                <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-zinc-600"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg> AI plans</li>
               </ul>
               <a
                 href="https://app.coderhelm.com"
@@ -546,12 +557,12 @@ export default function Home() {
                 <span className="text-text-secondary">/month</span>
               </div>
               <ul className="mt-6 space-y-3 text-sm text-text-secondary">
-                <li className="flex items-center gap-2"><span className="text-zinc-400">✓</span> 5M tokens / month</li>
-                <li className="flex items-center gap-2"><span className="text-zinc-400">✓</span> AI plans</li>
-                <li className="flex items-center gap-2"><span className="text-zinc-400">✓</span> $50/1M token overage</li>
-                <li className="flex items-center gap-2"><span className="text-zinc-400">✓</span> Priority queue</li>
-                <li className="flex items-center gap-2"><span className="text-zinc-400">✓</span> Custom instructions</li>
-                <li className="flex items-center gap-2"><span className="text-zinc-400">✓</span> Email support</li>
+                <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-zinc-400"><polyline points="20 6 9 17 4 12" /></svg> 5M tokens / month</li>
+                <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-zinc-400"><polyline points="20 6 9 17 4 12" /></svg> AI plans</li>
+                <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-zinc-400"><polyline points="20 6 9 17 4 12" /></svg> $50/1M token overage</li>
+                <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-zinc-400"><polyline points="20 6 9 17 4 12" /></svg> Priority queue</li>
+                <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-zinc-400"><polyline points="20 6 9 17 4 12" /></svg> Custom instructions</li>
+                <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-zinc-400"><polyline points="20 6 9 17 4 12" /></svg> Email support</li>
               </ul>
               <a
                 href="https://app.coderhelm.com"
