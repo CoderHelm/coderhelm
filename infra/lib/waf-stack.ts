@@ -105,6 +105,8 @@ export class WafStack extends cdk.Stack {
         },
 
         // ── Rule 5: Block common bot/scanner user-agents ──
+        // Excludes generic HTTP clients (curl, python-requests, go-http)
+        // that legitimate services like Googlebot verification may use.
         {
           name: "BlockBadBots",
           priority: 5,
@@ -114,7 +116,7 @@ export class WafStack extends cdk.Stack {
               arn: new wafv2.CfnRegexPatternSet(this, "BotPatterns", {
                 scope: "CLOUDFRONT",
                 regularExpressionList: [
-                  "(?i)(scrapy|httpclient|python-urllib|python-requests|curl\\/|wget\\/|go-http|nikto|sqlmap|nmap|masscan|zgrab)",
+                  "(?i)(scrapy|nikto|sqlmap|nmap|masscan|zgrab|dirbuster|gobuster|nuclei|wpscan|acunetix|nessus|openvas|arachni|havij)",
                 ],
               }).attrArn,
               fieldToMatch: {
