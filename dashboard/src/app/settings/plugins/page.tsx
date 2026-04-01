@@ -240,7 +240,7 @@ export default function PluginsPage() {
                         >
                           <span
                             className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-                              isEnabled ? "translate-x-5" : "translate-x-0.5"
+                              isEnabled ? "left-[22px]" : "left-[2px]"
                             }`}
                           />
                         </button>
