@@ -381,6 +381,68 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Log Analyzer */}
+      <section className="border-t border-surface-border py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="grid gap-12 md:grid-cols-2 md:items-center">
+            <div>
+              <p className="text-sm font-semibold text-orange-400 tracking-wider uppercase">Monitor</p>
+              <h2 className="mt-3 text-3xl font-bold sm:text-4xl">AWS Log Analyzer</h2>
+              <p className="mt-4 text-text-secondary leading-relaxed">
+                Connect your AWS account in one click. Coderhelm analyzes your CloudWatch Logs every 6 hours,
+                detects errors and patterns, and gives you actionable recommendations — ready to become a plan with one click.
+              </p>
+              <ul className="mt-6 space-y-2 text-sm text-text-secondary">
+                {[
+                  "One-click CloudFormation setup — read-only access, nothing else",
+                  "No logs stored — only aggregated error summaries leave your account",
+                  "Automatic secret & token detection — strips sensitive data before analysis",
+                  "AI-powered recommendations with severity and suggested fixes",
+                  "One click to create an executable plan from any recommendation",
+                ].map((t) => (
+                  <li key={t} className="flex items-start gap-2">
+                    <span className="mt-0.5 shrink-0 text-orange-400">✓</span>
+                    {t}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Security mockup */}
+            <div className="rounded-xl border border-[#21262d] bg-[#0d1117] p-5">
+              <div className="mb-4 flex items-center gap-2 border-b border-[#21262d] pb-3">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                <span className="text-[11px] font-semibold text-text-secondary">Security First</span>
+              </div>
+              <div className="space-y-3">
+                {[
+                  { label: "IAM Role", detail: "Read-only CloudWatch Logs — no write access", icon: "🔒" },
+                  { label: "External ID", detail: "Confused deputy prevention built in", icon: "🛡" },
+                  { label: "Temp Credentials", detail: "STS AssumeRole — no stored secrets", icon: "⏱" },
+                  { label: "Token Scrubbing", detail: "Secrets auto-detected and removed from logs", icon: "🧹" },
+                  { label: "Tenant Isolation", detail: "Your data is never shared across accounts", icon: "🏢" },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-start gap-3 text-[11px]">
+                    <span className="text-sm shrink-0 mt-0.5">{item.icon}</span>
+                    <div>
+                      <span className="text-text-primary font-medium">{item.label}</span>
+                      <span className="text-text-muted ml-1.5">— {item.detail}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 pt-3 border-t border-[#21262d]">
+                <div className="rounded bg-orange-500/10 border border-orange-500/20 px-3 py-2 text-[10px] text-orange-300">
+                  💡 We also recommend adding a log filter in your AWS account to strip tokens and secrets before they reach CloudWatch.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Security */}
       <section className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-6xl px-6">
