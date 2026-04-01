@@ -240,10 +240,10 @@ export default function TeamPage() {
               ].map((row) => (
                 <tr key={row.perm} className="border-b border-zinc-800/50">
                   <td className="py-2 pr-4 text-zinc-300">{row.perm}</td>
-                  <td className="text-center py-2 px-3">{row.viewer ? <span className="text-emerald-400">✓</span> : <span className="text-zinc-700">—</span>}</td>
-                  <td className="text-center py-2 px-3">{row.member ? <span className="text-emerald-400">✓</span> : <span className="text-zinc-700">—</span>}</td>
-                  <td className="text-center py-2 px-3">{row.admin ? <span className="text-emerald-400">✓</span> : <span className="text-zinc-700">—</span>}</td>
-                  <td className="text-center py-2 px-3">{row.owner ? <span className="text-emerald-400">✓</span> : <span className="text-zinc-700">—</span>}</td>
+                  <td className="text-center py-2 px-3">{row.viewer ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="inline text-emerald-400"><polyline points="20 6 9 17 4 12" /></svg> : <span className="text-zinc-700">—</span>}</td>
+                  <td className="text-center py-2 px-3">{row.member ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="inline text-emerald-400"><polyline points="20 6 9 17 4 12" /></svg> : <span className="text-zinc-700">—</span>}</td>
+                  <td className="text-center py-2 px-3">{row.admin ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="inline text-emerald-400"><polyline points="20 6 9 17 4 12" /></svg> : <span className="text-zinc-700">—</span>}</td>
+                  <td className="text-center py-2 px-3">{row.owner ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="inline text-emerald-400"><polyline points="20 6 9 17 4 12" /></svg> : <span className="text-zinc-700">—</span>}</td>
                 </tr>
               ))}
             </tbody>
