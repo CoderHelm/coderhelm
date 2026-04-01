@@ -20,6 +20,10 @@ export default function TeamPage() {
   const [loading, setLoading] = useState(true);
   const [myRole, setMyRole] = useState("");
   const [myUserId, setMyUserId] = useState("");
+  const [teamName, setTeamName] = useState("");
+  const [editingName, setEditingName] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [savingName, setSavingName] = useState(false);
   const { toast } = useToast();
   const { confirm } = useConfirm();
 
@@ -29,17 +33,34 @@ export default function TeamPage() {
   const [inviting, setInviting] = useState(false);
 
   useEffect(() => {
-    Promise.all([api.me(), api.listUsers()])
-      .then(([me, data]) => {
+    Promise.all([api.me(), api.listUsers(), api.listTenants()])
+      .then(([me, data, tenantData]) => {
         setMyRole(me.role);
         setMyUserId(me.user_id);
         setUsers(data.users);
+        const current = tenantData.tenants.find((t) => t.current);
+        if (current) setTeamName(current.org);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
   const isAdminOrOwner = myRole === "admin" || myRole === "owner";
+
+  const handleRenameSave = async () => {
+    if (!newName.trim()) return;
+    setSavingName(true);
+    try {
+      await api.renameTenant(newName.trim());
+      setTeamName(newName.trim());
+      setEditingName(false);
+      toast("Team renamed");
+    } catch {
+      toast("Failed to rename team", "error");
+    } finally {
+      setSavingName(false);
+    }
+  };
 
   const handleInvite = async () => {
     if (!inviteEmail.trim()) return;
@@ -101,6 +122,49 @@ export default function TeamPage() {
       <p className="text-sm text-zinc-500 mb-6">
         Manage who has access to this workspace and their permissions.
       </p>
+
+      {/* Team name */}
+      {myRole === "owner" && (
+        <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg mb-6">
+          <h3 className="text-sm font-medium text-zinc-100 mb-2">Team name</h3>
+          {editingName ? (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleRenameSave()}
+                maxLength={100}
+                className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
+                autoFocus
+              />
+              <button
+                onClick={handleRenameSave}
+                disabled={savingName || !newName.trim()}
+                className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-40 transition-colors cursor-pointer"
+              >
+                {savingName ? "Saving..." : "Save"}
+              </button>
+              <button
+                onClick={() => setEditingName(false)}
+                className="px-3 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-zinc-300">{teamName || "—"}</span>
+              <button
+                onClick={() => { setNewName(teamName); setEditingName(true); }}
+                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                Rename
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Invite */}
       {isAdminOrOwner && (

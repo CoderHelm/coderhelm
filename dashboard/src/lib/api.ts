@@ -50,6 +50,7 @@ export const api = {
   resetAccount: () => request<void>("/api/account/reset", { method: "POST" }),
   listTenants: () => request<{ tenants: TenantInfo[] }>("/api/tenants"),
   switchTenant: (tenantId: string) => request<{ tenant_id: string }>("/api/tenants/switch", { method: "POST", body: JSON.stringify({ tenant_id: tenantId }) }),
+  renameTenant: (name: string) => request<{ status: string; name: string }>("/api/tenants/rename", { method: "PUT", body: JSON.stringify({ name }) }),
 
   // Runs
   listRuns: () => request<{ runs: Run[] }>("/api/runs"),
@@ -217,6 +218,8 @@ export const api = {
     request<{ status: string; plugin_id: string }>(`/api/plugins/${id}`, { method: "DELETE" }),
   updatePluginCredentials: (id: string, credentials: Record<string, string>) =>
     request<{ status: string; error?: string }>(`/api/plugins/${id}/credentials`, { method: "PUT", body: JSON.stringify({ credentials }) }),
+  updatePluginPrompt: (id: string, custom_prompt: string) =>
+    request<{ status: string; error?: string }>(`/api/plugins/${id}/prompt`, { method: "PUT", body: JSON.stringify({ custom_prompt }) }),
 };
 
 export interface TeamUser {
@@ -549,6 +552,7 @@ export interface PluginDef {
   docs_url: string;
   repo_url: string;
   default_prompt: string;
+  recommended_permissions: string;
 }
 
 export interface EnabledPlugin {
@@ -556,6 +560,7 @@ export interface EnabledPlugin {
   enabled: boolean;
   has_credentials: boolean;
   enabled_at: string | null;
+  custom_prompt: string | null;
 }
 
 
