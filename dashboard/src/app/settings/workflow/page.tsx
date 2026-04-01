@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type WorkflowSettings, type JiraCheck } from "@/lib/api";
+import { api, type WorkflowSettings, type JiraCheck, type AwsConnection } from "@/lib/api";
 import { useToast } from "@/components/toast";
 
 type WorkflowToggleKey = "commit_openspec" | "allow_plan_log_analyzer";
@@ -22,15 +22,21 @@ const TOGGLES: { key: WorkflowToggleKey; label: string; description: string }[] 
 export default function WorkflowPage() {
   const [settings, setSettings] = useState<WorkflowSettings | null>(null);
   const [jira, setJira] = useState<JiraCheck | null>(null);
+  const [awsConnected, setAwsConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    Promise.all([api.getWorkflowSettings(), api.getJiraCheck().catch(() => null)])
-      .then(([data, j]) => {
+    Promise.all([
+      api.getWorkflowSettings(),
+      api.getJiraCheck().catch(() => null),
+      api.listAwsConnections().catch(() => ({ connections: [] })),
+    ])
+      .then(([data, j, aws]) => {
         setSettings(data);
         setJira(j);
+        setAwsConnected(aws.connections.some((c: AwsConnection) => c.status === "active"));
       })
       .finally(() => setLoading(false));
   }, []);
@@ -85,15 +91,22 @@ export default function WorkflowPage() {
       </p>
 
       <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-lg divide-y divide-zinc-800">
-        {TOGGLES.map((t) => (
+        {TOGGLES.map((t) => {
+          const disabled = saving || (t.key === "allow_plan_log_analyzer" && !awsConnected);
+          return (
           <div key={t.key} className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
             <div>
               <p className="text-sm font-medium text-zinc-100">{t.label}</p>
               <p className="text-xs text-zinc-500 mt-0.5">{t.description}</p>
+              {t.key === "allow_plan_log_analyzer" && !awsConnected && (
+                <p className="text-xs text-yellow-500 mt-1">
+                  <a href="/settings/aws" className="underline hover:text-yellow-300">Connect an AWS account</a> to enable this.
+                </p>
+              )}
             </div>
             <button
               onClick={() => toggle(t.key)}
-              disabled={saving}
+              disabled={disabled}
               className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
                 settings?.[t.key] ? "bg-emerald-500" : "bg-zinc-700"
               } disabled:opacity-50`}
@@ -105,7 +118,8 @@ export default function WorkflowPage() {
               />
             </button>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Default task destination */}

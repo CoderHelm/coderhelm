@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { api, type AwsConnection, type LogGroup } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { api, type AwsConnection, type LogGroup, type Recommendation } from "@/lib/api";
 import { useToast } from "@/components/toast";
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
@@ -15,6 +16,9 @@ export default function AwsConnectionsPage() {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [addMode, setAddMode] = useState<"cfn" | "manual">("cfn");
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [recsLoading, setRecsLoading] = useState(true);
+  const router = useRouter();
   const { toast } = useToast();
 
   const refresh = useCallback(() => {
@@ -24,17 +28,50 @@ export default function AwsConnectionsPage() {
       .then((r) => setConnections(r.connections))
       .catch(() => toast("Failed to load connections", "error"))
       .finally(() => setLoading(false));
+    setRecsLoading(true);
+    api
+      .listRecommendations({ status: "pending" })
+      .then((r) => setRecommendations(r.recommendations))
+      .catch(() => {})
+      .finally(() => setRecsLoading(false));
   }, [toast]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
+  const handleCreatePlan = async (recId: string) => {
+    try {
+      const result = await api.createPlanFromRecommendation(recId);
+      toast("Plan created");
+      refresh();
+      router.push(`/plans/${result.plan_id}`);
+    } catch {
+      toast("Failed to create plan", "error");
+    }
+  };
+
+  const handleDismiss = async (recId: string) => {
+    try {
+      await api.dismissRecommendation(recId);
+      setRecommendations((prev) => prev.filter((r) => r.rec_id !== recId));
+    } catch {
+      toast("Failed to dismiss", "error");
+    }
+  };
+
   return (
     <div className="max-w-2xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">AWS Connections</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold">AWS Connections</h1>
+            {recommendations.length > 0 && (
+              <span className="px-2.5 py-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-xs font-medium rounded-full">
+                {recommendations.length} finding{recommendations.length !== 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-zinc-500 mt-1">
             Connect your AWS accounts to analyze CloudWatch Logs and get recommendations.
           </p>
@@ -68,6 +105,58 @@ export default function AwsConnectionsPage() {
           onClose={() => setShowAdd(false)}
           onSuccess={refresh}
         />
+      )}
+
+      {/* Log Analysis Findings */}
+      {connections.length > 0 && (
+        <div className="mt-10">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-bold">Log Analysis</h2>
+              <p className="text-sm text-zinc-500 mt-1">
+                Recommendations from your connected AWS accounts
+              </p>
+            </div>
+          </div>
+
+          {recsLoading ? (
+            <div className="text-sm text-zinc-500">Loading recommendations...</div>
+          ) : recommendations.length === 0 ? (
+            <div className="border border-zinc-800 rounded-lg p-6 text-center">
+              <p className="text-sm text-zinc-500">No pending recommendations.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recommendations.map((rec) => (
+                <div key={rec.rec_id} className="border border-zinc-800 rounded-lg bg-zinc-900/50 p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-medium text-zinc-100">{rec.title}</h3>
+                      <p className="text-xs text-zinc-500 mt-1">{rec.summary}</p>
+                      {rec.source_log_group && (
+                        <p className="text-[10px] text-zinc-600 mt-1 font-mono">{rec.source_log_group}</p>
+                      )}
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        onClick={() => handleCreatePlan(rec.rec_id)}
+                        className="px-3 py-1.5 text-xs bg-white text-zinc-900 rounded-md font-medium hover:bg-zinc-200 transition-colors cursor-pointer"
+                      >
+                        Create Plan
+                      </button>
+                      <button
+                        onClick={() => handleDismiss(rec.rec_id)}
+                        className="px-3 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-md text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

@@ -26,6 +26,27 @@ const TIER_LABELS: Record<number, string> = {
   3: "Available",
 };
 
+const BRAND_ICONS: Record<string, { label: string; bg: string; fg: string }> = {
+  figma: { label: "Fi", bg: "bg-purple-600", fg: "text-white" },
+  sentry: { label: "Se", bg: "bg-rose-700", fg: "text-white" },
+  linear: { label: "Li", bg: "bg-indigo-600", fg: "text-white" },
+  notion: { label: "No", bg: "bg-zinc-100", fg: "text-zinc-900" },
+  vercel: { label: "Ve", bg: "bg-zinc-100", fg: "text-zinc-900" },
+  stripe: { label: "St", bg: "bg-violet-600", fg: "text-white" },
+  cloudflare: { label: "Cf", bg: "bg-orange-500", fg: "text-white" },
+  posthog: { label: "Ph", bg: "bg-blue-600", fg: "text-white" },
+  gitlab: { label: "Gl", bg: "bg-orange-600", fg: "text-white" },
+  neon: { label: "Ne", bg: "bg-emerald-600", fg: "text-white" },
+  turso: { label: "Tu", bg: "bg-teal-600", fg: "text-white" },
+  snyk: { label: "Sn", bg: "bg-purple-800", fg: "text-white" },
+  launchdarkly: { label: "Ld", bg: "bg-zinc-800", fg: "text-white" },
+  mongodb: { label: "Mg", bg: "bg-green-700", fg: "text-white" },
+  grafana: { label: "Gr", bg: "bg-orange-600", fg: "text-white" },
+  redis: { label: "Re", bg: "bg-red-600", fg: "text-white" },
+  upstash: { label: "Up", bg: "bg-emerald-700", fg: "text-white" },
+  sanity: { label: "Sa", bg: "bg-red-500", fg: "text-white" },
+};
+
 export default function PluginsPage() {
   const [catalog, setCatalog] = useState<PluginDef[]>([]);
   const [enabled, setEnabled] = useState<Map<string, EnabledPlugin>>(new Map());
@@ -35,6 +56,8 @@ export default function PluginsPage() {
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [savingPrompt, setSavingPrompt] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -64,7 +87,7 @@ export default function PluginsPage() {
         await api.enablePlugin(pluginId);
         setEnabled((prev) => {
           const next = new Map(prev);
-          next.set(pluginId, { plugin_id: pluginId, enabled: true, has_credentials: false, enabled_at: new Date().toISOString() });
+          next.set(pluginId, { plugin_id: pluginId, enabled: true, has_credentials: false, enabled_at: new Date().toISOString(), custom_prompt: null });
           return next;
         });
         toast("Plugin enabled");
@@ -81,6 +104,26 @@ export default function PluginsPage() {
     const empty: Record<string, string> = {};
     for (const f of plugin.credential_fields) empty[f.key] = "";
     setCredentials(empty);
+    const ep = enabled.get(plugin.id);
+    setCustomPrompt(ep?.custom_prompt || plugin.default_prompt);
+  };
+
+  const handleSavePrompt = async (pluginId: string) => {
+    setSavingPrompt(true);
+    try {
+      await api.updatePluginPrompt(pluginId, customPrompt);
+      setEnabled((prev) => {
+        const next = new Map(prev);
+        const ep = next.get(pluginId);
+        if (ep) next.set(pluginId, { ...ep, custom_prompt: customPrompt });
+        return next;
+      });
+      toast("Prompt saved");
+    } catch {
+      toast("Failed to save prompt", "error");
+    } finally {
+      setSavingPrompt(false);
+    }
   };
 
   const handleSaveCredentials = async (pluginId: string) => {
@@ -128,6 +171,24 @@ export default function PluginsPage() {
         <p className="text-sm text-zinc-500 mt-1">
           Connect MCP servers to give Coderhelm access to third-party tools during runs.
         </p>
+      </div>
+
+      {/* Security notice */}
+      <div className="mb-6 px-4 py-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5">
+        <div className="flex items-start gap-2">
+          <svg className="w-4 h-4 text-yellow-400 mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <div>
+            <p className="text-xs text-yellow-300 font-medium">Security Notice</p>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              Use read-only tokens and minimal scopes when configuring credentials. MCP servers should not be granted write or delete access unless required.
+              Contact <a href="mailto:security@coderhelm.com" className="text-yellow-400 hover:underline">security@coderhelm.com</a> with questions.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Category filter */}
@@ -182,7 +243,16 @@ export default function PluginsPage() {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-xl shrink-0" role="img">{plugin.icon}</span>
+                        {(() => {
+                          const brand = BRAND_ICONS[plugin.icon];
+                          return brand ? (
+                            <span className={`w-8 h-8 rounded-md ${brand.bg} ${brand.fg} flex items-center justify-center text-xs font-bold shrink-0`}>
+                              {brand.label}
+                            </span>
+                          ) : (
+                            <span className="text-xl shrink-0" role="img">{plugin.icon}</span>
+                          );
+                        })()}
                         <div className="flex flex-col min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-zinc-100">
@@ -220,6 +290,11 @@ export default function PluginsPage() {
                           >
                             {plugin.repo_url.replace("https://github.com/", "").replace("https://", "")} →
                           </a>
+                          {plugin.recommended_permissions && (
+                            <p className="text-[10px] text-zinc-500 mt-0.5">
+                              <span className="text-zinc-600">Permissions:</span> {plugin.recommended_permissions}
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -271,6 +346,27 @@ export default function PluginsPage() {
                               />
                             </div>
                           ))}
+                        </div>
+                        {/* Custom prompt */}
+                        <div className="mt-4">
+                          <label className="block text-xs text-zinc-400 mb-1">System prompt</label>
+                          <textarea
+                            value={customPrompt}
+                            onChange={(e) => setCustomPrompt(e.target.value)}
+                            rows={4}
+                            maxLength={4000}
+                            className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-md text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 font-mono resize-y"
+                          />
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="text-[10px] text-zinc-600">{customPrompt.length}/4000</span>
+                            <button
+                              onClick={() => handleSavePrompt(plugin.id)}
+                              disabled={savingPrompt}
+                              className="px-3 py-1 text-[10px] font-medium bg-zinc-800 text-zinc-300 border border-zinc-700 rounded hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+                            >
+                              {savingPrompt ? "Saving..." : "Save prompt"}
+                            </button>
+                          </div>
                         </div>
                         <div className="flex items-center justify-between mt-3">
                           <div className="flex items-center gap-3">
