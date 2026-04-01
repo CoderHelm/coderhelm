@@ -41,7 +41,7 @@ export default function AwsConnectionsPage() {
         </div>
         <button
           onClick={() => setShowAdd(true)}
-          className="px-4 py-2 text-sm font-medium bg-white text-zinc-900 rounded-lg hover:bg-zinc-200 transition-colors"
+          className="px-4 py-2 text-sm font-medium bg-white text-zinc-900 rounded-lg hover:bg-zinc-200 transition-colors cursor-pointer"
         >
           Connect AWS
         </button>
@@ -76,7 +76,9 @@ export default function AwsConnectionsPage() {
 function EmptyState({ onConnect }: { onConnect: () => void }) {
   return (
     <div className="border border-dashed border-zinc-700 rounded-xl p-8 text-center">
-      <div className="text-4xl mb-3">☁️</div>
+      <div className="mb-3 flex justify-center">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="#f97316" stroke="none"><path d="M7.64 14.38c0 .28.03.51.08.67.06.16.13.34.23.53.04.06.05.12.05.17 0 .07-.05.15-.14.22l-.47.31c-.07.05-.13.07-.19.07-.07 0-.15-.04-.22-.11a2.24 2.24 0 01-.27-.35 5.82 5.82 0 01-.23-.44c-.58.69-1.31 1.03-2.19 1.03-.63 0-1.13-.18-1.5-.54-.37-.36-.56-.84-.56-1.44 0-.64.22-1.16.68-1.55.45-.39 1.05-.59 1.82-.59.25 0 .51.02.79.06.28.04.56.1.86.17v-.55c0-.57-.12-.97-.35-1.2-.24-.24-.64-.35-1.22-.35-.26 0-.53.03-.81.1-.28.07-.55.15-.81.26-.12.05-.21.08-.26.1a.46.46 0 01-.12.02c-.11 0-.16-.08-.16-.24v-.36c0-.12.01-.22.05-.28.04-.07.12-.13.24-.2.26-.13.58-.24.94-.33a4.37 4.37 0 011.16-.14c.88 0 1.53.2 1.94.6.4.4.61.98.61 1.76v2.32zm-3.02 1.13c.24 0 .49-.04.75-.13.26-.09.5-.25.7-.47.12-.14.22-.3.28-.49.06-.19.1-.42.1-.69v-.33c-.22-.05-.45-.1-.7-.13a5.54 5.54 0 00-.71-.05c-.5 0-.86.1-1.1.31-.25.21-.37.51-.37.9 0 .36.1.63.28.82.19.19.45.26.77.26zm5.97.83c-.14 0-.23-.02-.3-.08-.06-.05-.12-.16-.17-.33l-1.91-6.29c-.05-.18-.08-.29-.08-.35 0-.14.07-.22.21-.22h.74c.14 0 .24.03.3.08.07.05.12.16.17.33l1.36 5.38 1.27-5.38c.04-.18.09-.28.16-.33.07-.05.18-.08.31-.08h.6c.14 0 .24.03.31.08.07.05.13.16.16.33l1.28 5.45 1.4-5.45c.05-.18.11-.28.17-.33.07-.05.17-.08.3-.08h.7c.14 0 .22.07.22.22 0 .04-.01.09-.02.14-.01.06-.03.13-.06.21l-1.96 6.29c-.05.18-.11.28-.17.33-.07.05-.17.08-.3.08h-.65c-.14 0-.24-.03-.31-.08-.07-.06-.12-.16-.16-.34l-1.26-5.24-1.25 5.23c-.04.18-.09.29-.16.34-.07.05-.18.08-.31.08h-.65zm9.5.17a4.1 4.1 0 01-.95-.12c-.31-.07-.55-.16-.7-.25-.09-.05-.16-.12-.18-.18a.47.47 0 01-.04-.18v-.38c0-.16.06-.24.17-.24.05 0 .09.01.14.03.05.02.12.05.19.09.26.12.55.21.85.28.31.07.61.1.92.1.49 0 .86-.09 1.13-.26.27-.18.41-.43.41-.77 0-.23-.07-.41-.21-.56-.14-.15-.41-.28-.79-.4l-1.14-.35c-.57-.18-.99-.44-1.24-.78-.25-.34-.38-.72-.38-1.13 0-.33.07-.62.21-.87.14-.26.33-.48.57-.66.24-.18.51-.31.83-.41.32-.09.65-.14 1.01-.14.18 0 .37.01.56.04.19.03.37.07.54.11.17.05.33.1.47.16.15.06.26.12.34.18.11.07.2.15.25.23.05.08.08.19.08.32v.35c0 .16-.06.24-.17.24-.06 0-.16-.03-.29-.1a3.87 3.87 0 00-1.63-.33c-.44 0-.79.07-1.03.22-.24.15-.36.38-.36.71 0 .23.08.42.24.57.16.15.45.3.88.43l1.11.35c.56.18.97.43 1.21.75.24.32.35.69.35 1.1 0 .34-.07.64-.21.91a2.1 2.1 0 01-.58.67c-.24.18-.53.33-.87.42-.35.1-.71.15-1.1.15z" /></svg>
+      </div>
       <h3 className="text-lg font-semibold text-zinc-100 mb-2">No AWS accounts connected</h3>
       <p className="text-sm text-zinc-500 mb-4 max-w-md mx-auto">
         Connect your AWS account to let Coderhelm analyze your CloudWatch Logs, detect errors,
@@ -84,7 +86,7 @@ function EmptyState({ onConnect }: { onConnect: () => void }) {
       </p>
       <button
         onClick={onConnect}
-        className="px-6 py-2.5 text-sm font-medium bg-white text-zinc-900 rounded-lg hover:bg-zinc-200 transition-colors"
+        className="px-6 py-2.5 text-sm font-medium bg-white text-zinc-900 rounded-lg hover:bg-zinc-200 transition-colors cursor-pointer"
       >
         Connect AWS Account
       </button>
@@ -190,25 +192,25 @@ function ConnectionCard({ connection: conn, onRefresh }: { connection: AwsConnec
             <button
               onClick={handleTest}
               disabled={testing}
-              className="px-3 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:bg-zinc-700 disabled:opacity-50"
+              className="px-3 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:bg-zinc-700 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
             >
               {testing ? "Testing..." : "Test"}
             </button>
             <button
               onClick={handleDiscover}
-              className="px-3 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:bg-zinc-700"
+              className="px-3 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:bg-zinc-700 cursor-pointer"
             >
               Log Groups
             </button>
             <button
               onClick={() => setShowEdit(true)}
-              className="px-3 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:bg-zinc-700"
+              className="px-3 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:bg-zinc-700 cursor-pointer"
             >
               Edit
             </button>
             <button
               onClick={() => setShowDelete(true)}
-              className="px-3 py-1.5 text-xs bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 hover:bg-red-500/20"
+              className="px-3 py-1.5 text-xs bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 hover:bg-red-500/20 cursor-pointer"
             >
               Remove
             </button>
@@ -260,13 +262,13 @@ function ConnectionCard({ connection: conn, onRefresh }: { connection: AwsConnec
                 {selectedGroups.size} selected
               </span>
               <div className="flex gap-3">
-                <button onClick={() => setShowLogGroups(false)} className="text-sm text-zinc-400">
+                <button onClick={() => setShowLogGroups(false)} className="text-sm text-zinc-400 cursor-pointer">
                   Cancel
                 </button>
                 <button
                   onClick={handleSaveLogGroups}
                   disabled={savingGroups}
-                  className="px-4 py-2 bg-white text-zinc-900 rounded-lg text-sm font-medium hover:bg-zinc-200 disabled:opacity-50"
+                  className="px-4 py-2 bg-white text-zinc-900 rounded-lg text-sm font-medium hover:bg-zinc-200 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                 >
                   {savingGroups ? "Saving..." : "Save"}
                 </button>
@@ -298,12 +300,12 @@ function ConnectionCard({ connection: conn, onRefresh }: { connection: AwsConnec
               This will disconnect AWS account {conn.connection_id}. Existing recommendations will be kept.
             </p>
             <div className="flex justify-end gap-3">
-              <button onClick={() => setShowDelete(false)} className="text-sm text-zinc-400">
+              <button onClick={() => setShowDelete(false)} className="text-sm text-zinc-400 cursor-pointer">
                 Cancel
               </button>
               <button
                 onClick={handleDelete}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm"
+                className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm cursor-pointer"
               >
                 Remove
               </button>
@@ -368,11 +370,11 @@ function EditConnectionModal({
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">
-          <button onClick={onClose} className="text-sm text-zinc-400">Cancel</button>
+          <button onClick={onClose} className="text-sm text-zinc-400 cursor-pointer">Cancel</button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 bg-white text-zinc-900 rounded-lg text-sm font-medium hover:bg-zinc-200 disabled:opacity-50"
+            className="px-4 py-2 bg-white text-zinc-900 rounded-lg text-sm font-medium hover:bg-zinc-200 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
           >
             {saving ? "Saving..." : "Save"}
           </button>
@@ -445,7 +447,7 @@ function AddConnectionModal({
         <div className="flex gap-1 p-1 bg-zinc-800 rounded-lg mb-6">
           <button
             onClick={() => setMode("cfn")}
-            className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
               mode === "cfn" ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-300"
             }`}
           >
@@ -453,7 +455,7 @@ function AddConnectionModal({
           </button>
           <button
             onClick={() => setMode("manual")}
-            className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
               mode === "manual" ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-300"
             }`}
           >
@@ -480,7 +482,7 @@ function AddConnectionModal({
             <button
               onClick={handleLaunchStack}
               disabled={loadingCfn}
-              className="w-full px-4 py-2.5 bg-[#FF9900] text-zinc-900 rounded-lg text-sm font-semibold hover:bg-[#FFB347] disabled:opacity-50 transition-colors"
+              className="w-full px-4 py-2.5 bg-[#FF9900] text-zinc-900 rounded-lg text-sm font-semibold hover:bg-[#FFB347] disabled:opacity-50 transition-colors cursor-pointer disabled:cursor-not-allowed"
             >
               {loadingCfn ? "Generating..." : "Launch Stack in AWS"}
             </button>
@@ -542,11 +544,11 @@ function AddConnectionModal({
         )}
 
         <div className="flex justify-end gap-3 mt-6">
-          <button onClick={onClose} className="text-sm text-zinc-400">Cancel</button>
+          <button onClick={onClose} className="text-sm text-zinc-400 cursor-pointer">Cancel</button>
           <button
             onClick={handleManualConnect}
             disabled={saving || !roleArn}
-            className="px-4 py-2 bg-white text-zinc-900 rounded-lg text-sm font-medium hover:bg-zinc-200 disabled:opacity-50"
+            className="px-4 py-2 bg-white text-zinc-900 rounded-lg text-sm font-medium hover:bg-zinc-200 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
           >
             {saving ? "Connecting..." : "Connect"}
           </button>
