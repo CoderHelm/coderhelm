@@ -630,7 +630,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
           </div>
 
           {error && (
-            <div className="w-full rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2.5 text-sm text-red-400">
+            <div className="mt-2 w-full rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2.5 text-sm text-red-400">
               {error}
             </div>
           )}
@@ -695,6 +695,13 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
           {/* ── Signup ── */}
           {view === "signup" && (
             <div className="w-full space-y-4">
+              <div className="text-center">
+                <div className="inline-flex items-center gap-2 rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 mb-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  <span className="text-xs font-medium text-amber-400">Closed beta</span>
+                </div>
+                <p className="text-xs text-zinc-500">Only users with an invite can create an account.</p>
+              </div>
               <div className="space-y-3">
                 <input type="email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); setMessage(""); }}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
