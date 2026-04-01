@@ -26,7 +26,7 @@ export default function SettingsPage() {
     { href: "/settings/github", title: "GitHub", description: "Connected GitHub account and installed repositories." },
     { href: "/settings/aws", title: "AWS", description: "Connect AWS accounts to analyze CloudWatch Logs and get recommendations." },
     { href: "/settings/jira", title: "Jira", description: "Connect Jira to create tickets from plans and sync issue status." },
-    { href: "/settings/plugins", title: "Plugins", description: "Connect third-party tools like Figma, Sentry, and Linear." },
+    { href: "/settings/plugins", title: "MCP Servers", description: "Connect MCP servers like Figma, Sentry, and Linear." },
   ];
 
   const handleReset = async () => {

@@ -555,11 +555,12 @@ function WebhookTab({ check, generatingSecret, generateSecret, deleteSecret, cop
 
 function EventsTab() {
   const [events, setEvents] = useState<JiraEvent[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api.listJiraEvents()
-      .then((res) => setEvents(res.events))
+      .then((res) => { setEvents(res.events); setTotal(res.total ?? res.events.length); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -581,7 +582,7 @@ function EventsTab() {
 
   return (
     <div className="mb-8">
-      <p className="text-zinc-400 text-sm mb-4">Last {events.length} webhook events.</p>
+      <p className="text-zinc-400 text-sm mb-4">Last {events.length} webhook events · {total} total</p>
       <div className="border border-zinc-800 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead>
