@@ -28,7 +28,16 @@ export default function SecurityPage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    api.me().then((u) => setAuthProvider(u.auth_provider ?? "email")).catch(() => {});
+    api.me().then((u) => {
+      // Determine auth provider: explicit field, or infer from github_login presence
+      if (u.auth_provider && u.auth_provider !== "email") {
+        setAuthProvider(u.auth_provider);
+      } else if (u.github_login) {
+        setAuthProvider("github");
+      } else {
+        setAuthProvider(u.auth_provider ?? "email");
+      }
+    }).catch(() => {});
   }, []);
 
   const isOAuth = authProvider === "github" || authProvider === "google";
