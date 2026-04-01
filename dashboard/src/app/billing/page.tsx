@@ -100,13 +100,25 @@ export default function BillingPage() {
   };
 
   const handleCancel = async () => {
-    if (!(await confirm({ title: "Cancel Subscription", message: "Cancel your subscription? You'll retain access until the end of the billing period.", confirmLabel: "Cancel Subscription", destructive: true }))) return;
+    const choice = await confirm({
+      title: "Cancel Subscription",
+      message: "How would you like to cancel?",
+      confirmLabel: "Cancel at period end",
+      secondaryLabel: "Cancel immediately",
+      destructive: true,
+    });
+    if (!choice) return;
+    const immediately = choice === "secondary";
     setActionLoading(true);
     try {
-      await api.cancelSubscription();
-      toast("Subscription cancelled");
+      await api.cancelSubscription(immediately);
+      toast(immediately ? "Subscription cancelled" : "Subscription will cancel at period end");
       window.dispatchEvent(new Event("billing-updated"));
-      refresh();
+      if (immediately) {
+        pollRefresh();
+      } else {
+        refresh();
+      }
     } catch {
       toast("Failed to cancel. Please try again.", "error");
     } finally {

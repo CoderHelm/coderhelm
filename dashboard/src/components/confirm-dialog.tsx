@@ -6,12 +6,15 @@ interface ConfirmOptions {
   title: string;
   message: string;
   confirmLabel?: string;
+  secondaryLabel?: string;
   destructive?: boolean;
 }
 
+type ConfirmResult = false | "primary" | "secondary";
+
 const ConfirmContext = createContext<{
-  confirm: (opts: ConfirmOptions) => Promise<boolean>;
-}>({ confirm: (_opts: ConfirmOptions) => Promise.resolve(false) });
+  confirm: (opts: ConfirmOptions) => Promise<ConfirmResult>;
+}>({ confirm: (_opts: ConfirmOptions) => Promise.resolve(false as ConfirmResult) });
 
 export function useConfirm() {
   return useContext(ConfirmContext);
@@ -20,17 +23,17 @@ export function useConfirm() {
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [opts, setOpts] = useState<ConfirmOptions>({ title: "", message: "" });
-  const resolveRef = useRef<((v: boolean) => void) | undefined>(undefined);
+  const resolveRef = useRef<((v: ConfirmResult) => void) | undefined>(undefined);
 
   const confirm = useCallback((o: ConfirmOptions) => {
     setOpts(o);
     setOpen(true);
-    return new Promise<boolean>((res) => {
+    return new Promise<ConfirmResult>((res) => {
       resolveRef.current = res;
     });
   }, []);
 
-  const close = (result: boolean) => {
+  const close = (result: ConfirmResult) => {
     setOpen(false);
     resolveRef.current?.(result);
   };
@@ -49,10 +52,18 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                 onClick={() => close(false)}
                 className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800"
               >
-                Cancel
+                Keep subscription
               </button>
+              {opts.secondaryLabel && (
+                <button
+                  onClick={() => close("secondary")}
+                  className="rounded-lg border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/10"
+                >
+                  {opts.secondaryLabel}
+                </button>
+              )}
               <button
-                onClick={() => close(true)}
+                onClick={() => close("primary")}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                   opts.destructive
                     ? "bg-red-600 text-white hover:bg-red-700"
