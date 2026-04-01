@@ -24,6 +24,7 @@ export default function SettingsPage() {
 
   const integrations = [
     { href: "/settings/github", title: "GitHub", description: "Connected GitHub account and installed repositories." },
+    { href: "/settings/aws", title: "AWS", description: "Connect AWS accounts to analyze CloudWatch Logs and get recommendations." },
     { href: "/settings/jira", title: "Jira", description: "Connect Jira to create tickets from plans and sync issue status." },
   ];
 

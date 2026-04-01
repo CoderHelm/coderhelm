@@ -179,6 +179,29 @@ export const api = {
   mfaVerifySetup: (access_token: string, code: string, session: string) =>
     request<{ status: string }>("/api/users/mfa/verify", { method: "POST", body: JSON.stringify({ access_token, code, session }) }),
   mfaDisable: () => request<{ status: string }>("/api/users/mfa", { method: "DELETE" }),
+
+  // AWS Connections (Log Analyzer)
+  listAwsConnections: () => request<{ connections: AwsConnection[] }>("/api/aws-connections"),
+  createAwsConnection: (role_arn: string, region?: string) =>
+    request<{ connection_id?: string; external_id?: string; status?: string; error?: string; message?: string }>("/api/aws-connections", { method: "POST", body: JSON.stringify({ role_arn, region }) }),
+  updateAwsConnection: (id: string, body: Partial<{ role_arn: string; region: string; log_groups: string[] }>) =>
+    request<{ status: string }>(`/api/aws-connections/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  deleteAwsConnection: (id: string) =>
+    request<{ status: string }>(`/api/aws-connections/${id}`, { method: "DELETE" }),
+  testAwsConnection: (id: string) =>
+    request<{ status: string; message: string }>(`/api/aws-connections/${id}/test`, { method: "POST" }),
+  discoverLogGroups: (id: string) =>
+    request<{ log_groups: LogGroup[] }>(`/api/aws-connections/${id}/log-groups`),
+  getCfnUrl: () =>
+    request<{ cfn_url: string; external_id: string }>("/api/aws-connections/cfn-url"),
+
+  // Recommendations
+  listRecommendations: (params?: { status?: string; severity?: string }) =>
+    request<{ recommendations: Recommendation[] }>(`/api/recommendations${params ? `?${new URLSearchParams(params as Record<string, string>)}` : ""}`),
+  createPlanFromRecommendation: (id: string) =>
+    request<{ plan_id: string; status: string }>(`/api/recommendations/${id}/plan`, { method: "POST" }),
+  dismissRecommendation: (id: string) =>
+    request<{ status: string }>(`/api/recommendations/${id}/dismiss`, { method: "POST" }),
 };
 
 export interface TeamUser {
@@ -457,6 +480,39 @@ export interface JiraProject {
   enabled: boolean;
   lead?: string | null;
   style?: string;
+}
+
+export interface AwsConnection {
+  connection_id: string;
+  role_arn: string;
+  external_id: string;
+  region: string;
+  status: string;
+  log_groups: string[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface LogGroup {
+  name: string;
+  stored_bytes?: number;
+  retention_days?: number;
+}
+
+export interface Recommendation {
+  rec_id: string;
+  status: "pending" | "approved" | "dismissed";
+  severity: "critical" | "warning" | "info";
+  title: string;
+  summary: string;
+  suggested_action: string;
+  source_log_group?: string;
+  source_account_id?: string;
+  error_hash?: string;
+  error_count?: number;
+  plan_id?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 
