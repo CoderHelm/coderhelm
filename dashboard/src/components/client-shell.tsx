@@ -11,7 +11,7 @@ import {
   PlayIcon, CircleDotIcon, BarChartIcon, HexagonIcon, HeartIcon,
   GitBranchIcon, GearIcon, SquareIcon, GitHubIcon, UsersIcon,
   BellIcon, DollarIcon, TargetIcon, RepeatIcon, ShieldCheckIcon,
-  CloudIcon,
+  AwsIcon,
 } from "./icons";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
@@ -63,11 +63,16 @@ const navGroups: NavGroup[] = [
     label: "Configure",
     items: [
       { href: "/settings/repos", label: "Repos", icon: <GitBranchIcon /> },
-      { href: "/settings", label: "Settings", icon: <GearIcon />, adminOnly: true },
+      { href: "/settings", label: "Settings", icon: <GearIcon /> },
       { href: "/settings/workflow", label: "Workflow", icon: <RepeatIcon />, adminOnly: true },
       { href: "/settings/notifications", label: "Notifications", icon: <BellIcon /> },
+    ],
+  },
+  {
+    label: "Integrations",
+    items: [
       { href: "/settings/github", label: "GitHub", icon: <GitHubIcon />, adminOnly: true },
-      { href: "/settings/aws", label: "AWS", icon: <CloudIcon />, adminOnly: true },
+      { href: "/settings/aws", label: "AWS", icon: <AwsIcon />, adminOnly: true },
       { href: "/settings/jira", label: "Jira", icon: <SquareIcon />, adminOnly: true },
     ],
   },
