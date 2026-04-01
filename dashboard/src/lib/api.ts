@@ -42,6 +42,13 @@ export const api = {
     request<{ status: string; tenant_id?: string }>("/auth/mfa/verify", { method: "POST", body: JSON.stringify({ session, code }) }),
   logout: () => request<void>("/auth/logout", { method: "POST" }),
 
+  // Allowlist
+  listAllowlist: () => request<{ emails: string[] }>("/api/allowlist"),
+  addToAllowlist: (email: string) =>
+    request<{ status: string }>("/api/allowlist", { method: "POST", body: JSON.stringify({ email }) }),
+  removeFromAllowlist: (email: string) =>
+    request<{ status: string }>("/api/allowlist", { method: "DELETE", body: JSON.stringify({ email }) }),
+
   // Health
   getHealth: () => request<HealthCheck>("/api/health"),
 
