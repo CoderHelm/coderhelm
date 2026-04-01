@@ -454,6 +454,72 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Plugins */}
+      <section className="border-t border-surface-border py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="grid gap-12 md:grid-cols-2 md:items-center">
+            <div className="order-2 md:order-1 rounded-xl border border-[#21262d] bg-[#0d1117] p-5">
+              <div className="mb-4 flex items-center gap-2 border-b border-[#21262d] pb-3">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2v4" /><path d="M12 18v4" /><path d="M4.93 4.93l2.83 2.83" /><path d="M16.24 16.24l2.83 2.83" /><path d="M2 12h4" /><path d="M18 12h4" /><path d="M4.93 19.07l2.83-2.83" /><path d="M16.24 7.76l2.83-2.83" />
+                </svg>
+                <span className="text-[11px] font-semibold text-text-secondary">Integrations</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { name: "Figma", cat: "Design" },
+                  { name: "Sentry", cat: "Monitoring" },
+                  { name: "Linear", cat: "Projects" },
+                  { name: "Notion", cat: "Docs" },
+                  { name: "Slack", cat: "Chat" },
+                  { name: "Datadog", cat: "Monitoring" },
+                  { name: "Vercel", cat: "Deploy" },
+                  { name: "Stripe", cat: "Payments" },
+                  { name: "PostHog", cat: "Analytics" },
+                  { name: "Supabase", cat: "Database" },
+                  { name: "Neon", cat: "Database" },
+                  { name: "Cloudflare", cat: "Deploy" },
+                ].map((p) => (
+                  <div key={p.name} className="flex items-center gap-2 rounded-md bg-white/[0.03] px-2.5 py-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                    <div>
+                      <div className="text-[11px] font-medium text-text-primary">{p.name}</div>
+                      <div className="text-[9px] text-text-muted">{p.cat}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 pt-3 border-t border-[#21262d] text-center">
+                <span className="text-[10px] text-text-muted">28 plugins available across 13 categories</span>
+              </div>
+            </div>
+
+            <div className="order-1 md:order-2">
+              <p className="text-sm font-semibold text-purple-400 tracking-wider uppercase">Integrate</p>
+              <h2 className="mt-3 text-3xl font-bold sm:text-4xl">Plugins</h2>
+              <p className="mt-4 text-text-secondary leading-relaxed">
+                Connect your tools so Coderhelm can pull context during planning and execution.
+                Pull Figma designs, query Sentry errors, check Datadog metrics, or read Notion docs
+                while building your PRs.
+              </p>
+              <ul className="mt-6 space-y-2 text-sm text-text-secondary">
+                {[
+                  "One-click enable with API key or token",
+                  "Available during both AI Plans and PR runs",
+                  "Credentials encrypted at rest, tenant-isolated",
+                  "28 plugins: Design, Monitoring, Database, Deployment, and more",
+                ].map((t) => (
+                  <li key={t} className="flex items-start gap-2">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="mt-1 shrink-0 text-purple-400"><polyline points="20 6 9 17 4 12" /></svg>
+                    {t}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Security */}
       <section className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-6xl px-6">

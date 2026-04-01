@@ -115,16 +115,19 @@ export default function TeamPage() {
               onKeyDown={(e) => e.key === "Enter" && handleInvite()}
               className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
             />
-            <select
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value)}
-              className="px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
-            >
-              <option value="viewer">Viewer</option>
-              <option value="member">Member</option>
-              <option value="billing">Billing</option>
-              <option value="admin">Admin</option>
-            </select>
+            <div className="relative">
+              <select
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value)}
+                className="appearance-none pl-3 pr-8 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
+              >
+                <option value="viewer">Viewer</option>
+                <option value="member">Member</option>
+                <option value="billing">Billing</option>
+                <option value="admin">Admin</option>
+              </select>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400"><polyline points="6 9 12 15 18 9" /></svg>
+            </div>
             <button
               onClick={handleInvite}
               disabled={inviting || !inviteEmail.trim()}
