@@ -54,7 +54,7 @@ export function WaitlistForm({ className = "" }: { className?: string }) {
       <button
         type="submit"
         disabled={status === "loading" || !email.trim()}
-        className="w-full sm:w-auto rounded-xl bg-blue-500 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:bg-blue-600 disabled:opacity-50"
+        className="w-full sm:w-auto rounded-xl bg-blue-500 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:bg-blue-600 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
       >
         {status === "loading" ? "Joining..." : "Get early access"}
       </button>
