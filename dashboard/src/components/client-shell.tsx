@@ -8,8 +8,8 @@ import { pushToDataLayer } from "@/lib/gtm";
 import { ToastProvider } from "./toast";
 import { ConfirmProvider } from "./confirm-dialog";
 import {
-  PlayIcon, CircleDotIcon, BarChartIcon, HexagonIcon, HeartIcon,
-  GitBranchIcon, GearIcon, SquareIcon, GitHubIcon, UsersIcon,
+  PlayIcon, CircleDotIcon, TrendingUpIcon, HexagonIcon, HeartIcon,
+  GitBranchIcon, GearIcon, AtlassianIcon, GitHubIcon, UsersIcon,
   BellIcon, DollarIcon, TargetIcon, RepeatIcon, ShieldCheckIcon,
   AwsIcon, PluginIcon,
 } from "./icons";
@@ -55,7 +55,7 @@ const navGroups: NavGroup[] = [
   {
     label: "Insights",
     items: [
-      { href: "/analytics", label: "Analytics", icon: <BarChartIcon /> },
+      { href: "/analytics", label: "Analytics", icon: <TrendingUpIcon /> },
       { href: "/infrastructure", label: "Infrastructure", icon: <HexagonIcon /> },
       { href: "/health", label: "Health", icon: <HeartIcon /> },
     ],
@@ -74,7 +74,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/settings/github", label: "GitHub", icon: <GitHubIcon />, adminOnly: true },
       { href: "/settings/aws", label: "AWS", icon: <AwsIcon />, adminOnly: true },
-      { href: "/settings/jira", label: "Jira", icon: <SquareIcon />, adminOnly: true },
+      { href: "/settings/jira", label: "Jira", icon: <AtlassianIcon />, adminOnly: true },
       { href: "/settings/plugins", label: "Plugins", icon: <PluginIcon />, adminOnly: true },
     ],
   },
