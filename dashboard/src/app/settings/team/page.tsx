@@ -306,9 +306,12 @@ export default function TeamPage() {
                 { perm: "Manage billing & budget", viewer: false, member: false, billing: true, admin: true, owner: true },
                 { perm: "Manage repos & workflow", viewer: false, member: false, billing: false, admin: true, owner: true },
                 { perm: "Manage integrations (GitHub, Jira, AWS)", viewer: false, member: false, billing: false, admin: true, owner: true },
+                { perm: "Manage MCP servers", viewer: false, member: false, billing: false, admin: true, owner: true },
                 { perm: "Invite & remove users", viewer: false, member: false, billing: false, admin: true, owner: true },
                 { perm: "Change user roles", viewer: false, member: false, billing: false, admin: true, owner: true },
                 { perm: "Access settings", viewer: false, member: false, billing: false, admin: true, owner: true },
+                { perm: "Rename team", viewer: false, member: false, billing: false, admin: false, owner: true },
+                { perm: "Reset account data", viewer: false, member: false, billing: false, admin: false, owner: true },
               ].map((row) => (
                 <tr key={row.perm} className="border-b border-zinc-800/50">
                   <td className="py-2 pr-4 text-zinc-300">{row.perm}</td>

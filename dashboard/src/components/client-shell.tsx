@@ -497,7 +497,7 @@ function Sidebar({
 
 // ── Auth Screen (login / signup / verify / forgot password) ────────
 
-type AuthView = "login" | "signup" | "verify" | "forgot" | "reset" | "mfa";
+type AuthView = "login" | "waitlist" | "verify" | "forgot" | "reset" | "mfa";
 
 function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const [view, setView] = useState<AuthView>("login");
@@ -510,15 +510,14 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  const handleSignup = async () => {
+  const handleWaitlist = async () => {
     setError(""); setLoading(true);
     try {
-      await api.signup(email, password);
-      setView("verify");
-      setMessage("Check your email for a verification code.");
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "";
-      setError(msg.includes("409") ? "An account with this email already exists." : msg || "Signup failed. Please try again.");
+      const result = await api.joinWaitlist(email);
+      setMessage(result.message || "You're on the list!");
+      setView("login");
+    } catch {
+      setError("Something went wrong. Please try again.");
     } finally { setLoading(false); }
   };
 
@@ -653,25 +652,26 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
               </div>
 
               <div className="flex items-center justify-between w-full text-xs">
-                <button onClick={() => { setView("signup"); setError(""); setMessage(""); }} className="text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">Create account</button>
+                <button onClick={() => { setView("waitlist"); setError(""); setMessage(""); }} className="text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">Join waitlist</button>
                 <button onClick={() => { setView("forgot"); setError(""); setMessage(""); }} className="text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">Forgot password?</button>
               </div>
             </div>
           )}
 
-          {/* ── Signup ── */}
-          {view === "signup" && (
+          {/* ── Waitlist ── */}
+          {view === "waitlist" && (
             <div className="w-full space-y-4">
-              <p className="text-sm text-zinc-400 text-center">Create your account</p>
+              <div className="text-center">
+                <p className="text-sm text-zinc-300 font-medium">Coderhelm is in closed beta</p>
+                <p className="text-xs text-zinc-500 mt-1">Join the waitlist and we&apos;ll notify you when we open up.</p>
+              </div>
               <div className="space-y-3">
                 <input type="email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                  onKeyDown={(e) => e.key === "Enter" && handleWaitlist()}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
-                <input type="password" placeholder="Password (8+ chars)" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }}
-                  onKeyDown={(e) => e.key === "Enter" && handleSignup()}
-                  className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
-                <button onClick={handleSignup} disabled={loading || !email || password.length < 8}
+                <button onClick={handleWaitlist} disabled={loading || !email}
                   className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed">
-                  {loading ? "Creating account..." : "Create account"}
+                  {loading ? "Joining..." : "Join waitlist"}
                 </button>
               </div>
               <button onClick={() => { setView("login"); setError(""); setMessage(""); }} className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">
