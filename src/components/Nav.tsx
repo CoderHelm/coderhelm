@@ -29,19 +29,13 @@ export default function Nav() {
             href="https://app.coderhelm.com"
             className="text-sm text-text-secondary hover:text-text-primary transition-colors"
           >
-            Dashboard
-          </a>
-          <a
-            href="https://api.coderhelm.com/auth/login"
-            className="text-sm text-text-secondary hover:text-text-primary transition-colors"
-          >
             Login
           </a>
           <a
-            href="https://github.com/apps/coderhelm"
+            href="https://app.coderhelm.com"
             className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90"
           >
-            Install on GitHub
+            Sign Up
           </a>
         </div>
 
@@ -78,19 +72,13 @@ export default function Nav() {
               href="https://app.coderhelm.com"
               className="text-sm text-text-secondary"
             >
-              Dashboard
-            </a>
-            <a
-              href="https://api.coderhelm.com/auth/login"
-              className="text-sm text-text-secondary"
-            >
               Login
             </a>
             <a
-              href="https://github.com/apps/coderhelm"
+              href="https://app.coderhelm.com"
               className="rounded-lg bg-white px-4 py-2 text-center text-sm font-semibold text-black"
             >
-              Install on GitHub
+              Sign Up
             </a>
           </div>
         </div>

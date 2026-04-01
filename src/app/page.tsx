@@ -34,16 +34,16 @@ export default function Home() {
 
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <a
-              href="https://github.com/apps/coderhelm"
+              href="https://app.coderhelm.com"
               className="rounded-xl bg-blue-500 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:bg-blue-600"
             >
-              Install on GitHub — Free
+              Get Started — Free
             </a>
             <a
-              href="#how-it-works"
+              href="https://app.coderhelm.com"
               className="rounded-xl border border-surface-border px-8 py-3.5 text-base font-semibold text-text-secondary transition-colors hover:text-text-primary"
             >
-              See how it works
+              Login
             </a>
           </div>
 
@@ -113,8 +113,8 @@ export default function Home() {
             {[
               {
                 step: "01",
-                title: "Install the app",
-                desc: "One click — choose repos, connect Jira if you want. Takes 30 seconds.",
+                title: "Sign up",
+                desc: "Create an account, connect GitHub and Jira. Takes 30 seconds.",
                 icon: (
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -466,7 +466,7 @@ export default function Home() {
                 <li className="flex items-center gap-2"><span className="text-zinc-600">✗</span> AI plans</li>
               </ul>
               <a
-                href="https://github.com/apps/coderhelm"
+                href="https://app.coderhelm.com"
                 className="mt-8 block rounded-lg bg-white/[0.06] px-6 py-3 text-center text-sm font-semibold transition-colors hover:bg-white/[0.1]"
               >
                 Get started
@@ -492,7 +492,7 @@ export default function Home() {
                 <li className="flex items-center gap-2"><span className="text-zinc-400">✓</span> Email support</li>
               </ul>
               <a
-                href="https://github.com/apps/coderhelm"
+                href="https://app.coderhelm.com"
                 className="mt-8 block rounded-lg bg-blue-500 px-6 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-blue-600"
               >
                 Upgrade
@@ -509,13 +509,13 @@ export default function Home() {
             Ready to ship faster?
           </h2>
           <p className="mt-4 text-text-secondary">
-            Install Coderhelm in 30 seconds. No credit card, no config.
+            Sign up in 30 seconds. No credit card, no config.
           </p>
           <a
-            href="https://github.com/apps/coderhelm"
+            href="https://app.coderhelm.com"
             className="mt-8 inline-block rounded-xl bg-blue-500 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:bg-blue-600"
           >
-            Install on GitHub — Free
+            Get Started — Free
           </a>
         </div>
       </section>
