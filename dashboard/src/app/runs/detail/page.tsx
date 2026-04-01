@@ -73,7 +73,7 @@ function PassProgress({ currentPass, status }: { currentPass?: string; status: s
 }
 
 function formatTokens(n?: number): string {
-  if (!n) return "—";
+  if (n == null) return "—";
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
   return n.toLocaleString();
@@ -245,7 +245,7 @@ function RunDetailInner() {
     ? (Object.keys(openspec) as (keyof Openspec)[]).filter((k) => openspec[k] && k !== "tasks")
     : [];
 
-  const implementStarted = PASSES.indexOf(run.current_pass ?? "") >= 2 || run.status === "completed" || run.status === "failed" || run.status === "archived";
+  const implementStarted = PASSES.indexOf(run.current_pass ?? "") >= 2 || run.status === "completed" || run.status === "failed" || run.status === "archived" || run.status === "cancelled";
   const showTaskSidebar = taskItems.length > 0 && implementStarted;
   const filesModified = run.files_modified ?? [];
 
@@ -352,6 +352,30 @@ function RunDetailInner() {
 
       {/* Retry for runs that failed without an error message (not feedback) */}
       {run.status === "failed" && !run.error && run.current_pass !== "feedback" && (
+        <div className="mb-6">
+          <button
+            onClick={async () => {
+              setRetrying(true);
+              try {
+                await api.retryRun(runId);
+                toast("Run retried — redirecting to runs list");
+                router.push("/");
+              } catch {
+                toast("Failed to retry run", "error");
+                setRetrying(false);
+              }
+            }}
+            disabled={retrying || tokensExceeded}
+            title={tokensExceeded ? "Token limit reached" : undefined}
+            className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-semibold hover:bg-white disabled:opacity-50 cursor-pointer"
+          >
+            {retrying ? "Retrying..." : "Retry this run"}
+          </button>
+        </div>
+      )}
+
+      {/* Retry for cancelled runs */}
+      {run.status === "cancelled" && (
         <div className="mb-6">
           <button
             onClick={async () => {
@@ -507,6 +531,13 @@ function RunDetailInner() {
                 {run.status === "failed" && (
                   <TrailEntry
                     label="Run failed"
+                    time={run.updated_at}
+                    status="failed"
+                  />
+                )}
+                {run.status === "cancelled" && (
+                  <TrailEntry
+                    label="Run cancelled"
                     time={run.updated_at}
                     status="failed"
                   />

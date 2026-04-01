@@ -208,7 +208,7 @@ export default function PluginsPage() {
             className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
               categoryFilter === cat
                 ? "bg-zinc-100 text-zinc-900 border-zinc-100"
-                : `${CATEGORY_COLORS[cat] || "bg-zinc-900 text-zinc-400 border-zinc-700"} hover:opacity-80`
+                : "bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-zinc-200"
             }`}
           >
             {cat}
@@ -260,7 +260,9 @@ export default function PluginsPage() {
                             </span>
                             <span
                               className={`px-1.5 py-0.5 text-[10px] font-medium rounded border ${
-                                CATEGORY_COLORS[plugin.category] || "bg-zinc-800 text-zinc-400 border-zinc-700"
+                                isEnabled
+                                  ? "bg-zinc-100/10 text-zinc-300 border-zinc-600"
+                                  : "bg-zinc-800 text-zinc-500 border-zinc-700"
                               }`}
                             >
                               {plugin.category}
@@ -291,8 +293,8 @@ export default function PluginsPage() {
                             {plugin.repo_url.replace("https://github.com/", "").replace("https://", "")} →
                           </a>
                           {plugin.recommended_permissions && (
-                            <p className="text-[10px] text-zinc-500 mt-0.5">
-                              <span className="text-zinc-600">Permissions:</span> {plugin.recommended_permissions}
+                            <p className="text-xs text-zinc-400 mt-1">
+                              <span className="text-zinc-500 font-medium">Permissions:</span> {plugin.recommended_permissions}
                             </p>
                           )}
                         </div>
@@ -316,7 +318,7 @@ export default function PluginsPage() {
                         >
                           <span
                             className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-                              isEnabled ? "left-[22px]" : "left-[2px]"
+                              isEnabled ? "left-[23px]" : "left-[2px]"
                             }`}
                           />
                         </button>
@@ -326,8 +328,26 @@ export default function PluginsPage() {
                     {/* Credentials form */}
                     {configuring === plugin.id && (
                       <div className="mt-3 pt-3 border-t border-zinc-800">
-                        <div className="space-y-3">
-                          {plugin.credential_fields.map((field) => (
+                        {hasCreds && !Object.values(credentials).some((v) => v !== "") ? (
+                          <div className="flex items-center justify-between mb-3 px-3 py-2.5 bg-emerald-500/5 border border-emerald-500/20 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400"><path d="M20 6L9 17l-5-5" /></svg>
+                              <span className="text-sm text-emerald-400 font-medium">Credentials saved</span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                const empty: Record<string, string> = {};
+                                for (const f of plugin.credential_fields) empty[f.key] = " ";
+                                setCredentials(empty);
+                              }}
+                              className="px-3 py-1 text-xs font-medium text-zinc-400 bg-zinc-800 border border-zinc-700 rounded-md hover:text-zinc-200 hover:bg-zinc-700 transition-colors cursor-pointer"
+                            >
+                              Update credentials
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {plugin.credential_fields.map((field) => (
                             <div key={field.key}>
                               <label className="block text-xs text-zinc-400 mb-1">
                                 {field.label}
@@ -347,6 +367,7 @@ export default function PluginsPage() {
                             </div>
                           ))}
                         </div>
+                        )}
                         {/* Custom prompt */}
                         <div className="mt-4">
                           <label className="block text-xs text-zinc-400 mb-1">System prompt</label>
@@ -362,7 +383,7 @@ export default function PluginsPage() {
                             <button
                               onClick={() => handleSavePrompt(plugin.id)}
                               disabled={savingPrompt}
-                              className="px-3 py-1 text-[10px] font-medium bg-zinc-800 text-zinc-300 border border-zinc-700 rounded hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+                              className="px-4 py-1.5 text-xs font-medium bg-zinc-100 text-zinc-900 border border-zinc-100 rounded-md hover:bg-white disabled:opacity-50 transition-colors cursor-pointer"
                             >
                               {savingPrompt ? "Saving..." : "Save prompt"}
                             </button>
