@@ -31,3 +31,6 @@ export const GitHubIcon = () => <svg {...s} fill="currentColor" stroke="none"><p
 
 // Safety agent icon
 export const ScanIcon = () => <svg {...s}><path d="M3 7V5a2 2 0 012-2h2" /><path d="M17 3h2a2 2 0 012 2v2" /><path d="M21 17v2a2 2 0 01-2 2h-2" /><path d="M7 21H5a2 2 0 01-2-2v-2" /><path d="M8 12h8" /><path d="M12 8v8" /></svg>;
+
+// Plugin icon (puzzle piece)
+export const PluginIcon = () => <svg {...s}><path d="M12 2v4" /><path d="M12 18v4" /><path d="M4.93 4.93l2.83 2.83" /><path d="M16.24 16.24l2.83 2.83" /><path d="M2 12h4" /><path d="M18 12h4" /><path d="M4.93 19.07l2.83-2.83" /><path d="M16.24 7.76l2.83-2.83" /></svg>;
