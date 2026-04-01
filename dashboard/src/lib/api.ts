@@ -55,6 +55,7 @@ export const api = {
   getRunOpenspec: (id: string) => request<Openspec>(`/api/runs/${id}/openspec`),
   retryRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/retry`, { method: "POST" }),
   reReviewRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/re-review`, { method: "POST" }),
+  cancelRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/cancel`, { method: "POST" }),
 
   // Repos
   listRepos: () => request<{ repos: Repo[] }>("/api/repos"),
@@ -136,7 +137,7 @@ export const api = {
   createPlan: (body: { title: string; description?: string; repo?: string; destination?: "github" | "jira"; tasks?: Partial<Task>[] }) =>
     request<{ plan_id: string }>("/api/plans", { method: "POST", body: JSON.stringify(body) }),
   getPlan: (planId: string) => request<Plan & { tasks: Task[] }>(`/api/plans/${planId}`),
-  updatePlan: (planId: string, body: Partial<{ title: string; description: string; status: string }>) =>
+  updatePlan: (planId: string, body: Partial<{ title: string; description: string; status: string; destination: string }>) =>
     request<void>(`/api/plans/${planId}`, { method: "PUT", body: JSON.stringify(body) }),
   deletePlan: (planId: string) => request<void>(`/api/plans/${planId}`, { method: "DELETE" }),
   addTask: (planId: string, body: Partial<Task>) =>
@@ -346,6 +347,7 @@ export interface Plan {
   title: string;
   description: string;
   repo: string;
+  destination?: "github" | "jira" | string;
   status: "draft" | "executing" | "done" | string;
   task_count: number;
   tokens_in?: number;
