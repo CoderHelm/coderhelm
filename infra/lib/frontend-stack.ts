@@ -29,15 +29,15 @@ export class FrontendStack extends cdk.Stack {
       domainName: "coderhelm.ai",
     });
 
-    // ACM certificate (must be us-east-1 for CloudFront — this stack deploys to us-east-1)
+    // ACM wildcard certificate (us-east-1 for CloudFront)
     const certificate = new acm.Certificate(this, "Certificate", {
       domainName: "coderhelm.com",
-      subjectAlternativeNames: ["www.coderhelm.com", "coderhelm.ai", "www.coderhelm.ai"],
+      subjectAlternativeNames: ["*.coderhelm.com", "coderhelm.ai", "*.coderhelm.ai"],
       validation: acm.CertificateValidation.fromDnsMultiZone({
         "coderhelm.com": hostedZone,
-        "www.coderhelm.com": hostedZone,
+        "*.coderhelm.com": hostedZone,
         "coderhelm.ai": aiHostedZone,
-        "www.coderhelm.ai": aiHostedZone,
+        "*.coderhelm.ai": aiHostedZone,
       }),
     });
 
