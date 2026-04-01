@@ -68,32 +68,15 @@ function formatChatContent(text: string): { clean: string; tools: string[] } {
   return { clean, tools };
 }
 
-const THINKING_STAGES = [
-  "Thinking",
-  "Analyzing your request",
-  "Exploring the codebase",
-  "Building a plan",
-];
-
 function ThinkingIndicator() {
-  const [stage, setStage] = useState(0);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setStage((s) => (s + 1) % THINKING_STAGES.length);
-    }, 3000);
-    return () => clearInterval(id);
-  }, []);
-
   return (
     <div className="flex justify-start">
-      <div className="px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-sm flex items-center gap-2">
+      <div className="px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center">
         <span className="flex gap-1">
           <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce [animation-delay:0ms]" />
           <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce [animation-delay:150ms]" />
           <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce [animation-delay:300ms]" />
         </span>
-        <span className="text-zinc-500 transition-all duration-300">{THINKING_STAGES[stage]}…</span>
       </div>
     </div>
   );
