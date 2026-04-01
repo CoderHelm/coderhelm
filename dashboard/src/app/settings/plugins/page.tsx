@@ -55,7 +55,8 @@ export default function PluginsPage() {
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
   const [customPrompt, setCustomPrompt] = useState("");
   const [savingPrompt, setSavingPrompt] = useState(false);
   const [editingCreds, setEditingCreds] = useState(false);
@@ -194,12 +195,21 @@ export default function PluginsPage() {
         </div>
       </div>
 
-      {/* Category filter */}
+      {/* Search + Category filter */}
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Search servers..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full sm:w-72 px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+        />
+      </div>
       <div className="flex items-center gap-2 mb-6 flex-wrap">
         <button
-          onClick={() => setCategoryFilter(null)}
+          onClick={() => setCategoryFilter(new Set())}
           className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
-            !categoryFilter ? "bg-zinc-100 text-zinc-900 border-zinc-100" : "bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-zinc-200"
+            categoryFilter.size === 0 ? "bg-zinc-100 text-zinc-900 border-zinc-100" : "bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-zinc-200"
           }`}
         >
           All
@@ -207,9 +217,13 @@ export default function PluginsPage() {
         {categories.map((cat) => (
           <button
             key={cat}
-            onClick={() => setCategoryFilter(categoryFilter === cat ? null : cat)}
+            onClick={() => setCategoryFilter(prev => {
+              const next = new Set(prev);
+              if (next.has(cat)) next.delete(cat); else next.add(cat);
+              return next;
+            })}
             className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
-              categoryFilter === cat
+              categoryFilter.has(cat)
                 ? "bg-zinc-100 text-zinc-900 border-zinc-100"
                 : "bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-zinc-200"
             }`}
@@ -220,7 +234,15 @@ export default function PluginsPage() {
       </div>
 
       {tiers.map((tier) => {
-        const plugins = catalog.filter((p) => p.tier === tier && (!categoryFilter || p.category === categoryFilter));
+        const plugins = catalog.filter((p) => {
+          if (categoryFilter.size > 0 && !categoryFilter.has(p.category)) return false;
+          if (p.tier !== tier) return false;
+          if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            return p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q) || p.category.toLowerCase().includes(q);
+          }
+          return true;
+        });
         if (plugins.length === 0) return null;
 
         return (

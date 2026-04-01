@@ -124,7 +124,7 @@ export const api = {
   // Billing
   getBilling: () => request<BillingInfo>("/api/billing"),
   createSubscription: () => request<{ client_secret?: string; already_active?: boolean }>("/api/billing/subscribe", { method: "POST", body: "{}" }),
-  cancelSubscription: () => request<{ status: string }>("/api/billing/cancel", { method: "POST" }),
+  cancelSubscription: (immediately = false) => request<{ status: string }>("/api/billing/cancel", { method: "POST", body: JSON.stringify({ immediately }) }),
   reactivateSubscription: () => request<{ status: string }>("/api/billing/reactivate", { method: "POST" }),
   createSetupIntent: () => request<{ client_secret: string }>("/api/billing/payment-method", { method: "POST" }),
   listPaymentMethods: () => request<{ payment_methods: PaymentMethod[] }>("/api/billing/payment-methods"),
