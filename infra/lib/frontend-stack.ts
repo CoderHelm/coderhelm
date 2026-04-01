@@ -18,18 +18,27 @@ export class FrontendStack extends cdk.Stack {
     super(scope, id, props);
 
     const prefix = `coderhelm-${props.stage}`;
-    const domainNames = ["coderhelm.com", "www.coderhelm.com"];
+    const domainNames = ["coderhelm.com", "www.coderhelm.com", "coderhelm.ai", "www.coderhelm.ai"];
 
     // Route53 hosted zone (must exist in the account)
     const hostedZone = route53.HostedZone.fromLookup(this, "Zone", {
       domainName: "coderhelm.com",
     });
 
+    const aiHostedZone = route53.HostedZone.fromLookup(this, "AiZone", {
+      domainName: "coderhelm.ai",
+    });
+
     // ACM certificate (must be us-east-1 for CloudFront — this stack deploys to us-east-1)
     const certificate = new acm.Certificate(this, "Certificate", {
       domainName: "coderhelm.com",
-      subjectAlternativeNames: ["www.coderhelm.com"],
-      validation: acm.CertificateValidation.fromDns(hostedZone),
+      subjectAlternativeNames: ["www.coderhelm.com", "coderhelm.ai", "www.coderhelm.ai"],
+      validation: acm.CertificateValidation.fromDnsMultiZone({
+        "coderhelm.com": hostedZone,
+        "www.coderhelm.com": hostedZone,
+        "coderhelm.ai": aiHostedZone,
+        "www.coderhelm.ai": aiHostedZone,
+      }),
     });
 
     // S3 bucket for static site
@@ -95,12 +104,20 @@ export class FrontendStack extends cdk.Stack {
       }
     );
 
-    // Rewrite directory paths to index.html (e.g. /contact/ → /contact/index.html)
+    // Rewrite directory paths to index.html and redirect coderhelm.ai → coderhelm.com
     const urlRewrite = new cloudfront.Function(this, "UrlRewrite", {
       functionName: `${prefix}-site-url-rewrite`,
       code: cloudfront.FunctionCode.fromInline(`
 function handler(event) {
   var request = event.request;
+  var host = request.headers.host && request.headers.host.value;
+  if (host && host.indexOf('coderhelm.ai') !== -1) {
+    return {
+      statusCode: 301,
+      statusDescription: 'Moved Permanently',
+      headers: { location: { value: 'https://coderhelm.com' + request.uri } }
+    };
+  }
   var uri = request.uri;
   if (uri.startsWith('/errors/')) return request;
   if (uri.endsWith('/')) {
@@ -177,6 +194,24 @@ function handler(event) {
     new route53.ARecord(this, "WwwAlias", {
       zone: hostedZone,
       recordName: "www.coderhelm.com",
+      target: route53.RecordTarget.fromAlias(
+        new targets.CloudFrontTarget(distribution)
+      ),
+    });
+
+    // DNS: coderhelm.ai → CloudFront (redirects to coderhelm.com)
+    new route53.ARecord(this, "AiApexAlias", {
+      zone: aiHostedZone,
+      recordName: "coderhelm.ai",
+      target: route53.RecordTarget.fromAlias(
+        new targets.CloudFrontTarget(distribution)
+      ),
+    });
+
+    // DNS: www.coderhelm.ai → CloudFront (redirects to coderhelm.com)
+    new route53.ARecord(this, "AiWwwAlias", {
+      zone: aiHostedZone,
+      recordName: "www.coderhelm.ai",
       target: route53.RecordTarget.fromAlias(
         new targets.CloudFrontTarget(distribution)
       ),

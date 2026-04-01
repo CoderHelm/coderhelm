@@ -501,33 +501,33 @@ function PlanDetail() {
                       {task.repo && <span className="text-xs text-zinc-600 font-mono">{task.repo}</span>}
                       {task.approved_by && <span className="text-xs text-zinc-600">approved by {task.approved_by}</span>}
                       {task.status === "running" && <span className="text-xs text-blue-400 animate-pulse">Processing…</span>}
-                      {task.status === "waiting" && task.depends_on && (() => {
+                      {task.depends_on && task.status !== "waiting" && (() => {
                         const dep = plan.tasks.find((t) => t.task_id === task.depends_on);
-                        return (
+                        return dep ? <span className="text-xs text-zinc-500">Depends on &ldquo;{dep.title}&rdquo;</span> : null;
+                      })()}
+                    </div>
+                    {task.status === "waiting" && task.depends_on && (() => {
+                      const dep = plan.tasks.find((t) => t.task_id === task.depends_on);
+                      return (
+                        <div className="flex items-center gap-2 mt-1.5 ml-7">
                           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20">
                             <svg className="w-3 h-3 text-orange-400" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5"><path d="M8 2v4M8 10v4M2 8h4M10 8h4" /></svg>
                             <span className="text-xs text-orange-400">Blocked on &ldquo;{dep?.title || "dependency"}&rdquo;</span>
                           </span>
-                        );
-                      })()}
-                      {task.status === "waiting" && (
-                        <button
-                          onClick={async () => {
-                            setActionLoading(task.task_id);
-                            try { await api.forceRunTask(plan.plan_id, task.task_id); refresh(); } catch {}
-                            setActionLoading(null);
-                          }}
-                          disabled={!!actionLoading}
-                          className="px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded text-xs hover:bg-blue-500/20 disabled:opacity-50"
-                        >
-                          Force run
-                        </button>
-                      )}
-                      {task.depends_on && task.status !== "waiting" && (() => {
-                        const dep = plan.tasks.find((t) => t.task_id === task.depends_on);
-                        return dep ? <span className="text-xs text-zinc-500">After &ldquo;{dep.title}&rdquo;</span> : null;
-                      })()}
-                    </div>
+                          <button
+                            onClick={async () => {
+                              setActionLoading(task.task_id);
+                              try { await api.forceRunTask(plan.plan_id, task.task_id); refresh(); } catch {}
+                              setActionLoading(null);
+                            }}
+                            disabled={!!actionLoading}
+                            className="px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded text-xs hover:bg-blue-500/20 disabled:opacity-50"
+                          >
+                            Force run
+                          </button>
+                        </div>
+                      );
+                    })()}
                     {task.description && <p className="text-sm text-zinc-400 mt-2 ml-7 leading-relaxed">{task.description}</p>}
                     {task.acceptance_criteria && (
                       <div className="mt-3 ml-7">
