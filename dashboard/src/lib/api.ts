@@ -365,9 +365,10 @@ export interface Task {
   title: string;
   description: string;
   acceptance_criteria: string;
-  status: "draft" | "approved" | "rejected" | "queued" | "running" | "done" | string;
+  status: "draft" | "approved" | "rejected" | "queued" | "running" | "done" | "waiting" | string;
   order: number;
   repo?: string;
+  depends_on?: string;
   destination?: "github" | "jira" | string;
   jira_project?: string;
   issue_number?: number;

@@ -16,6 +16,7 @@ const TASK_STATUS_STYLES: Record<string, string> = {
   queued: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
   running: "bg-blue-500/10 text-blue-400 border-blue-500/20",
   done: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  waiting: "bg-orange-500/10 text-orange-400 border-orange-500/20",
 };
 
 const TASK_BORDER_COLORS: Record<string, string> = {
@@ -25,6 +26,7 @@ const TASK_BORDER_COLORS: Record<string, string> = {
   queued: "border-l-yellow-500/50",
   running: "border-l-blue-500",
   done: "border-l-emerald-500",
+  waiting: "border-l-orange-500/50",
 };
 
 const TASK_DOT_COLORS: Record<string, string> = {
@@ -34,11 +36,13 @@ const TASK_DOT_COLORS: Record<string, string> = {
   queued: "bg-yellow-500/60",
   running: "bg-blue-500",
   done: "bg-emerald-500",
+  waiting: "bg-orange-500/60",
 };
 
 const PLAN_STATUS_STYLES: Record<string, string> = {
   draft: "bg-zinc-800 text-zinc-400 border-zinc-700",
   executing: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  waiting: "bg-orange-500/10 text-orange-400 border-orange-500/20",
   done: "bg-green-500/10 text-green-400 border-green-500/20",
 };
 
@@ -61,7 +65,7 @@ function PlanDetail() {
   const [editingTask, setEditingTask] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Task>>({});
   const [showAddTask, setShowAddTask] = useState(false);
-  const [newTask, setNewTask] = useState({ title: "", description: "", acceptance_criteria: "", repo: "" });
+  const [newTask, setNewTask] = useState({ title: "", description: "", acceptance_criteria: "", repo: "", depends_on: "" });
   const [executing, setExecuting] = useState(false);
   const [repos, setRepos] = useState<Repo[]>([]);
   const [jiraReady, setJiraReady] = useState(false);
@@ -93,8 +97,8 @@ function PlanDetail() {
   // Auto-poll when tasks are queued or running
   useEffect(() => {
     if (!plan) return;
-    const hasActive = plan.tasks.some((t) => t.status === "queued" || t.status === "running");
-    if (!hasActive && plan.status !== "executing") return;
+    const hasActive = plan.tasks.some((t) => t.status === "queued" || t.status === "running" || t.status === "waiting");
+    if (!hasActive && plan.status !== "executing" && plan.status !== "waiting") return;
     const interval = setInterval(() => {
       api.getPlan(planId).then(setPlan).catch(() => {});
     }, 5000);
@@ -146,9 +150,11 @@ function PlanDetail() {
     setActionLoading("add");
     try {
       const order = plan?.tasks.length ?? 0;
-      await api.addTask(planId, { ...newTask, destination: plan?.destination ?? "github", order });
+      const taskPayload: Record<string, unknown> = { ...newTask, destination: plan?.destination ?? "github", order };
+      if (!newTask.depends_on) delete taskPayload.depends_on;
+      await api.addTask(planId, taskPayload);
       toast("Task added");
-      setNewTask({ title: "", description: "", acceptance_criteria: "", repo: "" });
+      setNewTask({ title: "", description: "", acceptance_criteria: "", repo: "", depends_on: "" });
       setShowAddTask(false);
       refresh();
     } catch {
@@ -425,6 +431,23 @@ function PlanDetail() {
                 ) : (
                   <input value={editForm.repo ?? task.repo ?? ""} onChange={(e) => setEditForm((f) => ({ ...f, repo: e.target.value }))} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Repo override (owner/repo) — blank uses plan default" />
                 )}
+                {plan.tasks.filter((t) => t.task_id !== task.task_id).length > 0 && (
+                  <div>
+                    <label className="text-xs text-zinc-500 mb-1 block">Run after (only start after this task&apos;s PR merges)</label>
+                    <select
+                      value={editForm.depends_on ?? task.depends_on ?? ""}
+                      onChange={(e) => setEditForm((f) => ({ ...f, depends_on: e.target.value }))}
+                      className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
+                    >
+                      <option value="">No dependency</option>
+                      {plan.tasks.filter((t) => t.task_id !== task.task_id).map((t, i) => (
+                        <option key={t.task_id} value={t.task_id}>
+                          {i + 1}. {t.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <button onClick={() => handleSaveEdit(task.task_id)} disabled={actionLoading === task.task_id + ":save"} className="px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded text-xs font-medium hover:bg-white disabled:opacity-50">Save</button>
                   <button onClick={() => setEditingTask(null)} className="px-3 py-1.5 text-zinc-500 hover:text-zinc-300 text-xs">Cancel</button>
@@ -461,6 +484,14 @@ function PlanDetail() {
                       {task.repo && <span className="text-xs text-zinc-600 font-mono">{task.repo}</span>}
                       {task.approved_by && <span className="text-xs text-zinc-600">approved by {task.approved_by}</span>}
                       {task.status === "running" && <span className="text-xs text-blue-400 animate-pulse">Processing…</span>}
+                      {task.status === "waiting" && task.depends_on && (() => {
+                        const dep = plan.tasks.find((t) => t.task_id === task.depends_on);
+                        return dep ? <span className="text-xs text-orange-400">Waiting for &ldquo;{dep.title}&rdquo; to merge</span> : <span className="text-xs text-orange-400">Waiting for dependency</span>;
+                      })()}
+                      {task.depends_on && task.status !== "waiting" && (() => {
+                        const dep = plan.tasks.find((t) => t.task_id === task.depends_on);
+                        return dep ? <span className="text-xs text-zinc-600">Runs after &ldquo;{dep.title}&rdquo;</span> : null;
+                      })()}
                     </div>
                     {task.description && <p className="text-sm text-zinc-400 mt-2 ml-7 leading-relaxed">{task.description}</p>}
                     {task.acceptance_criteria && (
@@ -507,6 +538,23 @@ function PlanDetail() {
                 </div>
               ) : (
                 <input value={newTask.repo} onChange={(e) => setNewTask((t) => ({ ...t, repo: e.target.value }))} placeholder="Repo override (owner/repo) — blank uses plan default" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
+              )}
+              {plan.tasks.length > 0 && (
+                <div>
+                  <label className="text-xs text-zinc-500 mb-1 block">Run after (only start after this task&apos;s PR merges)</label>
+                  <select
+                    value={newTask.depends_on}
+                    onChange={(e) => setNewTask((t) => ({ ...t, depends_on: e.target.value }))}
+                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
+                  >
+                    <option value="">No dependency</option>
+                    {plan.tasks.map((t, i) => (
+                      <option key={t.task_id} value={t.task_id}>
+                        {i + 1}. {t.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               )}
               <div className="flex gap-2">
                 <button onClick={handleAddTask} disabled={!newTask.title.trim() || actionLoading === "add"} className="px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded text-xs font-medium hover:bg-white disabled:opacity-50">Add task</button>
