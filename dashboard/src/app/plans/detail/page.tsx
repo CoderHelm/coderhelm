@@ -557,7 +557,7 @@ function PlanDetail() {
                         const depIdx = dep ? plan.tasks.indexOf(dep) + 1 : null;
                         return dep ? (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700">
-                            <svg className="w-3 h-3 text-zinc-500" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5"><path d="M4 8h8M9 5l3 3-3 3" /></svg>
+                            <span className="text-xs text-zinc-500">↳</span>
                             <span className="text-xs text-zinc-400">after <span className="font-medium">#{depIdx} {dep.title}</span></span>
                           </span>
                         ) : null;
