@@ -296,6 +296,7 @@ export interface NotificationPrefs {
 export interface WorkflowSettings {
   commit_openspec: boolean;
   default_destination: "github" | "jira";
+  allow_plan_log_analyzer: boolean;
 }
 
 export interface BillingInfo {
