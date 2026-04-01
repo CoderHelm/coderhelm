@@ -28,6 +28,8 @@ export const api = {
   me: () => request<{ user_id: string; tenant_id: string; github_login: string | null; email: string; avatar_url: string; role: string; status?: string; auth_provider?: string }>("/api/me"),
   signup: (email: string, password: string) =>
     request<{ status: string; message: string }>("/auth/signup", { method: "POST", body: JSON.stringify({ email, password }) }),
+  joinWaitlist: (email: string) =>
+    request<{ status: string; message: string }>("/auth/waitlist", { method: "POST", body: JSON.stringify({ email }) }),
   loginEmail: (email: string, password: string) =>
     request<{ status: string; session?: string; tenant_id?: string }>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
   verifyEmail: (email: string, code: string) =>
