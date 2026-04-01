@@ -6,7 +6,6 @@ const API_BASE = "https://api.coderhelm.com";
 
 export function WaitlistForm({ className = "" }: { className?: string }) {
   const [email, setEmail] = useState("");
-  const [reason, setReason] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
 
@@ -18,7 +17,7 @@ export function WaitlistForm({ className = "" }: { className?: string }) {
       const res = await fetch(`${API_BASE}/auth/waitlist`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), reason: reason.trim() || undefined }),
+        body: JSON.stringify({ email: email.trim() }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -61,14 +60,6 @@ export function WaitlistForm({ className = "" }: { className?: string }) {
           {status === "loading" ? "Joining..." : "Get early access"}
         </button>
       </div>
-      <textarea
-        placeholder="What would you use Coderhelm for? (optional)"
-        value={reason}
-        onChange={(e) => setReason(e.target.value)}
-        maxLength={500}
-        rows={2}
-        className="w-full sm:w-[29rem] rounded-xl border border-surface-border bg-surface-elevated px-5 py-3 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-blue-500 resize-none"
-      />
       {status === "error" && <p className="text-sm text-red-400">{message}</p>}
     </form>
   );
