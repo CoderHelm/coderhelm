@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -8,6 +8,8 @@ import { useConfirm } from "@/components/confirm-dialog";
 export default function SecurityPage() {
   const { toast } = useToast();
   const { confirm } = useConfirm();
+
+  const [authProvider, setAuthProvider] = useState<string | null>(null);
 
   // Password
   const [currentPassword, setCurrentPassword] = useState("");
@@ -24,6 +26,12 @@ export default function SecurityPage() {
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [mfaLoading, setMfaLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    api.me().then((u) => setAuthProvider(u.auth_provider ?? "email")).catch(() => {});
+  }, []);
+
+  const isOAuth = authProvider === "github" || authProvider === "google";
 
   const handleChangePassword = async () => {
     if (newPassword !== confirmPassword) {
@@ -108,7 +116,16 @@ export default function SecurityPage() {
         Manage your password and two-factor authentication.
       </p>
 
+      {isOAuth && (
+        <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg mb-6">
+          <p className="text-sm text-zinc-400">
+            You signed in with <span className="text-zinc-200 font-medium capitalize">{authProvider}</span>. Password and two-factor authentication are managed by your identity provider.
+          </p>
+        </div>
+      )}
+
       {/* Change Password */}
+      {!isOAuth && (
       <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-lg mb-6">
         <h3 className="text-sm font-semibold text-zinc-100 mb-4">Change password</h3>
         <div className="space-y-3">
@@ -150,8 +167,10 @@ export default function SecurityPage() {
           </button>
         </div>
       </div>
+      )}
 
       {/* Two-Factor Authentication */}
+      {!isOAuth && (
       <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-lg">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -253,6 +272,7 @@ export default function SecurityPage() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
