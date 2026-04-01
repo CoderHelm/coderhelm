@@ -26,25 +26,25 @@ const TIER_LABELS: Record<number, string> = {
   3: "Available",
 };
 
-const BRAND_ICONS: Record<string, { label: string; bg: string; fg: string }> = {
-  figma: { label: "Fi", bg: "bg-purple-600", fg: "text-white" },
-  sentry: { label: "Se", bg: "bg-rose-700", fg: "text-white" },
-  linear: { label: "Li", bg: "bg-indigo-600", fg: "text-white" },
-  notion: { label: "No", bg: "bg-zinc-100", fg: "text-zinc-900" },
-  vercel: { label: "Ve", bg: "bg-zinc-100", fg: "text-zinc-900" },
-  stripe: { label: "St", bg: "bg-violet-600", fg: "text-white" },
-  cloudflare: { label: "Cf", bg: "bg-orange-500", fg: "text-white" },
-  posthog: { label: "Ph", bg: "bg-blue-600", fg: "text-white" },
-  gitlab: { label: "Gl", bg: "bg-orange-600", fg: "text-white" },
-  neon: { label: "Ne", bg: "bg-emerald-600", fg: "text-white" },
-  turso: { label: "Tu", bg: "bg-teal-600", fg: "text-white" },
-  snyk: { label: "Sn", bg: "bg-purple-800", fg: "text-white" },
-  launchdarkly: { label: "Ld", bg: "bg-zinc-800", fg: "text-white" },
-  mongodb: { label: "Mg", bg: "bg-green-700", fg: "text-white" },
-  grafana: { label: "Gr", bg: "bg-orange-600", fg: "text-white" },
-  redis: { label: "Re", bg: "bg-red-600", fg: "text-white" },
-  upstash: { label: "Up", bg: "bg-emerald-700", fg: "text-white" },
-  sanity: { label: "Sa", bg: "bg-red-500", fg: "text-white" },
+const BRAND_ICONS: Record<string, string> = {
+  figma: "Fi",
+  sentry: "Se",
+  linear: "Li",
+  notion: "No",
+  vercel: "Ve",
+  stripe: "St",
+  cloudflare: "Cf",
+  posthog: "Ph",
+  gitlab: "Gl",
+  neon: "Ne",
+  turso: "Tu",
+  snyk: "Sn",
+  launchdarkly: "Ld",
+  mongodb: "Mg",
+  grafana: "Gr",
+  redis: "Re",
+  upstash: "Up",
+  sanity: "Sa",
 };
 
 export default function PluginsPage() {
@@ -58,6 +58,7 @@ export default function PluginsPage() {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
   const [savingPrompt, setSavingPrompt] = useState(false);
+  const [editingCreds, setEditingCreds] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -104,6 +105,7 @@ export default function PluginsPage() {
     const empty: Record<string, string> = {};
     for (const f of plugin.credential_fields) empty[f.key] = "";
     setCredentials(empty);
+    setEditingCreds(false);
     const ep = enabled.get(plugin.id);
     setCustomPrompt(ep?.custom_prompt || plugin.default_prompt);
   };
@@ -141,6 +143,7 @@ export default function PluginsPage() {
         return next;
       });
       setConfiguring(null);
+      setEditingCreds(false);
       toast("Credentials saved");
     } catch {
       toast("Failed to save credentials", "error");
@@ -246,8 +249,8 @@ export default function PluginsPage() {
                         {(() => {
                           const brand = BRAND_ICONS[plugin.icon];
                           return brand ? (
-                            <span className={`w-8 h-8 rounded-md ${brand.bg} ${brand.fg} flex items-center justify-center text-xs font-bold shrink-0`}>
-                              {brand.label}
+                            <span className="w-8 h-8 rounded-md bg-zinc-800 text-zinc-300 flex items-center justify-center text-xs font-bold shrink-0">
+                              {brand}
                             </span>
                           ) : (
                             <span className="text-xl shrink-0" role="img">{plugin.icon}</span>
@@ -318,7 +321,7 @@ export default function PluginsPage() {
                         >
                           <span
                             className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-                              isEnabled ? "left-[23px]" : "left-[2px]"
+                              isEnabled ? "left-[22px]" : "left-[2px]"
                             }`}
                           />
                         </button>
@@ -328,7 +331,7 @@ export default function PluginsPage() {
                     {/* Credentials form */}
                     {configuring === plugin.id && (
                       <div className="mt-3 pt-3 border-t border-zinc-800">
-                        {hasCreds && !Object.values(credentials).some((v) => v.trim() !== "") ? (
+                        {hasCreds && !editingCreds ? (
                           <div className="flex items-center justify-between mb-3 px-3 py-2.5 bg-emerald-500/5 border border-emerald-500/20 rounded-lg">
                             <div className="flex items-center gap-2">
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400"><path d="M20 6L9 17l-5-5" /></svg>
@@ -342,8 +345,9 @@ export default function PluginsPage() {
                             <button
                               onClick={() => {
                                 const empty: Record<string, string> = {};
-                                for (const f of plugin.credential_fields) empty[f.key] = " ";
+                                for (const f of plugin.credential_fields) empty[f.key] = "";
                                 setCredentials(empty);
+                                setEditingCreds(true);
                               }}
                               className="px-3 py-1 text-xs font-medium text-zinc-400 bg-zinc-800 border border-zinc-700 rounded-md hover:text-zinc-200 hover:bg-zinc-700 transition-colors cursor-pointer"
                             >
