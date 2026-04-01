@@ -211,6 +211,45 @@ export default function TeamPage() {
       {users.length === 0 && (
         <p className="text-zinc-500 text-sm text-center py-8">No team members yet.</p>
       )}
+
+      {/* Role permissions */}
+      <div className="mt-8 p-5 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+        <h3 className="text-sm font-semibold text-zinc-100 mb-4">Role permissions</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-zinc-500 border-b border-zinc-800">
+                <th className="text-left py-2 pr-4 font-medium">Permission</th>
+                <th className="text-center py-2 px-3 font-medium">Viewer</th>
+                <th className="text-center py-2 px-3 font-medium">Member</th>
+                <th className="text-center py-2 px-3 font-medium">Admin</th>
+                <th className="text-center py-2 px-3 font-medium">Owner</th>
+              </tr>
+            </thead>
+            <tbody className="text-zinc-400">
+              {[
+                { perm: "View runs & analytics", viewer: true, member: true, admin: true, owner: true },
+                { perm: "View plans & health", viewer: true, member: true, admin: true, owner: true },
+                { perm: "Create & execute plans", viewer: false, member: true, admin: true, owner: true },
+                { perm: "Manage repos & workflow", viewer: false, member: false, admin: true, owner: true },
+                { perm: "Manage integrations (GitHub, Jira, AWS)", viewer: false, member: false, admin: true, owner: true },
+                { perm: "Invite & remove users", viewer: false, member: false, admin: true, owner: true },
+                { perm: "Change user roles", viewer: false, member: false, admin: true, owner: true },
+                { perm: "Manage billing & budget", viewer: false, member: false, admin: true, owner: true },
+                { perm: "Access settings", viewer: false, member: false, admin: true, owner: true },
+              ].map((row) => (
+                <tr key={row.perm} className="border-b border-zinc-800/50">
+                  <td className="py-2 pr-4 text-zinc-300">{row.perm}</td>
+                  <td className="text-center py-2 px-3">{row.viewer ? <span className="text-emerald-400">✓</span> : <span className="text-zinc-700">—</span>}</td>
+                  <td className="text-center py-2 px-3">{row.member ? <span className="text-emerald-400">✓</span> : <span className="text-zinc-700">—</span>}</td>
+                  <td className="text-center py-2 px-3">{row.admin ? <span className="text-emerald-400">✓</span> : <span className="text-zinc-700">—</span>}</td>
+                  <td className="text-center py-2 px-3">{row.owner ? <span className="text-emerald-400">✓</span> : <span className="text-zinc-700">—</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
