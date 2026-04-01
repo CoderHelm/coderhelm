@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, type RunDetail, type Openspec, type BillingInfo } from "@/lib/api";
+import { api, type RunDetail, type Openspec, type BillingInfo, type EnabledPlugin, type PluginDef } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
 import { Markdown } from "@/components/markdown";
@@ -174,9 +174,15 @@ function RunDetailInner() {
   const [cancelling, setCancelling] = useState(false);
   const [specTab, setSpecTab] = useState<keyof Openspec>("proposal");
   const [billing, setBilling] = useState<BillingInfo | null>(null);
+  const [plugins, setPlugins] = useState<{ catalog: PluginDef[]; enabled: EnabledPlugin[] }>({ catalog: [], enabled: [] });
   const { toast } = useToast();
 
   useEffect(() => { api.getBilling().then(setBilling).catch(() => {}); }, []);
+  useEffect(() => {
+    Promise.all([api.getPluginCatalog(), api.listEnabledPlugins()])
+      .then(([c, e]) => setPlugins({ catalog: c.plugins, enabled: e.plugins }))
+      .catch(() => {});
+  }, []);
   const tokensExceeded = billing ? billing.current_period.total_tokens >= billing.limits.tokens : false;
 
   const fetchRun = useCallback(() => {
@@ -374,6 +380,21 @@ function RunDetailInner() {
         <StatCard label="Tokens In" value={formatTokens(run.tokens_in)} />
         <StatCard label="Tokens Out" value={formatTokens(run.tokens_out)} />
       </div>
+
+      {/* Active MCP servers */}
+      {plugins.enabled.length > 0 && (
+        <div className="flex items-center gap-2 mb-6 flex-wrap">
+          <span className="text-xs text-zinc-500">MCP Servers</span>
+          {plugins.enabled.map((ep) => {
+            const def = plugins.catalog.find((c) => c.id === ep.plugin_id);
+            return (
+              <span key={ep.plugin_id} className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 border border-zinc-700 text-zinc-300">
+                {def?.name ?? ep.plugin_id}
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       {/* Links */}
       {(run.pr_url || run.branch) && (
