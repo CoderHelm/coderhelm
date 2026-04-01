@@ -9,7 +9,7 @@ import { ToastProvider } from "./toast";
 import { ConfirmProvider } from "./confirm-dialog";
 import {
   PlayIcon, CircleDotIcon, BarChartIcon, HexagonIcon, HeartIcon,
-  GitBranchIcon, GearIcon, SquareIcon,
+  GitBranchIcon, GearIcon, SquareIcon, GitHubIcon, UsersIcon,
   BellIcon, DollarIcon, TargetIcon, RepeatIcon,
 } from "./icons";
 
@@ -64,7 +64,14 @@ const navGroups: NavGroup[] = [
       { href: "/settings", label: "Settings", icon: <GearIcon /> },
       { href: "/settings/workflow", label: "Workflow", icon: <RepeatIcon /> },
       { href: "/settings/notifications", label: "Notifications", icon: <BellIcon /> },
+      { href: "/settings/github", label: "GitHub", icon: <GitHubIcon /> },
       { href: "/settings/jira", label: "Jira", icon: <SquareIcon /> },
+    ],
+  },
+  {
+    label: "Team",
+    items: [
+      { href: "/settings/team", label: "Members", icon: <UsersIcon /> },
     ],
   },
   {
