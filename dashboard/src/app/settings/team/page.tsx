@@ -6,10 +6,11 @@ import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Skeleton } from "@/components/skeleton";
 
-const ROLES = ["viewer", "member", "admin", "owner"] as const;
+const ROLES = ["viewer", "member", "billing", "admin", "owner"] as const;
 const ROLE_COLORS: Record<string, string> = {
   owner: "text-amber-400 bg-amber-500/10 border-amber-500/20",
   admin: "text-blue-400 bg-blue-500/10 border-blue-500/20",
+  billing: "text-green-400 bg-green-500/10 border-green-500/20",
   member: "text-zinc-300 bg-zinc-800 border-zinc-700",
   viewer: "text-zinc-500 bg-zinc-900 border-zinc-800",
 };
@@ -121,6 +122,7 @@ export default function TeamPage() {
             >
               <option value="viewer">Viewer</option>
               <option value="member">Member</option>
+              <option value="billing">Billing</option>
               <option value="admin">Admin</option>
             </select>
             <button
@@ -186,6 +188,7 @@ export default function TeamPage() {
                 >
                   <option value="viewer">viewer</option>
                   <option value="member">member</option>
+                  <option value="billing">billing</option>
                   <option value="admin">admin</option>
                 </select>
               ) : (
@@ -222,26 +225,29 @@ export default function TeamPage() {
                 <th className="text-left py-2 pr-4 font-medium">Permission</th>
                 <th className="text-center py-2 px-3 font-medium">Viewer</th>
                 <th className="text-center py-2 px-3 font-medium">Member</th>
+                <th className="text-center py-2 px-3 font-medium">Billing</th>
                 <th className="text-center py-2 px-3 font-medium">Admin</th>
                 <th className="text-center py-2 px-3 font-medium">Owner</th>
               </tr>
             </thead>
             <tbody className="text-zinc-400">
               {[
-                { perm: "View runs & analytics", viewer: true, member: true, admin: true, owner: true },
-                { perm: "View plans & health", viewer: true, member: true, admin: true, owner: true },
-                { perm: "Create & execute plans", viewer: false, member: true, admin: true, owner: true },
-                { perm: "Manage repos & workflow", viewer: false, member: false, admin: true, owner: true },
-                { perm: "Manage integrations (GitHub, Jira, AWS)", viewer: false, member: false, admin: true, owner: true },
-                { perm: "Invite & remove users", viewer: false, member: false, admin: true, owner: true },
-                { perm: "Change user roles", viewer: false, member: false, admin: true, owner: true },
-                { perm: "Manage billing & budget", viewer: false, member: false, admin: true, owner: true },
-                { perm: "Access settings", viewer: false, member: false, admin: true, owner: true },
+                { perm: "View runs & analytics", viewer: true, member: true, billing: false, admin: true, owner: true },
+                { perm: "View plans & health", viewer: true, member: true, billing: false, admin: true, owner: true },
+                { perm: "Create & execute plans", viewer: false, member: true, billing: false, admin: true, owner: true },
+                { perm: "View billing & invoices", viewer: false, member: false, billing: true, admin: true, owner: true },
+                { perm: "Manage billing & budget", viewer: false, member: false, billing: true, admin: true, owner: true },
+                { perm: "Manage repos & workflow", viewer: false, member: false, billing: false, admin: true, owner: true },
+                { perm: "Manage integrations (GitHub, Jira, AWS)", viewer: false, member: false, billing: false, admin: true, owner: true },
+                { perm: "Invite & remove users", viewer: false, member: false, billing: false, admin: true, owner: true },
+                { perm: "Change user roles", viewer: false, member: false, billing: false, admin: true, owner: true },
+                { perm: "Access settings", viewer: false, member: false, billing: false, admin: true, owner: true },
               ].map((row) => (
                 <tr key={row.perm} className="border-b border-zinc-800/50">
                   <td className="py-2 pr-4 text-zinc-300">{row.perm}</td>
                   <td className="text-center py-2 px-3">{row.viewer ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="inline text-emerald-400"><polyline points="20 6 9 17 4 12" /></svg> : <span className="text-zinc-700">—</span>}</td>
                   <td className="text-center py-2 px-3">{row.member ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="inline text-emerald-400"><polyline points="20 6 9 17 4 12" /></svg> : <span className="text-zinc-700">—</span>}</td>
+                  <td className="text-center py-2 px-3">{row.billing ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="inline text-emerald-400"><polyline points="20 6 9 17 4 12" /></svg> : <span className="text-zinc-700">—</span>}</td>
                   <td className="text-center py-2 px-3">{row.admin ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="inline text-emerald-400"><polyline points="20 6 9 17 4 12" /></svg> : <span className="text-zinc-700">—</span>}</td>
                   <td className="text-center py-2 px-3">{row.owner ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="inline text-emerald-400"><polyline points="20 6 9 17 4 12" /></svg> : <span className="text-zinc-700">—</span>}</td>
                 </tr>

@@ -37,6 +37,7 @@ interface NavItem {
   label: string;
   icon: ReactNode;
   adminOnly?: boolean;
+  billingVisible?: boolean;
 }
 
 interface NavGroup {
@@ -86,8 +87,8 @@ const navGroups: NavGroup[] = [
     label: "Account",
     items: [
       { href: "/settings/security", label: "Security", icon: <ShieldCheckIcon /> },
-      { href: "/billing", label: "Billing", icon: <DollarIcon />, adminOnly: true },
-      { href: "/settings/budget", label: "Budget", icon: <TargetIcon />, adminOnly: true },
+      { href: "/billing", label: "Billing", icon: <DollarIcon />, adminOnly: true, billingVisible: true },
+      { href: "/settings/budget", label: "Budget", icon: <TargetIcon />, adminOnly: true, billingVisible: true },
     ],
   },
 ];
@@ -366,7 +367,13 @@ function Sidebar({
       <div className="flex-1 space-y-4 overflow-y-auto min-h-0">
         {navGroups.map((group, index) => {
           const isAdminOrOwner = user?.role === "admin" || user?.role === "owner";
-          const visibleItems = group.items.filter((item) => !item.adminOnly || isAdminOrOwner);
+          const isBilling = user?.role === "billing";
+          const visibleItems = group.items.filter((item) => {
+            if (!item.adminOnly) return true;
+            if (isAdminOrOwner) return true;
+            if (isBilling && item.billingVisible) return true;
+            return false;
+          });
           if (visibleItems.length === 0) return null;
 
           return (
