@@ -554,7 +554,13 @@ function PlanDetail() {
                       {task.status === "running" && <span className="text-xs text-blue-400 animate-pulse">Processing…</span>}
                       {task.depends_on && (() => {
                         const dep = plan.tasks.find((t) => t.task_id === task.depends_on);
-                        return dep ? <span className="text-xs text-zinc-500">Depends on &ldquo;{dep.title}&rdquo;</span> : null;
+                        const depIdx = dep ? plan.tasks.indexOf(dep) + 1 : null;
+                        return dep ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700">
+                            <svg className="w-3 h-3 text-zinc-500" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5"><path d="M4 8h8M9 5l3 3-3 3" /></svg>
+                            <span className="text-xs text-zinc-400">after <span className="font-medium">#{depIdx} {dep.title}</span></span>
+                          </span>
+                        ) : null;
                       })()}
                     </div>
                     {task.status === "waiting" && task.depends_on && (() => {
@@ -568,7 +574,9 @@ function PlanDetail() {
                           <button
                             onClick={async () => {
                               setActionLoading(task.task_id);
-                              try { await api.forceRunTask(plan.plan_id, task.task_id); refresh(); } catch {}
+                              // Optimistic: move to queued immediately
+                              setPlan((prev) => prev ? { ...prev, tasks: prev.tasks.map((t) => t.task_id === task.task_id ? { ...t, status: "queued" } : t) } : prev);
+                              try { await api.forceRunTask(plan.plan_id, task.task_id); } catch { refresh(); }
                               setActionLoading(null);
                             }}
                             disabled={!!actionLoading}
@@ -593,10 +601,11 @@ function PlanDetail() {
                           value={task.depends_on ?? ""}
                           onChange={async (e) => {
                             const val = e.target.value;
+                            // Optimistic update to avoid page flash
+                            setPlan((prev) => prev ? { ...prev, tasks: prev.tasks.map((t) => t.task_id === task.task_id ? { ...t, depends_on: val || undefined } : t) } : prev);
                             try {
                               await api.updateTask(plan.plan_id, task.task_id, { depends_on: val });
-                              refresh();
-                            } catch { toast("Failed to update dependency", "error"); }
+                            } catch { toast("Failed to update dependency", "error"); refresh(); }
                           }}
                           className="w-full max-w-sm px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300 focus:outline-none focus:border-zinc-600"
                         >
