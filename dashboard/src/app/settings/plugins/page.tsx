@@ -34,6 +34,7 @@ export default function PluginsPage() {
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -44,7 +45,7 @@ export default function PluginsPage() {
         for (const p of e.plugins) map.set(p.plugin_id, p);
         setEnabled(map);
       })
-      .catch(() => toast("Failed to load plugins", "error"))
+      .catch(() => toast("Failed to load MCP servers", "error"))
       .finally(() => setLoading(false));
   }, []);
 
@@ -108,28 +109,54 @@ export default function PluginsPage() {
   if (loading) {
     return (
       <div className="max-w-4xl">
-        <h1 className="text-2xl font-bold mb-6">Plugins</h1>
+        <h1 className="text-2xl font-bold mb-6">MCP Servers</h1>
         <div className="flex items-center gap-2 text-zinc-500 text-sm">
           <div className="w-4 h-4 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
-          Loading plugins...
+          Loading servers...
         </div>
       </div>
     );
   }
 
+  const categories = Array.from(new Set(catalog.map((p) => p.category))).sort();
   const tiers = [1, 2, 3];
 
   return (
     <div className="max-w-4xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Plugins</h1>
+        <h1 className="text-2xl font-bold">MCP Servers</h1>
         <p className="text-sm text-zinc-500 mt-1">
-          Connect third-party tools to give Coderhelm access to your services during runs.
+          Connect MCP servers to give Coderhelm access to third-party tools during runs.
         </p>
       </div>
 
+      {/* Category filter */}
+      <div className="flex items-center gap-2 mb-6 flex-wrap">
+        <button
+          onClick={() => setCategoryFilter(null)}
+          className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+            !categoryFilter ? "bg-zinc-100 text-zinc-900 border-zinc-100" : "bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-zinc-200"
+          }`}
+        >
+          All
+        </button>
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setCategoryFilter(categoryFilter === cat ? null : cat)}
+            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+              categoryFilter === cat
+                ? "bg-zinc-100 text-zinc-900 border-zinc-100"
+                : `${CATEGORY_COLORS[cat] || "bg-zinc-900 text-zinc-400 border-zinc-700"} hover:opacity-80`
+            }`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
       {tiers.map((tier) => {
-        const plugins = catalog.filter((p) => p.tier === tier);
+        const plugins = catalog.filter((p) => p.tier === tier && (!categoryFilter || p.category === categoryFilter));
         if (plugins.length === 0) return null;
 
         return (
@@ -184,6 +211,14 @@ export default function PluginsPage() {
                           <p className="text-xs text-zinc-500 mt-0.5">
                             {plugin.description}
                           </p>
+                          <a
+                            href={plugin.repo_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors mt-0.5 inline-block"
+                          >
+                            {plugin.repo_url.replace("https://github.com/", "")} →
+                          </a>
                         </div>
                       </div>
 
@@ -237,14 +272,24 @@ export default function PluginsPage() {
                           ))}
                         </div>
                         <div className="flex items-center justify-between mt-3">
-                          <a
-                            href={plugin.docs_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
-                          >
-                            API docs
-                          </a>
+                          <div className="flex items-center gap-3">
+                            <a
+                              href={plugin.docs_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                            >
+                              API docs
+                            </a>
+                            <a
+                              href={plugin.repo_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                            >
+                              Source
+                            </a>
+                          </div>
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => setConfiguring(null)}

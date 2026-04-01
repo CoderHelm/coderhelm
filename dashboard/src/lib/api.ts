@@ -50,7 +50,7 @@ export const api = {
 
   // Runs
   listRuns: () => request<{ runs: Run[] }>("/api/runs"),
-  listJiraEvents: () => request<{ events: JiraEvent[] }>("/api/integrations/jira/events?limit=20"),
+  listJiraEvents: () => request<{ events: JiraEvent[]; total: number }>("/api/integrations/jira/events?limit=20"),
   getRun: (id: string) => request<RunDetail>(`/api/runs/${id}`),
   getRunOpenspec: (id: string) => request<Openspec>(`/api/runs/${id}/openspec`),
   retryRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/retry`, { method: "POST" }),
@@ -540,6 +540,7 @@ export interface PluginDef {
   tier: number;
   credential_fields: CredentialField[];
   docs_url: string;
+  repo_url: string;
 }
 
 export interface EnabledPlugin {
