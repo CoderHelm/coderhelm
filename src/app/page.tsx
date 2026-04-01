@@ -1,5 +1,6 @@
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
+import { WaitlistForm } from "@/components/WaitlistForm";
 
 export default function Home() {
   return (
@@ -18,8 +19,8 @@ export default function Home() {
 
         <div className="relative mx-auto max-w-4xl px-6 text-center">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-surface-border bg-surface-elevated px-4 py-1.5 text-sm text-text-secondary">
-            <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-            Now in public beta
+            <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+            Closed beta
           </div>
 
           <h1 className="text-5xl font-extrabold leading-tight tracking-tight sm:text-7xl">
@@ -32,19 +33,9 @@ export default function Home() {
             AI that reads your codebase, plans changes, implements, and self-reviews.
           </p>
 
-          <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <a
-              href="https://app.coderhelm.com"
-              className="rounded-xl bg-blue-500 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:bg-blue-600"
-            >
-              Get Started — Free
-            </a>
-            <a
-              href="https://app.coderhelm.com"
-              className="rounded-xl border border-surface-border px-8 py-3.5 text-base font-semibold text-text-secondary transition-colors hover:text-text-primary"
-            >
-              Login
-            </a>
+          <div className="mt-10 relative">
+            <WaitlistForm />
+            <p className="mt-3 text-sm text-text-muted">Join the waitlist — we&apos;ll notify you when we open up.</p>
           </div>
 
           {/* Code demo */}
@@ -648,14 +639,9 @@ export default function Home() {
             Ready to ship faster?
           </h2>
           <p className="mt-4 text-text-secondary">
-            Sign up in 30 seconds. No credit card, no config.
+            Join the waitlist. We&apos;ll let you know when your spot is ready.
           </p>
-          <a
-            href="https://app.coderhelm.com"
-            className="mt-8 inline-block rounded-xl bg-blue-500 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:bg-blue-600"
-          >
-            Get Started — Free
-          </a>
+          <WaitlistForm className="mt-8" />
         </div>
       </section>
 
