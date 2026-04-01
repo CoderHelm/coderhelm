@@ -242,7 +242,7 @@ export default function PluginsPage() {
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className={`flex items-center gap-3 min-w-0 ${!isEnabled ? "opacity-70" : ""}`}>
                         {(() => {
                           const brand = BRAND_ICONS[plugin.icon];
                           return brand ? (
@@ -294,7 +294,7 @@ export default function PluginsPage() {
                           </a>
                           {plugin.recommended_permissions && (
                             <p className="text-xs text-zinc-400 mt-1">
-                              <span className="text-zinc-500 font-medium">Permissions:</span> {plugin.recommended_permissions}
+                              <span className="text-zinc-500 font-medium">Recommended Permissions:</span> {plugin.recommended_permissions}
                             </p>
                           )}
                         </div>
@@ -328,11 +328,16 @@ export default function PluginsPage() {
                     {/* Credentials form */}
                     {configuring === plugin.id && (
                       <div className="mt-3 pt-3 border-t border-zinc-800">
-                        {hasCreds && !Object.values(credentials).some((v) => v !== "") ? (
+                        {hasCreds && !Object.values(credentials).some((v) => v.trim() !== "") ? (
                           <div className="flex items-center justify-between mb-3 px-3 py-2.5 bg-emerald-500/5 border border-emerald-500/20 rounded-lg">
                             <div className="flex items-center gap-2">
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400"><path d="M20 6L9 17l-5-5" /></svg>
-                              <span className="text-sm text-emerald-400 font-medium">Credentials saved</span>
+                              <div className="flex flex-col">
+                                <span className="text-sm text-emerald-400 font-medium">Credentials saved</span>
+                                <span className="text-[10px] text-zinc-500 font-mono mt-0.5">
+                                  {plugin.credential_fields.map((f) => f.key).join(", ")}: ••••••••
+                                </span>
+                              </div>
                             </div>
                             <button
                               onClick={() => {
@@ -366,6 +371,15 @@ export default function PluginsPage() {
                               />
                             </div>
                           ))}
+                          <div className="flex justify-end mt-2">
+                            <button
+                              onClick={() => handleSaveCredentials(plugin.id)}
+                              disabled={saving || !Object.values(credentials).some((v) => v.trim() !== "")}
+                              className="px-4 py-1.5 text-xs font-medium bg-zinc-100 text-zinc-900 border border-zinc-100 rounded-md hover:bg-white disabled:opacity-50 transition-colors cursor-pointer"
+                            >
+                              {saving ? "Saving..." : "Save credentials"}
+                            </button>
+                          </div>
                         </div>
                         )}
                         {/* Custom prompt */}

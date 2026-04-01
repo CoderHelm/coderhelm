@@ -33,9 +33,9 @@ export default function Home() {
             AI that reads your codebase, plans changes, implements, and self-reviews.
           </p>
 
-          <div className="mt-10 relative">
+          <div className="mt-12 relative">
             <WaitlistForm />
-            <p className="mt-3 text-sm text-text-muted">Join the waitlist — we&apos;ll notify you when we open up.</p>
+            <p className="mt-4 text-sm text-text-muted">Join the waitlist — we&apos;ll notify you when we open up.</p>
           </div>
 
           {/* Code demo */}
