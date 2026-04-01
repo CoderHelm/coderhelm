@@ -22,7 +22,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   // Auth
-  me: () => request<{ user_id: string; tenant_id: string; github_login: string | null; email: string; avatar_url: string; role: string; status?: string }>("/api/me"),
+  me: () => request<{ user_id: string; tenant_id: string; github_login: string | null; email: string; avatar_url: string; role: string; status?: string; auth_provider?: string }>("/api/me"),
   signup: (email: string, password: string, name?: string) =>
     request<{ status: string; message: string }>("/auth/signup", { method: "POST", body: JSON.stringify({ email, password, name }) }),
   loginEmail: (email: string, password: string) =>
