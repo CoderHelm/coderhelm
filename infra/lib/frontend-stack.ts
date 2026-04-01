@@ -88,7 +88,7 @@ export class FrontendStack extends cdk.Stack {
           },
           contentSecurityPolicy: {
             contentSecurityPolicy:
-              "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com; font-src 'self'",
+              "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.coderhelm.com https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com; font-src 'self'",
             override: true,
           },
         },
