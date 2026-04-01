@@ -539,9 +539,11 @@ export interface PluginDef {
   description: string;
   category: string;
   tier: number;
+  icon: string;
   credential_fields: CredentialField[];
   docs_url: string;
   repo_url: string;
+  default_prompt: string;
 }
 
 export interface EnabledPlugin {

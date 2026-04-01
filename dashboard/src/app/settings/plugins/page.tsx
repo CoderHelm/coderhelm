@@ -182,6 +182,7 @@ export default function PluginsPage() {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-xl shrink-0" role="img">{plugin.icon}</span>
                         <div className="flex flex-col min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-zinc-100">
@@ -217,7 +218,7 @@ export default function PluginsPage() {
                             rel="noopener noreferrer"
                             className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors mt-0.5 inline-block"
                           >
-                            {plugin.repo_url.replace("https://github.com/", "")} →
+                            {plugin.repo_url.replace("https://github.com/", "").replace("https://", "")} →
                           </a>
                         </div>
                       </div>
