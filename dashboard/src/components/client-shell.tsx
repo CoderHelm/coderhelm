@@ -644,6 +644,12 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
           {/* ── Login ── */}
           {view === "login" && (
             <div className="w-full space-y-4">
+              <div className="flex items-center justify-center gap-2 rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                <span className="text-xs font-medium text-amber-400">Closed beta</span>
+                <span className="text-xs text-zinc-500">·</span>
+                <button onClick={() => { setView("waitlist"); setError(""); setMessage(""); }} className="text-xs text-amber-400 hover:text-amber-300 underline underline-offset-2 cursor-pointer">Join waitlist</button>
+              </div>
               <div className="space-y-3">
                 <a
                   href={`${API_BASE}/auth/google`}
