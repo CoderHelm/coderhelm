@@ -14,7 +14,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     if (res.status === 402) {
       throw new Error("Your subscription is inactive. Please update your billing to continue.");
     }
-    throw new Error(`API ${res.status}: ${res.statusText}`);
+    const body = await res.text().catch(() => "");
+    let serverMsg = "";
+    try { serverMsg = body ? JSON.parse(body).error || "" : ""; } catch {}
+    throw new Error(serverMsg || `API ${res.status}: ${res.statusText}`);
   }
   const text = await res.text();
   return text ? JSON.parse(text) : (undefined as T);
@@ -150,6 +153,8 @@ export const api = {
     request<void>(`/api/plans/${planId}/tasks/${taskId}/approve`, { method: "POST" }),
   rejectTask: (planId: string, taskId: string) =>
     request<void>(`/api/plans/${planId}/tasks/${taskId}/reject`, { method: "POST" }),
+  forceRunTask: (planId: string, taskId: string) =>
+    request<{ status: string }>(`/api/plans/${planId}/tasks/${taskId}/force-run`, { method: "POST" }),
   executePlan: (planId: string) =>
     request<{ status: string; tasks_queued: number }>(`/api/plans/${planId}/execute`, { method: "POST" }),
   approveAllAndExecute: (planId: string) =>
