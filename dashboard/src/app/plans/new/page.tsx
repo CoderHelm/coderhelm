@@ -41,6 +41,32 @@ function parsePlan(text: string): DraftPlan | null {
 
 const STORAGE_KEY = "coderhelm:plan-chat";
 
+// Strip MCP tool_call / tool_response blocks from chat content and replace with badges
+function formatChatContent(text: string): { clean: string; tools: string[] } {
+  const tools: string[] = [];
+
+  // Extract tool names from <tool_call> blocks
+  const toolCallRe = /<tool_call>\s*\{?\s*"?name"?\s*:\s*"([^"]+)"[\s\S]*?<\/tool_call>/g;
+  let m;
+  while ((m = toolCallRe.exec(text)) !== null) {
+    tools.push(m[1]);
+  }
+
+  let clean = text
+    // Remove <tool_call>...</tool_call> blocks
+    .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "")
+    // Remove <tool_response>...</tool_response> blocks
+    .replace(/<tool_response>[\s\S]*?<\/tool_response>/g, "")
+    // Remove orphaned tags (unclosed)
+    .replace(/<\/?tool_call>/g, "")
+    .replace(/<\/?tool_response>/g, "")
+    // Collapse multiple blank lines into one
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return { clean, tools };
+}
+
 const THINKING_STAGES = [
   "Thinking",
   "Analyzing your request",
@@ -252,19 +278,36 @@ export default function NewPlanPage() {
                       ))}
                     </div>
                   )}
-                  {msg.content.includes("```json")
-                    ? msg.content.split(/```json\n[\s\S]*?\n```/).map((part, j, arr) => (
-                        <span key={j}>
-                          {part}
-                          {j < arr.length - 1 && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 my-1 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-emerald-400 text-xs font-medium">
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                              Plan generated — see preview
-                            </span>
-                          )}
-                        </span>
-                      ))
-                    : msg.content}
+                  {(() => {
+                    const { clean, tools } = formatChatContent(msg.content);
+                    return (
+                      <>
+                        {tools.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {tools.map((t, ti) => (
+                              <span key={ti} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded text-blue-400 text-xs font-medium">
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                {t.replace(/_/g, " ")}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {clean.includes("```json")
+                          ? clean.split(/```json\n[\s\S]*?\n```/).map((part, j, arr) => (
+                              <span key={j}>
+                                {part}
+                                {j < arr.length - 1 && (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 my-1 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-emerald-400 text-xs font-medium">
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    Plan generated — see preview
+                                  </span>
+                                )}
+                              </span>
+                            ))
+                          : clean}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             ))}
