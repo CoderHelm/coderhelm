@@ -6,6 +6,7 @@ import Link from "next/link";
 import { api, type RunDetail, type Openspec, type BillingInfo } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
+import { Markdown } from "@/components/markdown";
 
 const PASSES = ["triage", "plan", "implement", "review", "pr"];
 
@@ -442,9 +443,7 @@ function RunDetailInner() {
               ))}
             </div>
             <div className="p-4 max-h-96 overflow-y-auto">
-              <pre className="text-sm text-zinc-300 font-mono whitespace-pre-wrap leading-relaxed">
-                {openspec![specTab]}
-              </pre>
+              <Markdown>{String(openspec![specTab])}</Markdown>
             </div>
           </div>
         </div>

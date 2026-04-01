@@ -313,7 +313,7 @@ function PlanDetail() {
               disabled={executing}
               className="px-5 py-2.5 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-40"
             >
-              {executing ? "Executing..." : "Approve all"}
+              {executing ? "Executing..." : "Approve"}
             </button>
           </div>
         )}
@@ -568,7 +568,7 @@ function PlanDetail() {
         )}
 
       {draftCount > 0 && plan.status === "draft" && (
-        <p className="text-xs text-zinc-600 mt-6 ml-8">Approve individual tasks or click &ldquo;Approve all&rdquo; to start. Approving the last task auto-triggers execution.</p>
+        <p className="text-xs text-zinc-600 mt-6 ml-8">Approve individual tasks or click &ldquo;Approve&rdquo; to start. Approving the last task auto-triggers execution.</p>
       )}
     </div>
   );

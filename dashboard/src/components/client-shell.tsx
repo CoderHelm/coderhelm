@@ -10,7 +10,7 @@ import { ConfirmProvider } from "./confirm-dialog";
 import {
   PlayIcon, CircleDotIcon, BarChartIcon, HexagonIcon, HeartIcon,
   GitBranchIcon, GearIcon, SquareIcon, GitHubIcon, UsersIcon,
-  BellIcon, DollarIcon, TargetIcon, RepeatIcon,
+  BellIcon, DollarIcon, TargetIcon, RepeatIcon, ShieldCheckIcon,
 } from "./icons";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
@@ -35,6 +35,7 @@ interface NavItem {
   href: string;
   label: string;
   icon: ReactNode;
+  adminOnly?: boolean;
 }
 
 interface NavGroup {
@@ -61,11 +62,11 @@ const navGroups: NavGroup[] = [
     label: "Configure",
     items: [
       { href: "/settings/repos", label: "Repos", icon: <GitBranchIcon /> },
-      { href: "/settings", label: "Settings", icon: <GearIcon /> },
-      { href: "/settings/workflow", label: "Workflow", icon: <RepeatIcon /> },
+      { href: "/settings", label: "Settings", icon: <GearIcon />, adminOnly: true },
+      { href: "/settings/workflow", label: "Workflow", icon: <RepeatIcon />, adminOnly: true },
       { href: "/settings/notifications", label: "Notifications", icon: <BellIcon /> },
-      { href: "/settings/github", label: "GitHub", icon: <GitHubIcon /> },
-      { href: "/settings/jira", label: "Jira", icon: <SquareIcon /> },
+      { href: "/settings/github", label: "GitHub", icon: <GitHubIcon />, adminOnly: true },
+      { href: "/settings/jira", label: "Jira", icon: <SquareIcon />, adminOnly: true },
     ],
   },
   {
@@ -77,8 +78,9 @@ const navGroups: NavGroup[] = [
   {
     label: "Account",
     items: [
-      { href: "/billing", label: "Billing", icon: <DollarIcon /> },
-      { href: "/settings/budget", label: "Budget", icon: <TargetIcon /> },
+      { href: "/settings/security", label: "Security", icon: <ShieldCheckIcon /> },
+      { href: "/billing", label: "Billing", icon: <DollarIcon />, adminOnly: true },
+      { href: "/settings/budget", label: "Budget", icon: <TargetIcon />, adminOnly: true },
     ],
   },
 ];
@@ -355,7 +357,12 @@ function Sidebar({
       </Link>
 
       <div className="flex-1 space-y-4 overflow-y-auto min-h-0">
-        {navGroups.map((group, index) => (
+        {navGroups.map((group, index) => {
+          const isAdminOrOwner = user?.role === "admin" || user?.role === "owner";
+          const visibleItems = group.items.filter((item) => !item.adminOnly || isAdminOrOwner);
+          if (visibleItems.length === 0) return null;
+
+          return (
           <div key={index}>
             {group.label && (
               <p className="px-2 mb-1 text-xs font-semibold text-zinc-600 uppercase tracking-widest">
@@ -364,7 +371,7 @@ function Sidebar({
             )}
 
             <div className="space-y-1">
-              {group.items.map((item) => {
+              {visibleItems.map((item) => {
                 return (
                   <Link
                     key={item.href}
@@ -385,7 +392,8 @@ function Sidebar({
               })}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Tokens remaining */}
