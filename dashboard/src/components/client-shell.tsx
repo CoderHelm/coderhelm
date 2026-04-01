@@ -414,8 +414,8 @@ function Sidebar({
       {/* Tokens remaining */}
       {billing && (
         <div className="mx-2 mt-3 pt-3 border-t border-zinc-800/60 shrink-0">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-zinc-500">Tokens left</span>
+          <div className="flex items-center justify-between text-xs" title={`${billing.current_period.total_tokens.toLocaleString()} tokens used of ${billing.limits.tokens.toLocaleString()} limit`}>
+            <span className="text-zinc-500">Tokens used</span>
             <span className={`font-medium ${
               billing.current_period.total_tokens >= billing.limits.tokens
                 ? "text-red-400"
@@ -423,7 +423,7 @@ function Sidebar({
                   ? "text-yellow-400"
                   : "text-zinc-300"
             }`}>
-              {formatTokens(Math.max(billing.limits.tokens - billing.current_period.total_tokens, 0))} / {formatTokens(billing.limits.tokens)}
+              {formatTokens(billing.current_period.total_tokens)} / {formatTokens(billing.limits.tokens)}
             </span>
           </div>
           <div className="mt-1.5 h-1 bg-zinc-800 rounded-full overflow-hidden">
@@ -517,7 +517,8 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
       setView("verify");
       setMessage("Check your email for a verification code.");
     } catch (e: unknown) {
-      setError(e instanceof Error && e.message.includes("409") ? "An account with this email already exists." : "Signup failed. Please try again.");
+      const msg = e instanceof Error ? e.message : "";
+      setError(msg.includes("409") ? "An account with this email already exists." : msg || "Signup failed. Please try again.");
     } finally { setLoading(false); }
   };
 
