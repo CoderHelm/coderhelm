@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api, type BillingInfo, type WorkflowSettings } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { ChatMarkdown } from "@/components/chat-markdown";
 
 interface Message {
   role: "user" | "assistant";
@@ -262,9 +263,9 @@ export default function NewPlanPage() {
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div
-                  className={`max-w-[85%] px-4 py-3 rounded-xl text-sm whitespace-pre-wrap leading-relaxed ${
+                  className={`max-w-[85%] px-4 py-3 rounded-xl text-sm leading-relaxed ${
                     msg.role === "user"
-                      ? "bg-zinc-700 text-zinc-100"
+                      ? "bg-zinc-700 text-zinc-100 whitespace-pre-wrap"
                       : "bg-zinc-900 border border-zinc-800 text-zinc-200"
                   }`}
                 >
@@ -292,19 +293,19 @@ export default function NewPlanPage() {
                             ))}
                           </div>
                         )}
-                        {clean.includes("```json")
-                          ? clean.split(/```json\n[\s\S]*?\n```/).map((part, j, arr) => (
-                              <span key={j}>
-                                {part}
-                                {j < arr.length - 1 && (
-                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 my-1 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-emerald-400 text-xs font-medium">
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    Plan generated — see preview
-                                  </span>
-                                )}
-                              </span>
-                            ))
-                          : clean}
+                        {msg.role === "assistant" ? (
+                          <>
+                            {clean.includes("```json") && (
+                              <div className="flex items-center gap-1.5 mb-2">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-emerald-400 text-xs font-medium">
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                  Plan generated — see preview
+                                </span>
+                              </div>
+                            )}
+                            <ChatMarkdown>{clean.replace(/```json\n[\s\S]*?\n```/g, "").trim()}</ChatMarkdown>
+                          </>
+                        ) : clean}
                       </>
                     );
                   })()}

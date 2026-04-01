@@ -32,11 +32,6 @@ export default function TeamPage() {
   const [inviteRole, setInviteRole] = useState("member");
   const [inviting, setInviting] = useState(false);
 
-  // Allowlist state
-  const [allowlist, setAllowlist] = useState<string[]>([]);
-  const [allowEmail, setAllowEmail] = useState("");
-  const [addingAllow, setAddingAllow] = useState(false);
-
   useEffect(() => {
     Promise.all([api.me(), api.listUsers(), api.listTenants()])
       .then(([me, data, tenantData]) => {
@@ -45,9 +40,6 @@ export default function TeamPage() {
         setUsers(data.users);
         const current = tenantData.tenants.find((t) => t.current);
         if (current) setTeamName(current.org);
-        if (me.role === "owner") {
-          api.listAllowlist().then((r) => setAllowlist(r.emails)).catch(() => {});
-        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -208,67 +200,6 @@ export default function TeamPage() {
               {inviting ? "Inviting..." : "Invite"}
             </button>
           </div>
-        </div>
-      )}
-
-      {/* Allowlist */}
-      {myRole === "owner" && (
-        <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg mb-6">
-          <h3 className="text-sm font-medium text-zinc-100 mb-1">Signup allowlist</h3>
-          <p className="text-xs text-zinc-500 mb-3">Only these emails can create accounts. Use <code className="text-zinc-400">*@domain.com</code> for domain wildcards.</p>
-          <div className="flex gap-2 mb-3">
-            <input
-              type="text"
-              placeholder="user@example.com or *@company.com"
-              value={allowEmail}
-              onChange={(e) => setAllowEmail(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && allowEmail.trim()) {
-                  setAddingAllow(true);
-                  api.addToAllowlist(allowEmail.trim())
-                    .then(() => { setAllowlist((prev) => [...prev, allowEmail.trim()]); setAllowEmail(""); toast("Added to allowlist"); })
-                    .catch(() => toast("Failed to add", "error"))
-                    .finally(() => setAddingAllow(false));
-                }
-              }}
-              className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
-            />
-            <button
-              onClick={() => {
-                if (!allowEmail.trim()) return;
-                setAddingAllow(true);
-                api.addToAllowlist(allowEmail.trim())
-                  .then(() => { setAllowlist((prev) => [...prev, allowEmail.trim()]); setAllowEmail(""); toast("Added to allowlist"); })
-                  .catch(() => toast("Failed to add", "error"))
-                  .finally(() => setAddingAllow(false));
-              }}
-              disabled={addingAllow || !allowEmail.trim()}
-              className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed"
-            >
-              {addingAllow ? "Adding..." : "Add"}
-            </button>
-          </div>
-          {allowlist.length > 0 ? (
-            <div className="space-y-1">
-              {allowlist.map((e) => (
-                <div key={e} className="flex items-center justify-between px-3 py-1.5 bg-zinc-900 rounded-lg border border-zinc-800">
-                  <span className="text-sm text-zinc-300 font-mono">{e}</span>
-                  <button
-                    onClick={() => {
-                      api.removeFromAllowlist(e)
-                        .then(() => { setAllowlist((prev) => prev.filter((x) => x !== e)); toast("Removed"); })
-                        .catch(() => toast("Failed to remove", "error"));
-                    }}
-                    className="text-xs text-zinc-600 hover:text-red-400 transition-colors cursor-pointer"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-zinc-600">No allowed emails yet. All signups will be blocked.</p>
-          )}
         </div>
       )}
 
