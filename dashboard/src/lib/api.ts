@@ -202,6 +202,16 @@ export const api = {
     request<{ plan_id: string; status: string }>(`/api/recommendations/${id}/plan`, { method: "POST" }),
   dismissRecommendation: (id: string) =>
     request<{ status: string }>(`/api/recommendations/${id}/dismiss`, { method: "POST" }),
+
+  // Plugins
+  getPluginCatalog: () => request<{ plugins: PluginDef[] }>("/api/plugins/catalog"),
+  listEnabledPlugins: () => request<{ plugins: EnabledPlugin[] }>("/api/plugins"),
+  enablePlugin: (id: string) =>
+    request<{ status: string; plugin_id: string }>(`/api/plugins/${id}/enable`, { method: "POST" }),
+  disablePlugin: (id: string) =>
+    request<{ status: string; plugin_id: string }>(`/api/plugins/${id}`, { method: "DELETE" }),
+  updatePluginCredentials: (id: string, credentials: Record<string, string>) =>
+    request<{ status: string; error?: string }>(`/api/plugins/${id}/credentials`, { method: "PUT", body: JSON.stringify({ credentials }) }),
 };
 
 export interface TeamUser {
@@ -513,6 +523,30 @@ export interface Recommendation {
   plan_id?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface CredentialField {
+  key: string;
+  label: string;
+  placeholder: string;
+  secret: boolean;
+}
+
+export interface PluginDef {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  tier: number;
+  credential_fields: CredentialField[];
+  docs_url: string;
+}
+
+export interface EnabledPlugin {
+  plugin_id: string;
+  enabled: boolean;
+  has_credentials: boolean;
+  enabled_at: string | null;
 }
 
 
