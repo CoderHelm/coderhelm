@@ -16,6 +16,7 @@ function StatusBadge({ status }: { status: string }) {
     failed: { dot: "bg-red-400", text: "text-red-400", bg: "bg-red-500/10 border-red-500/20" },
     pending: { dot: "bg-yellow-400", text: "text-yellow-400", bg: "bg-yellow-500/10 border-yellow-500/20" },
     archived: { dot: "bg-zinc-500", text: "text-zinc-500", bg: "bg-zinc-800/50 border-zinc-700/50" },
+    cancelled: { dot: "bg-amber-400", text: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },
   };
   const s = map[status] ?? { dot: "bg-zinc-500", text: "text-zinc-400", bg: "bg-zinc-800 border-zinc-700" };
   return (
@@ -169,6 +170,7 @@ function RunDetailInner() {
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
   const [reReviewing, setReReviewing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [specTab, setSpecTab] = useState<keyof Openspec>("proposal");
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const { toast } = useToast();
@@ -265,6 +267,29 @@ function RunDetailInner() {
       <div className="mb-6">
         <PassProgress currentPass={run.current_pass} status={run.status} />
       </div>
+
+      {/* Cancel button for running jobs */}
+      {run.status === "running" && (
+        <div className="mb-6">
+          <button
+            onClick={async () => {
+              setCancelling(true);
+              try {
+                await api.cancelRun(runId);
+                setRun((r) => r ? { ...r, status: "cancelled" } : r);
+                toast("Run cancelled");
+              } catch {
+                toast("Failed to cancel run", "error");
+                setCancelling(false);
+              }
+            }}
+            disabled={cancelling}
+            className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700 disabled:opacity-50 cursor-pointer"
+          >
+            {cancelling ? "Cancelling..." : "Cancel Run"}
+          </button>
+        </div>
+      )}
 
       {/* Error banner */}
       {run.error && (
@@ -525,7 +550,7 @@ function RunDetailInner() {
                           )}
                         </div>
                         <span className={`text-xs leading-relaxed ${
-                          done ? "text-zinc-500 line-through" : "text-zinc-400"
+                          done ? "text-zinc-500" : "text-zinc-400"
                         }`}>
                           {task.text.length > 120 ? task.text.slice(0, 120) + "…" : task.text}
                         </span>

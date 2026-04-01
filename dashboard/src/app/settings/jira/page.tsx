@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, type JiraEvent, type JiraCheck, type JiraConfig, type JiraProject } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Skeleton } from "@/components/skeleton";
 
 type Tab = "app" | "webhook" | "events" | "settings";
@@ -16,6 +17,7 @@ export default function JiraPage() {
   const [tab, setTab] = useState<Tab>("app");
   const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
   const { toast } = useToast();
+  const { confirm } = useConfirm();
 
   useEffect(() => {
     Promise.all([api.getJiraCheck(), api.getJiraConfig()])
@@ -45,7 +47,7 @@ export default function JiraPage() {
   };
 
   const deleteSecret = async () => {
-    if (!confirm("Remove the webhook URL? Jira webhooks will stop working until you generate a new one.")) return;
+    if (!(await confirm({ title: "Remove Webhook URL", message: "Remove the webhook URL? Jira webhooks will stop working until you generate a new one.", confirmLabel: "Remove", destructive: true }))) return;
     try {
       await api.deleteJiraSecret();
       setCheck((c) => c ? { ...c, secret_configured: false, webhook_url: undefined } : c);
@@ -137,6 +139,7 @@ function JiraAppTab({ check, config, setConfig, toast }: {
 }) {
   const [copied, setCopied] = useState<string | null>(null);
   const [unlinking, setUnlinking] = useState(false);
+  const { confirm } = useConfirm();
   const copy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     setCopied(label);
@@ -147,7 +150,7 @@ function JiraAppTab({ check, config, setConfig, toast }: {
   const forgeLinked = !!(config?.list_projects_url && config?.create_ticket_url);
 
   const unlink = async () => {
-    if (!confirm("Disconnect the Jira app? You can reconnect it anytime.")) return;
+    if (!(await confirm({ title: "Disconnect Jira", message: "Disconnect the Jira app? You can reconnect it anytime.", confirmLabel: "Disconnect", destructive: true }))) return;
     setUnlinking(true);
     try {
       await api.updateJiraConfig({ list_projects_url: "", create_ticket_url: "" });

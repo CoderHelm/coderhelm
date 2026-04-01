@@ -1,140 +1,6 @@
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 
-const features = [
-  {
-    accentColor: "#a1a1aa",
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="10" />
-        <polygon points="10 8 16 12 10 16 10 8" />
-      </svg>
-    ),
-    title: "GitHub Or Jira Intake",
-    desc: "Assign a GitHub issue or Jira ticket — Coderhelm creates a branch, opens a draft PR, and marks it ready when CI passes.",
-  },
-  {
-    accentColor: "#a1a1aa",
-    icon: (
-      // Pipeline: directed workflow graph (common pattern used for orchestration UX)
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2.5" y="3" width="6" height="6" rx="1.5" />
-        <rect x="15.5" y="3" width="6" height="6" rx="1.5" />
-        <rect x="9" y="15" width="6" height="6" rx="1.5" />
-        <path d="M8.5 6h7" />
-        <path d="M12 9.5v5" />
-        <path d="M18.5 9l1.8-1.8" />
-        <path d="M10.5 14.5l-1.8-1.8" />
-        <path d="M11 13.5l-1.2 1.2" />
-        <path d="M13 13.5l1.2 1.2" />
-      </svg>
-    ),
-    title: "Multi-Pass Pipeline",
-    desc: "Triage → Plan → Implement → Review → PR → CI Fix → Feedback. Every change is self-reviewed before you see it.",
-  },
-  {
-    accentColor: "#a1a1aa",
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-        <path d="M9 12l2 2 4-4" />
-      </svg>
-    ),
-    title: "Guardrails",
-    desc: "Never pushes to main — built in. Add rules like \"always add tests\" or \"never delete migrations\". Enforced on every run.",
-  },
-  {
-    accentColor: "#a1a1aa",
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        <path d="M8 9h8M8 13h4" />
-      </svg>
-    ),
-    title: "Team Voice",
-    desc: "Learns from your existing PRs, commits, and reviews. Writes descriptions that sound like your team, not a bot.",
-  },
-  {
-    accentColor: "#a1a1aa",
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-      </svg>
-    ),
-    title: "Context-Aware",
-    desc: "Reads your repo structure, AGENTS.md, README, and CI config to match your conventions exactly.",
-  },
-  {
-    accentColor: "#a1a1aa",
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-        <line x1="16" y1="13" x2="8" y2="13" />
-        <line x1="16" y1="17" x2="8" y2="17" />
-        <polyline points="10 9 9 9 8 9" />
-      </svg>
-    ),
-    title: "Openspec",
-    desc: "Every ticket gets a proposal, design, task list, and acceptance criteria committed to the branch — full traceability, optionally toggled off.",
-  },
-  {
-    accentColor: "#a1a1aa",
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="23 4 23 10 17 10" />
-        <polyline points="1 20 1 14 7 14" />
-        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-      </svg>
-    ),
-    title: "Self-Healing CI",
-    desc: "When CI fails on its branch, Coderhelm reads the logs and pushes a fix automatically.",
-  },
-  {
-    accentColor: "#a1a1aa",
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-        <circle cx="12" cy="11" r="3" />
-        <path d="M12 8v0" />
-      </svg>
-    ),
-    title: "Safety Agent",
-    desc: "Every implementation is reviewed by a built-in safety agent before opening a PR. Violations are caught and the code is revised automatically.",
-  },
-  {
-    accentColor: "#a1a1aa",
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-      </svg>
-    ),
-    title: "Review Feedback Loop",
-    desc: "Request changes, ask questions, or @mention Coderhelm on any PR comment. It reads your feedback, answers questions, fixes the code, and pushes — no back-and-forth needed.",
-  },
-];
-
-const steps = [
-  {
-    step: "01",
-    title: "Install the GitHub App",
-    desc: "One click — choose repos, then connect Jira via webhook/automation. Run the Jira integration check endpoint to validate your payload before go-live.",
-  },
-  {
-    step: "02",
-    title: "Create an issue",
-    desc: 'Write a GitHub issue or Jira ticket describing what you need. Assign it to Coderhelm[bot] or add the "Coderhelm" label.',
-  },
-  {
-    step: "03",
-    title: "Review the PR",
-    desc: "Coderhelm opens a draft PR, runs CI, and marks it ready when checks pass. Request changes and it reads your comments, fixes the code, and pushes — iterate until you're happy, then merge.",
-  },
-];
-
-
-
 export default function Home() {
   return (
     <>
@@ -142,13 +8,11 @@ export default function Home() {
 
       {/* Hero */}
       <section className="relative flex min-h-screen items-center justify-center overflow-hidden pt-16">
-        {/* Aurora background — animated color blobs */}
         <div className="aurora-container" aria-hidden="true">
           <div className="aurora-blob aurora-blob-1" />
           <div className="aurora-blob aurora-blob-2" />
           <div className="aurora-blob aurora-blob-3" />
           <div className="aurora-blob aurora-blob-4" />
-          {/* Vignette to keep text readable */}
           <div className="aurora-vignette" />
         </div>
 
@@ -164,9 +28,8 @@ export default function Home() {
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg text-text-secondary sm:text-xl">
-            Assign a GitHub issue or Jira ticket → get a production-ready PR. An autonomous
-            AI agent that reads your codebase, plans changes, implements them,
-            and self-reviews — all in minutes.
+            Assign a GitHub issue or Jira ticket — get a production-ready PR. Autonomous
+            AI that reads your codebase, plans changes, implements, and self-reviews.
           </p>
 
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
@@ -184,7 +47,7 @@ export default function Home() {
             </a>
           </div>
 
-          {/* Code demo — pipeline run */}
+          {/* Code demo */}
           <div className="mx-auto mt-16 max-w-2xl code-window glow">
             <div className="code-window-header">
               <div className="code-dot bg-[#ff5f57]" />
@@ -220,7 +83,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Stats strip */}
           <div className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm">
             <span className="text-text-muted">
               <span className="font-bold text-blue-400">~ 5 min</span> average run
@@ -237,301 +99,324 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Integrations */}
+      {/* How It Works — moved up, prominent */}
+      <section id="how-it-works" className="border-t border-surface-border py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="text-center">
+            <p className="text-sm font-semibold text-blue-400 tracking-wider uppercase">How it works</p>
+            <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
+              Three steps. That&apos;s it.
+            </h2>
+          </div>
+
+          <div className="mt-16 grid gap-8 md:grid-cols-3">
+            {[
+              {
+                step: "01",
+                title: "Install the app",
+                desc: "One click — choose repos, connect Jira if you want. Takes 30 seconds.",
+                icon: (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                ),
+              },
+              {
+                step: "02",
+                title: "Create an issue",
+                desc: "Write a GitHub issue or Jira ticket. Assign it to Coderhelm or add the label.",
+                icon: (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="16" />
+                    <line x1="8" y1="12" x2="16" y2="12" />
+                  </svg>
+                ),
+              },
+              {
+                step: "03",
+                title: "Review the PR",
+                desc: "Coderhelm opens a PR, runs CI, and marks it ready. Request changes — it iterates.",
+                icon: (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 11 12 14 22 4" />
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                  </svg>
+                ),
+              },
+            ].map((s) => (
+              <div key={s.step} className="relative rounded-lg bg-white/[0.03] p-8 transition-colors hover:bg-white/[0.05]">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
+                    {s.icon}
+                  </div>
+                  <span className="text-xs font-mono text-text-muted">{s.step}</span>
+                </div>
+                <h3 className="text-lg font-semibold">{s.title}</h3>
+                <p className="mt-2 text-sm text-text-secondary leading-relaxed">{s.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Product Section 1: Intake */}
       <section className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-6xl px-6">
-          <h2 className="text-center text-3xl font-bold sm:text-4xl">Works where you work</h2>
-          <p className="mx-auto mt-4 max-w-xl text-center text-text-secondary">
-            Native GitHub and Jira apps — no tokens to paste, no webhooks to wire. Install and go.
-          </p>
-
-          <div className="mt-12 grid gap-6 md:grid-cols-2">
-            {/* GitHub App */}
-            <div className="relative overflow-hidden rounded-2xl border border-surface-border bg-surface-elevated">
-              <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(ellipse at top left, rgba(255,255,255,0.02), transparent 60%)" }} />
-              <div className="relative p-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#238636" strokeWidth="1.5">
-                      <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-bold">GitHub App</h3>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="rounded-lg border border-[#21262d] bg-[#0d1117] p-4">
-                    <div className="flex items-center gap-2 text-[11px] text-text-muted mb-3">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-                      PR Comment
+          <div className="grid gap-12 md:grid-cols-2 md:items-center">
+            <div>
+              <p className="text-sm font-semibold text-emerald-400 tracking-wider uppercase">1.0 Intake</p>
+              <h2 className="mt-3 text-3xl font-bold sm:text-4xl">Works where you work</h2>
+              <p className="mt-4 text-text-secondary leading-relaxed">
+                Native GitHub and Jira apps. Assign an issue to Coderhelm or add a label — a PR appears automatically.
+                Comments on PRs with live progress. Reads your feedback, pushes fixes.
+              </p>
+              <div className="mt-8 grid grid-cols-2 gap-4">
+                {[
+                  { name: "GitHub App", color: "#238636", items: ["Assign issues → get PRs", "Live PR progress", "Self-healing CI"] },
+                  { name: "Jira App", color: "#0052CC", items: ["Native Forge app", "Label + assign = PR", "Project sync"] },
+                ].map((app) => (
+                  <div key={app.name} className="rounded-lg bg-white/[0.03] p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-2 h-2 rounded-full" style={{ background: app.color }} />
+                      <span className="text-sm font-medium">{app.name}</span>
                     </div>
-                    <div className="space-y-2.5">
-                      <div className="flex gap-2">
-                        <div className="w-5 h-5 rounded-full bg-[#238636]/20 flex items-center justify-center shrink-0 mt-0.5">
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#238636" strokeWidth="2.5"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22" /></svg>
-                        </div>
-                        <div className="text-[11px] text-text-secondary leading-relaxed">
-                          <span className="text-text-primary font-medium">coderhelm[bot]</span> commented on <span className="text-[#238636]">#43</span>
-                          <div className="mt-1.5 rounded border border-[#21262d] bg-[#161b22] p-2.5 text-[10px]">
-                            <p className="text-text-primary font-medium mb-1">Coderhelm is working on this</p>
-                            <div className="space-y-0.5 text-text-muted">
-                              <p className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" /> Triage — feature, medium priority</p>
-                              <p className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" /> Plan — 5 files, 3 new functions</p>
-                              <p className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" /> Implement — in progress...</p>
-                              <p className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-full bg-zinc-600" /> Review</p>
-                              <p className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-full bg-zinc-600" /> PR</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2.5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-                        </div>
-                        <div className="text-[11px] text-text-secondary leading-relaxed">
-                          <span className="text-text-primary font-medium">@you</span> requested changes
-                          <div className="mt-1.5 rounded border border-[#21262d] bg-[#161b22] p-2.5 text-[10px] text-text-muted">
-                            &quot;Use a custom hook instead of inline state&quot;
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <div className="w-5 h-5 rounded-full bg-[#238636]/20 flex items-center justify-center shrink-0 mt-0.5">
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#238636" strokeWidth="2.5"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22" /></svg>
-                        </div>
-                        <div className="text-[11px] text-text-secondary leading-relaxed">
-                          <span className="text-text-primary font-medium">coderhelm[bot]</span> pushed 1 commit
-                          <div className="mt-1 text-[10px] text-emerald-400 flex items-center gap-1">
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
-                            Refactored to useThemeToggle hook — LGTM
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <ul className="space-y-2 text-sm text-text-secondary">
-                    {[
-                      "Assign issues → get PRs automatically",
-                      "Comments on PRs with live progress",
-                      "Reads your feedback, pushes fixes",
-                      "Self-healing CI — reads logs, pushes fix",
-                    ].map((t) => (
-                      <li key={t} className="flex items-start gap-2">
-                        <span className="mt-0.5 shrink-0 text-[#238636]">✓</span>
-                        {t}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            {/* Jira App */}
-            <div className="relative overflow-hidden rounded-2xl border border-surface-border bg-surface-elevated">
-              <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(ellipse at top right, rgba(255,255,255,0.02), transparent 60%)" }} />
-              <div className="relative p-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#0052CC">
-                      <path d="M11.53 2c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.94 4.34 4.34 4.35V2.84a.84.84 0 00-.84-.84H11.53zM6.77 6.8a4.36 4.36 0 004.34 4.34h1.8v1.72a4.36 4.36 0 004.34 4.34V7.63a.84.84 0 00-.83-.83H6.77zM2 11.6a4.35 4.35 0 004.35 4.35h1.78v1.71c0 2.4 1.94 4.35 4.34 4.34v-9.56a.84.84 0 00-.84-.84H2z"/>
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-bold">Jira App</h3>
-                  <span className="rounded-full bg-[#0052CC]/15 px-2 py-0.5 text-[9px] font-semibold text-[#0052CC]">Forge</span>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="rounded-lg border border-[#21262d] bg-[#0d1117] p-4">
-                    <div className="flex items-center gap-2 text-[11px] text-text-muted mb-3">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
-                      Jira Board
-                    </div>
-                    <div className="space-y-2">
-                      {[
-                        { key: "KAN-12", title: "Add OAuth login flow", status: "In Progress", statusColor: "#0052CC" },
-                        { key: "KAN-13", title: "Build settings API", status: "Done", statusColor: "#36B37E" },
-                        { key: "KAN-14", title: "Add rate limiting", status: "In Review", statusColor: "#FF991F" },
-                      ].map((ticket) => (
-                        <div key={ticket.key} className="flex items-center gap-3 rounded border border-[#21262d] bg-[#161b22] px-3 py-2">
-                          <span className="text-[10px] font-mono text-[#0052CC]">{ticket.key}</span>
-                          <span className="text-[11px] text-text-secondary flex-1">{ticket.title}</span>
-                          <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium" style={{ color: ticket.statusColor, background: ticket.statusColor + "20" }}>
-                            {ticket.status}
-                          </span>
-                        </div>
+                    <ul className="space-y-1.5">
+                      {app.items.map((item) => (
+                        <li key={item} className="text-xs text-text-secondary flex items-center gap-1.5">
+                          <span style={{ color: app.color }}>✓</span> {item}
+                        </li>
                       ))}
-                    </div>
-                    <div className="mt-3 flex items-center gap-2 text-[10px] text-text-muted border-t border-[#21262d] pt-3">
-                      <span className="text-emerald-400">→</span>
-                      <span>Assign + label <code className="text-[#0052CC] bg-[#0052CC]/10 px-1 rounded text-[9px]">coderhelm</code> = PR created automatically</span>
-                    </div>
+                    </ul>
                   </div>
+                ))}
+              </div>
+            </div>
 
-                  <ul className="space-y-2 text-sm text-text-secondary">
+            {/* GitHub PR mockup */}
+            <div className="rounded-xl border border-[#21262d] bg-[#0d1117] p-5">
+              <div className="flex items-center gap-2 text-[11px] text-text-muted mb-4">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#238636" strokeWidth="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22" /></svg>
+                PR &middot; coderhelm[bot]
+              </div>
+              <div className="space-y-2">
+                {[
+                  { label: "Triage", detail: "feature · medium priority", done: true },
+                  { label: "Plan", detail: "5 files, 3 functions", done: true },
+                  { label: "Implement", detail: "in progress...", done: false, active: true },
+                  { label: "Review", detail: "", done: false },
+                  { label: "PR", detail: "", done: false },
+                ].map((pass) => (
+                  <div key={pass.label} className="flex items-center gap-2 text-[11px]">
+                    <span className={`w-2.5 h-2.5 rounded-full ${
+                      pass.done ? "bg-emerald-500" : pass.active ? "bg-blue-500 animate-pulse" : "bg-zinc-700"
+                    }`} />
+                    <span className={pass.done ? "text-text-secondary" : pass.active ? "text-blue-400" : "text-text-muted"}>
+                      {pass.label}
+                    </span>
+                    {pass.detail && <span className="text-text-muted">— {pass.detail}</span>}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 pt-3 border-t border-[#21262d] flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-blue-500/20 flex items-center justify-center">
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="3"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                </div>
+                <span className="text-[10px] text-text-muted">&quot;Use a custom hook instead&quot;</span>
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+                </div>
+                <span className="text-[10px] text-emerald-400">Refactored to custom hook — pushed</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Product Section 2: Pipeline */}
+      <section className="border-t border-surface-border py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="text-center">
+            <p className="text-sm font-semibold text-purple-400 tracking-wider uppercase">2.0 Execute</p>
+            <h2 className="mt-3 text-3xl font-bold sm:text-4xl">Multi-pass pipeline</h2>
+            <p className="mx-auto mt-4 max-w-2xl text-text-secondary">
+              Triage → Plan → Implement → Review → PR → CI Fix → Feedback. Every change is self-reviewed before you see it.
+            </p>
+          </div>
+
+          <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                title: "Context-Aware",
+                desc: "Reads your repo structure, AGENTS.md, README, and CI config to match your conventions.",
+                color: "#a855f7",
+              },
+              {
+                title: "Team Voice",
+                desc: "Learns from your PRs, commits, and reviews. Writes descriptions that sound like your team.",
+                color: "#a855f7",
+              },
+              {
+                title: "Openspec",
+                desc: "Every ticket gets a proposal, design, task list, and acceptance criteria committed to the branch.",
+                color: "#a855f7",
+              },
+              {
+                title: "Safety Agent",
+                desc: "Every implementation is reviewed by a safety agent. Violations are caught and revised automatically.",
+                color: "#a855f7",
+              },
+              {
+                title: "Self-Healing CI",
+                desc: "When CI fails, Coderhelm reads the logs and pushes a fix automatically.",
+                color: "#a855f7",
+              },
+              {
+                title: "Feedback Loop",
+                desc: "Request changes or @mention Coderhelm on any PR comment. It fixes the code and pushes.",
+                color: "#a855f7",
+              },
+            ].map((f) => (
+              <div
+                key={f.title}
+                className="rounded-lg bg-white/[0.03] p-6 transition-colors hover:bg-white/[0.05]"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-2 h-2 rounded-full" style={{ background: f.color }} />
+                  <h3 className="text-base font-semibold">{f.title}</h3>
+                </div>
+                <p className="text-sm text-text-secondary leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Guardrails highlight */}
+          <div className="mt-12 rounded-lg bg-white/[0.03] p-8 md:flex md:items-center md:gap-8">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-3">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  <path d="M9 12l2 2 4-4" />
+                </svg>
+                <h3 className="text-lg font-semibold">Guardrails</h3>
+              </div>
+              <p className="text-text-secondary leading-relaxed">
+                Never pushes to main — built in. Add rules like &quot;always add tests&quot; or &quot;never delete migrations&quot;.
+                Enforced on every single run, no exceptions.
+              </p>
+            </div>
+            <div className="mt-6 md:mt-0 rounded-lg border border-[#21262d] bg-[#0d1117] p-4 font-mono text-xs md:w-80">
+              <div className="text-text-muted mb-2"># .coderhelm/rules.md</div>
+              <div className="text-emerald-400">✓ Always add tests</div>
+              <div className="text-emerald-400">✓ Never push to main</div>
+              <div className="text-emerald-400">✓ No migration deletes</div>
+              <div className="text-red-400 mt-1">✗ Direct DB queries blocked</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Product Section 3: AI Plans */}
+      <section className="border-t border-surface-border py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="grid gap-12 md:grid-cols-2 md:items-center">
+            {/* Chat mockup */}
+            <div className="order-2 md:order-1 rounded-xl border border-[#21262d] bg-[#0d1117] p-5">
+              <div className="mb-3 flex items-center gap-2 border-b border-[#21262d] pb-3">
+                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 text-[9px] font-bold text-zinc-400">P</div>
+                <span className="text-[11px] font-semibold text-text-secondary">New Plan</span>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-end">
+                  <div className="max-w-[80%] rounded-lg rounded-tr-none bg-zinc-800 px-3 py-2 text-[11px] text-zinc-300">
+                    Add OAuth login with GitHub and Google
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-[9px] font-bold text-zinc-400">c</div>
+                  <div className="rounded-lg rounded-tl-none border border-[#21262d] bg-[#161b22] px-3 py-2.5 text-[11px] text-text-secondary">
+                    <p className="mb-2 text-text-primary">I&apos;ll scope this as 4 tasks:</p>
                     {[
-                      "Native Forge app — install from Atlassian Marketplace",
-                      "Auto-detects repo from ticket context",
-                      "Label + assign = Coderhelm starts working",
-                      "Syncs Jira projects from the dashboard",
+                      "#1 Add OAuth provider config",
+                      "#2 Build login / logout flow",
+                      "#3 Protect authenticated routes",
+                      "#4 Session management",
                     ].map((t) => (
-                      <li key={t} className="flex items-start gap-2">
-                        <span className="mt-0.5 shrink-0 text-[#0052CC]">✓</span>
-                        {t}
-                      </li>
+                      <div key={t} className="flex items-center gap-1.5 text-[10px] leading-5">
+                        <span className="text-green-400">·</span>
+                        <span>{t}</span>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </div>
               </div>
+            </div>
+
+            <div className="order-1 md:order-2">
+              <p className="text-sm font-semibold text-cyan-400 tracking-wider uppercase">3.0 Plan</p>
+              <h2 className="mt-3 text-3xl font-bold sm:text-4xl">AI Plans</h2>
+              <p className="mt-4 text-text-secondary leading-relaxed">
+                Describe a feature in plain English. Coderhelm chats with you to scope the work,
+                then generates an ordered list of executable issues — each ready to become a PR with one click.
+              </p>
+              <ul className="mt-6 space-y-2 text-sm text-text-secondary">
+                {[
+                  "Conversational scoping — asks clarifying questions",
+                  "Creates ordered GitHub issues or Jira tickets",
+                  "One-click Approve → Execute per task",
+                  "Set GitHub or Jira destination for the whole plan",
+                ].map((t) => (
+                  <li key={t} className="flex items-start gap-2">
+                    <span className="mt-0.5 shrink-0 text-cyan-400">✓</span>
+                    {t}
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </div>
       </section>
 
-      {/* AI Plans */}
+      {/* Security */}
       <section className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-6xl px-6">
-          <h2 className="text-center text-3xl font-bold sm:text-4xl">AI Plans</h2>
-          <p className="mx-auto mt-4 max-w-xl text-center text-text-secondary">
-            Turn a rough idea into an ordered set of executable GitHub issues.
-          </p>
-
-          <div className="mt-12 relative overflow-hidden rounded-2xl border border-surface-border bg-surface-elevated">
-            <div
-              className="pointer-events-none absolute inset-0"
-              style={{ background: "radial-gradient(ellipse at top left, rgba(255,255,255,0.02), transparent 60%)" }}
-            />
-            <div className="relative grid md:grid-cols-2">
-              <div className="flex flex-col justify-center p-8 md:p-10">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
-                      <rect x="9" y="3" width="6" height="4" rx="1" />
-                      <path d="M9 12h6M9 16h4" />
-                      <path d="M19 3l.5 1.5L21 5l-1.5.5L19 7l-.5-1.5L17 5l1.5-.5z" />
-                    </svg>
-                  </div>
-                </div>
-                <h3 className="mt-4 text-2xl font-bold">AI Plans</h3>
-                <p className="mt-3 text-text-secondary leading-relaxed">
-                  Describe a feature in plain English. Coderhelm chats with you to scope the work, then generates an ordered list of GitHub issues or Jira tickets — each ready to become a PR with one click.
-                </p>
-                <ul className="mt-5 space-y-2 text-sm text-text-secondary">
-                  {[
-                    "Conversational scoping — it asks clarifying questions",
-                    "Ordered GitHub issues created automatically",
-                    "One-click Approve → Execute",
-                  ].map((t) => (
-                    <li key={t} className="flex items-start gap-2">
-                      <span className="mt-0.5 shrink-0 text-zinc-400">✓</span>
-                      {t}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="flex items-center justify-center border-t border-surface-border p-6 md:border-l md:border-t-0">
-                <div className="w-full max-w-sm rounded-xl border border-[#21262d] bg-[#0d1117] p-5">
-                  <div className="mb-3 flex items-center gap-2 border-b border-[#21262d] pb-3">
-                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 text-[9px] font-bold text-zinc-400">P</div>
-                    <span className="text-[11px] font-semibold text-text-secondary">New Plan</span>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-end">
-                      <div className="max-w-[80%] rounded-lg rounded-tr-none bg-zinc-800 px-3 py-2 text-[11px] text-zinc-300">
-                        Add OAuth login with GitHub and Google
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-[9px] font-bold text-zinc-400">c</div>
-                      <div className="rounded-lg rounded-tl-none border border-[#21262d] bg-[#161b22] px-3 py-2.5 text-[11px] text-text-secondary">
-                        <p className="mb-2 text-text-primary">I&apos;ll scope this as 4 tasks:</p>
-                        {[
-                          "#1 Add OAuth provider config",
-                          "#2 Build login / logout flow",
-                          "#3 Protect authenticated routes",
-                          "#4 Session management",
-                        ].map((t) => (
-                          <div key={t} className="flex items-center gap-1.5 text-[10px] leading-5">
-                            <span className="text-green-400">·</span>
-                            <span>{t}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+          <div className="text-center">
+            <p className="text-sm font-semibold text-emerald-400 tracking-wider uppercase">Security</p>
+            <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
+              Enterprise-grade security
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-text-secondary">
+              Your code never leaves your control. Every run is fully isolated.
+            </p>
           </div>
-        </div>
-      </section>
-
-      {/* Security & Isolation */}
-      <section className="border-t border-surface-border py-24">
-        <div className="mx-auto max-w-6xl px-6">
-          <h2 className="text-center text-3xl font-bold sm:text-4xl">
-            Enterprise-grade security
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-center text-text-secondary">
-            Your code never leaves your control. Every run is fully isolated.
-          </p>
 
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {[
               {
-                icon: (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
-                ),
                 color: "#10b981",
                 title: "Isolated Execution",
-                desc: "Every run executes in its own isolated container. No shared state, no shared filesystem — one tenant cannot access another's data.",
+                desc: "Every run executes in its own isolated container. No shared state — one team cannot access another's data.",
               },
               {
-                icon: (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                  </svg>
-                ),
                 color: "#3b82f6",
                 title: "No Code Storage",
-                desc: "Coderhelm reads your code through the GitHub API on-demand. Your source code is never cloned to disk or stored on our servers.",
+                desc: "Reads your code through the GitHub API on-demand. Source code is never cloned to disk or stored on our servers.",
               },
               {
-                icon: (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                  </svg>
-                ),
                 color: "#a855f7",
-                title: "Tenant Isolation",
-                desc: "All data is partitioned by tenant ID. Every API call is scoped to your organization — cross-tenant access is architecturally impossible.",
+                title: "Team Isolation",
+                desc: "All data is partitioned by team ID. Every API call is scoped to your organization — cross-team access is architecturally impossible.",
               },
               {
-                icon: (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                    <path d="M9 12l2 2 4-4" />
-                  </svg>
-                ),
                 color: "#00d4ff",
                 title: "Webhook Verification",
-                desc: "Every incoming webhook — GitHub, Stripe, Jira — is cryptographically verified before processing. Spoofed requests are rejected.",
+                desc: "Every incoming webhook — GitHub, Stripe, Jira — is cryptographically verified before processing.",
               },
               {
-                icon: (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 6v6l4 2" />
-                  </svg>
-                ),
                 color: "#f43f5e",
                 title: "Rate-Limited & Audited",
                 desc: "Sensitive endpoints are rate-limited per organization. Every action is logged for full auditability.",
@@ -539,206 +424,13 @@ export default function Home() {
             ].map((f) => (
               <div
                 key={f.title}
-                className="rounded-xl border border-surface-border bg-surface-elevated p-6 transition-colors hover:border-zinc-700"
+                className="rounded-lg bg-white/[0.03] p-6 transition-colors hover:bg-white/[0.05]"
               >
-                <div
-                  className="flex h-10 w-10 items-center justify-center rounded-lg"
-                  style={{ color: f.color, background: f.color + "15", border: `1px solid ${f.color}30` }}
-                >
-                  {f.icon}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-2 h-2 rounded-full" style={{ background: f.color }} />
+                  <h3 className="text-base font-semibold">{f.title}</h3>
                 </div>
-                <h3 className="mt-4 text-lg font-semibold">{f.title}</h3>
-                <p className="mt-2 text-sm text-text-secondary leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section id="features" className="border-t border-surface-border py-24">
-        <div className="mx-auto max-w-6xl px-6">
-          <h2 className="text-center text-3xl font-bold sm:text-4xl">
-            Built for real engineering teams
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-center text-text-secondary">
-            Not a code suggestion tool — a full autonomous agent that ships code end-to-end.
-          </p>
-
-          {/* Regular feature grid */}
-          <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {features.map((f) => (
-              <div
-                key={f.title}
-                className="rounded-xl border border-surface-border bg-surface-elevated p-6 transition-colors hover:border-zinc-700"
-              >
-                <div
-                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-400"
-                >
-                  {f.icon}
-                </div>
-                <h3 className="mt-4 text-lg font-semibold">{f.title}</h3>
-                <p className="mt-2 text-sm text-text-secondary leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Team & User Management */}
-      <section className="border-t border-surface-border py-24">
-        <div className="mx-auto max-w-6xl px-6">
-          <h2 className="text-center text-3xl font-bold sm:text-4xl">
-            Team management built in
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-center text-text-secondary">
-            Invite your team, control access with roles, and secure accounts with multi-factor authentication — all from the dashboard.
-          </p>
-
-          <div className="mt-12 grid gap-6 md:grid-cols-2">
-            {/* Roles & Permissions */}
-            <div className="relative overflow-hidden rounded-2xl border border-surface-border bg-surface-elevated">
-              <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(ellipse at top left, rgba(168,85,247,0.04), transparent 60%)" }} />
-              <div className="relative p-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-bold">Roles &amp; Permissions</h3>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="rounded-lg border border-[#21262d] bg-[#0d1117] p-4">
-                    <div className="flex items-center gap-2 text-[11px] text-text-muted mb-3">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-                      Team Members
-                    </div>
-                    <div className="space-y-2">
-                      {[
-                        { name: "Sarah Chen", email: "sarah@team.io", role: "Owner", roleColor: "#f59e0b" },
-                        { name: "Alex Rivera", email: "alex@team.io", role: "Admin", roleColor: "#3b82f6" },
-                        { name: "Jordan Lee", email: "jordan@team.io", role: "Member", roleColor: "#a1a1aa" },
-                        { name: "Casey Kim", email: "casey@team.io", role: "Viewer", roleColor: "#71717a" },
-                      ].map((m) => (
-                        <div key={m.name} className="flex items-center gap-3 rounded border border-[#21262d] bg-[#161b22] px-3 py-2">
-                          <div className="w-6 h-6 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[9px] font-medium text-zinc-400">
-                            {m.name[0]}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <span className="text-[11px] text-text-primary block truncate">{m.name}</span>
-                            <span className="text-[9px] text-text-muted">{m.email}</span>
-                          </div>
-                          <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium" style={{ color: m.roleColor, background: m.roleColor + "20" }}>
-                            {m.role}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <ul className="space-y-2 text-sm text-text-secondary">
-                    {[
-                      "Four roles — Owner, Admin, Member, Viewer",
-                      "Invite by email — accounts created automatically",
-                      "Admins manage team, Viewers get read-only access",
-                      "Owner controls billing and workspace settings",
-                    ].map((t) => (
-                      <li key={t} className="flex items-start gap-2">
-                        <span className="mt-0.5 shrink-0 text-purple-400">✓</span>
-                        {t}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            {/* Auth & Security */}
-            <div className="relative overflow-hidden rounded-2xl border border-surface-border bg-surface-elevated">
-              <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(ellipse at top right, rgba(16,185,129,0.04), transparent 60%)" }} />
-              <div className="relative p-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-bold">Authentication &amp; 2FA</h3>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="rounded-lg border border-[#21262d] bg-[#0d1117] p-4">
-                    <div className="flex items-center gap-2 text-[11px] text-text-muted mb-3">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-                      Sign In
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-3 rounded border border-[#21262d] bg-[#161b22] px-3 py-2.5">
-                        <svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-                        <span className="text-[11px] text-text-secondary">Continue with Google</span>
-                      </div>
-                      <div className="flex items-center gap-3 rounded border border-[#21262d] bg-[#161b22] px-3 py-2.5">
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="#e4e4e7"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-                        <span className="text-[11px] text-text-secondary">Continue with GitHub</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 h-px bg-[#21262d]" />
-                        <span className="text-[9px] text-text-muted">or</span>
-                        <div className="flex-1 h-px bg-[#21262d]" />
-                      </div>
-                      <div className="rounded border border-[#21262d] bg-[#161b22] px-3 py-2 text-[11px] text-text-muted">
-                        Email &amp; password
-                      </div>
-                    </div>
-                    <div className="mt-3 flex items-center gap-2 text-[10px] text-text-muted border-t border-[#21262d] pt-3">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-                      <span>Optional TOTP 2FA via authenticator app</span>
-                    </div>
-                  </div>
-
-                  <ul className="space-y-2 text-sm text-text-secondary">
-                    {[
-                      "Email/password, Google, and GitHub sign-in",
-                      "Optional TOTP two-factor authentication",
-                      "Secure password reset via email",
-                      "Accounts powered by AWS Cognito",
-                    ].map((t) => (
-                      <li key={t} className="flex items-start gap-2">
-                        <span className="mt-0.5 shrink-0 text-emerald-400">✓</span>
-                        {t}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section id="how-it-works" className="border-t border-surface-border py-24">
-        <div className="mx-auto max-w-4xl px-6">
-          <h2 className="text-center text-3xl font-bold sm:text-4xl">
-            Three steps. That&apos;s it.
-          </h2>
-
-          <div className="mt-16 space-y-12">
-            {steps.map((s) => (
-              <div key={s.step} className="flex gap-6">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-white text-sm font-bold">
-                  {s.step}
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold">{s.title}</h3>
-                  <p className="mt-1 text-text-secondary">{s.desc}</p>
-                </div>
+                <p className="text-sm text-text-secondary leading-relaxed">{f.desc}</p>
               </div>
             ))}
           </div>
@@ -748,48 +440,41 @@ export default function Home() {
       {/* Pricing */}
       <section id="pricing" className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-4xl px-6">
-          <h2 className="text-center text-3xl font-bold sm:text-4xl">
-            Simple pricing
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-center text-text-secondary">
-            Start free, upgrade when you&apos;re ready.
-          </p>
+          <div className="text-center">
+            <p className="text-sm font-semibold text-blue-400 tracking-wider uppercase">Pricing</p>
+            <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
+              Simple pricing
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-text-secondary">
+              Start free, upgrade when you&apos;re ready.
+            </p>
+          </div>
 
           <div className="mt-12 grid gap-6 md:grid-cols-2">
             {/* Free */}
-            <div className="rounded-xl border border-surface-border bg-surface-elevated p-8">
+            <div className="rounded-lg bg-white/[0.03] p-8">
               <h3 className="text-lg font-semibold">Free</h3>
               <div className="mt-4">
                 <span className="text-4xl font-bold">$0</span>
                 <span className="text-text-secondary">/month</span>
               </div>
               <ul className="mt-6 space-y-3 text-sm text-text-secondary">
-                <li className="flex items-center gap-2">
-                  <span className="text-green-400">✓</span> 500K tokens / month
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-green-400">✓</span> Public &amp; private repos
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-green-400">✓</span> All passes
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-green-400">✓</span> CI self-healing
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-zinc-600">✗</span> AI plans
-                </li>
+                <li className="flex items-center gap-2"><span className="text-green-400">✓</span> 500K tokens / month</li>
+                <li className="flex items-center gap-2"><span className="text-green-400">✓</span> Public &amp; private repos</li>
+                <li className="flex items-center gap-2"><span className="text-green-400">✓</span> All passes</li>
+                <li className="flex items-center gap-2"><span className="text-green-400">✓</span> CI self-healing</li>
+                <li className="flex items-center gap-2"><span className="text-zinc-600">✗</span> AI plans</li>
               </ul>
               <a
                 href="https://github.com/apps/coderhelm"
-                className="mt-8 block rounded-lg border border-surface-border bg-transparent px-6 py-3 text-center text-sm font-semibold transition-colors hover:bg-surface-border"
+                className="mt-8 block rounded-lg bg-white/[0.06] px-6 py-3 text-center text-sm font-semibold transition-colors hover:bg-white/[0.1]"
               >
                 Get started
               </a>
             </div>
 
             {/* Pro */}
-            <div className="relative rounded-xl border border-blue-500/30 bg-surface-elevated p-8">
+            <div className="relative rounded-lg bg-white/[0.03] ring-1 ring-blue-500/30 p-8">
               <div className="absolute -top-3 left-6 rounded-full bg-blue-500 px-3 py-0.5 text-xs font-semibold text-white">
                 Pro
               </div>
@@ -799,24 +484,12 @@ export default function Home() {
                 <span className="text-text-secondary">/month</span>
               </div>
               <ul className="mt-6 space-y-3 text-sm text-text-secondary">
-                <li className="flex items-center gap-2">
-                  <span className="text-zinc-400">✓</span> 5M tokens / month
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-zinc-400">✓</span> AI plans
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-zinc-400">✓</span> $50/1M token overage
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-zinc-400">✓</span> Priority queue
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-zinc-400">✓</span> Custom instructions
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-zinc-400">✓</span> Email support
-                </li>
+                <li className="flex items-center gap-2"><span className="text-zinc-400">✓</span> 5M tokens / month</li>
+                <li className="flex items-center gap-2"><span className="text-zinc-400">✓</span> AI plans</li>
+                <li className="flex items-center gap-2"><span className="text-zinc-400">✓</span> $50/1M token overage</li>
+                <li className="flex items-center gap-2"><span className="text-zinc-400">✓</span> Priority queue</li>
+                <li className="flex items-center gap-2"><span className="text-zinc-400">✓</span> Custom instructions</li>
+                <li className="flex items-center gap-2"><span className="text-zinc-400">✓</span> Email support</li>
               </ul>
               <a
                 href="https://github.com/apps/coderhelm"
