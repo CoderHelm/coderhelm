@@ -454,7 +454,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Plugins */}
+      {/* MCP Servers */}
       <section className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-6xl px-6">
           <div className="grid gap-12 md:grid-cols-2 md:items-center">
@@ -490,13 +490,13 @@ export default function Home() {
                 ))}
               </div>
               <div className="mt-3 pt-3 border-t border-[#21262d] text-center">
-                <span className="text-[10px] text-text-muted">28 plugins available across 13 categories</span>
+                <span className="text-[10px] text-text-muted">28 MCP servers available across 13 categories</span>
               </div>
             </div>
 
             <div className="order-1 md:order-2">
               <p className="text-sm font-semibold text-purple-400 tracking-wider uppercase">Integrate</p>
-              <h2 className="mt-3 text-3xl font-bold sm:text-4xl">Plugins</h2>
+              <h2 className="mt-3 text-3xl font-bold sm:text-4xl">MCP Servers</h2>
               <p className="mt-4 text-text-secondary leading-relaxed">
                 Connect your tools so Coderhelm can pull context during planning and execution.
                 Pull Figma designs, query Sentry errors, check Datadog metrics, or read Notion docs
@@ -507,7 +507,7 @@ export default function Home() {
                   "One-click enable with API key or token",
                   "Available during both AI Plans and PR runs",
                   "Credentials encrypted at rest, tenant-isolated",
-                  "28 plugins: Design, Monitoring, Database, Deployment, and more",
+                  "28 MCP servers: Design, Monitoring, Database, Deployment, and more",
                 ].map((t) => (
                   <li key={t} className="flex items-start gap-2">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="mt-1 shrink-0 text-purple-400"><polyline points="20 6 9 17 4 12" /></svg>

@@ -4,11 +4,18 @@ import { useEffect, useState } from "react";
 import { api, type WorkflowSettings, type JiraCheck } from "@/lib/api";
 import { useToast } from "@/components/toast";
 
-const TOGGLES: { key: keyof WorkflowSettings; label: string; description: string }[] = [
+type WorkflowToggleKey = "commit_openspec" | "allow_plan_log_analyzer";
+
+const TOGGLES: { key: WorkflowToggleKey; label: string; description: string }[] = [
   {
     key: "commit_openspec",
     label: "Commit openspec to repo",
     description: "Include proposal, design, tasks, and acceptance criteria files in the PR branch under openspec/specs/.",
+  },
+  {
+    key: "allow_plan_log_analyzer",
+    label: "Allow plans to use AWS Log Analyzer",
+    description: "When enabled, plan generation can reference AWS Log Analyzer recommendations. Disabled by default.",
   },
 ];
 
@@ -28,7 +35,7 @@ export default function WorkflowPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const toggle = async (key: keyof WorkflowSettings) => {
+  const toggle = async (key: WorkflowToggleKey) => {
     if (!settings) return;
     const updated = { ...settings, [key]: !settings[key] };
     setSettings(updated);
