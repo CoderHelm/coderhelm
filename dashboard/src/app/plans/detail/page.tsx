@@ -71,6 +71,8 @@ function PlanDetail() {
   const [jiraReady, setJiraReady] = useState(false);
   const [updatingDest, setUpdatingDest] = useState(false);
   const [plugins, setPlugins] = useState<{ catalog: PluginDef[]; enabled: EnabledPlugin[] }>({ catalog: [], enabled: [] });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilters, setStatusFilters] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { confirm } = useConfirm();
 
@@ -413,6 +415,51 @@ function PlanDetail() {
         </div>
       )}
 
+      {/* Search & status filters */}
+      {plan.tasks.length > 3 && (
+        <div className="mb-4 space-y-3">
+          <input
+            type="text"
+            placeholder="Search tasks..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
+          />
+          <div className="flex items-center gap-2 flex-wrap">
+            {["draft", "approved", "rejected", "queued", "running", "waiting", "done"].map((s) => {
+              const count = plan.tasks.filter((t) => t.status === s).length;
+              if (count === 0) return null;
+              const active = statusFilters.has(s);
+              return (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilters((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(s)) next.delete(s); else next.add(s);
+                    return next;
+                  })}
+                  className={`px-2.5 py-1 rounded-full text-xs border transition-colors cursor-pointer ${
+                    active
+                      ? TASK_STATUS_STYLES[s] || TASK_STATUS_STYLES.draft
+                      : "bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-zinc-300"
+                  }`}
+                >
+                  {s} ({count})
+                </button>
+              );
+            })}
+            {statusFilters.size > 0 && (
+              <button
+                onClick={() => setStatusFilters(new Set())}
+                className="text-xs text-zinc-600 hover:text-zinc-400 cursor-pointer"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="relative">
         {/* Vertical connector line */}
         {plan.tasks.length > 1 && (
@@ -420,7 +467,11 @@ function PlanDetail() {
         )}
 
         <div className="space-y-0">
-          {plan.tasks.map((task, idx) => (
+          {plan.tasks.filter((task) => {
+            if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase()) && !task.description?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+            if (statusFilters.size > 0 && !statusFilters.has(task.status)) return false;
+            return true;
+          }).map((task, idx) => (
             <div key={task.task_id} className="relative">
               {/* Timeline dot */}
               <div className="absolute left-0 top-5 z-10 flex items-center justify-center">
@@ -501,7 +552,7 @@ function PlanDetail() {
                       {task.repo && <span className="text-xs text-zinc-600 font-mono">{task.repo}</span>}
                       {task.approved_by && <span className="text-xs text-zinc-600">approved by {task.approved_by}</span>}
                       {task.status === "running" && <span className="text-xs text-blue-400 animate-pulse">Processing…</span>}
-                      {task.depends_on && task.status !== "waiting" && (() => {
+                      {task.depends_on && (() => {
                         const dep = plan.tasks.find((t) => t.task_id === task.depends_on);
                         return dep ? <span className="text-xs text-zinc-500">Depends on &ldquo;{dep.title}&rdquo;</span> : null;
                       })()}
