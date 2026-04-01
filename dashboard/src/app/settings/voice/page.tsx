@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, type Repo } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm-dialog";
 import { TextareaSkeleton } from "@/components/skeleton";
 import { RepoCombobox } from "@/components/repo-combobox";
 
@@ -72,6 +73,7 @@ function VoiceEditor({
 export default function VoicePage() {
   const [tab, setTab] = useState<"global" | "repo">("global");
   const { toast } = useToast();
+  const { confirm } = useConfirm();
 
   const [globalContent, setGlobalContent] = useState("");
   const [globalLoading, setGlobalLoading] = useState(true);
@@ -137,7 +139,7 @@ export default function VoicePage() {
 
   const regenerate = async () => {
     if (!selectedRepo) return;
-    if (!confirm("This will re-analyze your repo and regenerate the voice profile. Your edits will be replaced. Continue?")) return;
+    if (!(await confirm({ title: "Regenerate Voice", message: "This will re-analyze your repo and regenerate the voice profile. Your edits will be replaced. Continue?", confirmLabel: "Regenerate", destructive: true }))) return;
     setRegenerating(true);
     try {
       await api.regenerateRepo(selectedRepo);

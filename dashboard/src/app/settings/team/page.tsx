@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, type TeamUser } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Skeleton } from "@/components/skeleton";
 
 const ROLES = ["viewer", "member", "admin", "owner"] as const;
@@ -19,6 +20,7 @@ export default function TeamPage() {
   const [myRole, setMyRole] = useState("");
   const [myUserId, setMyUserId] = useState("");
   const { toast } = useToast();
+  const { confirm } = useConfirm();
 
   // Invite state
   const [inviteEmail, setInviteEmail] = useState("");
@@ -67,7 +69,7 @@ export default function TeamPage() {
 
   const handleRemove = async (user: TeamUser) => {
     const display = user.email || user.github_login || user.user_id;
-    if (!confirm(`Remove ${display} from the team?`)) return;
+    if (!(await confirm({ title: "Remove Team Member", message: `Remove ${display} from the team?`, confirmLabel: "Remove", destructive: true }))) return;
     try {
       await api.removeUser(user.user_id);
       setUsers((prev) => prev.filter((u) => u.user_id !== user.user_id));

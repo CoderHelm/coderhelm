@@ -5,6 +5,7 @@ import { api, type BillingInfo, type Invoice, type PaymentMethod } from "@/lib/a
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm-dialog";
 import { CardSkeleton, TableSkeleton } from "@/components/skeleton";
 
 function formatTokens(n: number): string {
@@ -31,6 +32,7 @@ export default function BillingPage() {
   const [emailDraft, setEmailDraft] = useState("");
   const [invoicePage, setInvoicePage] = useState(1);
   const { toast } = useToast();
+  const { confirm } = useConfirm();
 
   const refresh = useCallback(() => {
     setLoading(true);
@@ -98,7 +100,7 @@ export default function BillingPage() {
   };
 
   const handleCancel = async () => {
-    if (!confirm("Cancel your subscription? You'll retain access until the end of the billing period.")) return;
+    if (!(await confirm({ title: "Cancel Subscription", message: "Cancel your subscription? You'll retain access until the end of the billing period.", confirmLabel: "Cancel Subscription", destructive: true }))) return;
     setActionLoading(true);
     try {
       await api.cancelSubscription();
@@ -140,7 +142,7 @@ export default function BillingPage() {
   };
 
   const handleDeletePaymentMethod = async (pmId: string) => {
-    if (!confirm("Remove this payment method?")) return;
+    if (!(await confirm({ title: "Remove Payment Method", message: "Remove this payment method?", confirmLabel: "Remove", destructive: true }))) return;
     setActionLoading(true);
     try {
       await api.deletePaymentMethod(pmId);

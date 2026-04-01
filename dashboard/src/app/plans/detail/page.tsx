@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, type BillingInfo, type Plan, type Task, type Repo, type JiraCheck } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Skeleton, TableSkeleton } from "@/components/skeleton";
 import { RepoCombobox } from "@/components/repo-combobox";
 
@@ -60,11 +61,13 @@ function PlanDetail() {
   const [editingTask, setEditingTask] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Task>>({});
   const [showAddTask, setShowAddTask] = useState(false);
-  const [newTask, setNewTask] = useState({ title: "", description: "", acceptance_criteria: "", repo: "", destination: "github", jira_project: "" });
+  const [newTask, setNewTask] = useState({ title: "", description: "", acceptance_criteria: "", repo: "" });
   const [executing, setExecuting] = useState(false);
   const [repos, setRepos] = useState<Repo[]>([]);
   const [jiraReady, setJiraReady] = useState(false);
+  const [updatingDest, setUpdatingDest] = useState(false);
   const { toast } = useToast();
+  const { confirm } = useConfirm();
 
   useEffect(() => {
     api.listRepos().then((data) => {
@@ -143,15 +146,29 @@ function PlanDetail() {
     setActionLoading("add");
     try {
       const order = plan?.tasks.length ?? 0;
-      await api.addTask(planId, { ...newTask, order });
+      await api.addTask(planId, { ...newTask, destination: plan?.destination ?? "github", order });
       toast("Task added");
-      setNewTask({ title: "", description: "", acceptance_criteria: "", repo: "", destination: "github", jira_project: "" });
+      setNewTask({ title: "", description: "", acceptance_criteria: "", repo: "" });
       setShowAddTask(false);
       refresh();
     } catch {
       toast("Failed to add task", "error");
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleChangeDestination = async (dest: "github" | "jira") => {
+    if (!plan || dest === (plan.destination ?? "github")) return;
+    setUpdatingDest(true);
+    try {
+      await api.updatePlan(planId, { destination: dest });
+      toast(`Destination changed to ${dest === "github" ? "GitHub Issues" : "Jira Tickets"}`);
+      refresh();
+    } catch {
+      toast("Failed to update destination", "error");
+    } finally {
+      setUpdatingDest(false);
     }
   };
 
@@ -169,7 +186,7 @@ function PlanDetail() {
   };
 
   const handleDeletePlan = async () => {
-    if (!confirm("Delete this plan and all its tasks? This cannot be undone.")) return;
+    if (!(await confirm({ title: "Delete Plan", message: "Delete this plan and all its tasks? This cannot be undone.", confirmLabel: "Delete", destructive: true }))) return;
     try {
       await api.deletePlan(planId);
       toast("Plan deleted");
@@ -304,6 +321,40 @@ function PlanDetail() {
         )}
       </div>
 
+      {/* Plan-level destination picker */}
+      <div className="mb-6 flex items-center gap-3 p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+        <span className="text-xs text-zinc-500 uppercase tracking-wider font-medium whitespace-nowrap">Destination</span>
+        <div className="flex gap-2">
+          {(["github", "jira"] as const).map((d) => (
+            <button
+              key={d}
+              disabled={(d === "jira" && !jiraReady) || updatingDest || plan.status !== "draft"}
+              onClick={() => handleChangeDestination(d)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                d === "jira" && !jiraReady ? "opacity-40 cursor-not-allowed" :
+                plan.status !== "draft" ? "cursor-default" :
+                "cursor-pointer"
+              } ${
+                (plan.destination ?? "github") === d
+                  ? d === "github"
+                    ? "border-[#238636]/40 bg-[#238636]/10 text-[#238636]"
+                    : "border-[#0052CC]/40 bg-[#0052CC]/10 text-[#4C9AFF]"
+                  : "border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
+              }`}
+            >
+              {d === "github" ? (
+                <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+              ) : (
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M11.53 2c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.94 4.34 4.34 4.35V2.84a.84.84 0 00-.84-.84H11.53zM6.77 6.8a4.36 4.36 0 004.34 4.34h1.8v1.72a4.36 4.36 0 004.34 4.34V7.63a.84.84 0 00-.84-.84H6.77zM2 11.6a4.35 4.35 0 004.34 4.34h1.8v1.72A4.35 4.35 0 0012.48 22v-9.57a.84.84 0 00-.84-.84H2z"/></svg>
+              )}
+              {d === "github" ? "GitHub Issues" : "Jira Tickets"}
+            </button>
+          ))}
+        </div>
+        {!jiraReady && <span className="text-xs text-zinc-600">Connect Jira in Settings to enable</span>}
+        {plan.status !== "draft" && <span className="text-xs text-zinc-600">Locked after execution starts</span>}
+      </div>
+
       {plan.tasks.length > 0 && (plan.status === "executing" || plan.status === "done") && (
         <div className="mb-6">
           <div className="flex items-center justify-between text-xs mb-2">
@@ -374,20 +425,6 @@ function PlanDetail() {
                 ) : (
                   <input value={editForm.repo ?? task.repo ?? ""} onChange={(e) => setEditForm((f) => ({ ...f, repo: e.target.value }))} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Repo override (owner/repo) — blank uses plan default" />
                 )}
-                <div>
-                  <label className="text-xs text-zinc-500 mb-1 block">Destination</label>
-                  <div className="flex gap-2">
-                    {(["github", "jira"] as const).map((d) => (
-                      <button key={d} disabled={d === "jira" && !jiraReady} onClick={() => setEditForm((f) => ({ ...f, destination: d }))} className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${d === "jira" && !jiraReady ? "opacity-40 cursor-not-allowed" : "cursor-pointer"} ${(editForm.destination ?? task.destination ?? "github") === d ? "bg-zinc-700 text-zinc-100 border-zinc-600" : "bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-zinc-300"}`}>
-                        {d === "github" ? "GitHub Issue" : "Jira Ticket"}
-                      </button>
-                    ))}
-                  </div>
-                  {!jiraReady && <p className="text-xs text-zinc-600 mt-1">Configure Jira integration in Settings to enable Jira tickets.</p>}
-                </div>
-                {(editForm.destination ?? task.destination) === "jira" && (
-                  <input value={editForm.jira_project ?? task.jira_project ?? ""} onChange={(e) => setEditForm((f) => ({ ...f, jira_project: e.target.value }))} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Jira project key (e.g. PROJ) — blank uses default" />
-                )}
                 <div className="flex gap-2">
                   <button onClick={() => handleSaveEdit(task.task_id)} disabled={actionLoading === task.task_id + ":save"} className="px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded text-xs font-medium hover:bg-white disabled:opacity-50">Save</button>
                   <button onClick={() => setEditingTask(null)} className="px-3 py-1.5 text-zinc-500 hover:text-zinc-300 text-xs">Cancel</button>
@@ -401,9 +438,6 @@ function PlanDetail() {
                       <span className="text-xs text-zinc-600 font-mono w-5 text-right flex-shrink-0">{idx + 1}</span>
                       <h3 className={`text-base font-semibold ${task.status === "done" ? "text-zinc-400" : "text-zinc-100"}`}>{task.title}</h3>
                       <span className={`px-1.5 py-0.5 rounded-full text-xs border ${TASK_STATUS_STYLES[task.status] || TASK_STATUS_STYLES.draft}`}>{task.status}</span>
-                      {task.destination === "jira" && (
-                        <span className="px-1.5 py-0.5 rounded-full text-xs border bg-blue-500/10 text-blue-300 border-blue-500/20">Jira{task.jira_project ? ` · ${task.jira_project}` : ""}</span>
-                      )}
                     </div>
                     <div className="flex items-center gap-3 mt-1.5 ml-7">
                       {task.issue_url && (
@@ -473,20 +507,6 @@ function PlanDetail() {
                 </div>
               ) : (
                 <input value={newTask.repo} onChange={(e) => setNewTask((t) => ({ ...t, repo: e.target.value }))} placeholder="Repo override (owner/repo) — blank uses plan default" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
-              )}
-              <div>
-                <label className="text-xs text-zinc-500 mb-1 block">Destination</label>
-                <div className="flex gap-2">
-                  {(["github", "jira"] as const).map((d) => (
-                    <button key={d} disabled={d === "jira" && !jiraReady} onClick={() => setNewTask((t) => ({ ...t, destination: d }))} className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${d === "jira" && !jiraReady ? "opacity-40 cursor-not-allowed" : "cursor-pointer"} ${newTask.destination === d ? "bg-zinc-700 text-zinc-100 border-zinc-600" : "bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-zinc-300"}`}>
-                      {d === "github" ? "GitHub Issue" : "Jira Ticket"}
-                    </button>
-                  ))}
-                </div>
-                {!jiraReady && <p className="text-xs text-zinc-600 mt-1">Configure Jira integration in Settings to enable Jira tickets.</p>}
-              </div>
-              {newTask.destination === "jira" && (
-                <input value={newTask.jira_project} onChange={(e) => setNewTask((t) => ({ ...t, jira_project: e.target.value }))} placeholder="Jira project key (e.g. PROJ) — blank uses default" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
               )}
               <div className="flex gap-2">
                 <button onClick={handleAddTask} disabled={!newTask.title.trim() || actionLoading === "add"} className="px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded text-xs font-medium hover:bg-white disabled:opacity-50">Add task</button>

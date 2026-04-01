@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm-dialog";
 
 export default function SecurityPage() {
   const { toast } = useToast();
+  const { confirm } = useConfirm();
 
   // Password
   const [currentPassword, setCurrentPassword] = useState("");
@@ -79,7 +81,7 @@ export default function SecurityPage() {
   };
 
   const handleMfaDisable = async () => {
-    if (!confirm("Disable two-factor authentication? Your account will be less secure.")) return;
+    if (!(await confirm({ title: "Disable 2FA", message: "Disable two-factor authentication? Your account will be less secure.", confirmLabel: "Disable", destructive: true }))) return;
     setMfaLoading(true);
     try {
       await api.mfaDisable();

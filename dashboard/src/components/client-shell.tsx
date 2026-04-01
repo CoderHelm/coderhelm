@@ -6,6 +6,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { api, type BillingInfo, type Banner, type TenantInfo } from "@/lib/api";
 import { pushToDataLayer } from "@/lib/gtm";
 import { ToastProvider } from "./toast";
+import { ConfirmProvider } from "./confirm-dialog";
 import {
   PlayIcon, CircleDotIcon, BarChartIcon, HexagonIcon, HeartIcon,
   GitBranchIcon, GearIcon, SquareIcon,
@@ -189,6 +190,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   return (
     <ToastProvider>
+    <ConfirmProvider>
       <div className="flex min-h-screen bg-zinc-950">
         <Sidebar billing={billing} user={user} tenants={tenants} />
         <div className="flex-1 flex flex-col">
@@ -296,6 +298,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           <main className="flex-1 p-8">{children}</main>
         </div>
       </div>
+    </ConfirmProvider>
     </ToastProvider>
   );
 }
