@@ -263,6 +263,7 @@ export interface RunDetail extends Run {
   branch?: string;
   pr_number?: number;
   files_modified?: string[];
+  mcp_servers?: string[];
   error?: string;
   updated_at?: string;
   pass_history?: { pass: string; started_at: string }[];

@@ -405,15 +405,15 @@ function RunDetailInner() {
         <StatCard label="Tokens Out" value={formatTokens(run.tokens_out)} />
       </div>
 
-      {/* Active MCP servers */}
-      {plugins.enabled.length > 0 && (
+      {/* MCP servers used in this run */}
+      {run.mcp_servers && run.mcp_servers.length > 0 && (
         <div className="flex items-center gap-2 mb-6 flex-wrap">
           <span className="text-xs text-zinc-500">MCP Servers</span>
-          {plugins.enabled.map((ep) => {
-            const def = plugins.catalog.find((c) => c.id === ep.plugin_id);
+          {run.mcp_servers.map((id) => {
+            const def = plugins.catalog.find((c) => c.id === id);
             return (
-              <span key={ep.plugin_id} className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 border border-zinc-700 text-zinc-300">
-                {def?.name ?? ep.plugin_id}
+              <span key={id} className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 border border-zinc-700 text-zinc-300">
+                {def?.name ?? id}
               </span>
             );
           })}
