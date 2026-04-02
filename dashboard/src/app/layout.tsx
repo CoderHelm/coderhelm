@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ClientShell } from "@/components/client-shell";
+import { GoogleTagManager } from "@/components/google-tag-manager";
 import { GoogleAnalytics } from "@/components/google-analytics";
 
 export const metadata: Metadata = {
@@ -17,6 +18,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="bg-zinc-950 text-zinc-100 min-h-screen antialiased">
+        <GoogleTagManager />
         <GoogleAnalytics />
         <ClientShell>{children}</ClientShell>
       </body>
