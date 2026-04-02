@@ -217,13 +217,32 @@ function handler(event) {
       ),
     });
 
-    // Deploy static site (runs on `cdk deploy`)
+    // Deploy static site — hashed assets get long cache, HTML gets short cache
+    // Next.js puts hashed assets under _next/static/ — safe for immutable caching
     new s3deploy.BucketDeployment(this, "DeploySite", {
       sources: [s3deploy.Source.asset("../out")],
       destinationBucket: siteBucket,
       distribution,
       distributionPaths: ["/*"],
-      exclude: ["errors/*"],
+      exclude: ["errors/*", "_next/*"],
+      cacheControl: [
+        s3deploy.CacheControl.setPublic(),
+        s3deploy.CacheControl.maxAge(cdk.Duration.hours(1)),
+        s3deploy.CacheControl.sMaxAge(cdk.Duration.days(1)),
+      ],
+    });
+
+    // Deploy _next/static with immutable cache (content-hashed filenames)
+    new s3deploy.BucketDeployment(this, "DeployStaticAssets", {
+      sources: [s3deploy.Source.asset("../out")],
+      destinationBucket: siteBucket,
+      include: ["_next/*"],
+      exclude: ["*"],
+      cacheControl: [
+        s3deploy.CacheControl.setPublic(),
+        s3deploy.CacheControl.maxAge(cdk.Duration.days(365)),
+        s3deploy.CacheControl.immutable(),
+      ],
     });
 
     // Deploy error pages to /errors/ prefix
