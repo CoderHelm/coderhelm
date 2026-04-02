@@ -1,7 +1,9 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "Terms of Service — Coderhelm",
+  title: "Terms of Service",
+  description: "Coderhelm Terms of Service. Read the terms that govern your use of the Coderhelm autonomous AI coding agent.",
+  alternates: { canonical: "https://coderhelm.com/terms" },
 };
 
 export default function Terms() {
