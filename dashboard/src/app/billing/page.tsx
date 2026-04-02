@@ -451,7 +451,7 @@ export default function BillingPage() {
               </div>
             )}
             <div className="border-t border-zinc-800 pt-2 flex justify-between font-medium">
-              <span className="text-zinc-200">Estimated total</span>
+              <span className="text-zinc-200">Total</span>
               <span className="text-zinc-100">${((19900 + billing.current_period.estimated_overage_cents) / 100).toFixed(2)}</span>
             </div>
           </div>
