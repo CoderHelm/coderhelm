@@ -38,8 +38,8 @@ export const api = {
     request<{ status: string; message: string }>("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }),
   confirmReset: (email: string, code: string, new_password: string) =>
     request<{ status: string; message: string }>("/auth/confirm-reset", { method: "POST", body: JSON.stringify({ email, code, new_password }) }),
-  mfaVerify: (session: string, code: string) =>
-    request<{ status: string; team_id?: string }>("/auth/mfa/verify", { method: "POST", body: JSON.stringify({ session, code }) }),
+  mfaVerify: (session: string, code: string, email: string) =>
+    request<{ status: string; team_id?: string }>("/auth/mfa/verify", { method: "POST", body: JSON.stringify({ session, code, email }) }),
   logout: () => request<void>("/auth/logout", { method: "POST" }),
 
   // Allowlist
