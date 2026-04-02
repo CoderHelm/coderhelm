@@ -188,6 +188,8 @@ export const api = {
     request<{ status: string }>(`/api/users/${encodeURIComponent(userId)}/role`, { method: "PUT", body: JSON.stringify({ role }) }),
   removeUser: (userId: string) =>
     request<{ status: string }>(`/api/users/${encodeURIComponent(userId)}`, { method: "DELETE" }),
+  resendInvite: (userId: string) =>
+    request<{ status: string }>(`/api/users/${encodeURIComponent(userId)}/resend`, { method: "POST" }),
   changePassword: (current_password: string, new_password: string) =>
     request<{ status: string }>("/api/users/password", { method: "PUT", body: JSON.stringify({ current_password, new_password }) }),
   mfaSetup: (password: string) =>
