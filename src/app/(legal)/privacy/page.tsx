@@ -1,5 +1,7 @@
 export const metadata = {
-  title: "Privacy Policy — Coderhelm",
+  title: "Privacy Policy",
+  description: "Coderhelm Privacy Policy. Learn how we collect, use, and protect your data when you use the Coderhelm AI coding agent.",
+  alternates: { canonical: "https://coderhelm.com/privacy" },
 };
 
 export default function Privacy() {

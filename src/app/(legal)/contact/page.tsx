@@ -1,5 +1,7 @@
 export const metadata = {
-  title: "Contact — Coderhelm",
+  title: "Contact",
+  description: "Contact Coderhelm for support, legal, or security inquiries about our autonomous AI coding agent.",
+  alternates: { canonical: "https://coderhelm.com/contact" },
 };
 
 export default function Contact() {
