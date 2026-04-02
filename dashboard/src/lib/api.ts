@@ -229,6 +229,8 @@ export const api = {
     request<{ status: string; error?: string }>(`/api/plugins/${id}/credentials`, { method: "PUT", body: JSON.stringify({ credentials }) }),
   updatePluginPrompt: (id: string, custom_prompt: string) =>
     request<{ status: string; error?: string }>(`/api/plugins/${id}/prompt`, { method: "PUT", body: JSON.stringify({ custom_prompt }) }),
+  testPluginConnection: (id: string) =>
+    request<{ status: string; tool_count?: number; message?: string }>(`/api/plugins/${id}/test`, { method: "POST" }),
 };
 
 export interface TeamUser {

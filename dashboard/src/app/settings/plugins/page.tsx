@@ -60,6 +60,8 @@ export default function PluginsPage() {
   const [customPrompt, setCustomPrompt] = useState("");
   const [savingPrompt, setSavingPrompt] = useState(false);
   const [editingCreds, setEditingCreds] = useState(false);
+  const [testing, setTesting] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ status: string; tool_count?: number; message?: string } | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -107,6 +109,7 @@ export default function PluginsPage() {
     for (const f of plugin.credential_fields) empty[f.key] = "";
     setCredentials(empty);
     setEditingCreds(false);
+    setTestResult(null);
     const ep = enabled.get(plugin.id);
     setCustomPrompt(ep?.custom_prompt || plugin.default_prompt);
   };
@@ -150,6 +153,24 @@ export default function PluginsPage() {
       toast("Failed to save credentials", "error");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTestConnection = async (pluginId: string) => {
+    setTesting(pluginId);
+    setTestResult(null);
+    try {
+      const result = await api.testPluginConnection(pluginId);
+      setTestResult(result);
+      if (result.status === "ok") {
+        toast(`Connection successful — ${result.tool_count} tool${result.tool_count === 1 ? "" : "s"} available`);
+      } else {
+        toast(result.message || "Connection test failed", "error");
+      }
+    } catch {
+      toast("Connection test failed", "error");
+    } finally {
+      setTesting(null);
     }
   };
 
@@ -407,6 +428,34 @@ export default function PluginsPage() {
                             </button>
                           </div>
                         </div>
+                        )}
+                        {/* Test connection */}
+                        {hasCreds && (
+                          <div className="mb-3">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleTestConnection(plugin.id)}
+                                disabled={testing === plugin.id}
+                                className="px-3 py-1.5 text-xs font-medium text-zinc-300 bg-zinc-800 border border-zinc-700 rounded-md hover:bg-zinc-700 disabled:opacity-50 transition-colors cursor-pointer"
+                              >
+                                {testing === plugin.id ? (
+                                  <span className="flex items-center gap-1.5">
+                                    <span className="w-3 h-3 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin" />
+                                    Testing...
+                                  </span>
+                                ) : "Test connection"}
+                              </button>
+                              {testResult && configuring === plugin.id && testResult.status === "ok" && (
+                                <span className="text-xs text-emerald-400 flex items-center gap-1">
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+                                  {testResult.tool_count} tool{testResult.tool_count === 1 ? "" : "s"} available
+                                </span>
+                              )}
+                              {testResult && configuring === plugin.id && testResult.status === "error" && (
+                                <span className="text-xs text-red-400">{testResult.message}</span>
+                              )}
+                            </div>
+                          </div>
                         )}
                         {/* Custom prompt */}
                         <div className="mt-4">

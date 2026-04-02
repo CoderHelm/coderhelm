@@ -93,7 +93,7 @@ export default function BudgetPage() {
         <div className="flex items-center justify-between pt-2">
           <p className="text-xs text-zinc-500">
             {maxBudget && parseFloat(maxBudget) > 0
-              ? `Coderhelm will stop after ~${formatTokens(Math.floor(parseFloat(maxBudget) * 100 / 5 * 1000) + 5_000_000)} tokens/month`
+              ? `Coderhelm will stop after ~${formatTokens(Math.floor(parseFloat(maxBudget) * 100 / 1000 * 1000) + 1_000_000)} tokens/month`
               : "No spending limit — usage will continue with overage billing"}
           </p>
           <button

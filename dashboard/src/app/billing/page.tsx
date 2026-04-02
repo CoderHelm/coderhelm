@@ -242,7 +242,7 @@ export default function BillingPage() {
 
       {isActive && (
         <p className="text-xs text-zinc-500 -mt-4 mb-6">
-          ${(billing.limits.overage_per_1k_tokens_cents / 100).toFixed(2)} per 1K overage tokens, billed in $50 increments.
+          ${(billing.limits.overage_per_1k_tokens_cents / 100).toFixed(2)} per 1K overage tokens, billed in $100 increments.
         </p>
       )}
 
