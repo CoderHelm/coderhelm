@@ -3,9 +3,10 @@
 import Script from "next/script";
 
 const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID;
+const GTM_ID_RE = /^GTM-[A-Z0-9]{1,10}$/;
 
 export function GoogleTagManager() {
-  if (!GTM_ID) return null;
+  if (!GTM_ID || !GTM_ID_RE.test(GTM_ID)) return null;
 
   return (
     <>
