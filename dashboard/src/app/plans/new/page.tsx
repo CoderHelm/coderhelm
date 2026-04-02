@@ -242,6 +242,9 @@ export default function NewPlanPage() {
       <div className="flex gap-6 flex-1 min-h-0">
         {/* Chat panel */}
         <div className="flex flex-col flex-1 min-h-0">
+          <div className="px-3 py-2 mb-2 text-xs text-zinc-500 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+            Responses are AI-generated and may contain errors. Review all suggestions carefully.
+          </div>
           <div className="flex-1 overflow-y-auto space-y-4 pb-4 pr-2">
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>

@@ -174,7 +174,13 @@ function JiraAppTab({ check, config, setConfig, toast }: {
               </div>
               <div>
                 <p className="text-sm font-medium text-emerald-400">Jira app linked</p>
-                <p className="text-xs text-zinc-500 mt-0.5">Trigger URLs registered — assigning labeled tickets will start runs.</p>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  {config?.site_url ? (
+                    <a href={config.site_url} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-200 transition-colors">{config.site_url.replace(/^https?:\/\//, "")}</a>
+                  ) : (
+                    "Trigger URLs registered — assigning labeled tickets will start runs."
+                  )}
+                </p>
               </div>
             </div>
             <button
