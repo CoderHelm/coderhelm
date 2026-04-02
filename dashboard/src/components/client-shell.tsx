@@ -682,7 +682,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const handleMfa = async () => {
     setError(""); setLoading(true);
     try {
-      await api.mfaVerify(mfaSession, code);
+      await api.mfaVerify(mfaSession, code, email);
       const u = await api.me();
       onAuth(u);
     } catch {
@@ -747,17 +747,16 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
                 <div className="flex-1 h-px bg-zinc-800" />
               </div>
 
-              <div className="space-y-3">
-                <input type="email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); setMessage(""); }}
+              <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} className="space-y-3">
+                <input type="email" name="email" id="login-email" autoComplete="email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); setMessage(""); }}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
-                <input type="password" placeholder="Password" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }}
-                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                <input type="password" name="password" id="login-password" autoComplete="current-password" placeholder="Password" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
-                <button onClick={handleLogin} disabled={loading || !email || !password}
+                <button type="submit" disabled={loading || !email || !password}
                   className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed">
                   {loading ? "Signing in..." : "Sign in"}
                 </button>
-              </div>
+              </form>
 
               <div className="flex items-center justify-between w-full text-xs">
                 <button onClick={() => { setView("signup"); setError(""); setMessage(""); }} className="text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">Create account</button>
@@ -776,11 +775,10 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
                 </div>
                 <p className="text-xs text-zinc-500">Only users with an invite can create an account.</p>
               </div>
-              <div className="space-y-3">
-                <input type="email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); setMessage(""); }}
+              <form onSubmit={(e) => { e.preventDefault(); if (password.length >= 8 && agreedTos) handleSignup(); }} className="space-y-3">
+                <input type="email" name="email" id="signup-email" autoComplete="email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); setMessage(""); }}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
-                <input type="password" placeholder="Password (8+ chars)" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }}
-                  onKeyDown={(e) => e.key === "Enter" && password.length >= 8 && agreedTos && handleSignup()}
+                <input type="password" name="password" id="signup-password" autoComplete="new-password" placeholder="Password (8+ chars)" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
                 <label className="flex items-start gap-2 cursor-pointer">
                   <input type="checkbox" checked={agreedTos} onChange={(e) => setAgreedTos(e.target.checked)}
@@ -792,11 +790,11 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
                     <a href="https://coderhelm.com/privacy" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-200 underline">Privacy Policy</a>
                   </span>
                 </label>
-                <button onClick={handleSignup} disabled={loading || !email || password.length < 8 || !agreedTos}
+                <button type="submit" disabled={loading || !email || password.length < 8 || !agreedTos}
                   className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed">
                   {loading ? "Creating account..." : "Create account"}
                 </button>
-              </div>
+              </form>
               <button onClick={() => { setView("login"); setError(""); setMessage(""); }} className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">
                 Already have an account? Sign in
               </button>
