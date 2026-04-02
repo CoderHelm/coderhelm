@@ -376,6 +376,15 @@ function SettingsTab({ config, setConfig, toast }: {
               className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-100 placeholder-zinc-600 opacity-60 cursor-default"
             />
           </div>
+          {config?.site_url && (
+            <div>
+              <label className="text-xs text-zinc-500 mb-1 block">Jira Site</label>
+              <a href={config.site_url} target="_blank" rel="noopener noreferrer"
+                className="inline-block px-3 py-2 text-sm text-zinc-300 hover:text-zinc-100 transition-colors">
+                {config.site_url.replace(/^https?:\/\//, "")}
+              </a>
+            </div>
+          )}
         </div>
       </section>
 
