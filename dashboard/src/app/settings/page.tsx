@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/toast";
@@ -9,14 +9,24 @@ export default function SettingsPage() {
   const [resetting, setResetting] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
   const [confirmText, setConfirmText] = useState("");
+  const [role, setRole] = useState<string | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    api.me().then((u) => setRole(u.role)).catch(() => {});
+  }, []);
+
+  const isAdminOrOwner = role === "admin" || role === "owner";
+  const isBillingOrAbove = isAdminOrOwner || role === "billing";
+  const isMemberOrAbove = isBillingOrAbove || role === "member";
+
   const sections = [
-    { href: "/settings/guardrails", title: "Guardrails", description: "Must-rules Coderhelm always follows. Never pushes to main." },
-    { href: "/settings/voice", title: "Team Voice", description: "Control how Coderhelm writes — tone, commit style, PR format." },
-    { href: "/settings/instructions", title: "Custom Instructions", description: "Global conventions and preferences for all repos." },
-    { href: "/settings/repos", title: "Repositories", description: "Connected repos and their status." },
-    { href: "/settings/budget", title: "Budget", description: "Set a monthly spending cap to control overage costs." },
-    { href: "/settings/workflow", title: "Workflow", description: "Openspec output, commit behavior, and pipeline preferences." },
+    { href: "/settings/guardrails", title: "Guardrails", description: "Must-rules Coderhelm always follows. Never pushes to main.", adminOnly: true },
+    { href: "/settings/voice", title: "Team Voice", description: "Control how Coderhelm writes — tone, commit style, PR format.", adminOnly: true },
+    { href: "/settings/instructions", title: "Custom Instructions", description: "Global conventions and preferences for all repos.", adminOnly: true },
+    { href: "/settings/repos", title: "Repositories", description: "Connected repos and their status.", memberOnly: true },
+    { href: "/settings/budget", title: "Budget", description: "Set a monthly spending cap to control overage costs.", billingOnly: true },
+    { href: "/settings/workflow", title: "Workflow", description: "Openspec output, commit behavior, and pipeline preferences.", adminOnly: true },
     { href: "/settings/notifications", title: "Notifications", description: "Choose which emails Coderhelm sends you." },
     { href: "/settings/team", title: "Team", description: "Invite members, assign roles, and manage who has access." },
     { href: "/settings/security", title: "Security", description: "Change your password and enable two-factor authentication." },
@@ -28,6 +38,13 @@ export default function SettingsPage() {
     { href: "/settings/jira", title: "Jira", description: "Connect Jira to create tickets from plans and sync issue status." },
     { href: "/settings/plugins", title: "MCP Servers", description: "Connect MCP servers like Figma, Sentry, and Linear." },
   ];
+
+  const visibleSections = sections.filter((s) => {
+    if ("adminOnly" in s && s.adminOnly) return isAdminOrOwner;
+    if ("billingOnly" in s && s.billingOnly) return isBillingOrAbove;
+    if ("memberOnly" in s && s.memberOnly) return isMemberOrAbove;
+    return true;
+  });
 
   const handleReset = async () => {
     if (confirmText !== "DELETE") return;
@@ -48,7 +65,7 @@ export default function SettingsPage() {
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-6">Settings</h1>
       <div className="space-y-3">
-        {sections.map((s) => (
+        {visibleSections.map((s) => (
           <Link
             key={s.href}
             href={s.href}
@@ -60,6 +77,8 @@ export default function SettingsPage() {
         ))}
       </div>
 
+      {isAdminOrOwner && (
+      <>
       <h2 className="text-lg font-semibold mt-10 mb-3">Integrations</h2>
       <div className="space-y-3">
         {integrations.map((s) => (
@@ -73,8 +92,11 @@ export default function SettingsPage() {
           </Link>
         ))}
       </div>
+      </>
+      )}
 
       {/* Danger zone */}
+      {isAdminOrOwner && (
       <div className="mt-12 border border-red-500/20 rounded-lg p-5">
         <h2 className="text-sm font-semibold text-red-400 mb-1">Danger Zone</h2>
         <p className="text-xs text-zinc-500 mb-4">
@@ -88,6 +110,7 @@ export default function SettingsPage() {
           {resetting ? "Resetting..." : "Reset all data"}
         </button>
       </div>
+      )}
 
       {/* Reset confirmation modal */}
       {showResetModal && (

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, type Repo } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { RoleGuard } from "@/components/role-guard";
 import { Skeleton } from "@/components/skeleton";
 import { RepoCombobox } from "@/components/repo-combobox";
 import {
@@ -88,7 +89,11 @@ function RuleList({
   );
 }
 
-export default function GuardrailsPage() {
+export default function GuardrailsPageGuarded() {
+  return <RoleGuard minRole="admin"><GuardrailsPage /></RoleGuard>;
+}
+
+function GuardrailsPage() {
   const [tab, setTab] = useState<"global" | "repo">("global");
   const { toast } = useToast();
 

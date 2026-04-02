@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react";
 import { api, type Repo } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
+import { RoleGuard } from "@/components/role-guard";
 
 const PAGE_SIZE = 10;
 
-export default function ReposPage() {
+export default function ReposPageGuarded() { return <RoleGuard minRole="member"><ReposPage /></RoleGuard>; }
+
+function ReposPage() {
   const [repos, setRepos] = useState<Repo[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");

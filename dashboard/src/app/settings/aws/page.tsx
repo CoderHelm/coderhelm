@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { api, type AwsConnection, type LogGroup, type Recommendation } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { RoleGuard } from "@/components/role-guard";
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
   active: { bg: "bg-emerald-500/10", text: "text-emerald-400", dot: "bg-emerald-400" },
@@ -11,7 +12,9 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> =
   testing: { bg: "bg-blue-500/10", text: "text-blue-400", dot: "bg-blue-400" },
 };
 
-export default function AwsConnectionsPage() {
+export default function AwsConnectionsPageGuarded() { return <RoleGuard minRole="admin"><AwsConnectionsPage /></RoleGuard>; }
+
+function AwsConnectionsPage() {
   const [connections, setConnections] = useState<AwsConnection[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);

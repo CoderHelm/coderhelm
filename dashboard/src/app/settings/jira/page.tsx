@@ -5,10 +5,13 @@ import { api, type JiraEvent, type JiraCheck, type JiraConfig, type JiraProject 
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Skeleton } from "@/components/skeleton";
+import { RoleGuard } from "@/components/role-guard";
 
 type Tab = "app" | "webhook" | "events" | "settings";
 
-export default function JiraPage() {
+export default function JiraPageGuarded() { return <RoleGuard minRole="admin"><JiraPage /></RoleGuard>; }
+
+function JiraPage() {
   const [check, setCheck] = useState<JiraCheck | null>(null);
   const [config, setConfig] = useState<JiraConfig | null>(null);
   const [loading, setLoading] = useState(true);

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { RoleGuard } from "@/components/role-guard";
 
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -10,7 +11,9 @@ function formatTokens(n: number): string {
   return n.toString();
 }
 
-export default function BudgetPage() {
+export default function BudgetPageGuarded() { return <RoleGuard minRole="billing"><BudgetPage /></RoleGuard>; }
+
+function BudgetPage() {
   const [maxBudget, setMaxBudget] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

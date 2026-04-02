@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, type WorkflowSettings, type JiraCheck, type AwsConnection } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { RoleGuard } from "@/components/role-guard";
 
 type WorkflowToggleKey = "commit_openspec" | "allow_plan_log_analyzer";
 
@@ -19,7 +20,9 @@ const TOGGLES: { key: WorkflowToggleKey; label: string; description: string }[] 
   },
 ];
 
-export default function WorkflowPage() {
+export default function WorkflowPageGuarded() { return <RoleGuard minRole="admin"><WorkflowPage /></RoleGuard>; }
+
+function WorkflowPage() {
   const [settings, setSettings] = useState<WorkflowSettings | null>(null);
   const [jira, setJira] = useState<JiraCheck | null>(null);
   const [awsConnected, setAwsConnected] = useState(false);

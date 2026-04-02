@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, type Repo } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { RoleGuard } from "@/components/role-guard";
 import { useConfirm } from "@/components/confirm-dialog";
 import { TextareaSkeleton } from "@/components/skeleton";
 import { RepoCombobox } from "@/components/repo-combobox";
@@ -70,7 +71,11 @@ function VoiceEditor({
   );
 }
 
-export default function VoicePage() {
+export default function VoicePageGuarded() {
+  return <RoleGuard minRole="admin"><VoicePage /></RoleGuard>;
+}
+
+function VoicePage() {
   const [tab, setTab] = useState<"global" | "repo">("global");
   const { toast } = useToast();
   const { confirm } = useConfirm();
