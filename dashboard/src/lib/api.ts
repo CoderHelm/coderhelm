@@ -114,6 +114,7 @@ export const api = {
   getJiraCheck: () => request<JiraCheck>("/api/integrations/jira/check"),
   generateJiraSecret: () => request<{ token: string; webhook_secret: string }>("/api/integrations/jira/secret", { method: "POST" }),
   deleteJiraSecret: () => request<void>("/api/integrations/jira/secret", { method: "DELETE" }),
+  deleteJiraIntegration: () => request<void>("/api/integrations/jira/check", { method: "DELETE" }),
   getJiraConfig: () => request<JiraConfig>("/api/integrations/jira/config"),
   updateJiraConfig: (body: Partial<JiraConfig>) =>
     request<void>("/api/integrations/jira/config", { method: "PUT", body: JSON.stringify(body) }),

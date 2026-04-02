@@ -13,6 +13,7 @@ export default function JiraPage() {
   const [config, setConfig] = useState<JiraConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [generatingSecret, setGeneratingSecret] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("app");
   const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
@@ -55,6 +56,22 @@ export default function JiraPage() {
       toast("Webhook URL removed");
     } catch {
       toast("Failed to remove webhook URL", "error");
+    }
+  };
+
+  const deleteIntegration = async () => {
+    if (!(await confirm({ title: "Delete Jira Integration", message: "This will remove all Jira configuration, webhook credentials, project settings, and event history. You can set it up again anytime.", confirmLabel: "Delete", destructive: true }))) return;
+    setDeleting(true);
+    try {
+      await api.deleteJiraIntegration();
+      setCheck(null);
+      setConfig(null);
+      setRevealedSecret(null);
+      toast("Jira integration deleted");
+    } catch {
+      toast("Failed to delete integration", "error");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -126,6 +143,25 @@ export default function JiraPage() {
         <EventsTab />
       ) : (
         <SettingsTab config={config} setConfig={setConfig} toast={toast} />
+      )}
+
+      {/* Delete integration */}
+      {(check || config) && (
+        <div className="mt-10 pt-6 border-t border-zinc-800">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-zinc-300">Delete integration</p>
+              <p className="text-xs text-zinc-500 mt-0.5">Remove all Jira configuration, credentials, and event history.</p>
+            </div>
+            <button
+              onClick={deleteIntegration}
+              disabled={deleting}
+              className="px-3 py-1.5 text-xs text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {deleting ? "Deleting…" : "Delete"}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
