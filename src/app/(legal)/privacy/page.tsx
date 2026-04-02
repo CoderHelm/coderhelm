@@ -15,7 +15,7 @@ export default function Privacy() {
         Coderhelm (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) operates the coderhelm.com website and
         the Coderhelm GitHub App (collectively, the &quot;Service&quot;). This Privacy Policy explains
         how we collect, use, disclose, and safeguard your information when you use our Service. Please
-        read this policy carefully. By using the Service, you consent to the practices described herein.
+        read this policy carefully. By using the Service, you acknowledge the practices described herein.
       </p>
 
       <h2>1. Information We Collect</h2>
@@ -54,7 +54,34 @@ export default function Privacy() {
         are collected and processed directly by Stripe. We receive only a Stripe customer ID,
         subscription status, and invoice summaries. We never see or store your full card number.</p>
 
-      <h3>1.5 Automatically Collected Data</h3>
+      <h3>1.5 Jira Integration Data</h3>
+      <p>If you connect a Jira workspace to Coderhelm, we receive the following via the Atlassian API:</p>
+      <ul>
+        <li>Jira OAuth access and refresh tokens (stored encrypted)</li>
+        <li>Jira Cloud site ID and site URL</li>
+        <li>Project keys, issue keys, and issue metadata (titles, descriptions, status)</li>
+        <li>Atlassian account ID of the authorizing user</li>
+      </ul>
+      <p>Jira tokens are used solely to read and create issues on your behalf. They are stored
+        encrypted at rest and can be revoked at any time from your Jira settings.</p>
+
+      <h3>1.6 Google Authentication Data</h3>
+      <p>If you sign in with Google, we receive the following via Google OAuth:</p>
+      <ul>
+        <li>Email address and email verification status</li>
+        <li>Display name and profile picture URL</li>
+      </ul>
+      <p>We use this information solely to create and authenticate your dashboard account.
+        We do not access your Google Drive, Gmail, Calendar, or any other Google services.</p>
+
+      <h3>1.7 MCP Tool Integrations</h3>
+      <p>Coderhelm supports user-configured Model Context Protocol (MCP) tool servers. When you
+        configure an MCP server, the AI agent may send contextual data (such as file paths, code
+        snippets, or issue metadata) to that server during a run. MCP servers are configured
+        and controlled by you, and data is sent only at your direction. We do not operate or
+        control third-party MCP servers, and their use is subject to their own privacy policies.</p>
+
+      <h3>1.8 Automatically Collected Data</h3>
       <p>When you visit coderhelm.com, we may automatically collect:</p>
       <ul>
         <li>IP address and approximate geographic location</li>
@@ -112,13 +139,19 @@ export default function Privacy() {
           <tr><th>Provider</th><th>Purpose</th><th>Data Processed</th></tr>
         </thead>
         <tbody>
-          <tr><td>Amazon Web Services (AWS)</td><td>Infrastructure hosting, compute, data storage, AI processing, and transactional email delivery</td><td>All service data</td></tr>
+          <tr><td>Amazon Web Services (AWS)</td><td>Infrastructure hosting, compute, data storage, and transactional email delivery</td><td>All service data</td></tr>
+          <tr><td>Amazon Bedrock (AWS)</td><td>AI model inference for code generation and analysis</td><td>Source code (in-memory only), issue metadata</td></tr>
           <tr><td>GitHub</td><td>Authentication, repository access, webhook delivery</td><td>Account data, repository metadata</td></tr>
           <tr><td>Stripe</td><td>Payment processing, subscription management</td><td>Billing information</td></tr>
+          <tr><td>Google (OAuth)</td><td>User authentication via Google Sign-In</td><td>Email, display name, profile picture</td></tr>
+          <tr><td>Atlassian (Jira)</td><td>Issue tracking integration</td><td>Jira OAuth tokens, project/issue metadata</td></tr>
         </tbody>
       </table>
       <p>Each sub-processor operates under its own privacy policy and is bound by data
         processing agreements where applicable.</p>
+      <p><strong>User-configured MCP servers:</strong> If you configure third-party MCP tool
+        servers, data may be sent to those servers at your direction during runs. These are not
+        Coderhelm sub-processors — you are responsible for evaluating their privacy practices.</p>
 
       <h2>6. International Data Transfers</h2>
       <p>Our Service infrastructure is located in the United States. If you access the Service
@@ -143,7 +176,15 @@ export default function Privacy() {
           after each run</li>
       </ul>
 
-      <h2>8. Data Security</h2>
+      <h2>8. Data Breach Notification</h2>
+      <p>In the event of a personal data breach that is likely to result in a risk to your rights
+        and freedoms, we will notify affected users without undue delay and no later than 72 hours
+        after becoming aware of the breach, as required by applicable law. Notification will be sent
+        to the email address associated with your account and will include: the nature of the breach,
+        the categories of data affected, the likely consequences, and the measures taken or proposed
+        to address the breach.</p>
+
+      <h2>9. Data Security</h2>
       <p>We implement industry-standard technical and organizational measures to protect your
         data, including:</p>
       <ul>
@@ -157,7 +198,7 @@ export default function Privacy() {
       <p>No method of transmission or storage is 100% secure. While we strive to protect your
         information, we cannot guarantee absolute security.</p>
 
-      <h2>9. Cookies &amp; Tracking</h2>
+      <h2>10. Cookies &amp; Tracking</h2>
       <p>The coderhelm.com website uses a session cookie (<code>coderhelm_session</code>) to maintain
         your authenticated dashboard session. This is a strictly necessary cookie and does not
         require consent under ePrivacy regulations.</p>
@@ -165,7 +206,7 @@ export default function Privacy() {
         that track you across other websites. We do not participate in ad networks or
         cross-site tracking.</p>
 
-      <h2>10. AI &amp; Automated Processing</h2>
+      <h2>11. AI &amp; Automated Processing</h2>
       <p>Coderhelm uses large language models (LLMs) to analyze code and generate pull requests.
         This processing is automated and occurs on your behalf when you assign an issue. Key points:</p>
       <ul>
@@ -177,7 +218,7 @@ export default function Privacy() {
           contacting us</li>
       </ul>
 
-      <h2>11. Your Rights</h2>
+      <h2>12. Your Rights</h2>
       <p>Depending on your location, you may have the following rights:</p>
 
       <h3>All Users</h3>
@@ -205,6 +246,8 @@ export default function Privacy() {
         <li><strong>Right to know:</strong> Request the categories and specific pieces of personal
           information collected about you</li>
         <li><strong>Right to delete:</strong> Request deletion of personal information</li>
+        <li><strong>Right to correct:</strong> Request correction of inaccurate personal
+          information</li>
         <li><strong>Right to opt-out of sale:</strong> We do not sell personal information. No
           opt-out is necessary</li>
         <li><strong>Non-discrimination:</strong> We will not discriminate against you for
@@ -215,23 +258,23 @@ export default function Privacy() {
         <a href="mailto:privacy@coderhelm.com">privacy@coderhelm.com</a>. We will respond within
         30 days (or as required by applicable law).</p>
 
-      <h2>12. Children&apos;s Privacy</h2>
+      <h2>13. Children&apos;s Privacy</h2>
       <p>The Service is not directed to individuals under the age of 16. We do not knowingly
         collect personal data from children. If we become aware that a child under 16 has
         provided us with personal data, we will take steps to delete such information promptly.</p>
 
-      <h2>13. Do Not Track</h2>
+      <h2>14. Do Not Track</h2>
       <p>We do not track users across third-party websites and therefore do not respond to
-        Do Not Track (DNT) signals. As noted in Section 9, we do not use third-party tracking
+        Do Not Track (DNT) signals. As noted in Section 10, we do not use third-party tracking
         technologies.</p>
 
-      <h2>14. Changes to This Policy</h2>
+      <h2>15. Changes to This Policy</h2>
       <p>We may update this Privacy Policy from time to time. When we make material changes,
         we will update the &quot;Last updated&quot; date at the top of this page and, where
         required by law, notify you by email or through the Service. Your continued use of the
         Service after any changes constitutes acceptance of the updated policy.</p>
 
-      <h2>15. Contact Us</h2>
+      <h2>16. Contact Us</h2>
       <p>If you have questions or concerns about this Privacy Policy or our data practices:</p>
       <ul>
         <li>Email: <a href="mailto:privacy@coderhelm.com">privacy@coderhelm.com</a></li>

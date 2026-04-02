@@ -28,6 +28,12 @@ export default function Contact() {
       <p>
         <a href="mailto:legal@coderhelm.com">legal@coderhelm.com</a>
       </p>
+      <p>
+        For privacy-specific requests (data access, correction, deletion):
+      </p>
+      <p>
+        <a href="mailto:privacy@coderhelm.com">privacy@coderhelm.com</a>
+      </p>
 
       <h2>Security</h2>
       <p>
@@ -35,6 +41,21 @@ export default function Contact() {
       </p>
       <p>
         <a href="mailto:security@coderhelm.com">security@coderhelm.com</a>
+      </p>
+
+      <h2>Abuse</h2>
+      <p>
+        To report abuse, policy violations, or DMCA takedown notices:
+      </p>
+      <p>
+        <a href="mailto:abuse@coderhelm.com">abuse@coderhelm.com</a>
+      </p>
+
+      <h2>Response Times</h2>
+      <p>
+        We aim to respond to all inquiries within 2 business days. Privacy and
+        data rights requests will be addressed within 30 days as required by
+        applicable law.
       </p>
     </>
   );

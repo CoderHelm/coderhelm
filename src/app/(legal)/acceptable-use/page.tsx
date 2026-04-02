@@ -36,7 +36,8 @@ export default function AcceptableUse() {
           restrictions of the Service or any third-party system</li>
         <li>Attempt to reverse-engineer, decompile, disassemble, or extract the Service&apos;s
           underlying models, algorithms, prompts, or training data</li>
-        <li>Probe, scan, or test the vulnerability of the Service without prior written authorization</li>
+        <li>Probe, scan, or test the vulnerability of the Service without prior written authorization
+          (see Section 4.1 for authorized security research)</li>
         <li>Introduce viruses, worms, or other harmful code into the Service</li>
         <li>Interfere with or disrupt the integrity or performance of the Service</li>
       </ul>
@@ -98,6 +99,32 @@ export default function AcceptableUse() {
         possible, including the nature of the violation and any supporting evidence. We will
         investigate all credible reports and take appropriate action.</p>
 
+      <h3>4.1 Responsible Disclosure &amp; Security Research</h3>
+      <p>We welcome good-faith security research. If you discover a vulnerability in the Service,
+        please report it responsibly to{" "}
+        <a href="mailto:security@coderhelm.com">security@coderhelm.com</a> before disclosing it
+        publicly. Authorized security researchers acting in good faith will not be subject to
+        enforcement action under this AUP, provided they:</p>
+      <ul>
+        <li>Do not access, modify, or delete other users&apos; data</li>
+        <li>Do not degrade the availability of the Service for other users</li>
+        <li>Report findings promptly and privately</li>
+        <li>Allow reasonable time for remediation before any disclosure</li>
+      </ul>
+
+      <h3>4.2 Copyright &amp; DMCA Takedown</h3>
+      <p>If you believe that content generated through the Service infringes your copyright, you
+        may submit a takedown notice to our designated DMCA agent:</p>
+      <ul>
+        <li>Email: <a href="mailto:legal@coderhelm.com">legal@coderhelm.com</a></li>
+        <li>Subject line: &quot;DMCA Takedown Notice&quot;</li>
+      </ul>
+      <p>Your notice must include: identification of the copyrighted work, the infringing material
+        and its location, your contact information, a statement of good faith belief, and a
+        statement under penalty of perjury that the information is accurate and you are authorized
+        to act on behalf of the copyright owner. We will respond to valid DMCA notices in
+        accordance with applicable law.</p>
+
       <h2>5. Monitoring &amp; Enforcement</h2>
       <p>We reserve the right to monitor usage of the Service for compliance with this AUP.
         We may investigate suspected violations and take any action we deem appropriate,
@@ -113,6 +140,14 @@ export default function AcceptableUse() {
         taking action, unless doing so would compromise security, enable further abuse, or
         violate applicable law.</p>
 
+      <h3>5.1 Appeal Process</h3>
+      <p>If your account is suspended or terminated under this AUP and you believe the action
+        was taken in error, you may submit an appeal to{" "}
+        <a href="mailto:appeals@coderhelm.com">appeals@coderhelm.com</a> within 30 days of the
+        enforcement action. Include your account details and an explanation of why you believe
+        the action was unwarranted. We will review appeals in good faith and respond within
+        14 business days.</p>
+
       <h2>6. Consequences of Violation</h2>
       <p>If your account is terminated for violation of this AUP:</p>
       <ul>
@@ -124,9 +159,10 @@ export default function AcceptableUse() {
 
       <h2>7. Changes to This Policy</h2>
       <p>We may update this AUP at any time. When we make material changes, we will update
-        the &quot;Last updated&quot; date at the top of this page. Changes take effect
-        immediately upon posting. Your continued use of the Service after changes constitutes
-        acceptance of the revised AUP.</p>
+        the &quot;Last updated&quot; date at the top of this page and notify you by email or
+        through the Service at least 14 days before the changes take effect. Your continued
+        use of the Service after the effective date constitutes acceptance of the revised AUP.
+        If you do not agree to the revised AUP, you must stop using the Service.</p>
 
       <h2>8. Contact</h2>
       <p>Questions about this Acceptable Use Policy? Contact us at:</p>
