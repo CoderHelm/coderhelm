@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url>
+<loc>https://coderhelm.com</loc>
+<lastmod>2026-04-02T16:51:50.403Z</lastmod>
+<changefreq>weekly</changefreq>
+<priority>1</priority>
+</url>
+<url>
+<loc>https://coderhelm.com/terms</loc>
+<lastmod>2026-04-02T16:51:50.403Z</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.3</priority>
+</url>
+<url>
+<loc>https://coderhelm.com/privacy</loc>
+<lastmod>2026-04-02T16:51:50.403Z</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.3</priority>
+</url>
+<url>
+<loc>https://coderhelm.com/acceptable-use</loc>
+<lastmod>2026-04-02T16:51:50.403Z</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.3</priority>
+</url>
+<url>
+<loc>https://coderhelm.com/contact</loc>
+<lastmod>2026-04-02T16:51:50.403Z</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.4</priority>
+</url>
+</urlset>

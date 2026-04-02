@@ -1,0 +1,44 @@
+{
+  "/coderhelm-prod-landing-waf/BotPatterns": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BotPatterns"
+    }
+  ],
+  "/coderhelm-prod-landing-waf/WebAcl": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "WebAcl"
+    }
+  ],
+  "/coderhelm-prod-landing-waf/WebAclArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "WebAclArn"
+    }
+  ],
+  "/coderhelm-prod-landing-waf/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/coderhelm-prod-landing-waf/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/coderhelm-prod-landing-waf/CDKMetadata/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CDKMetadata"
+    }
+  ],
+  "/coderhelm-prod-landing-waf/Exports/Output{\"Fn::GetAtt\":[\"WebAcl\",\"Arn\"]}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputFnGetAttWebAclArnEF1FFB35"
+    }
+  ]
+}

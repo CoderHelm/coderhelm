@@ -104,14 +104,14 @@ export class FrontendStack extends cdk.Stack {
       }
     );
 
-    // Rewrite directory paths to index.html and redirect coderhelm.ai → coderhelm.com
+    // Rewrite directory paths to index.html and redirect coderhelm.ai / www → coderhelm.com
     const urlRewrite = new cloudfront.Function(this, "UrlRewrite", {
       functionName: `${prefix}-site-url-rewrite`,
       code: cloudfront.FunctionCode.fromInline(`
 function handler(event) {
   var request = event.request;
   var host = request.headers.host && request.headers.host.value;
-  if (host && host.indexOf('coderhelm.ai') !== -1) {
+  if (host && (host.indexOf('coderhelm.ai') !== -1 || host.indexOf('www.coderhelm.com') !== -1)) {
     return {
       statusCode: 301,
       statusDescription: 'Moved Permanently',
