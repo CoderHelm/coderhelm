@@ -18,6 +18,7 @@ export default function AwsConnectionsPage() {
   const [addMode, setAddMode] = useState<"cfn" | "manual">("cfn");
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [recsLoading, setRecsLoading] = useState(true);
+  const [isPro, setIsPro] = useState<boolean | null>(null);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -37,6 +38,7 @@ export default function AwsConnectionsPage() {
   }, [toast]);
 
   useEffect(() => {
+    api.getBilling().then((b) => setIsPro(b.subscription_status === "active")).catch(() => setIsPro(false));
     refresh();
   }, [refresh]);
 
@@ -59,6 +61,37 @@ export default function AwsConnectionsPage() {
       toast("Failed to dismiss", "error");
     }
   };
+
+  if (isPro === null) {
+    return (
+      <div className="max-w-2xl">
+        <h1 className="text-2xl font-bold mb-6">AWS Connections</h1>
+        <div className="h-32 bg-zinc-900/50 border border-zinc-800 rounded-lg animate-pulse" />
+      </div>
+    );
+  }
+
+  if (!isPro) {
+    return (
+      <div className="max-w-2xl">
+        <h1 className="text-2xl font-bold mb-2">AWS Connections</h1>
+        <p className="text-sm text-zinc-500 mb-6">
+          Connect your AWS accounts to analyze CloudWatch Logs and get recommendations.
+        </p>
+        <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+          <p className="text-sm text-zinc-400 mb-3">
+            AWS Connections require the <span className="text-zinc-200 font-medium">Pro plan</span>. Upgrade to connect your AWS accounts and get automated log analysis.
+          </p>
+          <a
+            href="/billing"
+            className="inline-block px-4 py-2 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors"
+          >
+            Upgrade to Pro
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl">
