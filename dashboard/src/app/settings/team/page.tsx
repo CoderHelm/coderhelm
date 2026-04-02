@@ -89,6 +89,15 @@ export default function TeamPage() {
     }
   };
 
+  const handleResend = async (user: TeamUser) => {
+    try {
+      await api.resendInvite(user.user_id);
+      toast(`Invite resent to ${user.email}`);
+    } catch {
+      toast("Failed to resend invite", "error");
+    }
+  };
+
   const handleRemove = async (user: TeamUser) => {
     const display = user.email || user.github_login || user.user_id;
     if (!(await confirm({ title: "Remove Team Member", message: `Remove ${display} from the team?`, confirmLabel: "Remove", destructive: true }))) return;
@@ -241,37 +250,55 @@ export default function TeamPage() {
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-zinc-100 truncate">{display}</span>
                   {isMe && <span className="text-[10px] text-zinc-500 border border-zinc-700 px-1.5 py-0.5 rounded">you</span>}
-                  {user.status === "invited" && <span className="text-[10px] text-yellow-400 border border-yellow-500/20 px-1.5 py-0.5 rounded">invited</span>}
+                  {user.status === "invited" && (
+                    <span className="text-[10px] text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-1.5 py-0.5 rounded">pending</span>
+                  )}
+                  {user.status === "active" && (
+                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">active</span>
+                  )}
                 </div>
                 {subtitle && <p className="text-xs text-zinc-500 truncate">{subtitle}</p>}
               </div>
 
               {/* Role badge / selector */}
               {isAdminOrOwner && !isOwner && !isMe ? (
-                <select
-                  value={user.role}
-                  onChange={(e) => handleRoleChange(user.user_id, e.target.value)}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-full border bg-transparent focus:outline-none cursor-pointer ${ROLE_COLORS[user.role] || ROLE_COLORS.member}`}
-                >
-                  <option value="viewer">viewer</option>
-                  <option value="member">member</option>
-                  <option value="billing">billing</option>
-                  <option value="admin">admin</option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={user.role}
+                    onChange={(e) => handleRoleChange(user.user_id, e.target.value)}
+                    className={`appearance-none pl-2.5 pr-7 py-1 text-xs font-medium rounded-full border bg-transparent focus:outline-none cursor-pointer ${ROLE_COLORS[user.role] || ROLE_COLORS.member}`}
+                  >
+                    <option value="viewer">viewer</option>
+                    <option value="member">member</option>
+                    <option value="billing">billing</option>
+                    <option value="admin">admin</option>
+                  </select>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-current opacity-50"><polyline points="6 9 12 15 18 9" /></svg>
+                </div>
               ) : (
                 <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full border ${ROLE_COLORS[user.role] || ROLE_COLORS.member}`}>
                   {user.role}
                 </span>
               )}
 
-              {/* Remove */}
+              {/* Actions */}
               {isAdminOrOwner && !isOwner && !isMe && (
-                <button
-                  onClick={() => handleRemove(user)}
-                  className="text-zinc-600 hover:text-red-400 text-xs transition-colors cursor-pointer"
-                >
-                  Remove
-                </button>
+                <div className="flex items-center gap-2">
+                  {user.status === "invited" && (
+                    <button
+                      onClick={() => handleResend(user)}
+                      className="text-zinc-500 hover:text-zinc-200 text-xs transition-colors cursor-pointer"
+                    >
+                      Resend
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleRemove(user)}
+                    className="text-zinc-600 hover:text-red-400 text-xs transition-colors cursor-pointer"
+                  >
+                    Remove
+                  </button>
+                </div>
               )}
             </div>
           );
