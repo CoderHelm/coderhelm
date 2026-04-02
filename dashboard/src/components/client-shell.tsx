@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
-import { api, type BillingInfo, type Banner, type TenantInfo } from "@/lib/api";
+import { api, type BillingInfo, type Banner, type TeamInfo } from "@/lib/api";
 import { pushToDataLayer } from "@/lib/gtm";
 import { ToastProvider } from "./toast";
 import { ConfirmProvider } from "./confirm-dialog";
@@ -24,7 +24,7 @@ function formatTokens(n: number): string {
 
 interface User {
   user_id: string;
-  tenant_id: string;
+  team_id: string;
   github_login: string | null;
   email: string;
   avatar_url: string;
@@ -99,7 +99,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
-  const [tenants, setTenants] = useState<TenantInfo[]>([]);
+  const [teams, setTeams] = useState<TeamInfo[]>([]);
   const [dismissedBanners, setDismissedBanners] = useState<Set<string>>(new Set());
   // Load persisted dismissals once billing data is available (keyed to billing period)
   useEffect(() => {
@@ -128,11 +128,11 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     api.me()
       .then((u) => {
         setUser(u);
-        pushToDataLayer({ event: "identify", user_id: u.user_id, tenant_id: u.tenant_id });
+        pushToDataLayer({ event: "identify", user_id: u.user_id, team_id: u.team_id });
         setAuthChecked(true);
         api.getBilling().then(setBilling).catch(() => {});
         api.getBanners().then((r) => setBanners(r.banners)).catch(() => {});
-        api.listTenants().then((r) => setTenants(r.tenants)).catch(() => {});
+        api.listTeams().then((r) => setTeams(r.teams)).catch(() => {});
       })
       .catch(() => {
         setAuthChecked(true);
@@ -167,10 +167,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   if (!user) {
     return <AuthScreen onAuth={(u) => {
       setUser(u);
-      pushToDataLayer({ event: "identify", user_id: u.user_id, tenant_id: u.tenant_id });
+      pushToDataLayer({ event: "identify", user_id: u.user_id, team_id: u.team_id });
       api.getBilling().then(setBilling).catch(() => {});
       api.getBanners().then((r) => setBanners(r.banners)).catch(() => {});
-      api.listTenants().then((r) => setTenants(r.tenants)).catch(() => {});
+      api.listTeams().then((r) => setTeams(r.teams)).catch(() => {});
     }} />;
   }
 
@@ -205,14 +205,14 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               Then log in here
             </a>
           </div>
-          {tenants.filter((t) => t.status !== "deactivated").length > 0 && (
+          {teams.filter((t) => t.status !== "deactivated").length > 0 && (
             <div className="mt-2">
               <p className="text-xs text-zinc-600 mb-2">Or switch to an active organization:</p>
-              {tenants.filter((t) => t.status !== "deactivated" && !t.current).map((t) => (
+              {teams.filter((t) => t.status !== "deactivated" && !t.current).map((t) => (
                 <button
-                  key={t.tenant_id}
+                  key={t.team_id}
                   onClick={async () => {
-                    await api.switchTenant(t.tenant_id);
+                    await api.switchTeam(t.team_id);
                     window.location.reload();
                   }}
                   className="block mx-auto mt-1 text-sm text-zinc-300 hover:text-white underline"
@@ -231,7 +231,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     <ToastProvider>
     <ConfirmProvider>
       <div className="flex min-h-screen bg-zinc-950">
-        <Sidebar billing={billing} user={user} tenants={tenants} />
+        <Sidebar billing={billing} user={user} teams={teams} />
         <div className="flex-1 flex flex-col">
           {banners.filter((b) => !dismissedBanners.has(b.id)).map((banner) => (
             <div
@@ -397,11 +397,11 @@ function OverageBanner({ billing, onDismiss }: { billing: BillingInfo; onDismiss
 function Sidebar({
   billing,
   user,
-  tenants,
+  teams,
 }: {
   billing: BillingInfo | null;
   user: User | null;
-  tenants: TenantInfo[];
+  teams: TeamInfo[];
 }) {
   const pathname = usePathname();
   const [switching, setSwitching] = useState(false);
@@ -412,12 +412,12 @@ function Sidebar({
     return pathname.startsWith(href);
   };
 
-  const currentTenant = tenants.find((t) => t.current);
+  const currentTeam = teams.find((t) => t.current);
 
-  const handleSwitch = async (tenantId: string) => {
+  const handleSwitch = async (teamId: string) => {
     setSwitching(true);
     try {
-      await api.switchTenant(tenantId);
+      await api.switchTeam(teamId);
       window.location.reload();
     } catch {
       setSwitching(false);
@@ -516,17 +516,17 @@ function Sidebar({
 
       {user && (
         <div className="mt-3 pt-3 border-t border-zinc-800/60 shrink-0">
-          {tenants.filter((t) => t.status !== "deactivated").length > 1 && (
+          {teams.filter((t) => t.status !== "deactivated").length > 1 && (
             <div className="mb-3">
               <p className="text-xs text-zinc-600 mb-1.5 px-1">Organization</p>
               <select
-                value={currentTenant?.tenant_id ?? ""}
+                value={currentTeam?.team_id ?? ""}
                 onChange={(e) => handleSwitch(e.target.value)}
                 disabled={switching}
                 className="w-full px-2 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300 focus:outline-none focus:border-zinc-600 disabled:opacity-50"
               >
-                {tenants.filter((t) => t.status !== "deactivated").map((t) => (
-                  <option key={t.tenant_id} value={t.tenant_id}>
+                {teams.filter((t) => t.status !== "deactivated").map((t) => (
+                  <option key={t.team_id} value={t.team_id}>
                     {t.org}
                   </option>
                 ))}

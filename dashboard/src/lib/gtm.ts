@@ -1,7 +1,7 @@
 export type GtmDataLayerEvent = {
   event: "identify";
   user_id: string;
-  tenant_id: string;
+  team_id: string;
 };
 
 declare global {
