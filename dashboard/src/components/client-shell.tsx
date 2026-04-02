@@ -294,7 +294,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           )}
           {billing && billing.current_period.total_tokens >= billing.limits.tokens && !dismissedBanners.has("overage-banner") && (
             billing.subscription_status === "active"
-              ? <OverageBanner billing={billing} />
+              ? <OverageBanner billing={billing} onDismiss={() => setDismissedBanners((prev) => new Set(prev).add("overage-banner"))} />
               : (
               <div className="bg-red-900/90 border-b-2 border-red-500 px-6 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -325,7 +325,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function OverageBanner({ billing }: { billing: BillingInfo }) {
+function OverageBanner({ billing, onDismiss }: { billing: BillingInfo; onDismiss: () => void }) {
   const overageTokens = billing.current_period.total_tokens - billing.limits.tokens;
   const overageCents = Math.floor(overageTokens / 1000) * billing.limits.overage_per_1k_tokens_cents;
   const budgetReached = billing.limits.max_budget_cents > 0 && overageCents >= billing.limits.max_budget_cents;
@@ -353,12 +353,20 @@ function OverageBanner({ billing }: { billing: BillingInfo }) {
           </p>
         </div>
       </div>
-      <a
-        href="/settings/budget"
-        className={`shrink-0 rounded-md ${isPaused ? "bg-red-600 hover:bg-red-500" : "bg-yellow-700 hover:bg-yellow-600"} px-4 py-1.5 text-sm font-medium text-white transition-colors`}
-      >
-        {budgetReached ? "Adjust Budget" : noBudget ? "Set Budget" : "View Budget"}
-      </a>
+      <div className="flex items-center gap-3 shrink-0">
+        <a
+          href="/settings/budget"
+          className={`rounded-md ${isPaused ? "bg-red-600 hover:bg-red-500" : "bg-yellow-700 hover:bg-yellow-600"} px-4 py-1.5 text-sm font-medium text-white transition-colors`}
+        >
+          {budgetReached ? "Adjust Budget" : noBudget ? "Set Budget" : "View Budget"}
+        </a>
+        <button
+          onClick={onDismiss}
+          className={`${isPaused ? "text-red-400 hover:text-red-200" : "text-yellow-400 hover:text-yellow-200"} text-lg leading-none transition-colors`}
+        >
+          ×
+        </button>
+      </div>
     </div>
   );
 }
