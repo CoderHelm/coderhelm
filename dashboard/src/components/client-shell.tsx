@@ -11,7 +11,7 @@ import {
   PlayIcon, CircleDotIcon, TrendingUpIcon, HexagonIcon, HeartIcon,
   GitBranchIcon, GearIcon, AtlassianIcon, GitHubIcon, UsersIcon,
   BellIcon, DollarIcon, TargetIcon, RepeatIcon, ShieldCheckIcon,
-  AwsIcon, PluginIcon,
+  AwsIcon, PluginIcon, ShieldIcon,
 } from "./icons";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
@@ -38,6 +38,7 @@ interface NavItem {
   icon: ReactNode;
   adminOnly?: boolean;
   billingVisible?: boolean;
+  superAdminOnly?: boolean;
 }
 
 interface NavGroup {
@@ -90,6 +91,7 @@ const navGroups: NavGroup[] = [
       { href: "/settings/security", label: "Security", icon: <ShieldCheckIcon /> },
       { href: "/billing", label: "Billing", icon: <DollarIcon />, adminOnly: true, billingVisible: true },
       { href: "/settings/budget", label: "Budget", icon: <TargetIcon />, adminOnly: true, billingVisible: true },
+      { href: "/admin", label: "Admin", icon: <ShieldIcon />, superAdminOnly: true },
     ],
   },
 ];
@@ -442,7 +444,9 @@ function Sidebar({
         {navGroups.map((group, index) => {
           const isAdminOrOwner = user?.role === "admin" || user?.role === "owner";
           const isBilling = user?.role === "billing";
+          const isSuperAdmin = user?.email === "admin@coderhelm.com";
           const visibleItems = group.items.filter((item) => {
+            if (item.superAdminOnly) return isSuperAdmin;
             if (!item.adminOnly) return true;
             if (isAdminOrOwner) return true;
             if (isBilling && item.billingVisible) return true;
