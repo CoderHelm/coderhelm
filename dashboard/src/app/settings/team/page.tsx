@@ -33,12 +33,12 @@ export default function TeamPage() {
   const [inviting, setInviting] = useState(false);
 
   useEffect(() => {
-    Promise.all([api.me(), api.listUsers(), api.listTenants()])
-      .then(([me, data, tenantData]) => {
+    Promise.all([api.me(), api.listUsers(), api.listTeams()])
+      .then(([me, data, teamData]) => {
         setMyRole(me.role);
         setMyUserId(me.user_id);
         setUsers(data.users);
-        const current = tenantData.tenants.find((t) => t.current);
+        const current = teamData.teams.find((t) => t.current);
         if (current) setTeamName(current.org);
       })
       .catch(() => {})
@@ -51,7 +51,7 @@ export default function TeamPage() {
     if (!newName.trim()) return;
     setSavingName(true);
     try {
-      await api.renameTenant(newName.trim());
+      await api.renameTeam(newName.trim());
       setTeamName(newName.trim());
       setEditingName(false);
       toast("Team renamed");
