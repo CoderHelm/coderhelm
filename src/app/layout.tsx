@@ -100,10 +100,14 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <head>
+        <style dangerouslySetInnerHTML={{ __html: `
+          /* Critical CSS — unblock hero LCP */
+          :root{--color-surface:#0a0a0a;--color-text-primary:#fafafa}
+          body{margin:0;background:#0a0a0a;color:#fafafa;-webkit-font-smoothing:antialiased}
+          .gradient-text{background:linear-gradient(135deg,#60a5fa 0%,#3b82f6 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        `}} />
         <link rel="preconnect" href="https://www.googletagmanager.com" />
-        <link rel="preconnect" href="https://www.google-analytics.com" />
         <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
-        <link rel="dns-prefetch" href="https://www.google-analytics.com" />
       </head>
       <body className={`${inter.className} bg-surface text-text-primary antialiased`}>
         <script
