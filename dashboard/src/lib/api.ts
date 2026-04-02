@@ -190,10 +190,10 @@ export const api = {
     request<{ status: string }>(`/api/users/${encodeURIComponent(userId)}`, { method: "DELETE" }),
   changePassword: (current_password: string, new_password: string) =>
     request<{ status: string }>("/api/users/password", { method: "PUT", body: JSON.stringify({ current_password, new_password }) }),
-  mfaSetup: (access_token: string) =>
-    request<{ secret: string; qr_uri: string; session: string }>("/api/users/mfa/setup", { method: "POST", body: JSON.stringify({ access_token }) }),
-  mfaVerifySetup: (access_token: string, code: string, session: string) =>
-    request<{ status: string }>("/api/users/mfa/verify", { method: "POST", body: JSON.stringify({ access_token, code, session }) }),
+  mfaSetup: (password: string) =>
+    request<{ secret: string; qr_uri: string; session: string }>("/api/users/mfa/setup", { method: "POST", body: JSON.stringify({ password }) }),
+  mfaVerifySetup: (password: string, code: string, session: string) =>
+    request<{ status: string }>("/api/users/mfa/verify", { method: "POST", body: JSON.stringify({ password, code, session }) }),
   mfaDisable: () => request<{ status: string }>("/api/users/mfa", { method: "DELETE" }),
 
   // AWS Connections (Log Analyzer)
