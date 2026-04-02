@@ -500,6 +500,8 @@ export interface JiraConfig {
   trigger_label: string;
   list_projects_url: string;
   create_ticket_url: string;
+  add_comment_url: string;
+  site_url: string;
   projects: JiraProject[];
 }
 
