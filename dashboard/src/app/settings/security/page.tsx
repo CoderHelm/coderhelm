@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
+import QRCode from "qrcode";
 
 export default function SecurityPage() {
   const { toast } = useToast();
@@ -22,6 +23,7 @@ export default function SecurityPage() {
   const [mfaPassword, setMfaPassword] = useState("");
   const [mfaSecret, setMfaSecret] = useState("");
   const [mfaQrUri, setMfaQrUri] = useState("");
+  const [mfaQrDataUrl, setMfaQrDataUrl] = useState("");
   const [mfaSession, setMfaSession] = useState("");
   const [mfaCode, setMfaCode] = useState("");
   const [mfaEnabled, setMfaEnabled] = useState(false);
@@ -92,6 +94,15 @@ export default function SecurityPage() {
       setMfaSecret(result.secret);
       setMfaQrUri(result.qr_uri);
       setMfaSession(result.session);
+      // Generate QR code data URL
+      try {
+        const url = await QRCode.toDataURL(result.qr_uri, {
+          width: 200,
+          margin: 2,
+          color: { dark: "#ffffff", light: "#00000000" },
+        });
+        setMfaQrDataUrl(url);
+      } catch { /* QR generation failed, user can enter manually */ }
       setMfaStep("setup");
     } catch {
       toast("Failed to start MFA setup. Check your password.", "error");
@@ -269,11 +280,13 @@ export default function SecurityPage() {
               Scan this QR code with your authenticator app (Google Authenticator, Authy, 1Password, etc).
             </p>
 
-            {/* QR placeholder — show the URI for now, real QR would need a library */}
-            <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
-              <p className="text-xs text-zinc-500 mb-2">Authenticator URI:</p>
-              <code className="text-xs text-zinc-300 break-all font-mono">{mfaQrUri}</code>
-            </div>
+            {mfaQrDataUrl && (
+              <div className="flex justify-center py-2">
+                <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+                  <img src={mfaQrDataUrl} alt="MFA QR Code" width={200} height={200} className="block" />
+                </div>
+              </div>
+            )}
 
             <div>
               <p className="text-xs text-zinc-500 mb-1.5">Or enter this secret manually:</p>
