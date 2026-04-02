@@ -428,7 +428,7 @@ function RunDetailInner() {
               View Pull Request →
             </a>
           )}
-          {run.pr_url && run.status !== "running" && (
+          {run.pr_url && run.status !== "running" && run.status !== "merged" && (
             <button
               onClick={async () => {
                 setReReviewing(true);
