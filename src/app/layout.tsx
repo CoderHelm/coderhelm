@@ -11,11 +11,11 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL("https://coderhelm.com"),
   title: {
-    default: "Coderhelm — Ship code, not tickets | Autonomous AI Coding Agent",
+    default: "Coderhelm — Autonomous AI Coding Agent | Ship Code, Not Tickets",
     template: "%s | Coderhelm",
   },
   description:
-    "Coderhelm is an autonomous AI coding agent. Assign a GitHub issue or Jira ticket and get a production-ready PR. Multi-pass code generation with self-healing CI, AI plans, MCP tool integrations, and AWS log analysis. Supports React, Python, Go, Rust, and any stack.",
+    "Coderhelm is an autonomous AI coding agent. Assign a GitHub issue or Jira ticket and get a production-ready PR with self-healing CI and multi-pass code generation.",
   keywords: [
     "AI coding agent",
     "autonomous coding",
@@ -98,7 +98,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <head />
+      <head>
+        <link rel="preconnect" href="https://www.googletagmanager.com" />
+        <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+      </head>
       <body className={`${inter.className} bg-surface text-text-primary antialiased`}>
         <script
           type="application/ld+json"

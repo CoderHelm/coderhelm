@@ -16,7 +16,7 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="mb-3 text-sm font-semibold">Product</h4>
+            <p className="mb-3 text-sm font-semibold text-text-primary">Product</p>
             <ul className="space-y-2 text-sm text-text-secondary">
               <li>
                 <a href="#features" className="hover:text-text-primary transition-colors">
@@ -37,7 +37,7 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="mb-3 text-sm font-semibold">Legal</h4>
+            <p className="mb-3 text-sm font-semibold text-text-primary">Legal</p>
             <ul className="space-y-2 text-sm text-text-secondary">
               <li>
                 <Link href="/privacy" className="hover:text-text-primary transition-colors">
@@ -58,7 +58,7 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="mb-3 text-sm font-semibold">Connect</h4>
+            <p className="mb-3 text-sm font-semibold text-text-primary">Connect</p>
             <ul className="space-y-2 text-sm text-text-secondary">
               <li>
                 <Link href="/contact" className="hover:text-text-primary transition-colors">
