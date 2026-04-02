@@ -381,12 +381,14 @@ function OverageBanner({ billing, onDismiss }: { billing: BillingInfo; onDismiss
         >
           {budgetReached ? "Adjust Budget" : noBudget ? "Set Budget" : "View Budget"}
         </a>
-        <button
-          onClick={onDismiss}
-          className={`${isPaused ? "text-red-400 hover:text-red-200" : "text-yellow-400 hover:text-yellow-200"} text-lg leading-none transition-colors`}
-        >
-          ×
-        </button>
+        {!isPaused && (
+          <button
+            onClick={onDismiss}
+            className="text-yellow-400 hover:text-yellow-200 text-lg leading-none transition-colors"
+          >
+            ×
+          </button>
+        )}
       </div>
     </div>
   );
