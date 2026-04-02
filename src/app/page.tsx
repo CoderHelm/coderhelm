@@ -7,6 +7,7 @@ export default function Home() {
     <>
       <Nav />
 
+      <main>
       {/* Hero */}
       <section className="relative flex min-h-screen items-center justify-center overflow-hidden pt-16">
         <div className="aurora-container" aria-hidden="true">
@@ -44,7 +45,7 @@ export default function Home() {
               <div className="code-dot bg-[#ff5f57]" />
               <div className="code-dot bg-[#febc2e]" />
               <div className="code-dot bg-[#28c840]" />
-              <span className="ml-3 text-xs text-text-muted">Coderhelm · issue #42</span>
+              <span className="ml-3 text-xs text-neutral-400">Coderhelm · issue #42</span>
             </div>
             <div className="p-6 text-left font-mono text-sm leading-relaxed">
               <p className="text-text-muted">
@@ -605,7 +606,7 @@ export default function Home() {
 
             {/* Pro */}
             <div className="relative rounded-lg bg-white/[0.03] ring-1 ring-blue-500/30 p-8">
-              <div className="absolute -top-3 left-6 rounded-full bg-blue-500 px-3 py-0.5 text-xs font-semibold text-white">
+              <div className="absolute -top-3 left-6 rounded-full bg-blue-600 px-3 py-0.5 text-xs font-semibold text-white">
                 Pro
               </div>
               <h3 className="text-lg font-semibold">Pro</h3>
@@ -623,7 +624,7 @@ export default function Home() {
               </ul>
               <a
                 href="https://app.coderhelm.com"
-                className="mt-8 block rounded-lg bg-blue-500 px-6 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-blue-600"
+                className="mt-8 block rounded-lg bg-blue-600 px-6 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-blue-700"
               >
                 Upgrade
               </a>
@@ -645,6 +646,7 @@ export default function Home() {
         </div>
       </section>
 
+      </main>
       <Footer />
     </>
   );
