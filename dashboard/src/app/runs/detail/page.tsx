@@ -183,7 +183,17 @@ function RunDetailInner() {
       .then(([c, e]) => setPlugins({ catalog: c.plugins, enabled: e.plugins }))
       .catch(() => {});
   }, []);
-  const tokensExceeded = billing ? billing.current_period.total_tokens >= billing.limits.tokens : false;
+  const tokensExceeded = billing ? (() => {
+    const tokens = billing.current_period.total_tokens;
+    const limit = billing.limits.tokens;
+    if (tokens < limit) return false;
+    // Pro with budget: only exceeded if overage cost >= budget
+    if (billing.subscription_status === "active" && billing.limits.max_budget_cents > 0) {
+      const overageCents = Math.floor((tokens - limit) / 1000) * billing.limits.overage_per_1k_tokens_cents;
+      return overageCents >= billing.limits.max_budget_cents;
+    }
+    return true;
+  })() : false;
 
   const fetchRun = useCallback(() => {
     if (!runId) return;
