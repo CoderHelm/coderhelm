@@ -305,7 +305,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                   Go to Billing
                 </a>
                 <button
-                  onClick={() => dismissBanner("cancelled-banner"))
+                  onClick={() => dismissBanner("cancelled-banner")}
                   className="text-yellow-300 text-lg leading-none opacity-60 hover:opacity-100 transition-opacity"
                 >
                   ×
