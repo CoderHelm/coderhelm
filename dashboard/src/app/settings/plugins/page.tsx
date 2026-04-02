@@ -33,7 +33,6 @@ const BRAND_ICONS: Record<string, string> = {
   notion: "No",
   vercel: "Ve",
   stripe: "St",
-  cloudflare: "Cf",
   posthog: "Ph",
   gitlab: "Gl",
   neon: "Ne",
