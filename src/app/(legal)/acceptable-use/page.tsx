@@ -1,5 +1,7 @@
 export const metadata = {
-  title: "Acceptable Use Policy — Coderhelm",
+  title: "Acceptable Use Policy",
+  description: "Coderhelm Acceptable Use Policy. Guidelines for responsible use of the Coderhelm autonomous AI coding agent.",
+  alternates: { canonical: "https://coderhelm.com/acceptable-use" },
 };
 
 export default function AcceptableUse() {
