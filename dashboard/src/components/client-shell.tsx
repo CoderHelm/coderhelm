@@ -100,22 +100,25 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [tenants, setTenants] = useState<TenantInfo[]>([]);
-  const [dismissedBanners, setDismissedBanners] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set<string>();
+  const [dismissedBanners, setDismissedBanners] = useState<Set<string>>(new Set());
+  // Load persisted dismissals once billing data is available (keyed to billing period)
+  useEffect(() => {
+    if (!billing) return;
     try {
       const stored = JSON.parse(localStorage.getItem("dismissedBanners") || "{}");
-      const month = new Date().toISOString().slice(0, 7);
-      if (stored.month === month && Array.isArray(stored.ids)) return new Set<string>(stored.ids);
+      if (stored.period === billing.current_period.month && Array.isArray(stored.ids)) {
+        setDismissedBanners(new Set<string>(stored.ids));
+      }
     } catch { /* ignore */ }
-    return new Set<string>();
-  });
+  }, [billing?.current_period.month]);
   const dismissBanner = (id: string) => {
     setDismissedBanners((prev) => {
       const next = new Set(prev).add(id);
-      try {
-        const month = new Date().toISOString().slice(0, 7);
-        localStorage.setItem("dismissedBanners", JSON.stringify({ month, ids: [...next] }));
-      } catch { /* ignore */ }
+      if (billing) {
+        try {
+          localStorage.setItem("dismissedBanners", JSON.stringify({ period: billing.current_period.month, ids: [...next] }));
+        } catch { /* ignore */ }
+      }
       return next;
     });
   };
