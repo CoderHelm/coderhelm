@@ -51,7 +51,7 @@ export default function BudgetPage() {
     <div className="max-w-xl">
       <h1 className="text-2xl font-bold mb-2">Budget</h1>
       <p className="text-sm text-zinc-500 mb-6">
-        Set a cap on monthly overage charges. When reached, Coderhelm will stop picking up new issues and post a comment explaining why.
+        Set a monthly overage budget. Without a budget, runs pause when your included tokens are used up. Set a budget to allow overage runs to continue.
       </p>
 
       {!isPro ? (
@@ -78,7 +78,7 @@ export default function BudgetPage() {
               type="number"
               min="0"
               step="1"
-              placeholder="No limit"
+              placeholder="Disabled"
               value={maxBudget}
               onChange={(e) => setMaxBudget(e.target.value)}
               className="w-full pl-7 pr-16 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
@@ -86,7 +86,7 @@ export default function BudgetPage() {
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs">/month</span>
           </div>
           <p className="text-xs text-zinc-600 mt-1.5">
-            Caps overage charges only (base subscription not included). Set to 0 or empty for no cap.
+            Set to 0 or empty to disable overage — runs will stop at the included token limit.
           </p>
         </div>
 
