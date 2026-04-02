@@ -41,3 +41,14 @@ button:disabled {
 @utility animate-toast-in {
   animation: toast-in 0.15s ease-out;
 }
+
+/* Fix autofill highlight for dark theme (1Password, Chrome, etc) */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #0a0a0a inset !important;
+  -webkit-text-fill-color: #e4e4e7 !important;
+  caret-color: #e4e4e7;
+  transition: background-color 5000s ease-in-out 0s;
+}
