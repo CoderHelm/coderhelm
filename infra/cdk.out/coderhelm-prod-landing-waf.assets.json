@@ -1,0 +1,21 @@
+{
+  "version": "53.0.0",
+  "files": {
+    "4e71765bca5505ffca95168d82959a3bec9b37b4b3538983f59f05728580a863": {
+      "displayName": "coderhelm-prod-landing-waf Template",
+      "source": {
+        "path": "coderhelm-prod-landing-waf.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "REDACTED_AWS_ACCOUNT_ID-us-east-1-eb085d6c": {
+          "bucketName": "cdk-hnb659fds-assets-REDACTED_AWS_ACCOUNT_ID-us-east-1",
+          "objectKey": "4e71765bca5505ffca95168d82959a3bec9b37b4b3538983f59f05728580a863.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::REDACTED_AWS_ACCOUNT_ID:role/cdk-hnb659fds-file-publishing-role-REDACTED_AWS_ACCOUNT_ID-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}
