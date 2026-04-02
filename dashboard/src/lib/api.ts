@@ -331,6 +331,7 @@ export interface BillingInfo {
   limits: {
     tokens: number;
     overage_per_1k_tokens_cents: number;
+    max_budget_cents: number;
   };
   current_period: {
     month: string;
