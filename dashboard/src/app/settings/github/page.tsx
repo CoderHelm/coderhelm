@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react";
 import { api, type Repo } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
+import { RoleGuard } from "@/components/role-guard";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
 
-export default function GitHubSettingsPage() {
+export default function GitHubSettingsPageGuarded() { return <RoleGuard minRole="admin"><GitHubSettingsPage /></RoleGuard>; }
+
+function GitHubSettingsPage() {
   const [login, setLogin] = useState<string | null>(null);
   const [repos, setRepos] = useState<Repo[]>([]);
   const [loading, setLoading] = useState(true);

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, type PluginDef, type EnabledPlugin } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { RoleGuard } from "@/components/role-guard";
 
 const CATEGORY_COLORS: Record<string, string> = {
   Design: "bg-purple-500/10 text-purple-400 border-purple-500/20",
@@ -46,7 +47,9 @@ const BRAND_ICONS: Record<string, string> = {
   sanity: "Sa",
 };
 
-export default function PluginsPage() {
+export default function PluginsPageGuarded() { return <RoleGuard minRole="admin"><PluginsPage /></RoleGuard>; }
+
+function PluginsPage() {
   const [catalog, setCatalog] = useState<PluginDef[]>([]);
   const [enabled, setEnabled] = useState<Map<string, EnabledPlugin>>(new Map());
   const [loading, setLoading] = useState(true);

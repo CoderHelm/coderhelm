@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, type Repo } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { RoleGuard } from "@/components/role-guard";
 import { TextareaSkeleton } from "@/components/skeleton";
 import { RepoCombobox } from "@/components/repo-combobox";
 
@@ -19,7 +20,11 @@ function Tab({ label, active, onClick }: { label: string; active: boolean; onCli
   );
 }
 
-export default function InstructionsPage() {
+export default function InstructionsPageGuarded() {
+  return <RoleGuard minRole="admin"><InstructionsPage /></RoleGuard>;
+}
+
+function InstructionsPage() {
   const [tab, setTab] = useState<"global" | "repo">("global");
   const { toast } = useToast();
 

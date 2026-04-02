@@ -37,6 +37,7 @@ interface NavItem {
   label: string;
   icon: ReactNode;
   adminOnly?: boolean;
+  memberOnly?: boolean;
   billingVisible?: boolean;
   superAdminOnly?: boolean;
 }
@@ -56,17 +57,16 @@ const navGroups: NavGroup[] = [
   {
     label: "Insights",
     items: [
-      { href: "/analytics", label: "Analytics", icon: <TrendingUpIcon /> },
-      { href: "/infrastructure", label: "Infrastructure", icon: <HexagonIcon /> },
-      { href: "/health", label: "Health", icon: <HeartIcon /> },
+      { href: "/analytics", label: "Analytics", icon: <TrendingUpIcon />, memberOnly: true },
+      { href: "/infrastructure", label: "Infrastructure", icon: <HexagonIcon />, memberOnly: true },
+      { href: "/health", label: "Health", icon: <HeartIcon />, memberOnly: true },
     ],
   },
   {
     label: "Configure",
     items: [
-      { href: "/settings/repos", label: "Repos", icon: <GitBranchIcon /> },
+      { href: "/settings/repos", label: "Repos", icon: <GitBranchIcon />, memberOnly: true },
       { href: "/settings", label: "Settings", icon: <GearIcon /> },
-      { href: "/settings/workflow", label: "Workflow", icon: <RepeatIcon />, adminOnly: true },
       { href: "/settings/notifications", label: "Notifications", icon: <BellIcon /> },
     ],
   },
@@ -444,9 +444,11 @@ function Sidebar({
         {navGroups.map((group, index) => {
           const isAdminOrOwner = user?.role === "admin" || user?.role === "owner";
           const isBilling = user?.role === "billing";
+          const isMemberOrAbove = isAdminOrOwner || isBilling || user?.role === "member";
           const isSuperAdmin = user?.email === "admin@coderhelm.com";
           const visibleItems = group.items.filter((item) => {
             if (item.superAdminOnly) return isSuperAdmin;
+            if (item.memberOnly) return isMemberOrAbove;
             if (!item.adminOnly) return true;
             if (isAdminOrOwner) return true;
             if (isBilling && item.billingVisible) return true;
