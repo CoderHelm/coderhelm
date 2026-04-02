@@ -100,7 +100,25 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [tenants, setTenants] = useState<TenantInfo[]>([]);
-  const [dismissedBanners, setDismissedBanners] = useState<Set<string>>(new Set());
+  const [dismissedBanners, setDismissedBanners] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set<string>();
+    try {
+      const stored = JSON.parse(localStorage.getItem("dismissedBanners") || "{}");
+      const month = new Date().toISOString().slice(0, 7);
+      if (stored.month === month && Array.isArray(stored.ids)) return new Set<string>(stored.ids);
+    } catch { /* ignore */ }
+    return new Set<string>();
+  });
+  const dismissBanner = (id: string) => {
+    setDismissedBanners((prev) => {
+      const next = new Set(prev).add(id);
+      try {
+        const month = new Date().toISOString().slice(0, 7);
+        localStorage.setItem("dismissedBanners", JSON.stringify({ month, ids: [...next] }));
+      } catch { /* ignore */ }
+      return next;
+    });
+  };
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
@@ -242,7 +260,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               </div>
               {banner.dismissible && (
                 <button
-                  onClick={() => setDismissedBanners((prev) => new Set(prev).add(banner.id))}
+                  onClick={() => dismissBanner(banner.id)}
                   className={`shrink-0 ml-4 text-lg leading-none opacity-60 hover:opacity-100 transition-opacity ${
                     banner.type === "error" ? "text-red-300" : banner.type === "warning" ? "text-yellow-300" : "text-blue-300"
                   }`}
@@ -284,7 +302,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                   Go to Billing
                 </a>
                 <button
-                  onClick={() => setDismissedBanners((prev) => new Set(prev).add("cancelled-banner"))}
+                  onClick={() => dismissBanner("cancelled-banner"))
                   className="text-yellow-300 text-lg leading-none opacity-60 hover:opacity-100 transition-opacity"
                 >
                   ×
@@ -294,7 +312,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           )}
           {billing && billing.current_period.total_tokens >= billing.limits.tokens && !dismissedBanners.has("overage-banner") && (
             billing.subscription_status === "active"
-              ? <OverageBanner billing={billing} onDismiss={() => setDismissedBanners((prev) => new Set(prev).add("overage-banner"))} />
+              ? <OverageBanner billing={billing} onDismiss={() => dismissBanner("overage-banner")} />
               : (
               <div className="bg-red-900/90 border-b-2 border-red-500 px-6 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
