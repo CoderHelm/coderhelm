@@ -18,7 +18,8 @@ export default function SecurityPage() {
   const [changingPassword, setChangingPassword] = useState(false);
 
   // MFA
-  const [mfaStep, setMfaStep] = useState<"idle" | "setup" | "verify">("idle");
+  const [mfaStep, setMfaStep] = useState<"idle" | "password" | "setup" | "verify">("idle");
+  const [mfaPassword, setMfaPassword] = useState("");
   const [mfaSecret, setMfaSecret] = useState("");
   const [mfaQrUri, setMfaQrUri] = useState("");
   const [mfaSession, setMfaSession] = useState("");
@@ -81,16 +82,19 @@ export default function SecurityPage() {
   };
 
   const handleMfaSetup = async () => {
+    if (!mfaPassword) {
+      toast("Enter your password to continue", "error");
+      return;
+    }
     setMfaLoading(true);
     try {
-      // For MFA setup we need an access token — the backend will handle via Cognito
-      const result = await api.mfaSetup("");
+      const result = await api.mfaSetup(mfaPassword);
       setMfaSecret(result.secret);
       setMfaQrUri(result.qr_uri);
       setMfaSession(result.session);
       setMfaStep("setup");
     } catch {
-      toast("Failed to start MFA setup", "error");
+      toast("Failed to start MFA setup. Check your password.", "error");
     } finally {
       setMfaLoading(false);
     }
@@ -100,10 +104,11 @@ export default function SecurityPage() {
     if (mfaCode.length < 6) return;
     setMfaLoading(true);
     try {
-      await api.mfaVerifySetup("", mfaCode, mfaSession);
+      await api.mfaVerifySetup(mfaPassword, mfaCode, mfaSession);
       setMfaEnabled(true);
       setMfaStep("idle");
       setMfaCode("");
+      setMfaPassword("");
       toast("Two-factor authentication enabled");
     } catch {
       toast("Invalid code. Try again.", "error");
@@ -211,12 +216,41 @@ export default function SecurityPage() {
 
         {mfaStep === "idle" && !mfaEnabled && (
           <button
-            onClick={handleMfaSetup}
+            onClick={() => setMfaStep("password")}
             disabled={mfaLoading}
             className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-40 transition-colors cursor-pointer"
           >
-            {mfaLoading ? "Setting up..." : "Enable 2FA"}
+            Enable 2FA
           </button>
+        )}
+
+        {mfaStep === "password" && (
+          <div className="space-y-3">
+            <p className="text-sm text-zinc-400">Enter your password to set up two-factor authentication.</p>
+            <input
+              type="password"
+              placeholder="Current password"
+              value={mfaPassword}
+              onChange={(e) => setMfaPassword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleMfaSetup()}
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={handleMfaSetup}
+                disabled={mfaLoading || !mfaPassword}
+                className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed"
+              >
+                {mfaLoading ? "Setting up..." : "Continue"}
+              </button>
+              <button
+                onClick={() => { setMfaStep("idle"); setMfaPassword(""); }}
+                className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         )}
 
         {mfaStep === "idle" && mfaEnabled && (
@@ -287,7 +321,7 @@ export default function SecurityPage() {
                 {mfaLoading ? "Verifying..." : "Verify & enable"}
               </button>
               <button
-                onClick={() => { setMfaStep("idle"); setMfaCode(""); }}
+                onClick={() => { setMfaStep("idle"); setMfaCode(""); setMfaPassword(""); }}
                 className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
               >
                 Cancel
