@@ -25,13 +25,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   // Auth
-  me: () => request<{ user_id: string; tenant_id: string; github_login: string | null; email: string; avatar_url: string; role: string; status?: string; auth_provider?: string }>("/api/me"),
+  me: () => request<{ user_id: string; team_id: string; github_login: string | null; email: string; avatar_url: string; role: string; status?: string; auth_provider?: string }>("/api/me"),
   signup: (email: string, password: string) =>
     request<{ status: string; message: string }>("/auth/signup", { method: "POST", body: JSON.stringify({ email, password }) }),
   joinWaitlist: (email: string) =>
     request<{ status: string; message: string }>("/auth/waitlist", { method: "POST", body: JSON.stringify({ email }) }),
   loginEmail: (email: string, password: string) =>
-    request<{ status: string; session?: string; tenant_id?: string }>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+    request<{ status: string; session?: string; team_id?: string }>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
   verifyEmail: (email: string, code: string) =>
     request<{ status: string; message: string }>("/auth/verify-email", { method: "POST", body: JSON.stringify({ email, code }) }),
   forgotPassword: (email: string) =>
@@ -39,7 +39,7 @@ export const api = {
   confirmReset: (email: string, code: string, new_password: string) =>
     request<{ status: string; message: string }>("/auth/confirm-reset", { method: "POST", body: JSON.stringify({ email, code, new_password }) }),
   mfaVerify: (session: string, code: string) =>
-    request<{ status: string; tenant_id?: string }>("/auth/mfa/verify", { method: "POST", body: JSON.stringify({ session, code }) }),
+    request<{ status: string; team_id?: string }>("/auth/mfa/verify", { method: "POST", body: JSON.stringify({ session, code }) }),
   logout: () => request<void>("/auth/logout", { method: "POST" }),
 
   // Allowlist
@@ -57,9 +57,9 @@ export const api = {
 
   // Account
   resetAccount: () => request<void>("/api/account/reset", { method: "POST" }),
-  listTenants: () => request<{ tenants: TenantInfo[] }>("/api/tenants"),
-  switchTenant: (tenantId: string) => request<{ tenant_id: string }>("/api/tenants/switch", { method: "POST", body: JSON.stringify({ tenant_id: tenantId }) }),
-  renameTenant: (name: string) => request<{ status: string; name: string }>("/api/tenants/rename", { method: "PUT", body: JSON.stringify({ name }) }),
+  listTeams: () => request<{ teams: TeamInfo[] }>("/api/teams"),
+  switchTeam: (teamId: string) => request<{ team_id: string }>("/api/teams/switch", { method: "POST", body: JSON.stringify({ team_id: teamId }) }),
+  renameTeam: (name: string) => request<{ status: string; name: string }>("/api/teams/rename", { method: "PUT", body: JSON.stringify({ name }) }),
 
   // Runs
   listRuns: () => request<{ runs: Run[] }>("/api/runs"),
@@ -364,8 +364,8 @@ export interface Banner {
   link_url?: string;
 }
 
-export interface TenantInfo {
-  tenant_id: string;
+export interface TeamInfo {
+  team_id: string;
   org: string;
   status: string;
   current: boolean;
@@ -485,7 +485,7 @@ export interface JiraCheck {
   last_jira_event_at?: string;
   jira_event_count?: number;
   installation_id: number;
-  tenant_id: string;
+  team_id: string;
   webhook_url?: string;
 }
 
