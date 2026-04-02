@@ -293,43 +293,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             </div>
           )}
           {billing && billing.current_period.total_tokens >= billing.limits.tokens && !dismissedBanners.has("overage-banner") && (
-            billing.subscription_status === "active" ? (() => {
-              const overageTokens = billing.current_period.total_tokens - billing.limits.tokens;
-              const overageCents = Math.floor(overageTokens / 1000) * billing.limits.overage_per_1k_tokens_cents;
-              const budgetReached = billing.limits.max_budget_cents > 0 && overageCents >= billing.limits.max_budget_cents;
-              const noBudget = billing.limits.max_budget_cents === 0;
-              const isPaused = budgetReached || noBudget;
-              return (
-              <div className={`${isPaused ? "bg-red-900/90 border-red-500" : "bg-yellow-900/80 border-yellow-600"} border-b-2 px-6 py-4 flex items-center justify-between`}>
-                <div className="flex items-center gap-3">
-                  <span className={`${isPaused ? "text-red-300" : "text-yellow-300"} text-xl`}>⚠</span>
-                  <div>
-                    <p className={`text-sm font-bold ${isPaused ? "text-red-100" : "text-yellow-100"}`}>
-                      {budgetReached
-                        ? "Overage budget reached — all runs are paused"
-                        : noBudget
-                        ? "Token limit reached — all runs are paused"
-                        : "You\u2019re in overage — runs are still active"}
-                    </p>
-                    <p className={`text-xs ${isPaused ? "text-red-300" : "text-yellow-300"} mt-0.5`}>
-                      You&apos;ve used {formatTokens(billing.current_period.total_tokens)} of your {formatTokens(billing.limits.tokens)} included tokens.{" "}
-                      {budgetReached
-                        ? `Your $${(billing.limits.max_budget_cents / 100).toLocaleString()} overage budget has been reached.`
-                        : noBudget
-                        ? "Set an overage budget to allow runs to continue beyond your included tokens."
-                        : `Overage so far: $${(overageCents / 100).toLocaleString()} of $${(billing.limits.max_budget_cents / 100).toLocaleString()} budget.`}
-                    </p>
-                  </div>
-                </div>
-                <a
-                  href="/settings/budget"
-                  className={`shrink-0 rounded-md ${isPaused ? "bg-red-600 hover:bg-red-500" : "bg-yellow-700 hover:bg-yellow-600"} px-4 py-1.5 text-sm font-medium text-white transition-colors`}
-                >
-                  {budgetReached ? "Adjust Budget" : noBudget ? "Set Budget" : "View Budget"}
-                </a>
-              </div>);
-            })()
-            ) : (
+            billing.subscription_status === "active"
+              ? <OverageBanner billing={billing} />
+              : (
               <div className="bg-red-900/90 border-b-2 border-red-500 px-6 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="text-red-300 text-xl">⚠</span>
@@ -356,6 +322,44 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       </div>
     </ConfirmProvider>
     </ToastProvider>
+  );
+}
+
+function OverageBanner({ billing }: { billing: BillingInfo }) {
+  const overageTokens = billing.current_period.total_tokens - billing.limits.tokens;
+  const overageCents = Math.floor(overageTokens / 1000) * billing.limits.overage_per_1k_tokens_cents;
+  const budgetReached = billing.limits.max_budget_cents > 0 && overageCents >= billing.limits.max_budget_cents;
+  const noBudget = billing.limits.max_budget_cents === 0;
+  const isPaused = budgetReached || noBudget;
+  return (
+    <div className={`${isPaused ? "bg-red-900/90 border-red-500" : "bg-yellow-900/80 border-yellow-600"} border-b-2 px-6 py-4 flex items-center justify-between`}>
+      <div className="flex items-center gap-3">
+        <span className={`${isPaused ? "text-red-300" : "text-yellow-300"} text-xl`}>⚠</span>
+        <div>
+          <p className={`text-sm font-bold ${isPaused ? "text-red-100" : "text-yellow-100"}`}>
+            {budgetReached
+              ? "Overage budget reached — all runs are paused"
+              : noBudget
+              ? "Token limit reached — all runs are paused"
+              : "You\u2019re in overage — runs are still active"}
+          </p>
+          <p className={`text-xs ${isPaused ? "text-red-300" : "text-yellow-300"} mt-0.5`}>
+            You&apos;ve used {formatTokens(billing.current_period.total_tokens)} of your {formatTokens(billing.limits.tokens)} included tokens.{" "}
+            {budgetReached
+              ? `Your $${(billing.limits.max_budget_cents / 100).toLocaleString()} overage budget has been reached.`
+              : noBudget
+              ? "Set an overage budget to allow runs to continue beyond your included tokens."
+              : `Overage so far: $${(overageCents / 100).toLocaleString()} of $${(billing.limits.max_budget_cents / 100).toLocaleString()} budget.`}
+          </p>
+        </div>
+      </div>
+      <a
+        href="/settings/budget"
+        className={`shrink-0 rounded-md ${isPaused ? "bg-red-600 hover:bg-red-500" : "bg-yellow-700 hover:bg-yellow-600"} px-4 py-1.5 text-sm font-medium text-white transition-colors`}
+      >
+        {budgetReached ? "Adjust Budget" : noBudget ? "Set Budget" : "View Budget"}
+      </a>
+    </div>
   );
 }
 
