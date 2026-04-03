@@ -116,7 +116,7 @@ function AwsConnectionsPage() {
           onClick={() => setShowAdd(true)}
           className="px-4 py-2 text-sm font-medium bg-white text-zinc-900 rounded-lg hover:bg-zinc-200 transition-colors cursor-pointer"
         >
-          Connect AWS
+          Connect
         </button>
       </div>
 
