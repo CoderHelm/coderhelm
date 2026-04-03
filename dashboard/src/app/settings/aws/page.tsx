@@ -292,54 +292,76 @@ function ConnectionCard({ connection: conn, onRefresh }: { connection: AwsConnec
   return (
     <>
       <div className="border border-zinc-800 rounded-lg bg-zinc-900/50 p-5">
-        <div className="flex items-start justify-between gap-4">
+        {/* Header: AWS logo + account + status */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#232f3e]">
+            <svg width="20" height="14" viewBox="0 0 40 25" fill="none">
+              <path d="M11.3 9.8c0 .5.1.8.2 1 .1.3.3.5.4.8.1.1.1.2.1.3 0 .1-.1.2-.2.4l-.8.5c-.1.1-.2.1-.3.1-.1 0-.2-.1-.4-.2-.2-.2-.3-.4-.4-.5-.1-.2-.2-.4-.4-.7-.9 1.1-2.1 1.6-3.4 1.6-1 0-1.8-.3-2.4-.9-.6-.5-.9-1.3-.9-2.2 0-1 .3-1.8 1.1-2.4.7-.6 1.7-.9 2.9-.9.4 0 .8 0 1.3.1.4.1.9.2 1.3.3v-.9c0-.9-.2-1.5-.6-1.8-.4-.4-1-.5-1.9-.5-.4 0-.9.1-1.3.2-.4.1-.9.2-1.3.4-.2.1-.3.1-.4.2h-.2c-.2 0-.3-.1-.3-.4v-.6c0-.2 0-.3.1-.4.1-.1.2-.2.4-.3.4-.2.9-.4 1.5-.5.6-.2 1.2-.2 1.9-.2 1.4 0 2.4.3 3.1 1 .6.6 1 1.5 1 2.8v3.6zm-4.7 1.8c.4 0 .8-.1 1.2-.2.4-.1.8-.4 1.1-.7.2-.2.3-.5.4-.8.1-.3.1-.7.1-1.1v-.5c-.4-.1-.7-.2-1.1-.2-.4-.1-.7-.1-1.1-.1-.8 0-1.4.2-1.7.5-.4.3-.6.8-.6 1.4 0 .6.1 1 .5 1.3.3.3.7.4 1.2.4z" fill="#F90"/>
+              <path d="M17.6 12.5c-.2 0-.3 0-.4-.1-.1-.1-.2-.2-.3-.5l-3-9.9c-.1-.2-.1-.4-.1-.5 0-.2.1-.4.4-.4h1.2c.2 0 .4 0 .5.1.1.1.2.2.3.5l2.1 8.5 2-8.5c.1-.3.1-.4.3-.5.1-.1.3-.1.5-.1h1c.2 0 .4 0 .5.1.1.1.2.3.3.5l2 8.6 2.2-8.6c.1-.3.2-.4.3-.5.1-.1.3-.1.5-.1h1.1c.3 0 .4.1.4.4 0 .1 0 .2 0 .2l-.1.3-3.1 9.9c-.1.3-.1.4-.3.5-.1.1-.3.1-.4.1h-1c-.2 0-.4 0-.5-.1-.1-.1-.2-.3-.3-.5l-2-8.3-1.9 8.3c-.1.3-.1.4-.3.5-.1.1-.3.1-.5.1h-1.1z" fill="#F90"/>
+              <path d="M35.2 12.8c-.6 0-1.2-.1-1.8-.2-.6-.1-1-.3-1.3-.5-.2-.1-.3-.2-.3-.3 0-.1-.1-.2-.1-.3v-.6c0-.3.1-.4.3-.4.1 0 .2 0 .3 0 .1 0 .2.1.3.1.4.2.9.4 1.4.5.5.1 1 .2 1.5.2.8 0 1.4-.1 1.8-.4.4-.3.6-.7.6-1.2 0-.4-.1-.6-.3-.9-.2-.2-.6-.4-1.3-.6l-1.8-.6c-1-.3-1.6-.7-2-1.2-.4-.5-.6-1-.6-1.7 0-.5.1-1 .3-1.4.2-.4.5-.7.9-1 .4-.3.8-.5 1.3-.6.5-.1 1-.2 1.6-.2.3 0 .6 0 .9.1.3 0 .6.1.9.2.3.1.5.1.7.2.2.1.4.2.5.3.2.1.3.2.3.4.1.1.1.3.1.5v.6c0 .3-.1.4-.3.4-.1 0-.2 0-.5-.2-.8-.4-1.8-.6-2.7-.6-.7 0-1.3.1-1.6.3-.3.2-.5.6-.5 1.1 0 .3.1.6.4.9.2.2.7.4 1.4.6l1.8.6c.9.3 1.6.7 1.9 1.2.3.5.5 1 .5 1.6 0 .5-.1 1-.3 1.4-.2.4-.5.8-.9 1.1-.4.3-.8.5-1.4.6-.6.2-1.1.2-1.8.2z" fill="#F90"/>
+              <path d="M36.6 19.6c-4.5 3.3-11 5.1-16.6 5.1-7.9 0-14.9-2.9-20.3-7.7-.4-.4 0-.9.5-.6 5.8 3.4 12.9 5.4 20.3 5.4 5 0 10.4-1 15.4-3.1.8-.3 1.4.5.7 1z" fill="#F90"/>
+              <path d="M38.5 17.3c-.6-.7-3.7-.3-5.2-.2-.4.1-.5-.3-.1-.6 2.5-1.8 6.6-1.3 7.1-.7.5.6-.1 4.8-2.5 6.9-.4.3-.7.1-.5-.3.5-1.3 1.7-4.4 1.2-5.1z" fill="#F90"/>
+            </svg>
+          </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-3">
-              <h4 className="text-sm font-semibold text-zinc-100 truncate">
-                AWS Account {conn.connection_id}
-              </h4>
-              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${s.bg} ${s.text}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
-                {conn.status}
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs text-zinc-500">
-              <p>Role: <code className="text-zinc-400 break-all">{conn.role_arn}</code></p>
-              <p>Region: <span className="text-zinc-400">{conn.region}</span></p>
-              <p>Log groups: <span className="text-zinc-400">{conn.log_groups.length > 0 ? conn.log_groups.length : "auto-discover"}</span></p>
-              {conn.updated_at && (
-                <p>Updated: <span className="text-zinc-400">{new Date(conn.updated_at).toLocaleString()}</span></p>
-              )}
-            </div>
+            <h4 className="text-sm font-semibold text-zinc-100 truncate">
+              AWS Account {conn.connection_id}
+            </h4>
           </div>
+          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${s.bg} ${s.text}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
+            {conn.status}
+          </span>
+        </div>
 
-          <div className="flex gap-2 shrink-0">
-            <button
-              onClick={handleTest}
-              disabled={testing}
-              className="px-3 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:bg-zinc-700 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-            >
-              {testing ? "Testing..." : "Test"}
-            </button>
-            <button
-              onClick={handleDiscover}
-              className="px-3 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:bg-zinc-700 cursor-pointer"
-            >
-              Log Groups
-            </button>
-            <button
-              onClick={() => setShowEdit(true)}
-              className="px-3 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:bg-zinc-700 cursor-pointer"
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => setShowDelete(true)}
-              className="px-3 py-1.5 text-xs bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 hover:bg-red-500/20 cursor-pointer"
-            >
-              Remove
-            </button>
+        {/* Error message */}
+        {conn.status === "error" && conn.error_message && (
+          <div className="mb-4 px-3 py-2 rounded-lg bg-red-500/5 border border-red-500/20 flex items-start gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
+              <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <p className="text-xs text-red-400 break-all">{conn.error_message}</p>
           </div>
+        )}
+
+        {/* Metadata */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs text-zinc-500">
+          <p>Role: <code className="text-zinc-400 break-all">{conn.role_arn}</code></p>
+          <p>Region: <span className="text-zinc-400">{conn.region}</span></p>
+          <p>Log groups: <span className="text-zinc-400">{conn.log_groups.length > 0 ? conn.log_groups.length : "auto-discover"}</span></p>
+          {conn.updated_at && (
+            <p>Updated: <span className="text-zinc-400">{new Date(conn.updated_at).toLocaleString()}</span></p>
+          )}
+        </div>
+
+        {/* Actions at bottom */}
+        <div className="mt-4 pt-4 border-t border-zinc-800 flex flex-wrap gap-2">
+          <button
+            onClick={handleTest}
+            disabled={testing}
+            className="px-3 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:bg-zinc-700 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+          >
+            {testing ? "Testing..." : "Test"}
+          </button>
+          <button
+            onClick={handleDiscover}
+            className="px-3 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:bg-zinc-700 cursor-pointer"
+          >
+            Log Groups
+          </button>
+          <button
+            onClick={() => setShowEdit(true)}
+            className="px-3 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:bg-zinc-700 cursor-pointer"
+          >
+            Edit
+          </button>
+          <div className="flex-1" />
+          <button
+            onClick={() => setShowDelete(true)}
+            className="px-3 py-1.5 text-xs bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 hover:bg-red-500/20 cursor-pointer"
+          >
+            Remove
+          </button>
         </div>
       </div>
 
@@ -491,28 +513,38 @@ function LogGroupsModal({
           ) : filtered.length === 0 ? (
             <p className="text-sm text-zinc-500 text-center py-8">No log groups match &quot;{search}&quot;</p>
           ) : (
-            paginated.map((lg) => (
-              <label
-                key={lg.name}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-zinc-800/50 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedGroups.has(lg.name)}
-                  onChange={() => onToggle(lg.name)}
-                  className="rounded border-zinc-600 bg-zinc-800 text-emerald-500 focus:ring-emerald-500 shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-zinc-200 truncate">{lg.name}</p>
-                  {lg.stored_bytes !== undefined && (
-                    <p className="text-xs text-zinc-500">
-                      {formatBytes(lg.stored_bytes)}
-                      {lg.retention_days ? ` · ${lg.retention_days}d retention` : ""}
-                    </p>
-                  )}
-                </div>
-              </label>
-            ))
+            paginated.map((lg) => {
+              const isSelected = selectedGroups.has(lg.name);
+              return (
+                <button
+                  type="button"
+                  key={lg.name}
+                  onClick={() => onToggle(lg.name)}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors w-full text-left ${
+                    isSelected ? "bg-emerald-500/[0.06] border border-emerald-500/20" : "border border-transparent hover:bg-zinc-800/50"
+                  }`}
+                >
+                  <div className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded border transition-colors ${
+                    isSelected
+                      ? "border-emerald-500 bg-emerald-500"
+                      : "border-zinc-600 bg-zinc-800"
+                  }`}>
+                    {isSelected && (
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-zinc-200 truncate">{lg.name}</p>
+                    {lg.stored_bytes !== undefined && (
+                      <p className="text-xs text-zinc-500">
+                        {formatBytes(lg.stored_bytes)}
+                        {lg.retention_days ? ` · ${lg.retention_days}d retention` : ""}
+                      </p>
+                    )}
+                  </div>
+                </button>
+              );
+            })
           )}
         </div>
 
