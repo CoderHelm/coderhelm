@@ -720,9 +720,25 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
     setError(""); setLoading(true);
     try {
       await api.verifyEmail(email, code);
+      setCode("");
+      // Auto-login if we still have the password from signup
+      if (password) {
+        try {
+          const result = await api.loginEmail(email, password);
+          if (result.status === "mfa_required" && result.session) {
+            setMfaSession(result.session);
+            setView("mfa");
+          } else {
+            const u = await api.me();
+            onAuth(u);
+          }
+          return;
+        } catch {
+          // Auto-login failed — fall through to manual login
+        }
+      }
       setMessage("Email verified! You can now log in.");
       setView("login");
-      setCode("");
     } catch {
       setError("Invalid or expired code.");
     } finally { setLoading(false); }
