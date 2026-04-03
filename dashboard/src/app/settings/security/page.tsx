@@ -175,7 +175,7 @@ export default function SecurityPage() {
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 autofill:bg-zinc-900 autofill:text-zinc-100 [-webkit-text-fill-color:theme(colors.zinc.100)] [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_30px_theme(colors.zinc.900)_inset]"
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
             />
           </div>
           <div>
@@ -185,7 +185,7 @@ export default function SecurityPage() {
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="8+ characters"
-              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 autofill:bg-zinc-900 autofill:text-zinc-100 [-webkit-text-fill-color:theme(colors.zinc.100)] [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_30px_theme(colors.zinc.900)_inset]"
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
             />
           </div>
           <div>
@@ -195,7 +195,7 @@ export default function SecurityPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleChangePassword()}
-              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 autofill:bg-zinc-900 autofill:text-zinc-100 [-webkit-text-fill-color:theme(colors.zinc.100)] [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_30px_theme(colors.zinc.900)_inset]"
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
             />
           </div>
           <button
@@ -244,7 +244,7 @@ export default function SecurityPage() {
               value={mfaPassword}
               onChange={(e) => setMfaPassword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleMfaSetup()}
-              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 autofill:bg-zinc-900 autofill:text-zinc-100 [-webkit-text-fill-color:theme(colors.zinc.100)] [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_30px_theme(colors.zinc.900)_inset]"
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
             />
             <div className="flex gap-3">
               <button
