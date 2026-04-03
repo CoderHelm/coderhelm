@@ -348,6 +348,13 @@ function SettingsTab({ config, setConfig, toast }: {
     }
   }, [config?.projects]);
 
+  // Sync default project when config updates (e.g. after load or account switch)
+  useEffect(() => {
+    if (config?.default_project !== undefined) {
+      setDefaultProject(config.default_project);
+    }
+  }, [config?.default_project]);
+
   const saveConfig = async () => {
     setSaving(true);
     try {
