@@ -155,84 +155,254 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Before / After */}
-      <section className="border-t border-surface-border py-24">
-        <div className="mx-auto max-w-6xl px-6">
+      {/* Agent Orchestra — Under the Hood */}
+      <section className="border-t border-surface-border py-28 overflow-hidden relative">
+        {/* Background grid pattern */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }} />
+
+        <div className="relative mx-auto max-w-6xl px-6">
           <div className="text-center">
-            <p className="text-sm font-semibold text-rose-400 tracking-wider uppercase">Compare</p>
-            <h2 className="mt-3 text-3xl font-bold sm:text-4xl">Your workflow, supercharged</h2>
-            <p className="mx-auto mt-4 max-w-2xl text-text-secondary">
-              See how the same issue plays out — with and without Coderhelm.
+            <p className="text-sm font-semibold text-brand tracking-wider uppercase">Under the Hood</p>
+            <h2 className="mt-3 text-3xl font-bold sm:text-5xl">
+              A team of agents,<br className="hidden sm:block" />
+              <span className="gradient-text">not a single prompt.</span>
+            </h2>
+            <p className="mx-auto mt-5 max-w-2xl text-text-secondary text-lg">
+              Every issue triggers an orchestrated state machine. Eight specialized agents pass structured state from stage to stage — with self-healing loops and automatic retries built into the fabric.
             </p>
           </div>
 
-          <div className="mt-16 grid gap-6 md:grid-cols-2">
-            {/* Without */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6">
-              <div className="flex items-center gap-2 mb-5">
-                <div className="w-2.5 h-2.5 rounded-full bg-zinc-600" />
-                <span className="text-sm font-semibold text-zinc-400">Without Coderhelm</span>
-              </div>
-              <div className="space-y-3">
-                {[
-                  { who: "PM", action: "Writes ticket with vague requirements", time: "10 min" },
-                  { who: "Dev", action: "Reads ticket, asks 3 clarifying questions", time: "30 min" },
-                  { who: "Dev", action: "Explores codebase, finds relevant files", time: "45 min" },
-                  { who: "Dev", action: "Implements the feature", time: "3 hrs" },
-                  { who: "Dev", action: "Writes tests, fixes lint errors", time: "45 min" },
-                  { who: "Dev", action: "Opens PR, waits for review", time: "4 hrs" },
-                  { who: "Lead", action: "Reviews PR, requests 2 changes", time: "30 min" },
-                  { who: "Dev", action: "Addresses feedback, pushes again", time: "45 min" },
-                  { who: "CI", action: "Runs again, finally passes", time: "8 min" },
-                ].map((s, i) => (
-                  <div key={i} className="flex items-start gap-3 text-xs">
-                    <span className="shrink-0 w-8 text-right font-mono text-zinc-600">{s.who}</span>
-                    <span className="flex-1 text-zinc-400">{s.action}</span>
-                    <span className="shrink-0 text-zinc-600 tabular-nums">{s.time}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-5 pt-4 border-t border-zinc-800 flex items-center justify-between">
-                <span className="text-xs text-zinc-600">Total wall time</span>
-                <span className="text-sm font-bold text-zinc-400">~10 hours</span>
+          {/* Orchestrator visualization */}
+          <div className="mt-20 relative">
+            {/* Central orchestrator hub */}
+            <div className="flex justify-center mb-12">
+              <div className="relative">
+                <div className="absolute -inset-4 rounded-full bg-blue-500/10 agent-pulse" />
+                <div className="absolute -inset-8 rounded-full bg-blue-500/5 agent-pulse-delayed" />
+                <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-blue-500/30 bg-[#0d1117]">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M12 1v4" /><path d="M12 19v4" />
+                    <path d="M4.22 4.22l2.83 2.83" /><path d="M16.95 16.95l2.83 2.83" />
+                    <path d="M1 12h4" /><path d="M19 12h4" />
+                    <path d="M4.22 19.78l2.83-2.83" /><path d="M16.95 7.05l2.83-2.83" />
+                  </svg>
+                </div>
+                <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-semibold text-blue-400">Orchestrator</div>
               </div>
             </div>
 
-            {/* With */}
-            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.03] p-6 ring-1 ring-emerald-500/10">
-              <div className="flex items-center gap-2 mb-5">
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                <span className="text-sm font-semibold text-emerald-400">With Coderhelm</span>
-              </div>
-              <div className="space-y-3">
-                {[
-                  { who: "PM", action: "Writes ticket, assigns to Coderhelm", time: "10 min", color: "text-zinc-400" },
-                  { who: "Bot", action: "Triages issue and plans implementation", time: "3s", color: "text-emerald-400" },
-                  { who: "Bot", action: "Validates plan — scope OK, files exist", time: "0.1s", color: "text-emerald-400" },
-                  { who: "Bot", action: "Implements across 3 files: +87 −12", time: "47s", color: "text-emerald-400" },
-                  { who: "Bot", action: "Runs CI, all 12 checks pass", time: "3m", color: "text-emerald-400" },
-                  { who: "Bot", action: "Self-reviews, finds 0 issues", time: "4s", color: "text-emerald-400" },
-                  { who: "Bot", action: "OWASP security audit — clean", time: "3s", color: "text-emerald-400" },
-                  { who: "Bot", action: "Opens PR #43, marks ready for review", time: "0.3s", color: "text-emerald-400" },
-                  { who: "Lead", action: "Reviews one clean PR, approves", time: "10 min", color: "text-zinc-400" },
-                ].map((s, i) => (
-                  <div key={i} className="flex items-start gap-3 text-xs">
-                    <span className={`shrink-0 w-8 text-right font-mono ${s.who === "Bot" ? "text-emerald-600" : "text-zinc-600"}`}>{s.who}</span>
-                    <span className={`flex-1 ${s.color}`}>{s.action}</span>
-                    <span className="shrink-0 text-zinc-600 tabular-nums">{s.time}</span>
+            {/* Flowing pipeline */}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                {
+                  name: "Triage",
+                  color: "#06b6d4",
+                  desc: "Classifies bug vs feature vs refactor. Scores priority and complexity.",
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
+                    </svg>
+                  ),
+                },
+                {
+                  name: "Plan",
+                  color: "#8b5cf6",
+                  desc: "Reads repo conventions and produces a step-by-step task list with file paths.",
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><line x1="10" y1="9" x2="8" y2="9" />
+                    </svg>
+                  ),
+                },
+                {
+                  name: "Validate",
+                  color: "#10b981",
+                  desc: "Verifies files exist, imports resolve, and scope matches the issue.",
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                  ),
+                },
+                {
+                  name: "Implement",
+                  color: "#f59e0b",
+                  desc: "Agentic coding loop — reads files, writes code, runs commands across your repo.",
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
+                    </svg>
+                  ),
+                },
+              ].map((agent, i) => (
+                <div key={agent.name} className="relative group">
+                  {/* Connector arrow (mobile: below, desktop: right) */}
+                  {i < 3 && (
+                    <div className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 z-10">
+                      <svg width="6" height="10" viewBox="0 0 6 10" fill="none"><path d="M1 1l4 4-4 4" stroke="#333" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    </div>
+                  )}
+                  <div className="relative rounded-xl border border-zinc-800 bg-[#0d1117] p-5 h-full transition-all duration-300 hover:border-zinc-600 agent-card" style={{ "--agent-color": agent.color } as React.CSSProperties}>
+                    {/* Top glow bar */}
+                    <div className="absolute top-0 left-4 right-4 h-px" style={{ background: `linear-gradient(90deg, transparent, ${agent.color}40, transparent)` }} />
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl border" style={{ borderColor: `${agent.color}30`, color: agent.color, background: `${agent.color}08` }}>
+                        {agent.icon}
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-mono text-zinc-600">{String(i + 1).padStart(2, "0")}</span>
+                        <h3 className="text-sm font-semibold -mt-0.5" style={{ color: agent.color }}>{agent.name}</h3>
+                      </div>
+                    </div>
+                    <p className="text-xs text-text-secondary leading-relaxed">{agent.desc}</p>
                   </div>
-                ))}
+                </div>
+              ))}
+            </div>
+
+            {/* Center divider with animated data flow */}
+            <div className="my-4 flex items-center gap-3 px-4">
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-zinc-700 to-zinc-700" />
+              <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono">
+                <div className="flex gap-0.5">
+                  <span className="inline-block w-1 h-1 rounded-full bg-zinc-600 agent-flow-dot" />
+                  <span className="inline-block w-1 h-1 rounded-full bg-zinc-600 agent-flow-dot-2" />
+                  <span className="inline-block w-1 h-1 rounded-full bg-zinc-600 agent-flow-dot-3" />
+                </div>
+                state passes through
+                <div className="flex gap-0.5">
+                  <span className="inline-block w-1 h-1 rounded-full bg-zinc-600 agent-flow-dot" />
+                  <span className="inline-block w-1 h-1 rounded-full bg-zinc-600 agent-flow-dot-2" />
+                  <span className="inline-block w-1 h-1 rounded-full bg-zinc-600 agent-flow-dot-3" />
+                </div>
               </div>
-              <div className="mt-5 pt-4 border-t border-emerald-500/10 flex items-center justify-between">
-                <span className="text-xs text-zinc-600">Total wall time</span>
-                <span className="text-sm font-bold text-emerald-400">~15 minutes</span>
+              <div className="flex-1 h-px bg-gradient-to-l from-transparent via-zinc-700 to-zinc-700" />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                {
+                  name: "Test",
+                  color: "#ec4899",
+                  desc: "Runs CI. If tests fail, reads logs and auto-pushes fixes — up to 3 healing attempts.",
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
+                    </svg>
+                  ),
+                },
+                {
+                  name: "Review",
+                  color: "#3b82f6",
+                  desc: "Self-reviews like a senior engineer. Loops back to Implement up to 3 times if needed.",
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" />
+                    </svg>
+                  ),
+                  loop: true,
+                },
+                {
+                  name: "Security",
+                  color: "#ef4444",
+                  desc: "OWASP audit for injection, XSS, SSRF, and secrets. Auto-remediates violations.",
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" />
+                    </svg>
+                  ),
+                },
+                {
+                  name: "Ship",
+                  color: "#22d3ee",
+                  desc: "Formats the PR in your team&apos;s voice, adds test evidence, and marks ready for review.",
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22" />
+                    </svg>
+                  ),
+                },
+              ].map((agent, i) => (
+                <div key={agent.name} className="relative group">
+                  {i < 3 && (
+                    <div className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 z-10">
+                      <svg width="6" height="10" viewBox="0 0 6 10" fill="none"><path d="M1 1l4 4-4 4" stroke="#333" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    </div>
+                  )}
+                  <div className="relative rounded-xl border border-zinc-800 bg-[#0d1117] p-5 h-full transition-all duration-300 hover:border-zinc-600 agent-card" style={{ "--agent-color": agent.color } as React.CSSProperties}>
+                    <div className="absolute top-0 left-4 right-4 h-px" style={{ background: `linear-gradient(90deg, transparent, ${agent.color}40, transparent)` }} />
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl border" style={{ borderColor: `${agent.color}30`, color: agent.color, background: `${agent.color}08` }}>
+                        {agent.icon}
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-mono text-zinc-600">{String(i + 5).padStart(2, "0")}</span>
+                        <h3 className="text-sm font-semibold -mt-0.5" style={{ color: agent.color }}>{agent.name}</h3>
+                      </div>
+                      {agent.loop && (
+                        <div className="ml-auto flex items-center gap-1 text-[9px] text-blue-400/70 bg-blue-500/10 px-1.5 py-0.5 rounded-full">
+                          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+                          loop
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-text-secondary leading-relaxed">{agent.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* The review loop — hero callout */}
+          <div className="mt-14 relative">
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-blue-500/5" />
+            <div className="relative rounded-2xl border border-zinc-800 bg-[#0d1117] p-6 sm:p-8">
+              <div className="sm:flex sm:items-start sm:gap-6">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-blue-500/20 bg-blue-500/[0.06]">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 4v6h6" /><path d="M23 20v-6h-6" />
+                    <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
+                  </svg>
+                </div>
+                <div className="mt-4 sm:mt-0">
+                  <h3 className="text-base font-semibold text-text-primary">Self-correcting review loop</h3>
+                  <p className="mt-2 text-sm text-text-secondary leading-relaxed">
+                    When the Review Agent finds issues — logic bugs, missing edge cases, naming problems — it sends structured feedback back to Implementation. The code gets fixed and re-submitted automatically. Up to 3 loops. The result: cleaner code than most human first-pass PRs.
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-4 text-xs font-mono">
+                    <span className="flex items-center gap-1.5 text-blue-400">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                      Review → Implement → Review
+                    </span>
+                    <span className="flex items-center gap-1.5 text-emerald-400">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                      Max 3 iterations
+                    </span>
+                    <span className="flex items-center gap-1.5 text-purple-400">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                      Structured feedback protocol
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          <p className="mt-8 text-center text-sm text-text-muted">
-            That&apos;s 40x faster from ticket to merged PR — and the human only reviewed, never typed code.
-          </p>
+          {/* Stats */}
+          <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { value: "8", label: "Specialized agents", color: "#06b6d4" },
+              { value: "3×", label: "Self-healing loops", color: "#3b82f6" },
+              { value: "40+", label: "Tool calls per run", color: "#8b5cf6" },
+              { value: "<5m", label: "Issue to PR", color: "#10b981" },
+            ].map((stat) => (
+              <div key={stat.label} className="rounded-xl border border-zinc-800 bg-[#0d1117] p-5 text-center">
+                <div className="text-3xl font-bold tabular-nums" style={{ color: stat.color }}>{stat.value}</div>
+                <div className="text-xs text-text-muted mt-1.5">{stat.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
