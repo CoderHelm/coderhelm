@@ -169,8 +169,7 @@ function GitHubSettingsPage() {
       </div>
 
       {/* GitHub App installation status */}
-      {login && (
-        <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
+      <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
           <h3 className="text-sm font-medium text-zinc-300 mb-2">GitHub App</h3>
 
           {status === "connected" ? (
@@ -210,7 +209,6 @@ function GitHubSettingsPage() {
             </>
           )}
         </div>
-      )}
 
       {/* Repositories */}
       <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
