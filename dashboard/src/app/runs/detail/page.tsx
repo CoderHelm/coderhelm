@@ -340,7 +340,7 @@ function RunDetailInner() {
                 {reReviewing ? "Re-reviewing…" : "Re-review"}
               </button>
             )}
-            {run.status === "failed" && run.current_pass !== "feedback" && (
+            {(run.status === "failed" || run.status === "needs_input") && run.current_pass !== "feedback" && (
               <button
                 onClick={async () => {
                   setRetrying(true);
@@ -364,8 +364,8 @@ function RunDetailInner() {
         </div>
       )}
 
-      {/* Retry for runs that failed without an error message (not feedback) */}
-      {run.status === "failed" && !run.error && run.current_pass !== "feedback" && (
+      {/* Retry for runs that failed/needs_input without an error message (not feedback) */}
+      {(run.status === "failed" || run.status === "needs_input") && !run.error && run.current_pass !== "feedback" && (
         <div className="mb-6">
           <button
             onClick={async () => {
