@@ -173,6 +173,7 @@ export default function SecurityPage() {
             <label className="text-xs text-zinc-500 mb-1 block">Current password</label>
             <input
               type="password"
+              autoComplete="current-password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
@@ -182,6 +183,7 @@ export default function SecurityPage() {
             <label className="text-xs text-zinc-500 mb-1 block">New password</label>
             <input
               type="password"
+              autoComplete="new-password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="8+ characters"
@@ -192,6 +194,7 @@ export default function SecurityPage() {
             <label className="text-xs text-zinc-500 mb-1 block">Confirm new password</label>
             <input
               type="password"
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleChangePassword()}
@@ -241,8 +244,7 @@ export default function SecurityPage() {
             <input
               type="password"
               placeholder="Current password"
-              autoComplete="off"
-              data-1p-ignore
+              autoComplete="current-password"
               value={mfaPassword}
               onChange={(e) => setMfaPassword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleMfaSetup()}
@@ -324,7 +326,6 @@ export default function SecurityPage() {
               inputMode="numeric"
               placeholder="000000"
               autoComplete="one-time-code"
-              data-1p-ignore
               value={mfaCode}
               onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
               onKeyDown={(e) => e.key === "Enter" && handleMfaVerify()}
