@@ -602,6 +602,10 @@ function AddConnectionModal({
                 The stack creates a read-only IAM role with access to CloudWatch Logs only.
                 No data is written to your account.
               </p>
+              <p className="text-xs text-zinc-500 mt-2">
+                By default the role grants access to all log groups (<code className="text-zinc-400">*</code>). You can restrict this to specific log groups by editing the IAM policy on the role after deployment.
+                Questions? Reach out to <a href="mailto:security@coderhelm.com" className="text-zinc-300 hover:text-zinc-100 underline transition-colors">security@coderhelm.com</a>.
+              </p>
             </div>
 
             <button
@@ -615,7 +619,7 @@ function AddConnectionModal({
             {cfnData && (
               <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
                 <p className="text-xs text-emerald-400 mb-1">Stack launched! External ID:</p>
-                <code className="text-xs text-zinc-300 block bg-zinc-800 px-2 py-1 rounded">
+                <code className="text-xs text-emerald-200 block bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded">
                   {cfnData.external_id}
                 </code>
               </div>
