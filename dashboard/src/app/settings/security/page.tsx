@@ -241,6 +241,8 @@ export default function SecurityPage() {
             <input
               type="password"
               placeholder="Current password"
+              autoComplete="off"
+              data-1p-ignore
               value={mfaPassword}
               onChange={(e) => setMfaPassword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleMfaSetup()}
@@ -319,7 +321,10 @@ export default function SecurityPage() {
             </p>
             <input
               type="text"
+              inputMode="numeric"
               placeholder="000000"
+              autoComplete="one-time-code"
+              data-1p-ignore
               value={mfaCode}
               onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
               onKeyDown={(e) => e.key === "Enter" && handleMfaVerify()}
