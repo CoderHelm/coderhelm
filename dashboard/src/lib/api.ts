@@ -543,6 +543,7 @@ export interface AwsConnection {
   external_id: string;
   region: string;
   status: string;
+  error_message?: string;
   log_groups: string[];
   created_at?: string;
   updated_at?: string;
