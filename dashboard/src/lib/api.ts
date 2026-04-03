@@ -69,6 +69,7 @@ export const api = {
   retryRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/retry`, { method: "POST" }),
   reReviewRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/re-review`, { method: "POST" }),
   cancelRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/cancel`, { method: "POST" }),
+  getRunTraces: (id: string) => request<{ traces: PassTrace[] }>(`/api/runs/${id}/traces`),
 
   // Repos
   listRepos: () => request<{ repos: Repo[] }>("/api/repos"),
@@ -277,6 +278,17 @@ export interface RunDetail extends Run {
   error?: string;
   updated_at?: string;
   pass_history?: { pass: string; started_at: string }[];
+}
+
+export interface PassTrace {
+  pass: string;
+  duration_ms: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens?: number;
+  cache_write_tokens?: number;
+  error?: string;
+  timestamp: string;
 }
 
 export interface Openspec {

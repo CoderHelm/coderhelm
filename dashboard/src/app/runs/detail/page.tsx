@@ -3,12 +3,12 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, type RunDetail, type Openspec, type BillingInfo, type EnabledPlugin, type PluginDef } from "@/lib/api";
+import { api, type RunDetail, type Openspec, type BillingInfo, type EnabledPlugin, type PluginDef, type PassTrace } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
 import { Markdown } from "@/components/markdown";
 
-const PASSES = ["triage", "plan", "implement", "review", "pr"];
+const PASSES = ["triage", "plan", "implement", "test", "review", "security", "pr"];
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { dot: string; text: string; bg: string }> = {
@@ -175,6 +175,7 @@ function RunDetailInner() {
   const [specTab, setSpecTab] = useState<keyof Openspec>("proposal");
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [plugins, setPlugins] = useState<{ catalog: PluginDef[]; enabled: EnabledPlugin[] }>({ catalog: [], enabled: [] });
+  const [traces, setTraces] = useState<PassTrace[]>([]);
   const { toast } = useToast();
 
   useEffect(() => { api.getBilling().then(setBilling).catch(() => {}); }, []);
@@ -202,6 +203,9 @@ function RunDetailInner() {
         setRun(r);
         if (r.status !== "running" || PASSES.indexOf(r.current_pass ?? "") >= 1) {
           api.getRunOpenspec(runId).then(setOpenspec).catch(() => {});
+        }
+        if (r.status === "completed" || r.status === "failed") {
+          api.getRunTraces(runId).then((t) => setTraces(t.traces)).catch(() => {});
         }
       })
       .catch(() => {})
@@ -414,6 +418,74 @@ function RunDetailInner() {
         <StatCard label="Tokens In" value={formatTokens(run.tokens_in)} />
         <StatCard label="Tokens Out" value={formatTokens(run.tokens_out)} />
       </div>
+
+      {/* Pass timeline waterfall */}
+      {traces.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-sm font-medium text-zinc-300 mb-2">Pass Timeline</h2>
+          <div className="border border-zinc-800 rounded-lg p-4 space-y-2">
+            {(() => {
+              const maxDuration = Math.max(...traces.map((t) => t.duration_ms), 1);
+              return traces.map((trace) => {
+                const pct = (trace.duration_ms / maxDuration) * 100;
+                const passLabel = trace.pass.includes(":") ? trace.pass.replace(":", " #") : trace.pass;
+                const hasError = !!trace.error;
+                return (
+                  <div key={trace.pass} className="flex items-center gap-3">
+                    <span className="text-xs text-zinc-500 w-20 text-right font-mono">{passLabel}</span>
+                    <div className="flex-1 h-5 bg-zinc-900 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${hasError ? "bg-red-500/60" : "bg-blue-500/60"}`}
+                        style={{ width: `${Math.max(pct, 2)}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-zinc-500 w-16 font-mono">
+                      {trace.duration_ms >= 60000
+                        ? `${(trace.duration_ms / 60000).toFixed(1)}m`
+                        : `${(trace.duration_ms / 1000).toFixed(1)}s`}
+                    </span>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Token breakdown per pass */}
+      {traces.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-sm font-medium text-zinc-300 mb-2">Tokens by Pass</h2>
+          <div className="border border-zinc-800 rounded-lg overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-zinc-800 text-zinc-500">
+                  <th className="text-left px-3 py-2 font-medium">Pass</th>
+                  <th className="text-right px-3 py-2 font-medium">Input</th>
+                  <th className="text-right px-3 py-2 font-medium">Output</th>
+                  <th className="text-right px-3 py-2 font-medium">Cache Read</th>
+                  <th className="text-right px-3 py-2 font-medium">Duration</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800">
+                {traces.map((trace) => (
+                  <tr key={trace.pass} className="text-zinc-400 hover:bg-zinc-800/50">
+                    <td className="px-3 py-2 font-mono">{trace.pass.includes(":") ? trace.pass.replace(":", " #") : trace.pass}</td>
+                    <td className="text-right px-3 py-2 tabular-nums">{formatTokens(trace.input_tokens)}</td>
+                    <td className="text-right px-3 py-2 tabular-nums">{formatTokens(trace.output_tokens)}</td>
+                    <td className="text-right px-3 py-2 tabular-nums">{formatTokens(trace.cache_read_tokens)}</td>
+                    <td className="text-right px-3 py-2 tabular-nums font-mono">
+                      {trace.duration_ms >= 60000
+                        ? `${(trace.duration_ms / 60000).toFixed(1)}m`
+                        : `${(trace.duration_ms / 1000).toFixed(1)}s`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* MCP servers used in this run */}
       {run.mcp_servers && run.mcp_servers.length > 0 && (
