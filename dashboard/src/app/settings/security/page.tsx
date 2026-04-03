@@ -168,10 +168,12 @@ export default function SecurityPage() {
       {!isOAuth && (
       <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-lg mb-6">
         <h3 className="text-sm font-semibold text-zinc-100 mb-4">Change password</h3>
-        <div className="space-y-3">
+        <form onSubmit={(e) => { e.preventDefault(); handleChangePassword(); }} autoComplete="off" className="space-y-3">
           <div>
-            <label className="text-xs text-zinc-500 mb-1 block">Current password</label>
+            <label htmlFor="current-password" className="text-xs text-zinc-500 mb-1 block">Current password</label>
             <input
+              id="current-password"
+              name="current-password"
               type="password"
               autoComplete="current-password"
               value={currentPassword}
@@ -180,8 +182,10 @@ export default function SecurityPage() {
             />
           </div>
           <div>
-            <label className="text-xs text-zinc-500 mb-1 block">New password</label>
+            <label htmlFor="new-password" className="text-xs text-zinc-500 mb-1 block">New password</label>
             <input
+              id="new-password"
+              name="new-password"
               type="password"
               autoComplete="new-password"
               value={newPassword}
@@ -191,24 +195,25 @@ export default function SecurityPage() {
             />
           </div>
           <div>
-            <label className="text-xs text-zinc-500 mb-1 block">Confirm new password</label>
+            <label htmlFor="confirm-password" className="text-xs text-zinc-500 mb-1 block">Confirm new password</label>
             <input
+              id="confirm-password"
+              name="confirm-password"
               type="password"
               autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleChangePassword()}
               className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
             />
           </div>
           <button
-            onClick={handleChangePassword}
+            type="submit"
             disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
             className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed"
           >
             {changingPassword ? "Updating..." : "Update password"}
           </button>
-        </div>
+        </form>
       </div>
       )}
 
@@ -239,33 +244,35 @@ export default function SecurityPage() {
         )}
 
         {mfaStep === "password" && (
-          <div className="space-y-3">
+          <form onSubmit={(e) => { e.preventDefault(); handleMfaSetup(); }} className="space-y-3">
             <p className="text-sm text-zinc-400">Enter your password to set up two-factor authentication.</p>
             <input
+              id="mfa-password"
+              name="mfa-password"
               type="password"
               placeholder="Current password"
               autoComplete="current-password"
               value={mfaPassword}
               onChange={(e) => setMfaPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleMfaSetup()}
               className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
             />
             <div className="flex gap-3">
               <button
-                onClick={handleMfaSetup}
+                type="submit"
                 disabled={mfaLoading || !mfaPassword}
                 className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed"
               >
                 {mfaLoading ? "Setting up..." : "Continue"}
               </button>
               <button
+                type="button"
                 onClick={() => { setMfaStep("idle"); setMfaPassword(""); }}
                 className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
             </div>
-          </div>
+          </form>
         )}
 
         {mfaStep === "idle" && mfaEnabled && (
@@ -317,36 +324,38 @@ export default function SecurityPage() {
         )}
 
         {mfaStep === "verify" && (
-          <div className="space-y-4">
+          <form onSubmit={(e) => { e.preventDefault(); handleMfaVerify(); }} className="space-y-4">
             <p className="text-sm text-zinc-400">
               Enter the 6-digit code from your authenticator app to verify setup.
             </p>
             <input
+              id="totp-code"
+              name="totp-code"
               type="text"
               inputMode="numeric"
               placeholder="000000"
               autoComplete="one-time-code"
               value={mfaCode}
               onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              onKeyDown={(e) => e.key === "Enter" && handleMfaVerify()}
               className="w-48 px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 text-center tracking-widest text-lg font-mono"
             />
             <div className="flex gap-3">
               <button
-                onClick={handleMfaVerify}
+                type="submit"
                 disabled={mfaLoading || mfaCode.length < 6}
                 className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed"
               >
                 {mfaLoading ? "Verifying..." : "Verify & enable"}
               </button>
               <button
+                type="button"
                 onClick={() => { setMfaStep("idle"); setMfaCode(""); setMfaPassword(""); }}
                 className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
             </div>
-          </div>
+          </form>
         )}
       </div>
       )}
