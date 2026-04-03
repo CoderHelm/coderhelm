@@ -205,8 +205,8 @@ export const api = {
 
   // AWS Connections (Log Analyzer)
   listAwsConnections: () => request<{ connections: AwsConnection[] }>("/api/aws-connections"),
-  createAwsConnection: (role_arn: string, region?: string) =>
-    request<{ connection_id?: string; external_id?: string; status?: string; error?: string; message?: string }>("/api/aws-connections", { method: "POST", body: JSON.stringify({ role_arn, region }) }),
+  createAwsConnection: (role_arn: string, region?: string, external_id?: string) =>
+    request<{ connection_id?: string; external_id?: string; status?: string; error?: string; message?: string }>("/api/aws-connections", { method: "POST", body: JSON.stringify({ role_arn, region, external_id }) }),
   updateAwsConnection: (id: string, body: Partial<{ role_arn: string; region: string; log_groups: string[] }>) =>
     request<{ status: string }>(`/api/aws-connections/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteAwsConnection: (id: string) =>
@@ -494,6 +494,7 @@ export interface JiraCheck {
   installation_id: number;
   team_id: string;
   webhook_url?: string;
+  forge_secret?: string;
 }
 
 export interface JiraEvent {
