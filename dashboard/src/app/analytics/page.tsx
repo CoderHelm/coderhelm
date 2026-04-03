@@ -273,20 +273,7 @@ export default function AnalyticsPage() {
           </ResponsiveContainer>
         </ChartCard>
 
-        {useDaily && (
-          <ChartCard title="Cost per day">
-            <ResponsiveContainer width="100%" height={240}>
-              <AreaChart data={chartData}>
-                <GradientDefs />
-                <CartesianGrid vertical={false} stroke="#27272a" strokeDasharray="3 3" />
-                <XAxis dataKey="label" {...axisProps} interval={range === "30d" ? 2 : 0} />
-                <YAxis {...axisProps} width={40} tickFormatter={(v: number) => `$${v.toFixed(2)}`} />
-                <Tooltip content={<ChartTooltip formatter={(v: number) => `$${v.toFixed(2)}`} />} cursor={{ stroke: "#3f3f46" }} />
-                <Area type="monotone" dataKey="cost" name="Cost" stroke={COLORS.purple.stroke} fill={COLORS.purple.fill} strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ChartCard>
-        )}
+
 
         {useDaily && (
           <ChartCard title="Avg duration per day">
