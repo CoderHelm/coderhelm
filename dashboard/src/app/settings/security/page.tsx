@@ -40,6 +40,9 @@ export default function SecurityPage() {
       } else {
         setAuthProvider(u.auth_provider ?? "email");
       }
+      if (u.mfa_enabled) {
+        setMfaEnabled(true);
+      }
     }).catch(() => {});
   }, []);
 
