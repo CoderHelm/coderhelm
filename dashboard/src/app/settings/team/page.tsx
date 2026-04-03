@@ -266,7 +266,7 @@ export default function TeamPage() {
                   <select
                     value={user.role}
                     onChange={(e) => handleRoleChange(user.user_id, e.target.value)}
-                    className={`appearance-none pl-2.5 pr-7 py-1 text-xs font-medium rounded-full border bg-transparent focus:outline-none cursor-pointer ${ROLE_COLORS[user.role] || ROLE_COLORS.member}`}
+                    className={`appearance-none pl-2.5 pr-7 py-1 text-xs font-medium rounded-md border bg-transparent focus:outline-none cursor-pointer ${ROLE_COLORS[user.role] || ROLE_COLORS.member}`}
                   >
                     <option value="viewer">viewer</option>
                     <option value="member">member</option>
