@@ -20,8 +20,8 @@ export default function Home() {
 
         <div className="relative mx-auto max-w-4xl px-6 text-center">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-surface-border bg-surface-elevated px-4 py-1.5 text-sm text-text-secondary">
-            <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-            Closed beta
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            Now in open beta
           </div>
 
           <h1 className="text-5xl font-extrabold leading-tight tracking-tight sm:text-7xl">
@@ -58,11 +58,12 @@ export default function Home() {
                 {[
                   { step: "triage    ", detail: "feature · medium priority", time: "0.8s",   color: "#10b981" },
                   { step: "plan      ", detail: "5 files · 3 new functions", time: "2.1s",   color: "#10b981" },
+                  { step: "validate  ", detail: "all files exist · scope OK", time: "0.1s",   color: "#10b981" },
                   { step: "implement ", detail: "+87 −12 across 3 files",    time: "47s",    color: "#10b981" },
-                  { step: "review    ", detail: "LGTM · tests added",        time: "4.3s",   color: "#10b981" },
-                  { step: "pr        ", detail: "#43 opened as draft",        time: "0.3s",   color: "#10b981" },
-                  { step: "ci        ", detail: "12/12 checks passed",        time: "3m 22s", color: "#10b981" },
-                  { step: "ready     ", detail: "marked ready for review",    time: "",       color: "#10b981" },
+                  { step: "test      ", detail: "CI green · 12/12 passed",   time: "3m 22s", color: "#10b981" },
+                  { step: "review    ", detail: "LGTM · no issues found",    time: "4.3s",   color: "#10b981" },
+                  { step: "security  ", detail: "OWASP audit passed",        time: "3.1s",   color: "#10b981" },
+                  { step: "pr        ", detail: "#43 opened → ready",        time: "0.3s",   color: "#10b981" },
                 ].map((s) => (
                   <div key={s.step} className="flex items-center gap-3">
                     <span style={{ color: s.color }} className="shrink-0 text-xs">✓</span>
@@ -154,6 +155,87 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Before / After */}
+      <section className="border-t border-surface-border py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="text-center">
+            <p className="text-sm font-semibold text-rose-400 tracking-wider uppercase">Compare</p>
+            <h2 className="mt-3 text-3xl font-bold sm:text-4xl">Your workflow, supercharged</h2>
+            <p className="mx-auto mt-4 max-w-2xl text-text-secondary">
+              See how the same issue plays out — with and without Coderhelm.
+            </p>
+          </div>
+
+          <div className="mt-16 grid gap-6 md:grid-cols-2">
+            {/* Without */}
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <div className="w-2.5 h-2.5 rounded-full bg-zinc-600" />
+                <span className="text-sm font-semibold text-zinc-400">Without Coderhelm</span>
+              </div>
+              <div className="space-y-3">
+                {[
+                  { who: "PM", action: "Writes ticket with vague requirements", time: "10 min" },
+                  { who: "Dev", action: "Reads ticket, asks 3 clarifying questions", time: "30 min" },
+                  { who: "Dev", action: "Explores codebase, finds relevant files", time: "45 min" },
+                  { who: "Dev", action: "Implements the feature", time: "3 hrs" },
+                  { who: "Dev", action: "Writes tests, fixes lint errors", time: "45 min" },
+                  { who: "Dev", action: "Opens PR, waits for review", time: "4 hrs" },
+                  { who: "Lead", action: "Reviews PR, requests 2 changes", time: "30 min" },
+                  { who: "Dev", action: "Addresses feedback, pushes again", time: "45 min" },
+                  { who: "CI", action: "Runs again, finally passes", time: "8 min" },
+                ].map((s, i) => (
+                  <div key={i} className="flex items-start gap-3 text-xs">
+                    <span className="shrink-0 w-8 text-right font-mono text-zinc-600">{s.who}</span>
+                    <span className="flex-1 text-zinc-400">{s.action}</span>
+                    <span className="shrink-0 text-zinc-600 tabular-nums">{s.time}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5 pt-4 border-t border-zinc-800 flex items-center justify-between">
+                <span className="text-xs text-zinc-600">Total wall time</span>
+                <span className="text-sm font-bold text-zinc-400">~10 hours</span>
+              </div>
+            </div>
+
+            {/* With */}
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.03] p-6 ring-1 ring-emerald-500/10">
+              <div className="flex items-center gap-2 mb-5">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                <span className="text-sm font-semibold text-emerald-400">With Coderhelm</span>
+              </div>
+              <div className="space-y-3">
+                {[
+                  { who: "PM", action: "Writes ticket, assigns to Coderhelm", time: "10 min", color: "text-zinc-400" },
+                  { who: "Bot", action: "Triages issue and plans implementation", time: "3s", color: "text-emerald-400" },
+                  { who: "Bot", action: "Validates plan — scope OK, files exist", time: "0.1s", color: "text-emerald-400" },
+                  { who: "Bot", action: "Implements across 3 files: +87 −12", time: "47s", color: "text-emerald-400" },
+                  { who: "Bot", action: "Runs CI, all 12 checks pass", time: "3m", color: "text-emerald-400" },
+                  { who: "Bot", action: "Self-reviews, finds 0 issues", time: "4s", color: "text-emerald-400" },
+                  { who: "Bot", action: "OWASP security audit — clean", time: "3s", color: "text-emerald-400" },
+                  { who: "Bot", action: "Opens PR #43, marks ready for review", time: "0.3s", color: "text-emerald-400" },
+                  { who: "Lead", action: "Reviews one clean PR, approves", time: "10 min", color: "text-zinc-400" },
+                ].map((s, i) => (
+                  <div key={i} className="flex items-start gap-3 text-xs">
+                    <span className={`shrink-0 w-8 text-right font-mono ${s.who === "Bot" ? "text-emerald-600" : "text-zinc-600"}`}>{s.who}</span>
+                    <span className={`flex-1 ${s.color}`}>{s.action}</span>
+                    <span className="shrink-0 text-zinc-600 tabular-nums">{s.time}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5 pt-4 border-t border-emerald-500/10 flex items-center justify-between">
+                <span className="text-xs text-zinc-600">Total wall time</span>
+                <span className="text-sm font-bold text-emerald-400">~15 minutes</span>
+              </div>
+            </div>
+          </div>
+
+          <p className="mt-8 text-center text-sm text-text-muted">
+            That&apos;s 40x faster from ticket to merged PR — and the human only reviewed, never typed code.
+          </p>
+        </div>
+      </section>
+
       {/* Product Section 1: Intake */}
       <section className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-6xl px-6">
@@ -198,7 +280,9 @@ export default function Home() {
                   { label: "Triage", detail: "feature · medium priority", done: true },
                   { label: "Plan", detail: "5 files, 3 functions", done: true },
                   { label: "Implement", detail: "in progress...", done: false, active: true },
+                  { label: "Test", detail: "", done: false },
                   { label: "Review", detail: "", done: false },
+                  { label: "Security", detail: "", done: false },
                   { label: "PR", detail: "", done: false },
                 ].map((pass) => (
                   <div key={pass.label} className="flex items-center gap-2 text-[11px]">
@@ -236,7 +320,7 @@ export default function Home() {
             <p className="text-sm font-semibold text-purple-400 tracking-wider uppercase">Execute</p>
             <h2 className="mt-3 text-3xl font-bold sm:text-4xl">Multi-pass pipeline</h2>
             <p className="mx-auto mt-4 max-w-2xl text-text-secondary">
-              Triage → Plan → Implement → Review → PR → CI Fix → Feedback. Every change is self-reviewed before you see it.
+              Triage → Plan → Validate → Implement → Test → Review → Security → PR. Every change is self-reviewed and security-audited before you see it.
             </p>
           </div>
 
@@ -258,8 +342,8 @@ export default function Home() {
                 color: "#a855f7",
               },
               {
-                title: "Safety Agent",
-                desc: "Every implementation is reviewed by a safety agent. Violations are caught and revised automatically.",
+                title: "Security Audit",
+                desc: "OWASP-based security scan catches injection, XSS, SSRF, and supply chain risks. Violations are auto-remediated before PR.",
                 color: "#a855f7",
               },
               {
