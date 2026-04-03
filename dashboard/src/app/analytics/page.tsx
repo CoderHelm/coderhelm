@@ -139,6 +139,8 @@ function groupRunsByDay(runs: Run[], range: Range): { label: string; completed: 
       total_tokens_in: dayRuns.reduce((s, r) => s + (r.tokens_in ?? 0), 0),
       total_tokens_out: dayRuns.reduce((s, r) => s + (r.tokens_out ?? 0), 0),
       merge_rate: completed > 0 ? (merged / completed) * 100 : 0,
+      cost: dayRuns.reduce((s, r) => s + (r.cost_usd ?? 0), 0),
+      avg_duration: dayRuns.length > 0 ? dayRuns.reduce((s, r) => s + (r.duration_s ?? 0), 0) / dayRuns.length : 0,
     };
   });
 }
@@ -218,11 +220,12 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
         <KpiCard label="Runs" value={kpi.total_runs} />
         <KpiCard label="Merge rate" value={`${(kpi.merge_rate * 100).toFixed(0)}%`} />
         <KpiCard label="Run tokens" value={formatNumber(kpi.total_tokens_in + kpi.total_tokens_out)} />
         <KpiCard label="Plan tokens" value={formatNumber(planTokens)} />
+        <KpiCard label="Total cost" value={`$${kpi.total_cost_usd.toFixed(2)}`} />
         <KpiCard label="In progress" value={kpi.in_progress} />
       </div>
 
@@ -269,6 +272,36 @@ export default function AnalyticsPage() {
             </AreaChart>
           </ResponsiveContainer>
         </ChartCard>
+
+        {useDaily && (
+          <ChartCard title="Cost per day">
+            <ResponsiveContainer width="100%" height={240}>
+              <AreaChart data={chartData}>
+                <GradientDefs />
+                <CartesianGrid vertical={false} stroke="#27272a" strokeDasharray="3 3" />
+                <XAxis dataKey="label" {...axisProps} interval={range === "30d" ? 2 : 0} />
+                <YAxis {...axisProps} width={40} tickFormatter={(v: number) => `$${v.toFixed(2)}`} />
+                <Tooltip content={<ChartTooltip formatter={(v: number) => `$${v.toFixed(2)}`} />} cursor={{ stroke: "#3f3f46" }} />
+                <Area type="monotone" dataKey="cost" name="Cost" stroke={COLORS.purple.stroke} fill={COLORS.purple.fill} strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        )}
+
+        {useDaily && (
+          <ChartCard title="Avg duration per day">
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={chartData} barGap={2}>
+                <GradientDefs />
+                <CartesianGrid vertical={false} stroke="#27272a" strokeDasharray="3 3" />
+                <XAxis dataKey="label" {...axisProps} interval={range === "30d" ? 2 : 0} />
+                <YAxis {...axisProps} width={36} tickFormatter={(v: number) => `${Math.round(v / 60)}m`} />
+                <Tooltip content={<ChartTooltip formatter={(v: number) => `${Math.floor(v / 60)}m ${Math.round(v % 60)}s`} />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+                <Bar dataKey="avg_duration" name="Avg duration" fill={COLORS.cyan.stroke} radius={[4, 4, 0, 0]} maxBarSize={28} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        )}
       </div>
     </div>
   );
