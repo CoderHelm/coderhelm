@@ -180,12 +180,12 @@ export default function Home() {
                 <div className="absolute -inset-4 rounded-full bg-blue-500/10 agent-pulse" />
                 <div className="absolute -inset-8 rounded-full bg-blue-500/5 agent-pulse-delayed" />
                 <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-blue-500/30 bg-[#0d1117]">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="3" />
-                    <path d="M12 1v4" /><path d="M12 19v4" />
-                    <path d="M4.22 4.22l2.83 2.83" /><path d="M16.95 16.95l2.83 2.83" />
-                    <path d="M1 12h4" /><path d="M19 12h4" />
-                    <path d="M4.22 19.78l2.83-2.83" /><path d="M16.95 7.05l2.83-2.83" />
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="2" />
+                    <circle cx="4" cy="6" r="1.5" /><circle cx="20" cy="6" r="1.5" />
+                    <circle cx="4" cy="18" r="1.5" /><circle cx="20" cy="18" r="1.5" />
+                    <path d="M5.5 6.5L10 10.5" /><path d="M18.5 6.5L14 10.5" />
+                    <path d="M5.5 17.5L10 13.5" /><path d="M18.5 17.5L14 13.5" />
                   </svg>
                 </div>
                 <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-semibold text-blue-400">Orchestrator</div>
@@ -237,17 +237,11 @@ export default function Home() {
                 },
               ].map((agent, i) => (
                 <div key={agent.name} className="relative group">
-                  {/* Connector arrow (mobile: below, desktop: right) */}
-                  {i < 3 && (
-                    <div className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 z-10">
-                      <svg width="6" height="10" viewBox="0 0 6 10" fill="none"><path d="M1 1l4 4-4 4" stroke="#333" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                    </div>
-                  )}
-                  <div className="relative rounded-xl border border-zinc-800 bg-[#0d1117] p-5 h-full transition-all duration-300 hover:border-zinc-600 agent-card" style={{ "--agent-color": agent.color } as React.CSSProperties}>
+                  <div className="relative rounded-lg border border-zinc-800 bg-[#0d1117] p-5 h-full transition-all duration-300 hover:border-zinc-600 agent-card" style={{ "--agent-color": agent.color } as React.CSSProperties}>
                     {/* Top glow bar */}
                     <div className="absolute top-0 left-4 right-4 h-px" style={{ background: `linear-gradient(90deg, transparent, ${agent.color}40, transparent)` }} />
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl border" style={{ borderColor: `${agent.color}30`, color: agent.color, background: `${agent.color}08` }}>
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg border" style={{ borderColor: `${agent.color}30`, color: agent.color, background: `${agent.color}08` }}>
                         {agent.icon}
                       </div>
                       <div>
@@ -261,24 +255,7 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Center divider with animated data flow */}
-            <div className="my-4 flex items-center gap-3 px-4">
-              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-zinc-700 to-zinc-700" />
-              <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono">
-                <div className="flex gap-0.5">
-                  <span className="inline-block w-1 h-1 rounded-full bg-zinc-600 agent-flow-dot" />
-                  <span className="inline-block w-1 h-1 rounded-full bg-zinc-600 agent-flow-dot-2" />
-                  <span className="inline-block w-1 h-1 rounded-full bg-zinc-600 agent-flow-dot-3" />
-                </div>
-                state passes through
-                <div className="flex gap-0.5">
-                  <span className="inline-block w-1 h-1 rounded-full bg-zinc-600 agent-flow-dot" />
-                  <span className="inline-block w-1 h-1 rounded-full bg-zinc-600 agent-flow-dot-2" />
-                  <span className="inline-block w-1 h-1 rounded-full bg-zinc-600 agent-flow-dot-3" />
-                </div>
-              </div>
-              <div className="flex-1 h-px bg-gradient-to-l from-transparent via-zinc-700 to-zinc-700" />
-            </div>
+
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {[
@@ -316,7 +293,7 @@ export default function Home() {
                 {
                   name: "Ship",
                   color: "#22d3ee",
-                  desc: "Formats the PR in your team&apos;s voice, adds test evidence, and marks ready for review.",
+                  desc: "Formats the PR in your team\u2019s voice, adds test evidence, and marks ready for review.",
                   icon: (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22" />
@@ -325,15 +302,10 @@ export default function Home() {
                 },
               ].map((agent, i) => (
                 <div key={agent.name} className="relative group">
-                  {i < 3 && (
-                    <div className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 z-10">
-                      <svg width="6" height="10" viewBox="0 0 6 10" fill="none"><path d="M1 1l4 4-4 4" stroke="#333" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                    </div>
-                  )}
-                  <div className="relative rounded-xl border border-zinc-800 bg-[#0d1117] p-5 h-full transition-all duration-300 hover:border-zinc-600 agent-card" style={{ "--agent-color": agent.color } as React.CSSProperties}>
+                  <div className="relative rounded-lg border border-zinc-800 bg-[#0d1117] p-5 h-full transition-all duration-300 hover:border-zinc-600 agent-card" style={{ "--agent-color": agent.color } as React.CSSProperties}>
                     <div className="absolute top-0 left-4 right-4 h-px" style={{ background: `linear-gradient(90deg, transparent, ${agent.color}40, transparent)` }} />
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl border" style={{ borderColor: `${agent.color}30`, color: agent.color, background: `${agent.color}08` }}>
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg border" style={{ borderColor: `${agent.color}30`, color: agent.color, background: `${agent.color}08` }}>
                         {agent.icon}
                       </div>
                       <div>
@@ -356,10 +328,10 @@ export default function Home() {
 
           {/* The review loop — hero callout */}
           <div className="mt-14 relative">
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-blue-500/5" />
-            <div className="relative rounded-2xl border border-zinc-800 bg-[#0d1117] p-6 sm:p-8">
+            <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-blue-500/5" />
+            <div className="relative rounded-lg border border-zinc-800 bg-[#0d1117] p-6 sm:p-8">
               <div className="sm:flex sm:items-start sm:gap-6">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-blue-500/20 bg-blue-500/[0.06]">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/[0.06]">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M1 4v6h6" /><path d="M23 20v-6h-6" />
                     <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
