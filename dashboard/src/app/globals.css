@@ -2,6 +2,7 @@
 
 html {
   font-size: 18px;
+  color-scheme: dark;
 }
 
 button, [role="button"] {
@@ -42,14 +43,8 @@ button:disabled {
   animation: toast-in 0.15s ease-out;
 }
 
-/* Disable autofill highlight for dark theme (1Password, Chrome, Safari, etc) */
-@keyframes autofill-dark {
-  0%, 100% {
-    background: #18181b;
-    color: #e4e4e7;
-  }
-}
-
+/* Autofill styling for dark theme — color-scheme: dark on <html> tells Chrome
+   to use dark autofill colors natively. These rules are a fallback/refinement. */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
@@ -58,10 +53,6 @@ input:-webkit-autofill:active {
   box-shadow: 0 0 0 50px #18181b inset !important;
   -webkit-text-fill-color: #e4e4e7 !important;
   caret-color: #e4e4e7 !important;
-  -webkit-animation-name: autofill-dark !important;
-  animation-name: autofill-dark !important;
-  -webkit-animation-fill-mode: both !important;
-  animation-fill-mode: both !important;
   border-color: #3f3f46 !important;
 }
 
@@ -73,9 +64,5 @@ input:autofill:active {
   box-shadow: 0 0 0 50px #18181b inset !important;
   -webkit-text-fill-color: #e4e4e7 !important;
   caret-color: #e4e4e7 !important;
-  -webkit-animation-name: autofill-dark !important;
-  animation-name: autofill-dark !important;
-  -webkit-animation-fill-mode: both !important;
-  animation-fill-mode: both !important;
   border-color: #3f3f46 !important;
 }
