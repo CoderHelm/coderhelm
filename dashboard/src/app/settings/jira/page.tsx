@@ -279,16 +279,16 @@ function JiraAppTab({ check, config, setConfig, toast }: {
           <p className="text-zinc-400 text-sm mb-3">
             After installing, go to <strong className="text-zinc-200">Jira → Apps → Manage your apps → Coderhelm</strong> and enter your Team ID.
           </p>
-          {check?.installation_id ? (
+          {check?.team_id ? (
             <div className="space-y-3 p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
               <div>
                 <label className="text-xs text-zinc-500 mb-1 block">Team ID</label>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono">
-                    {String(check.installation_id)}
+                    {check.team_id}
                   </code>
-                  <button onClick={() => copy(String(check.installation_id), "install-id")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer">
-                    {copied === "install-id" ? "Copied!" : "Copy"}
+                  <button onClick={() => copy(check.team_id, "team-id")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer">
+                    {copied === "team-id" ? "Copied!" : "Copy"}
                   </button>
                 </div>
               </div>
