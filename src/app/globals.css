@@ -106,3 +106,34 @@ body {
   font-size: 13px !important;
   font-weight: 600;
 }
+
+/* ── Agent orchestra animations ──────────────────────────────────────────── */
+.agent-pulse {
+  animation: agent-pulse 3s ease-in-out infinite;
+}
+.agent-pulse-delayed {
+  animation: agent-pulse 3s ease-in-out infinite 1.5s;
+}
+@keyframes agent-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.08); }
+}
+
+.agent-card:hover {
+  box-shadow: 0 0 40px color-mix(in srgb, var(--agent-color) 8%, transparent);
+  border-color: color-mix(in srgb, var(--agent-color) 25%, #27272a) !important;
+}
+
+.agent-flow-dot {
+  animation: agent-flow 2s ease-in-out infinite;
+}
+.agent-flow-dot-2 {
+  animation: agent-flow 2s ease-in-out infinite 0.3s;
+}
+.agent-flow-dot-3 {
+  animation: agent-flow 2s ease-in-out infinite 0.6s;
+}
+@keyframes agent-flow {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
