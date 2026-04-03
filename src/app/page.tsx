@@ -388,24 +388,39 @@ export default function Home() {
                 Comments on PRs with live progress. Reads your feedback, pushes fixes.
               </p>
               <div className="mt-8 grid grid-cols-2 gap-4">
-                {[
-                  { name: "GitHub App", color: "#238636", items: ["Assign issues → get PRs", "Live PR progress", "Self-healing CI"] },
-                  { name: "Jira App", color: "#0052CC", items: ["Native Forge app", "Label + assign = PR", "Project sync"] },
-                ].map((app) => (
-                  <div key={app.name} className="rounded-lg bg-white/[0.03] p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-2 h-2 rounded-full" style={{ background: app.color }} />
-                      <span className="text-sm font-medium">{app.name}</span>
-                    </div>
-                    <ul className="space-y-1.5">
-                      {app.items.map((item) => (
-                        <li key={item} className="text-xs text-text-secondary flex items-center gap-1.5">
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={app.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><polyline points="20 6 9 17 4 12" /></svg> {item}
-                        </li>
-                      ))}
-                    </ul>
+                {/* GitHub App */}
+                <div className="rounded-lg bg-white/[0.03] p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#238636" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                      <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22" />
+                    </svg>
+                    <span className="text-sm font-medium">GitHub App</span>
                   </div>
-                ))}
+                  <ul className="space-y-1.5">
+                    {["Assign issues → get PRs", "Live PR progress", "Self-healing CI"].map((item) => (
+                      <li key={item} className="text-xs text-text-secondary flex items-center gap-1.5">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#238636" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><polyline points="20 6 9 17 4 12" /></svg> {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Jira App */}
+                <div className="rounded-lg bg-white/[0.03] p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0">
+                      <path d="M12.005 2L2 12.005l4.489 4.489a5.217 5.217 0 007.38 0l2.626-2.626-.01-.01L12.005 9.38l-2.626 2.626 2.626 2.626 2.626-2.626a1.065 1.065 0 000-1.506L12.005 7.874l4.49-4.49.01.01L22 8.874" stroke="#2684FF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span className="text-sm font-medium">Jira App</span>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {["Native Forge app", "Label + assign = PR", "Project sync"].map((item) => (
+                      <li key={item} className="text-xs text-text-secondary flex items-center gap-1.5">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#2684FF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><polyline points="20 6 9 17 4 12" /></svg> {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             </div>
 
