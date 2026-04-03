@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { api, type BillingInfo, type Banner, type TeamInfo } from "@/lib/api";
 import { pushToDataLayer } from "@/lib/gtm";
 import { ToastProvider } from "./toast";
@@ -396,6 +396,75 @@ function OverageBanner({ billing, onDismiss }: { billing: BillingInfo; onDismiss
   );
 }
 
+function TeamSwitcher({
+  teams,
+  currentTeam,
+  switching,
+  onSwitch,
+}: {
+  teams: TeamInfo[];
+  currentTeam: TeamInfo | null;
+  switching: boolean;
+  onSwitch: (teamId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const activeTeams = teams.filter((t) => t.status !== "deactivated");
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  if (activeTeams.length <= 1) return null;
+
+  return (
+    <div ref={ref} className="relative mb-3 pb-3 border-b border-zinc-800/60">
+      <button
+        onClick={() => setOpen(!open)}
+        disabled={switching}
+        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-zinc-800/50 transition-colors disabled:opacity-50"
+      >
+        <span className="w-5 h-5 rounded bg-blue-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
+          {(currentTeam?.org ?? "?").charAt(0).toUpperCase()}
+        </span>
+        <span className="text-xs font-medium text-zinc-200 truncate flex-1">{currentTeam?.org ?? "Select org"}</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-1 bg-zinc-900 border border-zinc-700 rounded-md shadow-xl z-50 py-1 max-h-48 overflow-y-auto">
+          {activeTeams.map((t) => (
+            <button
+              key={t.team_id}
+              onClick={() => { onSwitch(t.team_id); setOpen(false); }}
+              className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-xs transition-colors ${
+                t.team_id === currentTeam?.team_id
+                  ? "text-zinc-100 bg-zinc-800"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+              }`}
+            >
+              <span className="w-4 h-4 rounded bg-blue-600/80 flex items-center justify-center text-[9px] font-bold text-white shrink-0">
+                {t.org.charAt(0).toUpperCase()}
+              </span>
+              {t.org}
+              {t.team_id === currentTeam?.team_id && (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="ml-auto text-blue-400">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Sidebar({
   billing,
   user,
@@ -440,22 +509,7 @@ function Sidebar({
         <span className="text-sm font-semibold text-zinc-100">Coderhelm</span>
       </Link>
 
-      {teams.filter((t) => t.status !== "deactivated").length > 1 && (
-        <div className="mb-3 pb-3 border-b border-zinc-800/60">
-          <select
-            value={currentTeam?.team_id ?? ""}
-            onChange={(e) => handleSwitch(e.target.value)}
-            disabled={switching}
-            className="w-full px-2 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300 focus:outline-none focus:border-zinc-600 disabled:opacity-50"
-          >
-            {teams.filter((t) => t.status !== "deactivated").map((t) => (
-              <option key={t.team_id} value={t.team_id}>
-                {t.org}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+      <TeamSwitcher teams={teams} currentTeam={currentTeam ?? null} switching={switching} onSwitch={handleSwitch} />
 
       <div className="flex-1 space-y-4 overflow-y-auto min-h-0">
         {navGroups.map((group, index) => {
