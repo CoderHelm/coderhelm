@@ -547,7 +547,7 @@ function AddConnectionModal({
     }
     setSaving(true);
     try {
-      const result = await api.createAwsConnection(roleArn, region);
+      const result = await api.createAwsConnection(roleArn, region, cfnData?.external_id);
       if (result.error) {
         toast(result.message || "Failed to connect", "error");
       } else {

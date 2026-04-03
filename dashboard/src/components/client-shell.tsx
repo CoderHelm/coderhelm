@@ -410,6 +410,7 @@ function TeamSwitcher({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const activeTeams = teams.filter((t) => t.status !== "deactivated");
+  const canSwitch = activeTeams.length > 1;
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -419,41 +420,52 @@ function TeamSwitcher({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  if (activeTeams.length <= 1) return null;
+  if (!currentTeam) return null;
 
   return (
     <div ref={ref} className="relative mb-3 pb-3 border-b border-zinc-800/60">
+      <p className="px-2 mb-1.5 text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">Team</p>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={() => canSwitch && setOpen(!open)}
         disabled={switching}
-        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-zinc-800/50 transition-colors disabled:opacity-50"
+        className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors disabled:opacity-50 border ${
+          canSwitch
+            ? "hover:bg-zinc-800/60 border-zinc-800 cursor-pointer"
+            : "border-transparent cursor-default"
+        } ${open ? "bg-zinc-800/60 border-zinc-700" : ""}`}
       >
-        <span className="w-5 h-5 rounded bg-blue-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
-          {(currentTeam?.org ?? "?").charAt(0).toUpperCase()}
+        <span className="w-7 h-7 rounded-md bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-xs font-bold text-white shrink-0 shadow-sm">
+          {currentTeam.org.charAt(0).toUpperCase()}
         </span>
-        <span className="text-xs font-medium text-zinc-200 truncate flex-1">{currentTeam?.org ?? "Select org"}</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}>
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
+        <div className="flex-1 min-w-0">
+          <span className="text-sm font-medium text-zinc-100 truncate block">{currentTeam.org}</span>
+        </div>
+        {canSwitch && (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-500 shrink-0">
+            <polyline points="7 15 12 20 17 15" />
+            <polyline points="7 9 12 4 17 9" />
+          </svg>
+        )}
       </button>
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-zinc-900 border border-zinc-700 rounded-md shadow-xl z-50 py-1 max-h-48 overflow-y-auto">
+        <div className="absolute left-0 right-0 top-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl z-50 py-1 max-h-56 overflow-y-auto">
+          <p className="px-3 py-1.5 text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">Switch team</p>
           {activeTeams.map((t) => (
             <button
               key={t.team_id}
               onClick={() => { onSwitch(t.team_id); setOpen(false); }}
-              className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-xs transition-colors ${
-                t.team_id === currentTeam?.team_id
+              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${
+                t.team_id === currentTeam.team_id
                   ? "text-zinc-100 bg-zinc-800"
                   : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
               }`}
             >
-              <span className="w-4 h-4 rounded bg-blue-600/80 flex items-center justify-center text-[9px] font-bold text-white shrink-0">
+              <span className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
                 {t.org.charAt(0).toUpperCase()}
               </span>
-              {t.org}
-              {t.team_id === currentTeam?.team_id && (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="ml-auto text-blue-400">
+              <span className="truncate">{t.org}</span>
+              {t.team_id === currentTeam.team_id && (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="ml-auto text-blue-400 shrink-0">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               )}
