@@ -25,7 +25,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   // Auth
-  me: () => request<{ user_id: string; team_id: string; github_login: string | null; email: string; avatar_url: string; role: string; status?: string; auth_provider?: string }>("/api/me"),
+  me: () => request<{ user_id: string; team_id: string; github_login: string | null; email: string; avatar_url: string; role: string; status?: string; auth_provider?: string; mfa_enabled?: boolean }>("/api/me"),
   signup: (email: string, password: string) =>
     request<{ status: string; message: string }>("/auth/signup", { method: "POST", body: JSON.stringify({ email, password }) }),
   joinWaitlist: (email: string) =>
