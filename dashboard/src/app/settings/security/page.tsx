@@ -175,7 +175,7 @@ export default function SecurityPage() {
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 autofill:bg-zinc-900 autofill:text-zinc-100 [-webkit-text-fill-color:theme(colors.zinc.100)] [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_30px_theme(colors.zinc.900)_inset]"
             />
           </div>
           <div>
@@ -185,7 +185,7 @@ export default function SecurityPage() {
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="8+ characters"
-              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 autofill:bg-zinc-900 autofill:text-zinc-100 [-webkit-text-fill-color:theme(colors.zinc.100)] [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_30px_theme(colors.zinc.900)_inset]"
             />
           </div>
           <div>
@@ -195,7 +195,7 @@ export default function SecurityPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleChangePassword()}
-              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 autofill:bg-zinc-900 autofill:text-zinc-100 [-webkit-text-fill-color:theme(colors.zinc.100)] [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_30px_theme(colors.zinc.900)_inset]"
             />
           </div>
           <button
@@ -244,7 +244,7 @@ export default function SecurityPage() {
               value={mfaPassword}
               onChange={(e) => setMfaPassword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleMfaSetup()}
-              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 autofill:bg-zinc-900 autofill:text-zinc-100 [-webkit-text-fill-color:theme(colors.zinc.100)] [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_30px_theme(colors.zinc.900)_inset]"
             />
             <div className="flex gap-3">
               <button
@@ -290,13 +290,13 @@ export default function SecurityPage() {
 
             <div>
               <p className="text-xs text-zinc-500 mb-1.5">Or enter this secret manually:</p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono tracking-wider">
+              <div className="flex items-center gap-2 max-w-full">
+                <code className="flex-1 min-w-0 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono tracking-wider break-all select-all">
                   {mfaSecret}
                 </code>
                 <button
                   onClick={copySecret}
-                  className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer"
+                  className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer shrink-0"
                 >
                   {copied ? "Copied!" : "Copy"}
                 </button>
