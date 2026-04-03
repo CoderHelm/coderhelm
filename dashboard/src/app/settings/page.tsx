@@ -20,31 +20,56 @@ export default function SettingsPage() {
   const isBillingOrAbove = isAdminOrOwner || role === "billing";
   const isMemberOrAbove = isBillingOrAbove || role === "member";
 
-  const sections = [
-    { href: "/settings/guardrails", title: "Guardrails", description: "Must-rules Coderhelm always follows. Never pushes to main.", adminOnly: true },
-    { href: "/settings/voice", title: "Team Voice", description: "Control how Coderhelm writes — tone, commit style, PR format.", adminOnly: true },
-    { href: "/settings/instructions", title: "Custom Instructions", description: "Global conventions and preferences for all repos.", adminOnly: true },
-    { href: "/settings/repos", title: "Repositories", description: "Connected repos and their status.", memberOnly: true },
-    { href: "/settings/budget", title: "Budget", description: "Set a monthly spending cap to control overage costs.", billingOnly: true },
-    { href: "/settings/workflow", title: "Workflow", description: "Openspec output, commit behavior, and pipeline preferences.", adminOnly: true },
-    { href: "/settings/notifications", title: "Notifications", description: "Choose which emails Coderhelm sends you." },
-    { href: "/settings/team", title: "Team", description: "Invite members, assign roles, and manage who has access." },
-    { href: "/settings/security", title: "Security", description: "Change your password and enable two-factor authentication." },
+  const groups = [
+    {
+      label: "AI Configuration",
+      adminOnly: true,
+      items: [
+        { href: "/settings/guardrails", title: "Guardrails", description: "Must-rules Coderhelm always follows. Never pushes to main." },
+        { href: "/settings/voice", title: "Team Voice", description: "Control how Coderhelm writes — tone, commit style, PR format." },
+        { href: "/settings/instructions", title: "Custom Instructions", description: "Global conventions and preferences for all repos." },
+        { href: "/settings/workflow", title: "Workflow", description: "Openspec output, commit behavior, and pipeline preferences." },
+      ],
+    },
+    {
+      label: "Integrations",
+      adminOnly: true,
+      items: [
+        { href: "/settings/github", title: "GitHub", description: "Connected GitHub account and installed repositories." },
+        { href: "/settings/aws", title: "AWS", description: "Connect AWS accounts to analyze CloudWatch Logs and get recommendations." },
+        { href: "/settings/jira", title: "Jira", description: "Connect Jira to create tickets from plans and sync issue status." },
+        { href: "/settings/plugins", title: "MCP Servers", description: "Connect MCP servers like Figma, Sentry, and Linear." },
+      ],
+    },
+    {
+      label: "Team & Access",
+      items: [
+        { href: "/settings/repos", title: "Repositories", description: "Connected repos and their status.", memberOnly: true },
+        { href: "/settings/team", title: "Team", description: "Invite members, assign roles, and manage who has access." },
+        { href: "/settings/budget", title: "Budget", description: "Set a monthly spending cap to control overage costs.", billingOnly: true },
+      ],
+    },
+    {
+      label: "Account",
+      items: [
+        { href: "/settings/notifications", title: "Notifications", description: "Choose which emails Coderhelm sends you." },
+        { href: "/settings/security", title: "Security", description: "Change your password and enable two-factor authentication." },
+      ],
+    },
   ];
 
-  const integrations = [
-    { href: "/settings/github", title: "GitHub", description: "Connected GitHub account and installed repositories." },
-    { href: "/settings/aws", title: "AWS", description: "Connect AWS accounts to analyze CloudWatch Logs and get recommendations." },
-    { href: "/settings/jira", title: "Jira", description: "Connect Jira to create tickets from plans and sync issue status." },
-    { href: "/settings/plugins", title: "MCP Servers", description: "Connect MCP servers like Figma, Sentry, and Linear." },
-  ];
-
-  const visibleSections = sections.filter((s) => {
-    if ("adminOnly" in s && s.adminOnly) return isAdminOrOwner;
-    if ("billingOnly" in s && s.billingOnly) return isBillingOrAbove;
-    if ("memberOnly" in s && s.memberOnly) return isMemberOrAbove;
-    return true;
-  });
+  const visibleGroups = groups
+    .filter((g) => !("adminOnly" in g && g.adminOnly) || isAdminOrOwner)
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((s) => {
+        if ("adminOnly" in s && (s as { adminOnly?: boolean }).adminOnly) return isAdminOrOwner;
+        if ("billingOnly" in s && (s as { billingOnly?: boolean }).billingOnly) return isBillingOrAbove;
+        if ("memberOnly" in s && (s as { memberOnly?: boolean }).memberOnly) return isMemberOrAbove;
+        return true;
+      }),
+    }))
+    .filter((g) => g.items.length > 0);
 
   const handleReset = async () => {
     if (confirmText !== "DELETE") return;
@@ -64,36 +89,24 @@ export default function SettingsPage() {
   return (
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-6">Settings</h1>
-      <div className="space-y-3">
-        {visibleSections.map((s) => (
-          <Link
-            key={s.href}
-            href={s.href}
-            className="block px-4 py-4 bg-zinc-900/50 border border-zinc-800 rounded-lg hover:border-zinc-700 transition-colors"
-          >
-            <h3 className="text-sm font-medium text-zinc-100">{s.title}</h3>
-            <p className="text-xs text-zinc-500 mt-1">{s.description}</p>
-          </Link>
-        ))}
-      </div>
 
-      {isAdminOrOwner && (
-      <>
-      <h2 className="text-lg font-semibold mt-10 mb-3">Integrations</h2>
-      <div className="space-y-3">
-        {integrations.map((s) => (
-          <Link
-            key={s.href}
-            href={s.href}
-            className="block px-4 py-4 bg-zinc-900/50 border border-zinc-800 rounded-lg hover:border-zinc-700 transition-colors"
-          >
-            <h3 className="text-sm font-medium text-zinc-100">{s.title}</h3>
-            <p className="text-xs text-zinc-500 mt-1">{s.description}</p>
-          </Link>
-        ))}
-      </div>
-      </>
-      )}
+      {visibleGroups.map((group, gi) => (
+        <div key={group.label} className={gi > 0 ? "mt-8" : ""}>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">{group.label}</h2>
+          <div className="space-y-3">
+            {group.items.map((s) => (
+              <Link
+                key={s.href}
+                href={s.href}
+                className="block px-4 py-4 bg-zinc-900/50 border border-zinc-800 rounded-lg hover:border-zinc-700 transition-colors"
+              >
+                <h3 className="text-sm font-medium text-zinc-100">{s.title}</h3>
+                <p className="text-xs text-zinc-500 mt-1">{s.description}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ))}
 
       {/* Danger zone */}
       {isAdminOrOwner && (

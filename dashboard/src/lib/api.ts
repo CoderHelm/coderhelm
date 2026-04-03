@@ -80,6 +80,11 @@ export const api = {
   getStats: () => request<{ month: Stats; all_time: Stats }>("/api/stats"),
   getStatsHistory: () => request<{ months: MonthStats[] }>("/api/stats/history"),
 
+  // GitHub App installation
+  getInstallationStatus: () => request<{ status: string; github_org?: string; installation_id?: number }>("/api/github/installation-status"),
+  linkGithubInstallation: (installation_id: number) =>
+    request<{ status?: string; error?: string; github_org?: string; installation_id?: number; repos_synced?: number }>("/api/github/link-installation", { method: "POST", body: JSON.stringify({ installation_id }) }),
+
   // Rules (guardrails)
   getGlobalRules: () => request<{ rules: string[] }>("/api/rules/global"),
   updateGlobalRules: (rules: string[]) => request<void>("/api/rules/global", { method: "PUT", body: JSON.stringify({ rules }) }),
