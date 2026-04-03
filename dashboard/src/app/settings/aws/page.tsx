@@ -162,31 +162,44 @@ function AwsConnectionsPage() {
               <p className="text-sm text-zinc-500">No pending recommendations.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {recommendations.map((rec) => (
-                <div key={rec.rec_id} className="border border-zinc-800 rounded-lg bg-zinc-900/50 p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-medium text-zinc-100">{rec.title}</h3>
-                      <p className="text-xs text-zinc-500 mt-1">{rec.summary}</p>
-                      {rec.source_log_group && (
-                        <p className="text-[10px] text-zinc-600 mt-1 font-mono">{rec.source_log_group}</p>
-                      )}
-                    </div>
-                    <div className="flex gap-2 shrink-0">
-                      <button
-                        onClick={() => handleCreatePlan(rec.rec_id)}
-                        className="px-3 py-1.5 text-xs bg-white text-zinc-900 rounded-md font-medium hover:bg-zinc-200 transition-colors cursor-pointer"
-                      >
-                        Create Plan
-                      </button>
-                      <button
-                        onClick={() => handleDismiss(rec.rec_id)}
-                        className="px-3 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-md text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
-                      >
-                        Dismiss
-                      </button>
-                    </div>
+            <div className="space-y-5">
+              {Object.entries(
+                recommendations.reduce<Record<string, Recommendation[]>>((groups, rec) => {
+                  const key = rec.source_log_group || "Other";
+                  (groups[key] ??= []).push(rec);
+                  return groups;
+                }, {})
+              ).map(([logGroup, recs]) => (
+                <div key={logGroup}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-[11px] font-mono text-zinc-500 truncate">{logGroup}</span>
+                    <span className="text-[10px] text-zinc-600">{recs.length}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {recs.map((rec) => (
+                      <div key={rec.rec_id} className="border border-zinc-800 rounded-lg bg-zinc-900/50 p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-medium text-zinc-100">{rec.title}</h3>
+                            <p className="text-xs text-zinc-500 mt-1">{rec.summary}</p>
+                          </div>
+                          <div className="flex gap-2 shrink-0">
+                            <button
+                              onClick={() => handleCreatePlan(rec.rec_id)}
+                              className="px-3 py-1.5 text-xs bg-white text-zinc-900 rounded-md font-medium hover:bg-zinc-200 transition-colors cursor-pointer"
+                            >
+                              Create Plan
+                            </button>
+                            <button
+                              onClick={() => handleDismiss(rec.rec_id)}
+                              className="px-3 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-md text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
