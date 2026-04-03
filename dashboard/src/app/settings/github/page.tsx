@@ -1,28 +1,114 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { api, type Repo } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
 import { RoleGuard } from "@/components/role-guard";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
+const GITHUB_APP_INSTALL_URL = "https://github.com/apps/coderhelm/installations/new";
+const STATE_STORAGE_KEY = "gh_install_state";
 
-export default function GitHubSettingsPageGuarded() { return <RoleGuard minRole="admin"><GitHubSettingsPage /></RoleGuard>; }
+export default function GitHubSettingsPageGuarded() {
+  return <RoleGuard minRole="admin"><GitHubSettingsPage /></RoleGuard>;
+}
+
+type InstallStatus = "not_connected" | "connected" | "linking";
 
 function GitHubSettingsPage() {
+  const searchParams = useSearchParams();
   const [login, setLogin] = useState<string | null>(null);
   const [repos, setRepos] = useState<Repo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<InstallStatus>("not_connected");
+  const [githubOrg, setGithubOrg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [linkResult, setLinkResult] = useState<string | null>(null);
 
-  useEffect(() => {
-    Promise.all([api.me(), api.listRepos()])
-      .then(([me, r]) => {
-        setLogin(me.github_login);
-        setRepos(r.repos);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  const loadStatus = useCallback(async () => {
+    try {
+      const [me, repoData, installStatus] = await Promise.all([
+        api.me(),
+        api.listRepos(),
+        api.getInstallationStatus(),
+      ]);
+      setLogin(me.github_login);
+      setRepos(repoData.repos);
+      if (installStatus.status === "connected") {
+        setStatus("connected");
+        setGithubOrg(installStatus.github_org ?? null);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  // On mount: load status, then check for ?installation_id redirect
+  useEffect(() => {
+    loadStatus().then(() => {
+      const installationId = searchParams.get("installation_id");
+      const setupAction = searchParams.get("setup_action");
+      const returnedState = searchParams.get("state");
+
+      if (!installationId) return;
+
+      // Validate CSRF state parameter
+      const savedState = sessionStorage.getItem(STATE_STORAGE_KEY);
+      sessionStorage.removeItem(STATE_STORAGE_KEY);
+
+      if (!savedState || savedState !== returnedState) {
+        setError("Invalid state parameter. Please try installing again.");
+        // Clean URL
+        window.history.replaceState({}, "", "/settings/github");
+        return;
+      }
+
+      // Clean URL
+      window.history.replaceState({}, "", "/settings/github");
+
+      if (setupAction === "request") {
+        // Org admin hasn't approved yet — show pending message
+        setError(null);
+        setLinkResult("Installation request sent. Your GitHub organization admin needs to approve the app. The connection will be established automatically once approved.");
+        return;
+      }
+
+      // Link the installation
+      const id = parseInt(installationId, 10);
+      if (isNaN(id)) {
+        setError("Invalid installation ID.");
+        return;
+      }
+
+      setStatus("linking");
+      setError(null);
+      api.linkGithubInstallation(id).then((result) => {
+        if (result.error) {
+          setError(result.error);
+          setStatus("not_connected");
+        } else {
+          setStatus("connected");
+          setGithubOrg(result.github_org ?? null);
+          setLinkResult(`Connected to ${result.github_org}. ${result.repos_synced ?? 0} repositories synced.`);
+          // Refresh repos
+          api.listRepos().then((r) => setRepos(r.repos)).catch(() => {});
+        }
+      }).catch((e) => {
+        setError(e.message || "Failed to link installation.");
+        setStatus("not_connected");
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleInstallClick = () => {
+    // Generate CSRF state token and store in sessionStorage
+    const state = crypto.randomUUID();
+    sessionStorage.setItem(STATE_STORAGE_KEY, state);
+    window.location.href = `${GITHUB_APP_INSTALL_URL}?state=${state}`;
+  };
 
   if (loading) {
     return (
@@ -41,12 +127,25 @@ function GitHubSettingsPage() {
       <a href="/settings" className="text-zinc-500 hover:text-zinc-300 text-sm">← Settings</a>
       <h1 className="text-2xl font-bold mt-4 mb-6">GitHub</h1>
 
+      {/* Error banner */}
+      {error && (
+        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400">
+          {error}
+        </div>
+      )}
+
+      {/* Success / info banner */}
+      {linkResult && !error && (
+        <div className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-400">
+          {linkResult}
+        </div>
+      )}
+
+      {/* Connected account */}
       <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
         <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-800 text-zinc-300">
-            <svg className="w-6 h-6" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-            </svg>
+            <GitHubIcon className="w-6 h-6" />
           </div>
           <div className="flex-1">
             <p className="text-xs text-zinc-500 uppercase tracking-wider">Connected account</p>
@@ -59,34 +158,61 @@ function GitHubSettingsPage() {
             </span>
           ) : (
             <a
-              href={`${API_BASE}/auth/github`}
+              href={`${process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com"}/auth/github`}
               className="inline-flex items-center gap-2 rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-100 hover:bg-zinc-700 transition-colors"
             >
-              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-              </svg>
+              <GitHubIcon className="w-4 h-4" />
               Connect GitHub
             </a>
           )}
         </div>
       </div>
 
+      {/* GitHub App installation status */}
       {login && (
         <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
           <h3 className="text-sm font-medium text-zinc-300 mb-2">GitHub App</h3>
-          <p className="text-xs text-zinc-500 mb-3">Install the Coderhelm GitHub App to grant access to your repositories.</p>
-          <a
-            href="https://github.com/apps/coderhelm/installations/new"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
-          >
-            Install GitHub App
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-          </a>
+
+          {status === "connected" ? (
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-xs font-medium">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                Installed
+              </span>
+              {githubOrg && (
+                <span className="text-sm text-zinc-400">
+                  on <span className="font-mono text-zinc-200">{githubOrg}</span>
+                </span>
+              )}
+            </div>
+          ) : status === "linking" ? (
+            <div className="flex items-center gap-2 text-sm text-zinc-400">
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Linking installation…
+            </div>
+          ) : (
+            <>
+              <p className="text-xs text-zinc-500 mb-3">
+                Install the CoderHelm GitHub App to grant access to your repositories.
+              </p>
+              <button
+                onClick={handleInstallClick}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+              >
+                Install GitHub App
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </button>
+            </>
+          )}
         </div>
       )}
 
+      {/* Repositories */}
       <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
         <h3 className="text-sm font-medium text-zinc-300 mb-3">Repositories ({enabledRepos.length} active)</h3>
         {enabledRepos.length === 0 ? (
@@ -117,5 +243,13 @@ function GitHubSettingsPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+function GitHubIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 16 16" fill="currentColor">
+      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+    </svg>
   );
 }
