@@ -440,6 +440,23 @@ function Sidebar({
         <span className="text-sm font-semibold text-zinc-100">Coderhelm</span>
       </Link>
 
+      {teams.filter((t) => t.status !== "deactivated").length > 1 && (
+        <div className="mb-3 pb-3 border-b border-zinc-800/60">
+          <select
+            value={currentTeam?.team_id ?? ""}
+            onChange={(e) => handleSwitch(e.target.value)}
+            disabled={switching}
+            className="w-full px-2 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300 focus:outline-none focus:border-zinc-600 disabled:opacity-50"
+          >
+            {teams.filter((t) => t.status !== "deactivated").map((t) => (
+              <option key={t.team_id} value={t.team_id}>
+                {t.org}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="flex-1 space-y-4 overflow-y-auto min-h-0">
         {navGroups.map((group, index) => {
           const isAdminOrOwner = user?.role === "admin" || user?.role === "owner";
@@ -522,23 +539,6 @@ function Sidebar({
 
       {user && (
         <div className="mt-3 pt-3 border-t border-zinc-800/60 shrink-0">
-          {teams.filter((t) => t.status !== "deactivated").length > 1 && (
-            <div className="mb-3">
-              <p className="text-xs text-zinc-600 mb-1.5 px-1">Organization</p>
-              <select
-                value={currentTeam?.team_id ?? ""}
-                onChange={(e) => handleSwitch(e.target.value)}
-                disabled={switching}
-                className="w-full px-2 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300 focus:outline-none focus:border-zinc-600 disabled:opacity-50"
-              >
-                {teams.filter((t) => t.status !== "deactivated").map((t) => (
-                  <option key={t.team_id} value={t.team_id}>
-                    {t.org}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
           <div className="flex items-center gap-2">
           {user.avatar_url ? (
             // eslint-disable-next-line @next/next/no-img-element
