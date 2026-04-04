@@ -115,6 +115,11 @@ async function fetchStreamToken(signal?: AbortSignal): Promise<string> {
   return token;
 }
 
+/** Warm the token cache so the first message doesn't pay the RTT. */
+export function prefetchStreamToken(): void {
+  fetchStreamToken().catch(() => {});
+}
+
 // ---------------------------------------------------------------------------
 // Stream chat
 // ---------------------------------------------------------------------------

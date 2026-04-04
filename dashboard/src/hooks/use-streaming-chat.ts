@@ -113,9 +113,9 @@ export function useStreamingChat(): UseStreamingChatReturn {
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  // rAF-throttled update for streaming message
+  // 200ms-throttled update for streaming message (avoids 60fps markdown reparse)
   const pendingParts = useRef<MessagePart[]>([]);
-  const rafId = useRef<number | undefined>(undefined);
+  const flushTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const streamingMsgId = useRef<string>("");
 
   // Persist messages (skip while streaming)
@@ -126,6 +126,10 @@ export function useStreamingChat(): UseStreamingChatReturn {
   }, [messages, status]);
 
   const flushParts = useCallback(() => {
+    if (flushTimer.current) {
+      clearTimeout(flushTimer.current);
+      flushTimer.current = undefined;
+    }
     if (pendingParts.current.length === 0) return;
     const parts = [...pendingParts.current];
     pendingParts.current = [];
@@ -143,11 +147,11 @@ export function useStreamingChat(): UseStreamingChatReturn {
   }, []);
 
   const scheduleFlush = useCallback(() => {
-    if (!rafId.current) {
-      rafId.current = requestAnimationFrame(() => {
-        rafId.current = undefined;
+    if (!flushTimer.current) {
+      flushTimer.current = setTimeout(() => {
+        flushTimer.current = undefined;
         flushParts();
-      });
+      }, 200);
     }
   }, [flushParts]);
 
