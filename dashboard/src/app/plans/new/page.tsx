@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
 import { useRouter } from "next/navigation";
-import { api, type BillingInfo, type Repo } from "@/lib/api";
+import { api, type BillingInfo, type Repo, type Template } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { ChatMarkdown } from "@/components/chat-markdown";
 import { useStreamingChat, messageText, messageServers } from "@/hooks/use-streaming-chat";
@@ -339,6 +339,8 @@ export default function NewPlanPage() {
   const [billingLoading, setBillingLoading] = useState(true);
   const [destination, setDestination] = useState<"github" | "jira">("github");
   const [repos, setRepos] = useState<Repo[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [usingTemplate, setUsingTemplate] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -355,6 +357,7 @@ export default function NewPlanPage() {
       .finally(() => setBillingLoading(false));
     api.getWorkflowSettings().then((s) => setDestination(s.default_destination ?? "github")).catch(() => {});
     api.listRepos().then((r) => setRepos(r.repos.filter((repo) => repo.enabled))).catch(() => {});
+    api.listTemplates({ limit: 6 }).then((data) => setTemplates(data.templates)).catch(() => {});
   }, []);
 
   const plansEnabled = billingLoading || billing?.subscription_status === "active";
@@ -457,6 +460,17 @@ export default function NewPlanPage() {
     return () => window.removeEventListener("keydown", handler);
   }, [status, stop, clear, input, messages, editAndResend]);
 
+  const handleUseTemplate = async (templateId: string) => {
+    setUsingTemplate(templateId);
+    try {
+      const { plan_id } = await api.useTemplate(templateId, {});
+      router.push(`/plans/detail?id=${plan_id}`);
+    } catch {
+      toast("Failed to create plan from template", "error");
+      setUsingTemplate(null);
+    }
+  };
+
   if (!plansEnabled) {
     return (
       <div className="max-w-2xl">
@@ -506,6 +520,30 @@ export default function NewPlanPage() {
           <div className="px-3 py-2 mb-2 text-xs text-zinc-500 bg-zinc-900/50 border border-zinc-800 rounded-lg">
             Responses are AI-generated and may contain errors. Review all suggestions carefully.
           </div>
+
+          {messages.length === 0 && templates.length > 0 && (
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-zinc-600">Quick start from a template</p>
+                <a href="/plans/templates" className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
+                  View all →
+                </a>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {templates.map((t) => (
+                  <button
+                    key={t.template_id}
+                    onClick={() => handleUseTemplate(t.template_id)}
+                    disabled={usingTemplate === t.template_id}
+                    className="text-left p-3 rounded-lg border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800/50 transition-colors disabled:opacity-50"
+                  >
+                    <div className="text-sm font-medium text-zinc-300 truncate">{t.title}</div>
+                    <div className="text-xs text-zinc-600 mt-0.5">{t.task_count} tasks · Used {t.usage_count}×</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div ref={scrollContainerRef} className="flex-1 overflow-y-auto space-y-4 pb-4 pr-2">
             {messages.map((msg) =>
