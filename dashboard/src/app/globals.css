@@ -43,8 +43,15 @@ button:disabled {
   animation: toast-in 0.15s ease-out;
 }
 
-/* Autofill styling for dark theme — color-scheme: dark on <html> tells Chrome
-   to use dark autofill colors natively. These rules are a fallback/refinement. */
+/* Force dark autofill — covers Chrome native autofill AND extension fills
+   (1Password, LastPass, Bitwarden etc.) that inject via JS/inline styles. */
+@keyframes autofill-dark {
+  0%, 100% {
+    background-color: #18181b;
+    color: #e4e4e7;
+  }
+}
+
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
@@ -57,7 +64,12 @@ input:-webkit-autofill:active {
   background-color: #18181b !important;
   -webkit-background-clip: text !important;
   background-clip: text !important;
-  transition: background-color 5000s ease-in-out 0s !important;
+  -webkit-animation-name: autofill-dark;
+  -webkit-animation-fill-mode: both;
+  animation-name: autofill-dark;
+  animation-fill-mode: both;
+  transition: background-color 0s 0s, color 0s 0s;
+  transition-delay: calc(infinity * 1s);
 }
 
 input:autofill,
@@ -72,5 +84,21 @@ input:autofill:active {
   background-color: #18181b !important;
   -webkit-background-clip: text !important;
   background-clip: text !important;
-  transition: background-color 5000s ease-in-out 0s !important;
+  -webkit-animation-name: autofill-dark;
+  -webkit-animation-fill-mode: both;
+  animation-name: autofill-dark;
+  animation-fill-mode: both;
+  transition: background-color 0s 0s, color 0s 0s;
+  transition-delay: calc(infinity * 1s);
+}
+
+/* 1Password, LastPass, Bitwarden fill via JS — target their data attributes */
+input[data-com-onepassword-filled],
+input[data-lpignore],
+input[data-bwautofill],
+input[data-autocompleted] {
+  -webkit-box-shadow: 0 0 0 50px #18181b inset !important;
+  box-shadow: 0 0 0 50px #18181b inset !important;
+  -webkit-text-fill-color: #e4e4e7 !important;
+  background-color: #18181b !important;
 }
