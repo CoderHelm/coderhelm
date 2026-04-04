@@ -695,6 +695,26 @@ function PlanDetail() {
                           View run
                         </Link>
                       )}
+                      {task.status === "failed" && (
+                        <button
+                          onClick={async () => {
+                            setActionLoading(task.task_id + ":retry");
+                            try {
+                              await api.forceRunTask(plan.plan_id, task.task_id);
+                              toast("Task retried");
+                              api.getPlan(plan.plan_id).then(setPlan);
+                            } catch {
+                              toast("Failed to retry task", "error");
+                            }
+                            setActionLoading(null);
+                          }}
+                          disabled={actionLoading === task.task_id + ":retry"}
+                          className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer"
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5"><path d="M2 8a6 6 0 0111.47-2.5M14 8a6 6 0 01-11.47 2.5" /><path d="M14 2v4h-4M2 14v-4h4" /></svg>
+                          {actionLoading === task.task_id + ":retry" ? "Retrying…" : "Retry"}
+                        </button>
+                      )}
                       {task.repo && (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-zinc-800/50 rounded text-[10px] text-zinc-500 font-mono">
                           <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" className="opacity-40"><path d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1h-8a1 1 0 00-1 1v6.708A2.486 2.486 0 014.5 9h8.5V1.5zm-8 11a1 1 0 100-2 1 1 0 000 2z"/></svg>
