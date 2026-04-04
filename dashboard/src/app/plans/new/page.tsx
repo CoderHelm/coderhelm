@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
 import { useRouter } from "next/navigation";
 import { api, type BillingInfo } from "@/lib/api";
 import { useToast } from "@/components/toast";
@@ -134,7 +134,7 @@ function MessageCopyButton({ text }: { text: string }) {
 // Editable user message bubble
 // ---------------------------------------------------------------------------
 
-function EditableUserBubble({
+const EditableUserBubble = memo(function EditableUserBubble({
   msg,
   onEdit,
   disabled,
@@ -220,13 +220,13 @@ function EditableUserBubble({
       </div>
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Message bubble — renders multi-part messages
 // ---------------------------------------------------------------------------
 
-function MessageBubble({ msg }: { msg: StreamMessage }) {
+const MessageBubble = memo(function MessageBubble({ msg }: { msg: StreamMessage }) {
   const isUser = msg.role === "user";
   const textContent = messageText(msg);
   const servers = messageServers(msg);
@@ -324,7 +324,7 @@ function MessageBubble({ msg }: { msg: StreamMessage }) {
       </div>
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Main page
@@ -355,12 +355,14 @@ export default function NewPlanPage() {
     api.getWorkflowSettings().then((s) => setDestination(s.default_destination ?? "github")).catch(() => {});
   }, []);
 
-  const plansEnabled = billing?.subscription_status === "active";
+  const plansEnabled = billingLoading || billing?.subscription_status === "active";
 
   // Parse draft plan from latest assistant message (memoized)
   const lastAssistantText = useMemo(() => {
-    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
-    return lastAssistant ? messageText(lastAssistant) : "";
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant") return messageText(messages[i]);
+    }
+    return "";
   }, [messages]);
   const isStreamingPlan = (status === "streaming" || status === "submitted") && lastAssistantText.includes("```json") && !lastAssistantText.includes("\n```\n");
 
@@ -369,27 +371,31 @@ export default function NewPlanPage() {
     if (parsed) setDraft(parsed);
   }, [lastAssistantText]);
 
-  // Parse partial plan during streaming for incremental task display
-  const streamingPartialPlan = useMemo(() => {
-    if (!isStreamingPlan) return null;
-    return parsePartialPlan(lastAssistantText);
+  // Parse partial plan during streaming for incremental task display (throttled)
+  const [streamingPartialPlan, setStreamingPartialPlan] = useState<ReturnType<typeof parsePartialPlan>>(null);
+  const lastParseRef = useRef(0);
+
+  useEffect(() => {
+    if (!isStreamingPlan) {
+      setStreamingPartialPlan(null);
+      return;
+    }
+    const now = Date.now();
+    if (now - lastParseRef.current < 200) return;
+    lastParseRef.current = now;
+    setStreamingPartialPlan(parsePartialPlan(lastAssistantText));
   }, [isStreamingPlan, lastAssistantText]);
 
-  // Auto-scroll on new content
+  // Auto-scroll on new content (merged: new messages + streaming updates)
   const prevMsgCount = useRef(messages.length);
   useEffect(() => {
     if (messages.length !== prevMsgCount.current) {
       prevMsgCount.current = messages.length;
       onNewContent();
-    }
-  }, [messages, onNewContent]);
-
-  // Scroll on streaming updates — use instant scroll to avoid visual lag
-  useEffect(() => {
-    if (status === "streaming") {
+    } else if (status === "streaming") {
       onNewContent(true);
     }
-  }, [status, messages, onNewContent]);
+  }, [messages, status, onNewContent]);
 
   const handleSend = useCallback(() => {
     if (!input.trim()) return;
@@ -448,10 +454,6 @@ export default function NewPlanPage() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [status, stop, clear, input, messages, editAndResend]);
-
-  if (billingLoading) {
-    return <div className="text-sm text-zinc-500">Loading...</div>;
-  }
 
   if (!plansEnabled) {
     return (

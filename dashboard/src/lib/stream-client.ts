@@ -85,8 +85,15 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 // Token fetch
 // ---------------------------------------------------------------------------
 
-/** Fetch a short-lived stream token from the gateway. */
+// Token cache — avoids re-fetching on every message send
+let cachedToken: { token: string; expiresAt: number } | null = null;
+
+/** Fetch a short-lived stream token from the gateway (cached for 4 min). */
 async function fetchStreamToken(signal?: AbortSignal): Promise<string> {
+  if (cachedToken && Date.now() < cachedToken.expiresAt) {
+    return cachedToken.token;
+  }
+
   assertOnline();
 
   const res = await withTimeout(
@@ -104,6 +111,7 @@ async function fetchStreamToken(signal?: AbortSignal): Promise<string> {
     throw new Error(friendlyError(res.status));
   }
   const { token } = await res.json();
+  cachedToken = { token, expiresAt: Date.now() + 4 * 60 * 1000 };
   return token;
 }
 
