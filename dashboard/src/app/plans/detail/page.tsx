@@ -460,6 +460,18 @@ function PlanDetail() {
         </div>
       )}
 
+      {(() => {
+        const uniqueRepos = [...new Set(plan.tasks.map((t) => t.repo || plan.repo).filter(Boolean))];
+        return uniqueRepos.length > 1 ? (
+          <div className="flex items-center gap-2 text-xs text-zinc-500 mb-3">
+            <span>Multi-repo plan:</span>
+            {uniqueRepos.map((r) => (
+              <span key={r} className="px-1.5 py-0.5 bg-zinc-800/50 rounded font-mono text-[10px]">{r}</span>
+            ))}
+          </div>
+        ) : null;
+      })()}
+
       <div className="relative">
         {/* Vertical connector line */}
         {plan.tasks.length > 1 && (
@@ -549,7 +561,12 @@ function PlanDetail() {
                           View run
                         </Link>
                       )}
-                      {task.repo && <span className="text-xs text-zinc-600 font-mono">{task.repo}</span>}
+                      {task.repo && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-zinc-800/50 rounded text-[10px] text-zinc-500 font-mono">
+                          <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" className="opacity-40"><path d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1h-8a1 1 0 00-1 1v6.708A2.486 2.486 0 014.5 9h8.5V1.5zm-8 11a1 1 0 100-2 1 1 0 000 2z"/></svg>
+                          {task.repo}
+                        </span>
+                      )}
                       {task.approved_by && <span className="text-xs text-zinc-600">approved by {task.approved_by}</span>}
                       {task.status === "running" && <span className="text-xs text-blue-400 animate-pulse">Processing…</span>}
                       {task.depends_on && (() => {

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
 import { useRouter } from "next/navigation";
-import { api, type BillingInfo } from "@/lib/api";
+import { api, type BillingInfo, type Repo } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { ChatMarkdown } from "@/components/chat-markdown";
 import { useStreamingChat, messageText, messageServers } from "@/hooks/use-streaming-chat";
@@ -338,6 +338,7 @@ export default function NewPlanPage() {
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [billingLoading, setBillingLoading] = useState(true);
   const [destination, setDestination] = useState<"github" | "jira">("github");
+  const [repos, setRepos] = useState<Repo[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -353,6 +354,7 @@ export default function NewPlanPage() {
       .catch(() => {})
       .finally(() => setBillingLoading(false));
     api.getWorkflowSettings().then((s) => setDestination(s.default_destination ?? "github")).catch(() => {});
+    api.listRepos().then((r) => setRepos(r.repos.filter((repo) => repo.enabled))).catch(() => {});
   }, []);
 
   const plansEnabled = billingLoading || billing?.subscription_status === "active";
@@ -541,6 +543,17 @@ export default function NewPlanPage() {
           )}
 
           {/* Input bar */}
+          {repos.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 px-1 pb-2">
+              <span className="text-[10px] text-zinc-600 self-center">Repos:</span>
+              {repos.map((r) => (
+                <span key={r.name} className="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-800/50 border border-zinc-700/50 rounded text-[11px] text-zinc-500 font-mono">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" className="opacity-50"><path d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1h-8a1 1 0 00-1 1v6.708A2.486 2.486 0 014.5 9h8.5V1.5zm-8 11a1 1 0 100-2 1 1 0 000 2z"/></svg>
+                  {r.name}
+                </span>
+              ))}
+            </div>
+          )}
           <div className="flex gap-2 pt-3 border-t border-zinc-800">
             <textarea
               ref={inputRef}
