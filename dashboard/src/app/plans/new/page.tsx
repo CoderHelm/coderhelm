@@ -6,6 +6,7 @@ import { api, type BillingInfo, type Repo, type Template } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { ChatMarkdown } from "@/components/chat-markdown";
 import { useStreamingChat, messageText, messageServers } from "@/hooks/use-streaming-chat";
+import { prefetchStreamToken } from "@/lib/stream-client";
 import type { StreamMessage, ToolCallPart, ThinkingPart, TextPart } from "@/lib/stream-types";
 import { ThinkingBlock } from "@/components/thinking-block";
 import { ToolCallCard } from "@/components/tool-call-card";
@@ -348,8 +349,9 @@ export default function NewPlanPage() {
 
   const { sentinelRef, showPill, scrollToBottom, onNewContent } = useSmartScroll(scrollContainerRef);
 
-  // Load billing + workflow settings
+  // Load billing + workflow settings + prefetch stream token
   useEffect(() => {
+    prefetchStreamToken();
     api
       .getBilling()
       .then((b) => setBilling(b))
