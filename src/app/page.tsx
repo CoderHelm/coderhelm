@@ -419,8 +419,11 @@ export default function Home() {
                 {/* Jira App */}
                 <div className="rounded-lg bg-white/[0.03] p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0">
-                      <path d="M12.005 2L2 12.005l4.489 4.489a5.217 5.217 0 007.38 0l2.626-2.626-.01-.01L12.005 9.38l-2.626 2.626 2.626 2.626 2.626-2.626a1.065 1.065 0 000-1.506L12.005 7.874l4.49-4.49.01.01L22 8.874" stroke="#2684FF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <svg width="16" height="16" viewBox="0 0 256 256" className="shrink-0">
+                      <defs><linearGradient id="jira-grad" x1="98.031%" x2="58.888%" y1="0.161%" y2="40.766%"><stop offset="0%" stopColor="#0052CC" /><stop offset="92.3%" stopColor="#2684FF" /></linearGradient></defs>
+                      <path d="M244.658 0H121.707a55.502 55.502 0 0 0 55.502 55.502h22.649V77.37c.02 30.625 24.841 55.447 55.5 55.502V10.666C255.358 4.777 250.581 0 244.658 0Z" fill="#2684FF" />
+                      <path d="M183.822 61.262H60.872c.019 30.625 24.84 55.447 55.501 55.502h22.649v21.868c.039 30.625 24.877 55.443 55.502 55.502V71.928c0-5.891-4.776-10.666-10.702-10.666Z" fill="url(#jira-grad)" />
+                      <path d="M122.951 122.489H0c0 30.653 24.85 55.502 55.502 55.502h22.72v21.867c.02 30.597 24.798 55.426 55.378 55.502V133.156c0-5.891-4.776-10.667-10.649-10.667Z" fill="url(#jira-grad)" />
                     </svg>
                     <span className="text-sm font-medium">Jira App</span>
                   </div>
