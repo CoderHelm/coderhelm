@@ -3,11 +3,12 @@
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, type BillingInfo, type Plan, type Task, type Repo, type JiraCheck, type EnabledPlugin, type PluginDef } from "@/lib/api";
+import { api, type BillingInfo, type Plan, type Task, type Repo, type JiraCheck, type EnabledPlugin, type PluginDef, type Openspec, type Template } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Skeleton, TableSkeleton } from "@/components/skeleton";
 import { RepoCombobox } from "@/components/repo-combobox";
+import { ChatMarkdown } from "@/components/chat-markdown";
 
 const TASK_STATUS_STYLES: Record<string, string> = {
   draft: "bg-zinc-800 text-zinc-400 border-zinc-700",
@@ -73,6 +74,12 @@ function PlanDetail() {
   const [plugins, setPlugins] = useState<{ catalog: PluginDef[]; enabled: EnabledPlugin[] }>({ catalog: [], enabled: [] });
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilters, setStatusFilters] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<'tasks' | 'openspec'>('tasks');
+  const [openspec, setOpenspec] = useState<Openspec | null>(null);
+  const [openspecLoading, setOpenspecLoading] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateForm, setTemplateForm] = useState({ title: "", description: "", category: "", tags: "" });
+  const [savingTemplate, setSavingTemplate] = useState(false);
   const { toast } = useToast();
   const { confirm } = useConfirm();
 
@@ -208,6 +215,76 @@ function PlanDetail() {
     }
   };
 
+  const handleSaveTemplate = async () => {
+    if (!templateForm.title.trim()) return;
+    setSavingTemplate(true);
+    try {
+      const tags = templateForm.tags.trim() ? templateForm.tags.split(",").map((t) => t.trim()).filter(Boolean) : undefined;
+      await api.createTemplateFromPlan(planId, {
+        title: templateForm.title.trim(),
+        description: templateForm.description.trim() || undefined,
+        category: templateForm.category.trim() || undefined,
+        tags,
+      });
+      toast("Template saved!");
+      setShowTemplateModal(false);
+    } catch {
+      toast("Failed to save template", "error");
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const openTemplateModal = () => {
+    setTemplateForm({
+      title: (plan?.title ?? "") + " Template",
+      description: plan?.description ?? "",
+      category: "",
+      tags: "",
+    });
+    setShowTemplateModal(true);
+  };
+
+  const loadOpenspec = async () => {
+    if (openspec || openspecLoading) return;
+    setOpenspecLoading(true);
+    try {
+      const data = await api.getPlanOpenspec(planId);
+      setOpenspec(data);
+    } catch {
+      // Not generated yet — that's fine
+    } finally {
+      setOpenspecLoading(false);
+    }
+  };
+
+  const generateOpenspec = async () => {
+    setOpenspecLoading(true);
+    try {
+      await api.generatePlanOpenspec(planId);
+      const data = await api.getPlanOpenspec(planId);
+      setOpenspec(data);
+      toast("Openspec generated!");
+    } catch {
+      toast("Failed to generate openspec", "error");
+    } finally {
+      setOpenspecLoading(false);
+    }
+  };
+
+  const downloadOpenspec = () => {
+    if (!openspec) return;
+    for (const [name, content] of Object.entries(openspec)) {
+      const blob = new Blob([content], { type: "text/markdown" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${name}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
   const handleApprove = async (taskId: string) => {
     setActionLoading(taskId + ":approve");
     try {
@@ -322,6 +399,12 @@ function PlanDetail() {
         {plan.status === "draft" && draftCount > 0 && (
           <div className="flex items-center gap-2">
             <button
+              onClick={openTemplateModal}
+              className="px-3 py-2 text-zinc-500 hover:text-zinc-300 text-sm border border-zinc-700 rounded-lg transition-colors"
+            >
+              Save as Template
+            </button>
+            <button
               onClick={handleDeletePlan}
               className="px-3 py-2 text-zinc-600 hover:text-red-400 text-sm transition-colors"
             >
@@ -337,12 +420,20 @@ function PlanDetail() {
           </div>
         )}
         {plan.status !== "draft" && (
-          <button
-            onClick={handleDeletePlan}
-            className="px-3 py-2 text-zinc-600 hover:text-red-400 text-sm transition-colors"
-          >
-            Delete
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={openTemplateModal}
+              className="px-3 py-2 text-zinc-500 hover:text-zinc-300 text-sm border border-zinc-700 rounded-lg transition-colors"
+            >
+              Save as Template
+            </button>
+            <button
+              onClick={handleDeletePlan}
+              className="px-3 py-2 text-zinc-600 hover:text-red-400 text-sm transition-colors"
+            >
+              Delete
+            </button>
+          </div>
         )}
       </div>
 
@@ -415,6 +506,49 @@ function PlanDetail() {
         </div>
       )}
 
+      {/* Tab bar */}
+      <div className="flex items-center gap-1 border-b border-zinc-800 mb-4">
+        <button onClick={() => setActiveTab('tasks')} className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'tasks' ? 'text-zinc-100 border-zinc-100' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}>
+          Tasks ({plan.tasks.length})
+        </button>
+        <button onClick={() => { setActiveTab('openspec'); loadOpenspec(); }} className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'openspec' ? 'text-zinc-100 border-zinc-100' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}>
+          Openspec
+        </button>
+      </div>
+
+      {activeTab === 'openspec' && (
+        <div>
+          {!openspec ? (
+            <div className="text-center py-12">
+              <p className="text-sm text-zinc-500 mb-4">Generate an Openspec to document this plan&apos;s proposal, design, tasks, and acceptance criteria.</p>
+              <button onClick={generateOpenspec} disabled={openspecLoading} className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-semibold hover:bg-white disabled:opacity-50">
+                {openspecLoading ? 'Generating...' : 'Generate Openspec'}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex justify-end">
+                <button onClick={downloadOpenspec} className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-400 border border-zinc-700 rounded-lg hover:text-zinc-200 hover:border-zinc-600 transition-colors">
+                  Download All
+                </button>
+              </div>
+              {(['proposal', 'design', 'tasks', 'spec'] as const).map(file => (
+                <div key={file} className="rounded-lg border border-zinc-800 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-2 bg-zinc-800/50 border-b border-zinc-800">
+                    <span className="text-sm font-medium text-zinc-300">{file}.md</span>
+                    <button onClick={() => navigator.clipboard.writeText(openspec[file] ?? '')} className="text-xs text-zinc-500 hover:text-zinc-300">Copy</button>
+                  </div>
+                  <div className="p-4">
+                    <ChatMarkdown>{openspec[file] ?? ''}</ChatMarkdown>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'tasks' && (<>
       {/* Search & status filters */}
       {plan.tasks.length > 3 && (
         <div className="mb-4 space-y-3">
@@ -704,6 +838,67 @@ function PlanDetail() {
 
       {draftCount > 0 && plan.status === "draft" && (
         <p className="text-xs text-zinc-600 mt-6 ml-8">Approve individual tasks or click &ldquo;Approve&rdquo; to start. Approving the last task auto-triggers execution.</p>
+      )}
+      </>)}
+
+      {showTemplateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-900 p-6">
+            <h2 className="text-lg font-semibold mb-4">Save as Template</h2>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-zinc-500 block mb-1">Title</label>
+                <input
+                  value={templateForm.title}
+                  onChange={(e) => setTemplateForm((f) => ({ ...f, title: e.target.value }))}
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 block mb-1">Description</label>
+                <textarea
+                  value={templateForm.description}
+                  onChange={(e) => setTemplateForm((f) => ({ ...f, description: e.target.value }))}
+                  rows={2}
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-zinc-500 resize-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 block mb-1">Category (optional)</label>
+                <input
+                  value={templateForm.category}
+                  onChange={(e) => setTemplateForm((f) => ({ ...f, category: e.target.value }))}
+                  placeholder="e.g. backend, frontend, devops"
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 block mb-1">Tags (optional, comma-separated)</label>
+                <input
+                  value={templateForm.tags}
+                  onChange={(e) => setTemplateForm((f) => ({ ...f, tags: e.target.value }))}
+                  placeholder="e.g. api, auth, migration"
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                onClick={() => setShowTemplateModal(false)}
+                className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveTemplate}
+                disabled={savingTemplate || !templateForm.title.trim()}
+                className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-semibold hover:bg-white transition-colors disabled:opacity-50"
+              >
+                {savingTemplate ? "Saving..." : "Save Template"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
