@@ -565,63 +565,175 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Product Section 3: AI Plans */}
+      {/* Product Section 3: AI Plans — Streaming Chat */}
       <section className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-6xl px-6">
-          <div className="grid gap-12 md:grid-cols-2 md:items-center">
-            {/* Chat mockup */}
-            <div className="order-2 md:order-1 rounded-xl border border-[#21262d] bg-[#0d1117] p-5">
-              <div className="mb-3 flex items-center gap-2 border-b border-[#21262d] pb-3">
-                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 text-[9px] font-bold text-zinc-400">P</div>
-                <span className="text-[11px] font-semibold text-text-secondary">New Plan</span>
+          {/* Section header — centered */}
+          <div className="text-center">
+            <p className="text-sm font-semibold text-cyan-400 tracking-wider uppercase">AI Plans</p>
+            <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
+              Talk to your codebase.<br className="hidden sm:block" />
+              <span className="text-cyan-400">Ship a plan in seconds.</span>
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-text-secondary leading-relaxed">
+              Describe what you want to build. Coderhelm&apos;s AI searches your Notion docs, reads your Figma designs,
+              and generates an executable plan — streamed to you in real-time, token by token.
+            </p>
+          </div>
+
+          {/* Full-width chat experience mockup */}
+          <div className="mt-16 rounded-xl border border-[#21262d] bg-[#0d1117] overflow-hidden">
+            {/* Title bar */}
+            <div className="flex items-center gap-2 border-b border-[#21262d] px-5 py-3">
+              <div className="flex gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#333]" />
+                <div className="w-2.5 h-2.5 rounded-full bg-[#333]" />
+                <div className="w-2.5 h-2.5 rounded-full bg-[#333]" />
               </div>
-              <div className="space-y-3">
-                <div className="flex justify-end">
-                  <div className="max-w-[80%] rounded-lg rounded-tr-none bg-zinc-800 px-3 py-2 text-[11px] text-zinc-300">
-                    Add OAuth login with GitHub and Google
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-[9px] font-bold text-zinc-400">c</div>
-                  <div className="rounded-lg rounded-tl-none border border-[#21262d] bg-[#161b22] px-3 py-2.5 text-[11px] text-text-secondary">
-                    <p className="mb-2 text-text-primary">I&apos;ll scope this as 4 tasks:</p>
-                    {[
-                      "#1 Add OAuth provider config",
-                      "#2 Build login / logout flow",
-                      "#3 Protect authenticated routes",
-                      "#4 Session management",
-                    ].map((t) => (
-                      <div key={t} className="flex items-center gap-1.5 text-[10px] leading-5">
-                        <span className="text-green-400">·</span>
-                        <span>{t}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              <span className="ml-2 text-[11px] text-text-muted">coderhelm — new plan</span>
             </div>
 
-            <div className="order-1 md:order-2">
-              <p className="text-sm font-semibold text-cyan-400 tracking-wider uppercase">Plan</p>
-              <h2 className="mt-3 text-3xl font-bold sm:text-4xl">AI Plans</h2>
-              <p className="mt-4 text-text-secondary leading-relaxed">
-                Describe a feature in plain English. Coderhelm chats with you to scope the work,
-                then generates an ordered list of executable issues — each ready to become a PR with one click.
-              </p>
-              <ul className="mt-6 space-y-2 text-sm text-text-secondary">
+            <div className="flex">
+              {/* Chat panel */}
+              <div className="flex-1 p-5 space-y-4 border-r border-[#21262d]">
+                {/* User message */}
+                <div className="flex justify-end">
+                  <div className="max-w-[80%] rounded-lg rounded-tr-none bg-zinc-800 px-3.5 py-2.5 text-[11px] text-zinc-200 leading-relaxed">
+                    Add Google Tag Manager to the marketing site and dashboard. Use the GTM ID from our Notion workspace.
+                  </div>
+                </div>
+
+                {/* Assistant — thinking */}
+                <div className="flex gap-2.5">
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cyan-400/10 mt-0.5">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyan-400"><path d="M12 2a7 7 0 00-4.7 12.2A3.5 3.5 0 0010 21h4a3.5 3.5 0 002.7-6.8A7 7 0 0012 2z" /></svg>
+                  </div>
+                  <div className="space-y-2.5 flex-1 min-w-0">
+                    {/* Thinking block */}
+                    <div className="rounded-lg border border-[#21262d] bg-[#161b22] px-3.5 py-2.5">
+                      <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 mb-1.5">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a7 7 0 00-4.7 12.2A3.5 3.5 0 0010 21h4a3.5 3.5 0 002.7-6.8A7 7 0 0012 2z" /></svg>
+                        Reasoning
+                      </div>
+                      <p className="text-[10px] text-zinc-500 italic leading-relaxed">
+                        The user wants GTM added to two properties. They mentioned a GTM ID in Notion — I should search for it before generating the plan...
+                      </p>
+                    </div>
+
+                    {/* Tool call card — Notion */}
+                    <div className="rounded-lg border border-[#21262d] bg-[#161b22] px-3.5 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center w-4 h-4 rounded bg-cyan-400/10">
+                          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyan-400"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                        </div>
+                        <span className="text-[10px] text-zinc-400 font-medium">notion</span>
+                        <span className="text-[10px] text-zinc-600">search_pages</span>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="ml-auto text-emerald-400"><polyline points="20 6 9 17 4 12" /></svg>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 mt-1.5 pl-6">Found &quot;Analytics Config&quot; — GTM-XXXX47F</p>
+                    </div>
+
+                    {/* Tool call card — GitHub */}
+                    <div className="rounded-lg border border-[#21262d] bg-[#161b22] px-3.5 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center w-4 h-4 rounded bg-cyan-400/10">
+                          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyan-400"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                        </div>
+                        <span className="text-[10px] text-zinc-400 font-medium">github</span>
+                        <span className="text-[10px] text-zinc-600">search_code</span>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="ml-auto text-emerald-400"><polyline points="20 6 9 17 4 12" /></svg>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 mt-1.5 pl-6">Scanned layout files — no existing GTM snippet</p>
+                    </div>
+
+                    {/* Streamed response text */}
+                    <div className="rounded-lg rounded-tl-none border border-[#21262d] bg-[#161b22] px-3.5 py-2.5 text-[11px] text-text-secondary leading-relaxed">
+                      <p className="text-text-primary">
+                        I found your GTM ID (<code className="text-[10px] text-cyan-400 bg-cyan-400/5 px-1 py-0.5 rounded">GTM-XXXX47F</code>) in the Analytics Config page on Notion. Neither repo has GTM installed yet.
+                      </p>
+                      <p className="mt-2">Here&apos;s a 3-task plan:</p>
+                      <span className="inline-block w-[3px] h-3.5 bg-cyan-400 ml-0.5 animate-pulse" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Plan sidebar */}
+              <div className="w-64 p-4 space-y-3 hidden md:block">
+                <div>
+                  <p className="text-[9px] text-zinc-600 uppercase tracking-wider font-semibold">Generated plan</p>
+                  <p className="text-[11px] font-semibold text-text-primary mt-1">Add GTM tracking</p>
+                  <p className="text-[10px] text-zinc-500 mt-0.5">3 tasks · 2 repos</p>
+                </div>
                 {[
-                  "Conversational scoping — asks clarifying questions",
-                  "Creates ordered GitHub issues or Jira tickets",
-                  "One-click Approve → Execute per task",
-                  "Set GitHub or Jira destination for the whole plan",
-                ].map((t) => (
-                  <li key={t} className="flex items-start gap-2">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="mt-1 shrink-0 text-cyan-400"><polyline points="20 6 9 17 4 12" /></svg>
-                    {t}
-                  </li>
+                  { n: 1, t: "Add GTM to marketing site", repo: "site" },
+                  { n: 2, t: "Add GTM to dashboard app", repo: "dashboard" },
+                  { n: 3, t: "Add CSP and cookie consent", repo: "site" },
+                ].map((task) => (
+                  <div key={task.n} className="rounded-lg border border-[#21262d] bg-[#161b22] p-2.5">
+                    <div className="flex gap-2">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-zinc-800 text-zinc-500 flex items-center justify-center text-[9px] font-bold">{task.n}</span>
+                      <div>
+                        <p className="text-[10px] text-zinc-300 font-medium leading-tight">{task.t}</p>
+                        <p className="text-[9px] text-zinc-600 mt-0.5 font-mono">{task.repo}</p>
+                      </div>
+                    </div>
+                  </div>
                 ))}
-              </ul>
+                {/* Skeleton for streaming task */}
+                <div className="rounded-lg border border-[#21262d] bg-[#161b22] p-2.5 opacity-30">
+                  <div className="flex gap-2">
+                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-zinc-800" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-2.5 bg-zinc-800 rounded w-3/4 animate-pulse" />
+                      <div className="h-2 bg-zinc-800/60 rounded w-1/2 animate-pulse" />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
+          </div>
+
+          {/* Feature highlights — 4-col grid below the mockup */}
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
+                ),
+                title: "Real-time streaming",
+                desc: "See the AI think and type, token by token. No loading spinners — just answers appearing as they form.",
+              },
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
+                ),
+                title: "Searches your tools",
+                desc: "Connects to Notion, Figma, Linear, Sentry and more via MCP. Pulls in IDs, specs, and context automatically.",
+              },
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
+                ),
+                title: "Live plan preview",
+                desc: "Tasks appear in the sidebar as they stream in. Review and refine before any code is written.",
+              },
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                ),
+                title: "One-click execute",
+                desc: "Approve the plan and Coderhelm opens PRs for each task — in order, with full specs and tests.",
+              },
+            ].map((f) => (
+              <div key={f.title} className="rounded-lg bg-white/[0.03] p-5 transition-colors hover:bg-white/[0.05]">
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-cyan-400/10 text-cyan-400 mb-3">
+                  {f.icon}
+                </div>
+                <h3 className="text-sm font-semibold text-text-primary">{f.title}</h3>
+                <p className="mt-1.5 text-[13px] text-text-secondary leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
