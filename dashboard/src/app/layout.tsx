@@ -7,7 +7,6 @@ export const metadata: Metadata = {
   title: "Coderhelm — Dashboard",
   description: "Manage your Coderhelm settings and monitor runs",
   icons: { icon: "/favicon.svg" },
-  other: { "color-scheme": "dark" },
 };
 
 export default function RootLayout({
