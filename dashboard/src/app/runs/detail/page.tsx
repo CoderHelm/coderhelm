@@ -420,73 +420,109 @@ function RunDetailInner() {
         <StatCard label="Tokens Out" value={formatTokens(run.tokens_out)} />
       </div>
 
-      {/* Pass timeline waterfall */}
-      {traces.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-sm font-medium text-zinc-300 mb-2">Pass Timeline</h2>
-          <div className="border border-zinc-800 rounded-lg p-4 space-y-2">
-            {(() => {
-              const maxDuration = Math.max(...traces.map((t) => t.duration_ms), 1);
-              return traces.map((trace) => {
-                const pct = (trace.duration_ms / maxDuration) * 100;
-                const passLabel = trace.pass.includes(":") ? trace.pass.replace(":", " #") : trace.pass;
-                const hasError = !!trace.error;
+      {/* Pass pipeline */}
+      {traces.length > 0 && (() => {
+        const maxDuration = Math.max(...traces.map((t) => t.duration_ms), 1);
+        const totalTokens = traces.reduce((s, t) => s + (t.input_tokens || 0) + (t.output_tokens || 0), 0);
+        const passColors: Record<string, string> = {
+          triage: "from-violet-500/80 to-violet-600/40",
+          plan: "from-blue-500/80 to-blue-600/40",
+          implement: "from-emerald-500/80 to-emerald-600/40",
+          test: "from-amber-500/80 to-amber-600/40",
+          review: "from-cyan-500/80 to-cyan-600/40",
+          security: "from-rose-500/80 to-rose-600/40",
+          pr: "from-fuchsia-500/80 to-fuchsia-600/40",
+        };
+        const dotColors: Record<string, string> = {
+          triage: "bg-violet-400",
+          plan: "bg-blue-400",
+          implement: "bg-emerald-400",
+          test: "bg-amber-400",
+          review: "bg-cyan-400",
+          security: "bg-rose-400",
+          pr: "bg-fuchsia-400",
+        };
+        return (
+          <div className="mb-6 border border-zinc-800 rounded-lg overflow-hidden">
+            {/* Stacked bar showing relative time per pass */}
+            <div className="flex h-2">
+              {traces.map((trace) => {
+                const baseName = trace.pass.split(":")[0];
                 return (
-                  <div key={trace.pass} className="flex items-center gap-3">
-                    <span className="text-xs text-zinc-500 w-20 text-right font-mono">{passLabel}</span>
-                    <div className="flex-1 h-5 bg-zinc-900 rounded-full overflow-hidden">
+                  <div
+                    key={trace.pass}
+                    className={`h-full bg-gradient-to-r ${passColors[baseName] || "from-zinc-500/80 to-zinc-600/40"}`}
+                    style={{ width: `${Math.max((trace.duration_ms / maxDuration) * 100, 1)}%` }}
+                    title={`${trace.pass}: ${trace.duration_ms >= 60000 ? `${(trace.duration_ms / 60000).toFixed(1)}m` : `${(trace.duration_ms / 1000).toFixed(1)}s`}`}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Pass rows */}
+            <div className="divide-y divide-zinc-800/50">
+              {traces.map((trace) => {
+                const baseName = trace.pass.split(":")[0];
+                const passLabel = trace.pass.includes(":") ? trace.pass.replace(":", " #") : trace.pass;
+                const pct = (trace.duration_ms / maxDuration) * 100;
+                const passTokens = (trace.input_tokens || 0) + (trace.output_tokens || 0);
+                const tokenPct = totalTokens > 0 ? (passTokens / totalTokens) * 100 : 0;
+                const cached = trace.cache_read_tokens || 0;
+                const duration = trace.duration_ms >= 60000
+                  ? `${(trace.duration_ms / 60000).toFixed(1)}m`
+                  : `${(trace.duration_ms / 1000).toFixed(1)}s`;
+
+                return (
+                  <div key={trace.pass} className="px-4 py-3 hover:bg-zinc-800/30 transition-colors">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${dotColors[baseName] || "bg-zinc-400"}`} />
+                        <span className="text-sm font-medium text-zinc-200">{passLabel}</span>
+                        {trace.error && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-medium">error</span>
+                        )}
+                      </div>
+                      <span className="text-sm font-mono text-zinc-400">{duration}</span>
+                    </div>
+
+                    {/* Duration bar */}
+                    <div className="h-1.5 bg-zinc-900 rounded-full overflow-hidden mb-2">
                       <div
-                        className={`h-full rounded-full transition-all ${hasError ? "bg-red-500/60" : "bg-blue-500/60"}`}
+                        className={`h-full rounded-full bg-gradient-to-r ${passColors[baseName] || "from-zinc-500/80 to-zinc-600/40"}`}
                         style={{ width: `${Math.max(pct, 2)}%` }}
                       />
                     </div>
-                    <span className="text-xs text-zinc-500 w-16 font-mono">
-                      {trace.duration_ms >= 60000
-                        ? `${(trace.duration_ms / 60000).toFixed(1)}m`
-                        : `${(trace.duration_ms / 1000).toFixed(1)}s`}
-                    </span>
+
+                    {/* Token chips */}
+                    <div className="flex items-center gap-3 text-[11px]">
+                      {passTokens > 0 ? (
+                        <>
+                          <span className="text-zinc-500">
+                            {formatTokens(trace.input_tokens)} in
+                          </span>
+                          <span className="text-zinc-500">
+                            {formatTokens(trace.output_tokens)} out
+                          </span>
+                          {cached > 0 && (
+                            <span className="text-zinc-600">
+                              {formatTokens(cached)} cached
+                            </span>
+                          )}
+                          <span className="ml-auto text-zinc-600 tabular-nums">
+                            {tokenPct.toFixed(0)}% of tokens
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-zinc-600 italic">no LLM calls</span>
+                      )}
+                    </div>
                   </div>
                 );
-              });
-            })()}
+              })}
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* Token breakdown per pass */}
-      {traces.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-sm font-medium text-zinc-300 mb-2">Tokens by Pass</h2>
-          <div className="border border-zinc-800 rounded-lg overflow-hidden">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-zinc-800 text-zinc-500">
-                  <th className="text-left px-3 py-2 font-medium">Pass</th>
-                  <th className="text-right px-3 py-2 font-medium">Input</th>
-                  <th className="text-right px-3 py-2 font-medium">Output</th>
-                  <th className="text-right px-3 py-2 font-medium">Cache Read</th>
-                  <th className="text-right px-3 py-2 font-medium">Duration</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800">
-                {traces.map((trace) => (
-                  <tr key={trace.pass} className="text-zinc-400 hover:bg-zinc-800/50">
-                    <td className="px-3 py-2 font-mono">{trace.pass.includes(":") ? trace.pass.replace(":", " #") : trace.pass}</td>
-                    <td className="text-right px-3 py-2 tabular-nums">{formatTokens(trace.input_tokens)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums">{formatTokens(trace.output_tokens)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums">{formatTokens(trace.cache_read_tokens)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums font-mono">
-                      {trace.duration_ms >= 60000
-                        ? `${(trace.duration_ms / 60000).toFixed(1)}m`
-                        : `${(trace.duration_ms / 1000).toFixed(1)}s`}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* MCP servers used in this run */}
       {run.mcp_servers && run.mcp_servers.length > 0 && (
