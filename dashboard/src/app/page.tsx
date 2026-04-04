@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type Run } from "@/lib/api";
 import { TableSkeleton } from "@/components/skeleton";
+import { formatTimeAgo, formatAbsoluteDate } from "@/lib/utils";
 
 interface RunGroup {
   ticket_id: string;
@@ -162,7 +163,12 @@ function TicketGroup({
         <td className="px-4 py-3">
           <StatusBadge status={latest.status} />
         </td>
-        <td className="px-4 py-3 text-zinc-400">{latest.duration_s ? `${latest.duration_s}s` : "—"}</td>
+        <td className="px-4 py-3 text-zinc-400">
+          <div className="flex flex-col gap-0.5">
+            {latest.duration_s && <span>{latest.duration_s}s</span>}
+            <span className="text-xs text-zinc-500" title={formatAbsoluteDate(latest.created_at)}>{formatTimeAgo(latest.created_at)}</span>
+          </div>
+        </td>
       </tr>
 
       {/* Previous attempts (collapsed by default) */}
@@ -181,7 +187,12 @@ function TicketGroup({
             <td className="px-4 py-2">
               <StatusBadge status={run.status} />
             </td>
-            <td className="px-4 py-2 text-zinc-600 text-xs">{run.duration_s ? `${run.duration_s}s` : "—"}</td>
+            <td className="px-4 py-2 text-zinc-600 text-xs">
+              <div className="flex flex-col gap-0.5">
+                {run.duration_s && <span>{run.duration_s}s</span>}
+                <span className="text-zinc-600" title={formatAbsoluteDate(run.created_at)}>{formatTimeAgo(run.created_at)}</span>
+              </div>
+            </td>
           </tr>
         ))}
     </>
