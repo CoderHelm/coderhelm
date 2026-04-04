@@ -236,7 +236,7 @@ const MessageBubble = memo(function MessageBubble({ msg }: { msg: StreamMessage 
 
   const hasContent = textContent || thinkingParts.length > 0 || toolParts.length > 0;
 
-  if (!hasContent && !msg.streaming) return null;
+  if (!hasContent) return null;
 
   // Detect plan JSON in text for badge
   const hasPlan = textContent.includes("```json");
