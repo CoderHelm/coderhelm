@@ -39,84 +39,179 @@ export default function Home() {
             <p className="mt-4 text-sm text-text-muted">Join the waitlist — we&apos;ll notify you when we open up.</p>
           </div>
 
-          {/* Issue → PR transformation visual */}
-          <div className="mx-auto mt-16 max-w-4xl">
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-6 md:gap-0">
-              {/* GitHub Issue Card */}
-              <div className="rounded-xl border border-[#21262d] bg-[#0d1117] p-5 text-left">
-                <div className="flex items-center gap-2 mb-3">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="#3fb950"><path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z"/></svg>
-                  <span className="text-xs font-medium text-[#3fb950]">Open</span>
-                  <span className="ml-auto text-xs text-neutral-500">#42</span>
+          {/* Product workspace mockup — the "window into the product" */}
+          <div className="mx-auto mt-16 max-w-5xl">
+            <div className="rounded-xl border border-[#21262d] bg-[#0d1117] shadow-2xl shadow-brand/5 overflow-hidden">
+              {/* Window chrome */}
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-[#161b22] border-b border-[#21262d]">
+                <div className="flex gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#febc2e]" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#28c840]" />
                 </div>
-                <h4 className="text-sm font-semibold text-white">Add dark mode toggle to settings</h4>
-                <p className="mt-1.5 text-xs text-neutral-400 leading-relaxed">
-                  Users should be able to switch between light/dark mode from the settings page. Should persist preference and respect system theme.
-                </p>
-                <div className="mt-3 flex items-center gap-2">
-                  <span className="rounded-full bg-[#1f6feb]/20 px-2 py-0.5 text-[10px] font-medium text-[#58a6ff]">feature</span>
-                  <span className="rounded-full bg-[#a371f7]/20 px-2 py-0.5 text-[10px] font-medium text-[#a371f7]">frontend</span>
+                <div className="flex-1 flex justify-center">
+                  <div className="flex items-center gap-2 px-3 py-0.5 rounded-md bg-[#0d1117] border border-[#21262d] text-[11px] text-neutral-500">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                    app.coderhelm.com
+                  </div>
                 </div>
               </div>
 
-              {/* Animated connection — Coderhelm pipeline */}
-              <div className="flex flex-col items-center gap-2 py-4 md:px-8">
-                <div className="hidden md:flex flex-col items-center gap-1.5">
-                  {["triage", "plan", "implement", "test", "review"].map((step, i) => (
-                    <div key={step} className="flex items-center gap-2" style={{ animationDelay: `${i * 0.15}s` }}>
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                        <circle cx="5" cy="5" r="4" stroke="#10b981" strokeWidth="1.5" />
-                        <circle cx="5" cy="5" r="2" fill="#10b981" />
-                      </svg>
-                      <span className="text-[10px] font-mono text-emerald-400/70 uppercase tracking-wider">{step}</span>
+              {/* Dashboard layout */}
+              <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] min-h-[380px]">
+                {/* Left sidebar — Agent activity feed */}
+                <div className="border-r border-[#21262d] p-4 hidden md:block">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-5 h-5 rounded bg-brand/20 flex items-center justify-center">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" strokeWidth="2" strokeLinecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
                     </div>
-                  ))}
-                  <svg width="2" height="20" className="opacity-30"><line x1="1" y1="0" x2="1" y2="20" stroke="#10b981" strokeWidth="1" strokeDasharray="3 3" /></svg>
-                </div>
-                <div className="md:hidden flex items-center gap-2">
-                  <svg width="40" height="2"><line x1="0" y1="1" x2="40" y2="1" stroke="#10b981" strokeWidth="1" strokeDasharray="3 3" /></svg>
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>
+                    <span className="text-xs font-semibold text-white">Issue #42</span>
+                    <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Running
+                    </span>
                   </div>
-                  <svg width="40" height="2"><line x1="0" y1="1" x2="40" y2="1" stroke="#10b981" strokeWidth="1" strokeDasharray="3 3" /></svg>
-                </div>
-                <span className="text-[10px] text-emerald-500/60 font-mono">~4 min</span>
-              </div>
 
-              {/* Pull Request Card */}
-              <div className="rounded-xl border border-[#21262d] bg-[#0d1117] p-5 text-left">
-                <div className="flex items-center gap-2 mb-3">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="#a371f7"><path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/></svg>
-                  <span className="text-xs font-medium text-[#a371f7]">Ready for review</span>
-                  <span className="ml-auto text-xs text-neutral-500">#43</span>
+                  {/* Pipeline steps */}
+                  <div className="space-y-0.5">
+                    {[
+                      { step: "Triage", detail: "feature · medium", done: true },
+                      { step: "Read context", detail: "notion, figma, 3 docs", done: true },
+                      { step: "Plan", detail: "5 files · 3 functions", done: true },
+                      { step: "Implement", detail: "+87 −12 across 3 files", done: true },
+                      { step: "Run tests", detail: "12/12 passed", done: true },
+                      { step: "Self-review", detail: "LGTM · 0 issues", done: true },
+                      { step: "Security scan", detail: "OWASP passed", done: true },
+                      { step: "Open PR", detail: "#43 → ready", active: true, done: false },
+                    ].map((s) => (
+                      <div key={s.step} className="flex items-center gap-2.5 py-1.5 px-2 rounded-md text-left" style={s.active ? { background: "rgba(0,212,255,0.06)" } : {}}>
+                        {s.done ? (
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0"><circle cx="7" cy="7" r="6" fill="#10b981" fillOpacity="0.15" stroke="#10b981" strokeWidth="1.2" /><path d="M4.5 7l1.8 1.8 3.2-3.6" stroke="#10b981" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        ) : s.active ? (
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0 animate-spin" style={{ animationDuration: "2s" }}><circle cx="7" cy="7" r="6" stroke="#00d4ff" strokeWidth="1.2" strokeDasharray="20 18" /></svg>
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0"><circle cx="7" cy="7" r="6" stroke="#333" strokeWidth="1.2" /></svg>
+                        )}
+                        <div className="min-w-0">
+                          <div className={`text-[11px] font-medium ${s.active ? "text-brand" : s.done ? "text-neutral-300" : "text-neutral-600"}`}>{s.step}</div>
+                          <div className="text-[10px] text-neutral-600 truncate">{s.detail}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Timer */}
+                  <div className="mt-4 pt-3 border-t border-[#21262d] flex items-center justify-between text-[11px]">
+                    <span className="text-neutral-500">Elapsed</span>
+                    <span className="font-mono text-brand tabular-nums">3:47</span>
+                  </div>
                 </div>
-                <h4 className="text-sm font-semibold text-white">Add dark mode toggle to settings</h4>
-                <div className="mt-3 space-y-1.5 font-mono text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-neutral-400">src/components/ThemeToggle.tsx</span>
-                    <span className="text-[#3fb950]">+52</span>
+
+                {/* Main content — agent workspace */}
+                <div className="p-5 flex flex-col gap-4">
+                  {/* Tabs */}
+                  <div className="flex items-center gap-1 border-b border-[#21262d] -mx-5 px-5">
+                    {[
+                      { label: "Activity", active: false },
+                      { label: "Code", active: true },
+                      { label: "PR Preview", active: false },
+                    ].map((tab) => (
+                      <div key={tab.label} className={`px-3 py-2 text-[11px] font-medium border-b-2 ${tab.active ? "text-white border-brand" : "text-neutral-500 border-transparent"}`}>
+                        {tab.label}
+                      </div>
+                    ))}
+                    <div className="ml-auto flex items-center gap-1.5 pb-2">
+                      <span className="text-[10px] text-neutral-600">3 files changed</span>
+                      <span className="text-[10px] font-mono text-[#3fb950]">+87</span>
+                      <span className="text-[10px] font-mono text-[#f85149]">−12</span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-neutral-400">src/pages/settings.tsx</span>
-                    <span><span className="text-[#3fb950]">+23</span> <span className="text-[#f85149]">−4</span></span>
+
+                  {/* Code editor mockup */}
+                  <div className="rounded-lg border border-[#21262d] bg-[#0a0e14] overflow-hidden flex-1">
+                    {/* File tab bar */}
+                    <div className="flex items-center bg-[#161b22] border-b border-[#21262d]">
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0d1117] border-r border-b-2 border-b-brand border-r-[#21262d] text-[11px] text-neutral-300">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M13 2v7h7"/></svg>
+                        ThemeToggle.tsx
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-neutral-600">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M13 2v7h7"/></svg>
+                        settings.tsx
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-neutral-600">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M13 2v7h7"/></svg>
+                        useTheme.ts
+                      </div>
+                    </div>
+
+                    {/* Code lines */}
+                    <div className="p-4 font-mono text-[11px] leading-[1.7] overflow-hidden">
+                      <div className="flex">
+                        <span className="w-8 text-right pr-4 text-neutral-700 select-none">1</span>
+                        <span><span className="text-[#ff7b72]">import</span> <span className="text-neutral-300">{"{"}</span> <span className="text-[#79c0ff]">useState</span><span className="text-neutral-300">,</span> <span className="text-[#79c0ff]">useEffect</span> <span className="text-neutral-300">{"}"}</span> <span className="text-[#ff7b72]">from</span> <span className="text-[#a5d6ff]">&apos;react&apos;</span></span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-8 text-right pr-4 text-neutral-700 select-none">2</span>
+                        <span className="text-neutral-600" />
+                      </div>
+                      <div className="flex bg-[#0b3d22]/30 border-l-2 border-[#3fb950]">
+                        <span className="w-8 text-right pr-4 text-neutral-700 select-none">3</span>
+                        <span><span className="text-[#ff7b72]">export function</span> <span className="text-[#d2a8ff]">ThemeToggle</span><span className="text-neutral-400">() {"{"}</span></span>
+                      </div>
+                      <div className="flex bg-[#0b3d22]/30 border-l-2 border-[#3fb950]">
+                        <span className="w-8 text-right pr-4 text-neutral-700 select-none">4</span>
+                        <span>  <span className="text-[#ff7b72]">const</span> <span className="text-neutral-300">[</span><span className="text-[#79c0ff]">theme</span><span className="text-neutral-300">,</span> <span className="text-[#79c0ff]">setTheme</span><span className="text-neutral-300">]</span> <span className="text-[#ff7b72]">=</span> <span className="text-[#d2a8ff]">useTheme</span><span className="text-neutral-400">()</span></span>
+                      </div>
+                      <div className="flex bg-[#0b3d22]/30 border-l-2 border-[#3fb950]">
+                        <span className="w-8 text-right pr-4 text-neutral-700 select-none">5</span>
+                        <span className="text-neutral-600" />
+                      </div>
+                      <div className="flex bg-[#0b3d22]/30 border-l-2 border-[#3fb950]">
+                        <span className="w-8 text-right pr-4 text-neutral-700 select-none">6</span>
+                        <span>  <span className="text-[#ff7b72]">return</span> <span className="text-neutral-400">(</span></span>
+                      </div>
+                      <div className="flex bg-[#0b3d22]/30 border-l-2 border-[#3fb950]">
+                        <span className="w-8 text-right pr-4 text-neutral-700 select-none">7</span>
+                        <span>    <span className="text-neutral-400">&lt;</span><span className="text-[#7ee787]">button</span></span>
+                      </div>
+                      <div className="flex bg-[#0b3d22]/30 border-l-2 border-[#3fb950]">
+                        <span className="w-8 text-right pr-4 text-neutral-700 select-none">8</span>
+                        <span>      <span className="text-[#79c0ff]">onClick</span><span className="text-neutral-400">={"{"}() =&gt;</span> <span className="text-[#d2a8ff]">setTheme</span><span className="text-neutral-400">(</span><span className="text-[#79c0ff]">theme</span> <span className="text-[#ff7b72]">===</span> <span className="text-[#a5d6ff]">&apos;dark&apos;</span> <span className="text-neutral-400">?</span> <span className="text-[#a5d6ff]">&apos;light&apos;</span> <span className="text-neutral-400">:</span> <span className="text-[#a5d6ff]">&apos;dark&apos;</span><span className="text-neutral-400">){"}"}</span></span>
+                      </div>
+                      <div className="flex bg-[#0b3d22]/30 border-l-2 border-[#3fb950]">
+                        <span className="w-8 text-right pr-4 text-neutral-700 select-none">9</span>
+                        <span>      <span className="text-[#79c0ff]">className</span><span className="text-neutral-400">=</span><span className="text-[#a5d6ff]">&quot;theme-toggle&quot;</span></span>
+                      </div>
+                      <div className="flex bg-[#0b3d22]/30 border-l-2 border-[#3fb950]">
+                        <span className="w-8 text-right pr-4 text-neutral-700 select-none">10</span>
+                        <span>    <span className="text-neutral-400">&gt;</span></span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-8 text-right pr-4 text-neutral-700 select-none">11</span>
+                        <span className="text-neutral-600">      ...</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-neutral-400">src/hooks/useTheme.ts</span>
-                    <span className="text-[#3fb950]">+18</span>
-                  </div>
-                </div>
-                <div className="mt-3 flex items-center gap-3 pt-2 border-t border-[#21262d]">
-                  <div className="flex items-center gap-1">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="#3fb950" strokeWidth="1.5"/><path d="M4 6l1.5 1.5L8 5" stroke="#3fb950" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    <span className="text-[10px] text-[#3fb950]">CI passed</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v4l2.5 1.5" stroke="#58a6ff" strokeWidth="1.2" strokeLinecap="round"/><circle cx="6" cy="6" r="5" stroke="#58a6ff" strokeWidth="1.2"/></svg>
-                    <span className="text-[10px] text-[#58a6ff]">4m 12s</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3fb950" strokeWidth="2" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    <span className="text-[10px] text-[#3fb950]">Secure</span>
+
+                  {/* Bottom status bar */}
+                  <div className="flex items-center gap-4 text-[10px] -mx-5 px-5 py-2 border-t border-[#21262d] bg-[#161b22]">
+                    <div className="flex items-center gap-1.5">
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="#3fb950"><path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z"/></svg>
+                      <span className="text-neutral-400">Issue #42</span>
+                      <span className="text-neutral-600">→</span>
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="#a371f7"><path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/></svg>
+                      <span className="text-neutral-400">PR #43</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="#3fb950" strokeWidth="1.2" /><path d="M3.5 5l1 1 2-2.5" stroke="#3fb950" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      <span className="text-[#3fb950]">CI passed</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="#3fb950" strokeWidth="1.2" /><path d="M5 1.5v3l2 1" stroke="#3fb950" strokeWidth="1" strokeLinecap="round" /></svg>
+                      <span className="text-[#3fb950]">Security passed</span>
+                    </div>
+                    <span className="ml-auto text-neutral-500 font-mono tabular-nums">12 tests · 0 warnings</span>
                   </div>
                 </div>
               </div>
