@@ -39,40 +39,86 @@ export default function Home() {
             <p className="mt-4 text-sm text-text-muted">Join the waitlist — we&apos;ll notify you when we open up.</p>
           </div>
 
-          {/* Code demo */}
-          <div className="mx-auto mt-16 max-w-2xl code-window glow">
-            <div className="code-window-header">
-              <div className="code-dot bg-[#ff5f57]" />
-              <div className="code-dot bg-[#febc2e]" />
-              <div className="code-dot bg-[#28c840]" />
-              <span className="ml-3 text-xs text-neutral-400">Coderhelm · issue #42</span>
-            </div>
-            <div className="p-6 text-left font-mono text-sm leading-relaxed">
-              <p className="text-text-muted">
-                <span className="text-brand">@you</span> opened issue <span className="text-white">#42</span>
-              </p>
-              <p className="mt-0.5 text-text-muted text-xs">
-                &nbsp;&nbsp;&quot;Add dark mode toggle to the settings page&quot;
-              </p>
-              <div className="mt-4 space-y-1.5">
-                {[
-                  { step: "triage    ", detail: "feature · medium priority", time: "0.8s",   color: "#10b981" },
-                  { step: "resolve   ", detail: "notion › page loaded",       time: "1.2s",   color: "#10b981" },
-                  { step: "plan      ", detail: "5 files · 3 new functions", time: "2.1s",   color: "#10b981" },
-                  { step: "validate  ", detail: "all files exist · scope OK", time: "0.1s",   color: "#10b981" },
-                  { step: "implement ", detail: "+87 −12 across 3 files",    time: "47s",    color: "#10b981" },
-                  { step: "test      ", detail: "CI green · 12/12 passed",   time: "3m 22s", color: "#10b981" },
-                  { step: "review    ", detail: "LGTM · no issues found",    time: "4.3s",   color: "#10b981" },
-                  { step: "security  ", detail: "OWASP audit passed",        time: "3.1s",   color: "#10b981" },
-                  { step: "pr        ", detail: "#43 opened → ready",        time: "0.3s",   color: "#10b981" },
-                ].map((s) => (
-                  <div key={s.step} className="flex items-center gap-3">
-                    <span style={{ color: s.color }} className="shrink-0 text-xs">✓</span>
-                    <span className="shrink-0 text-text-muted">{s.step}</span>
-                    <span className="flex-1 text-text-secondary">{s.detail}</span>
-                    {s.time && <span className="text-text-muted text-xs tabular-nums">{s.time}</span>}
+          {/* Issue → PR transformation visual */}
+          <div className="mx-auto mt-16 max-w-4xl">
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-6 md:gap-0">
+              {/* GitHub Issue Card */}
+              <div className="rounded-xl border border-[#21262d] bg-[#0d1117] p-5 text-left">
+                <div className="flex items-center gap-2 mb-3">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="#3fb950"><path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z"/></svg>
+                  <span className="text-xs font-medium text-[#3fb950]">Open</span>
+                  <span className="ml-auto text-xs text-neutral-500">#42</span>
+                </div>
+                <h4 className="text-sm font-semibold text-white">Add dark mode toggle to settings</h4>
+                <p className="mt-1.5 text-xs text-neutral-400 leading-relaxed">
+                  Users should be able to switch between light/dark mode from the settings page. Should persist preference and respect system theme.
+                </p>
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="rounded-full bg-[#1f6feb]/20 px-2 py-0.5 text-[10px] font-medium text-[#58a6ff]">feature</span>
+                  <span className="rounded-full bg-[#a371f7]/20 px-2 py-0.5 text-[10px] font-medium text-[#a371f7]">frontend</span>
+                </div>
+              </div>
+
+              {/* Animated connection — Coderhelm pipeline */}
+              <div className="flex flex-col items-center gap-2 py-4 md:px-8">
+                <div className="hidden md:flex flex-col items-center gap-1.5">
+                  {["triage", "plan", "implement", "test", "review"].map((step, i) => (
+                    <div key={step} className="flex items-center gap-2" style={{ animationDelay: `${i * 0.15}s` }}>
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                        <circle cx="5" cy="5" r="4" stroke="#10b981" strokeWidth="1.5" />
+                        <circle cx="5" cy="5" r="2" fill="#10b981" />
+                      </svg>
+                      <span className="text-[10px] font-mono text-emerald-400/70 uppercase tracking-wider">{step}</span>
+                    </div>
+                  ))}
+                  <svg width="2" height="20" className="opacity-30"><line x1="1" y1="0" x2="1" y2="20" stroke="#10b981" strokeWidth="1" strokeDasharray="3 3" /></svg>
+                </div>
+                <div className="md:hidden flex items-center gap-2">
+                  <svg width="40" height="2"><line x1="0" y1="1" x2="40" y2="1" stroke="#10b981" strokeWidth="1" strokeDasharray="3 3" /></svg>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>
                   </div>
-                ))}
+                  <svg width="40" height="2"><line x1="0" y1="1" x2="40" y2="1" stroke="#10b981" strokeWidth="1" strokeDasharray="3 3" /></svg>
+                </div>
+                <span className="text-[10px] text-emerald-500/60 font-mono">~4 min</span>
+              </div>
+
+              {/* Pull Request Card */}
+              <div className="rounded-xl border border-[#21262d] bg-[#0d1117] p-5 text-left">
+                <div className="flex items-center gap-2 mb-3">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="#a371f7"><path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/></svg>
+                  <span className="text-xs font-medium text-[#a371f7]">Ready for review</span>
+                  <span className="ml-auto text-xs text-neutral-500">#43</span>
+                </div>
+                <h4 className="text-sm font-semibold text-white">Add dark mode toggle to settings</h4>
+                <div className="mt-3 space-y-1.5 font-mono text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-400">src/components/ThemeToggle.tsx</span>
+                    <span className="text-[#3fb950]">+52</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-400">src/pages/settings.tsx</span>
+                    <span><span className="text-[#3fb950]">+23</span> <span className="text-[#f85149]">−4</span></span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-400">src/hooks/useTheme.ts</span>
+                    <span className="text-[#3fb950]">+18</span>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center gap-3 pt-2 border-t border-[#21262d]">
+                  <div className="flex items-center gap-1">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="#3fb950" strokeWidth="1.5"/><path d="M4 6l1.5 1.5L8 5" stroke="#3fb950" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    <span className="text-[10px] text-[#3fb950]">CI passed</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v4l2.5 1.5" stroke="#58a6ff" strokeWidth="1.2" strokeLinecap="round"/><circle cx="6" cy="6" r="5" stroke="#58a6ff" strokeWidth="1.2"/></svg>
+                    <span className="text-[10px] text-[#58a6ff]">4m 12s</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3fb950" strokeWidth="2" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    <span className="text-[10px] text-[#3fb950]">Secure</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -482,89 +528,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Product Section 2: Pipeline */}
-      <section className="border-t border-surface-border py-24">
-        <div className="mx-auto max-w-6xl px-6">
-          <div className="text-center">
-            <p className="text-sm font-semibold text-purple-400 tracking-wider uppercase">Execute</p>
-            <h2 className="mt-3 text-3xl font-bold sm:text-4xl">Multi-pass pipeline</h2>
-            <p className="mx-auto mt-4 max-w-2xl text-text-secondary">
-              Triage → Plan → Validate → Implement → Test → Review → Security → PR. Every change is self-reviewed and security-audited before you see it.
-            </p>
-          </div>
-
-          <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                title: "Context-Aware",
-                desc: "Reads your repo structure, AGENTS.md, README, and CI config to match your conventions.",
-                color: "#a855f7",
-              },
-              {
-                title: "Team Voice",
-                desc: "Learns from your PRs, commits, and reviews. Writes descriptions that sound like your team.",
-                color: "#a855f7",
-              },
-              {
-                title: "Openspec",
-                desc: "Every ticket gets a proposal, design, task list, and acceptance criteria committed to the branch.",
-                color: "#a855f7",
-              },
-              {
-                title: "Security Audit",
-                desc: "OWASP-based security scan catches injection, XSS, SSRF, and supply chain risks. Violations are auto-remediated before PR.",
-                color: "#a855f7",
-              },
-              {
-                title: "Self-Healing CI",
-                desc: "When CI fails, Coderhelm reads the logs and pushes a fix automatically.",
-                color: "#a855f7",
-              },
-              {
-                title: "Feedback Loop",
-                desc: "Request changes or @mention Coderhelm on any PR comment. It fixes the code and pushes.",
-                color: "#a855f7",
-              },
-            ].map((f) => (
-              <div
-                key={f.title}
-                className="rounded-lg bg-white/[0.03] p-6 transition-colors hover:bg-white/[0.05]"
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-2 h-2 rounded-full" style={{ background: f.color }} />
-                  <h3 className="text-base font-semibold">{f.title}</h3>
-                </div>
-                <p className="text-sm text-text-secondary leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Guardrails highlight */}
-          <div className="mt-12 rounded-lg bg-white/[0.03] p-8 md:flex md:items-center md:gap-8">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-3">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                  <path d="M9 12l2 2 4-4" />
-                </svg>
-                <h3 className="text-lg font-semibold">Guardrails</h3>
-              </div>
-              <p className="text-text-secondary leading-relaxed">
-                Never pushes to main — built in. Add rules like &quot;always add tests&quot; or &quot;never delete migrations&quot;.
-                Enforced on every single run, no exceptions.
-              </p>
-            </div>
-            <div className="mt-6 md:mt-0 rounded-lg border border-[#21262d] bg-[#0d1117] p-4 font-mono text-xs md:w-80">
-              <div className="text-text-muted mb-2"># .coderhelm/rules.md</div>
-              <div className="text-emerald-400">✓ Always add tests</div>
-              <div className="text-emerald-400">✓ Never push to main</div>
-              <div className="text-emerald-400">✓ No migration deletes</div>
-              <div className="text-red-400 mt-1">✗ Direct DB queries blocked</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Product Section 3: AI Plans — Streaming Chat */}
       <section className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-6xl px-6">
@@ -746,16 +709,15 @@ export default function Home() {
               <p className="text-sm font-semibold text-orange-400 tracking-wider uppercase">Monitor</p>
               <h2 className="mt-3 text-3xl font-bold sm:text-4xl">AWS Log Analyzer</h2>
               <p className="mt-4 text-text-secondary leading-relaxed">
-                Connect your AWS account in one click. Coderhelm analyzes your CloudWatch Logs every 6 hours,
-                detects errors and patterns, and gives you actionable recommendations — ready to become a plan with one click.
+                Connect your AWS account in one click. Coderhelm scans your CloudWatch Logs every 6 hours, surfaces errors with severity and root cause, and turns every finding into an actionable plan.
               </p>
               <ul className="mt-6 space-y-2 text-sm text-text-secondary">
                 {[
-                  "One-click CloudFormation setup — read-only access, nothing else",
-                  "No logs stored — only aggregated error summaries leave your account",
-                  "Automatic secret & token detection — strips sensitive data before analysis",
-                  "AI-powered recommendations with severity and suggested fixes",
-                  "One click to create an executable plan from any recommendation",
+                  "One-click CloudFormation setup — read-only, nothing else",
+                  "Zero logs stored — only error summaries leave your account",
+                  "Secrets auto-detected and stripped before analysis",
+                  "AI severity scoring with root-cause suggestions",
+                  "One click from finding → executable plan",
                 ].map((t) => (
                   <li key={t} className="flex items-start gap-2">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="mt-1 shrink-0 text-orange-400"><polyline points="20 6 9 17 4 12" /></svg>
@@ -765,48 +727,98 @@ export default function Home() {
               </ul>
             </div>
 
-            {/* Security mockup */}
-            <div className="rounded-xl border border-[#21262d] bg-[#0d1117] p-5">
-              <div className="mb-4 flex items-center gap-2 border-b border-[#21262d] pb-3">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            {/* CloudWatch analysis dashboard mockup */}
+            <div className="rounded-xl border border-[#21262d] bg-[#0d1117] overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center gap-2.5 border-b border-[#21262d] px-5 py-3">
+                {/* AWS smile mark */}
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 10h16" />
+                  <path d="M5 14c3 4 11 4 14 0" />
                 </svg>
-                <span className="text-[11px] font-semibold text-text-secondary">Security First</span>
+                <span className="text-[11px] font-semibold text-text-secondary">CloudWatch Analysis</span>
+                <span className="ml-auto text-[9px] text-text-muted">us-east-1</span>
               </div>
-              <div className="space-y-3">
-                {[
-                  { label: "IAM Role", detail: "Read-only CloudWatch Logs — no write access", icon: (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
-                  ) },
-                  { label: "External ID", detail: "Confused deputy prevention built in", icon: (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
-                  ) },
-                  { label: "Temp Credentials", detail: "STS AssumeRole — no stored secrets", icon: (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-                  ) },
-                  { label: "Token Scrubbing", detail: "Secrets auto-detected and removed from logs", icon: (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" /></svg>
-                  ) },
-                  { label: "Tenant Isolation", detail: "Your data is never shared across accounts", icon: (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
-                  ) },
-                ].map((item) => (
-                  <div key={item.label} className="flex items-start gap-3 text-[11px]">
-                    <span className="shrink-0 mt-0.5">{item.icon}</span>
-                    <div>
-                      <span className="text-text-primary font-medium">{item.label}</span>
-                      <span className="text-text-muted ml-1.5">— {item.detail}</span>
+
+              <div className="p-4 space-y-3">
+                {/* Stat cards */}
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: "Errors detected", value: "12", color: "text-orange-400" },
+                    { label: "Critical", value: "3", color: "text-red-400" },
+                    { label: "Last scan", value: "2h ago", color: "text-text-secondary" },
+                  ].map((s) => (
+                    <div key={s.label} className="rounded-lg border border-[#21262d] bg-[#161b22] px-3 py-2.5 text-center">
+                      <div className={`text-base font-bold ${s.color}`}>{s.value}</div>
+                      <div className="text-[9px] text-text-muted mt-0.5">{s.label}</div>
                     </div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 pt-3 border-t border-[#21262d]">
-                <div className="rounded bg-orange-500/10 border border-orange-500/20 px-3 py-2 text-[10px] text-orange-300 flex items-start gap-1.5">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-px"><path d="M9 18h6" /><path d="M10 22h4" /><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z" /></svg>
-                  We also recommend adding a log filter in your AWS account to strip tokens and secrets before they reach CloudWatch.
+                  ))}
+                </div>
+
+                {/* Error entries */}
+                <div className="space-y-2">
+                  {[
+                    { severity: "critical", badge: "bg-red-500/15 text-red-400 border-red-500/20", msg: "OOMKilled in ecs-api-prod — container exceeded 512 MB limit", time: "34m ago" },
+                    { severity: "critical", badge: "bg-red-500/15 text-red-400 border-red-500/20", msg: "Connection refused on RDS pg-main:5432 — 28 occurrences in 1h", time: "1h ago" },
+                    { severity: "warning", badge: "bg-yellow-500/15 text-yellow-400 border-yellow-500/20", msg: "Lambda timeout on invoice-processor — 15s exceeded 3 times", time: "2h ago" },
+                  ].map((e) => (
+                    <div key={e.msg} className="rounded-lg border border-[#21262d] bg-[#161b22] px-3.5 py-2.5">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border ${e.badge}`}>{e.severity}</span>
+                        <span className="text-[9px] text-text-muted ml-auto">{e.time}</span>
+                      </div>
+                      <p className="text-[11px] text-text-secondary leading-relaxed">{e.msg}</p>
+                      <div className="mt-2 flex justify-end">
+                        <span className="text-[10px] text-orange-400 font-medium flex items-center gap-1 cursor-default">
+                          Create Plan
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Bottom bar */}
+                <div className="pt-2 border-t border-[#21262d] text-center">
+                  <span className="text-[10px] text-text-muted">Next scan in 4h · 3 log groups monitored</span>
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Feature grid */}
+          <div className="mt-12 grid gap-6 sm:grid-cols-3">
+            {[
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
+                ),
+                title: "Zero-config setup",
+                desc: "One CloudFormation click deploys a read-only IAM role. No agents, no daemons, nothing to maintain.",
+              },
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+                ),
+                title: "Privacy first",
+                desc: "Logs never leave your AWS account. Only aggregated error summaries are analyzed — secrets are stripped automatically.",
+              },
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a7 7 0 00-4.7 12.2A3.5 3.5 0 0010 21h4a3.5 3.5 0 002.7-6.8A7 7 0 0012 2z" /></svg>
+                ),
+                title: "AI recommendations",
+                desc: "Every finding includes severity, root cause analysis, and a suggested fix — ready to become an executable plan.",
+              },
+            ].map((f) => (
+              <div key={f.title} className="rounded-lg bg-white/[0.03] p-5 transition-colors hover:bg-white/[0.05]">
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-orange-400/10 text-orange-400 mb-3">
+                  {f.icon}
+                </div>
+                <h3 className="text-sm font-semibold text-text-primary">{f.title}</h3>
+                <p className="mt-1.5 text-[13px] text-text-secondary leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -814,65 +826,160 @@ export default function Home() {
       {/* MCP Servers */}
       <section className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-6xl px-6">
-          <div className="grid gap-12 md:grid-cols-2 md:items-center">
-            <div className="order-2 md:order-1 rounded-xl border border-[#21262d] bg-[#0d1117] p-5">
-              <div className="mb-4 flex items-center gap-2 border-b border-[#21262d] pb-3">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2v4" /><path d="M12 18v4" /><path d="M4.93 4.93l2.83 2.83" /><path d="M16.24 16.24l2.83 2.83" /><path d="M2 12h4" /><path d="M18 12h4" /><path d="M4.93 19.07l2.83-2.83" /><path d="M16.24 7.76l2.83-2.83" />
-                </svg>
-                <span className="text-[11px] font-semibold text-text-secondary">Integrations</span>
+          {/* Centered header */}
+          <div className="text-center">
+            <p className="text-sm font-semibold text-purple-400 tracking-wider uppercase">Integrate</p>
+            <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
+              MCP Servers.<br className="hidden sm:block" />
+              <span className="text-purple-400">Your tools, connected.</span>
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-text-secondary leading-relaxed">
+              Connect your tools so Coderhelm can pull context during planning and execution.
+              Pull Figma designs, query Sentry errors, check Datadog metrics, or read Notion docs — all while building your PRs.
+            </p>
+          </div>
+
+          {/* Connected tools dashboard mockup */}
+          <div className="mt-16 rounded-xl border border-[#21262d] bg-[#0d1117] overflow-hidden">
+            {/* Title bar */}
+            <div className="flex items-center gap-2 border-b border-[#21262d] px-5 py-3">
+              <div className="flex gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#333]" />
+                <div className="w-2.5 h-2.5 rounded-full bg-[#333]" />
+                <div className="w-2.5 h-2.5 rounded-full bg-[#333]" />
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { name: "Figma", cat: "Design" },
-                  { name: "Sentry", cat: "Monitoring" },
-                  { name: "Linear", cat: "Projects" },
-                  { name: "Notion", cat: "Docs" },
-                  { name: "Slack", cat: "Chat" },
-                  { name: "Datadog", cat: "Monitoring" },
-                  { name: "Vercel", cat: "Deploy" },
-                  { name: "Stripe", cat: "Payments" },
-                  { name: "PostHog", cat: "Analytics" },
-                  { name: "Supabase", cat: "Database" },
-                  { name: "Neon", cat: "Database" },
-                  { name: "Cloudflare", cat: "Deploy" },
-                ].map((p) => (
-                  <div key={p.name} className="flex items-center gap-2 rounded-md bg-white/[0.03] px-2.5 py-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-                    <div>
-                      <div className="text-[11px] font-medium text-text-primary">{p.name}</div>
-                      <div className="text-[9px] text-text-muted">{p.cat}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-3 pt-3 border-t border-[#21262d] text-center">
-                <span className="text-[10px] text-text-muted">28 MCP servers available across 13 categories</span>
-              </div>
+              <span className="ml-2 text-[11px] text-text-muted">coderhelm — integrations</span>
             </div>
 
-            <div className="order-1 md:order-2">
-              <p className="text-sm font-semibold text-purple-400 tracking-wider uppercase">Integrate</p>
-              <h2 className="mt-3 text-3xl font-bold sm:text-4xl">MCP Servers</h2>
-              <p className="mt-4 text-text-secondary leading-relaxed">
-                Connect your tools so Coderhelm can pull context during planning and execution.
-                Pull Figma designs, query Sentry errors, check Datadog metrics, or read Notion docs
-                while building your PRs.
-              </p>
-              <ul className="mt-6 space-y-2 text-sm text-text-secondary">
-                {[
-                  "One-click enable with API key or token",
-                  "Available during both AI Plans and PR runs",
-                  "Credentials encrypted at rest, tenant-isolated",
-                  "28 MCP servers: Design, Monitoring, Database, Deployment, and more",
-                ].map((t) => (
-                  <li key={t} className="flex items-start gap-2">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="mt-1 shrink-0 text-purple-400"><polyline points="20 6 9 17 4 12" /></svg>
-                    {t}
-                  </li>
-                ))}
-              </ul>
+            <div className="p-5">
+              {/* Search bar */}
+              <div className="flex items-center gap-2 rounded-lg border border-[#21262d] bg-[#161b22] px-3.5 py-2.5 mb-5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted shrink-0"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                <span className="text-[11px] text-text-muted">Search integrations...</span>
+              </div>
+
+              {/* Integration groups */}
+              <div className="space-y-4">
+                {/* Development & Design */}
+                <div>
+                  <p className="text-[9px] text-text-muted uppercase tracking-wider font-semibold mb-2">Development & Design</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {[
+                      { name: "GitHub", cat: "Version Control", connected: true },
+                      { name: "Figma", cat: "Design", connected: true },
+                      { name: "Linear", cat: "Projects", connected: true },
+                      { name: "Jira", cat: "Projects", connected: false },
+                    ].map((p) => (
+                      <div key={p.name} className="flex items-center gap-2.5 rounded-lg border border-[#21262d] bg-[#161b22] px-3 py-2.5">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${p.connected ? "bg-emerald-400" : "bg-zinc-600"}`} />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[11px] font-medium text-text-primary">{p.name}</div>
+                          <div className="text-[9px] text-text-muted">{p.cat}</div>
+                        </div>
+                        <span className={`text-[9px] font-medium shrink-0 ${p.connected ? "text-emerald-400" : "text-text-muted"}`}>
+                          {p.connected ? "Connected" : "Enable"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Monitoring & Analytics */}
+                <div>
+                  <p className="text-[9px] text-text-muted uppercase tracking-wider font-semibold mb-2">Monitoring & Analytics</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {[
+                      { name: "Sentry", cat: "Error Tracking", connected: true },
+                      { name: "Datadog", cat: "Monitoring", connected: true },
+                      { name: "PostHog", cat: "Analytics", connected: false },
+                      { name: "Vercel", cat: "Deploy", connected: true },
+                    ].map((p) => (
+                      <div key={p.name} className="flex items-center gap-2.5 rounded-lg border border-[#21262d] bg-[#161b22] px-3 py-2.5">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${p.connected ? "bg-emerald-400" : "bg-zinc-600"}`} />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[11px] font-medium text-text-primary">{p.name}</div>
+                          <div className="text-[9px] text-text-muted">{p.cat}</div>
+                        </div>
+                        <span className={`text-[9px] font-medium shrink-0 ${p.connected ? "text-emerald-400" : "text-text-muted"}`}>
+                          {p.connected ? "Connected" : "Enable"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Data & Communication */}
+                <div>
+                  <p className="text-[9px] text-text-muted uppercase tracking-wider font-semibold mb-2">Data & Communication</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {[
+                      { name: "Notion", cat: "Docs", connected: true },
+                      { name: "Slack", cat: "Chat", connected: true },
+                      { name: "Stripe", cat: "Payments", connected: false },
+                      { name: "Supabase", cat: "Database", connected: true },
+                    ].map((p) => (
+                      <div key={p.name} className="flex items-center gap-2.5 rounded-lg border border-[#21262d] bg-[#161b22] px-3 py-2.5">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${p.connected ? "bg-emerald-400" : "bg-zinc-600"}`} />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[11px] font-medium text-text-primary">{p.name}</div>
+                          <div className="text-[9px] text-text-muted">{p.cat}</div>
+                        </div>
+                        <span className={`text-[9px] font-medium shrink-0 ${p.connected ? "text-emerald-400" : "text-text-muted"}`}>
+                          {p.connected ? "Connected" : "Enable"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom bar */}
+              <div className="mt-4 pt-3 border-t border-[#21262d] text-center">
+                <span className="text-[10px] text-text-muted">9 connected · 28 MCP servers available across 13 categories</span>
+              </div>
             </div>
+          </div>
+
+          {/* Feature grid — 4 cols */}
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
+                ),
+                title: "One-click setup",
+                desc: "Enable any integration with an API key or OAuth token. No config files, no YAML.",
+              },
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
+                ),
+                title: "28+ integrations",
+                desc: "Design, monitoring, database, deployment, and more. New servers added every week.",
+              },
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" /></svg>
+                ),
+                title: "Available everywhere",
+                desc: "MCP servers are available during AI Plans, PR runs, and log analysis. Context flows automatically.",
+              },
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
+                ),
+                title: "Encrypted credentials",
+                desc: "All tokens encrypted at rest and tenant-isolated. Credentials never leave your organization boundary.",
+              },
+            ].map((f) => (
+              <div key={f.title} className="rounded-lg bg-white/[0.03] p-5 transition-colors hover:bg-white/[0.05]">
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-purple-400/10 text-purple-400 mb-3">
+                  {f.icon}
+                </div>
+                <h3 className="text-sm font-semibold text-text-primary">{f.title}</h3>
+                <p className="mt-1.5 text-[13px] text-text-secondary leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -883,52 +990,96 @@ export default function Home() {
           <div className="text-center">
             <p className="text-sm font-semibold text-emerald-400 tracking-wider uppercase">Security</p>
             <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
-              Enterprise-grade security
+              Built for teams that don&apos;t compromise<br className="hidden sm:block" /> on security.
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-text-secondary">
-              Your code never leaves your control. Every run is fully isolated.
+              Your code never leaves your control. Every run is fully isolated, every credential encrypted, every action auditable.
             </p>
           </div>
 
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Top row — 3 feature cards */}
+          <div className="mt-12 grid gap-6 sm:grid-cols-3">
             {[
               {
-                color: "#10b981",
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M2 7h20" /><path d="M12 17v4" /><path d="M8 21h8" /></svg>
+                ),
                 title: "Isolated Execution",
-                desc: "Every run executes in its own isolated container. No shared state — one team cannot access another's data.",
+                desc: "Every run executes in its own container. No shared state — one team cannot access another's data.",
+                tag: "Container-per-run",
               },
               {
-                color: "#3b82f6",
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" /></svg>
+                ),
                 title: "No Code Storage",
-                desc: "Reads your code through the GitHub API on-demand. Source code is never cloned to disk or stored on our servers.",
+                desc: "Source code is read through the GitHub API on-demand. Never cloned to disk or stored on our servers.",
+                tag: "Zero persistence",
               },
               {
-                color: "#a855f7",
-                title: "Team Isolation",
-                desc: "All data is partitioned by team ID. Every API call is scoped to your organization — cross-team access is architecturally impossible.",
-              },
-              {
-                color: "#00d4ff",
-                title: "Webhook Verification",
-                desc: "Every incoming webhook — GitHub, Stripe, Jira — is cryptographically verified before processing.",
-              },
-              {
-                color: "#f43f5e",
-                title: "Rate-Limited & Audited",
-                desc: "Sensitive endpoints are rate-limited per organization. Every action is logged for full auditability.",
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
+                ),
+                title: "Encrypted Everything",
+                desc: "All credentials, tokens, and secrets are encrypted at rest. Team data is partitioned — cross-team access is architecturally impossible.",
+                tag: "AES-256",
               },
             ].map((f) => (
-              <div
-                key={f.title}
-                className="rounded-lg bg-white/[0.03] p-6 transition-colors hover:bg-white/[0.05]"
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-2 h-2 rounded-full" style={{ background: f.color }} />
-                  <h3 className="text-base font-semibold">{f.title}</h3>
+              <div key={f.title} className="rounded-lg bg-white/[0.03] p-6 transition-colors hover:bg-white/[0.05]">
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-400/10 text-emerald-400 mb-4">
+                  {f.icon}
                 </div>
-                <p className="text-sm text-text-secondary leading-relaxed">{f.desc}</p>
+                <h3 className="text-base font-semibold text-text-primary">{f.title}</h3>
+                <p className="mt-2 text-[13px] text-text-secondary leading-relaxed">{f.desc}</p>
+                <div className="mt-4 pt-3 border-t border-[#21262d]">
+                  <span className="text-[10px] font-medium text-emerald-400/80 bg-emerald-400/10 px-2 py-0.5 rounded">{f.tag}</span>
+                </div>
               </div>
             ))}
+          </div>
+
+          {/* Bottom row — security dashboard bar */}
+          <div className="mt-6 rounded-xl border border-[#21262d] bg-[#0d1117] p-5">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-0 md:divide-x md:divide-[#21262d]">
+              {[
+                {
+                  icon: (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M2 7h20" /></svg>
+                  ),
+                  label: "Isolation",
+                  value: "Container-per-run",
+                },
+                {
+                  icon: (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="9" y1="15" x2="15" y2="9" /></svg>
+                  ),
+                  label: "Code storage",
+                  value: "None",
+                },
+                {
+                  icon: (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
+                  ),
+                  label: "Encryption",
+                  value: "AES-256 at rest",
+                },
+                {
+                  icon: (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" /></svg>
+                  ),
+                  label: "Access",
+                  value: "Team-scoped RBAC",
+                },
+              ].map((m) => (
+                <div key={m.label} className="flex items-center gap-3 md:justify-center md:px-4">
+                  <span className="text-emerald-400 shrink-0">{m.icon}</span>
+                  <div>
+                    <div className="text-[10px] text-text-muted">{m.label}</div>
+                    <div className="text-[12px] font-semibold text-text-primary">{m.value}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
