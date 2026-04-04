@@ -35,3 +35,4 @@ export const ScanIcon = () => <svg {...s}><path d="M3 7V5a2 2 0 012-2h2" /><path
 
 // Plugin icon (puzzle piece)
 export const PluginIcon = () => <svg {...s}><path d="M12 2v4" /><path d="M12 18v4" /><path d="M4.93 4.93l2.83 2.83" /><path d="M16.24 16.24l2.83 2.83" /><path d="M2 12h4" /><path d="M18 12h4" /><path d="M4.93 19.07l2.83-2.83" /><path d="M16.24 7.76l2.83-2.83" /></svg>;
+export const TemplateIcon = () => <svg {...s}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>;
