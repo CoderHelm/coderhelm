@@ -314,13 +314,23 @@ function RunDetailInner() {
         </div>
       )}
 
-      {/* Error banner */}
+      {/* Error / clarification banner */}
       {run.error && (
-        <div className="mb-6 rounded-lg border border-red-500/20 bg-red-500/5 p-4">
+        <div className={`mb-6 rounded-lg border p-4 ${
+          run.status === "needs_input"
+            ? "border-amber-500/20 bg-amber-500/5"
+            : "border-red-500/20 bg-red-500/5"
+        }`}>
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-red-400 mb-1">Error</p>
-              <pre className="text-sm text-red-300/80 whitespace-pre-wrap font-mono leading-relaxed">{sanitizeError(run.error)}</pre>
+              <p className={`text-sm font-medium mb-1 ${
+                run.status === "needs_input" ? "text-amber-400" : "text-red-400"
+              }`}>
+                {run.status === "needs_input" ? "Needs more detail" : "Error"}
+              </p>
+              <pre className={`text-sm whitespace-pre-wrap font-mono leading-relaxed ${
+                run.status === "needs_input" ? "text-amber-300/80" : "text-red-300/80"
+              }`}>{sanitizeError(run.error)}</pre>
             </div>
             {run.status === "failed" && run.current_pass === "feedback" && run.pr_url && (
               <button
