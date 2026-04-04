@@ -176,6 +176,27 @@ export const api = {
     request<{ status: string; tasks_queued: number }>(`/api/plans/${planId}/execute`, { method: "POST" }),
   approveAllAndExecute: (planId: string) =>
     request<{ status: string; tasks_queued: number }>(`/api/plans/${planId}/approve-and-execute`, { method: "POST" }),
+  generatePlanOpenspec: (planId: string) =>
+    request<{ files: string[] }>(`/api/plans/${planId}/openspec/generate`, { method: "POST" }),
+  getPlanOpenspec: (planId: string) =>
+    request<{ proposal: string; design: string; tasks: string; spec: string }>(`/api/plans/${planId}/openspec`),
+
+  // Plan Templates
+  listTemplates: (params?: { limit?: number; cursor?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.cursor) qs.set("cursor", params.cursor);
+    const q = qs.toString();
+    return request<{ templates: Template[]; next_cursor?: string }>(`/api/plans/templates${q ? `?${q}` : ""}`);
+  },
+  createTemplate: (body: { title: string; description?: string; category?: string; tags?: string[]; task_templates?: TaskTemplate[] }) =>
+    request<{ template_id: string }>("/api/plans/templates", { method: "POST", body: JSON.stringify(body) }),
+  createTemplateFromPlan: (planId: string, body: { title?: string; description?: string; category?: string; tags?: string[] }) =>
+    request<{ template_id: string }>(`/api/plans/templates/from-plan/${planId}`, { method: "POST", body: JSON.stringify(body) }),
+  getTemplate: (templateId: string) => request<Template>(`/api/plans/templates/${templateId}`),
+  deleteTemplate: (templateId: string) => request<void>(`/api/plans/templates/${templateId}`, { method: "DELETE" }),
+  useTemplate: (templateId: string, body: { title?: string; description?: string; repo?: string; destination?: string }) =>
+    request<{ plan_id: string }>(`/api/plans/templates/${templateId}/use`, { method: "POST", body: JSON.stringify(body) }),
 
   // Infrastructure
   getInfrastructure: () => request<InfraAnalysis>("/api/infrastructure"),
@@ -455,6 +476,27 @@ export interface Task {
   approved_by?: string;
   rejected_at?: string;
   rejected_by?: string;
+  created_at: string;
+}
+
+export interface TaskTemplate {
+  title: string;
+  description: string;
+  acceptance_criteria: string;
+  repo?: string;
+  order: number;
+}
+
+export interface Template {
+  template_id: string;
+  title: string;
+  description: string;
+  category?: string;
+  tags?: string[];
+  task_templates?: TaskTemplate[];
+  task_count: number;
+  usage_count: number;
+  created_by: string;
   created_at: string;
 }
 
