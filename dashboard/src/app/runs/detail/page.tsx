@@ -177,6 +177,7 @@ function RunDetailInner() {
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [plugins, setPlugins] = useState<{ catalog: PluginDef[]; enabled: EnabledPlugin[] }>({ catalog: [], enabled: [] });
   const [traces, setTraces] = useState<PassTrace[]>([]);
+  const [pipelineOpen, setPipelineOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => { api.getBilling().then(setBilling).catch(() => {}); }, []);
@@ -420,9 +421,10 @@ function RunDetailInner() {
         <StatCard label="Tokens Out" value={formatTokens(run.tokens_out)} />
       </div>
 
-      {/* Pass pipeline */}
+      {/* Pass pipeline (collapsed by default) */}
       {traces.length > 0 && (() => {
         const maxDuration = Math.max(...traces.map((t) => t.duration_ms), 1);
+        const totalDuration = traces.reduce((s, t) => s + t.duration_ms, 0);
         const totalTokens = traces.reduce((s, t) => s + (t.input_tokens || 0) + (t.output_tokens || 0), 0);
         const passColors: Record<string, string> = {
           triage: "from-violet-500/80 to-violet-600/40",
@@ -444,82 +446,100 @@ function RunDetailInner() {
         };
         return (
           <div className="mb-6 border border-zinc-800 rounded-lg overflow-hidden">
-            {/* Stacked bar showing relative time per pass */}
-            <div className="flex h-2">
-              {traces.map((trace) => {
-                const baseName = trace.pass.split(":")[0];
-                return (
-                  <div
-                    key={trace.pass}
-                    className={`h-full bg-gradient-to-r ${passColors[baseName] || "from-zinc-500/80 to-zinc-600/40"}`}
-                    style={{ width: `${Math.max((trace.duration_ms / maxDuration) * 100, 1)}%` }}
-                    title={`${trace.pass}: ${trace.duration_ms >= 60000 ? `${(trace.duration_ms / 60000).toFixed(1)}m` : `${(trace.duration_ms / 1000).toFixed(1)}s`}`}
-                  />
-                );
-              })}
-            </div>
+            {/* Clickable summary header */}
+            <button
+              onClick={() => setPipelineOpen((o) => !o)}
+              className="w-full text-left cursor-pointer"
+            >
+              {/* Stacked proportional bar */}
+              <div className="flex h-1.5">
+                {traces.map((trace) => {
+                  const baseName = trace.pass.split(":")[0];
+                  return (
+                    <div
+                      key={trace.pass}
+                      className={`h-full bg-gradient-to-r ${passColors[baseName] || "from-zinc-500/80 to-zinc-600/40"}`}
+                      style={{ width: `${Math.max((trace.duration_ms / totalDuration) * 100, 1)}%` }}
+                    />
+                  );
+                })}
+              </div>
 
-            {/* Pass rows */}
-            <div className="divide-y divide-zinc-800/50">
-              {traces.map((trace) => {
-                const baseName = trace.pass.split(":")[0];
-                const passLabel = trace.pass.includes(":") ? trace.pass.replace(":", " #") : trace.pass;
-                const pct = (trace.duration_ms / maxDuration) * 100;
-                const passTokens = (trace.input_tokens || 0) + (trace.output_tokens || 0);
-                const tokenPct = totalTokens > 0 ? (passTokens / totalTokens) * 100 : 0;
-                const cached = trace.cache_read_tokens || 0;
-                const duration = trace.duration_ms >= 60000
-                  ? `${(trace.duration_ms / 60000).toFixed(1)}m`
-                  : `${(trace.duration_ms / 1000).toFixed(1)}s`;
+              {/* Compact pass chips */}
+              <div className="px-4 py-2.5 flex items-center gap-3 flex-wrap">
+                {traces.map((trace) => {
+                  const baseName = trace.pass.split(":")[0];
+                  const label = trace.pass.includes(":") ? trace.pass.replace(":", " #") : trace.pass;
+                  const dur = trace.duration_ms >= 60000
+                    ? `${(trace.duration_ms / 60000).toFixed(1)}m`
+                    : `${(trace.duration_ms / 1000).toFixed(1)}s`;
+                  return (
+                    <span key={trace.pass} className="flex items-center gap-1.5 text-xs text-zinc-400">
+                      <span className={`w-1.5 h-1.5 rounded-full ${dotColors[baseName] || "bg-zinc-400"}`} />
+                      {label}
+                      <span className="text-zinc-600 font-mono">{dur}</span>
+                    </span>
+                  );
+                })}
+                <span className="ml-auto text-[11px] text-zinc-600">
+                  {pipelineOpen ? "▲" : "▼"}
+                </span>
+              </div>
+            </button>
 
-                return (
-                  <div key={trace.pass} className="px-4 py-3 hover:bg-zinc-800/30 transition-colors">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${dotColors[baseName] || "bg-zinc-400"}`} />
-                        <span className="text-sm font-medium text-zinc-200">{passLabel}</span>
-                        {trace.error && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-medium">error</span>
+            {/* Expanded detail rows */}
+            {pipelineOpen && (
+              <div className="divide-y divide-zinc-800/50 border-t border-zinc-800/50">
+                {traces.map((trace) => {
+                  const baseName = trace.pass.split(":")[0];
+                  const passLabel = trace.pass.includes(":") ? trace.pass.replace(":", " #") : trace.pass;
+                  const pct = (trace.duration_ms / maxDuration) * 100;
+                  const passTokens = (trace.input_tokens || 0) + (trace.output_tokens || 0);
+                  const tokenPct = totalTokens > 0 ? (passTokens / totalTokens) * 100 : 0;
+                  const cached = trace.cache_read_tokens || 0;
+                  const duration = trace.duration_ms >= 60000
+                    ? `${(trace.duration_ms / 60000).toFixed(1)}m`
+                    : `${(trace.duration_ms / 1000).toFixed(1)}s`;
+
+                  return (
+                    <div key={trace.pass} className="px-4 py-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${dotColors[baseName] || "bg-zinc-400"}`} />
+                          <span className="text-sm font-medium text-zinc-200">{passLabel}</span>
+                          {trace.error && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-medium">error</span>
+                          )}
+                        </div>
+                        <span className="text-sm font-mono text-zinc-400">{duration}</span>
+                      </div>
+
+                      <div className="h-1.5 bg-zinc-900 rounded-full overflow-hidden mb-2">
+                        <div
+                          className={`h-full rounded-full bg-gradient-to-r ${passColors[baseName] || "from-zinc-500/80 to-zinc-600/40"}`}
+                          style={{ width: `${Math.max(pct, 2)}%` }}
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3 text-[11px]">
+                        {passTokens > 0 ? (
+                          <>
+                            <span className="text-zinc-500">{formatTokens(trace.input_tokens)} in</span>
+                            <span className="text-zinc-500">{formatTokens(trace.output_tokens)} out</span>
+                            {cached > 0 && (
+                              <span className="text-zinc-600">{formatTokens(cached)} cached</span>
+                            )}
+                            <span className="ml-auto text-zinc-600 tabular-nums">{tokenPct.toFixed(0)}% of tokens</span>
+                          </>
+                        ) : (
+                          <span className="text-zinc-600 italic">no LLM calls</span>
                         )}
                       </div>
-                      <span className="text-sm font-mono text-zinc-400">{duration}</span>
                     </div>
-
-                    {/* Duration bar */}
-                    <div className="h-1.5 bg-zinc-900 rounded-full overflow-hidden mb-2">
-                      <div
-                        className={`h-full rounded-full bg-gradient-to-r ${passColors[baseName] || "from-zinc-500/80 to-zinc-600/40"}`}
-                        style={{ width: `${Math.max(pct, 2)}%` }}
-                      />
-                    </div>
-
-                    {/* Token chips */}
-                    <div className="flex items-center gap-3 text-[11px]">
-                      {passTokens > 0 ? (
-                        <>
-                          <span className="text-zinc-500">
-                            {formatTokens(trace.input_tokens)} in
-                          </span>
-                          <span className="text-zinc-500">
-                            {formatTokens(trace.output_tokens)} out
-                          </span>
-                          {cached > 0 && (
-                            <span className="text-zinc-600">
-                              {formatTokens(cached)} cached
-                            </span>
-                          )}
-                          <span className="ml-auto text-zinc-600 tabular-nums">
-                            {tokenPct.toFixed(0)}% of tokens
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-zinc-600 italic">no LLM calls</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })()}
