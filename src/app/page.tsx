@@ -57,6 +57,7 @@ export default function Home() {
               <div className="mt-4 space-y-1.5">
                 {[
                   { step: "triage    ", detail: "feature · medium priority", time: "0.8s",   color: "#10b981" },
+                  { step: "resolve   ", detail: "notion › page loaded",       time: "1.2s",   color: "#10b981" },
                   { step: "plan      ", detail: "5 files · 3 new functions", time: "2.1s",   color: "#10b981" },
                   { step: "validate  ", detail: "all files exist · scope OK", time: "0.1s",   color: "#10b981" },
                   { step: "implement ", detail: "+87 −12 across 3 files",    time: "47s",    color: "#10b981" },
@@ -168,7 +169,7 @@ export default function Home() {
               <span className="gradient-text">not a single prompt.</span>
             </h2>
             <p className="mx-auto mt-5 max-w-2xl text-text-secondary text-lg">
-              Every issue triggers an orchestrated state machine. Eight specialized agents pass structured state from stage to stage — with self-healing loops and automatic retries built into the fabric.
+              Every issue triggers an orchestrated state machine. Nine specialized agents pass structured state from stage to stage — with self-healing loops and automatic retries built into the fabric.
             </p>
           </div>
 
@@ -193,7 +194,7 @@ export default function Home() {
             </div>
 
             {/* Flowing pipeline */}
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               {[
                 {
                   name: "Triage",
@@ -202,6 +203,16 @@ export default function Home() {
                   icon: (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
+                    </svg>
+                  ),
+                },
+                {
+                  name: "Resolve",
+                  color: "#a78bfa",
+                  desc: "Fetches external context — Notion docs, Figma designs, Sentry errors — via MCP tools.",
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" /><path d="M2 12h20" /><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
                     </svg>
                   ),
                 },
@@ -307,7 +318,7 @@ export default function Home() {
                         {agent.icon}
                       </div>
                       <div>
-                        <span className="text-[10px] font-mono text-zinc-600">{String(i + 5).padStart(2, "0")}</span>
+                        <span className="text-[10px] font-mono text-zinc-600">{String(i + 6).padStart(2, "0")}</span>
                         <h3 className="text-sm font-semibold -mt-0.5" style={{ color: agent.color }}>{agent.name}</h3>
                       </div>
                       {agent.loop && (
@@ -362,7 +373,7 @@ export default function Home() {
           {/* Stats */}
           <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { value: "8", label: "Specialized agents", color: "#06b6d4" },
+              { value: "9", label: "Specialized agents", color: "#06b6d4" },
               { value: "3×", label: "Self-healing loops", color: "#3b82f6" },
               { value: "40+", label: "Tool calls per run", color: "#8b5cf6" },
               { value: "<5m", label: "Issue to PR", color: "#10b981" },
