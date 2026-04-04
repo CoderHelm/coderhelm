@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { api, type Template } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
+import { TrashIcon } from "@/components/icons";
 import { TableSkeleton } from "@/components/skeleton";
 
 export default function TemplatesPage() {
@@ -135,10 +136,10 @@ export default function TemplatesPage() {
                   </button>
                   <button
                     onClick={() => handleDelete(t.template_id)}
-                    className="px-2 py-2 text-zinc-600 hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition-all"
+                    className="px-2 py-2 text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
                     title="Delete template"
                   >
-                    ✕
+                    <TrashIcon />
                   </button>
                 </div>
               </div>

@@ -6,6 +6,7 @@ interface ConfirmOptions {
   title: string;
   message: string;
   confirmLabel?: string;
+  cancelLabel?: string;
   secondaryLabel?: string;
   destructive?: boolean;
 }
@@ -52,7 +53,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                 onClick={() => close(false)}
                 className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800"
               >
-                Keep subscription
+                {opts.cancelLabel || "Cancel"}
               </button>
               {opts.secondaryLabel && (
                 <button
