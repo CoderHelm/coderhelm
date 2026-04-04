@@ -493,6 +493,7 @@ function Sidebar({
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
     if (href === "/settings") return pathname === "/settings";
+    if (href === "/plans") return pathname === "/plans" || pathname.startsWith("/plans/detail") || pathname.startsWith("/plans/new");
     return pathname.startsWith(href);
   };
 
