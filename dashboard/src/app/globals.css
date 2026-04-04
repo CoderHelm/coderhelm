@@ -43,6 +43,31 @@ button:disabled {
   animation: toast-in 0.15s ease-out;
 }
 
+/* Streaming chat animations */
+@keyframes cursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+@utility animate-cursor-blink {
+  animation: cursor-blink 0.8s step-end infinite;
+}
+
+@keyframes message-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility animate-message-in {
+  animation: message-in 0.15s ease-out;
+}
+
 /* Force dark autofill — covers Chrome native autofill AND extension fills
    (1Password, LastPass, Bitwarden etc.) that inject via JS/inline styles. */
 @keyframes autofill-dark {
