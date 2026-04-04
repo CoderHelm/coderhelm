@@ -219,7 +219,7 @@ function RunDetailInner() {
   // Auto-poll running runs every 5s
   useEffect(() => {
     if (!run || run.status !== "running") return;
-    const interval = setInterval(fetchRun, 5000);
+    const interval = setInterval(fetchRun, 3000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run?.status, fetchRun]);
@@ -646,20 +646,45 @@ function RunDetailInner() {
                   time={run.created_at}
                   status="done"
                 />
-                {run.pass_history?.map((entry, i) => (
-                  <TrailEntry
-                    key={i}
-                    label={`${entry.pass.charAt(0).toUpperCase()}${entry.pass.slice(1)} started`}
-                    time={entry.started_at}
-                    status={
-                      run.status === "failed" && i === (run.pass_history?.length ?? 0) - 1
-                        ? "failed"
-                        : run.status === "running" && i === (run.pass_history?.length ?? 0) - 1
-                          ? "active"
-                          : "done"
+                {(() => {
+                  // Merge pass_history and progress_notes into a unified timeline
+                  const events: { label: string; time: string; kind: "pass" | "note" | "terminal"; idx: number }[] = [];
+                  run.pass_history?.forEach((entry, i) => {
+                    events.push({
+                      label: `${entry.pass.charAt(0).toUpperCase()}${entry.pass.slice(1)} started`,
+                      time: entry.started_at,
+                      kind: "pass",
+                      idx: i,
+                    });
+                  });
+                  run.progress_notes?.forEach((note) => {
+                    events.push({
+                      label: note.message,
+                      time: note.timestamp,
+                      kind: "note",
+                      idx: -1,
+                    });
+                  });
+                  events.sort((a, b) => a.time.localeCompare(b.time));
+
+                  const lastPassIdx = (run.pass_history?.length ?? 0) - 1;
+                  return events.map((ev, i) => {
+                    let status: "done" | "active" | "failed" = "done";
+                    if (ev.kind === "pass") {
+                      if (run.status === "failed" && ev.idx === lastPassIdx) status = "failed";
+                      else if (run.status === "running" && ev.idx === lastPassIdx) status = "active";
                     }
-                  />
-                ))}
+                    return (
+                      <TrailEntry
+                        key={`${ev.kind}-${i}`}
+                        label={ev.label}
+                        time={ev.time}
+                        status={status}
+                        isNote={ev.kind === "note"}
+                      />
+                    );
+                  });
+                })()}
                 {run.status === "completed" && (
                   <TrailEntry
                     label="Run completed"
@@ -779,15 +804,17 @@ function sanitizeError(msg: string): string {
     .trim();
 }
 
-function TrailEntry({ label, time, status }: { label: string; time?: string; status: "done" | "active" | "failed" }) {
+function TrailEntry({ label, time, status, isNote }: { label: string; time?: string; status: "done" | "active" | "failed"; isNote?: boolean }) {
   const dotColor =
     status === "failed" ? "bg-red-400" :
     status === "active" ? "bg-blue-400 animate-pulse" :
+    isNote ? "bg-zinc-600" :
     "bg-emerald-400";
+  const dotSize = isNote ? "w-[7px] h-[7px] ml-[2px]" : "w-[11px] h-[11px]";
   return (
     <div className="flex items-center gap-3 relative pl-0">
-      <div className={`w-[11px] h-[11px] rounded-full ${dotColor} z-10 flex-shrink-0`} />
-      <span className={`text-sm ${status === "failed" ? "text-red-400" : status === "active" ? "text-blue-400" : "text-zinc-300"}`}>
+      <div className={`${dotSize} rounded-full ${dotColor} z-10 flex-shrink-0`} />
+      <span className={`text-sm ${isNote ? "text-zinc-500" : status === "failed" ? "text-red-400" : status === "active" ? "text-blue-400" : "text-zinc-300"}`}>
         {label}
       </span>
       {time && (

@@ -299,6 +299,7 @@ export interface RunDetail extends Run {
   error?: string;
   updated_at?: string;
   pass_history?: { pass: string; started_at: string }[];
+  progress_notes?: { message: string; timestamp: string }[];
 }
 
 export interface PassTrace {
