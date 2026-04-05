@@ -761,10 +761,12 @@ export default function NewPlanPage() {
                               <p className="text-sm text-zinc-400 mt-1.5 leading-relaxed whitespace-pre-wrap">{task.description}</p>
                             )}
                             {task.acceptance_criteria && (
-                              <div className="mt-2">
-                                <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Acceptance criteria</p>
-                                <pre className="text-xs text-zinc-400 font-mono whitespace-pre-wrap leading-relaxed">{task.acceptance_criteria}</pre>
-                              </div>
+                              <details className="mt-2">
+                                <summary className="text-xs text-zinc-600 cursor-pointer hover:text-zinc-400 transition-colors">
+                                  Acceptance criteria
+                                </summary>
+                                <p className="text-xs text-zinc-500 mt-1 leading-relaxed whitespace-pre-wrap">{task.acceptance_criteria}</p>
+                              </details>
                             )}
                           </div>
                         </div>
@@ -772,38 +774,30 @@ export default function NewPlanPage() {
                     ))}
                   </div>
 
-                  <div>
-                    <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Destination</p>
+                  {/* Destination picker */}
+                  <div className="pt-2 border-t border-zinc-800">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Save to</p>
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => setDestination("github")}
-                        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors cursor-pointer ${
-                          destination === "github"
-                            ? "border-zinc-600 bg-zinc-800 text-zinc-100"
-                            : "border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
-                        }`}
-                      >
-                        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-                        GitHub Issues
-                      </button>
-                      <button
-                        onClick={() => setDestination("jira")}
-                        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors cursor-pointer ${
-                          destination === "jira"
-                            ? "border-zinc-600 bg-zinc-800 text-zinc-100"
-                            : "border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
-                        }`}
-                      >
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M11.53 2c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.94 4.34 4.34 4.35V2.84a.84.84 0 00-.84-.84H11.53zM6.77 6.8a4.36 4.36 0 004.34 4.34h1.8v1.72a4.36 4.36 0 004.34 4.34V7.63a.84.84 0 00-.84-.84H6.77zM2 11.6a4.35 4.35 0 004.34 4.34h1.8v1.72A4.35 4.35 0 0012.48 22v-9.57a.84.84 0 00-.84-.84H2z"/></svg>
-                        Jira Tickets
-                      </button>
+                      {(["github", "jira"] as const).map((d) => (
+                        <button
+                          key={d}
+                          onClick={() => setDestination(d)}
+                          className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
+                            destination === d
+                              ? "bg-zinc-700 border-zinc-600 text-zinc-100"
+                              : "bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-400"
+                          }`}
+                        >
+                          {d === "github" ? "GitHub Issues" : "Jira"}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
                   <button
                     onClick={savePlan}
                     disabled={saving}
-                    className="w-full px-4 py-2.5 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-50 cursor-pointer"
+                    className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 cursor-pointer"
                   >
                     {saving ? "Saving..." : "Save plan"}
                   </button>
