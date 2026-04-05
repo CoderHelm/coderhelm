@@ -285,23 +285,8 @@ function PlanDetail() {
     setActionLoading(taskId + ":approve");
     try {
       await api.approveTask(planId, taskId);
-      toast("Task approved");
-      const updated = await api.getPlan(planId);
-      setPlan(updated);
-      // Auto-execute if all tasks are now approved (no drafts left)
-      const remaining = updated.tasks.filter((t) => t.status === "draft").length;
-      if (remaining === 0 && updated.status === "draft") {
-        setExecuting(true);
-        try {
-          const result = await api.executePlan(planId);
-          toast(`All approved — ${result.tasks_queued} task${result.tasks_queued !== 1 ? "s" : ""} queued`);
-          refresh();
-        } catch {
-          toast("Failed to auto-execute", "error");
-        } finally {
-          setExecuting(false);
-        }
-      }
+      toast("Task approved & queued");
+      refresh();
     } catch {
       toast("Failed to approve task", "error");
     } finally {
