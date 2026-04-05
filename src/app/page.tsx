@@ -530,133 +530,271 @@ export default function Home() {
 
       {/* Agent Memory — Learns Your Codebase */}
       <section className="border-t border-surface-border py-28 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(139,92,246,0.3) 1px, transparent 0)", backgroundSize: "40px 40px" }} />
+        {/* Ambient glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-purple-500/[0.03] blur-[120px]" />
+
         <div className="relative mx-auto max-w-6xl px-6">
+          {/* Header */}
           <div className="text-center">
             <p className="text-sm font-semibold text-purple-400 tracking-wider uppercase">Agent Memory</p>
             <h2 className="mt-3 text-3xl font-bold sm:text-5xl">
-              Learns your codebase.<br className="hidden sm:block" />
-              <span className="text-purple-400">Gets smarter every run.</span>
+              A knowledge graph<br className="hidden sm:block" />
+              <span className="text-purple-400">that learns your codebase.</span>
             </h2>
             <p className="mx-auto mt-5 max-w-2xl text-text-secondary text-lg">
-              Most AI tools start from scratch every time. Coderhelm remembers what worked, what broke,
-              and how your team writes code. The more you use it, the better it gets.
+              Every run builds a living knowledge graph of your repository. Patterns, mistakes, conventions, architecture decisions — all
+              connected, weighted, and retrieved exactly when the agent needs them.
             </p>
           </div>
 
-          {/* Timeline visualization */}
-          <div className="mt-20 relative">
-            <div className="hidden md:block absolute top-1/2 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-500/30 to-transparent -translate-y-1/2" />
-            <div className="grid gap-8 md:grid-cols-3">
+          {/* Neural graph visualization + stats */}
+          <div className="mt-20 grid gap-8 lg:grid-cols-[1fr_380px] items-center">
+            {/* Animated knowledge graph SVG */}
+            <div className="relative rounded-2xl border border-zinc-800 bg-[#080b10] p-8 overflow-hidden min-h-[400px]">
+              {/* Grid background */}
+              <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: "linear-gradient(rgba(139,92,246,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,0.5) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+
+              <svg viewBox="0 0 560 360" className="relative w-full h-auto" fill="none">
+                {/* Edges (connections between memory nodes) */}
+                <g opacity="0.15" stroke="#a78bfa" strokeWidth="1">
+                  <line x1="280" y1="180" x2="140" y2="80" className="memory-edge" />
+                  <line x1="280" y1="180" x2="420" y2="100" className="memory-edge" />
+                  <line x1="280" y1="180" x2="180" y2="280" className="memory-edge" />
+                  <line x1="280" y1="180" x2="400" y2="260" className="memory-edge" />
+                  <line x1="280" y1="180" x2="100" y2="180" className="memory-edge" />
+                  <line x1="280" y1="180" x2="480" y2="180" className="memory-edge" />
+                  <line x1="140" y1="80" x2="60" y2="40" className="memory-edge" />
+                  <line x1="140" y1="80" x2="220" y2="40" className="memory-edge" />
+                  <line x1="420" y1="100" x2="500" y2="50" className="memory-edge" />
+                  <line x1="420" y1="100" x2="500" y2="160" className="memory-edge" />
+                  <line x1="180" y1="280" x2="100" y2="320" className="memory-edge" />
+                  <line x1="180" y1="280" x2="260" y2="330" className="memory-edge" />
+                  <line x1="400" y1="260" x2="460" y2="320" className="memory-edge" />
+                  <line x1="400" y1="260" x2="340" y2="320" className="memory-edge" />
+                  <line x1="100" y1="180" x2="40" y2="120" className="memory-edge" />
+                  <line x1="480" y1="180" x2="530" y2="240" className="memory-edge" />
+                </g>
+
+                {/* Animated data flow pulses along edges */}
+                <circle r="2.5" fill="#a78bfa" opacity="0.8">
+                  <animateMotion dur="3s" repeatCount="indefinite" path="M280,180 L140,80" />
+                </circle>
+                <circle r="2.5" fill="#c084fc" opacity="0.8">
+                  <animateMotion dur="2.5s" repeatCount="indefinite" path="M280,180 L420,100" />
+                </circle>
+                <circle r="2" fill="#a78bfa" opacity="0.6">
+                  <animateMotion dur="4s" repeatCount="indefinite" path="M280,180 L180,280" />
+                </circle>
+                <circle r="2" fill="#c084fc" opacity="0.6">
+                  <animateMotion dur="3.5s" repeatCount="indefinite" path="M280,180 L400,260" />
+                </circle>
+                <circle r="1.5" fill="#a78bfa" opacity="0.5">
+                  <animateMotion dur="2.8s" repeatCount="indefinite" path="M140,80 L60,40" />
+                </circle>
+                <circle r="1.5" fill="#c084fc" opacity="0.5">
+                  <animateMotion dur="3.2s" repeatCount="indefinite" path="M420,100 L500,50" />
+                </circle>
+
+                {/* Central hub node */}
+                <circle cx="280" cy="180" r="22" fill="#7c3aed" fillOpacity="0.1" stroke="#7c3aed" strokeWidth="1.5" className="memory-hub" />
+                <circle cx="280" cy="180" r="14" fill="#7c3aed" fillOpacity="0.2" stroke="#a78bfa" strokeWidth="1" />
+                <text x="280" y="184" textAnchor="middle" fill="#c084fc" fontSize="9" fontWeight="600" fontFamily="monospace">REPO</text>
+
+                {/* Primary cluster nodes (semantic memories) */}
+                {[
+                  { cx: 140, cy: 80, label: "Patterns", color: "#8b5cf6" },
+                  { cx: 420, cy: 100, label: "Security", color: "#ef4444" },
+                  { cx: 180, cy: 280, label: "Reviews", color: "#3b82f6" },
+                  { cx: 400, cy: 260, label: "Tests", color: "#10b981" },
+                  { cx: 100, cy: 180, label: "Style", color: "#f59e0b" },
+                  { cx: 480, cy: 180, label: "Anti-patterns", color: "#ec4899" },
+                ].map((n) => (
+                  <g key={n.label}>
+                    <circle cx={n.cx} cy={n.cy} r="16" fill={n.color} fillOpacity="0.08" stroke={n.color} strokeWidth="1" strokeOpacity="0.4" />
+                    <circle cx={n.cx} cy={n.cy} r="4" fill={n.color} fillOpacity="0.6">
+                      <animate attributeName="r" values="3;5;3" dur="3s" repeatCount="indefinite" />
+                    </circle>
+                    <text x={n.cx} y={n.cy + 28} textAnchor="middle" fill={n.color} fontSize="8" fontWeight="500" opacity="0.7" fontFamily="monospace">{n.label}</text>
+                  </g>
+                ))}
+
+                {/* Leaf nodes (individual memories) */}
+                {[
+                  { cx: 60, cy: 40 }, { cx: 220, cy: 40 }, { cx: 500, cy: 50 },
+                  { cx: 500, cy: 160 }, { cx: 100, cy: 320 }, { cx: 260, cy: 330 },
+                  { cx: 460, cy: 320 }, { cx: 340, cy: 320 }, { cx: 40, cy: 120 },
+                  { cx: 530, cy: 240 },
+                ].map((n, i) => (
+                  <circle key={i} cx={n.cx} cy={n.cy} r="3" fill="#a78bfa" fillOpacity="0.3" stroke="#a78bfa" strokeWidth="0.5" strokeOpacity="0.2">
+                    <animate attributeName="fillOpacity" values="0.1;0.4;0.1" dur={`${2 + (i % 3)}s`} repeatCount="indefinite" />
+                  </circle>
+                ))}
+
+                {/* Decay visualization: fading old memory */}
+                <g opacity="0.15">
+                  <circle cx="40" cy="120" r="8" stroke="#a78bfa" strokeWidth="0.5" strokeDasharray="2 2" />
+                  <text x="40" y="145" textAnchor="middle" fill="#a78bfa" fontSize="6" opacity="0.4" fontFamily="monospace">decayed</text>
+                </g>
+              </svg>
+
+              {/* Labels overlaid */}
+              <div className="absolute top-4 left-4 flex items-center gap-2">
+                <div className="flex h-5 w-5 items-center justify-center rounded bg-purple-500/10">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2"><circle cx="12" cy="12" r="2" /><circle cx="4" cy="6" r="1.5" /><circle cx="20" cy="6" r="1.5" /><circle cx="4" cy="18" r="1.5" /><circle cx="20" cy="18" r="1.5" /><path d="M5.5 6.5L10 10.5" /><path d="M18.5 6.5L14 10.5" /><path d="M5.5 17.5L10 13.5" /><path d="M18.5 17.5L14 13.5" /></svg>
+                </div>
+                <span className="text-[10px] font-mono text-purple-400/60">Knowledge Graph</span>
+              </div>
+              <div className="absolute bottom-4 right-4 text-[10px] font-mono text-zinc-600">
+                <span className="text-purple-400/40">●</span> 47 memories <span className="text-zinc-700 mx-1">·</span> <span className="text-purple-400/40">―</span> 83 edges
+              </div>
+            </div>
+
+            {/* Right column: evolution stats */}
+            <div className="space-y-4">
               {[
                 {
                   run: "Run 1",
-                  label: "First encounter",
-                  desc: "Reads your repo structure, coding conventions, and test patterns for the first time.",
+                  bar: "8%",
                   memories: "3",
-                  icon: (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
-                    </svg>
-                  ),
-                  glow: "from-purple-500/0 via-purple-500/10 to-purple-500/0",
+                  label: "First encounter",
+                  desc: "Learns repo structure, conventions, test runner",
                 },
                 {
                   run: "Run 10",
-                  label: "Pattern recognition",
-                  desc: "Knows your preferred libraries, test frameworks, and common pitfalls. Avoids past mistakes automatically.",
+                  bar: "45%",
                   memories: "47",
-                  icon: (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 2a7 7 0 00-4.7 12.2A3.5 3.5 0 0010 21h4a3.5 3.5 0 002.7-6.8A7 7 0 0012 2z" />
-                      <path d="M10 17v.01" /><path d="M14 17v.01" />
-                    </svg>
-                  ),
-                  glow: "from-purple-500/0 via-purple-500/20 to-purple-500/0",
+                  label: "Pattern recognition",
+                  desc: "Knows libraries, pitfalls, preferred patterns",
                 },
                 {
                   run: "Run 50",
-                  label: "Deep expertise",
-                  desc: "Understands your architecture inside out. Reviews catch domain-specific bugs. PRs match your team\u2019s voice.",
+                  bar: "88%",
                   memories: "200+",
-                  icon: (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                    </svg>
-                  ),
-                  glow: "from-purple-500/0 via-purple-500/30 to-purple-500/0",
+                  label: "Deep expertise",
+                  desc: "Domain expert. Catches bugs humans miss",
                 },
-              ].map((item) => (
-                <div key={item.run} className="relative group">
-                  <div className={`absolute inset-0 rounded-xl bg-gradient-to-b ${item.glow} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
-                  <div className="relative rounded-xl border border-zinc-800 bg-[#0d1117] p-6 h-full transition-all duration-300 hover:border-purple-500/30">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-purple-500/20 bg-purple-500/[0.06] text-purple-400">
-                          {item.icon}
-                        </div>
-                        <div>
-                          <span className="text-xs font-mono text-purple-400">{item.run}</span>
-                          <h3 className="text-sm font-semibold text-text-primary -mt-0.5">{item.label}</h3>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-bold text-purple-400 tabular-nums">{item.memories}</div>
-                        <div className="text-[10px] text-zinc-600">memories</div>
-                      </div>
+              ].map((s) => (
+                <div key={s.run} className="rounded-lg border border-zinc-800 bg-[#0d1117] p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-bold text-purple-400">{s.run}</span>
+                      <span className="text-[10px] text-zinc-500">{s.label}</span>
                     </div>
-                    <p className="text-xs text-text-secondary leading-relaxed">{item.desc}</p>
+                    <span className="text-xs font-mono text-zinc-500">{s.memories} memories</span>
                   </div>
+                  <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-purple-600 to-purple-400 transition-all duration-1000" style={{ width: s.bar }} />
+                  </div>
+                  <p className="mt-2 text-[11px] text-zinc-500">{s.desc}</p>
                 </div>
               ))}
+
+              {/* Key stat */}
+              <div className="rounded-lg border border-purple-500/20 bg-purple-500/[0.04] p-4 text-center">
+                <div className="text-3xl font-bold text-purple-400">11&times;</div>
+                <div className="text-xs text-zinc-500 mt-1">fewer repeated mistakes by run 50</div>
+              </div>
             </div>
           </div>
 
-          {/* Feature cards */}
-          <div className="mt-12 grid gap-4 sm:grid-cols-3">
-            {[
-              {
-                title: "Remembers past mistakes",
-                desc: "When a pattern caused a CI failure or security issue before, the agent avoids it next time.",
-                color: "#ef4444",
-                icon: (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                    <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-                  </svg>
-                ),
-              },
-              {
-                title: "Knows your patterns",
-                desc: "Learns your coding style, test conventions, import ordering, and PR formatting preferences.",
-                color: "#8b5cf6",
-                icon: (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z" /><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" />
-                  </svg>
-                ),
-              },
-              {
-                title: "Gets smarter over time",
-                desc: "Every run adds knowledge. Reviews get sharper. Security scans focus on what matters for your repo.",
-                color: "#10b981",
-                icon: (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                  </svg>
-                ),
-              },
-            ].map((card) => (
-              <div key={card.title} className="flex items-start gap-3 rounded-lg border border-zinc-800 bg-[#0d1117] p-4">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: `${card.color}10`, color: card.color }}>
-                  {card.icon}
+          {/* Technical capabilities grid */}
+          <div className="mt-16">
+            <h3 className="text-center text-sm font-semibold text-zinc-500 uppercase tracking-wider mb-8">How the memory engine works</h3>
+            <div className="grid gap-px sm:grid-cols-2 lg:grid-cols-4 rounded-xl border border-zinc-800 overflow-hidden bg-zinc-800">
+              {[
+                {
+                  title: "Knowledge Graph",
+                  desc: "Memories are connected by typed, weighted edges. The agent traverses the graph to find related context across runs.",
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="6" cy="6" r="3" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="18" r="3" /><path d="M8.5 8.5l7 7" /><path d="M15.5 8.5l-7 7" /><path d="M6 9v6" /><path d="M18 9v6" />
+                    </svg>
+                  ),
+                  color: "#8b5cf6",
+                },
+                {
+                  title: "Semantic Search",
+                  desc: "Vector similarity search finds relevant past learnings even when the wording is different. Understands intent, not just keywords.",
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><path d="M11 8a3 3 0 00-3 3" />
+                    </svg>
+                  ),
+                  color: "#3b82f6",
+                },
+                {
+                  title: "Contradiction Detection",
+                  desc: "When new information conflicts with existing beliefs, the engine flags it. Old knowledge is superseded, not silently overwritten.",
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                      <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                  ),
+                  color: "#f59e0b",
+                },
+                {
+                  title: "Salience Decay",
+                  desc: "Old, irrelevant memories naturally fade. Frequently accessed knowledge stays strong. The graph stays lean and useful.",
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                    </svg>
+                  ),
+                  color: "#10b981",
+                },
+                {
+                  title: "Anti-Pattern Learning",
+                  desc: "When something breaks CI or fails review, it gets stored as an anti-pattern. The agent actively avoids repeating it.",
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+                    </svg>
+                  ),
+                  color: "#ef4444",
+                },
+                {
+                  title: "Belief Propagation",
+                  desc: "When a fact changes, related beliefs are flagged for re-evaluation. Knowledge stays consistent across the entire graph.",
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 4v6h6" /><path d="M23 20v-6h-6" /><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
+                    </svg>
+                  ),
+                  color: "#ec4899",
+                },
+                {
+                  title: "Memory Tiers",
+                  desc: "Working, episodic, semantic, procedural. Different memory types are stored and retrieved with purpose-built strategies.",
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
+                    </svg>
+                  ),
+                  color: "#06b6d4",
+                },
+                {
+                  title: "Team Isolation",
+                  desc: "Each team\u2019s memory is cryptographically isolated. No cross-contamination. Your code patterns stay yours.",
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
+                    </svg>
+                  ),
+                  color: "#a78bfa",
+                },
+              ].map((feat) => (
+                <div key={feat.title} className="bg-[#0d1117] p-5 group hover:bg-[#0f1318] transition-colors">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: `${feat.color}08`, color: feat.color }}>
+                      {feat.icon}
+                    </div>
+                    <h4 className="text-sm font-semibold text-text-primary">{feat.title}</h4>
+                  </div>
+                  <p className="text-xs text-text-secondary leading-relaxed">{feat.desc}</p>
                 </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-text-primary">{card.title}</h4>
-                  <p className="mt-1 text-xs text-text-secondary leading-relaxed">{card.desc}</p>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </section>

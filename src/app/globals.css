@@ -137,3 +137,20 @@ body {
   0%, 100% { opacity: 0.2; }
   50% { opacity: 1; }
 }
+
+/* ── Agent memory graph animations ──────────────────────────────────────── */
+.memory-edge {
+  stroke-dasharray: 4 6;
+  animation: memory-edge-flow 8s linear infinite;
+}
+@keyframes memory-edge-flow {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -40; }
+}
+.memory-hub {
+  animation: memory-hub-pulse 4s ease-in-out infinite;
+}
+@keyframes memory-hub-pulse {
+  0%, 100% { r: 22; stroke-opacity: 0.4; }
+  50% { r: 26; stroke-opacity: 0.8; }
+}
