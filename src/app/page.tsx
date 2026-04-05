@@ -528,6 +528,139 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Agent Memory — Learns Your Codebase */}
+      <section className="border-t border-surface-border py-28 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(139,92,246,0.3) 1px, transparent 0)", backgroundSize: "40px 40px" }} />
+        <div className="relative mx-auto max-w-6xl px-6">
+          <div className="text-center">
+            <p className="text-sm font-semibold text-purple-400 tracking-wider uppercase">Agent Memory</p>
+            <h2 className="mt-3 text-3xl font-bold sm:text-5xl">
+              Learns your codebase.<br className="hidden sm:block" />
+              <span className="text-purple-400">Gets smarter every run.</span>
+            </h2>
+            <p className="mx-auto mt-5 max-w-2xl text-text-secondary text-lg">
+              Most AI tools start from scratch every time. Coderhelm remembers what worked, what broke,
+              and how your team writes code. The more you use it, the better it gets.
+            </p>
+          </div>
+
+          {/* Timeline visualization */}
+          <div className="mt-20 relative">
+            <div className="hidden md:block absolute top-1/2 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-500/30 to-transparent -translate-y-1/2" />
+            <div className="grid gap-8 md:grid-cols-3">
+              {[
+                {
+                  run: "Run 1",
+                  label: "First encounter",
+                  desc: "Reads your repo structure, coding conventions, and test patterns for the first time.",
+                  memories: "3",
+                  icon: (
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
+                    </svg>
+                  ),
+                  glow: "from-purple-500/0 via-purple-500/10 to-purple-500/0",
+                },
+                {
+                  run: "Run 10",
+                  label: "Pattern recognition",
+                  desc: "Knows your preferred libraries, test frameworks, and common pitfalls. Avoids past mistakes automatically.",
+                  memories: "47",
+                  icon: (
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2a7 7 0 00-4.7 12.2A3.5 3.5 0 0010 21h4a3.5 3.5 0 002.7-6.8A7 7 0 0012 2z" />
+                      <path d="M10 17v.01" /><path d="M14 17v.01" />
+                    </svg>
+                  ),
+                  glow: "from-purple-500/0 via-purple-500/20 to-purple-500/0",
+                },
+                {
+                  run: "Run 50",
+                  label: "Deep expertise",
+                  desc: "Understands your architecture inside out. Reviews catch domain-specific bugs. PRs match your team\u2019s voice.",
+                  memories: "200+",
+                  icon: (
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                    </svg>
+                  ),
+                  glow: "from-purple-500/0 via-purple-500/30 to-purple-500/0",
+                },
+              ].map((item) => (
+                <div key={item.run} className="relative group">
+                  <div className={`absolute inset-0 rounded-xl bg-gradient-to-b ${item.glow} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+                  <div className="relative rounded-xl border border-zinc-800 bg-[#0d1117] p-6 h-full transition-all duration-300 hover:border-purple-500/30">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-purple-500/20 bg-purple-500/[0.06] text-purple-400">
+                          {item.icon}
+                        </div>
+                        <div>
+                          <span className="text-xs font-mono text-purple-400">{item.run}</span>
+                          <h3 className="text-sm font-semibold text-text-primary -mt-0.5">{item.label}</h3>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-bold text-purple-400 tabular-nums">{item.memories}</div>
+                        <div className="text-[10px] text-zinc-600">memories</div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-text-secondary leading-relaxed">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Feature cards */}
+          <div className="mt-12 grid gap-4 sm:grid-cols-3">
+            {[
+              {
+                title: "Remembers past mistakes",
+                desc: "When a pattern caused a CI failure or security issue before, the agent avoids it next time.",
+                color: "#ef4444",
+                icon: (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                ),
+              },
+              {
+                title: "Knows your patterns",
+                desc: "Learns your coding style, test conventions, import ordering, and PR formatting preferences.",
+                color: "#8b5cf6",
+                icon: (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z" /><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" />
+                  </svg>
+                ),
+              },
+              {
+                title: "Gets smarter over time",
+                desc: "Every run adds knowledge. Reviews get sharper. Security scans focus on what matters for your repo.",
+                color: "#10b981",
+                icon: (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                  </svg>
+                ),
+              },
+            ].map((card) => (
+              <div key={card.title} className="flex items-start gap-3 rounded-lg border border-zinc-800 bg-[#0d1117] p-4">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: `${card.color}10`, color: card.color }}>
+                  {card.icon}
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-text-primary">{card.title}</h4>
+                  <p className="mt-1 text-xs text-text-secondary leading-relaxed">{card.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Product Section 1: Intake */}
       <section className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-6xl px-6">
