@@ -420,7 +420,13 @@ export default function NewPlanPage() {
     if (!draft) return;
     setSaving(true);
     try {
-      const { plan_id } = await api.createPlan({ ...draft, destination });
+      // Collect MCP servers actually used across all messages
+      const usedServers = new Set<string>();
+      for (const msg of messages) {
+        for (const s of messageServers(msg)) usedServers.add(s);
+      }
+      const mcp_servers = usedServers.size > 0 ? Array.from(usedServers) : undefined;
+      const { plan_id } = await api.createPlan({ ...draft, destination, mcp_servers });
       clear();
       setDraft(null);
       toast("Plan created!");
