@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, type BillingInfo, type Plan, type Task, type Repo, type JiraCheck, type EnabledPlugin, type PluginDef, type Openspec, type Template } from "@/lib/api";
+import { api, type BillingInfo, type Plan, type Task, type Repo, type JiraCheck, type Openspec, type Template } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Skeleton, TableSkeleton } from "@/components/skeleton";
@@ -71,7 +71,6 @@ function PlanDetail() {
   const [repos, setRepos] = useState<Repo[]>([]);
   const [jiraReady, setJiraReady] = useState(false);
   const [updatingDest, setUpdatingDest] = useState(false);
-  const [plugins, setPlugins] = useState<{ catalog: PluginDef[]; enabled: EnabledPlugin[] }>({ catalog: [], enabled: [] });
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilters, setStatusFilters] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<'tasks' | 'openspec'>('tasks');
@@ -88,9 +87,6 @@ function PlanDetail() {
       setRepos(data.repos.filter((r) => r.enabled));
     }).catch(() => {});
     api.getJiraCheck().then((c) => setJiraReady(c.ready)).catch(() => {});
-    Promise.all([api.getPluginCatalog(), api.listEnabledPlugins()])
-      .then(([c, e]) => setPlugins({ catalog: c.plugins, enabled: e.plugins }))
-      .catch(() => {});
   }, []);
 
   const refresh = useCallback(() => {
@@ -381,17 +377,14 @@ function PlanDetail() {
             {((plan.tokens_in ?? 0) + (plan.tokens_out ?? 0)) > 0 && (
               <span className="text-xs text-zinc-600">{(((plan.tokens_in ?? 0) + (plan.tokens_out ?? 0)) / 1000).toFixed(1)}K tokens</span>
             )}
-            {plugins.enabled.length > 0 && (
+            {plan.mcp_servers && plan.mcp_servers.length > 0 && (
               <>
                 <span className="text-xs text-zinc-600">MCP Servers:</span>
-                {plugins.enabled.map((ep) => {
-                  const def = plugins.catalog.find((c) => c.id === ep.plugin_id);
-                  return (
-                    <span key={ep.plugin_id} className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 border border-zinc-700 text-zinc-300">
-                      {def?.name ?? ep.plugin_id}
+                {plan.mcp_servers.map((id) => (
+                    <span key={id} className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 border border-zinc-700 text-zinc-300">
+                      {id}
                     </span>
-                  );
-                })}
+                ))}
               </>
             )}
           </div>
