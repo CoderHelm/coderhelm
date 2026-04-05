@@ -10,6 +10,20 @@ interface RunGroup {
   attempts: Run[]; // oldest first
 }
 
+function formatTimeAgo(iso: string): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return "—";
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
 function groupRunsByTicket(runs: Run[]): RunGroup[] {
   const map = new Map<string, Run[]>();
   for (const run of runs) {
@@ -162,7 +176,14 @@ function TicketGroup({
         <td className="px-4 py-3">
           <StatusBadge status={latest.status} />
         </td>
-        <td className="px-4 py-3 text-zinc-400">{latest.duration_s ? `${latest.duration_s}s` : "—"}</td>
+        <td className="px-4 py-3">
+          <time title={new Date(latest.created_at).toLocaleString()} className="text-zinc-400 text-xs">
+            {formatTimeAgo(latest.created_at)}
+          </time>
+          {latest.duration_s && (
+            <span className="block text-zinc-600 text-xs">{latest.duration_s}s</span>
+          )}
+        </td>
       </tr>
 
       {/* Previous attempts (collapsed by default) */}
@@ -181,7 +202,14 @@ function TicketGroup({
             <td className="px-4 py-2">
               <StatusBadge status={run.status} />
             </td>
-            <td className="px-4 py-2 text-zinc-600 text-xs">{run.duration_s ? `${run.duration_s}s` : "—"}</td>
+            <td className="px-4 py-2">
+              <time title={new Date(run.created_at).toLocaleString()} className="text-zinc-600 text-xs">
+                {formatTimeAgo(run.created_at)}
+              </time>
+              {run.duration_s && (
+                <span className="block text-zinc-600 text-xs">{run.duration_s}s</span>
+              )}
+            </td>
           </tr>
         ))}
     </>
