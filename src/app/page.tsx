@@ -21,7 +21,7 @@ export default function Home() {
         <div className="relative mx-auto max-w-4xl px-6 text-center">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-surface-border bg-surface-elevated px-4 py-1.5 text-sm text-text-secondary">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            Now in open beta
+            Now in closed beta
           </div>
 
           <h1 className="text-5xl font-extrabold leading-tight tracking-tight sm:text-7xl">
