@@ -193,8 +193,8 @@ function PlanDetail() {
       const result = await api.approveAllAndExecute(planId);
       toast(`Executing — ${result.tasks_queued} task${result.tasks_queued !== 1 ? "s" : ""} queued`);
       refresh();
-    } catch {
-      toast("Failed to execute plan", "error");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Failed to execute plan", "error");
     } finally {
       setExecuting(false);
     }
@@ -287,8 +287,8 @@ function PlanDetail() {
       await api.approveTask(planId, taskId);
       toast("Task approved & queued");
       refresh();
-    } catch {
-      toast("Failed to approve task", "error");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Failed to approve task", "error");
     } finally {
       setActionLoading(null);
     }
