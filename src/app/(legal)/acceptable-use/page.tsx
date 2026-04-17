@@ -95,7 +95,7 @@ export default function AcceptableUse() {
 
       <h2>4. Reporting Violations</h2>
       <p>If you become aware of any violation of this AUP, please report it promptly to{" "}
-        <a href="mailto:abuse@coderhelm.com">abuse@coderhelm.com</a>. Include as much detail as
+        <a href="mailto:abuserequest@coderhelm.com">abuserequest@coderhelm.com</a>. Include as much detail as
         possible, including the nature of the violation and any supporting evidence. We will
         investigate all credible reports and take appropriate action.</p>
 
@@ -167,7 +167,7 @@ export default function AcceptableUse() {
       <h2>8. Contact</h2>
       <p>Questions about this Acceptable Use Policy? Contact us at:</p>
       <ul>
-        <li>Abuse reports: <a href="mailto:abuse@coderhelm.com">abuse@coderhelm.com</a></li>
+        <li>Abuse reports: <a href="mailto:abuserequest@coderhelm.com">abuserequest@coderhelm.com</a></li>
         <li>General inquiries: <a href="mailto:support@coderhelm.com">support@coderhelm.com</a></li>
       </ul>
     </>
