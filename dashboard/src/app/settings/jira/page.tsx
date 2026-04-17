@@ -344,6 +344,14 @@ function SettingsTab({ config, setConfig, toast }: {
   const triggerLabel = "coderhelm";
   const [defaultProject, setDefaultProject] = useState(config?.default_project ?? "");
   const [projects, setProjects] = useState<JiraProject[]>(config?.projects ?? []);
+  const [enabledRepos, setEnabledRepos] = useState<string[]>([]);
+
+  // Load enabled repos for project → repo mapping
+  useEffect(() => {
+    api.listRepos().then(({ repos }) => {
+      setEnabledRepos(repos.filter((r) => r.enabled).map((r) => r.name));
+    }).catch(() => {});
+  }, []);
 
   // Sync projects when config updates (e.g. after re-fetch)
   useEffect(() => {
@@ -385,11 +393,12 @@ function SettingsTab({ config, setConfig, toast }: {
     setFetching(true);
     try {
       const { projects: fetched } = await api.fetchJiraProjects();
-      // Merge with existing enabled state
-      const existing = new Map(projects.map((p) => [p.key, p.enabled]));
+      // Merge with existing enabled state and repo mappings
+      const existing = new Map(projects.map((p) => [p.key, { enabled: p.enabled, repo: p.repo }]));
       const merged = fetched.map((p) => ({
         ...p,
-        enabled: existing.get(p.key) ?? false,
+        enabled: existing.get(p.key)?.enabled ?? false,
+        repo: existing.get(p.key)?.repo ?? "",
       }));
       setProjects(merged);
       toast(`Found ${merged.length} project${merged.length !== 1 ? "s" : ""}`);
@@ -406,6 +415,16 @@ function SettingsTab({ config, setConfig, toast }: {
       api.updateJiraProjects(updated).then(() => {
         setConfig((c) => c ? { ...c, projects: updated } : c);
       }).catch(() => toast("Failed to save projects", "error"));
+      return updated;
+    });
+  };
+
+  const setProjectRepo = (key: string, repo: string) => {
+    setProjects((prev) => {
+      const updated = prev.map((p) => p.key === key ? { ...p, repo } : p);
+      api.updateJiraProjects(updated).then(() => {
+        setConfig((c) => c ? { ...c, projects: updated } : c);
+      }).catch(() => toast("Failed to save repo mapping", "error"));
       return updated;
     });
   };
@@ -481,20 +500,34 @@ function SettingsTab({ config, setConfig, toast }: {
         {projects.length > 0 ? (
           <div className="space-y-1.5">
             {projects.map((p) => (
-              <label
+              <div
                 key={p.key}
-                className="flex items-center gap-3 px-3 py-2 bg-zinc-900/50 border border-zinc-800 rounded-lg cursor-pointer hover:bg-zinc-900"
+                className="flex items-center gap-3 px-3 py-2 bg-zinc-900/50 border border-zinc-800 rounded-lg"
               >
-                <input
-                  type="checkbox"
-                  checked={p.enabled}
-                  onChange={() => toggleProject(p.key)}
-                  className="accent-emerald-500"
-                />
-                <span className="text-sm text-zinc-200 font-mono">{p.key}</span>
-                <span className="text-sm text-zinc-400">{p.name}</span>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={p.enabled}
+                    onChange={() => toggleProject(p.key)}
+                    className="accent-emerald-500"
+                  />
+                  <span className="text-sm text-zinc-200 font-mono">{p.key}</span>
+                  <span className="text-sm text-zinc-400">{p.name}</span>
+                </label>
+                {p.enabled && enabledRepos.length > 1 && (
+                  <select
+                    value={p.repo ?? ""}
+                    onChange={(e) => setProjectRepo(p.key, e.target.value)}
+                    className="ml-auto px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 focus:outline-none focus:border-zinc-500"
+                  >
+                    <option value="">Auto-detect repo</option>
+                    {enabledRepos.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                )}
                 {p.lead && <span className="text-xs text-zinc-600 ml-auto">{p.lead}</span>}
-              </label>
+              </div>
             ))}
           </div>
         ) : (
