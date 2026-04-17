@@ -39,7 +39,7 @@ export default function SettingsPage() {
         { href: "/settings/aws", title: "AWS", description: "Connect AWS accounts to analyze CloudWatch Logs and get recommendations." },
         { href: "/settings/jira", title: "Jira", description: "Connect Jira to create tickets from plans and sync issue status." },
         { href: "/settings/plugins", title: "MCP Servers", description: "Connect MCP servers like Figma, Sentry, and Linear." },
-        { href: "/settings/models", title: "AI Models", description: "Choose your model provider and bring your own Anthropic API key." },
+        { href: "/settings/models", title: "AI Models", description: "Configure your Anthropic API key and choose which Claude models to use." },
       ],
     },
     {

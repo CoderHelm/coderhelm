@@ -795,12 +795,12 @@ function StatCard({ label, value }: { label: string; value: string }) {
 }
 
 function sanitizeError(msg: string): string {
-  // Strip model IDs, internal service names, and Bedrock details
+  // Strip model IDs and internal service names
   return msg
     .replace(/\(model=[^)]+\)/gi, "")
     .replace(/us\.anthropic\.[\w.-]+/gi, "")
     .replace(/anthropic\.claude[\w.-]*/gi, "")
-    .replace(/Bedrock converse error/gi, "An error occurred during processing")
+    .replace(/(?:Bedrock converse error|API call error)/gi, "An error occurred during processing")
     .replace(/service error/gi, "service temporarily unavailable")
     .replace(/\s{2,}/g, " ")
     .trim();
