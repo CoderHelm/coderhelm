@@ -46,7 +46,7 @@ export default function SettingsPage() {
       items: [
         { href: "/settings/repos", title: "Repositories", description: "Connected repos and their status.", memberOnly: true },
         { href: "/settings/team", title: "Team", description: "Invite members, assign roles, and manage who has access." },
-        { href: "/settings/budget", title: "Budget", description: "Set a monthly spending cap to control overage costs.", billingOnly: true },
+        { href: "/settings/budget", title: "Token Limit", description: "Set a monthly token usage limit." },
       ],
     },
     {

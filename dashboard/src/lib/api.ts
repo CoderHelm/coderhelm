@@ -11,9 +11,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     },
   });
   if (!res.ok) {
-    if (res.status === 402) {
-      throw new Error("Your subscription is inactive. Please update your billing to continue.");
-    }
     const body = await res.text().catch(() => "");
     let serverMsg = "";
     try { serverMsg = body ? JSON.parse(body).error || "" : ""; } catch {}
@@ -128,23 +125,12 @@ export const api = {
   updateJiraProjects: (projects: JiraProject[]) =>
     request<void>("/api/integrations/jira/projects", { method: "PUT", body: JSON.stringify({ projects }) }),
 
-  // Billing
-  getBilling: () => request<BillingInfo>("/api/billing"),
-  createSubscription: () => request<{ client_secret?: string; already_active?: boolean }>("/api/billing/subscribe", { method: "POST", body: "{}" }),
-  cancelSubscription: (immediately = false) => request<{ status: string }>("/api/billing/cancel", { method: "POST", body: JSON.stringify({ immediately }) }),
-  reactivateSubscription: () => request<{ status: string }>("/api/billing/reactivate", { method: "POST" }),
-  createSetupIntent: () => request<{ client_secret: string }>("/api/billing/payment-method", { method: "POST" }),
-  listPaymentMethods: () => request<{ payment_methods: PaymentMethod[] }>("/api/billing/payment-methods"),
-  deletePaymentMethod: (pmId: string) => request<{ status: string }>(`/api/billing/payment-methods/${pmId}`, { method: "DELETE" }),
-  setDefaultPaymentMethod: (pmId: string) => request<{ status: string }>(`/api/billing/payment-methods/${pmId}/default`, { method: "PUT" }),
-  getBillingCustomer: () => request<{ email: string | null; name: string | null }>("/api/billing/customer"),
-  updateBillingEmail: (email: string) => request<{ email: string }>("/api/billing/email", { method: "PUT", body: JSON.stringify({ email }) }),
-  listInvoices: () => request<{ invoices: Invoice[] }>("/api/billing/invoices"),
-  getInvoicePdf: (id: string) => request<{ pdf_url: string }>(`/api/billing/invoices/${id}/pdf`),
+  // Usage
+  getUsage: () => request<UsageInfo>("/api/usage"),
 
-  // Budget
-  getBudget: () => request<{ max_budget_cents: number }>("/api/settings/budget"),
-  updateBudget: (max_budget_cents: number) => request<void>("/api/settings/budget", { method: "PUT", body: JSON.stringify({ max_budget_cents }) }),
+  // Token Limit
+  getBudget: () => request<{ max_tokens: number }>("/api/settings/budget"),
+  updateBudget: (max_tokens: number) => request<void>("/api/settings/budget", { method: "PUT", body: JSON.stringify({ max_tokens }) }),
 
   // Workflow
   getWorkflowSettings: () => request<WorkflowSettings>("/api/settings/workflow"),
@@ -361,39 +347,13 @@ export interface WorkflowSettings {
   allow_plan_log_analyzer: boolean;
 }
 
-export interface BillingInfo {
-  subscription_status: string;
-  previous_status: string | null;
-  plan_id: string | null;
-  has_payment_method: boolean;
-  stripe_publishable_key: string;
-  last_payment_at: string | null;
-  payment_retry_count: number;
-  last_failure_reason: string | null;
-  access_until: string | null;
-  cancelled_at: string | null;
-  limits: {
-    tokens: number;
-    overage_per_1k_tokens_cents: number;
-    max_budget_cents: number;
-  };
-  current_period: {
-    month: string;
-    usage_cost: number;
-    total_runs: number;
-    total_tokens: number;
-    total_plans: number;
-    estimated_overage_cents: number;
-  };
-  recent_payments: Payment[];
-}
-
-export interface Payment {
-  invoice_id: string | null;
-  invoice_number: string | null;
-  amount_cents: number | null;
-  status: string | null;
-  created_at: string | null;
+export interface UsageInfo {
+  month: string;
+  total_tokens: number;
+  tokens_in: number;
+  tokens_out: number;
+  total_runs: number;
+  max_tokens: number;
 }
 
 export interface Banner {
@@ -410,33 +370,6 @@ export interface TeamInfo {
   org: string;
   status: string;
   current: boolean;
-}
-
-export interface Invoice {
-  invoice_id: string | null;
-  invoice_number: string | null;
-  amount_cents: number | null;
-  amount_refunded_cents: number | null;
-  period: string | null;
-  status: string | null;
-  created_at: string | null;
-}
-
-export interface PaymentMethod {
-  id: string;
-  type: "card" | "us_bank_account" | string;
-  is_default?: boolean;
-  card?: {
-    brand: string;
-    last4: string;
-    exp_month: number;
-    exp_year: number;
-  };
-  us_bank_account?: {
-    bank_name: string;
-    last4: string;
-    account_type: string;
-  };
 }
 
 export interface Plan {

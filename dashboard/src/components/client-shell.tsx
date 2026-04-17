@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { api, type BillingInfo, type Banner, type TeamInfo } from "@/lib/api";
+import { api, type UsageInfo, type Banner, type TeamInfo } from "@/lib/api";
 import { pushToDataLayer } from "@/lib/gtm";
 import { ToastProvider } from "./toast";
 import { ConfirmProvider } from "./confirm-dialog";
 import {
   PlayIcon, CircleDotIcon, TrendingUpIcon, HexagonIcon, HeartIcon,
   GitBranchIcon, GearIcon, AtlassianIcon, GitHubIcon, UsersIcon,
-  BellIcon, DollarIcon, TargetIcon, RepeatIcon, ShieldCheckIcon,
+  BellIcon, TargetIcon, RepeatIcon, ShieldCheckIcon,
   AwsIcon, PluginIcon, ShieldIcon, TemplateIcon,
 } from "./icons";
 
@@ -38,7 +38,6 @@ interface NavItem {
   icon: ReactNode;
   adminOnly?: boolean;
   memberOnly?: boolean;
-  billingVisible?: boolean;
   superAdminOnly?: boolean;
 }
 
@@ -90,8 +89,7 @@ const navGroups: NavGroup[] = [
     label: "Account",
     items: [
       { href: "/settings/security", label: "Security", icon: <ShieldCheckIcon /> },
-      { href: "/billing", label: "Billing", icon: <DollarIcon />, adminOnly: true, billingVisible: true },
-      { href: "/settings/budget", label: "Budget", icon: <TargetIcon />, adminOnly: true, billingVisible: true },
+      { href: "/settings/budget", label: "Token Limit", icon: <TargetIcon />, adminOnly: true },
       { href: "/admin", label: "Admin", icon: <ShieldIcon />, superAdminOnly: true },
     ],
   },
@@ -100,26 +98,26 @@ const navGroups: NavGroup[] = [
 export function ClientShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
-  const [billing, setBilling] = useState<BillingInfo | null>(null);
+  const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [teams, setTeams] = useState<TeamInfo[]>([]);
   const [dismissedBanners, setDismissedBanners] = useState<Set<string>>(new Set());
-  // Load persisted dismissals once billing data is available (keyed to billing period)
+  // Load persisted dismissals once usage data is available (keyed to usage month)
   useEffect(() => {
-    if (!billing) return;
+    if (!usage) return;
     try {
       const stored = JSON.parse(localStorage.getItem("dismissedBanners") || "{}");
-      if (stored.period === billing.current_period.month && Array.isArray(stored.ids)) {
+      if (stored.period === usage.month && Array.isArray(stored.ids)) {
         setDismissedBanners(new Set<string>(stored.ids));
       }
     } catch { /* ignore */ }
-  }, [billing?.current_period.month]);
+  }, [usage?.month]);
   const dismissBanner = (id: string) => {
     setDismissedBanners((prev) => {
       const next = new Set(prev).add(id);
-      if (billing) {
+      if (usage) {
         try {
-          localStorage.setItem("dismissedBanners", JSON.stringify({ period: billing.current_period.month, ids: [...next] }));
+          localStorage.setItem("dismissedBanners", JSON.stringify({ period: usage.month, ids: [...next] }));
         } catch { /* ignore */ }
       }
       return next;
@@ -133,7 +131,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         setUser(u);
         pushToDataLayer({ event: "identify", user_id: u.user_id, team_id: u.team_id });
         setAuthChecked(true);
-        api.getBilling().then(setBilling).catch(() => {});
+        api.getUsage().then(setUsage).catch(() => {});
         api.getBanners().then((r) => setBanners(r.banners)).catch(() => {});
         api.listTeams().then((r) => setTeams(r.teams)).catch(() => {});
       })
@@ -142,19 +140,12 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       });
   }, []);
 
-  // Refresh billing on route changes so token count stays current
+  // Refresh usage on route changes so token count stays current
   useEffect(() => {
     if (user) {
-      api.getBilling().then(setBilling).catch(() => {});
+      api.getUsage().then(setUsage).catch(() => {});
     }
   }, [pathname, user]);
-
-  // Refresh billing when subscription changes (e.g. subscribe/cancel on billing page)
-  useEffect(() => {
-    const handler = () => { api.getBilling().then(setBilling).catch(() => {}); };
-    window.addEventListener("billing-updated", handler);
-    return () => window.removeEventListener("billing-updated", handler);
-  }, []);
 
   if (!authChecked) {
     return (
@@ -171,7 +162,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     return <AuthScreen onAuth={(u) => {
       setUser(u);
       pushToDataLayer({ event: "identify", user_id: u.user_id, team_id: u.team_id });
-      api.getBilling().then(setBilling).catch(() => {});
+      api.getUsage().then(setUsage).catch(() => {});
       api.getBanners().then((r) => setBanners(r.banners)).catch(() => {});
       api.listTeams().then((r) => setTeams(r.teams)).catch(() => {});
     }} />;
@@ -234,7 +225,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     <ToastProvider>
     <ConfirmProvider>
       <div className="flex min-h-screen bg-zinc-950">
-        <Sidebar billing={billing} user={user} teams={teams} />
+        <Sidebar usage={usage} user={user} teams={teams} />
         <div className="flex-1 flex flex-col">
           {banners.filter((b) => !dismissedBanners.has(b.id)).map((banner) => (
             <div
@@ -276,50 +267,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
           ))}
-          {billing && billing.subscription_status === "past_due" && (
-            <div className="bg-red-900/80 border-b border-red-700 px-6 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="text-red-300 text-lg">⚠</span>
-                <p className="text-sm font-medium text-red-100">
-                  Your payment is past due. Please update your payment method to continue using Coderhelm.
-                </p>
-              </div>
-              <a
-                href="/billing"
-                className="shrink-0 rounded-md bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-500 transition-colors"
-              >
-                Update Payment
-              </a>
-            </div>
-          )}
-          {billing && (billing.subscription_status === "free" && billing.previous_status === "cancelled") && !dismissedBanners.has("cancelled-banner") && (
-            <div className="bg-yellow-900/60 border-b border-yellow-700 px-6 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="text-yellow-300 text-lg">⚡</span>
-                <p className="text-sm font-medium text-yellow-100">
-                  Your subscription has been cancelled. You&apos;re on the free plan. Subscribe again for full access.
-                </p>
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <a
-                  href="/billing"
-                  className="rounded-md bg-yellow-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-yellow-500 transition-colors"
-                >
-                  Go to Billing
-                </a>
-                <button
-                  onClick={() => dismissBanner("cancelled-banner")}
-                  className="text-yellow-300 text-lg leading-none opacity-60 hover:opacity-100 transition-opacity"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-          )}
-          {billing && billing.current_period.total_tokens >= billing.limits.tokens && !dismissedBanners.has("overage-banner") && (
-            billing.subscription_status === "active"
-              ? <OverageBanner billing={billing} onDismiss={() => dismissBanner("overage-banner")} />
-              : (
+          {usage && usage.max_tokens > 0 && usage.total_tokens >= usage.max_tokens && !dismissedBanners.has("token-limit-banner") && (
               <div className="bg-red-900/90 border-b-2 border-red-500 px-6 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="text-red-300 text-xl">⚠</span>
@@ -328,72 +276,23 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                       Token limit reached — all runs are paused
                     </p>
                     <p className="text-xs text-red-300 mt-0.5">
-                      You&apos;ve used {formatTokens(billing.current_period.total_tokens)} of your {formatTokens(billing.limits.tokens)} token limit this period. New GitHub and Jira actions will be skipped until your limit resets or is increased.
+                      You&apos;ve used {formatTokens(usage.total_tokens)} of your {formatTokens(usage.max_tokens)} token limit this month. Increase your limit or wait for the next month.
                     </p>
                   </div>
                 </div>
                 <a
-                  href="/billing"
+                  href="/settings/budget"
                   className="shrink-0 rounded-md bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-500 transition-colors"
                 >
-                  Upgrade Plan
+                  Adjust Limit
                 </a>
               </div>
-            )
           )}
           <main className="flex-1 p-8">{children}</main>
         </div>
       </div>
     </ConfirmProvider>
     </ToastProvider>
-  );
-}
-
-function OverageBanner({ billing, onDismiss }: { billing: BillingInfo; onDismiss: () => void }) {
-  const overageTokens = billing.current_period.total_tokens - billing.limits.tokens;
-  const overageCents = Math.floor(overageTokens / 1000) * billing.limits.overage_per_1k_tokens_cents;
-  const budgetReached = billing.limits.max_budget_cents > 0 && overageCents >= billing.limits.max_budget_cents;
-  const noBudget = billing.limits.max_budget_cents === 0;
-  const isPaused = budgetReached || noBudget;
-  return (
-    <div className={`${isPaused ? "bg-red-900/90 border-red-500" : "bg-yellow-900/80 border-yellow-600"} border-b-2 px-6 py-4 flex items-center justify-between`}>
-      <div className="flex items-center gap-3">
-        <span className={`${isPaused ? "text-red-300" : "text-yellow-300"} text-xl`}>⚠</span>
-        <div>
-          <p className={`text-sm font-bold ${isPaused ? "text-red-100" : "text-yellow-100"}`}>
-            {budgetReached
-              ? "Overage budget reached — all runs are paused"
-              : noBudget
-              ? "Token limit reached — all runs are paused"
-              : "You\u2019re in overage — runs are still active"}
-          </p>
-          <p className={`text-xs ${isPaused ? "text-red-300" : "text-yellow-300"} mt-0.5`}>
-            You&apos;ve used {formatTokens(billing.current_period.total_tokens)} of your {formatTokens(billing.limits.tokens)} included tokens.{" "}
-            {budgetReached
-              ? `Your $${(billing.limits.max_budget_cents / 100).toLocaleString()} overage budget has been reached.`
-              : noBudget
-              ? "Set an overage budget to allow runs to continue beyond your included tokens."
-              : `Overage so far: $${(overageCents / 100).toLocaleString()} of $${(billing.limits.max_budget_cents / 100).toLocaleString()} budget.`}
-          </p>
-        </div>
-      </div>
-      <div className="flex items-center gap-3 shrink-0">
-        <a
-          href="/settings/budget"
-          className={`rounded-md ${isPaused ? "bg-red-600 hover:bg-red-500" : "bg-yellow-700 hover:bg-yellow-600"} px-4 py-1.5 text-sm font-medium text-white transition-colors`}
-        >
-          {budgetReached ? "Adjust Budget" : noBudget ? "Set Budget" : "View Budget"}
-        </a>
-        {!isPaused && (
-          <button
-            onClick={onDismiss}
-            className="text-yellow-400 hover:text-yellow-200 text-lg leading-none transition-colors"
-          >
-            ×
-          </button>
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -479,11 +378,11 @@ function TeamSwitcher({
 }
 
 function Sidebar({
-  billing,
+  usage,
   user,
   teams,
 }: {
-  billing: BillingInfo | null;
+  usage: UsageInfo | null;
   user: User | null;
   teams: TeamInfo[];
 }) {
@@ -536,7 +435,6 @@ function Sidebar({
             if (item.memberOnly) return isMemberOrAbove;
             if (!item.adminOnly) return true;
             if (isAdminOrOwner) return true;
-            if (isBilling && item.billingVisible) return true;
             return false;
           });
           if (visibleItems.length === 0) return null;
@@ -576,30 +474,30 @@ function Sidebar({
       </div>
 
       {/* Tokens remaining */}
-      {billing && (
+      {usage && usage.max_tokens > 0 && (
         <div className="mx-2 mt-3 pt-3 border-t border-zinc-800/60 shrink-0">
-          <div className="flex items-center justify-between text-xs" title={`${billing.current_period.total_tokens.toLocaleString()} tokens used of ${billing.limits.tokens.toLocaleString()} limit`}>
+          <div className="flex items-center justify-between text-xs" title={`${usage.total_tokens.toLocaleString()} tokens used of ${usage.max_tokens.toLocaleString()} limit`}>
             <span className="text-zinc-500">Tokens used</span>
             <span className={`font-medium ${
-              billing.current_period.total_tokens >= billing.limits.tokens
+              usage.total_tokens >= usage.max_tokens
                 ? "text-red-400"
-                : billing.current_period.total_tokens >= billing.limits.tokens * 0.8
+                : usage.total_tokens >= usage.max_tokens * 0.8
                   ? "text-yellow-400"
                   : "text-zinc-300"
             }`}>
-              {formatTokens(billing.current_period.total_tokens)} / {formatTokens(billing.limits.tokens)}
+              {formatTokens(usage.total_tokens)} / {formatTokens(usage.max_tokens)}
             </span>
           </div>
           <div className="mt-1.5 h-1 bg-zinc-800 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all ${
-                billing.current_period.total_tokens >= billing.limits.tokens
+                usage.total_tokens >= usage.max_tokens
                   ? "bg-red-500"
-                  : billing.current_period.total_tokens >= billing.limits.tokens * 0.8
+                  : usage.total_tokens >= usage.max_tokens * 0.8
                     ? "bg-yellow-500"
                     : "bg-emerald-500"
               }`}
-              style={{ width: `${Math.min((billing.current_period.total_tokens / billing.limits.tokens) * 100, 100)}%` }}
+              style={{ width: `${Math.min((usage.total_tokens / usage.max_tokens) * 100, 100)}%` }}
             />
           </div>
         </div>

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
 import { useRouter } from "next/navigation";
-import { api, type BillingInfo, type Repo, type Template } from "@/lib/api";
+import { api, type Repo, type Template } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { ChatMarkdown } from "@/components/chat-markdown";
 import { useStreamingChat, messageText, messageServers } from "@/hooks/use-streaming-chat";
@@ -336,8 +336,6 @@ export default function NewPlanPage() {
   const [input, setInput] = useState("");
   const [draft, setDraft] = useState<DraftPlan | null>(null);
   const [saving, setSaving] = useState(false);
-  const [billing, setBilling] = useState<BillingInfo | null>(null);
-  const [billingLoading, setBillingLoading] = useState(true);
   const [destination, setDestination] = useState<"github" | "jira">("github");
   const [repos, setRepos] = useState<Repo[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -349,20 +347,13 @@ export default function NewPlanPage() {
 
   const { sentinelRef, showPill, scrollToBottom, onNewContent } = useSmartScroll(scrollContainerRef);
 
-  // Load billing + workflow settings + prefetch stream token
+  // Load workflow settings + prefetch stream token
   useEffect(() => {
     prefetchStreamToken();
-    api
-      .getBilling()
-      .then((b) => setBilling(b))
-      .catch(() => {})
-      .finally(() => setBillingLoading(false));
     api.getWorkflowSettings().then((s) => setDestination(s.default_destination ?? "github")).catch(() => {});
     api.listRepos().then((r) => setRepos(r.repos.filter((repo) => repo.enabled))).catch(() => {});
     api.listTemplates({ limit: 6 }).then((data) => setTemplates(data.templates)).catch(() => {});
   }, []);
-
-  const plansEnabled = billingLoading || billing?.subscription_status === "active";
 
   // Parse draft plan from latest assistant message (memoized)
   const lastAssistantText = useMemo(() => {
@@ -413,10 +404,6 @@ export default function NewPlanPage() {
   }, [input, send, scrollToBottom]);
 
   const savePlan = async () => {
-    if (!plansEnabled) {
-      toast("Plans requires Pro or the Plans add-on", "error");
-      return;
-    }
     if (!draft) return;
     setSaving(true);
     try {
@@ -478,28 +465,6 @@ export default function NewPlanPage() {
       setUsingTemplate(null);
     }
   };
-
-  if (!plansEnabled) {
-    return (
-      <div className="max-w-2xl">
-        <a href="/plans" className="text-zinc-500 hover:text-zinc-300 text-sm">
-          ← Plans
-        </a>
-        <div className="mt-4 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-6">
-          <h1 className="text-lg font-semibold text-yellow-300">Plans is a paid feature</h1>
-          <p className="text-sm text-yellow-200/80 mt-2">
-            Upgrade to Pro (or add the Plans add-on) to use AI planning and create executable task lists.
-          </p>
-          <a
-            href="/billing"
-            className="inline-block mt-4 px-4 py-2 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200"
-          >
-            Go to Billing
-          </a>
-        </div>
-      </div>
-    );
-  }
 
   const isActive = status === "submitted" || status === "streaming";
 

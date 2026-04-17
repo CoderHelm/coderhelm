@@ -32,7 +32,7 @@ jobs:
       - run: npm ci
       - run: npm run build
         env:
-          NEXT_PUBLIC_APP_URL: https://app.coderhelm.com
+          NEXT_PUBLIC_APP_URL: https://app.${{ vars.APP_DOMAIN }}
 
       - name: Build dashboard
         working-directory: dashboard
@@ -40,7 +40,7 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::654654210434:role/coderhelm-github-deploy
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - working-directory: infra
