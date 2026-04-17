@@ -5,6 +5,18 @@ import Link from "next/link";
 import { api, type Plan } from "@/lib/api";
 import { TableSkeleton } from "@/components/skeleton";
 
+function timeAgo(iso: string): string {
+  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
 const STATUS_STYLES: Record<string, string> = {
   draft: "bg-zinc-800 text-zinc-400 border-zinc-700",
   executing: "bg-blue-500/10 text-blue-400 border-blue-500/20",
@@ -122,7 +134,7 @@ export default function PlansPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-zinc-500 text-xs">
-                    {new Date(plan.created_at).toLocaleDateString()}
+                    {timeAgo(plan.created_at)}
                   </td>
                 </tr>
               ))}
