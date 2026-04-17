@@ -134,7 +134,7 @@ export const api = {
 
   // Model Provider
   getModelProvider: () => request<ModelProviderConfig>("/api/settings/model-provider"),
-  updateModelProvider: (config: { provider: string; api_key?: string; primary_model: string; heavy_model: string }) =>
+  updateModelProvider: (config: { api_key?: string; primary_model: string; heavy_model: string }) =>
     request<{ status: string; provider: string }>("/api/settings/model-provider", { method: "PUT", body: JSON.stringify(config) }),
   deleteModelProvider: () => request<void>("/api/settings/model-provider", { method: "DELETE" }),
 
@@ -362,7 +362,7 @@ export interface UsageInfo {
 }
 
 export interface ModelProviderConfig {
-  provider: "bedrock" | "anthropic";
+  provider: "anthropic";
   api_key_masked: string | null;
   primary_model: string | null;
   heavy_model: string | null;
