@@ -524,6 +524,7 @@ export interface JiraProject {
   key: string;
   name: string;
   enabled: boolean;
+  repo?: string;
   lead?: string | null;
   style?: string;
 }
