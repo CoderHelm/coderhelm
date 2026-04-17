@@ -103,26 +103,14 @@ export default function Terms() {
         non-exclusive, royalty-free, worldwide, perpetual license to use and incorporate
         such feedback without obligation to you.</p>
 
-      <h2>6. Pricing, Payment &amp; Billing</h2>
-      <h3>6.1 Plans</h3>
-      <p>The Service offers a free tier with 5 runs per month and a paid Pro plan with
-        100 runs per month. Current pricing is displayed on the <Link href="/#pricing">pricing page</Link>.</p>
-      <h3>6.2 Billing</h3>
-      <p>Paid plans are billed monthly in advance via Stripe. By subscribing, you authorize us
-        to charge the payment method on file for recurring monthly fees until you cancel.</p>
-      <h3>6.3 Price Changes</h3>
-      <p>We may change plan prices with at least 30 days&apos; prior notice. If you do not agree
-        to a price change, you may cancel your subscription before the new price takes effect.</p>
-      <h3>6.4 Cancellation &amp; Refunds</h3>
-      <p>You may cancel your subscription at any time through the billing portal or by contacting
-        support. Upon cancellation, you retain access to paid features until the end of your
-        current billing period. We do not provide prorated refunds for partial months. If you
-        believe you were charged in error, contact{" "}
-        <a href="mailto:support@coderhelm.com">support@coderhelm.com</a> within 30 days.</p>
-      <h3>6.5 Overdue Payments</h3>
-      <p>If a payment fails, we will attempt to retry the charge. If payment remains outstanding
-        for more than 14 days, we may downgrade your account to the free tier until the balance
-        is resolved.</p>
+      <h2>6. Usage &amp; Fair Use</h2>
+      <h3>6.1 Service Tiers</h3>
+      <p>The Service is currently offered free of charge. Usage limits (such as token budgets)
+        may apply and are displayed in your dashboard settings.</p>
+      <h3>6.2 Future Pricing</h3>
+      <p>We reserve the right to introduce paid plans in the future. If we do, we will provide
+        at least 30 days&apos; prior notice. Existing free-tier access will not be retroactively
+        charged.</p>
 
       <h2>7. Service Availability &amp; Modifications</h2>
       <p>We may modify, suspend, or discontinue any part of the Service at any time, with or
