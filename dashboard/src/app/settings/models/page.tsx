@@ -5,15 +5,18 @@ import { api, ModelProviderConfig } from "@/lib/api";
 import { useToast } from "@/components/toast";
 
 const MODEL_OPTIONS = [
-  { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
-  { value: "claude-opus-4-20250514", label: "Claude Opus 4" },
+  { value: "claude-opus-4-7", label: "Claude Opus 4.7 — most capable" },
+  { value: "claude-opus-4-6", label: "Claude Opus 4.6" },
+  { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 — fast + smart" },
+  { value: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
+  { value: "claude-haiku-4-5", label: "Claude Haiku 4.5 — fastest" },
 ];
 
 export default function ModelProviderPage() {
   const [config, setConfig] = useState<ModelProviderConfig | null>(null);
   const [apiKey, setApiKey] = useState("");
-  const [primaryModel, setPrimaryModel] = useState("claude-sonnet-4-20250514");
-  const [heavyModel, setHeavyModel] = useState("claude-opus-4-20250514");
+  const [primaryModel, setPrimaryModel] = useState("claude-sonnet-4-6");
+  const [heavyModel, setHeavyModel] = useState("claude-opus-4-7");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -177,8 +180,8 @@ export default function ModelProviderPage() {
         <h3 className="text-sm font-medium text-zinc-300 mb-2">How it works</h3>
         <ul className="text-xs text-zinc-500 space-y-1.5">
           <li>• CoderHelm uses the Anthropic API — you bring your own API key.</li>
-          <li>• <strong className="text-zinc-400">Claude Sonnet 4</strong> — fast, great for analysis and planning.</li>
-          <li>• <strong className="text-zinc-400">Claude Opus 4</strong> — powerful, ideal for complex code implementation.</li>
+          <li>• <strong className="text-zinc-400">Claude Sonnet 4.6</strong> — fast, great for analysis and planning.</li>
+          <li>• <strong className="text-zinc-400">Claude Opus 4.7</strong> — most capable, ideal for complex code implementation.</li>
           <li>• Your API key is encrypted with AWS KMS and isolated to your team.</li>
           <li>• Changes take effect on the next run. In-progress runs are unaffected.</li>
         </ul>
