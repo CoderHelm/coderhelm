@@ -47,14 +47,9 @@ export default function Privacy() {
         <li>Number of files modified and pass durations</li>
         <li>Branch names and PR URLs</li>
       </ul>
-      <p>This metadata powers the dashboard and billing. It does not include source code content.</p>
+      <p>This metadata powers the dashboard and usage tracking. It does not include source code content.</p>
 
-      <h3>1.4 Billing Information</h3>
-      <p>If you subscribe to a paid plan, payment details (credit card numbers, billing addresses)
-        are collected and processed directly by Stripe. We receive only a Stripe customer ID,
-        subscription status, and invoice summaries. We never see or store your full card number.</p>
-
-      <h3>1.5 Jira Integration Data</h3>
+      <h3>1.4 Jira Integration Data</h3>
       <p>If you connect a Jira workspace to Coderhelm, we receive the following via the Atlassian API:</p>
       <ul>
         <li>Jira OAuth access and refresh tokens (stored encrypted)</li>
@@ -140,9 +135,8 @@ export default function Privacy() {
         </thead>
         <tbody>
           <tr><td>Amazon Web Services (AWS)</td><td>Infrastructure hosting, compute, data storage, and transactional email delivery</td><td>All service data</td></tr>
-          <tr><td>Amazon Bedrock (AWS)</td><td>AI model inference for code generation and analysis</td><td>Source code (in-memory only), issue metadata</td></tr>
+          <tr><td>Anthropic</td><td>AI model inference for code generation and analysis</td><td>Source code (in-memory only), issue metadata</td></tr>
           <tr><td>GitHub</td><td>Authentication, repository access, webhook delivery</td><td>Account data, repository metadata</td></tr>
-          <tr><td>Stripe</td><td>Payment processing, subscription management</td><td>Billing information</td></tr>
           <tr><td>Google (OAuth)</td><td>User authentication via Google Sign-In</td><td>Email, display name, profile picture</td></tr>
           <tr><td>Atlassian (Jira)</td><td>Issue tracking integration</td><td>Jira OAuth tokens, project/issue metadata</td></tr>
         </tbody>

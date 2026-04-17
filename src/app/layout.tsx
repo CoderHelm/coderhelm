@@ -151,16 +151,7 @@ export default function RootLayout({
                       price: "0",
                       priceCurrency: "USD",
                       description:
-                        "500K tokens/month, public and private repos, all passes, CI self-healing",
-                    },
-                    {
-                      "@type": "Offer",
-                      name: "Pro",
-                      price: "199",
-                      priceCurrency: "USD",
-                      billingIncrement: "P1M",
-                      description:
-                        "5M tokens/month, AI plans, priority queue, custom instructions, email support",
+                        "Free and open source — bring your own Anthropic API key",
                     },
                   ],
                 },
