@@ -518,18 +518,9 @@ export default function NewPlanPage() {
             </div>
           )}
 
-          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto space-y-4 pb-4 pr-2">
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden space-y-4 pb-4 pr-2 min-w-0">
             {messages.map((msg) =>
-              msg.role === "user" ? (
-                <EditableUserBubble
-                  key={msg.id}
-                  msg={msg}
-                  onEdit={(newText) => editAndResend(msg.id, newText)}
-                  disabled={isActive}
-                />
-              ) : (
-                <MessageBubble key={msg.id} msg={msg} />
-              ),
+              <MessageBubble key={msg.id} msg={msg} />
             )}
             {status === "submitted" &&
               messages[messages.length - 1]?.parts.length === 0 && <ThinkingIndicator />}
