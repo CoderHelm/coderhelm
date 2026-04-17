@@ -4,13 +4,11 @@ import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, type Repo } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
-import { RoleGuard } from "@/components/role-guard";
-
 const GITHUB_APP_INSTALL_URL = "https://github.com/apps/coderhelm/installations/new";
 const STATE_STORAGE_KEY = "gh_install_state";
 
 export default function GitHubSettingsPageGuarded() {
-  return <RoleGuard minRole="admin"><GitHubSettingsPage /></RoleGuard>;
+  return <GitHubSettingsPage />;
 }
 
 type InstallStatus = "not_connected" | "connected" | "linking";
@@ -18,6 +16,7 @@ type InstallStatus = "not_connected" | "connected" | "linking";
 function GitHubSettingsPage() {
   const searchParams = useSearchParams();
   const [login, setLogin] = useState<string | null>(null);
+  const [role, setRole] = useState<string>("member");
   const [repos, setRepos] = useState<Repo[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<InstallStatus>("not_connected");
@@ -33,6 +32,7 @@ function GitHubSettingsPage() {
         api.getInstallationStatus(),
       ]);
       setLogin(me.github_login);
+      setRole(me.role ?? "member");
       setRepos(repoData.repos);
       if (installStatus.status === "connected") {
         setStatus("connected");
@@ -121,6 +121,7 @@ function GitHubSettingsPage() {
   }
 
   const enabledRepos = repos.filter((r) => r.enabled);
+  const isAdmin = role === "admin" || role === "owner";
 
   return (
     <div className="max-w-2xl">
@@ -167,7 +168,7 @@ function GitHubSettingsPage() {
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
-          ) : (
+          ) : isAdmin ? (
             <button
               onClick={handleInstallClick}
               className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
@@ -177,9 +178,11 @@ function GitHubSettingsPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
             </button>
+          ) : (
+            <span className="text-xs text-zinc-500">Ask an admin to install</span>
           )}
         </div>
-        {status !== "connected" && (
+        {status !== "connected" && isAdmin && (
           <p className="text-xs text-zinc-500 mt-3 ml-16">
             Install the CoderHelm GitHub App to grant access to your repositories.
           </p>
