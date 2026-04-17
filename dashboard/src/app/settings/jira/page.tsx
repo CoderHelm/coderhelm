@@ -5,11 +5,10 @@ import { api, type JiraEvent, type JiraCheck, type JiraConfig, type JiraProject 
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Skeleton } from "@/components/skeleton";
-import { RoleGuard } from "@/components/role-guard";
 
 type Tab = "app" | "webhook" | "events" | "settings";
 
-export default function JiraPageGuarded() { return <RoleGuard minRole="admin"><JiraPage /></RoleGuard>; }
+export default function JiraPageGuarded() { return <JiraPage />; }
 
 function JiraPage() {
   const [check, setCheck] = useState<JiraCheck | null>(null);
@@ -20,12 +19,15 @@ function JiraPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("app");
   const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
+  const [role, setRole] = useState<string>("member");
   const { toast } = useToast();
   const { confirm } = useConfirm();
 
+  const isAdmin = role === "admin" || role === "owner";
+
   useEffect(() => {
-    Promise.all([api.getJiraCheck(), api.getJiraConfig()])
-      .then(([c, cfg]) => { setCheck(c); setConfig(cfg); })
+    Promise.all([api.getJiraCheck(), api.getJiraConfig(), api.me()])
+      .then(([c, cfg, me]) => { setCheck(c); setConfig(cfg); setRole(me.role ?? "member"); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -120,9 +122,11 @@ function JiraPage() {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — only show admin tabs to admins */}
       <div className="flex gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-lg mb-6 w-fit">
-        {(["app", "webhook", "events", "settings"] as const).map((t) => (
+        {(["app", "webhook", "events", "settings"] as const)
+          .filter((t) => isAdmin || t === "app" || t === "events")
+          .map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer ${tab === t ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}>
             {t === "app" ? "Jira App" : t === "webhook" ? "Webhook" : t === "events" ? "Events" : "Settings"}
           </button>

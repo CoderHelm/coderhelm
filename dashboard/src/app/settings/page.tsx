@@ -33,13 +33,12 @@ export default function SettingsPage() {
     },
     {
       label: "Integrations",
-      adminOnly: true,
       items: [
         { href: "/settings/github", title: "GitHub", description: "Connected GitHub account and installed repositories." },
-        { href: "/settings/aws", title: "AWS", description: "Connect AWS accounts to analyze CloudWatch Logs and get recommendations." },
+        { href: "/settings/aws", title: "AWS", description: "Connect AWS accounts to analyze CloudWatch Logs and get recommendations.", adminOnly: true },
         { href: "/settings/jira", title: "Jira", description: "Connect Jira to create tickets from plans and sync issue status." },
-        { href: "/settings/plugins", title: "MCP Servers", description: "Connect MCP servers like Figma, Sentry, and Linear." },
-        { href: "/settings/models", title: "AI Models", description: "Configure your Anthropic API key and choose which Claude models to use." },
+        { href: "/settings/plugins", title: "MCP Servers", description: "Connect MCP servers like Figma, Sentry, and Linear.", adminOnly: true },
+        { href: "/settings/models", title: "AI Models", description: "Configure your Anthropic API key and choose which Claude models to use.", adminOnly: true },
       ],
     },
     {
