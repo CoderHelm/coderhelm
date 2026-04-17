@@ -132,6 +132,12 @@ export const api = {
   getBudget: () => request<{ max_tokens: number }>("/api/settings/budget"),
   updateBudget: (max_tokens: number) => request<void>("/api/settings/budget", { method: "PUT", body: JSON.stringify({ max_tokens }) }),
 
+  // Model Provider
+  getModelProvider: () => request<ModelProviderConfig>("/api/settings/model-provider"),
+  updateModelProvider: (config: { provider: string; api_key?: string; primary_model: string; heavy_model: string }) =>
+    request<{ status: string; provider: string }>("/api/settings/model-provider", { method: "PUT", body: JSON.stringify(config) }),
+  deleteModelProvider: () => request<void>("/api/settings/model-provider", { method: "DELETE" }),
+
   // Workflow
   getWorkflowSettings: () => request<WorkflowSettings>("/api/settings/workflow"),
   updateWorkflowSettings: (settings: WorkflowSettings) => request<void>("/api/settings/workflow", { method: "PUT", body: JSON.stringify(settings) }),
@@ -354,6 +360,13 @@ export interface UsageInfo {
   tokens_out: number;
   total_runs: number;
   max_tokens: number;
+}
+
+export interface ModelProviderConfig {
+  provider: "bedrock" | "anthropic";
+  api_key_masked: string | null;
+  primary_model: string | null;
+  heavy_model: string | null;
 }
 
 export interface Banner {
