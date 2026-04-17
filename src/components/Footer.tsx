@@ -24,8 +24,13 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a href="#pricing" className="hover:text-text-primary transition-colors">
-                  Pricing
+                <a href="#open-source" className="hover:text-text-primary transition-colors">
+                  Open Source
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/CoderHelm" target="_blank" rel="noopener noreferrer" className="hover:text-text-primary transition-colors">
+                  GitHub
                 </a>
               </li>
               <li>

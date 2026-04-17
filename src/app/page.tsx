@@ -1,6 +1,5 @@
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
-import { WaitlistForm } from "@/components/WaitlistForm";
 
 export default function Home() {
   return (
@@ -34,9 +33,23 @@ export default function Home() {
             AI that reads your codebase, plans changes, implements, and self-reviews.
           </p>
 
-          <div className="mt-12 relative">
-            <WaitlistForm />
-            <p className="mt-4 text-sm text-text-muted">Join the waitlist — we&apos;ll notify you when we open up.</p>
+          <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <a
+              href="https://app.coderhelm.com"
+              className="rounded-lg bg-blue-600 px-8 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+            >
+              Get started free
+            </a>
+            <a
+              href="https://github.com/CoderHelm"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg border border-white/20 px-8 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/5 flex items-center gap-2"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+              Star on GitHub
+            </a>
+            <p className="text-sm text-text-muted sm:hidden">Free &amp; open source — bring your own API keys.</p>
           </div>
 
           {/* Product workspace mockup — the "window into the product" */}
@@ -1281,8 +1294,8 @@ export default function Home() {
                     {[
                       { name: "Notion", cat: "Docs", connected: true },
                       { name: "Slack", cat: "Chat", connected: true },
-                      { name: "Stripe", cat: "Payments", connected: false },
                       { name: "Supabase", cat: "Database", connected: true },
+                      { name: "Confluence", cat: "Docs", connected: false },
                     ].map((p) => (
                       <div key={p.name} className="flex items-center gap-2.5 rounded-lg border border-[#21262d] bg-[#161b22] px-3 py-2.5">
                         <span className={`w-2 h-2 rounded-full shrink-0 ${p.connected ? "bg-emerald-400" : "bg-zinc-600"}`} />
@@ -1450,39 +1463,55 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="pricing" className="border-t border-surface-border py-24">
+      {/* Open Source */}
+      <section id="open-source" className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-4xl px-6">
           <div className="text-center">
-            <p className="text-sm font-semibold text-blue-400 tracking-wider uppercase">Pricing</p>
+            <p className="text-sm font-semibold text-blue-400 tracking-wider uppercase">Open Source</p>
             <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
-              Free &amp; open
+              Free forever. Open source.
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-text-secondary">
-              All features included. Bring your own API keys and set your own token limits.
+              Coderhelm is fully open source. Self-host it, contribute, or run it as-is — no subscriptions, no paywalls. Bring your own API keys and set your own token limits.
             </p>
           </div>
 
-          <div className="mt-12 max-w-md mx-auto">
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 max-w-2xl mx-auto">
             <div className="rounded-lg bg-white/[0.03] ring-1 ring-blue-500/30 p-8">
               <h3 className="text-lg font-semibold">Everything included</h3>
               <div className="mt-4">
                 <span className="text-4xl font-bold">$0</span>
-                <span className="text-text-secondary">/month</span>
+                <span className="text-text-secondary"> forever</span>
               </div>
               <ul className="mt-6 space-y-3 text-sm text-text-secondary">
                 <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> Public &amp; private repos</li>
                 <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> All passes (ticket, PR review, CI fix)</li>
-                <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> AI plans</li>
-                <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> CI self-healing</li>
+                <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> AI plans &amp; streaming chat</li>
+                <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> CI self-healing &amp; log analysis</li>
                 <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> MCP server integrations</li>
-                <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> User-configurable token limits</li>
+                <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> Bring your own API keys</li>
               </ul>
               <a
                 href="https://app.coderhelm.com"
                 className="mt-8 block rounded-lg bg-blue-600 px-6 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-blue-700"
               >
                 Get started
+              </a>
+            </div>
+
+            <div className="rounded-lg bg-white/[0.03] ring-1 ring-white/10 p-8 flex flex-col">
+              <h3 className="text-lg font-semibold">Self-host</h3>
+              <p className="mt-4 text-sm text-text-secondary flex-1">
+                Deploy to your own AWS account. Full control over your data, infrastructure, and costs. CDK included.
+              </p>
+              <a
+                href="https://github.com/CoderHelm"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-8 flex items-center justify-center gap-2 rounded-lg border border-white/20 px-6 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-white/5"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                View on GitHub
               </a>
             </div>
           </div>
@@ -1496,9 +1525,25 @@ export default function Home() {
             Ready to ship faster?
           </h2>
           <p className="mt-4 text-text-secondary">
-            Join the waitlist. We&apos;ll let you know when your spot is ready.
+            Free and open source. Deploy in minutes with your own API keys.
           </p>
-          <WaitlistForm className="mt-8" />
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <a
+              href="https://app.coderhelm.com"
+              className="rounded-lg bg-blue-600 px-8 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+            >
+              Get started free
+            </a>
+            <a
+              href="https://github.com/CoderHelm"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg border border-white/20 px-8 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/5 flex items-center gap-2"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+              Star on GitHub
+            </a>
+          </div>
         </div>
       </section>
 
