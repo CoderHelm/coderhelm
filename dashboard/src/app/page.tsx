@@ -31,16 +31,16 @@ function groupRunsByTicket(runs: Run[]): RunGroup[] {
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(run);
   }
-  // Sort attempts oldest-first within each group
+  // Sort attempts newest-first within each group
   const groups: RunGroup[] = [];
   for (const [ticket_id, attempts] of map) {
-    attempts.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    attempts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     groups.push({ ticket_id, attempts });
   }
   // Sort groups by latest attempt descending
   groups.sort((a, b) => {
-    const aLatest = new Date(a.attempts[a.attempts.length - 1].created_at).getTime();
-    const bLatest = new Date(b.attempts[b.attempts.length - 1].created_at).getTime();
+    const aLatest = new Date(a.attempts[0].created_at).getTime();
+    const bLatest = new Date(b.attempts[0].created_at).getTime();
     return bLatest - aLatest;
   });
   return groups;
@@ -102,7 +102,7 @@ export default function RunsPage() {
             </thead>
             <tbody className="divide-y divide-zinc-800">
               {groups.map((group) => {
-                const latest = group.attempts[group.attempts.length - 1];
+                const latest = group.attempts[0];
                 const hasMultiple = group.attempts.length > 1;
                 const isExpanded = expandedGroups.has(group.ticket_id);
 
@@ -188,11 +188,11 @@ function TicketGroup({
 
       {/* Previous attempts (collapsed by default) */}
       {hasMultiple && isExpanded &&
-        group.attempts.slice(0, -1).map((run, i) => (
+        group.attempts.slice(1).map((run, i) => (
           <tr key={run.run_id} className="bg-zinc-950/50 hover:bg-zinc-900/30">
             <td className="px-4 py-2 pl-10">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-zinc-600 font-mono">#{i + 1}</span>
+                <span className="text-[10px] text-zinc-600 font-mono">#{group.attempts.length - i - 1}</span>
                 <Link href={`/runs/detail?id=${run.run_id}`} className="text-zinc-500 hover:text-zinc-300 hover:underline text-xs">
                   {run.title}
                 </Link>
