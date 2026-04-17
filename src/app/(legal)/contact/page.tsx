@@ -48,7 +48,7 @@ export default function Contact() {
         To report abuse, policy violations, or DMCA takedown notices:
       </p>
       <p>
-        <a href="mailto:abuse@coderhelm.com">abuse@coderhelm.com</a>
+        <a href="mailto:abuserequest@coderhelm.com">abuserequest@coderhelm.com</a>
       </p>
 
       <h2>Response Times</h2>
