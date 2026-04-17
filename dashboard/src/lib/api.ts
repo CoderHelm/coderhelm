@@ -288,6 +288,8 @@ export interface RunDetail extends Run {
   pr_number?: number;
   files_modified?: string[];
   mcp_servers?: string[];
+  cache_read_tokens?: number;
+  cache_write_tokens?: number;
   error?: string;
   updated_at?: string;
   pass_history?: { pass: string; started_at: string }[];
