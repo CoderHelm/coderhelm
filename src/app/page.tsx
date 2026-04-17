@@ -1469,10 +1469,10 @@ export default function Home() {
           <div className="text-center">
             <p className="text-sm font-semibold text-blue-400 tracking-wider uppercase">Open Source</p>
             <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
-              Free forever. Open source.
+              Free and open source.
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-text-secondary">
-              Coderhelm is fully open source. Self-host it, contribute, or run it as-is — no subscriptions, no paywalls. Bring your own API keys and set your own token limits.
+              CoderHelm is fully open source. Self-host it, contribute, or run it as-is. Bring your own API keys and set your own token limits.
             </p>
           </div>
 
