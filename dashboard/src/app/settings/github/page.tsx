@@ -141,74 +141,55 @@ function GitHubSettingsPage() {
         </div>
       )}
 
-      {/* Connected account */}
+      {/* GitHub connection */}
       <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
         <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-800 text-zinc-300">
             <GitHubIcon className="w-6 h-6" />
           </div>
           <div className="flex-1">
-            <p className="text-xs text-zinc-500 uppercase tracking-wider">Connected account</p>
-            <p className="text-lg font-semibold text-zinc-100 mt-0.5">{login ?? "Not connected"}</p>
+            <p className="text-xs text-zinc-500 uppercase tracking-wider">GitHub App</p>
+            {status === "connected" ? (
+              <p className="text-lg font-semibold text-zinc-100 mt-0.5">{githubOrg ?? login ?? "Connected"}</p>
+            ) : status === "linking" ? (
+              <p className="text-sm text-zinc-400 mt-0.5">Linking installation…</p>
+            ) : (
+              <p className="text-sm text-zinc-400 mt-0.5">Not installed</p>
+            )}
           </div>
-          {login ? (
+          {status === "connected" ? (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-xs font-medium">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
               Connected
             </span>
-          ) : (
-            <a
-              href={`${process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com"}/auth/github`}
-              className="inline-flex items-center gap-2 rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-100 hover:bg-zinc-700 transition-colors"
-            >
-              <GitHubIcon className="w-4 h-4" />
-              Connect GitHub
-            </a>
-          )}
-        </div>
-      </div>
-
-      {/* GitHub App installation status */}
-      <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
-          <h3 className="text-sm font-medium text-zinc-300 mb-2">GitHub App</h3>
-
-          {status === "connected" ? (
-            <div className="flex items-center gap-3">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-xs font-medium">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                Installed
-              </span>
-              {githubOrg && (
-                <span className="text-sm text-zinc-400">
-                  on <span className="font-mono text-zinc-200">{githubOrg}</span>
-                </span>
-              )}
-            </div>
           ) : status === "linking" ? (
-            <div className="flex items-center gap-2 text-sm text-zinc-400">
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Linking installation…
-            </div>
+            <svg className="w-5 h-5 animate-spin text-zinc-400" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
           ) : (
-            <>
-              <p className="text-xs text-zinc-500 mb-3">
-                Install the CoderHelm GitHub App to grant access to your repositories.
-              </p>
-              <button
-                onClick={handleInstallClick}
-                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
-              >
-                Install GitHub App
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-              </button>
-            </>
+            <button
+              onClick={handleInstallClick}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+            >
+              Install
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </button>
           )}
         </div>
+        {status !== "connected" && (
+          <p className="text-xs text-zinc-500 mt-3 ml-16">
+            Install the CoderHelm GitHub App to grant access to your repositories.
+          </p>
+        )}
+        {status === "connected" && login && githubOrg && login !== githubOrg && (
+          <p className="text-xs text-zinc-500 mt-3 ml-16">
+            Signed in as <span className="font-mono text-zinc-400">{login}</span>
+          </p>
+        )}
+      </div>
 
       {/* Repositories */}
       <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
