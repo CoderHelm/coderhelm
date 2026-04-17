@@ -191,8 +191,6 @@ function AnalysisView({
           )}
           {warnCount > 0 && (
             <span className="px-2.5 py-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 rounded-full text-xs">
-              {warnCount > 0 && (
-            <span className="px-2.5 py-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 rounded-full text-xs">
               {warnCount} warning{warnCount !== 1 ? "s" : ""}
             </span>
           )}
