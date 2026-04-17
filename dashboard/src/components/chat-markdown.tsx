@@ -72,7 +72,7 @@ const COMPONENTS: Partial<Components> = {
   pre: ({ children }) => {
     const codeText = extractText(children);
     return (
-      <pre className="mb-2 last:mb-0 relative group/code overflow-x-auto">
+      <pre className="mb-2 last:mb-0 relative group/code overflow-x-auto max-w-full">
         {children}
         <CopyButton text={codeText} />
       </pre>
@@ -91,7 +91,7 @@ const COMPONENTS: Partial<Components> = {
 
 export const ChatMarkdown = memo(function ChatMarkdown({ children }: { children: string }) {
   return (
-    <div className="chat-md overflow-hidden break-words">
+    <div className="chat-md overflow-hidden break-words min-w-0 max-w-full">
       <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={COMPONENTS}>
         {children}
       </ReactMarkdown>
