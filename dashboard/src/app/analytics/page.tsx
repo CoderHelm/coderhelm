@@ -225,7 +225,6 @@ export default function AnalyticsPage() {
         <KpiCard label="Merge rate" value={`${(kpi.merge_rate * 100).toFixed(0)}%`} />
         <KpiCard label="Run tokens" value={formatNumber(kpi.total_tokens_in + kpi.total_tokens_out)} />
         <KpiCard label="Plan tokens" value={formatNumber(planTokens)} />
-        <KpiCard label="Total cost" value={`$${kpi.total_cost_usd.toFixed(2)}`} />
         <KpiCard label="In progress" value={kpi.in_progress} />
       </div>
 
