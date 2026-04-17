@@ -45,7 +45,7 @@ export class AppStack extends cdk.Stack {
       originAccessControlName: `${prefix}-app-oac`,
     });
 
-    // Security headers — allow Stripe frames and API connections
+    // Security headers
     const responseHeadersPolicy = new cloudfront.ResponseHeadersPolicy(
       this,
       "SecurityHeaders",
@@ -75,7 +75,7 @@ export class AppStack extends cdk.Stack {
           },
           contentSecurityPolicy: {
             contentSecurityPolicy:
-              "default-src 'self'; script-src 'self' 'unsafe-inline' https://js.stripe.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.coderhelm.com https://stream.coderhelm.com https://api.stripe.com https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com; frame-src https://js.stripe.com; font-src 'self'",
+              "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.coderhelm.com https://stream.coderhelm.com https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com; font-src 'self'",
             override: true,
           },
         },
@@ -83,7 +83,7 @@ export class AppStack extends cdk.Stack {
           customHeaders: [
             {
               header: "Permissions-Policy",
-              value: "camera=(), microphone=(), geolocation=(), payment=(self)",
+              value: "camera=(), microphone=(), geolocation=()",
               override: true,
             },
           ],

@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, type RunDetail, type Openspec, type BillingInfo, type EnabledPlugin, type PluginDef, type PassTrace } from "@/lib/api";
+import { api, type RunDetail, type Openspec, type UsageInfo, type EnabledPlugin, type PluginDef, type PassTrace } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
 import { Markdown } from "@/components/markdown";
@@ -174,29 +174,21 @@ function RunDetailInner() {
   const [reReviewing, setReReviewing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [specTab, setSpecTab] = useState<keyof Openspec>("proposal");
-  const [billing, setBilling] = useState<BillingInfo | null>(null);
+  const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [plugins, setPlugins] = useState<{ catalog: PluginDef[]; enabled: EnabledPlugin[] }>({ catalog: [], enabled: [] });
   const [traces, setTraces] = useState<PassTrace[]>([]);
   const [pipelineOpen, setPipelineOpen] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => { api.getBilling().then(setBilling).catch(() => {}); }, []);
+  useEffect(() => { api.getUsage().then(setUsage).catch(() => {}); }, []);
   useEffect(() => {
     Promise.all([api.getPluginCatalog(), api.listEnabledPlugins()])
       .then(([c, e]) => setPlugins({ catalog: c.plugins, enabled: e.plugins }))
       .catch(() => {});
   }, []);
-  const tokensExceeded = billing ? (() => {
-    const tokens = billing.current_period.total_tokens;
-    const limit = billing.limits.tokens;
-    if (tokens < limit) return false;
-    // Pro with budget: only exceeded if overage cost >= budget
-    if (billing.subscription_status === "active" && billing.limits.max_budget_cents > 0) {
-      const overageCents = Math.floor((tokens - limit) / 1000) * billing.limits.overage_per_1k_tokens_cents;
-      return overageCents >= billing.limits.max_budget_cents;
-    }
-    return true;
-  })() : false;
+  const tokensExceeded = usage ? (
+    usage.max_tokens > 0 && usage.total_tokens >= usage.max_tokens
+  ) : false;
 
   const fetchRun = useCallback(() => {
     if (!runId) return;

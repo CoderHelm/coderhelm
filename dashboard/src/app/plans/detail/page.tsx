@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, type BillingInfo, type Plan, type Task, type Repo, type JiraCheck, type Openspec, type Template } from "@/lib/api";
+import { api, type Plan, type Task, type Repo, type JiraCheck, type Openspec, type Template } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Skeleton, TableSkeleton } from "@/components/skeleton";
@@ -60,7 +60,6 @@ function PlanDetail() {
   const router = useRouter();
   const planId = searchParams.get("id") ?? "";
   const [plan, setPlan] = useState<(Plan & { tasks: Task[] }) | null>(null);
-  const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<string | null>(null);
@@ -92,10 +91,9 @@ function PlanDetail() {
   const refresh = useCallback(() => {
     if (!planId) return;
     setLoading(true);
-    Promise.all([api.getPlan(planId), api.getBilling()])
-      .then(([p, b]) => {
+    api.getPlan(planId)
+      .then((p) => {
         setPlan(p);
-        setBilling(b);
       })
       .catch(() => toast("Failed to load plan", "error"))
       .finally(() => setLoading(false));
@@ -296,8 +294,6 @@ function PlanDetail() {
 
   const approvedCount = plan?.tasks.filter((t) => t.status === "approved").length ?? 0;
   const draftCount = plan?.tasks.filter((t) => t.status === "draft").length ?? 0;
-  const plansEnabled = billing?.subscription_status === "active";
-
   if (!planId) {
     return (
       <div className="max-w-3xl">
@@ -322,28 +318,6 @@ function PlanDetail() {
       <div className="max-w-3xl">
         <Link href="/plans" className="text-zinc-500 hover:text-zinc-300 text-sm">← Plans</Link>
         <p className="text-zinc-500 mt-4">Plan not found.</p>
-      </div>
-    );
-  }
-
-  if (!plansEnabled) {
-    return (
-      <div className="max-w-2xl">
-        <Link href="/plans" className="text-zinc-500 hover:text-zinc-300 text-sm">
-          ← Plans
-        </Link>
-        <div className="mt-4 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-6">
-          <h1 className="text-lg font-semibold text-yellow-300">Plans is a paid feature</h1>
-          <p className="text-sm text-yellow-200/80 mt-2">
-            Upgrade to Pro (or add the Plans add-on) to manage and execute plans.
-          </p>
-          <Link
-            href="/billing"
-            className="inline-block mt-4 px-4 py-2 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200"
-          >
-            Go to Billing
-          </Link>
-        </div>
       </div>
     );
   }
