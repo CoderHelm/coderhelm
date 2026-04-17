@@ -116,7 +116,7 @@ export default function ModelProviderPage() {
     <div className="max-w-xl">
       <h1 className="text-2xl font-bold mb-2">AI Models</h1>
       <p className="text-sm text-zinc-500 mb-6">
-        Choose how CoderHelm calls Claude. Use AWS Bedrock (default) or bring your own Anthropic API key for direct access.
+        Choose how CoderHelm calls Claude. Use AWS Bedrock with your own AWS account or bring your own Anthropic API key for direct access.
       </p>
 
       {/* Provider toggle */}
@@ -133,7 +133,7 @@ export default function ModelProviderPage() {
               }`}
             >
               <span className="block font-semibold">AWS Bedrock</span>
-              <span className="block text-xs mt-0.5 opacity-70">Default — uses CoderHelm&apos;s infrastructure</span>
+              <span className="block text-xs mt-0.5 opacity-70">Default — uses your AWS account</span>
             </button>
             <button
               onClick={() => setProvider("anthropic")}
@@ -237,7 +237,7 @@ export default function ModelProviderPage() {
       <div className="mt-4 p-4 bg-zinc-900/30 border border-zinc-800 rounded-lg">
         <h3 className="text-sm font-medium text-zinc-300 mb-2">How it works</h3>
         <ul className="text-xs text-zinc-500 space-y-1.5">
-          <li>• <strong className="text-zinc-400">Bedrock (default)</strong> — runs through CoderHelm&apos;s AWS infrastructure. No setup needed.</li>
+          <li>• <strong className="text-zinc-400">Bedrock (default)</strong> — runs through your AWS infrastructure. Uses the deployment&apos;s configured Bedrock access.</li>
           <li>• <strong className="text-zinc-400">Anthropic API</strong> — calls Claude directly with your key. You control billing and rate limits.</li>
           <li>• Your API key is encrypted with AWS KMS and isolated to your team.</li>
           <li>• Switching providers takes effect on the next run. In-progress runs are unaffected.</li>
