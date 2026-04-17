@@ -342,8 +342,7 @@ export interface MonthStats {
 }
 
 export interface NotificationPrefs {
-  email_run_complete: boolean;
-  email_run_failed: boolean;
+  email_token_warning: boolean;
   email_weekly_summary: boolean;
 }
 
