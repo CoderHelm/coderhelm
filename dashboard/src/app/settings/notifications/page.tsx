@@ -5,8 +5,7 @@ import { api, type NotificationPrefs } from "@/lib/api";
 import { useToast } from "@/components/toast";
 
 const TOGGLES: { key: keyof NotificationPrefs; label: string; description: string }[] = [
-  { key: "email_run_complete", label: "Run completed", description: "Email when a Coderhelm run finishes successfully." },
-  { key: "email_run_failed", label: "Run failed", description: "Email when a run encounters an error." },
+  { key: "email_token_warning", label: "Token usage warnings", description: "Email when your team's monthly token usage reaches 80% and 100% of the limit." },
   { key: "email_weekly_summary", label: "Weekly summary", description: "A weekly digest of activity across your repos." },
 ];
 
