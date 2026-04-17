@@ -25,7 +25,27 @@ const CATEGORY_LABELS: Record<string, string> = {
   reliability: "Reliability",
 };
 
-function FindingCard({ finding }: { finding: InfraFinding }) {
+function FindingCard({ finding, selectedRepo }: { finding: InfraFinding; selectedRepo?: string }) {
+  const [isCreatingPlan, setIsCreatingPlan] = useState(false);
+  const { toast } = useToast();
+
+  const handleAddToPlan = async () => {
+    setIsCreatingPlan(true);
+    try {
+      const description = finding.detail + (finding.file ? `\n\nFile: ${finding.file}` : "");
+      await api.createPlan({
+        title: finding.title,
+        description,
+        repo: selectedRepo,
+      });
+      toast("Plan created successfully!");
+    } catch (error) {
+      toast("Failed to create plan", "error");
+    } finally {
+      setIsCreatingPlan(false);
+    }
+  };
+
   return (
     <div className={`p-3 rounded-lg border ${SEVERITY_STYLES[finding.severity] || SEVERITY_STYLES.info}`}>
       <div className="flex items-start gap-2">
@@ -37,6 +57,15 @@ function FindingCard({ finding }: { finding: InfraFinding }) {
           </div>
           <p className="text-xs text-zinc-500 mt-1 leading-relaxed">{finding.detail}</p>
           {finding.file && <p className="text-xs text-zinc-600 font-mono mt-1">{finding.file}</p>}
+          <div className="flex justify-end mt-2">
+            <button
+              onClick={handleAddToPlan}
+              disabled={isCreatingPlan}
+              className="px-2 py-1 text-xs border border-zinc-700 rounded text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors disabled:opacity-50"
+            >
+              {isCreatingPlan ? "Adding..." : "Add to Plan"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -61,10 +90,12 @@ function AnalysisView({
   analysis,
   refreshing,
   onRefresh,
+  selectedRepo,
 }: {
   analysis: InfraAnalysis;
   refreshing: boolean;
   onRefresh: () => void;
+  selectedRepo?: string;
 }) {
 
   const [copied, setCopied] = useState(false);
@@ -160,6 +191,8 @@ function AnalysisView({
           )}
           {warnCount > 0 && (
             <span className="px-2.5 py-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 rounded-full text-xs">
+              {warnCount > 0 && (
+            <span className="px-2.5 py-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 rounded-full text-xs">
               {warnCount} warning{warnCount !== 1 ? "s" : ""}
             </span>
           )}
@@ -184,7 +217,7 @@ function AnalysisView({
                     </p>
                     <div className="space-y-1.5">
                       {group.map((finding, i) => (
-                        <FindingCard key={i} finding={finding} />
+                        <FindingCard key={i} finding={finding} selectedRepo={selectedRepo} />
                       ))}
                     </div>
                   </div>
@@ -302,7 +335,7 @@ function InfrastructureContent() {
       {loading ? (
         <Skeleton className="h-96 w-full rounded-xl" />
       ) : analysis ? (
-        <AnalysisView analysis={analysis} refreshing={refreshing} onRefresh={handleRefresh} />
+        <AnalysisView analysis={analysis} refreshing={refreshing} onRefresh={handleRefresh} selectedRepo={scope === "repo" ? selectedRepo : undefined} />
       ) : (
         <div className="text-center py-16 text-zinc-600 text-sm">No data</div>
       )}
