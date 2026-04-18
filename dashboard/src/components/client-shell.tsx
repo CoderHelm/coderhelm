@@ -60,6 +60,7 @@ const navGroups: NavGroup[] = [
       { href: "/analytics", label: "Analytics", icon: <TrendingUpIcon />, memberOnly: true },
       { href: "/infrastructure", label: "Infrastructure", icon: <HexagonIcon />, memberOnly: true },
       { href: "/health", label: "Health", icon: <HeartIcon />, memberOnly: true },
+      { href: "/memory", label: "Memory", icon: <CpuIcon />, memberOnly: true },
     ],
   },
   {
