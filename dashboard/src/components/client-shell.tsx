@@ -11,7 +11,7 @@ import {
   PlayIcon, CircleDotIcon, TrendingUpIcon, HexagonIcon, HeartIcon,
   GitBranchIcon, GearIcon, AtlassianIcon, GitHubIcon, UsersIcon,
   BellIcon, TargetIcon, RepeatIcon, ShieldCheckIcon,
-  AwsIcon, PluginIcon, ShieldIcon, TemplateIcon, CpuIcon,
+  AwsIcon, PluginIcon, ShieldIcon, TemplateIcon, CpuIcon, BrainIcon,
 } from "./icons";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
@@ -60,7 +60,7 @@ const navGroups: NavGroup[] = [
       { href: "/analytics", label: "Analytics", icon: <TrendingUpIcon />, memberOnly: true },
       { href: "/infrastructure", label: "Infrastructure", icon: <HexagonIcon />, memberOnly: true },
       { href: "/health", label: "Health", icon: <HeartIcon />, memberOnly: true },
-      { href: "/memory", label: "Memory", icon: <CpuIcon />, memberOnly: true },
+      { href: "/memory", label: "Memory", icon: <BrainIcon />, memberOnly: true },
     ],
   },
   {

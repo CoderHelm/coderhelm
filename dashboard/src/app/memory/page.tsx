@@ -130,6 +130,16 @@ export default function MemoryPage() {
         </p>
       </div>
 
+      {repos.length === 0 ? (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
+          <svg className="w-12 h-12 mx-auto mb-4 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75" />
+          </svg>
+          <p className="text-zinc-400 text-sm">No active repositories.</p>
+          <p className="text-zinc-500 text-xs mt-1">Enable a repository in Settings to start building agent memory.</p>
+        </div>
+      ) : (
+      <>
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-3">
         {/* Repo picker */}
@@ -196,7 +206,7 @@ export default function MemoryPage() {
           <div className="p-8 text-center text-zinc-500">Loading memories…</div>
         ) : memories.length === 0 ? (
           <div className="p-8 text-center text-zinc-500">
-            {selectedRepo ? "No memories found for this repository." : "Select a repository to view memories."}
+            No memories yet. CoderHelm will learn from future runs on this repository.
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -302,6 +312,8 @@ export default function MemoryPage() {
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }
