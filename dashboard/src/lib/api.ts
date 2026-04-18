@@ -286,6 +286,9 @@ export interface RunDetail extends Run {
   ticket_source?: string;
   branch?: string;
   pr_number?: number;
+  pr_urls?: string[];
+  pr_numbers?: number[];
+  branches?: string[];
   files_modified?: string[];
   mcp_servers?: string[];
   cache_read_tokens?: number;
