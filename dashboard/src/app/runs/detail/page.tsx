@@ -30,8 +30,14 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function PassProgress({ currentPass, status }: { currentPass?: string; status: string }) {
-  const doneIdx = status === "completed" ? PASSES.length : PASSES.indexOf(currentPass ?? "");
+function PassProgress({ currentPass, status, passHistory }: { currentPass?: string; status: string; passHistory?: { pass: string }[] }) {
+  // Use the highest pass ever reached so CI fix cycles don't regress the bar
+  let maxIdx = PASSES.indexOf(currentPass ?? "");
+  passHistory?.forEach((entry) => {
+    const idx = PASSES.indexOf(entry.pass);
+    if (idx > maxIdx) maxIdx = idx;
+  });
+  const doneIdx = status === "completed" ? PASSES.length : maxIdx;
   const awaiting = status === "awaiting_ci";
   return (
     <div className="flex items-center gap-1">
@@ -136,9 +142,8 @@ function isTaskDone(
   task: TaskItem,
   filesModified: string[],
   runStatus: string,
-  currentPass: string | undefined,
+  maxPassIdx: number,
 ): boolean {
-  const passIdx = PASSES.indexOf(currentPass ?? "");
   const section = task.section.toLowerCase();
   const isPostDeploy = section.includes("post-deploy");
   const isVerification = section.includes("verification") && !isPostDeploy;
@@ -151,10 +156,10 @@ function isTaskDone(
   if (runStatus === "completed" && !isPostDeploy) return true;
 
   // Prerequisites done once we're past plan
-  if (isPrereq && passIdx >= 2) return true;
+  if (isPrereq && maxPassIdx >= 2) return true;
 
   // Verification done once review pass completed
-  if (isVerification && (passIdx >= 4 || runStatus === "completed")) return true;
+  if (isVerification && (maxPassIdx >= 4 || runStatus === "completed")) return true;
 
   // File-path matching for real-time progress during implement
   if (task.filePaths.length > 0) {
@@ -164,7 +169,7 @@ function isTaskDone(
   }
 
   // Implementation tasks without file paths: done if we're past implement
-  if (passIdx >= 3) return true;
+  if (maxPassIdx >= 3) return true;
 
   return false;
 }
@@ -259,11 +264,21 @@ function RunDetailInner() {
     ? (Object.keys(openspec) as (keyof Openspec)[]).filter((k) => openspec[k] && k !== "tasks")
     : [];
 
-  const implementStarted = PASSES.indexOf(run.current_pass ?? "") >= 2 || run.status === "completed" || run.status === "failed" || run.status === "archived" || run.status === "cancelled";
+  // Compute the highest pass index ever reached (not just current_pass, which regresses during CI fix cycles)
+  const maxPassIdx = useMemo(() => {
+    let max = PASSES.indexOf(run.current_pass ?? "");
+    run.pass_history?.forEach((entry) => {
+      const idx = PASSES.indexOf(entry.pass);
+      if (idx > max) max = idx;
+    });
+    return max;
+  }, [run.current_pass, run.pass_history]);
+
+  const implementStarted = maxPassIdx >= 2 || run.status === "completed" || run.status === "failed" || run.status === "archived" || run.status === "cancelled";
   const showTaskSidebar = taskItems.length > 0 && implementStarted;
   const filesModified = run.files_modified ?? [];
 
-  const doneCount = taskItems.filter((t) => isTaskDone(t, filesModified, run.status, run.current_pass)).length;
+  const doneCount = taskItems.filter((t) => isTaskDone(t, filesModified, run.status, maxPassIdx)).length;
 
   return (
     <div className={showTaskSidebar ? "max-w-6xl flex gap-6" : "max-w-3xl"}>
@@ -286,7 +301,7 @@ function RunDetailInner() {
 
       {/* Pass progress */}
       <div className="mb-6">
-        <PassProgress currentPass={run.current_pass} status={run.status} />
+        <PassProgress currentPass={run.current_pass} status={run.status} passHistory={run.pass_history} />
       </div>
 
       {/* Cancel button for running jobs */}
