@@ -13,6 +13,7 @@ const PASSES = ["triage", "plan", "implement", "security", "pr", "test", "review
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { dot: string; text: string; bg: string }> = {
     running: { dot: "bg-blue-400", text: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20" },
+    awaiting_ci: { dot: "bg-cyan-400", text: "text-cyan-400", bg: "bg-cyan-500/10 border-cyan-500/20" },
     completed: { dot: "bg-emerald-400", text: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
     failed: { dot: "bg-red-400", text: "text-red-400", bg: "bg-red-500/10 border-red-500/20" },
     pending: { dot: "bg-yellow-400", text: "text-yellow-400", bg: "bg-yellow-500/10 border-yellow-500/20" },
@@ -23,31 +24,32 @@ function StatusBadge({ status }: { status: string }) {
   const s = map[status] ?? { dot: "bg-zinc-500", text: "text-zinc-400", bg: "bg-zinc-800 border-zinc-700" };
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${s.bg} ${s.text}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${s.dot} ${status === "running" ? "animate-pulse" : ""}`} />
-      {status}
+      <span className={`w-1.5 h-1.5 rounded-full ${s.dot} ${status === "running" || status === "awaiting_ci" ? "animate-pulse" : ""}`} />
+      {status === "awaiting_ci" ? "awaiting CI" : status}
     </span>
   );
 }
 
 function PassProgress({ currentPass, status }: { currentPass?: string; status: string }) {
   const doneIdx = status === "completed" ? PASSES.length : PASSES.indexOf(currentPass ?? "");
+  const awaiting = status === "awaiting_ci";
   return (
     <div className="flex items-center gap-1">
       {PASSES.map((pass, i) => {
         const done = i < doneIdx;
-        const active = i === doneIdx && status === "running";
+        const active = i === doneIdx && (status === "running" || awaiting);
         const failed = status === "failed" && i === doneIdx;
         return (
           <div key={pass} className="flex items-center">
             {i > 0 && (
-              <div className={`w-6 h-px ${done ? "bg-emerald-500/50" : active ? "bg-blue-500/30" : "bg-zinc-700/60"}`} />
+              <div className={`w-6 h-px ${done ? "bg-emerald-500/50" : active ? (awaiting ? "bg-cyan-500/30" : "bg-blue-500/30") : "bg-zinc-700/60"}`} />
             )}
             <div
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                 done
                   ? "text-emerald-400"
                   : active
-                    ? "bg-blue-500/10 text-blue-400"
+                    ? awaiting ? "bg-cyan-500/10 text-cyan-400" : "bg-blue-500/10 text-blue-400"
                     : failed
                       ? "bg-red-500/10 text-red-400"
                       : "text-zinc-600"
@@ -58,7 +60,11 @@ function PassProgress({ currentPass, status }: { currentPass?: string; status: s
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               ) : active ? (
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                awaiting ? (
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                ) : (
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                )
               ) : failed ? (
                 <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
               ) : (
@@ -210,8 +216,8 @@ function RunDetailInner() {
 
   // Auto-poll running runs every 5s
   useEffect(() => {
-    if (!run || run.status !== "running") return;
-    const interval = setInterval(fetchRun, 3000);
+    if (!run || (run.status !== "running" && run.status !== "awaiting_ci")) return;
+    const interval = setInterval(fetchRun, run.status === "awaiting_ci" ? 15000 : 3000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run?.status, fetchRun]);
