@@ -270,7 +270,7 @@ function RunDetailInner() {
           <h1 className="text-xl font-bold text-zinc-100">{run.title}</h1>
           <StatusBadge status={run.status} />
         </div>
-        <p className="text-sm text-zinc-500 font-mono">{run.repo}</p>
+        <p className="text-sm text-zinc-500 font-mono">{run.repo || "Determining repo…"}</p>
         {run.ticket_id && (
           <p className="text-xs text-zinc-600 mt-1">
             {run.ticket_source === "jira" ? "Jira" : "Issue"}: {run.ticket_id}
