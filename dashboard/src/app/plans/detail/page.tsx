@@ -647,6 +647,12 @@ function PlanDetail() {
                           View run
                         </Link>
                       )}
+                      {task.pr_url && (
+                        <a href={task.pr_url} target="_blank" rel="noopener noreferrer" className="text-xs text-green-400 hover:underline flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5"><path d="M5 3v6a3 3 0 003 3h1M11 13V7a3 3 0 00-3-3H7" /><circle cx="5" cy="3" r="1.5" /><circle cx="11" cy="13" r="1.5" /></svg>
+                          View PR
+                        </a>
+                      )}
                       {task.status === "failed" && (
                         <button
                           onClick={async () => {
