@@ -436,6 +436,7 @@ export interface Task {
   jira_ticket_key?: string;
   jira_ticket_url?: string;
   run_id?: string;
+  pr_url?: string;
   approved_at?: string;
   approved_by?: string;
   rejected_at?: string;
