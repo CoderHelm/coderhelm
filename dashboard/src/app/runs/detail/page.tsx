@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
 import { Markdown } from "@/components/markdown";
 
-const PASSES = ["triage", "plan", "implement", "test", "review", "security", "pr"];
+const PASSES = ["triage", "plan", "implement", "security", "pr", "test", "review"];
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { dot: string; text: string; bg: string }> = {
