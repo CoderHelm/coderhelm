@@ -571,13 +571,20 @@ function RunDetailInner() {
       )}
 
       {/* Links */}
-      {(run.pr_url || run.branch) && (
-        <div className="flex items-center gap-4 mb-6">
-          {run.pr_url && (
+      {(run.pr_url || run.pr_urls?.length || run.branch) && (
+        <div className="flex flex-wrap items-center gap-4 mb-6">
+          {/* Multi-repo PRs */}
+          {run.pr_urls && run.pr_urls.length > 1 ? (
+            run.pr_urls.map((url, i) => (
+              <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-400 hover:text-blue-300">
+                PR #{run.pr_numbers?.[i] ?? i + 1} →
+              </a>
+            ))
+          ) : run.pr_url ? (
             <a href={run.pr_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-400 hover:text-blue-300">
               View Pull Request →
             </a>
-          )}
+          ) : null}
           {run.pr_url && run.status !== "running" && run.status !== "merged" && (
             <button
               onClick={async () => {
