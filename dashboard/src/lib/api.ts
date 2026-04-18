@@ -253,6 +253,18 @@ export const api = {
     request<{ status: string; error?: string }>(`/api/plugins/${id}/prompt`, { method: "PUT", body: JSON.stringify({ custom_prompt }) }),
   testPluginConnection: (id: string) =>
     request<{ status: string; tool_count?: number; message?: string }>(`/api/plugins/${id}/test`, { method: "POST" }),
+
+  // Memory
+  listMemories: (repo: string, page = 1, pageSize = 50, search?: string, memoryType?: string) => {
+    const params = new URLSearchParams({ repo, page: String(page), page_size: String(pageSize) });
+    if (search) params.set("search", search);
+    if (memoryType) params.set("memory_type", memoryType);
+    return request<MemoryListResponse>(`/api/memories?${params}`);
+  },
+  getMemoryStats: (repo: string) =>
+    request<MemoryStats>(`/api/memories/stats?repo=${encodeURIComponent(repo)}`),
+  deleteMemory: (id: string, repo: string) =>
+    request<{ deleted: string }>(`/api/memories/${id}?repo=${encodeURIComponent(repo)}`, { method: "DELETE" }),
 };
 
 export interface TeamUser {
@@ -595,4 +607,25 @@ export interface EnabledPlugin {
   custom_prompt: string | null;
 }
 
+export interface MemoryItem {
+  id: string;
+  content: string;
+  memory_type: string;
+  tags: string[];
+  confidence: number;
+  created_at: number;
+  accessed_at: number;
+  access_count: number;
+}
 
+export interface MemoryListResponse {
+  memories: MemoryItem[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface MemoryStats {
+  total: number;
+  by_type: Record<string, number>;
+}
