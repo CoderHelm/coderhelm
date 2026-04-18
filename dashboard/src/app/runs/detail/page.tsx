@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, type RunDetail, type Openspec, type UsageInfo, type EnabledPlugin, type PluginDef, type PassTrace } from "@/lib/api";
@@ -180,6 +180,7 @@ function RunDetailInner() {
   const runId = searchParams.get("id") ?? "";
   const [run, setRun] = useState<RunDetail | null>(null);
   const [openspec, setOpenspec] = useState<Openspec | null>(null);
+  const openspecLoaded = useRef(false);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
   const [reReviewing, setReReviewing] = useState(false);
@@ -207,7 +208,10 @@ function RunDetailInner() {
       .then((r) => {
         setRun(r);
         if (r.status !== "running" || PASSES.indexOf(r.current_pass ?? "") >= 1) {
-          api.getRunOpenspec(runId).then(setOpenspec).catch(() => {});
+          if (!openspecLoaded.current) {
+            openspecLoaded.current = true;
+            api.getRunOpenspec(runId).then(setOpenspec).catch(() => { openspecLoaded.current = false; });
+          }
         }
         if (r.status !== "running" && r.status !== "queued") {
           api.getRunTraces(runId).then((t) => setTraces(t.traces)).catch(() => {});
