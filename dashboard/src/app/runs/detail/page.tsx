@@ -665,27 +665,33 @@ function RunDetailInner() {
                 />
                 {(() => {
                   // Merge pass_history and progress_notes into a unified timeline
-                  const events: { label: string; time: string; kind: "pass" | "note" | "terminal"; idx: number }[] = [];
+                  // Group tool-call notes under their preceding pass entry
+                  const passEvents: { label: string; time: string; kind: "pass" | "terminal"; idx: number; tools: { label: string; time: string }[] }[] = [];
                   run.pass_history?.forEach((entry, i) => {
-                    events.push({
+                    passEvents.push({
                       label: `${entry.pass.charAt(0).toUpperCase()}${entry.pass.slice(1)} started`,
                       time: entry.started_at,
                       kind: "pass",
                       idx: i,
+                      tools: [],
                     });
                   });
-                  run.progress_notes?.forEach((note) => {
-                    events.push({
-                      label: note.message,
-                      time: note.timestamp,
-                      kind: "note",
-                      idx: -1,
-                    });
-                  });
-                  events.sort((a, b) => a.time.localeCompare(b.time));
+
+                  // Sort progress notes by time and attach each to the most recent pass
+                  const notes = [...(run.progress_notes || [])].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+                  for (const note of notes) {
+                    // Find the last pass that started before this note
+                    let target = passEvents.length - 1;
+                    for (let j = passEvents.length - 1; j >= 0; j--) {
+                      if (passEvents[j].time <= note.timestamp) { target = j; break; }
+                    }
+                    if (target >= 0) {
+                      passEvents[target].tools.push({ label: note.message, time: note.timestamp });
+                    }
+                  }
 
                   const lastPassIdx = (run.pass_history?.length ?? 0) - 1;
-                  return events.map((ev, i) => {
+                  return passEvents.map((ev, i) => {
                     let status: "done" | "active" | "failed" = "done";
                     if (ev.kind === "pass") {
                       if (run.status === "failed" && ev.idx === lastPassIdx) status = "failed";
@@ -697,7 +703,7 @@ function RunDetailInner() {
                         label={ev.label}
                         time={ev.time}
                         status={status}
-                        isNote={ev.kind === "note"}
+                        tools={ev.tools}
                       />
                     );
                   });
@@ -821,23 +827,46 @@ function sanitizeError(msg: string): string {
     .trim();
 }
 
-function TrailEntry({ label, time, status, isNote }: { label: string; time?: string; status: "done" | "active" | "failed"; isNote?: boolean }) {
+function TrailEntry({ label, time, status, tools }: { label: string; time?: string; status: "done" | "active" | "failed"; tools?: { label: string; time: string }[] }) {
+  const [expanded, setExpanded] = useState(false);
   const dotColor =
     status === "failed" ? "bg-red-400" :
     status === "active" ? "bg-blue-400 animate-pulse" :
-    isNote ? "bg-zinc-600" :
     "bg-emerald-400";
-  const dotSize = isNote ? "w-[7px] h-[7px] ml-[2px]" : "w-[11px] h-[11px]";
+  const dotSize = "w-[11px] h-[11px]";
+  const hasTools = tools && tools.length > 0;
   return (
-    <div className="flex items-center gap-3 relative pl-0">
-      <div className={`${dotSize} rounded-full ${dotColor} z-10 flex-shrink-0`} />
-      <span className={`text-sm ${isNote ? "text-zinc-500" : status === "failed" ? "text-red-400" : status === "active" ? "text-blue-400" : "text-zinc-300"}`}>
-        {label}
-      </span>
-      {time && (
-        <span className="text-xs text-zinc-600 ml-auto">
-          {new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+    <div>
+      <div className="flex items-center gap-3 relative pl-0">
+        <div className={`${dotSize} rounded-full ${dotColor} z-10 flex-shrink-0`} />
+        <span className={`text-sm ${status === "failed" ? "text-red-400" : status === "active" ? "text-blue-400" : "text-zinc-300"}`}>
+          {label}
         </span>
+        {hasTools && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="text-xs text-zinc-500 hover:text-zinc-400 transition-colors ml-1"
+          >
+            {expanded ? "hide" : `${tools.length} tool call${tools.length > 1 ? "s" : ""}`}
+          </button>
+        )}
+        {time && (
+          <span className="text-xs text-zinc-600 ml-auto whitespace-nowrap">
+            {new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+          </span>
+        )}
+      </div>
+      {expanded && hasTools && (
+        <div className="ml-6 mt-1 mb-1 space-y-0.5 border-l border-zinc-800 pl-3">
+          {tools.map((t, i) => (
+            <div key={i} className="flex items-center gap-2 text-xs text-zinc-500">
+              <span>{t.label}</span>
+              <span className="text-zinc-700 ml-auto whitespace-nowrap">
+                {new Date(t.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              </span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
