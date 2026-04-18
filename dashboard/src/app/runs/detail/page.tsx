@@ -189,6 +189,7 @@ function RunDetailInner() {
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [plugins, setPlugins] = useState<{ catalog: PluginDef[]; enabled: EnabledPlugin[] }>({ catalog: [], enabled: [] });
   const [traces, setTraces] = useState<PassTrace[]>([]);
+  const tracesLoaded = useRef(false);
   const [pipelineOpen, setPipelineOpen] = useState(false);
   const { toast } = useToast();
 
@@ -214,7 +215,10 @@ function RunDetailInner() {
           }
         }
         if (r.status !== "running" && r.status !== "queued") {
-          api.getRunTraces(runId).then((t) => setTraces(t.traces)).catch(() => {});
+          if (!tracesLoaded.current) {
+            tracesLoaded.current = true;
+            api.getRunTraces(runId).then((t) => setTraces(t.traces)).catch(() => { tracesLoaded.current = false; });
+          }
         }
       })
       .catch(() => {})
