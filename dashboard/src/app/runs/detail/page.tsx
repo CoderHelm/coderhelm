@@ -198,7 +198,7 @@ function RunDetailInner() {
         if (r.status !== "running" || PASSES.indexOf(r.current_pass ?? "") >= 1) {
           api.getRunOpenspec(runId).then(setOpenspec).catch(() => {});
         }
-        if (r.status === "completed" || r.status === "failed") {
+        if (r.status !== "running" && r.status !== "queued") {
           api.getRunTraces(runId).then((t) => setTraces(t.traces)).catch(() => {});
         }
       })
@@ -417,8 +417,9 @@ function RunDetailInner() {
       )}
 
       {/* Stats cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         <StatCard label="Duration" value={formatDuration(run.duration_s)} />
+        <StatCard label="Cost" value={run.cost_usd ? `$${run.cost_usd.toFixed(2)}` : "—"} />
         <StatCard label="Tokens In" value={formatTokens(run.tokens_in)} />
         <StatCard label="Tokens Out" value={formatTokens(run.tokens_out)} />
         <StatCard label="Cache Read" value={formatTokens(run.cache_read_tokens)} />
