@@ -23,9 +23,9 @@ function StatusBadge({ status }: { status: string }) {
   };
   const s = map[status] ?? { dot: "bg-zinc-500", text: "text-zinc-400", bg: "bg-zinc-800 border-zinc-700" };
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${s.bg} ${s.text}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap ${s.bg} ${s.text}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${s.dot} ${status === "running" || status === "awaiting_ci" ? "animate-pulse" : ""}`} />
-      {status === "awaiting_ci" ? "awaiting CI" : status}
+      {status === "awaiting_ci" ? "Awaiting CI" : status}
     </span>
   );
 }
