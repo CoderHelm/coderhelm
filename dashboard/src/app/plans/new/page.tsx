@@ -248,7 +248,7 @@ const MessageBubble = memo(function MessageBubble({ msg }: { msg: StreamMessage 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} animate-message-in group/msg`}>
       <div
-        className={`max-w-[85%] min-w-0 overflow-hidden px-4 py-3 rounded-xl text-sm leading-relaxed ${
+        className={`max-w-[85%] min-w-0 overflow-hidden px-4 py-3 rounded-xl text-sm leading-relaxed break-words ${
           isUser
             ? "bg-zinc-700 text-zinc-100 whitespace-pre-wrap"
             : "bg-zinc-900 border border-zinc-800 text-zinc-200"

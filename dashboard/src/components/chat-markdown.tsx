@@ -72,7 +72,7 @@ const COMPONENTS: Partial<Components> = {
   pre: ({ children }) => {
     const codeText = extractText(children);
     return (
-      <pre className="mb-2 last:mb-0 relative group/code overflow-x-auto max-w-full">
+      <pre className="mb-2 last:mb-0 relative group/code overflow-x-auto max-w-full [&>code]:whitespace-pre-wrap [&>code]:break-all">
         {children}
         <CopyButton text={codeText} />
       </pre>
