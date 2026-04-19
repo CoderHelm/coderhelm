@@ -180,7 +180,7 @@ function TicketGroup({
           <time title={new Date(latest.created_at).toLocaleString()} className="text-zinc-400 text-xs">
             {formatTimeAgo(latest.created_at)}
           </time>
-          {latest.duration_s && (
+          {latest.duration_s != null && latest.duration_s > 0 && (
             <span className="block text-zinc-600 text-xs">{latest.duration_s}s</span>
           )}
         </td>
@@ -206,7 +206,7 @@ function TicketGroup({
               <time title={new Date(run.created_at).toLocaleString()} className="text-zinc-600 text-xs">
                 {formatTimeAgo(run.created_at)}
               </time>
-              {run.duration_s && (
+              {run.duration_s != null && run.duration_s > 0 && (
                 <span className="block text-zinc-600 text-xs">{run.duration_s}s</span>
               )}
             </td>
