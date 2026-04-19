@@ -63,6 +63,7 @@ export const api = {
   listJiraEvents: () => request<{ events: JiraEvent[]; total: number }>("/api/integrations/jira/events?limit=20"),
   getRun: (id: string) => request<RunDetail>(`/api/runs/${id}`),
   getRunOpenspec: (id: string) => request<Openspec>(`/api/runs/${id}/openspec`),
+  getAgentLog: (id: string) => request<{ passes: AgentLogPass[] }>(`/api/runs/${id}/agent-log`),
   retryRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/retry`, { method: "POST" }),
   reReviewRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/re-review`, { method: "POST" }),
   cancelRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/cancel`, { method: "POST" }),
@@ -327,6 +328,19 @@ export interface Openspec {
   design?: string;
   tasks?: string;
   spec?: string;
+}
+
+export interface AgentLogTurn {
+  turn: number;
+  role: string;
+  content: unknown[];
+  usage?: { input_tokens: number; output_tokens: number; cache_read: number; cache_write: number };
+  stop_reason?: string;
+}
+
+export interface AgentLogPass {
+  pass: string;
+  conversation: AgentLogTurn[];
 }
 
 export interface Repo {

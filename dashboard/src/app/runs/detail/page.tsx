@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, type RunDetail, type Openspec, type UsageInfo, type EnabledPlugin, type PluginDef, type PassTrace } from "@/lib/api";
+import { api, type RunDetail, type Openspec, type UsageInfo, type EnabledPlugin, type PluginDef, type PassTrace, type AgentLogPass } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
 import { Markdown } from "@/components/markdown";
@@ -174,6 +174,103 @@ function isTaskDone(
   return false;
 }
 
+function AgentLogPassView({ pass }: { pass: AgentLogPass }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="p-3">
+      <button onClick={() => setOpen((o) => !o)} className="text-xs font-medium text-zinc-300 uppercase flex items-center gap-1 hover:text-zinc-100 cursor-pointer">
+        <span className={`transition-transform ${open ? "rotate-90" : ""}`}>▶</span>
+        {pass.pass} ({pass.conversation.length} turns)
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2 max-h-[600px] overflow-y-auto">
+          {pass.conversation.map((turn, i) => (
+            <AgentLogTurnView key={i} turn={turn} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AgentLogTurnView({ turn }: { turn: AgentLogPass["conversation"][number] }) {
+  const [open, setOpen] = useState(false);
+  const roleColors: Record<string, string> = {
+    assistant: "text-blue-400",
+    tool_results: "text-amber-400",
+  };
+
+  const contentSummary = useMemo(() => {
+    if (turn.role === "assistant") {
+      // Show text blocks and list tool_use names
+      const texts: string[] = [];
+      const tools: string[] = [];
+      for (const block of turn.content as Record<string, unknown>[]) {
+        if (block.type === "text" && typeof block.text === "string") {
+          texts.push(block.text.slice(0, 200));
+        } else if (block.type === "tool_use" && typeof block.name === "string") {
+          tools.push(block.name as string);
+        }
+      }
+      return { texts, tools };
+    }
+    if (turn.role === "tool_results") {
+      return {
+        texts: [],
+        tools: (turn.content as Record<string, unknown>[]).map((r) => {
+          const content = typeof r.content === "string" ? r.content : "";
+          const isErr = !!r.is_error;
+          return `${isErr ? "❌ " : ""}${content.slice(0, 150)}${content.length > 150 ? "…" : ""}`;
+        }),
+      };
+    }
+    return { texts: [], tools: [] };
+  }, [turn]);
+
+  return (
+    <div className="border border-zinc-800 rounded text-xs">
+      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-800/50 cursor-pointer">
+        <span className={`transition-transform text-[10px] ${open ? "rotate-90" : ""}`}>▶</span>
+        <span className={`font-medium uppercase ${roleColors[turn.role] ?? "text-zinc-400"}`}>
+          {turn.role === "tool_results" ? "Tools" : turn.role}
+        </span>
+        <span className="text-zinc-600">Turn {turn.turn}</span>
+        {turn.usage && (
+          <span className="text-zinc-600 ml-auto">
+            {((turn.usage.input_tokens + turn.usage.output_tokens) / 1000).toFixed(1)}k tokens
+          </span>
+        )}
+        {contentSummary.tools.length > 0 && turn.role === "assistant" && (
+          <span className="text-zinc-500 ml-1">{contentSummary.tools.join(", ")}</span>
+        )}
+      </button>
+      {open && (
+        <div className="px-3 py-2 border-t border-zinc-800 bg-zinc-900/50 font-mono whitespace-pre-wrap text-zinc-400 max-h-80 overflow-y-auto">
+          {turn.role === "assistant" && contentSummary.texts.map((t, i) => (
+            <div key={i} className="mb-2">{t}</div>
+          ))}
+          {turn.role === "assistant" && contentSummary.tools.length > 0 && (
+            <div className="text-blue-400/70">
+              {contentSummary.tools.map((t, i) => <div key={i}>→ {t}</div>)}
+            </div>
+          )}
+          {turn.role === "tool_results" && (turn.content as Record<string, unknown>[]).map((r, i) => {
+            const content = typeof r.content === "string" ? r.content : JSON.stringify(r.content);
+            return (
+              <details key={i} className="mb-1">
+                <summary className={`cursor-pointer ${r.is_error ? "text-red-400" : "text-zinc-400"}`}>
+                  Result {i + 1} ({content.length > 1000 ? `${(content.length / 1024).toFixed(1)}KB` : `${content.length}B`})
+                </summary>
+                <pre className="mt-1 text-[11px] leading-relaxed overflow-x-auto">{content.slice(0, 5000)}{content.length > 5000 ? "\n… (truncated)" : ""}</pre>
+              </details>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RunDetailInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -191,6 +288,9 @@ function RunDetailInner() {
   const [traces, setTraces] = useState<PassTrace[]>([]);
   const tracesLoaded = useRef(false);
   const [pipelineOpen, setPipelineOpen] = useState(false);
+  const [agentLog, setAgentLog] = useState<{ passes: AgentLogPass[]; live_events: { tool: string; input_summary: string; duration_ms: number; is_error: boolean; timestamp: string }[] } | null>(null);
+  const [agentLogOpen, setAgentLogOpen] = useState(false);
+  const agentLogLoaded = useRef(false);
   const { toast } = useToast();
 
   useEffect(() => { api.getUsage().then(setUsage).catch(() => {}); }, []);
@@ -672,6 +772,58 @@ function RunDetailInner() {
           </div>
         </div>
       )}
+
+      {/* Agent Log */}
+      <div className="mb-6">
+        <button
+          onClick={() => {
+            setAgentLogOpen((o) => !o);
+            if (!agentLogLoaded.current) {
+              agentLogLoaded.current = true;
+              api.getAgentLog(runId).then(setAgentLog).catch(() => { agentLogLoaded.current = false; });
+            }
+          }}
+          className="text-sm font-medium text-zinc-300 mb-2 flex items-center gap-1 hover:text-zinc-100 transition-colors cursor-pointer"
+        >
+          <span className={`transition-transform ${agentLogOpen ? "rotate-90" : ""}`}>▶</span>
+          Agent Log
+        </button>
+        {agentLogOpen && (
+          <div className="border border-zinc-800 rounded-lg overflow-hidden">
+            {!agentLog ? (
+              <div className="p-4 text-zinc-500 text-sm">Loading…</div>
+            ) : (
+              <div className="divide-y divide-zinc-800">
+                {/* Live tool events (shown during/after run) */}
+                {agentLog.live_events.length > 0 && (
+                  <div className="p-3">
+                    <h3 className="text-xs font-medium text-zinc-400 uppercase mb-2">Live Tool Calls ({agentLog.live_events.length})</h3>
+                    <div className="space-y-1 max-h-64 overflow-y-auto">
+                      {agentLog.live_events.map((evt, i) => (
+                        <div key={i} className={`text-xs font-mono flex items-start gap-2 ${evt.is_error ? "text-red-400" : "text-zinc-400"}`}>
+                          <span className="text-zinc-600 shrink-0">{new Date(evt.timestamp).toLocaleTimeString()}</span>
+                          <span className="text-zinc-200">{evt.tool}</span>
+                          {evt.input_summary && <span className="truncate text-zinc-500">{evt.input_summary}</span>}
+                          <span className="text-zinc-600 shrink-0">{evt.duration_ms}ms</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Full conversation logs per pass (from S3) */}
+                {agentLog.passes.length > 0 ? (
+                  agentLog.passes.map((p) => (
+                    <AgentLogPassView key={p.pass} pass={p} />
+                  ))
+                ) : agentLog.live_events.length === 0 ? (
+                  <div className="p-4 text-zinc-500 text-sm">No agent logs available yet. Logs are captured during the implement pass.</div>
+                ) : null}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Activity trail */}
       {(run.pass_history?.length || run.created_at) && (
