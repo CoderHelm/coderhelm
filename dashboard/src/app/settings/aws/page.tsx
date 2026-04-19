@@ -47,9 +47,11 @@ function AwsConnectionsPage() {
     const rec = recommendations.find((r) => r.rec_id === recId);
     if (!rec) return;
     
-    // Build a prefill message with all the context
+    // Build a prefill message with all the context for the plan chat
     const parts: string[] = [];
-    parts.push(`Fix: ${rec.title}`);
+    parts.push(`Create a plan to fix this issue detected in our AWS logs:`);
+    parts.push("");
+    parts.push(`**${rec.title}**`);
     parts.push("");
     parts.push(rec.summary);
     if (rec.source_log_group) {

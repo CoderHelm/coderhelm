@@ -350,11 +350,12 @@ export default function NewPlanPage() {
   useEffect(() => {
     if (prefillSent.current) return;
     const prefill = searchParams.get("prefill");
-    if (prefill && messages.length === 0) {
+    // messages always starts with [GREETING], so length 1 means fresh chat
+    if (prefill && messages.length <= 1 && status === "idle") {
       prefillSent.current = true;
       send(prefill);
     }
-  }, [searchParams, messages.length, send]);
+  }, [searchParams, messages.length, status, send]);
   const { toast } = useToast();
 
   const { sentinelRef, showPill, scrollToBottom, onNewContent } = useSmartScroll(scrollContainerRef);
