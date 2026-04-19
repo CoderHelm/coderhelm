@@ -127,7 +127,7 @@ export default function PlansPage() {
                       <span className="text-zinc-400 font-mono text-xs">{plan.repo || "—"}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-zinc-400">{plan.task_count}</td>
+                  <td className="px-4 py-3 text-zinc-400">{plan.task_count || "—"}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs border ${STATUS_STYLES[plan.status] || STATUS_STYLES.draft}`}>
                       {plan.status}
