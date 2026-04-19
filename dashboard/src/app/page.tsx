@@ -218,6 +218,20 @@ function TicketGroup({
               <StatusBadge status={run.status} />
             </td>
             <td className="px-4 py-2">
+              {run.pr_number ? (
+                <Link
+                  href={`https://github.com/${run.repo}/pull/${run.pr_number}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 hover:underline text-xs"
+                >
+                  #{run.pr_number}
+                </Link>
+              ) : (
+                <span className="text-zinc-600 text-xs">—</span>
+              )}
+            </td>
+            <td className="px-4 py-2">
               <time title={new Date(run.created_at).toLocaleString()} className="text-zinc-600 text-xs">
                 {formatTimeAgo(run.created_at)}
               </time>
