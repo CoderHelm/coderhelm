@@ -63,7 +63,7 @@ export const api = {
   listJiraEvents: () => request<{ events: JiraEvent[]; total: number }>("/api/integrations/jira/events?limit=20"),
   getRun: (id: string) => request<RunDetail>(`/api/runs/${id}`),
   getRunOpenspec: (id: string) => request<Openspec>(`/api/runs/${id}/openspec`),
-  getAgentLog: (id: string) => request<{ passes: AgentLogPass[] }>(`/api/runs/${id}/agent-log`),
+  getAgentLog: (id: string) => request<{ passes: AgentLogPass[]; live_events: { tool: string; input_summary: string; duration_ms: number; is_error: boolean; timestamp: string }[] }>(`/api/runs/${id}/agent-log`),
   retryRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/retry`, { method: "POST" }),
   reReviewRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/re-review`, { method: "POST" }),
   cancelRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/cancel`, { method: "POST" }),
