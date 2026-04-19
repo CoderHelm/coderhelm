@@ -97,6 +97,7 @@ export default function RunsPage() {
                 <th className="px-4 py-3 font-medium">Title</th>
                 <th className="px-4 py-3 font-medium">Repo</th>
                 <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">PR</th>
                 <th className="px-4 py-3 font-medium">Time</th>
               </tr>
             </thead>
