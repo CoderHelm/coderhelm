@@ -950,7 +950,7 @@ function RunDetailInner() {
               {(() => {
                 let lastSection = "";
                 return taskItems.map((task, i) => {
-                  const done = isTaskDone(task, filesModified, run.status, run.current_pass);
+                  const done = isTaskDone(task, filesModified, run.status, maxPassIdx);
                   const sectionHeader = task.section !== lastSection ? task.section : null;
                   lastSection = task.section;
                   return (
