@@ -1,20 +1,19 @@
-# Dependencies
-node_modules/
 
-# Next.js
-.next/
-out/
-
-# Environment
+.DS_Store
 .env
 .env.*
-
-# OS
-.DS_Store
-Thumbs.db
-
-# IDE
 .idea/
+.next/
 .vscode/
-*.swp
 *.swo
+*.swp
+# Dependencies
+# Environment
+# IDE
+# Next.js
+# OS
+infra/cdk.context.json
+infra/cdk.out/
+node_modules/
+out/
+Thumbs.db
