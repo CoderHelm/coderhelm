@@ -335,6 +335,15 @@ function RunDetailInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run?.status, fetchRun]);
 
+  // Auto-poll agent log every 10s when panel is open and run is active
+  useEffect(() => {
+    if (!agentLogOpen || !run || (run.status !== "running" && run.status !== "awaiting_ci")) return;
+    const interval = setInterval(() => {
+      api.getAgentLog(runId).then(setAgentLog).catch(() => {});
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [agentLogOpen, run?.status, runId]);
+
   const taskItems = useMemo(() => parseTaskItems(openspec?.tasks), [openspec?.tasks]);
 
   if (!runId) {
