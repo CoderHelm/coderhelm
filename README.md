@@ -1,48 +1,29 @@
-# Coderhelm
+# CoderHelm
 
-> Your code, Coderhelm handled.
+> Ship code, not tickets.
 
-Autonomous AI coding agent — assign a GitHub issue, get a draft PR.
+Autonomous AI coding agent that turns GitHub issues and Jira tickets into draft pull requests. Assign a ticket — CoderHelm creates a branch, implements the change, runs your CI, self-reviews, and opens a PR.
 
-## Architecture
+🌐 [coderhelm.com](https://coderhelm.com)
+
+## What's in this repo
 
 ```
-dashboard/        → Next.js static SPA (S3 + CloudFront)
-services/gateway/ → Rust Lambda (webhook receiver + API)
-services/worker/  → Rust Lambda (AI orchestrator)
-infra/            → CDK (TypeScript)
-brand/            → Logo, favicon, brand guidelines
+dashboard/   → Next.js dashboard SPA (runs, plans, settings, memory)
+landing/     → Marketing landing page
+brand/       → Logo, favicon, brand assets
 ```
 
-## Prerequisites
-
-- **Rust** 1.80+ with `cargo-lambda` (`cargo install cargo-lambda`)
-- **Node.js** 20+ with npm
-- **AWS CDK** v2 (`npm install -g aws-cdk`)
-- **AWS CLI** configured with credentials
-
-## Setup
+## Development
 
 ```bash
-# Install CDK dependencies
-cd infra && npm install
+# Install dependencies
+cd dashboard && npm install
 
-# Build gateway
-cd services/gateway && cargo lambda build --release
-
-# Build worker
-cd services/worker && cargo lambda build --release
-
-# Build dashboard
-cd dashboard && npm install && npm run build
-
-# Deploy
-cd infra && cdk deploy --all
+# Run dev server
+npm run dev
 ```
 
-## Manual Steps (one-time)
+## Deployment
 
-1. Register a GitHub App at https://github.com/settings/apps/new
-2. Buy `Coderhelm.com` domain
-3. Create AWS Secrets Manager entries (see infra/README.md)
-4. Deploy: `cd infra && cdk deploy --all`
+Pushing to `main` triggers CI — the dashboard is built and deployed to S3 + CloudFront automatically.
