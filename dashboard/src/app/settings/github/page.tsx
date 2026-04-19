@@ -21,6 +21,7 @@ function GitHubSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<InstallStatus>("not_connected");
   const [githubOrg, setGithubOrg] = useState<string | null>(null);
+  const [installationId, setInstallationId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [linkResult, setLinkResult] = useState<string | null>(null);
 
@@ -37,6 +38,7 @@ function GitHubSettingsPage() {
       if (installStatus.status === "connected") {
         setStatus("connected");
         setGithubOrg(installStatus.github_org ?? null);
+        setInstallationId(installStatus.installation_id ?? null);
       }
     } catch {
       // ignore
@@ -159,10 +161,25 @@ function GitHubSettingsPage() {
             )}
           </div>
           {status === "connected" ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-xs font-medium">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              Connected
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-xs font-medium">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                Connected
+              </span>
+              {installationId && (
+                <a
+                  href={`https://github.com/apps/coderhelm/installations/${installationId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 text-xs text-zinc-400 border border-zinc-700 rounded-lg hover:text-zinc-200 hover:border-zinc-500 transition-colors"
+                >
+                  Configure repos
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+              )}
+            </div>
           ) : status === "linking" ? (
             <svg className="w-5 h-5 animate-spin text-zinc-400" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />

@@ -61,10 +61,14 @@ function AnalysisView({
   analysis,
   refreshing,
   onRefresh,
+  pollStart,
+  stale,
 }: {
   analysis: InfraAnalysis;
   refreshing: boolean;
   onRefresh: () => void;
+  pollStart: number | null;
+  stale: boolean;
 }) {
 
   const [copied, setCopied] = useState(false);
@@ -105,27 +109,51 @@ function AnalysisView({
 
   // Pending
   if (analysis.status === "pending") {
+    const elapsed = pollStart ? Date.now() - pollStart : 0;
+    const showRetry = elapsed > RETRY_SHOW_MS || stale;
+    const slow = elapsed > POLL_TIMEOUT_MS || stale;
     return (
       <div className="flex flex-col items-center justify-center py-24">
-        <div className="w-8 h-8 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin mb-4" />
-        <p className="text-zinc-400 text-sm">Analyzing your infrastructure...</p>
-        <p className="text-zinc-600 text-xs mt-1">Scanning for CDK/Terraform/Serverless code</p>
+        {!slow && <div className="w-8 h-8 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin mb-4" />}
+        {slow ? (
+          <>
+            <div className="w-16 h-16 rounded-2xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center mx-auto mb-4 text-2xl">⚠</div>
+            <p className="text-yellow-400 text-sm font-medium">Taking longer than expected</p>
+            <p className="text-zinc-500 text-xs mt-1">The analysis may have stalled</p>
+          </>
+        ) : (
+          <>
+            <p className="text-zinc-400 text-sm">Analyzing your infrastructure...</p>
+            <p className="text-zinc-600 text-xs mt-1">Scanning for CDK/Terraform/Serverless code</p>
+          </>
+        )}
+        {showRetry && (
+          <button
+            onClick={onRefresh}
+            className="mt-4 px-4 py-2 text-sm border border-zinc-700 rounded-lg text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors cursor-pointer"
+          >
+            {refreshing ? "Starting..." : "Retry"}
+          </button>
+        )}
       </div>
     );
   }
 
   // Failed
   if (analysis.status === "failed") {
+    const { message, hint } = parseInfraError(analysis.error);
     return (
       <div className="max-w-xl mx-auto mt-12 text-center">
         <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4 text-2xl">✕</div>
-        <h2 className="text-lg font-semibold text-red-400 mb-2">Analysis failed</h2>
-        <p className="text-zinc-500 text-sm mb-2">Something went wrong while scanning your infrastructure code.</p>
-        {analysis.error && (
-          <p className="text-red-400/70 text-xs font-mono bg-zinc-900 border border-zinc-800 rounded-lg p-3 inline-block max-w-md">
-            {analysis.error.slice(0, 300)}
-          </p>
-        )}
+        <h2 className="text-lg font-semibold text-red-400 mb-2">{message}</h2>
+        {hint && <p className="text-zinc-500 text-sm mb-4">{hint}</p>}
+        <button
+          onClick={onRefresh}
+          disabled={refreshing}
+          className="px-4 py-2 text-sm border border-zinc-700 rounded-lg text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors disabled:opacity-50 cursor-pointer"
+        >
+          {refreshing ? "Starting..." : "Retry"}
+        </button>
       </div>
     );
   }
@@ -197,6 +225,21 @@ function AnalysisView({
   );
 }
 
+function parseInfraError(raw: string | undefined): { message: string; hint?: string } {
+  if (!raw) return { message: "An unknown error occurred." };
+  const lower = raw.toLowerCase();
+  if (lower.includes("404"))
+    return { message: "Repository not accessible", hint: "Check that the CoderHelm GitHub App has access to this repo." };
+  if (lower.includes("rate limit"))
+    return { message: "GitHub API rate limit reached", hint: "Try again in a few minutes." };
+  if (lower.includes("timeout") || lower.includes("timed out"))
+    return { message: "Analysis timed out", hint: "The scan took too long. Click Retry to try again." };
+  return { message: "Analysis failed", hint: raw.slice(0, 200) };
+}
+
+const POLL_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
+const RETRY_SHOW_MS = 30 * 1000; // 30 seconds
+
 function InfrastructureContent() {
   const [scope, setScope] = useState<"all" | "repo">("all");
   const [repos, setRepos] = useState<Repo[]>([]);
@@ -204,6 +247,8 @@ function InfrastructureContent() {
   const [analysis, setAnalysis] = useState<InfraAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [pollStart, setPollStart] = useState<number | null>(null);
+  const [pollStale, setPollStale] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -231,18 +276,34 @@ function InfrastructureContent() {
 
   useEffect(() => { loadAnalysis(); }, [loadAnalysis]);
 
-  // Poll while pending
+  // Track polling start time and stale state
   useEffect(() => {
-    if (analysis?.status !== "pending") return;
+    if (analysis?.status === "pending") {
+      if (pollStart === null) setPollStart(Date.now());
+    } else {
+      setPollStart(null);
+      setPollStale(false);
+    }
+  }, [analysis?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Poll while pending, with timeout
+  useEffect(() => {
+    if (analysis?.status !== "pending" || pollStale) return;
     const fetcher = scope === "all"
       ? () => api.getInfrastructure()
       : selectedRepo
         ? () => api.getRepoInfrastructure(selectedRepo)
         : null;
     if (!fetcher) return;
-    const timer = setInterval(() => { fetcher().then(setAnalysis).catch(() => {}); }, 5000);
+    const timer = setInterval(() => {
+      if (pollStart && Date.now() - pollStart > POLL_TIMEOUT_MS) {
+        setPollStale(true);
+        return;
+      }
+      fetcher().then(setAnalysis).catch(() => {});
+    }, 5000);
     return () => clearInterval(timer);
-  }, [analysis?.status, scope, selectedRepo]);
+  }, [analysis?.status, scope, selectedRepo, pollStart, pollStale]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -253,6 +314,8 @@ function InfrastructureContent() {
         await api.refreshRepoInfrastructure(selectedRepo);
       }
       setAnalysis((prev) => prev ? { ...prev, status: "pending", error: undefined } : null);
+      setPollStart(Date.now());
+      setPollStale(false);
       toast("Analysis started — this takes about 30 seconds");
     } catch {
       toast("Failed to start analysis", "error");
@@ -274,7 +337,7 @@ function InfrastructureContent() {
         </div>
         <button
           onClick={handleRefresh}
-          disabled={refreshing || (analysis?.status === "pending")}
+          disabled={refreshing || (analysis?.status === "pending" && !pollStale)}
           className="px-4 py-2 text-sm border border-zinc-700 rounded-lg text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors disabled:opacity-50"
         >
           {refreshing ? "Starting..." : refreshLabel}
@@ -296,7 +359,7 @@ function InfrastructureContent() {
       {loading ? (
         <Skeleton className="h-96 w-full rounded-xl" />
       ) : analysis ? (
-        <AnalysisView analysis={analysis} refreshing={refreshing} onRefresh={handleRefresh} />
+        <AnalysisView analysis={analysis} refreshing={refreshing} onRefresh={handleRefresh} pollStart={pollStart} stale={pollStale} />
       ) : (
         <div className="text-center py-16 text-zinc-600 text-sm">No data</div>
       )}

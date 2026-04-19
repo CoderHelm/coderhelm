@@ -7,6 +7,15 @@ import { RoleGuard } from "@/components/role-guard";
 
 const PAGE_SIZE = 10;
 
+function parseOnboardError(raw: string | undefined): string {
+  if (!raw) return "Analysis failed";
+  const lower = raw.toLowerCase();
+  if (lower.includes("404")) return "Not accessible — configure GitHub App access";
+  if (lower.includes("rate limit")) return "Rate limited — will retry automatically";
+  if (lower.includes("timeout")) return "Analysis timed out — click to retry";
+  return "Analysis failed — click to retry";
+}
+
 export default function ReposPageGuarded() { return <RoleGuard minRole="member"><ReposPage /></RoleGuard>; }
 
 function ReposPage() {
@@ -143,8 +152,22 @@ function ReposPage() {
                       </span>
                     )}
                     {repo.enabled && repo.onboard_status === "failed" && (
-                      <span className="text-xs text-red-400 mt-0.5 block" title={repo.onboard_error}>
-                        ✕ Analysis failed{repo.onboard_error ? `: ${repo.onboard_error.slice(0, 80)}` : ""}
+                      <span className="text-xs text-red-400 mt-0.5 flex items-center gap-2">
+                        <span title={repo.onboard_error}>✕ {parseOnboardError(repo.onboard_error)}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setToggling(repo.name);
+                            api.toggleRepo(repo.name, true)
+                              .then(() => setRepos((prev) => prev.map((r) => r.name === repo.name ? { ...r, onboard_status: "pending", onboard_error: undefined } : r)))
+                              .catch(() => {})
+                              .finally(() => setToggling(null));
+                          }}
+                          disabled={toggling === repo.name}
+                          className="text-xs text-zinc-400 hover:text-zinc-200 underline underline-offset-2 cursor-pointer disabled:opacity-50"
+                        >
+                          Retry
+                        </button>
                       </span>
                     )}
                     {repo.enabled && repo.onboard_status === "ready" && (
