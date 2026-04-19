@@ -1477,8 +1477,7 @@ export default function Home() {
             <div className="rounded-lg bg-white/[0.03] ring-1 ring-blue-500/30 p-8">
               <h3 className="text-lg font-semibold">Everything included</h3>
               <div className="mt-4">
-                <span className="text-4xl font-bold">$0</span>
-                <span className="text-text-secondary"> forever</span>
+                <span className="text-4xl font-bold">Free</span>
               </div>
               <ul className="mt-6 space-y-3 text-sm text-text-secondary">
                 <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> Public &amp; private repos</li>
