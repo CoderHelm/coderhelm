@@ -346,6 +346,17 @@ function RunDetailInner() {
 
   const taskItems = useMemo(() => parseTaskItems(openspec?.tasks), [openspec?.tasks]);
 
+  // Compute the highest pass index ever reached (not just current_pass, which regresses during CI fix cycles)
+  const maxPassIdx = useMemo(() => {
+    if (!run) return -1;
+    let max = PASSES.indexOf(run.current_pass ?? "");
+    run.pass_history?.forEach((entry) => {
+      const idx = PASSES.indexOf(entry.pass);
+      if (idx > max) max = idx;
+    });
+    return max;
+  }, [run?.current_pass, run?.pass_history]);
+
   if (!runId) {
     return (
       <div className="max-w-3xl">
@@ -380,16 +391,6 @@ function RunDetailInner() {
   const specTabs = openspec
     ? (Object.keys(openspec) as (keyof Openspec)[]).filter((k) => openspec[k] && k !== "tasks")
     : [];
-
-  // Compute the highest pass index ever reached (not just current_pass, which regresses during CI fix cycles)
-  const maxPassIdx = useMemo(() => {
-    let max = PASSES.indexOf(run.current_pass ?? "");
-    run.pass_history?.forEach((entry) => {
-      const idx = PASSES.indexOf(entry.pass);
-      if (idx > max) max = idx;
-    });
-    return max;
-  }, [run.current_pass, run.pass_history]);
 
   const implementStarted = maxPassIdx >= 2 || run.status === "completed" || run.status === "failed" || run.status === "archived" || run.status === "cancelled";
   const showTaskSidebar = taskItems.length > 0 && implementStarted;
