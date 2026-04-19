@@ -72,30 +72,29 @@ export default function Home() {
 
               {/* Dashboard layout */}
               <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] min-h-[380px]">
-                {/* Left sidebar — Agent activity feed */}
+                {/* Left sidebar — Pipeline progress */}
                 <div className="border-r border-[#21262d] p-4 hidden md:block">
-                  <div className="flex items-center gap-2 mb-4">
+                  <div className="flex items-center gap-2 mb-1">
                     <div className="w-5 h-5 rounded bg-brand/20 flex items-center justify-center">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" strokeWidth="2" strokeLinecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
                     </div>
-                    <span className="text-xs font-semibold text-white">Issue #42</span>
+                    <span className="text-xs font-semibold text-white truncate">CART-2847</span>
                     <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                       Running
                     </span>
                   </div>
+                  <p className="text-[10px] text-neutral-500 mb-4 pl-7 truncate">Add Stripe webhook for subscription renewals</p>
 
                   {/* Pipeline steps */}
                   <div className="space-y-0.5">
                     {[
-                      { step: "Triage", detail: "feature · medium", done: true },
-                      { step: "Read context", detail: "notion, figma, 3 docs", done: true },
-                      { step: "Plan", detail: "5 files · 3 functions", done: true },
-                      { step: "Implement", detail: "+87 −12 across 3 files", done: true },
-                      { step: "Run tests", detail: "12/12 passed", done: true },
-                      { step: "Self-review", detail: "LGTM · 0 issues", done: true },
-                      { step: "Security scan", detail: "OWASP passed", done: true },
-                      { step: "Open PR", detail: "#43 → ready", active: true, done: false },
+                      { step: "Triage", detail: "feature · complex", done: true },
+                      { step: "Plan", detail: "4 tasks · 6 files", done: true },
+                      { step: "Implement", detail: "+142 −18 across 4 files", done: true },
+                      { step: "Security", detail: "0 vulnerabilities", done: true },
+                      { step: "Open PR", detail: "#127 → draft", active: true, done: false },
+                      { step: "Awaiting CI", detail: "", done: false },
                     ].map((s) => (
                       <div key={s.step} className="flex items-center gap-2.5 py-1.5 px-2 rounded-md text-left" style={s.active ? { background: "rgba(0,212,255,0.06)" } : {}}>
                         {s.done ? (
@@ -107,16 +106,26 @@ export default function Home() {
                         )}
                         <div className="min-w-0">
                           <div className={`text-[11px] font-medium ${s.active ? "text-brand" : s.done ? "text-neutral-300" : "text-neutral-600"}`}>{s.step}</div>
-                          <div className="text-[10px] text-neutral-600 truncate">{s.detail}</div>
+                          {s.detail && <div className="text-[10px] text-neutral-600 truncate">{s.detail}</div>}
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  {/* Timer */}
-                  <div className="mt-4 pt-3 border-t border-[#21262d] flex items-center justify-between text-[11px]">
-                    <span className="text-neutral-500">Elapsed</span>
-                    <span className="font-mono text-brand tabular-nums">3:47</span>
+                  {/* Stats */}
+                  <div className="mt-4 pt-3 border-t border-[#21262d] space-y-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-neutral-500">Elapsed</span>
+                      <span className="font-mono text-brand tabular-nums">4:12</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-neutral-500">Tokens</span>
+                      <span className="font-mono text-neutral-400 tabular-nums">28.4K</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-neutral-500">Cost</span>
+                      <span className="font-mono text-neutral-400 tabular-nums">$0.42</span>
+                    </div>
                   </div>
                 </div>
 
@@ -125,18 +134,18 @@ export default function Home() {
                   {/* Tabs */}
                   <div className="flex items-center gap-1 border-b border-[#21262d] -mx-5 px-5">
                     {[
-                      { label: "Activity", active: false },
+                      { label: "Plan", active: false },
                       { label: "Code", active: true },
-                      { label: "PR Preview", active: false },
+                      { label: "Agent Log", active: false },
                     ].map((tab) => (
                       <div key={tab.label} className={`px-3 py-2 text-[11px] font-medium border-b-2 ${tab.active ? "text-white border-brand" : "text-neutral-500 border-transparent"}`}>
                         {tab.label}
                       </div>
                     ))}
                     <div className="ml-auto flex items-center gap-1.5 pb-2">
-                      <span className="text-[10px] text-neutral-600">3 files changed</span>
-                      <span className="text-[10px] font-mono text-[#3fb950]">+87</span>
-                      <span className="text-[10px] font-mono text-[#f85149]">−12</span>
+                      <span className="text-[10px] text-neutral-600">4 files changed</span>
+                      <span className="text-[10px] font-mono text-[#3fb950]">+142</span>
+                      <span className="text-[10px] font-mono text-[#f85149]">−18</span>
                     </div>
                   </div>
 
@@ -146,15 +155,15 @@ export default function Home() {
                     <div className="flex items-center bg-[#161b22] border-b border-[#21262d]">
                       <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0d1117] border-r border-b-2 border-b-brand border-r-[#21262d] text-[11px] text-neutral-300">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M13 2v7h7"/></svg>
-                        ThemeToggle.tsx
+                        webhook_handler.ts
                       </div>
                       <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-neutral-600">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M13 2v7h7"/></svg>
-                        settings.tsx
+                        subscription.service.ts
                       </div>
                       <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-neutral-600">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M13 2v7h7"/></svg>
-                        useTheme.ts
+                        stripe.types.ts
                       </div>
                     </div>
 
@@ -162,47 +171,39 @@ export default function Home() {
                     <div className="p-4 font-mono text-[11px] leading-[1.7] overflow-hidden">
                       <div className="flex">
                         <span className="w-8 text-right pr-4 text-neutral-700 select-none">1</span>
-                        <span><span className="text-[#ff7b72]">import</span> <span className="text-neutral-300">{"{"}</span> <span className="text-[#79c0ff]">useState</span><span className="text-neutral-300">,</span> <span className="text-[#79c0ff]">useEffect</span> <span className="text-neutral-300">{"}"}</span> <span className="text-[#ff7b72]">from</span> <span className="text-[#a5d6ff]">&apos;react&apos;</span></span>
+                        <span><span className="text-[#ff7b72]">import</span> <span className="text-neutral-300">{"{"}</span> <span className="text-[#79c0ff]">Stripe</span> <span className="text-neutral-300">{"}"}</span> <span className="text-[#ff7b72]">from</span> <span className="text-[#a5d6ff]">&apos;stripe&apos;</span></span>
                       </div>
                       <div className="flex">
                         <span className="w-8 text-right pr-4 text-neutral-700 select-none">2</span>
-                        <span className="text-neutral-600" />
+                        <span><span className="text-[#ff7b72]">import</span> <span className="text-neutral-300">{"{"}</span> <span className="text-[#79c0ff]">SubscriptionService</span> <span className="text-neutral-300">{"}"}</span> <span className="text-[#ff7b72]">from</span> <span className="text-[#a5d6ff]">&apos;./subscription.service&apos;</span></span>
                       </div>
-                      <div className="flex bg-[#0b3d22]/30 border-l-2 border-[#3fb950]">
+                      <div className="flex">
                         <span className="w-8 text-right pr-4 text-neutral-700 select-none">3</span>
-                        <span><span className="text-[#ff7b72]">export function</span> <span className="text-[#d2a8ff]">ThemeToggle</span><span className="text-neutral-400">() {"{"}</span></span>
+                        <span className="text-neutral-600" />
                       </div>
                       <div className="flex bg-[#0b3d22]/30 border-l-2 border-[#3fb950]">
                         <span className="w-8 text-right pr-4 text-neutral-700 select-none">4</span>
-                        <span>  <span className="text-[#ff7b72]">const</span> <span className="text-neutral-300">[</span><span className="text-[#79c0ff]">theme</span><span className="text-neutral-300">,</span> <span className="text-[#79c0ff]">setTheme</span><span className="text-neutral-300">]</span> <span className="text-[#ff7b72]">=</span> <span className="text-[#d2a8ff]">useTheme</span><span className="text-neutral-400">()</span></span>
+                        <span><span className="text-[#ff7b72]">export async function</span> <span className="text-[#d2a8ff]">handleWebhook</span><span className="text-neutral-400">(</span><span className="text-[#79c0ff]">event</span><span className="text-neutral-400">: Stripe.Event) {"{"}</span></span>
                       </div>
                       <div className="flex bg-[#0b3d22]/30 border-l-2 border-[#3fb950]">
                         <span className="w-8 text-right pr-4 text-neutral-700 select-none">5</span>
-                        <span className="text-neutral-600" />
+                        <span>  <span className="text-[#ff7b72]">if</span> <span className="text-neutral-400">(</span><span className="text-[#79c0ff]">event</span><span className="text-neutral-300">.type</span> <span className="text-[#ff7b72]">===</span> <span className="text-[#a5d6ff]">&apos;invoice.payment_succeeded&apos;</span><span className="text-neutral-400">) {"{"}</span></span>
                       </div>
                       <div className="flex bg-[#0b3d22]/30 border-l-2 border-[#3fb950]">
                         <span className="w-8 text-right pr-4 text-neutral-700 select-none">6</span>
-                        <span>  <span className="text-[#ff7b72]">return</span> <span className="text-neutral-400">(</span></span>
+                        <span>    <span className="text-[#ff7b72]">const</span> <span className="text-[#79c0ff]">subscription</span> <span className="text-[#ff7b72]">=</span> <span className="text-[#79c0ff]">event</span><span className="text-neutral-300">.data.object</span></span>
                       </div>
                       <div className="flex bg-[#0b3d22]/30 border-l-2 border-[#3fb950]">
                         <span className="w-8 text-right pr-4 text-neutral-700 select-none">7</span>
-                        <span>    <span className="text-neutral-400">&lt;</span><span className="text-[#7ee787]">button</span></span>
+                        <span>    <span className="text-[#ff7b72]">await</span> <span className="text-[#d2a8ff]">SubscriptionService</span><span className="text-neutral-300">.renew</span><span className="text-neutral-400">(</span><span className="text-[#79c0ff]">subscription</span><span className="text-neutral-300">.id</span><span className="text-neutral-400">)</span></span>
                       </div>
                       <div className="flex bg-[#0b3d22]/30 border-l-2 border-[#3fb950]">
                         <span className="w-8 text-right pr-4 text-neutral-700 select-none">8</span>
-                        <span>      <span className="text-[#79c0ff]">onClick</span><span className="text-neutral-400">={"{"}() =&gt;</span> <span className="text-[#d2a8ff]">setTheme</span><span className="text-neutral-400">(</span><span className="text-[#79c0ff]">theme</span> <span className="text-[#ff7b72]">===</span> <span className="text-[#a5d6ff]">&apos;dark&apos;</span> <span className="text-neutral-400">?</span> <span className="text-[#a5d6ff]">&apos;light&apos;</span> <span className="text-neutral-400">:</span> <span className="text-[#a5d6ff]">&apos;dark&apos;</span><span className="text-neutral-400">){"}"}</span></span>
-                      </div>
-                      <div className="flex bg-[#0b3d22]/30 border-l-2 border-[#3fb950]">
-                        <span className="w-8 text-right pr-4 text-neutral-700 select-none">9</span>
-                        <span>      <span className="text-[#79c0ff]">className</span><span className="text-neutral-400">=</span><span className="text-[#a5d6ff]">&quot;theme-toggle&quot;</span></span>
-                      </div>
-                      <div className="flex bg-[#0b3d22]/30 border-l-2 border-[#3fb950]">
-                        <span className="w-8 text-right pr-4 text-neutral-700 select-none">10</span>
-                        <span>    <span className="text-neutral-400">&gt;</span></span>
+                        <span>  <span className="text-neutral-400">{"}"}</span></span>
                       </div>
                       <div className="flex">
-                        <span className="w-8 text-right pr-4 text-neutral-700 select-none">11</span>
-                        <span className="text-neutral-600">      ...</span>
+                        <span className="w-8 text-right pr-4 text-neutral-700 select-none">9</span>
+                        <span className="text-neutral-600">  ...</span>
                       </div>
                     </div>
                   </div>
@@ -211,20 +212,16 @@ export default function Home() {
                   <div className="flex items-center gap-4 text-[10px] -mx-5 px-5 py-2 border-t border-[#21262d] bg-[#161b22]">
                     <div className="flex items-center gap-1.5">
                       <svg width="12" height="12" viewBox="0 0 16 16" fill="#3fb950"><path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z"/></svg>
-                      <span className="text-neutral-400">Issue #42</span>
+                      <span className="text-neutral-400">CART-2847</span>
                       <span className="text-neutral-600">→</span>
                       <svg width="12" height="12" viewBox="0 0 16 16" fill="#a371f7"><path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/></svg>
-                      <span className="text-neutral-400">PR #43</span>
+                      <span className="text-neutral-400">PR #127</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="#3fb950" strokeWidth="1.2" /><path d="M3.5 5l1 1 2-2.5" stroke="#3fb950" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                      <span className="text-[#3fb950]">CI passed</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="#3fb950" strokeWidth="1.2" /><path d="M5 1.5v3l2 1" stroke="#3fb950" strokeWidth="1" strokeLinecap="round" /></svg>
                       <span className="text-[#3fb950]">Security passed</span>
                     </div>
-                    <span className="ml-auto text-neutral-500 font-mono tabular-nums">12 tests · 0 warnings</span>
+                    <span className="ml-auto text-neutral-500 font-mono tabular-nums">claude-sonnet-4-5 · 4 tasks</span>
                   </div>
                 </div>
               </div>
@@ -1499,20 +1496,22 @@ export default function Home() {
               </a>
             </div>
 
-            <div className="rounded-lg bg-white/[0.03] ring-1 ring-white/10 p-8 flex flex-col">
+            <div className="rounded-lg bg-white/[0.03] ring-1 ring-white/10 p-8 flex flex-col relative">
+              <div className="absolute top-4 right-4">
+                <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-amber-400 ring-1 ring-amber-500/20">
+                  Coming Soon
+                </span>
+              </div>
               <h3 className="text-lg font-semibold">Self-host</h3>
               <p className="mt-4 text-sm text-text-secondary flex-1">
-                Deploy to your own AWS account. Full control over your data, infrastructure, and costs. CDK included.
+                Deploy to your own AWS account. Full control over your data, infrastructure, and costs. CDK included. Requires Jira connectors, auth, and more — launching soon.
               </p>
-              <a
-                href="https://github.com/CoderHelm"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-8 flex items-center justify-center gap-2 rounded-lg border border-white/20 px-6 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-white/5"
+              <div
+                className="mt-8 flex items-center justify-center gap-2 rounded-lg border border-white/10 px-6 py-3 text-center text-sm font-semibold text-neutral-500 cursor-not-allowed opacity-60"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
                 View on GitHub
-              </a>
+              </div>
             </div>
           </div>
         </div>
