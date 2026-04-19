@@ -44,14 +44,29 @@ function AwsConnectionsPage() {
   }, [refresh]);
 
   const handleCreatePlan = async (recId: string) => {
-    try {
-      const result = await api.createPlanFromRecommendation(recId);
-      toast("Plan created");
-      refresh();
-      router.push(`/plans/${result.plan_id}`);
-    } catch {
-      toast("Failed to create plan", "error");
+    const rec = recommendations.find((r) => r.rec_id === recId);
+    if (!rec) return;
+    
+    // Build a prefill message with all the context
+    const parts: string[] = [];
+    parts.push(`Fix: ${rec.title}`);
+    parts.push("");
+    parts.push(rec.summary);
+    if (rec.source_log_group) {
+      parts.push("");
+      parts.push(`Affected service (log group: ${rec.source_log_group})`);
     }
+    if (rec.error_pattern) {
+      parts.push("");
+      parts.push(`Error pattern: ${rec.error_pattern}`);
+    }
+    if (rec.suggested_action) {
+      parts.push("");
+      parts.push(`Suggested fix: ${rec.suggested_action}`);
+    }
+
+    const prefill = encodeURIComponent(parts.join("\n"));
+    router.push(`/plans/new?prefill=${prefill}`);
   };
 
   const handleDismiss = async (recId: string) => {

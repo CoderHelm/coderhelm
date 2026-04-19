@@ -586,6 +586,7 @@ export interface Recommendation {
   suggested_action: string;
   source_log_group?: string;
   source_account_id?: string;
+  error_pattern?: string;
   error_hash?: string;
   error_count?: number;
   plan_id?: string;

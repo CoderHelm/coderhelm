@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, type Repo, type Template } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { ChatMarkdown } from "@/components/chat-markdown";
@@ -343,6 +343,18 @@ export default function NewPlanPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const prefillSent = useRef(false);
+
+  // Auto-send prefill message from query param (e.g. from "Create Plan" on findings)
+  useEffect(() => {
+    if (prefillSent.current) return;
+    const prefill = searchParams.get("prefill");
+    if (prefill && messages.length === 0) {
+      prefillSent.current = true;
+      send(prefill);
+    }
+  }, [searchParams, messages.length, send]);
   const { toast } = useToast();
 
   const { sentinelRef, showPill, scrollToBottom, onNewContent } = useSmartScroll(scrollContainerRef);
