@@ -224,12 +224,6 @@ function InfrastructureContent() {
     fetcher
       .then((data) => {
         setAnalysis(data);
-        // Auto-trigger scan for per-repo when no analysis exists yet
-        if (data?.status === "no_infra" && scope === "repo" && selectedRepo) {
-          api.refreshRepoInfrastructure(selectedRepo).then(() => {
-            setAnalysis((prev) => prev ? { ...prev, status: "pending" } : null);
-          }).catch(() => {});
-        }
       })
       .catch(() => toast("Failed to load infrastructure analysis", "error"))
       .finally(() => setLoading(false));
