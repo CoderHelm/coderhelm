@@ -12,6 +12,7 @@ import {
   GitBranchIcon, GearIcon, AtlassianIcon, GitHubIcon, UsersIcon,
   BellIcon, TargetIcon, RepeatIcon, ShieldCheckIcon,
   AwsIcon, PluginIcon, ShieldIcon, TemplateIcon, CpuIcon, BrainIcon,
+  LifeBuoyIcon, MailIcon, ExternalLinkIcon,
 } from "./icons";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
@@ -473,6 +474,32 @@ function Sidebar({
           </div>
           );
         })}
+      </div>
+
+      {/* Support */}
+      <div className="mt-4 pt-3 border-t border-zinc-800/60 space-y-1 shrink-0">
+        <p className="px-2 mb-1 text-xs font-semibold text-zinc-600 uppercase tracking-widest">Support</p>
+        <a
+          href="https://github.com/CoderHelm/coderhelm/issues"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between px-2 py-1.5 rounded-md text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 transition-colors"
+        >
+          <span className="flex items-center gap-2.5">
+            <span className="w-4 flex items-center justify-center"><CircleDotIcon /></span>
+            Report Issue
+          </span>
+          <span className="w-3 text-zinc-600"><ExternalLinkIcon /></span>
+        </a>
+        <a
+          href="mailto:support@coderhelm.com"
+          className="flex items-center justify-between px-2 py-1.5 rounded-md text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 transition-colors"
+        >
+          <span className="flex items-center gap-2.5">
+            <span className="w-4 flex items-center justify-center"><MailIcon /></span>
+            Contact Us
+          </span>
+        </a>
       </div>
 
       {/* Tokens remaining */}
