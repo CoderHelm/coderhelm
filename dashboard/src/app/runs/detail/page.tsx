@@ -808,7 +808,7 @@ function RunDetailInner() {
                 {agentLog.live_events.length > 0 && (
                   <div className="p-3">
                     <h3 className="text-xs font-medium text-zinc-400 uppercase mb-2">Live Tool Calls ({agentLog.live_events.length})</h3>
-                    <div className="space-y-1 max-h-64 overflow-y-auto">
+                    <div className="space-y-1 max-h-64 overflow-y-auto" ref={(el) => { if (el) el.scrollTop = el.scrollHeight; }}>
                       {agentLog.live_events.map((evt, i) => (
                         <div key={i} className={`text-xs font-mono flex items-start gap-2 ${evt.is_error ? "text-red-400" : "text-zinc-400"}`}>
                           <span className="text-zinc-600 shrink-0">{new Date(evt.timestamp).toLocaleTimeString()}</span>
