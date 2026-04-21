@@ -49,6 +49,15 @@ export const api = {
   // Health
   getHealth: () => request<HealthCheck>("/api/health"),
 
+  // DLQ Management
+  getDlqMessages: () => request<DlqList>("/api/dlq"),
+  redriveDlqMessage: (receipt_handle: string, body: unknown) =>
+    request<void>("/api/dlq/redrive", { method: "POST", body: JSON.stringify({ receipt_handle, body }) }),
+  deleteDlqMessage: (receipt_handle: string) =>
+    request<void>("/api/dlq/delete", { method: "POST", body: JSON.stringify({ receipt_handle }) }),
+  purgeDlq: () =>
+    request<void>("/api/dlq/purge", { method: "POST" }),
+
   // Banners
   getBanners: () => request<{ banners: Banner[] }>("/api/banners"),
 
@@ -514,6 +523,20 @@ export interface HealthCheck {
   status: "healthy" | "degraded" | "unhealthy";
   checked_at: string;
   checks: HealthCheckItem[];
+}
+
+export interface DlqMessage {
+  message_id: string;
+  receipt_handle: string;
+  body: Record<string, unknown>;
+  sent_at: string;
+  receive_count: number;
+  source_queue: string;
+}
+
+export interface DlqList {
+  messages: DlqMessage[];
+  count: number;
 }
 
 export interface JiraCheck {

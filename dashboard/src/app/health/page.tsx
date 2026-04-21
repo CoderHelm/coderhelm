@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { api, type HealthCheck, type HealthCheckItem } from "@/lib/api";
+import { api, type HealthCheck, type HealthCheckItem, type DlqMessage } from "@/lib/api";
 import { useToast } from "@/components/toast";
 
 const STATUS_COLOR: Record<string, { bg: string; text: string; border: string; dot: string }> = {
@@ -41,7 +41,6 @@ export default function HealthPage() {
 
   useEffect(() => {
     refresh();
-    // Poll faster (5s) when unhealthy/degraded, normal (30s) otherwise
     const ms = health && health.status !== "healthy" ? 5_000 : 30_000;
     const interval = setInterval(refresh, ms);
     return () => clearInterval(interval);
@@ -76,7 +75,6 @@ export default function HealthPage() {
 
       {health && (
         <>
-          {/* Overall status banner */}
           <div className={`flex items-center gap-3 p-4 mb-8 rounded-lg border ${s.bg} ${s.border}`}>
             <span className={`h-3 w-3 rounded-full ${s.dot} ${health.status !== "healthy" ? "animate-pulse" : ""}`} />
             <span className={`text-base font-semibold capitalize ${s.text}`}>
@@ -89,7 +87,7 @@ export default function HealthPage() {
 
           <div className="space-y-3">
             {health.checks.map((check) => (
-              <CheckCard key={check.name} check={check} />
+              <CheckCard key={check.name} check={check} onRefresh={refresh} />
             ))}
           </div>
         </>
@@ -98,11 +96,12 @@ export default function HealthPage() {
   );
 }
 
-function CheckCard({ check }: { check: HealthCheckItem }) {
+function CheckCard({ check, onRefresh }: { check: HealthCheckItem; onRefresh: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const meta = CHECK_META[check.name] || { label: check.name, description: "" };
   const sc = STATUS_COLOR[check.status] || STATUS_COLOR.ok;
   const hasItems = check.items && check.items.length > 0;
+  const isDlq = check.name === "dlq";
   const clickable = hasItems || (check.depth !== undefined && check.depth > 0);
 
   const summary = check.depth !== undefined
@@ -120,10 +119,7 @@ function CheckCard({ check }: { check: HealthCheckItem }) {
         onClick={() => clickable && setExpanded(!expanded)}
         className={`w-full flex items-center gap-4 p-4 text-left ${clickable ? "cursor-pointer hover:bg-zinc-800/30" : "cursor-default"}`}
       >
-        {/* Status dot */}
         <span className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${sc.dot}`} />
-
-        {/* Label + description */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
             <span className="text-sm font-semibold text-zinc-100">{meta.label}</span>
@@ -135,11 +131,7 @@ function CheckCard({ check }: { check: HealthCheckItem }) {
             <p className="text-xs text-zinc-500 mt-0.5">{meta.description}</p>
           )}
         </div>
-
-        {/* Count */}
         <span className="text-sm text-zinc-400 flex-shrink-0">{summary}</span>
-
-        {/* Expand arrow */}
         {clickable && (
           <span className={`text-zinc-600 transition-transform ${expanded ? "rotate-180" : ""}`}>
             ▾
@@ -147,7 +139,11 @@ function CheckCard({ check }: { check: HealthCheckItem }) {
         )}
       </button>
 
-      {expanded && hasItems && (
+      {expanded && isDlq && check.depth !== undefined && check.depth > 0 && (
+        <DlqPanel onRefresh={onRefresh} />
+      )}
+
+      {expanded && hasItems && !isDlq && (
         <div className="border-t border-zinc-800 px-4 py-3 space-y-2">
           {check.items!.map((item, i) => (
             <div
@@ -180,6 +176,159 @@ function CheckCard({ check }: { check: HealthCheckItem }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function DlqPanel({ onRefresh }: { onRefresh: () => void }) {
+  const [messages, setMessages] = useState<DlqMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const loadMessages = useCallback(() => {
+    setLoading(true);
+    api
+      .getDlqMessages()
+      .then((r) => setMessages(r.messages))
+      .catch((e: Error) => toast(e.message, "error"))
+      .finally(() => setLoading(false));
+  }, [toast]);
+
+  useEffect(() => {
+    loadMessages();
+  }, [loadMessages]);
+
+  const handleRedrive = async (msg: DlqMessage) => {
+    setActing(msg.message_id);
+    try {
+      await api.redriveDlqMessage(msg.receipt_handle, msg.body);
+      toast("Message redriven to source queue", "success");
+      loadMessages();
+      onRefresh();
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : "Redrive failed", "error");
+    } finally {
+      setActing(null);
+    }
+  };
+
+  const handleDelete = async (msg: DlqMessage) => {
+    setActing(msg.message_id);
+    try {
+      await api.deleteDlqMessage(msg.receipt_handle);
+      toast("Message deleted", "success");
+      loadMessages();
+      onRefresh();
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : "Delete failed", "error");
+    } finally {
+      setActing(null);
+    }
+  };
+
+  const handlePurge = async () => {
+    if (!confirm("Permanently delete ALL messages from the dead letter queue?")) return;
+    setActing("purge");
+    try {
+      await api.purgeDlq();
+      toast("DLQ purged", "success");
+      setMessages([]);
+      onRefresh();
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : "Purge failed", "error");
+    } finally {
+      setActing(null);
+    }
+  };
+
+  const inferSource = (body: Record<string, unknown>) => {
+    const type = body.type as string | undefined;
+    if (type === "ci_fix" || type === "resume") return "ci-fix";
+    if (type === "feedback") return "feedback";
+    return "tickets";
+  };
+
+  if (loading) {
+    return (
+      <div className="border-t border-zinc-800 px-4 py-6 text-center text-sm text-zinc-500">
+        Loading DLQ messages...
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-t border-zinc-800">
+      {messages.length > 0 && (
+        <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800">
+          <span className="text-xs text-zinc-500">{messages.length} message{messages.length !== 1 ? "s" : ""} loaded (max 10)</span>
+          <div className="flex gap-2">
+            <button
+              onClick={loadMessages}
+              disabled={!!acting}
+              className="px-3 py-1 text-xs bg-zinc-800 border border-zinc-700 rounded text-zinc-300 hover:bg-zinc-700 disabled:opacity-50"
+            >
+              Reload
+            </button>
+            <button
+              onClick={handlePurge}
+              disabled={!!acting}
+              className="px-3 py-1 text-xs bg-red-900/30 border border-red-500/30 rounded text-red-400 hover:bg-red-900/50 disabled:opacity-50"
+            >
+              {acting === "purge" ? "Purging..." : "Purge All"}
+            </button>
+          </div>
+        </div>
+      )}
+      <div className="px-4 py-3 space-y-2 max-h-96 overflow-y-auto">
+        {messages.length === 0 ? (
+          <p className="text-sm text-zinc-500 text-center py-3">No messages in DLQ</p>
+        ) : (
+          messages.map((msg) => (
+            <div
+              key={msg.message_id}
+              className="bg-zinc-950/50 border border-zinc-800 rounded-lg px-4 py-3"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="px-2 py-0.5 rounded text-xs bg-zinc-800 text-zinc-400">
+                      {inferSource(msg.body)}
+                    </span>
+                    <span className="text-xs text-zinc-600">
+                      {msg.receive_count} attempts
+                    </span>
+                    {msg.sent_at && (
+                      <span className="text-xs text-zinc-600">
+                        · {new Date(msg.sent_at).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs font-mono text-zinc-400 bg-zinc-900 rounded p-2 mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap break-all">
+                    {JSON.stringify(msg.body, null, 2)}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => handleRedrive(msg)}
+                    disabled={!!acting}
+                    className="px-3 py-1 text-xs bg-blue-900/30 border border-blue-500/30 rounded text-blue-400 hover:bg-blue-900/50 disabled:opacity-50"
+                  >
+                    {acting === msg.message_id ? "..." : "Replay"}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(msg)}
+                    disabled={!!acting}
+                    className="px-3 py-1 text-xs bg-zinc-800 border border-zinc-700 rounded text-zinc-400 hover:bg-zinc-700 disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
