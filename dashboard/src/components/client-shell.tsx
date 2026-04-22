@@ -60,7 +60,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/analytics", label: "Analytics", icon: <TrendingUpIcon />, memberOnly: true },
       { href: "/infrastructure", label: "Infrastructure", icon: <HexagonIcon />, memberOnly: true },
-      { href: "/health", label: "Health", icon: <HeartIcon />, memberOnly: true },
+      { href: "/health", label: "Health", icon: <HeartIcon />, adminOnly: true },
       { href: "/memory", label: "Memory", icon: <BrainIcon />, memberOnly: true },
     ],
   },
@@ -68,7 +68,7 @@ const navGroups: NavGroup[] = [
     label: "Configure",
     items: [
       { href: "/settings/repos", label: "Repos", icon: <GitBranchIcon />, memberOnly: true },
-      { href: "/settings", label: "Settings", icon: <GearIcon /> },
+      { href: "/settings", label: "Settings", icon: <GearIcon />, adminOnly: true },
       { href: "/settings/notifications", label: "Notifications", icon: <BellIcon /> },
     ],
   },
@@ -85,7 +85,7 @@ const navGroups: NavGroup[] = [
   {
     label: "Team",
     items: [
-      { href: "/settings/team", label: "Members", icon: <UsersIcon /> },
+      { href: "/settings/team", label: "Members", icon: <UsersIcon />, adminOnly: true },
     ],
   },
   {

@@ -4,11 +4,12 @@ import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, type Repo } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
+import { RoleGuard } from "@/components/role-guard";
 const GITHUB_APP_INSTALL_URL = "https://github.com/apps/coderhelm/installations/new";
 const STATE_STORAGE_KEY = "gh_install_state";
 
 export default function GitHubSettingsPageGuarded() {
-  return <GitHubSettingsPage />;
+  return <RoleGuard minRole="admin"><GitHubSettingsPage /></RoleGuard>;
 }
 
 type InstallStatus = "not_connected" | "connected" | "linking";

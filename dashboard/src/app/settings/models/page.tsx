@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, ModelProviderConfig } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { RoleGuard } from "@/components/role-guard";
 
 const MODEL_OPTIONS = [
   { value: "claude-opus-4-7", label: "Claude Opus 4.7 — most capable" },
@@ -12,7 +13,11 @@ const MODEL_OPTIONS = [
   { value: "claude-haiku-4-5", label: "Claude Haiku 4.5 — fastest" },
 ];
 
-export default function ModelProviderPage() {
+export default function ModelProviderPageGuarded() {
+  return <RoleGuard minRole="admin"><ModelProviderPage /></RoleGuard>;
+}
+
+function ModelProviderPage() {
   const [config, setConfig] = useState<ModelProviderConfig | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [primaryModel, setPrimaryModel] = useState("claude-sonnet-4-6");

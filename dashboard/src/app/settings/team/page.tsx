@@ -5,6 +5,7 @@ import { api, type TeamUser } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Skeleton } from "@/components/skeleton";
+import { RoleGuard } from "@/components/role-guard";
 
 const ROLES = ["viewer", "member", "admin", "owner"] as const;
 const ROLE_COLORS: Record<string, string> = {
@@ -14,7 +15,11 @@ const ROLE_COLORS: Record<string, string> = {
   viewer: "text-zinc-500 bg-zinc-900 border-zinc-800",
 };
 
-export default function TeamPage() {
+export default function TeamPageGuarded() {
+  return <RoleGuard minRole="admin"><TeamPage /></RoleGuard>;
+}
+
+function TeamPage() {
   const [users, setUsers] = useState<TeamUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [myRole, setMyRole] = useState("");

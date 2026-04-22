@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, type HealthCheck, type HealthCheckItem, type DlqMessage } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { RoleGuard } from "@/components/role-guard";
 
 const STATUS_COLOR: Record<string, { bg: string; text: string; border: string; dot: string }> = {
   ok: { bg: "bg-emerald-500/10", text: "text-emerald-400", border: "border-emerald-500/20", dot: "bg-emerald-400" },
@@ -23,7 +24,11 @@ const CHECK_META: Record<string, { label: string; description: string }> = {
   failed_runs_24h: { label: "Failed Runs (24h)", description: "Runs that errored in the last 24 hours" },
 };
 
-export default function HealthPage() {
+export default function HealthPageGuarded() {
+  return <RoleGuard minRole="admin"><HealthPage /></RoleGuard>;
+}
+
+function HealthPage() {
   const [health, setHealth] = useState<HealthCheck | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
