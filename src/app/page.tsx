@@ -221,7 +221,7 @@ export default function Home() {
                       <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="#3fb950" strokeWidth="1.2" /><path d="M3.5 5l1 1 2-2.5" stroke="#3fb950" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" /></svg>
                       <span className="text-[#3fb950]">Security passed</span>
                     </div>
-                    <span className="ml-auto text-neutral-500 font-mono tabular-nums">claude-sonnet-4-5 · 4 tasks</span>
+                    <span className="ml-auto text-neutral-500 font-mono tabular-nums">claude-sonnet-4-6 · 4 tasks</span>
                   </div>
                 </div>
               </div>

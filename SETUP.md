@@ -16,7 +16,7 @@ Create a secret named `Coderhelm/<stage>/secrets` containing your GitHub App cre
 | Variable               | Where  | Description                                                          |
 |------------------------|--------|----------------------------------------------------------------------|
 | `CDK_DEFAULT_ACCOUNT`  | CDK    | Your AWS account ID                                                  |
-| `MODEL_ID`             | Worker | Bedrock model ID (e.g. `us.anthropic.claude-sonnet-4-20250514-v1:0`) |
+| `MODEL_ID`             | Worker | Anthropic model ID (e.g. `claude-sonnet-4-6` or `claude-opus-4-7`)   |
 | `STAGE`                | Both   | `dev` or `prod`                                                      |
 
 ## Deploy
