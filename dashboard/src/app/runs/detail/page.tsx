@@ -281,6 +281,7 @@ function RunDetailInner() {
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
   const [reReviewing, setReReviewing] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [specTab, setSpecTab] = useState<keyof Openspec>("proposal");
   const [usage, setUsage] = useState<UsageInfo | null>(null);
@@ -551,6 +552,38 @@ function RunDetailInner() {
             className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-semibold hover:bg-white disabled:opacity-50 cursor-pointer"
           >
             {retrying ? "Retrying..." : "Retry this run"}
+          </button>
+        </div>
+      )}
+
+      {/* Reset & re-run — clean slate for any terminal run: closes the PR,
+          deletes the branch, and starts fresh. */}
+      {["completed", "failed", "needs_input", "cancelled", "merged", "success"].includes(run.status) && (
+        <div className="mb-6">
+          <button
+            onClick={async () => {
+              if (
+                !window.confirm(
+                  "Reset & re-run will CLOSE the PR, DELETE the working branch, and start a brand-new run from scratch. Any unmerged work on this branch is discarded. Continue?"
+                )
+              ) {
+                return;
+              }
+              setResetting(true);
+              try {
+                await api.resetRun(runId);
+                toast("Run reset — branch cleaned, starting fresh. Redirecting…");
+                router.push("/");
+              } catch {
+                toast("Failed to reset run", "error");
+                setResetting(false);
+              }
+            }}
+            disabled={resetting || tokensExceeded}
+            title={tokensExceeded ? "Token limit reached" : "Close the PR, delete the branch, and run again from scratch"}
+            className="px-4 py-2 border border-red-500/40 text-red-400 rounded-lg text-sm font-semibold hover:bg-red-500/10 disabled:opacity-50 cursor-pointer"
+          >
+            {resetting ? "Resetting…" : "Reset & re-run from scratch"}
           </button>
         </div>
       )}
