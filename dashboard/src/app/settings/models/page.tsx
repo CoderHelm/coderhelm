@@ -6,7 +6,8 @@ import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
 
 const MODEL_OPTIONS = [
-  { value: "claude-opus-4-7", label: "Claude Opus 4.7 — most capable" },
+  { value: "claude-opus-4-8", label: "Claude Opus 4.8 — most capable" },
+  { value: "claude-opus-4-7", label: "Claude Opus 4.7" },
   { value: "claude-opus-4-6", label: "Claude Opus 4.6" },
   { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 — fast + smart" },
   { value: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
@@ -21,7 +22,7 @@ function ModelProviderPage() {
   const [config, setConfig] = useState<ModelProviderConfig | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [primaryModel, setPrimaryModel] = useState("claude-sonnet-4-6");
-  const [heavyModel, setHeavyModel] = useState("claude-opus-4-7");
+  const [heavyModel, setHeavyModel] = useState("claude-opus-4-8");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -186,7 +187,7 @@ function ModelProviderPage() {
         <ul className="text-xs text-zinc-500 space-y-1.5">
           <li>• CoderHelm uses the Anthropic API — you bring your own API key.</li>
           <li>• <strong className="text-zinc-400">Claude Sonnet 4.6</strong> — fast, great for analysis and planning.</li>
-          <li>• <strong className="text-zinc-400">Claude Opus 4.7</strong> — most capable, ideal for complex code implementation.</li>
+          <li>• <strong className="text-zinc-400">Claude Opus 4.8</strong> — most capable, ideal for complex code implementation.</li>
           <li>• Your API key is encrypted with AWS KMS and isolated to your team.</li>
           <li>• Changes take effect on the next run. In-progress runs are unaffected.</li>
         </ul>
