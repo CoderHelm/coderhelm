@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api, type AwsConnection, type LogGroup, type Recommendation } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
+import { formatBytes } from "@/lib/formatBytes";
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
   active: { bg: "bg-emerald-500/10", text: "text-emerald-400", dot: "bg-emerald-400" },
@@ -833,12 +834,4 @@ function AddConnectionModal({
       </div>
     </div>
   );
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 }
