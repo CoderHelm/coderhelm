@@ -40,6 +40,9 @@ export default function MemoryPage() {
   const [repos, setRepos] = useState<Repo[]>([]);
   const [selectedRepo, setSelectedRepo] = useState("");
   const [memories, setMemories] = useState<MemoryItem[]>([]);
+  // Unfiltered sample for the Agent Profile digest (independent of
+  // search/type/page so the profile stays stable while browsing).
+  const [profileItems, setProfileItems] = useState<MemoryItem[]>([]);
   const [stats, setStats] = useState<MemoryStats | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -66,17 +69,20 @@ export default function MemoryPage() {
     if (!selectedRepo) return;
     setLoading(true);
     try {
-      const [memRes, statsRes] = await Promise.all([
+      const [memRes, statsRes, profileRes] = await Promise.all([
         api.listMemories(selectedRepo, page, pageSize, search || undefined, typeFilter || undefined),
         api.getMemoryStats(selectedRepo),
+        api.listMemories(selectedRepo, 1, 200),
       ]);
       setMemories(memRes.memories);
       setTotal(memRes.total);
       setStats(statsRes);
+      setProfileItems(profileRes.memories);
     } catch {
       setMemories([]);
       setTotal(0);
       setStats(null);
+      setProfileItems([]);
     } finally {
       setLoading(false);
     }
@@ -197,6 +203,58 @@ export default function MemoryPage() {
               <p className="text-white font-semibold text-lg">{count}</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Agent Profile — a living digest of what the agent knows about this
+          repo, derived from the memory store, so it updates automatically as
+          runs learn (and as memories are deleted). */}
+      {profileItems.length > 0 && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-white font-semibold">Agent Profile</h2>
+              <p className="text-zinc-500 text-xs mt-0.5">
+                What CoderHelm currently knows about {selectedRepo} — updates automatically as it learns. Delete anything wrong below.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {(
+              [
+                ["semantic", "Repo knowledge"],
+                ["procedural", "How-tos it follows"],
+                ["correction", "Corrections it learned"],
+                ["anti_pattern", "Pitfalls it avoids"],
+              ] as const
+            ).map(([t, heading]) => {
+              const items = profileItems
+                .filter((m) => m.memory_type === t)
+                .sort(
+                  (a, b) =>
+                    b.confidence - a.confidence ||
+                    b.access_count - a.access_count ||
+                    b.created_at - a.created_at,
+                )
+                .slice(0, 4);
+              if (items.length === 0) return null;
+              return (
+                <div key={t} className="bg-zinc-800/40 border border-zinc-700/40 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TypeBadge type={t} />
+                    <span className="text-zinc-300 text-sm font-medium">{heading}</span>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {items.map((m) => (
+                      <li key={m.id} className="text-zinc-400 text-xs leading-relaxed line-clamp-2">
+                        {m.content}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
