@@ -25,6 +25,7 @@ function ReposPage() {
   const [page, setPage] = useState(0);
   const [toggling, setToggling] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [savingRole, setSavingRole] = useState<string | null>(null);
 
   useEffect(() => {
     api.listRepos().then((data) => {
@@ -51,6 +52,19 @@ function ReposPage() {
     setToggling(null);
   };
 
+  const handleRoleChange = async (repo: Repo, role: string) => {
+    setSavingRole(repo.name);
+    const prevRole = repo.role;
+    // Optimistic update; revert on failure (e.g. non-admin gets 403).
+    setRepos((prev) => prev.map((r) => r.name === repo.name ? { ...r, role: role || undefined } : r));
+    try {
+      await api.setRepoRole(repo.name, role);
+    } catch {
+      setRepos((prev) => prev.map((r) => r.name === repo.name ? { ...r, role: prevRole } : r));
+    }
+    setSavingRole(null);
+  };
+
   const filtered = repos.filter((r) =>
     r.name?.toLowerCase().includes(search.toLowerCase())
   );
@@ -64,7 +78,8 @@ function ReposPage() {
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-2">Repositories</h1>
       <p className="text-zinc-400 text-sm mb-4">
-        Repos connected via the GitHub App. Enable the ones you want Coderhelm to work on.
+        Repos connected via the GitHub App. Enable the ones you want Coderhelm to work on, and set a
+        role (web, backend, …) so Jira tickets route to the right repo.
       </p>
 
       {!loading && (
@@ -175,6 +190,25 @@ function ReposPage() {
                     )}
                   </div>
                 </div>
+                {repo.enabled && (
+                  <div className="relative shrink-0 ml-3" title="Primary role for this repo — routes matching Jira tickets here">
+                    <select
+                      value={repo.role || ""}
+                      onChange={(e) => handleRoleChange(repo, e.target.value)}
+                      disabled={savingRole === repo.name}
+                      className="appearance-none pl-2.5 pr-7 py-1 text-xs font-medium rounded-md border bg-zinc-900 border-zinc-700 text-zinc-300 focus:outline-none focus:border-zinc-500 cursor-pointer disabled:opacity-50"
+                    >
+                      <option value="">No role</option>
+                      <option value="web">Web</option>
+                      <option value="backend">Backend</option>
+                      <option value="mobile">Mobile</option>
+                      <option value="cms">CMS</option>
+                      <option value="infra">Infra</option>
+                      <option value="data">Data</option>
+                    </select>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500"><polyline points="6 9 12 15 18 9" /></svg>
+                  </div>
+                )}
               </div>
             ))}
           </div>
