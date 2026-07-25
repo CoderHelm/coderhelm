@@ -83,6 +83,7 @@ export const api = {
   listRepos: () => request<{ repos: Repo[] }>("/api/repos"),
   syncRepos: () => request<{ total: number; added: number }>("/api/repos/sync", { method: "POST" }),
   toggleRepo: (repo: string, enabled: boolean) => request<void>(`/api/repos/${repo}`, { method: "POST", body: JSON.stringify({ enabled }) }),
+  setRepoRole: (repo: string, role: string) => request<void>(`/api/repos/${repo}/role`, { method: "POST", body: JSON.stringify({ role }) }),
   deleteRepo: (repo: string) => request<void>(`/api/repos/${repo}`, { method: "DELETE" }),
 
   // Stats
@@ -359,6 +360,8 @@ export interface Repo {
   ticket_source: string;
   onboard_status?: "pending" | "ready" | "failed";
   onboard_error?: string;
+  /** Human-assigned role used to disambiguate Jira ticket routing. */
+  role?: string;
 }
 
 export interface Stats {
