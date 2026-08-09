@@ -24,6 +24,7 @@ const DEFAULTS: ReviewerConfig = {
   merge_method: "squash",
   require_human_approval: true,
   auto_tag: false,
+  tag_mode: "semver",
   tag_prefix: "v",
   health_check: false,
   health_wait_secs: 90,
@@ -178,6 +179,18 @@ function ReviewerConfigPage() {
 
                 <Toggle checked={cfg.auto_tag} onChange={(v) => set("auto_tag", v)} label="Tag after merge" />
                 <div className="ml-12 mb-2">
+                  <label className="block text-xs text-zinc-500 mb-1">Tag mode</label>
+                  <select
+                    value={cfg.tag_mode}
+                    onChange={(e) => set("tag_mode", e.target.value)}
+                    disabled={!cfg.auto_tag}
+                    className="px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 disabled:opacity-40"
+                  >
+                    <option value="semver">semver release (bump patch)</option>
+                    <option value="date">date marker</option>
+                  </select>
+                </div>
+                <div className="ml-12 mb-2">
                   <label className="block text-xs text-zinc-500 mb-1">Tag prefix</label>
                   <input
                     value={cfg.tag_prefix}
@@ -186,7 +199,11 @@ function ReviewerConfigPage() {
                     className="w-32 px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 disabled:opacity-40"
                     placeholder="v"
                   />
-                  <span className="ml-2 text-xs text-zinc-600">→ {cfg.tag_prefix}YYYYMMDD-HHMMSS</span>
+                  <span className="ml-2 text-xs text-zinc-600">
+                    {cfg.tag_mode === "date"
+                      ? `→ ${cfg.tag_prefix}YYYYMMDD-HHMMSS (timestamp, not a version)`
+                      : `→ next release, e.g. ${cfg.tag_prefix}1.2.4 (bumps the latest ${cfg.tag_prefix}X.Y.Z)`}
+                  </span>
                 </div>
 
                 <div className="border-t border-zinc-800 my-3" />
