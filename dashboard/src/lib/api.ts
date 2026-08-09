@@ -307,6 +307,9 @@ export interface ReviewerConfig {
   health_check: boolean;
   health_wait_secs: number;
   health_log_groups: string[];
+  reminders_enabled: boolean;
+  teams_webhook_url: string;
+  reminder_cooldown_hours: number;
 }
 
 export interface ReviewRatingComment {

@@ -29,6 +29,9 @@ const DEFAULTS: ReviewerConfig = {
   health_check: false,
   health_wait_secs: 90,
   health_log_groups: [],
+  reminders_enabled: false,
+  teams_webhook_url: "",
+  reminder_cooldown_hours: 4,
 };
 
 function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {
@@ -233,6 +236,38 @@ function ReviewerConfigPage() {
                 </div>
               </div>
             )}
+          </section>
+
+          {/* Teams reminders */}
+          <section className="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+            <h2 className="text-sm font-semibold text-zinc-200 mb-2">Teams reminders</h2>
+            <Toggle
+              checked={cfg.reminders_enabled}
+              onChange={(v) => set("reminders_enabled", v)}
+              label="Remind reviewers in Microsoft Teams"
+              hint="Every ~20 min, posts open PRs still waiting on their requested reviewers. Re-nudges after the cooldown or a new commit — never every tick."
+            />
+            <div className="mt-3">
+              <label className="block text-xs text-zinc-500 mb-1">Teams incoming webhook URL</label>
+              <input
+                value={cfg.teams_webhook_url}
+                onChange={(e) => set("teams_webhook_url", e.target.value)}
+                disabled={!cfg.reminders_enabled}
+                className="w-full px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 focus:border-zinc-500 outline-none disabled:opacity-40 font-mono"
+                placeholder="https://…webhook.office.com/… or a Power Automate URL"
+              />
+              <p className="text-xs text-zinc-600 mt-1">Must be an https URL. Create one via a Teams channel → Workflows / Incoming Webhook.</p>
+            </div>
+            <div className="mt-3">
+              <label className="block text-xs text-zinc-500 mb-1">Re-nudge cooldown (hours)</label>
+              <input
+                type="number"
+                value={cfg.reminder_cooldown_hours}
+                onChange={(e) => set("reminder_cooldown_hours", Math.max(1, Math.min(168, Number(e.target.value) || 1)))}
+                disabled={!cfg.reminders_enabled}
+                className="w-28 px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 disabled:opacity-40"
+              />
+            </div>
           </section>
 
           <button
