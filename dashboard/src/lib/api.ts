@@ -277,7 +277,60 @@ export const api = {
     request<MemoryStats>(`/api/memories/stats?repo=${encodeURIComponent(repo)}`),
   deleteMemory: (id: string, repo: string) =>
     request<{ deleted: string }>(`/api/memories/${id}?repo=${encodeURIComponent(repo)}`, { method: "DELETE" }),
+
+  // Reviewer agent
+  getReviewerConfig: (repo: string) => request<ReviewerConfig>(`/api/reviewer/config/${repo}`),
+  updateReviewerConfig: (repo: string, config: ReviewerConfig) =>
+    request<void>(`/api/reviewer/config/${repo}`, { method: "PUT", body: JSON.stringify(config) }),
+  listReviews: (repo?: string, limit = 100) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (repo) params.set("repo", repo);
+    return request<{ reviews: Review[] }>(`/api/reviewer/reviews?${params}`);
+  },
+  getReview: (sk: string) =>
+    request<Review>(`/api/reviewer/review?sk=${encodeURIComponent(sk)}`),
+  rateReview: (sk: string, rating: "up" | "down" | "none", comment?: string) =>
+    request<void>(`/api/reviewer/review/rate`, { method: "POST", body: JSON.stringify({ sk, rating, comment }) }),
 };
+
+export interface ReviewerConfig {
+  enabled: boolean;
+  label: string;
+  killed: boolean;
+  instructions: string;
+  auto_merge: boolean;
+  merge_method: string;
+  require_human_approval: boolean;
+  auto_tag: boolean;
+  tag_prefix: string;
+  health_check: boolean;
+  health_wait_secs: number;
+  health_log_groups: string[];
+}
+
+export interface ReviewRatingComment {
+  by: string;
+  text: string;
+  rating?: string;
+  at: string;
+}
+
+export interface Review {
+  sk: string;
+  repo: string;
+  pr_number: number;
+  head_sha: string;
+  verdict: string;
+  risk: string;
+  body: string;
+  posted_as: string;
+  trigger: string;
+  action_summary: string;
+  thumbs_up: number;
+  thumbs_down: number;
+  rating_comments: ReviewRatingComment[];
+  created_at: string;
+}
 
 export interface TeamUser {
   user_id: string;
