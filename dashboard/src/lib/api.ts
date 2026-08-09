@@ -302,6 +302,7 @@ export interface ReviewerConfig {
   merge_method: string;
   require_human_approval: boolean;
   auto_tag: boolean;
+  tag_mode: string;
   tag_prefix: string;
   health_check: boolean;
   health_wait_secs: number;
