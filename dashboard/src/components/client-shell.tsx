@@ -51,6 +51,7 @@ const navGroups: NavGroup[] = [
   {
     items: [
       { href: "/", label: "Runs", icon: <PlayIcon /> },
+      { href: "/reviewer", label: "Reviewer", icon: <ShieldCheckIcon />, memberOnly: true },
       { href: "/plans", label: "Plans", icon: <CircleDotIcon /> },
       { href: "/plans/templates", label: "Templates", icon: <TemplateIcon /> },
     ],
