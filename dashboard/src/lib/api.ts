@@ -305,7 +305,7 @@ export interface ReviewerConfig {
   tag_mode: string;
   tag_prefix: string;
   health_check: boolean;
-  health_wait_secs: number;
+  verify_tests: boolean;
   health_log_groups: string[];
   reminders_enabled: boolean;
   teams_webhook_url: string;

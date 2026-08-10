@@ -27,7 +27,7 @@ const DEFAULTS: ReviewerConfig = {
   tag_mode: "semver",
   tag_prefix: "v",
   health_check: false,
-  health_wait_secs: 90,
+  verify_tests: false,
   health_log_groups: [],
   reminders_enabled: false,
   teams_webhook_url: "",
@@ -61,9 +61,24 @@ function ReviewerConfigPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [logGroups, setLogGroups] = useState<string[]>([]);
+  const [loadingLogGroups, setLoadingLogGroups] = useState(false);
 
   useEffect(() => {
     api.listRepos().then((d) => setRepos(d.repos)).catch(() => {});
+    // Load the connected AWS account's log groups for the health-check picker
+    // (no free text — pick from the real list). Best-effort; empty if no account.
+    setLoadingLogGroups(true);
+    api
+      .listAwsConnections()
+      .then(async (d) => {
+        const conn = d.connections[0];
+        if (!conn) return;
+        const lg = await api.discoverLogGroups(conn.connection_id);
+        setLogGroups(lg.log_groups.map((g) => g.name));
+      })
+      .catch(() => {})
+      .finally(() => setLoadingLogGroups(false));
   }, []);
 
   useEffect(() => {
@@ -97,18 +112,19 @@ function ReviewerConfigPage() {
       </div>
       <h1 className="text-2xl font-bold mb-2">Reviewer configuration</h1>
       <p className="text-zinc-400 text-sm mb-5">
-        Per-repo settings for the PR reviewer. Everything is off by default — turn it on for a repo,
-        then add the review label to a PR.
+        Per-repo settings for the PR reviewer. Everything is off by default. Pick a repository below,
+        then configure reviewing, post-approval auto-actions, <strong>Teams reminders</strong>, and the
+        post-merge health check. Turn the reviewer on and add the review label to a PR.
       </p>
 
       <div className="mb-6 max-w-sm">
-        <label className="block text-xs text-zinc-500 mb-1">Repository</label>
+        <label className="block text-xs text-zinc-500 mb-1">Repository (select to configure)</label>
         <RepoCombobox repos={repos} selected={repo} onSelect={setRepo} />
       </div>
 
       {!repo ? (
         <div className="text-center py-12 text-zinc-500 text-sm border border-dashed border-zinc-800 rounded-lg">
-          Pick a repository to configure.
+          Pick a repository above to configure reviewing, auto-actions, Teams reminders, and health checks.
         </div>
       ) : loading ? (
         <div className="text-zinc-500 text-sm">Loading…</div>
@@ -119,6 +135,7 @@ function ReviewerConfigPage() {
             <h2 className="text-sm font-semibold text-zinc-200 mb-2">Reviewing</h2>
             <Toggle checked={cfg.enabled} onChange={(v) => set("enabled", v)} label="Enable reviewer for this repo" hint="Off = the reviewer ignores this repo entirely." />
             <Toggle checked={cfg.killed} onChange={(v) => set("killed", v)} label="Kill switch" hint="Hard-stops ALL reviewer action for this repo, overriding everything below." />
+            <Toggle checked={cfg.verify_tests} onChange={(v) => set("verify_tests", v)} label="Verify in sandbox (run tests)" hint="Runs the affected tests/build in a sandbox and attaches pass/fail receipts to the review. A hard failure requests changes. Slower + uses build minutes." />
             <div className="mt-3">
               <label className="block text-xs text-zinc-500 mb-1">Trigger label</label>
               <input
@@ -211,29 +228,35 @@ function ReviewerConfigPage() {
 
                 <div className="border-t border-zinc-800 my-3" />
 
-                <Toggle checked={cfg.health_check} onChange={(v) => set("health_check", v)} label="Health check after merge" hint="Watches CI on the base branch; posts an alert if the deploy looks broken." />
-                <div className="ml-12 mb-2">
-                  <label className="block text-xs text-zinc-500 mb-1">Watch window (seconds, max 300)</label>
-                  <input
-                    type="number"
-                    value={cfg.health_wait_secs}
-                    onChange={(e) => set("health_wait_secs", Math.max(0, Math.min(300, Number(e.target.value) || 0)))}
-                    disabled={!cfg.health_check}
-                    className="w-28 px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 disabled:opacity-40"
-                  />
-                </div>
-                <div className="ml-12 mb-1">
-                  <label className="block text-xs text-zinc-500 mb-1">CloudWatch log groups to scan (one per line, optional)</label>
-                  <textarea
-                    value={cfg.health_log_groups.join("\n")}
-                    onChange={(e) => set("health_log_groups", e.target.value.split("\n").map((s) => s.trim()).filter(Boolean))}
-                    disabled={!cfg.health_check}
-                    rows={3}
-                    className="w-full px-3 py-2 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 disabled:opacity-40 font-mono"
-                    placeholder="/aws/lambda/my-service"
-                  />
-                  <p className="text-xs text-zinc-600 mt-1">Only meaningful for repos that deploy into the CoderHelm AWS account.</p>
-                </div>
+                <Toggle checked={cfg.health_check} onChange={(v) => set("health_check", v)} label="Health check after merge" hint="Watches the base-branch deploy checks (adaptively — no timer to set) and flags only NEW failures vs. before the merge. Reports; never rolls back on its own." />
+                {cfg.health_check && (
+                  <div className="ml-12 mb-1">
+                    <label className="block text-xs text-zinc-500 mb-1">CloudWatch log groups to watch (optional)</label>
+                    {logGroups.length === 0 ? (
+                      <p className="text-xs text-zinc-600">
+                        {loadingLogGroups
+                          ? "Loading log groups…"
+                          : <>No AWS account connected — <a href="/settings/aws" className="text-zinc-400 underline">connect one</a> to pick log groups. (CI-check health works without it.)</>}
+                      </p>
+                    ) : (
+                      <div className="max-h-40 overflow-y-auto rounded border border-zinc-800 bg-zinc-950 p-2 space-y-1">
+                        {logGroups.map((lg) => {
+                          const on = cfg.health_log_groups.includes(lg);
+                          return (
+                            <label key={lg} className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={on}
+                                onChange={() => set("health_log_groups", on ? cfg.health_log_groups.filter((g) => g !== lg) : [...cfg.health_log_groups, lg])}
+                              />
+                              <span className="font-mono truncate">{lg}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </section>
