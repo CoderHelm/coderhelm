@@ -33,6 +33,19 @@ function verdictBadge(v: string) {
   );
 }
 
+// Collapse per-run review records into one entry per PR (newest kept as the
+// headline), so re-reviews don't flood the list. `reviews` arrives newest-first.
+function groupByPr(reviews: Review[]): { latest: Review; count: number }[] {
+  const groups = new Map<string, { latest: Review; count: number }>();
+  for (const r of reviews) {
+    const key = `${r.repo}#${r.pr_number}`;
+    const g = groups.get(key);
+    if (g) g.count += 1;
+    else groups.set(key, { latest: r, count: 1 });
+  }
+  return [...groups.values()];
+}
+
 function riskBadge(r: string) {
   if (!r || r === "N/A") return null;
   const map: Record<string, string> = {
@@ -98,9 +111,9 @@ function ReviewerPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {reviews.map((r) => (
+          {groupByPr(reviews).map(({ latest: r, count }) => (
             <Link
-              key={r.sk}
+              key={`${r.repo}#${r.pr_number}`}
               href={`/reviewer/detail?sk=${encodeURIComponent(r.sk)}`}
               className="block p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition-colors"
             >
@@ -111,6 +124,11 @@ function ReviewerPage() {
                   <span className="text-sm text-zinc-300 truncate">
                     {r.repo} <span className="text-zinc-500">#{r.pr_number}</span>
                   </span>
+                  {count > 1 && (
+                    <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-xs text-zinc-400 shrink-0">
+                      {count} reviews
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-zinc-500 shrink-0">
                   {r.thumbs_up > 0 && <span className="text-green-400">👍 {r.thumbs_up}</span>}
