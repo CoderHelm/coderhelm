@@ -28,6 +28,7 @@ const DEFAULTS: ReviewerConfig = {
   tag_prefix: "v",
   health_check: false,
   verify_tests: false,
+  deploy_label: "",
   health_log_groups: [],
   reminders_enabled: false,
   teams_webhook_url: "",
@@ -195,6 +196,20 @@ function ReviewerConfigPage() {
                   label="Require a human approval too (two-key)"
                   hint="Strongly recommended. If off, the bot's approval alone can merge."
                 />
+                <div className="ml-12 mt-2 mb-1">
+                  <label className="block text-xs text-zinc-500 mb-1">Deploy label (optional)</label>
+                  <input
+                    value={cfg.deploy_label}
+                    onChange={(e) => set("deploy_label", e.target.value)}
+                    disabled={!cfg.auto_merge}
+                    className="w-full max-w-xs px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 focus:border-zinc-500 outline-none disabled:opacity-40"
+                    placeholder="e.g. deploy-staging"
+                  />
+                  <p className="text-xs text-zinc-600 mt-1">
+                    Once a PR is cleared to merge, the reviewer adds this label so your own CI can deploy
+                    (staging/preview), then waits for that deploy&apos;s CI to pass before merging. Leave blank to skip.
+                  </p>
+                </div>
 
                 <div className="border-t border-zinc-800 my-3" />
 
