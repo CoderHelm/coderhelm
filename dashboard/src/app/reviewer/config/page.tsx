@@ -63,6 +63,7 @@ function ReviewerConfigPage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [logGroups, setLogGroups] = useState<string[]>([]);
   const [loadingLogGroups, setLoadingLogGroups] = useState(false);
+  const [logGroupFilter, setLogGroupFilter] = useState("");
 
   useEffect(() => {
     api.listRepos().then((d) => setRepos(d.repos)).catch(() => {});
@@ -239,21 +240,42 @@ function ReviewerConfigPage() {
                           : <>No AWS account connected — <a href="/settings/aws" className="text-zinc-400 underline">connect one</a> to pick log groups. (CI-check health works without it.)</>}
                       </p>
                     ) : (
-                      <div className="max-h-40 overflow-y-auto rounded border border-zinc-800 bg-zinc-950 p-2 space-y-1">
-                        {logGroups.map((lg) => {
-                          const on = cfg.health_log_groups.includes(lg);
+                      <>
+                        <input
+                          value={logGroupFilter}
+                          onChange={(e) => setLogGroupFilter(e.target.value)}
+                          placeholder={`Search ${logGroups.length} log groups…`}
+                          className="w-full mb-1 px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-xs text-zinc-200 focus:border-zinc-500 outline-none"
+                        />
+                        {(() => {
+                          const q = logGroupFilter.trim().toLowerCase();
+                          const shown = q ? logGroups.filter((lg) => lg.toLowerCase().includes(q)) : logGroups;
                           return (
-                            <label key={lg} className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={on}
-                                onChange={() => set("health_log_groups", on ? cfg.health_log_groups.filter((g) => g !== lg) : [...cfg.health_log_groups, lg])}
-                              />
-                              <span className="font-mono truncate">{lg}</span>
-                            </label>
+                            <div className="max-h-40 overflow-y-auto rounded border border-zinc-800 bg-zinc-950 p-2 space-y-1">
+                              {shown.length === 0 ? (
+                                <p className="text-xs text-zinc-600 px-1">No log groups match “{logGroupFilter}”.</p>
+                              ) : (
+                                shown.map((lg) => {
+                                  const on = cfg.health_log_groups.includes(lg);
+                                  return (
+                                    <label key={lg} className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={on}
+                                        onChange={() => set("health_log_groups", on ? cfg.health_log_groups.filter((g) => g !== lg) : [...cfg.health_log_groups, lg])}
+                                      />
+                                      <span className="font-mono truncate">{lg}</span>
+                                    </label>
+                                  );
+                                })
+                              )}
+                            </div>
                           );
-                        })}
-                      </div>
+                        })()}
+                        {cfg.health_log_groups.length > 0 && (
+                          <p className="text-xs text-zinc-500 mt-1">{cfg.health_log_groups.length} selected</p>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
