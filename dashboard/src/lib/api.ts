@@ -282,6 +282,10 @@ export const api = {
   getReviewerConfig: (repo: string) => request<ReviewerConfig>(`/api/reviewer/config/${repo}`),
   updateReviewerConfig: (repo: string, config: ReviewerConfig) =>
     request<void>(`/api/reviewer/config/${repo}`, { method: "PUT", body: JSON.stringify(config) }),
+  getOrgReviewInstructions: () =>
+    request<{ instructions: string }>(`/api/reviewer/org-config`),
+  updateOrgReviewInstructions: (instructions: string) =>
+    request<void>(`/api/reviewer/org-config`, { method: "PUT", body: JSON.stringify({ instructions }) }),
   listReviews: (repo?: string, limit = 100) => {
     const params = new URLSearchParams({ limit: String(limit) });
     if (repo) params.set("repo", repo);
