@@ -256,17 +256,18 @@ function ReviewerConfigPage() {
                   hint="Strongly recommended. If off, the bot's approval alone can merge."
                 />
                 <div className="ml-12 mt-2 mb-1">
-                  <label className="block text-xs text-zinc-500 mb-1">Deploy label (optional)</label>
+                  <label className="block text-xs text-zinc-500 mb-1">Deploy label(s) (optional)</label>
                   <input
                     value={cfg.deploy_label}
                     onChange={(e) => set("deploy_label", e.target.value)}
                     disabled={!cfg.auto_merge}
-                    className="w-full max-w-xs px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 focus:border-zinc-500 outline-none disabled:opacity-40"
-                    placeholder="e.g. deploy-staging"
+                    className="w-full max-w-md px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 focus:border-zinc-500 outline-none disabled:opacity-40"
+                    placeholder="e.g. deploy-staging  or  E2E:IOS,E2E:ANDROID"
                   />
                   <p className="text-xs text-zinc-600 mt-1">
-                    Once a PR is cleared to merge, the reviewer adds this label so your own CI can deploy
-                    (staging/preview), then waits for that deploy&apos;s CI to pass before merging. Leave blank to skip.
+                    Once a PR is cleared to merge, the reviewer adds this label so your own CI can run
+                    (deploy/staging/preview or E2E suites), then waits for all of it to pass before merging.
+                    <strong> Comma-separate for multiple</strong> (e.g. <code>E2E:IOS,E2E:ANDROID</code>). Leave blank to skip.
                   </p>
                 </div>
 
