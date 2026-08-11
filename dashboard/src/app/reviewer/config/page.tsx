@@ -66,6 +66,14 @@ function ReviewerConfigPage() {
   const [loadingLogGroups, setLoadingLogGroups] = useState(false);
   const [logGroupFilter, setLogGroupFilter] = useState("");
 
+  // Restore the selected repo from the URL (?repo=owner/name) so a refresh keeps
+  // the page on the same repo. Read window.location directly (not useSearchParams)
+  // to stay compatible with the static export without a Suspense boundary.
+  useEffect(() => {
+    const r = new URLSearchParams(window.location.search).get("repo");
+    if (r) setRepo(r);
+  }, []);
+
   useEffect(() => {
     api.listRepos().then((d) => setRepos(d.repos)).catch(() => {});
     // Load the connected AWS account's log groups for the health-check picker
@@ -95,6 +103,16 @@ function ReviewerConfigPage() {
 
   const set = <K extends keyof ReviewerConfig>(k: K, v: ReviewerConfig[K]) => setCfg((p) => ({ ...p, [k]: v }));
 
+  // Select a repo AND reflect it in the URL so the choice survives a refresh /
+  // is shareable, mirroring /runs/detail?id= and /reviewer/detail?sk=.
+  const selectRepo = (r: string) => {
+    setRepo(r);
+    const url = new URL(window.location.href);
+    if (r) url.searchParams.set("repo", r);
+    else url.searchParams.delete("repo");
+    window.history.replaceState(null, "", url.toString());
+  };
+
   const save = async () => {
     if (!repo) return;
     setSaving(true);
@@ -121,7 +139,7 @@ function ReviewerConfigPage() {
 
       <div className="mb-6 max-w-sm">
         <label className="block text-xs text-zinc-500 mb-1">Repository (select to configure)</label>
-        <RepoCombobox repos={repos} selected={repo} onSelect={setRepo} />
+        <RepoCombobox repos={repos} selected={repo} onSelect={selectRepo} />
       </div>
 
       {!repo ? (
