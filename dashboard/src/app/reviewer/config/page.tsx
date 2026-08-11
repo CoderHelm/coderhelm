@@ -265,8 +265,9 @@ function ReviewerConfigPage() {
                     placeholder="e.g. deploy-staging  or  E2E:IOS,E2E:ANDROID"
                   />
                   <p className="text-xs text-zinc-600 mt-1">
-                    Once a PR is cleared to merge, the reviewer adds this label so your own CI can run
-                    (deploy/staging/preview or E2E suites), then waits for all of it to pass before merging.
+                    CoderHelm adds this label to its own PRs at creation, so your deploy/preview/E2E CI runs
+                    from the start; human-authored PRs get it once they are cleared to merge. Either way,
+                    auto-merge waits for all of that CI to pass before merging.
                     <strong> Comma-separate for multiple</strong> (e.g. <code>E2E:IOS,E2E:ANDROID</code>). Leave blank to skip.
                   </p>
                 </div>
