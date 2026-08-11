@@ -65,6 +65,9 @@ function ReviewerConfigPage() {
   const [logGroups, setLogGroups] = useState<string[]>([]);
   const [loadingLogGroups, setLoadingLogGroups] = useState(false);
   const [logGroupFilter, setLogGroupFilter] = useState("");
+  // Org-wide review standards — team-level, applied to every repo's review.
+  const [orgInstructions, setOrgInstructions] = useState("");
+  const [savingOrg, setSavingOrg] = useState(false);
 
   // Restore the selected repo from the URL (?repo=owner/name) so a refresh keeps
   // the page on the same repo. Read window.location directly (not useSearchParams)
@@ -89,6 +92,11 @@ function ReviewerConfigPage() {
       })
       .catch(() => {})
       .finally(() => setLoadingLogGroups(false));
+    // Team-wide review standards (applies to every repo).
+    api
+      .getOrgReviewInstructions()
+      .then((d) => setOrgInstructions(d.instructions || ""))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -125,6 +133,17 @@ function ReviewerConfigPage() {
     setSaving(false);
   };
 
+  const saveOrg = async () => {
+    setSavingOrg(true);
+    try {
+      await api.updateOrgReviewInstructions(orgInstructions);
+      toast("Org-wide review standards saved");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Save failed (admins only)", "error");
+    }
+    setSavingOrg(false);
+  };
+
   return (
     <div className="max-w-2xl">
       <div className="flex items-center gap-2 mb-2">
@@ -136,6 +155,28 @@ function ReviewerConfigPage() {
         then configure reviewing, post-approval auto-actions, <strong>Teams reminders</strong>, and the
         post-merge health check. Turn the reviewer on and add the review label to a PR.
       </p>
+
+      <section className="mb-6 p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+        <h2 className="text-sm font-semibold text-zinc-200 mb-1">Org-wide review standards</h2>
+        <p className="text-xs text-zinc-500 mb-2">
+          Applied to <strong>every</strong> repo&apos;s review, on top of each repo&apos;s own focus and its
+          AGENTS.md. Put shared conventions here (error handling, auth, naming, security expectations).
+        </p>
+        <textarea
+          value={orgInstructions}
+          onChange={(e) => setOrgInstructions(e.target.value)}
+          rows={5}
+          className="w-full px-3 py-2 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 focus:border-zinc-500 outline-none font-mono"
+          placeholder="e.g. Enforce our error-handling wrapper on all handlers. Flag any new dependency. Never log secrets."
+        />
+        <button
+          onClick={saveOrg}
+          disabled={savingOrg}
+          className="mt-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium disabled:opacity-50"
+        >
+          {savingOrg ? "Saving…" : "Save org standards"}
+        </button>
+      </section>
 
       <div className="mb-6 max-w-sm">
         <label className="block text-xs text-zinc-500 mb-1">Repository (select to configure)</label>
