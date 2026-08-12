@@ -308,6 +308,7 @@ export interface ReviewerConfig {
   auto_tag: boolean;
   tag_mode: string;
   tag_prefix: string;
+  tag_batch_minutes: number;
   health_check: boolean;
   verify_tests: boolean;
   deploy_label: string;
