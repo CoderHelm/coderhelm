@@ -26,6 +26,7 @@ const DEFAULTS: ReviewerConfig = {
   auto_tag: false,
   tag_mode: "semver",
   tag_prefix: "v",
+  tag_batch_minutes: 15,
   health_check: false,
   verify_tests: false,
   deploy_label: "",
@@ -300,6 +301,29 @@ function ReviewerConfigPage() {
                     {cfg.tag_mode === "date"
                       ? `→ ${cfg.tag_prefix}YYYYMMDD-HHMMSS (timestamp, not a version)`
                       : `→ next release, e.g. ${cfg.tag_prefix}1.2.4 (bumps the latest ${cfg.tag_prefix}X.Y.Z)`}
+                  </span>
+                </div>
+                <div className="ml-12 mb-2">
+                  <label className="block text-xs text-zinc-500 mb-1">Batch window (minutes)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={360}
+                    value={cfg.tag_batch_minutes}
+                    onChange={(e) =>
+                      set(
+                        "tag_batch_minutes",
+                        Math.max(0, Math.min(360, Math.floor(Number(e.target.value) || 0))),
+                      )
+                    }
+                    disabled={!cfg.auto_tag}
+                    className="w-32 px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 disabled:opacity-40"
+                    placeholder="15"
+                  />
+                  <span className="ml-2 text-xs text-zinc-600">
+                    {cfg.tag_batch_minutes === 0
+                      ? "→ tag every merge immediately (no batching)"
+                      : `→ merges within ${cfg.tag_batch_minutes} min share one release tag at the latest commit`}
                   </span>
                 </div>
 
