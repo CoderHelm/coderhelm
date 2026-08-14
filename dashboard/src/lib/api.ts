@@ -311,6 +311,7 @@ export interface ReviewerConfig {
   tag_batch_minutes: number;
   health_check: boolean;
   verify_tests: boolean;
+  graph_enabled: boolean;
   deploy_label: string;
   health_log_groups: string[];
   reminders_enabled: boolean;
