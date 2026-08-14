@@ -279,6 +279,23 @@ export const api = {
     request<{ deleted: string }>(`/api/memories/${id}?repo=${encodeURIComponent(repo)}`, { method: "DELETE" }),
 
   // Reviewer agent
+  // Code graph — its own feature (serves the reviewer AND the PR maker)
+  getGraphRepos: () => request<{ repos: GraphRepo[] }>(`/api/graph/repos`),
+  getGraphStatus: (repo: string) =>
+    request<GraphStatus>(`/api/graph/status?repo=${encodeURIComponent(repo)}`),
+  searchGraphSymbol: (repo: string, q: string) =>
+    request<GraphSymbolResult>(
+      `/api/graph/symbol?repo=${encodeURIComponent(repo)}&q=${encodeURIComponent(q)}`,
+    ),
+  getGraphNeighborhood: (repo: string, path: string) =>
+    request<GraphNeighborhood>(
+      `/api/graph/neighborhood?repo=${encodeURIComponent(repo)}&path=${encodeURIComponent(path)}`,
+    ),
+  setGraphEnabled: (repo: string, enabled: boolean) =>
+    request<void>(`/api/graph/config/${repo}`, {
+      method: "PUT",
+      body: JSON.stringify({ enabled }),
+    }),
   getReviewerConfig: (repo: string) => request<ReviewerConfig>(`/api/reviewer/config/${repo}`),
   updateReviewerConfig: (repo: string, config: ReviewerConfig) =>
     request<void>(`/api/reviewer/config/${repo}`, { method: "PUT", body: JSON.stringify(config) }),
@@ -297,6 +314,54 @@ export const api = {
     request<void>(`/api/reviewer/review/rate`, { method: "POST", body: JSON.stringify({ sk, rating, comment }) }),
 };
 
+export interface GraphRepo {
+  repo: string;
+  graph_enabled: boolean;
+  indexed: boolean;
+  files: number;
+  symbols: number;
+  branch: string;
+  indexed_sha: string;
+  updated_at: string;
+}
+
+export interface GraphTopFile {
+  path: string;
+  rank: number;
+  defs: number;
+}
+
+export interface GraphStatus {
+  indexed: boolean;
+  files?: number;
+  symbols?: number;
+  names_referenced?: number;
+  branch?: string;
+  indexed_sha?: string;
+  updated_at?: string;
+  top_files?: GraphTopFile[];
+}
+
+export interface GraphSymbolDef {
+  name: string;
+  path: string;
+  kind: string;
+  line: number;
+  rank: number;
+}
+
+export interface GraphSymbolResult {
+  definitions: GraphSymbolDef[];
+  callers: string[];
+}
+
+export interface GraphNeighborhood {
+  path: string;
+  imports: string[];
+  importers: string[];
+  symbols: { name: string; callers: string[] }[];
+}
+
 export interface ReviewerConfig {
   enabled: boolean;
   label: string;
@@ -311,7 +376,9 @@ export interface ReviewerConfig {
   tag_batch_minutes: number;
   health_check: boolean;
   verify_tests: boolean;
-  graph_enabled: boolean;
+  /// Managed from the Code Graph page (its own feature); optional here so the
+  /// reviewer form round-trips it without owning it.
+  graph_enabled?: boolean;
   deploy_label: string;
   health_log_groups: string[];
   reminders_enabled: boolean;
