@@ -29,6 +29,7 @@ const DEFAULTS: ReviewerConfig = {
   tag_batch_minutes: 15,
   health_check: false,
   verify_tests: false,
+  graph_enabled: false,
   deploy_label: "",
   health_log_groups: [],
   reminders_enabled: false,
@@ -198,6 +199,7 @@ function ReviewerConfigPage() {
             <Toggle checked={cfg.enabled} onChange={(v) => set("enabled", v)} label="Enable reviewer for this repo" hint="Off = the reviewer ignores this repo entirely." />
             <Toggle checked={cfg.killed} onChange={(v) => set("killed", v)} label="Kill switch" hint="Hard-stops ALL reviewer action for this repo, overriding everything below." />
             <Toggle checked={cfg.verify_tests} onChange={(v) => set("verify_tests", v)} label="Verify in sandbox (run tests)" hint="Runs the affected tests/build in a sandbox and attaches pass/fail receipts to the review. A hard failure requests changes. Slower + uses build minutes." />
+            <Toggle checked={cfg.graph_enabled} onChange={(v) => set("graph_enabled", v)} label="Code graph (repo structure map)" hint="Indexes the repo into a code graph (definitions, callers, imports) so the reviewer knows exactly which files a change reaches. Full index on enable; pushes to the default branch keep it fresh automatically. Reviews then get exact impacted-file lists and structural lookup tools." />
             <div className="mt-3">
               <label className="block text-xs text-zinc-500 mb-1">Trigger label</label>
               <input
