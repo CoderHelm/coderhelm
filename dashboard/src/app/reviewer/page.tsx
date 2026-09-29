@@ -6,6 +6,7 @@ import { api, type Review, type Repo } from "@/lib/api";
 import { TableSkeleton } from "@/components/skeleton";
 import { RoleGuard } from "@/components/role-guard";
 import { RepoCombobox } from "@/components/repo-combobox";
+import { ReReviewButton } from "@/components/re-review-button";
 
 export default function ReviewerPageGuarded() {
   return (
@@ -87,6 +88,8 @@ function ReviewerPage() {
   const [repoFilter, setRepoFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [reviewRepo, setReviewRepo] = useState("");
+  const [reviewPr, setReviewPr] = useState("");
 
   useEffect(() => {
     api.listRepos().then((d) => setRepos(d.repos)).catch(() => {});
@@ -132,6 +135,26 @@ function ReviewerPage() {
         </div>
       </div>
 
+      <div className="mb-6 p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+        <h2 className="text-sm font-semibold text-zinc-200">Review a PR now</h2>
+        <p className="text-xs text-zinc-500 mt-1 mb-3">
+          Reviews the PR&apos;s latest commit — no label or GitHub comment needed.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="w-full sm:w-72">
+            <RepoCombobox repos={repos} selected={reviewRepo} onSelect={setReviewRepo} />
+          </div>
+          <input
+            inputMode="numeric"
+            placeholder="PR #"
+            value={reviewPr}
+            onChange={(e) => setReviewPr(e.target.value.replace(/\D/g, ""))}
+            className="w-24 px-3 py-1.5 text-sm rounded-lg bg-zinc-950 border border-zinc-700 text-zinc-100 placeholder:text-zinc-600"
+          />
+          <ReReviewButton repo={reviewRepo} pr={Number(reviewPr)} label="Review now" />
+        </div>
+      </div>
+
       <div className="mb-5 max-w-sm">
         <RepoCombobox repos={repos} selected={repoFilter} onSelect={setRepoFilter} />
         {repoFilter && (
@@ -146,7 +169,7 @@ function ReviewerPage() {
       ) : reviews.length === 0 ? (
         <div className="text-zinc-500 border border-zinc-800 rounded-lg p-8 text-center">
           <p className="text-lg mb-2">No reviews yet</p>
-          <p className="text-sm">Enable the reviewer for a repo and add the review label to a PR.</p>
+          <p className="text-sm">Enable the reviewer for a repo, then use “Review a PR now” above or add the review label to a PR.</p>
         </div>
       ) : (
         <div className="border border-zinc-800 rounded-lg overflow-hidden">
@@ -157,6 +180,7 @@ function ReviewerPage() {
                 <th className="px-4 py-3 font-medium">Verdict</th>
                 <th className="px-4 py-3 font-medium">Risk</th>
                 <th className="px-4 py-3 font-medium">Time</th>
+                <th className="px-4 py-3 font-medium" />
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
@@ -245,6 +269,9 @@ function PrRow({
             {formatTimeAgo(r.created_at)}
           </time>
         </td>
+        <td className="px-4 py-3 text-right">
+          <ReReviewButton repo={group.repo} pr={group.pr_number} />
+        </td>
       </tr>
 
       {hasMultiple &&
@@ -271,6 +298,7 @@ function PrRow({
                 {formatTimeAgo(rev.created_at)}
               </time>
             </td>
+            <td />
           </tr>
         ))}
     </>

@@ -7,6 +7,7 @@ import { api, type Review } from "@/lib/api";
 import { RoleGuard } from "@/components/role-guard";
 import { Markdown } from "@/components/markdown";
 import { useToast } from "@/components/toast";
+import { ReReviewButton } from "@/components/re-review-button";
 
 export default function ReviewDetailGuarded() {
   return (
@@ -98,6 +99,7 @@ function ReviewDetailPage() {
         <a href={prUrl} target="_blank" rel="noreferrer" className="text-lg font-semibold text-zinc-100 hover:underline">
           {review.repo} #{review.pr_number}
         </a>
+        <ReReviewButton repo={review.repo} pr={review.pr_number} className="ml-auto" />
       </div>
       <div className="mt-1 text-xs text-zinc-500 flex items-center gap-3 flex-wrap">
         {review.head_sha && <span>commit {review.head_sha.slice(0, 7)}</span>}
