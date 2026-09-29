@@ -6,10 +6,13 @@ import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
 
 const MODEL_OPTIONS = [
-  { value: "claude-opus-4-8", label: "Claude Opus 4.8 — most capable" },
+  { value: "claude-fable-5-1", label: "Claude Fable 5.1 — most capable" },
+  { value: "claude-opus-5-5", label: "Claude Opus 5.5 — recommended" },
+  { value: "claude-sonnet-5-5", label: "Claude Sonnet 5.5 — fast + smart" },
+  { value: "claude-opus-4-8", label: "Claude Opus 4.8" },
   { value: "claude-opus-4-7", label: "Claude Opus 4.7" },
   { value: "claude-opus-4-6", label: "Claude Opus 4.6" },
-  { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 — fast + smart" },
+  { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
   { value: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
   { value: "claude-haiku-4-5", label: "Claude Haiku 4.5 — fastest" },
 ];
@@ -21,8 +24,8 @@ export default function ModelProviderPageGuarded() {
 function ModelProviderPage() {
   const [config, setConfig] = useState<ModelProviderConfig | null>(null);
   const [apiKey, setApiKey] = useState("");
-  const [primaryModel, setPrimaryModel] = useState("claude-sonnet-4-6");
-  const [heavyModel, setHeavyModel] = useState("claude-opus-4-8");
+  const [primaryModel, setPrimaryModel] = useState("claude-sonnet-5-5");
+  const [heavyModel, setHeavyModel] = useState("claude-opus-5-5");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);

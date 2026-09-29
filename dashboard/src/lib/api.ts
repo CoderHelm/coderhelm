@@ -312,6 +312,11 @@ export const api = {
     request<Review>(`/api/reviewer/review?sk=${encodeURIComponent(sk)}`),
   rateReview: (sk: string, rating: "up" | "down" | "none", comment?: string) =>
     request<void>(`/api/reviewer/review/rate`, { method: "POST", body: JSON.stringify({ sk, rating, comment }) }),
+  reReview: (repo: string, pr: number) =>
+    request<{ status: "queued" | "skipped"; reason?: string }>(`/api/reviewer/re-review`, {
+      method: "POST",
+      body: JSON.stringify({ repo, pr }),
+    }),
 };
 
 export interface GraphRepo {
