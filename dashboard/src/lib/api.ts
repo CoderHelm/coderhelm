@@ -381,6 +381,16 @@ export interface ReviewerConfig {
   tag_batch_minutes: number;
   health_check: boolean;
   verify_tests: boolean;
+  /** New or changed behavior must come with new/updated tests (blocking finding). */
+  require_tests: boolean;
+  /** Reviewer picks CI labels (e.g. E2E areas, staging deploy) from what the PR changes. */
+  auto_labels: boolean;
+  /** Labels it may add: exact names or PREFIX*, comma-separated. */
+  auto_label_allow: string;
+  /** One rule per line: `pattern -> companion, companion`. */
+  auto_label_requires: string;
+  /** When to use which label (free text for the reviewer). */
+  auto_label_guide: string;
   /// Managed from the Code Graph page (its own feature); optional here so the
   /// reviewer form round-trips it without owning it.
   graph_enabled?: boolean;

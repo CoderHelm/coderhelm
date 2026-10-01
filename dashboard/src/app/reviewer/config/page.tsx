@@ -29,6 +29,11 @@ const DEFAULTS: ReviewerConfig = {
   tag_batch_minutes: 15,
   health_check: false,
   verify_tests: false,
+  require_tests: false,
+  auto_labels: false,
+  auto_label_allow: "",
+  auto_label_requires: "",
+  auto_label_guide: "",
   deploy_label: "",
   health_log_groups: [],
   reminders_enabled: false,
@@ -198,6 +203,12 @@ function ReviewerConfigPage() {
             <Toggle checked={cfg.enabled} onChange={(v) => set("enabled", v)} label="Enable reviewer for this repo" hint="Off = the reviewer ignores this repo entirely." />
             <Toggle checked={cfg.killed} onChange={(v) => set("killed", v)} label="Kill switch" hint="Hard-stops ALL reviewer action for this repo, overriding everything below." />
             <Toggle checked={cfg.verify_tests} onChange={(v) => set("verify_tests", v)} label="Verify in sandbox (run tests)" hint="Runs the affected tests/build in a sandbox and attaches pass/fail receipts to the review. A hard failure requests changes. Slower + uses build minutes." />
+            <Toggle
+              checked={cfg.require_tests}
+              onChange={(v) => set("require_tests", v)}
+              label="Require tests"
+              hint="New features need new tests; changed or fixed behavior needs its tests added or updated. Missing or stale tests are a blocking finding that requests changes. Refactors, docs, config and dependency bumps are exempt."
+            />
             <div className="mt-3">
               <label className="block text-xs text-zinc-500 mb-1">Trigger label</label>
               <input
@@ -216,6 +227,57 @@ function ReviewerConfigPage() {
                 className="w-full px-3 py-2 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 focus:border-zinc-500 outline-none font-mono"
                 placeholder="e.g. Pay special attention to auth changes and DB migrations. Enforce our error-handling conventions."
               />
+            </div>
+          </section>
+
+          {/* CI labels picked by the reviewer */}
+          <section className="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+            <h2 className="text-sm font-semibold text-zinc-200 mb-2">PR labels</h2>
+            <Toggle
+              checked={cfg.auto_labels}
+              onChange={(v) => set("auto_labels", v)}
+              label="Add CI labels from what the PR changes"
+              hint="On each review, adds the CI labels the PR needs (e.g. which e2e areas to run, a staging deploy) from the files it touches. Works from the repo itself: the labels your AGENTS.md / CLAUDE.md document, their GitHub descriptions, and any mapping files the docs point to — so documenting a new label is all it takes. Labels are only added, never removed, and the review says why each was added. The fields below are optional overrides."
+            />
+            <div className={`ml-12 space-y-3 ${cfg.auto_labels ? "" : "opacity-40 pointer-events-none"}`}>
+              <div>
+                <label className="block text-xs text-zinc-500 mb-1">Labels it may add (optional)</label>
+                <input
+                  value={cfg.auto_label_allow}
+                  onChange={(e) => set("auto_label_allow", e.target.value)}
+                  className="w-full max-w-md px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 focus:border-zinc-500 outline-none font-mono"
+                  placeholder="E2E:*, CI:E2E, CI:DEPLOY_STAGING"
+                />
+                <p className="text-xs text-zinc-600 mt-1">
+                  Empty = the repo&apos;s labels that its AGENTS.md / CLAUDE.md name (e.g. <code>CI:DEPLOY_STAGING</code>, or a family
+                  written <code>E2E:&lt;area&gt;</code>); production labels are never picked that way. Set this to pin an exact list
+                  (comma-separated names or <code>PREFIX*</code>) — then nothing outside it is ever added.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-500 mb-1">Required companions (optional)</label>
+                <textarea
+                  value={cfg.auto_label_requires}
+                  onChange={(e) => set("auto_label_requires", e.target.value)}
+                  rows={3}
+                  className="w-full max-w-md px-3 py-2 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 focus:border-zinc-500 outline-none font-mono"
+                  placeholder={"E2E:join -> CI:DEPLOY_STAGING"}
+                />
+                <p className="text-xs text-zinc-600 mt-1">
+                  Usually not needed — the reviewer follows what your docs say (e.g. &quot;payment tests need staging&quot;). Use this to
+                  guarantee it: one rule per line, <code>label -&gt; label, label</code> (<code>PREFIX*</code> works on the left).
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-500 mb-1">Guidance (optional)</label>
+                <textarea
+                  value={cfg.auto_label_guide}
+                  onChange={(e) => set("auto_label_guide", e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 focus:border-zinc-500 outline-none"
+                  placeholder="e.g. Areas and the code they cover are in e2e/test-map.json. Use CI:E2E when shared code (routing, components/ui) changes."
+                />
+              </div>
             </div>
           </section>
 
