@@ -317,7 +317,29 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ repo, pr }),
     }),
+  listReleases: (repo?: string) =>
+    request<{ releases: Release[] }>(`/api/releases${repo ? `?repo=${encodeURIComponent(repo)}` : ""}`),
+  sendRelease: (repo: string, tag: string, resend: "" | "email" | "all") =>
+    request<{ status: string }>(`/api/releases/send`, {
+      method: "POST",
+      body: JSON.stringify({ repo, tag, resend }),
+    }),
 };
+
+export interface Release {
+  repo: string;
+  tag: string;
+  prev_tag: string;
+  pr_count: number;
+  headline: string;
+  entry_md: string;
+  github_release_md: string;
+  unclear: string;
+  github_release_url: string;
+  confluence_url: string;
+  email_sent_at: string;
+  updated_at: string;
+}
 
 export interface GraphRepo {
   repo: string;
@@ -391,6 +413,19 @@ export interface ReviewerConfig {
   auto_label_requires: string;
   /** When to use which label (free text for the reviewer). */
   auto_label_guide: string;
+  /** Write + publish release notes when CoderHelm cuts a release tag. */
+  release_notes: boolean;
+  /** Only tags on this branch get notes; empty = the default branch. */
+  release_notes_branch: string;
+  release_notes_confluence_space: string;
+  /** Confluence page id the changelog lives under; empty = no Confluence step. */
+  release_notes_confluence_parent_id: string;
+  release_notes_confluence_container: string;
+  /** HTTPS webhook that emails the notes (e.g. Atlassian Automation); empty = no email. */
+  release_notes_email_webhook_url: string;
+  /** Repo path of the writing guide; empty = auto-detect. */
+  release_notes_guide: string;
+  release_notes_instructions: string;
   /// Managed from the Code Graph page (its own feature); optional here so the
   /// reviewer form round-trips it without owning it.
   graph_enabled?: boolean;
