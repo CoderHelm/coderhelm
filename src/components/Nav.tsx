@@ -22,6 +22,9 @@ export default function Nav() {
           <a href="#how-it-works" className="text-sm text-text-secondary hover:text-text-primary transition-colors">
             How it works
           </a>
+          <a href="#reviewer" className="text-sm text-text-secondary hover:text-text-primary transition-colors">
+            Reviewer
+          </a>
           <a href="#open-source" className="text-sm text-text-secondary hover:text-text-primary transition-colors">
             Open Source
           </a>
@@ -73,6 +76,9 @@ export default function Nav() {
             </a>
             <a href="#how-it-works" onClick={() => setOpen(false)} className="text-sm text-text-secondary">
               How it works
+            </a>
+            <a href="#reviewer" onClick={() => setOpen(false)} className="text-sm text-text-secondary">
+              Reviewer
             </a>
             <a href="#open-source" onClick={() => setOpen(false)} className="text-sm text-text-secondary">
               Open Source

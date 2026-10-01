@@ -1078,6 +1078,139 @@ export default function Home() {
       </section>
 
       {/* Log Analyzer */}
+      <section id="reviewer" className="border-t border-surface-border py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="grid gap-12 md:grid-cols-2 md:items-center">
+            <div>
+              <p className="text-sm font-semibold text-blue-400 tracking-wider uppercase">Review</p>
+              <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
+                A reviewer on every PR.<br className="hidden sm:block" />
+                <span className="text-blue-400">Not just the ones it wrote.</span>
+              </h2>
+              <p className="mt-4 text-text-secondary leading-relaxed">
+                Add a label to any pull request and Coderhelm reviews it like a senior engineer who knows your codebase.
+                It reads the code around the change, comments on the exact lines, and keeps reviewing as you push.
+              </p>
+              <ul className="mt-6 space-y-2 text-sm text-text-secondary">
+                {[
+                  "Reads callers, contracts and tests in your repo, not just the diff",
+                  "Comments on the exact lines, with suggested fixes you can apply in one click",
+                  "Scores risk by how much of the codebase a change reaches, and shows why",
+                  "Re-reviews every push and resolves its own comments once they are fixed",
+                  "Answers questions in the PR: @coderhelm why is this unsafe? or @coderhelm re-review",
+                ].map((t) => (
+                  <li key={t} className="flex items-start gap-2">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="mt-1 shrink-0 text-blue-400"><polyline points="20 6 9 17 4 12" /></svg>
+                    {t}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* PR review mockup */}
+            <div className="rounded-xl border border-[#21262d] bg-[#0d1117] overflow-hidden">
+              <div className="flex items-center gap-2.5 border-b border-[#21262d] px-5 py-3">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="2.5" /><circle cx="6" cy="18" r="2.5" /><circle cx="18" cy="18" r="2.5" /><path d="M6 8.5v7" /><path d="M18 15.5V9a3 3 0 00-3-3h-4" /></svg>
+                <span className="text-[11px] font-semibold text-text-secondary">feat: send start date at checkout</span>
+                <span className="ml-auto text-[9px] text-text-muted">#482</span>
+              </div>
+
+              <div className="p-4 space-y-3">
+                <div className="rounded-lg border border-[#21262d] bg-[#161b22] px-3.5 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold text-red-400">Changes requested</span>
+                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border bg-yellow-500/15 text-yellow-400 border-yellow-500/20">risk: medium</span>
+                    <span className="ml-auto text-[9px] text-text-muted">coderhelm</span>
+                  </div>
+                  <p className="mt-2 text-[11px] text-text-secondary leading-relaxed">
+                    The new start date reaches 3 callers. One still sends the old field, and the checkout test does not cover the new path.
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-[#21262d] bg-[#161b22] overflow-hidden">
+                  <div className="px-3.5 py-2 text-[10px] font-mono text-text-muted border-b border-[#21262d]">src/checkout/submit.ts · line 42</div>
+                  <div className="px-3.5 py-2.5">
+                    <p className="text-[11px] text-text-secondary"><span className="text-orange-400 font-semibold">high</span> · startDate is sent as a string; the API expects an ISO date.</p>
+                    <pre className="mt-2 rounded bg-[#0d1117] border border-[#21262d] px-2.5 py-1.5 text-[10px] text-green-400 font-mono overflow-hidden">+ startDate: toIsoDate(form.startDate),</pre>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-[#21262d] bg-[#161b22] px-3 py-2">
+                    <div className="text-[9px] text-text-muted">Earlier comments</div>
+                    <div className="text-[11px] text-text-secondary mt-0.5"><span className="text-green-400 font-semibold">2 fixed</span> · resolved</div>
+                  </div>
+                  <div className="rounded-lg border border-[#21262d] bg-[#161b22] px-3 py-2">
+                    <div className="text-[9px] text-text-muted">Labels added</div>
+                    <div className="text-[11px] font-mono text-blue-400 mt-0.5">E2E:checkout · CI:DEPLOY_STAGING</div>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-[#21262d] text-center">
+                  <span className="text-[10px] text-text-muted">Re-reviews on every push · reply @coderhelm to ask</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Feature grid */}
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="18" r="3" /><circle cx="6" cy="6" r="3" /><path d="M6 21V9a9 9 0 009 9" /></svg>
+                ),
+                title: "Merges only when it is safe",
+                desc: "Optional auto merge, only for the exact commit it reviewed, after a person approves too and every CI check is green.",
+              },
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0L2 12V2h10l8.6 8.6a2 2 0 010 2.8z" /><line x1="7" y1="7" x2="7.01" y2="7" /></svg>
+                ),
+                title: "Runs the right CI",
+                desc: "Adds the labels your CI listens for, such as which e2e tests to run or a staging deploy, based on what the PR actually changes. It uses the labels your repo documents, so new ones work with no setup.",
+              },
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></svg>
+                ),
+                title: "Holds the line on tests",
+                desc: "Optionally sends back any PR that adds or changes behavior without new or updated tests, and says what to test and where.",
+              },
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="6" r="2" /><circle cx="19" cy="6" r="2" /><circle cx="12" cy="18" r="2" /><path d="M7 6h10" /><path d="M6 8l5 8" /><path d="M18 8l-5 8" /></svg>
+                ),
+                title: "Code graph",
+                desc: "Maps your repo into definitions and callers, so reviews (and the code Coderhelm writes) know exactly what a change touches.",
+              },
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
+                ),
+                title: "Releases and health",
+                desc: "Optionally tags releases after merges, batched on your schedule, and watches each deploy for new failures.",
+              },
+              {
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.3a2 2 0 002-1.7l1.4-9A2 2 0 0018.7 9H14z" /><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3" /></svg>
+                ),
+                title: "Learns from your team",
+                desc: "Rate any review with a note. Future reviews on that repo follow your feedback, on top of your AGENTS.md and review rules.",
+              },
+            ].map((f) => (
+              <div key={f.title} className="rounded-lg bg-white/[0.03] p-5 transition-colors hover:bg-white/[0.05]">
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-400/10 text-blue-400 mb-3">
+                  {f.icon}
+                </div>
+                <h3 className="text-sm font-semibold text-text-primary">{f.title}</h3>
+                <p className="mt-1.5 text-[13px] text-text-secondary leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-6xl px-6">
           <div className="grid gap-12 md:grid-cols-2 md:items-center">
@@ -1482,6 +1615,7 @@ export default function Home() {
               <ul className="mt-6 space-y-3 text-sm text-text-secondary">
                 <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> Public &amp; private repos</li>
                 <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> All passes (ticket, PR review, CI fix)</li>
+                <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> PR reviewer with auto merge, CI labels &amp; code graph</li>
                 <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> AI plans &amp; streaming chat</li>
                 <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> CI self-healing &amp; log analysis</li>
                 <li className="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-green-400"><polyline points="20 6 9 17 4 12" /></svg> MCP server integrations</li>
