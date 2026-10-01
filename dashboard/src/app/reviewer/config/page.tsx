@@ -237,11 +237,11 @@ function ReviewerConfigPage() {
               checked={cfg.auto_labels}
               onChange={(v) => set("auto_labels", v)}
               label="Add CI labels from what the PR changes"
-              hint="On each review, picks labels (e.g. which e2e areas to run, staging deploy) from the files the PR touches, the repo's AGENTS.md / docs, and the guidance below. It chooses from the repo's current GitHub labels and their descriptions, so new or removed labels are picked up automatically. Labels are only added, never removed, and the review lists why each was added."
+              hint="On each review, adds the CI labels the PR needs (e.g. which e2e areas to run, a staging deploy) from the files it touches. Works from the repo itself: the labels your AGENTS.md / CLAUDE.md document, their GitHub descriptions, and any mapping files the docs point to — so documenting a new label is all it takes. Labels are only added, never removed, and the review says why each was added. The fields below are optional overrides."
             />
             <div className={`ml-12 space-y-3 ${cfg.auto_labels ? "" : "opacity-40 pointer-events-none"}`}>
               <div>
-                <label className="block text-xs text-zinc-500 mb-1">Labels it may add</label>
+                <label className="block text-xs text-zinc-500 mb-1">Labels it may add (optional)</label>
                 <input
                   value={cfg.auto_label_allow}
                   onChange={(e) => set("auto_label_allow", e.target.value)}
@@ -249,7 +249,9 @@ function ReviewerConfigPage() {
                   placeholder="E2E:*, CI:E2E, CI:DEPLOY_STAGING"
                 />
                 <p className="text-xs text-zinc-600 mt-1">
-                  Comma-separated exact names, or <code>PREFIX*</code> for a family. Nothing outside this list is ever added.
+                  Empty = the repo&apos;s labels that its AGENTS.md / CLAUDE.md name (e.g. <code>CI:DEPLOY_STAGING</code>, or a family
+                  written <code>E2E:&lt;area&gt;</code>); production labels are never picked that way. Set this to pin an exact list
+                  (comma-separated names or <code>PREFIX*</code>) — then nothing outside it is ever added.
                 </p>
               </div>
               <div>
@@ -262,8 +264,8 @@ function ReviewerConfigPage() {
                   placeholder={"E2E:join -> CI:DEPLOY_STAGING"}
                 />
                 <p className="text-xs text-zinc-600 mt-1">
-                  One rule per line: <code>label -&gt; label, label</code> (<code>PREFIX*</code> works on the left). Whenever the left label
-                  ends up on the PR, the right ones are added too — e.g. tests that only run on staging.
+                  Usually not needed — the reviewer follows what your docs say (e.g. &quot;payment tests need staging&quot;). Use this to
+                  guarantee it: one rule per line, <code>label -&gt; label, label</code> (<code>PREFIX*</code> works on the left).
                 </p>
               </div>
               <div>
