@@ -215,7 +215,7 @@ function ReviewerConfigPage() {
               checked={cfg.require_tests}
               onChange={(v) => set("require_tests", v)}
               label="Require tests"
-              hint="New features need new tests; changed or fixed behavior needs its tests added or updated. Missing or stale tests are a blocking finding that requests changes. Refactors, docs, config and dependency bumps are exempt."
+              hint="New features need new tests; changed or fixed behavior needs its tests added or updated. CoderHelm writes those tests itself when it plans and codes a change (following your AGENTS.md / CLAUDE.md test conventions), and the reviewer blocks any PR — CoderHelm's or a person's — whose tests are missing or stale. Refactors, docs, config and dependency bumps are exempt."
             />
             <div className="mt-3">
               <label className="block text-xs text-zinc-500 mb-1">Trigger label</label>
