@@ -34,6 +34,14 @@ const DEFAULTS: ReviewerConfig = {
   auto_label_allow: "",
   auto_label_requires: "",
   auto_label_guide: "",
+  release_notes: false,
+  release_notes_branch: "",
+  release_notes_confluence_space: "",
+  release_notes_confluence_parent_id: "",
+  release_notes_confluence_container: "Changelog",
+  release_notes_email_webhook_url: "",
+  release_notes_guide: "",
+  release_notes_instructions: "",
   deploy_label: "",
   health_log_groups: [],
   reminders_enabled: false,
@@ -277,6 +285,69 @@ function ReviewerConfigPage() {
                   className="w-full px-3 py-2 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 focus:border-zinc-500 outline-none"
                   placeholder="e.g. Areas and the code they cover are in e2e/test-map.json. Use CI:E2E when shared code (routing, components/ui) changes."
                 />
+              </div>
+            </div>
+          </section>
+
+          {/* Release notes */}
+          <section className="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+            <h2 className="text-sm font-semibold text-zinc-200 mb-2">Release notes</h2>
+            <Toggle
+              checked={cfg.release_notes}
+              onChange={(v) => set("release_notes", v)}
+              label="Write release notes for each release tag"
+              hint="When CoderHelm cuts a release tag (Tag after merge, below), it writes two versions from the merged PRs and Jira tickets since the last tag: technical GitHub Release notes, and a short business summary for IT and stakeholders. It follows your repo's release-notes guide when it has one. The tag is the approval — it only tags after an approved, green merge. Changes it can't explain from the PR or ticket are listed as written, never guessed."
+            />
+            <div className={`ml-12 space-y-3 ${cfg.release_notes ? "" : "opacity-40 pointer-events-none"}`}>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs text-zinc-500 mb-1">Release branch</label>
+                  <input value={cfg.release_notes_branch} onChange={(e) => set("release_notes_branch", e.target.value)}
+                    className="w-full px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 focus:border-zinc-500 outline-none font-mono" placeholder="main (empty = default branch)" />
+                  <p className="text-xs text-zinc-600 mt-1">Only tags cut on merges into this branch get notes (e.g. <code>main</code> when features merge into <code>develop</code>).</p>
+                </div>
+                <div>
+                  <label className="block text-xs text-zinc-500 mb-1">Writing guide (optional)</label>
+                  <input value={cfg.release_notes_guide} onChange={(e) => set("release_notes_guide", e.target.value)}
+                    className="w-full px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 focus:border-zinc-500 outline-none font-mono" placeholder="auto: .claude/skills/changelog-deploy/SKILL.md, RELEASE_NOTES.md…" />
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="block text-xs text-zinc-500 mb-1">Confluence parent page id</label>
+                  <input value={cfg.release_notes_confluence_parent_id} onChange={(e) => set("release_notes_confluence_parent_id", e.target.value.replace(/\D/g, ""))}
+                    className="w-full px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 focus:border-zinc-500 outline-none font-mono" placeholder="197197866" />
+                </div>
+                <div>
+                  <label className="block text-xs text-zinc-500 mb-1">Changelog page title</label>
+                  <input value={cfg.release_notes_confluence_container} onChange={(e) => set("release_notes_confluence_container", e.target.value)}
+                    className="w-full px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 focus:border-zinc-500 outline-none" placeholder="Changelog" />
+                </div>
+                <div>
+                  <label className="block text-xs text-zinc-500 mb-1">Space key (for reference)</label>
+                  <input value={cfg.release_notes_confluence_space} onChange={(e) => set("release_notes_confluence_space", e.target.value)}
+                    className="w-full px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 focus:border-zinc-500 outline-none font-mono" placeholder="TECH" />
+                </div>
+              </div>
+              <p className="text-xs text-zinc-600 -mt-1">
+                Entries go to parent → {cfg.release_notes_confluence_container || "Changelog"} → one page per year, newest at the top, through the CoderHelm app
+                in Jira (needs the app updated with Confluence access). Leave the parent empty to skip Confluence.
+              </p>
+              <div>
+                <label className="block text-xs text-zinc-500 mb-1">Email webhook (optional)</label>
+                <input value={cfg.release_notes_email_webhook_url} onChange={(e) => set("release_notes_email_webhook_url", e.target.value)}
+                  className="w-full max-w-xl px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 focus:border-zinc-500 outline-none font-mono" placeholder="https://api-private.atlassian.com/automation/webhooks/…" />
+                <p className="text-xs text-zinc-600 mt-1">
+                  After the Confluence entry, CoderHelm POSTs <code>subject</code>, <code>summary_html</code>, <code>summary_markdown</code>,
+                  <code> confluence_url</code>, <code>release_url</code>, <code>repo</code>, <code>tag</code> and <code>date</code> here — e.g. an
+                  Atlassian Automation rule that emails your IT list. Failures alert the Teams webhook below.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-500 mb-1">Instructions (optional)</label>
+                <textarea value={cfg.release_notes_instructions} onChange={(e) => set("release_notes_instructions", e.target.value)} rows={2}
+                  className="w-full px-3 py-2 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 focus:border-zinc-500 outline-none"
+                  placeholder="e.g. Audience is the IT help desk. Call the product 'the Chelsea Piers app'." />
               </div>
             </div>
           </section>
