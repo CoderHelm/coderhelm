@@ -296,7 +296,7 @@ function ReviewerConfigPage() {
               checked={cfg.release_notes}
               onChange={(v) => set("release_notes", v)}
               label="Write release notes for each release tag"
-              hint="When CoderHelm cuts a release tag (Tag after merge, below), it writes two versions from the merged PRs and Jira tickets since the last tag: technical GitHub Release notes, and a short business summary for IT and stakeholders. It follows your repo's release-notes guide when it has one. The tag is the approval — it only tags after an approved, green merge. Changes it can't explain from the PR or ticket are listed as written, never guessed."
+              hint="When a release tag is created on the release branch — by CoderHelm (Tag after merge, below), a person or CI — it writes two versions from the merged PRs and Jira tickets since the last tag: technical GitHub Release notes, and a short business summary for IT and stakeholders. It follows your repo's release-notes guide when it has one. The tag is the approval — it only tags after an approved, green merge. Changes it can't explain from the PR or ticket are listed as written, never guessed."
             />
             <div className={`ml-12 space-y-3 ${cfg.release_notes ? "" : "opacity-40 pointer-events-none"}`}>
               <div className="grid gap-3 sm:grid-cols-2">
