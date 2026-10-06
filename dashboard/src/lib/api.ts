@@ -423,6 +423,12 @@ export interface ReviewerConfig {
   release_notes_confluence_container: string;
   /** HTTPS webhook that emails the notes (e.g. Atlassian Automation); empty = no email. */
   release_notes_email_webhook_url: string;
+  /** Write-only: sent as X-Automation-Webhook-Token. Empty on save = keep the stored one. */
+  release_notes_email_webhook_secret?: string;
+  /** Read-only: whether a secret is stored. */
+  release_notes_email_webhook_secret_set?: boolean;
+  /** Set true on save to remove the stored secret. */
+  release_notes_email_webhook_secret_clear?: boolean;
   /** Repo path of the writing guide; empty = auto-detect. */
   release_notes_guide: string;
   release_notes_instructions: string;

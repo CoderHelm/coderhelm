@@ -334,13 +334,34 @@ function ReviewerConfigPage() {
                 in Jira (needs the app updated with Confluence access). Leave the parent empty to skip Confluence.
               </p>
               <div>
-                <label className="block text-xs text-zinc-500 mb-1">Email webhook (optional)</label>
+                <label className="block text-xs text-zinc-500 mb-1">Automation webhook (optional)</label>
                 <input value={cfg.release_notes_email_webhook_url} onChange={(e) => set("release_notes_email_webhook_url", e.target.value)}
                   className="w-full max-w-xl px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 focus:border-zinc-500 outline-none font-mono" placeholder="https://api-private.atlassian.com/automation/webhooks/…" />
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    value={cfg.release_notes_email_webhook_secret ?? ""}
+                    onChange={(e) => set("release_notes_email_webhook_secret", e.target.value)}
+                    className="w-full max-w-xs px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 focus:border-zinc-500 outline-none font-mono"
+                    placeholder={cfg.release_notes_email_webhook_secret_set ? "Secret saved — type to replace" : "Webhook secret (optional)"}
+                  />
+                  {cfg.release_notes_email_webhook_secret_set && (
+                    <label className="flex items-center gap-1 text-xs text-zinc-500">
+                      <input
+                        type="checkbox"
+                        checked={!!cfg.release_notes_email_webhook_secret_clear}
+                        onChange={(e) => set("release_notes_email_webhook_secret_clear", e.target.checked)}
+                      />
+                      Remove saved secret
+                    </label>
+                  )}
+                </div>
                 <p className="text-xs text-zinc-600 mt-1">
+                  The secret is sent as the <code>X-Automation-Webhook-Token</code> header (Atlassian Automation) and is never shown again.
                   After the Confluence entry, CoderHelm POSTs <code>subject</code>, <code>summary_html</code>, <code>summary_markdown</code>,
                   <code> confluence_url</code>, <code>release_url</code>, <code>repo</code>, <code>tag</code> and <code>date</code> here — e.g. an
-                  Atlassian Automation rule that emails your IT list. Failures alert the Teams webhook below.
+                  Atlassian Automation rule that posts the entry to Confluence or emails your IT list. Failures alert the Teams webhook below.
                 </p>
               </div>
               <div>
