@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { api, API_BASE_URL, type AlertRoute, type AwsConnection, type Repo } from "@/lib/api";
+import {
+  api,
+  API_BASE_URL,
+  type AlertNotifySettings,
+  type AlertRoute,
+  type AwsConnection,
+  type Repo,
+} from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
 import { RepoCombobox } from "@/components/repo-combobox";
@@ -16,7 +23,36 @@ export default function AlertsPageGuarded() {
   );
 }
 
-const EMPTY: AlertRoute = { topic_arn: "", repo: "", instructions: "", match_terms: [], enabled: true };
+const EMPTY: AlertRoute = {
+  topic_arn: "",
+  repo: "",
+  instructions: "",
+  match_terms: [],
+  enabled: true,
+  notify_mode: "team",
+  teams_webhook_url: "",
+};
+
+/** Teams webhook hosts the API accepts (Workflows and legacy incoming webhooks). */
+function validTeamsUrl(url: string): boolean {
+  try {
+    const u = new URL(url.trim());
+    const host = u.hostname.toLowerCase();
+    return (
+      u.protocol === "https:" &&
+      !u.username &&
+      [".powerplatform.com", ".logic.azure.com", ".webhook.office.com"].some((s) => host.endsWith(s))
+    );
+  } catch {
+    return false;
+  }
+}
+
+const NOTIFY_LABEL: Record<string, string> = {
+  team: "Team channel",
+  custom: "Own channel",
+  off: "No notifications",
+};
 
 /** `arn:aws:sns:<region>:<account>:<name>` → account, when well-formed. */
 function topicAccount(arn: string): string | null {
@@ -109,6 +145,8 @@ function AlertsPage() {
         </button>
       </div>
 
+      <TeamsChannel />
+
       <SetupSteps endpoint={endpoint} />
 
       {loading ? (
@@ -148,6 +186,9 @@ function AlertsPage() {
                         ))}
                       </div>
                     )}
+                    <p className="text-[11px] text-zinc-500 mt-2">
+                      Teams: {NOTIFY_LABEL[r.notify_mode ?? "team"] ?? "Team channel"}
+                    </p>
                     {!connected && (
                       <p className="text-xs text-yellow-400 mt-2">
                         The topic&apos;s AWS account ({account ?? "unknown"}) is not connected — alerts are ignored until
@@ -203,6 +244,116 @@ function AlertsPage() {
   );
 }
 
+function WebhookField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { toast } = useToast();
+  const [testing, setTesting] = useState(false);
+  const test = async () => {
+    setTesting(true);
+    try {
+      const r = await api.testAlertNotify(value.trim());
+      if (r.ok) toast("Test card sent. Check the channel.", "success");
+      else toast(r.error ? `Teams rejected it: ${r.error}` : "Teams rejected the card", "error");
+    } catch {
+      toast("That URL isn't a Teams webhook URL", "error");
+    } finally {
+      setTesting(false);
+    }
+  };
+  return (
+    <div className="flex gap-2">
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="https://….environment.api.powerplatform.com/…/workflows/…"
+        className="flex-1 min-w-0 px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-xs font-mono text-zinc-100"
+      />
+      <button
+        type="button"
+        onClick={test}
+        disabled={!validTeamsUrl(value) || testing}
+        className="px-3 py-2 text-xs bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:text-white disabled:opacity-40 cursor-pointer shrink-0"
+      >
+        {testing ? "Sending…" : "Send test"}
+      </button>
+    </div>
+  );
+}
+
+function TeamsChannel() {
+  const { toast } = useToast();
+  const [settings, setSettings] = useState<AlertNotifySettings>({ teams_webhook_url: "", enabled: false });
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api
+      .getAlertNotify()
+      .then(setSettings)
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+
+  const urlOk = validTeamsUrl(settings.teams_webhook_url);
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.saveAlertNotify({ ...settings, teams_webhook_url: settings.teams_webhook_url.trim() });
+      toast("Teams channel saved", "success");
+    } catch {
+      toast("Failed to save. Check the webhook URL.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="border border-zinc-800 rounded-lg p-4 mb-4 text-sm">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-zinc-200 font-medium">Teams channel for alerts</p>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            Every alert on your routes posts a card here: red when an alarm fires, green when it recovers, and a
+            follow-up with the PR link when CoderHelm opens one. A route can use its own channel instead.
+          </p>
+        </div>
+        <label className="flex items-center gap-2 text-xs text-zinc-300 shrink-0">
+          <input
+            type="checkbox"
+            checked={settings.enabled}
+            disabled={!loaded}
+            onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })}
+          />
+          On
+        </label>
+      </div>
+      <div className="mt-3">
+        <WebhookField
+          value={settings.teams_webhook_url}
+          onChange={(v) => setSettings({ ...settings, teams_webhook_url: v })}
+        />
+      </div>
+      <details className="mt-2 text-xs text-zinc-500">
+        <summary className="cursor-pointer hover:text-zinc-300">How to get a webhook URL</summary>
+        <ol className="list-decimal list-inside space-y-1 mt-2">
+          <li>In the Teams channel, open ⋯ → Workflows.</li>
+          <li>Pick “Send webhook alerts to a channel” (or “Post to a channel when a webhook request is received”).</li>
+          <li>Name it, choose the team and channel, then copy the URL it shows and paste it above.</li>
+          <li>Add a co-owner to the workflow so it keeps working if its creator leaves.</li>
+        </ol>
+      </details>
+      <div className="flex justify-end mt-3">
+        <button
+          onClick={save}
+          disabled={!loaded || saving || (settings.enabled && !urlOk) || (!!settings.teams_webhook_url && !urlOk)}
+          className="px-4 py-1.5 text-sm font-medium bg-white text-zinc-900 rounded-lg hover:bg-zinc-200 disabled:opacity-40 cursor-pointer"
+        >
+          {saving ? "Saving..." : "Save"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SetupSteps({ endpoint }: { endpoint: string }) {
   const { toast } = useToast();
   return (
@@ -227,7 +378,7 @@ function SetupSteps({ endpoint }: { endpoint: string }) {
         </li>
       </ol>
       <p className="text-xs text-zinc-500">
-        Works with CloudWatch alarm notifications (only the ALARM state acts), AWS Chatbot custom notifications,
+        Works with CloudWatch alarm notifications (only the ALARM state opens a PR; recoveries just notify), AWS Chatbot custom notifications,
         EventBridge events and plain messages. Repeats of the same alert collapse into one run, and each route starts at
         most 20 runs a day.
       </p>
@@ -261,7 +412,11 @@ function RouteEditor({
     account && !connectedAccounts.has(account)
       ? `Connect AWS account ${account} under Integrations → AWS first.`
       : "";
-  const canSave = !!account && !accountError && !!route.repo && !saving;
+  const customUrlError =
+    route.notify_mode === "custom" && !validTeamsUrl(route.teams_webhook_url ?? "")
+      ? "Paste a Teams Workflows webhook URL."
+      : "";
+  const canSave = !!account && !accountError && !customUrlError && !!route.repo && !saving;
 
   const save = async () => {
     setSaving(true);
@@ -275,6 +430,8 @@ function RouteEditor({
           .map((t) => t.trim())
           .filter(Boolean),
         enabled: route.enabled,
+        notify_mode: route.notify_mode ?? "team",
+        teams_webhook_url: route.notify_mode === "custom" ? (route.teams_webhook_url ?? "").trim() : "",
       });
       toast("Route saved", "success");
       onSaved();
@@ -336,15 +493,52 @@ function RouteEditor({
         </label>
 
         <label className="block">
-          <span className="text-xs text-zinc-400">Only alerts containing (optional, comma-separated)</span>
+          <span className="text-xs text-zinc-400">Only open PRs for alerts containing (optional, comma-separated)</span>
           <input
             value={terms}
             onChange={(e) => setTerms(e.target.value)}
             placeholder="e.g. fingerprint, 5xx"
             className="mt-1 w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-sm text-zinc-100"
           />
-          <span className="text-[11px] text-zinc-500">Empty = every alert on the topic.</span>
+          <span className="text-[11px] text-zinc-500">
+            Empty = every alert on the topic. Teams notifications cover every alert either way.
+          </span>
         </label>
+
+        <div>
+          <span className="text-xs text-zinc-400">Teams notifications</span>
+          <div className="mt-1 grid grid-cols-3 gap-1 p-1 bg-zinc-950 border border-zinc-700 rounded-lg">
+            {(["team", "custom", "off"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setRoute({ ...route, notify_mode: m })}
+                className={`px-2 py-1.5 text-xs rounded-md cursor-pointer transition-colors ${
+                  (route.notify_mode ?? "team") === m ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                {NOTIFY_LABEL[m]}
+              </button>
+            ))}
+          </div>
+          {route.notify_mode === "custom" ? (
+            <div className="mt-2">
+              <WebhookField
+                value={route.teams_webhook_url ?? ""}
+                onChange={(v) => setRoute({ ...route, teams_webhook_url: v })}
+              />
+              {customUrlError && route.teams_webhook_url && (
+                <span className="text-xs text-yellow-400">{customUrlError}</span>
+              )}
+            </div>
+          ) : (
+            <span className="text-[11px] text-zinc-500">
+              {(route.notify_mode ?? "team") === "team"
+                ? "Uses the team channel set at the top of this page."
+                : "This route's alerts won't post to Teams."}
+            </span>
+          )}
+        </div>
 
         <label className="flex items-center gap-2 text-sm text-zinc-300">
           <input

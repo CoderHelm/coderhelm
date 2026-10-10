@@ -237,6 +237,14 @@ export const api = {
     request<{ ok: boolean }>("/api/alert-routes", { method: "PUT", body: JSON.stringify(route) }),
   deleteAlertRoute: (topic_arn: string) =>
     request<void>(`/api/alert-routes?topic_arn=${encodeURIComponent(topic_arn)}`, { method: "DELETE" }),
+  getAlertNotify: () => request<AlertNotifySettings>("/api/alert-notify"),
+  saveAlertNotify: (s: AlertNotifySettings) =>
+    request<{ ok: boolean }>("/api/alert-notify", { method: "PUT", body: JSON.stringify(s) }),
+  testAlertNotify: (teams_webhook_url: string) =>
+    request<{ ok: boolean; error?: string }>("/api/alert-notify/test", {
+      method: "POST",
+      body: JSON.stringify({ teams_webhook_url }),
+    }),
   listAlerts: (after?: string) =>
     request<{ alerts: AlertEvent[]; next?: string | null }>(
       `/api/alerts${after ? `?after=${encodeURIComponent(after)}` : ""}`,
@@ -797,7 +805,15 @@ export interface AlertRoute {
   instructions: string;
   match_terms: string[];
   enabled: boolean;
+  /** Teams notifications: the team channel, the route's own channel, or none. */
+  notify_mode?: "team" | "custom" | "off";
+  teams_webhook_url?: string;
   updated_at?: string;
+}
+
+export interface AlertNotifySettings {
+  teams_webhook_url: string;
+  enabled: boolean;
 }
 
 /** One alert CoderHelm received, and what it did with it. */
