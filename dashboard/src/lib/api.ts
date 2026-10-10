@@ -251,8 +251,15 @@ export const api = {
     ),
   getAlert: (id: string) => request<AlertEventDetail>(`/api/alerts/event?id=${encodeURIComponent(id)}`),
   listAwsConnections: () => request<{ connections: AwsConnection[] }>("/api/aws-connections"),
-  createAwsConnection: (role_arn: string, region?: string, external_id?: string) =>
-    request<{ connection_id?: string; external_id?: string; status?: string; error?: string; message?: string }>("/api/aws-connections", { method: "POST", body: JSON.stringify({ role_arn, region, external_id }) }),
+  createAwsConnection: (role_arn: string, region?: string) =>
+    request<{ connection_id?: string; external_id?: string; status?: string; error?: string; message?: string }>("/api/aws-connections", { method: "POST", body: JSON.stringify({ role_arn, region }) }),
+  getRecNotify: () =>
+    request<{ notify_mode: "team" | "custom" | "off"; teams_webhook_url: string }>("/api/recommendations/notify"),
+  saveRecNotify: (notify_mode: "team" | "custom" | "off", teams_webhook_url: string) =>
+    request<{ ok: boolean }>("/api/recommendations/notify", {
+      method: "PUT",
+      body: JSON.stringify({ notify_mode, teams_webhook_url }),
+    }),
   updateAwsConnection: (id: string, body: Partial<{ role_arn: string; region: string; log_groups: string[] }>) =>
     request<{ status: string }>(`/api/aws-connections/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteAwsConnection: (id: string) =>
@@ -842,7 +849,10 @@ export interface AwsConnection {
   external_id: string;
   region: string;
   status: string;
+  /** The last failed analysis or test, if the latest one failed. */
   error_message?: string;
+  last_error_at?: string;
+  last_analyzed_at?: string;
   log_groups: string[];
   created_at?: string;
   updated_at?: string;
