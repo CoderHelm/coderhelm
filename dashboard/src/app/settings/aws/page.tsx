@@ -21,6 +21,7 @@ function AwsConnectionsPage() {
   const [addMode, setAddMode] = useState<"cfn" | "manual">("cfn");
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [recsLoading, setRecsLoading] = useState(true);
+  const [recsError, setRecsError] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -32,10 +33,11 @@ function AwsConnectionsPage() {
       .catch(() => toast("Failed to load connections", "error"))
       .finally(() => setLoading(false));
     setRecsLoading(true);
+    setRecsError(false);
     api
       .listRecommendations({ status: "pending" })
       .then((r) => setRecommendations(r.recommendations))
-      .catch(() => {})
+      .catch(() => setRecsError(true))
       .finally(() => setRecsLoading(false));
   }, [toast]);
 
@@ -139,8 +141,17 @@ function AwsConnectionsPage() {
             </div>
           </div>
 
+          <FindingsNotify />
+
           {recsLoading ? (
             <div className="text-sm text-zinc-500">Loading recommendations...</div>
+          ) : recsError ? (
+            <div className="border border-red-500/20 bg-red-500/5 rounded-lg p-4 text-sm text-red-400">
+              Couldn&apos;t load recommendations.{" "}
+              <button onClick={refresh} className="underline cursor-pointer">
+                Retry
+              </button>
+            </div>
           ) : recommendations.length === 0 ? (
             <div className="border border-zinc-800 rounded-lg p-6 text-center">
               <p className="text-sm text-zinc-500">No pending recommendations.</p>
@@ -191,6 +202,126 @@ function AwsConnectionsPage() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Teams webhook hosts the API accepts (Workflows and legacy incoming webhooks). */
+function validTeamsUrl(url: string): boolean {
+  try {
+    const u = new URL(url.trim());
+    const host = u.hostname.toLowerCase();
+    return (
+      u.protocol === "https:" &&
+      !u.username &&
+      [".powerplatform.com", ".logic.azure.com", ".webhook.office.com"].some((s) => host.endsWith(s))
+    );
+  } catch {
+    return false;
+  }
+}
+
+const NOTIFY_OPTIONS = [
+  { value: "off", label: "Off" },
+  { value: "team", label: "Team channel" },
+  { value: "custom", label: "Own channel" },
+] as const;
+
+function FindingsNotify() {
+  const { toast } = useToast();
+  const [mode, setMode] = useState<"team" | "custom" | "off">("off");
+  const [url, setUrl] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    api
+      .getRecNotify()
+      .then((r) => {
+        setMode(r.notify_mode);
+        setUrl(r.teams_webhook_url);
+      })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+
+  const urlOk = validTeamsUrl(url);
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.saveRecNotify(mode, mode === "custom" ? url.trim() : "");
+      toast("Notification setting saved", "success");
+    } catch {
+      toast("Failed to save. Check the webhook URL.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+  const test = async () => {
+    setTesting(true);
+    try {
+      const r = await api.testAlertNotify(url.trim());
+      toast(r.ok ? "Test card sent. Check the channel." : `Teams rejected it: ${r.error ?? "unknown error"}`, r.ok ? "success" : "error");
+    } catch {
+      toast("That URL isn't a Teams webhook URL", "error");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <div className="border border-zinc-800 rounded-lg p-4 mb-4 text-sm">
+      <p className="text-zinc-200 font-medium">Teams notifications for new findings</p>
+      <p className="text-xs text-zinc-500 mt-0.5">
+        After each analysis (every 6 hours), new findings post as one card. The team channel is the one set in{" "}
+        <a href="/settings/alerts" className="underline hover:text-zinc-300">
+          Alert routes
+        </a>
+        .
+      </p>
+      <div className="mt-3 grid grid-cols-3 gap-1 p-1 bg-zinc-950 border border-zinc-700 rounded-lg max-w-sm">
+        {NOTIFY_OPTIONS.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            disabled={!loaded}
+            onClick={() => setMode(o.value)}
+            className={`px-2 py-1.5 text-xs rounded-md cursor-pointer transition-colors ${
+              mode === o.value ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      {mode === "custom" && (
+        <div className="flex gap-2 mt-3">
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://….environment.api.powerplatform.com/…/workflows/…"
+            className="flex-1 min-w-0 px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-xs font-mono text-zinc-100"
+          />
+          <button
+            type="button"
+            onClick={test}
+            disabled={!urlOk || testing}
+            className="px-3 py-2 text-xs bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:text-white disabled:opacity-40 cursor-pointer shrink-0"
+          >
+            {testing ? "Sending…" : "Send test"}
+          </button>
+        </div>
+      )}
+      <div className="flex justify-end mt-3">
+        <button
+          onClick={save}
+          disabled={!loaded || saving || (mode === "custom" && !urlOk)}
+          className="px-4 py-1.5 text-sm font-medium bg-white text-zinc-900 rounded-lg hover:bg-zinc-200 disabled:opacity-40 cursor-pointer"
+        >
+          {saving ? "Saving..." : "Save"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -312,12 +443,19 @@ function ConnectionCard({ connection: conn, onRefresh }: { connection: AwsConnec
         </div>
 
         {/* Error message */}
-        {conn.status === "error" && conn.error_message && (
+        {conn.error_message && (
           <div className="mb-4 px-3 py-2 rounded-lg bg-red-500/5 border border-red-500/20 flex items-start gap-2">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
               <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
-            <p className="text-xs text-red-400 break-all">{conn.error_message}</p>
+            <p className="text-xs text-red-400 break-all">
+              {conn.status === "error" ? "" : "Last analysis failed"}
+              {conn.last_error_at && conn.status !== "error"
+                ? ` (${new Date(conn.last_error_at).toLocaleString()})`
+                : ""}
+              {conn.status === "error" ? "" : ": "}
+              {conn.error_message}
+            </p>
           </div>
         )}
 
@@ -326,6 +464,12 @@ function ConnectionCard({ connection: conn, onRefresh }: { connection: AwsConnec
           <p>Role: <code className="text-zinc-400 break-all">{conn.role_arn}</code></p>
           <p>Region: <span className="text-zinc-400">{conn.region}</span></p>
           <p>Log groups: <span className="text-zinc-400">{conn.log_groups.length > 0 ? conn.log_groups.length : "auto-discover"}</span></p>
+          <p>
+            Last analyzed:{" "}
+            <span className="text-zinc-400">
+              {conn.last_analyzed_at ? new Date(conn.last_analyzed_at).toLocaleString() : "not yet"}
+            </span>
+          </p>
           {conn.updated_at && (
             <p>Updated: <span className="text-zinc-400">{new Date(conn.updated_at).toLocaleString()}</span></p>
           )}
@@ -675,6 +819,13 @@ function AddConnectionModal({
   const [loadingCfn, setLoadingCfn] = useState(false);
   const { toast } = useToast();
 
+  // The External ID is stored per team, so the manual setup can show it up front.
+  useEffect(() => {
+    if (mode === "manual" && !cfnData) {
+      api.getCfnUrl().then(setCfnData).catch(() => {});
+    }
+  }, [mode, cfnData]);
+
   const handleLaunchStack = async () => {
     setLoadingCfn(true);
     try {
@@ -689,13 +840,17 @@ function AddConnectionModal({
   };
 
   const handleManualConnect = async () => {
-    if (!roleArn.match(/^arn:aws:iam::\d{12}:role\/.+$/)) {
-      toast("Invalid Role ARN format", "error");
+    if (!roleArn.trim().match(/^arn:aws:iam::\d{12}:role\/CoderHelmLogReader$/)) {
+      toast("The role must be named CoderHelmLogReader: arn:aws:iam::<account>:role/CoderHelmLogReader", "error");
+      return;
+    }
+    if (!/^[a-z]{2}(-[a-z0-9]+)+-\d+$/.test(region.trim())) {
+      toast("Enter an AWS region such as us-east-1", "error");
       return;
     }
     setSaving(true);
     try {
-      const result = await api.createAwsConnection(roleArn, region, cfnData?.external_id);
+      const result = await api.createAwsConnection(roleArn.trim(), region.trim());
       if (result.error) {
         toast(result.message || "Failed to connect", "error");
       } else {
@@ -789,13 +944,27 @@ function AddConnectionModal({
           <div className="space-y-4">
             <div className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg">
               <h4 className="text-sm font-medium text-zinc-200 mb-2">Manual setup</h4>
-              <p className="text-xs text-zinc-400">
-                Create an IAM role in your account with a trust policy allowing account{" "}
-                <code className="text-zinc-300">REDACTED_AWS_ACCOUNT_ID</code> to assume it. The role needs{" "}
-                <code className="text-zinc-300">logs:StartQuery</code>,{" "}
-                <code className="text-zinc-300">logs:GetQueryResults</code>, and{" "}
-                <code className="text-zinc-300">logs:DescribeLogGroups</code> permissions.
-              </p>
+              <ol className="text-xs text-zinc-400 space-y-1.5 list-decimal list-inside">
+                <li>
+                  Create an IAM role named <code className="text-zinc-300">CoderHelmLogReader</code>.
+                </li>
+                <li>
+                  Trust account <code className="text-zinc-300">654654210434</code> to assume it, with the condition{" "}
+                  <code className="text-zinc-300">sts:ExternalId</code> equal to:
+                  <code className="block mt-1 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-zinc-200 break-all">
+                    {cfnData?.external_id ?? "loading…"}
+                  </code>
+                  <span className="text-zinc-500">
+                    The External ID stops anyone else using CoderHelm from assuming your role.
+                  </span>
+                </li>
+                <li>
+                  Allow <code className="text-zinc-300">logs:StartQuery</code>,{" "}
+                  <code className="text-zinc-300">logs:GetQueryResults</code>,{" "}
+                  <code className="text-zinc-300">logs:StopQuery</code> and{" "}
+                  <code className="text-zinc-300">logs:DescribeLogGroups</code>.
+                </li>
+              </ol>
             </div>
 
             <div>
@@ -804,7 +973,7 @@ function AddConnectionModal({
                 value={roleArn}
                 onChange={(e) => setRoleArn(e.target.value)}
                 className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100"
-                placeholder="arn:aws:iam::123456789012:role/YourRoleName"
+                placeholder="arn:aws:iam::123456789012:role/CoderHelmLogReader"
               />
             </div>
 
