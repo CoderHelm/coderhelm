@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { api, API_BASE_URL, type AlertRoute, type AwsConnection, type Repo } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
@@ -87,11 +88,14 @@ function AlertsPage() {
     <div className="max-w-2xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Alerts</h1>
+          <h1 className="text-2xl font-bold">Alert routes</h1>
           <p className="text-sm text-zinc-500 mt-1">
             Turn monitoring alerts into pull requests. CoderHelm reads the alerts on an SNS topic, makes the change your
             instructions describe in the mapped repo, and opens a PR for review. Nothing merges without a person&apos;s
-            approval.
+            approval.{" "}
+            <Link href="/alerts" className="text-zinc-400 hover:text-zinc-200 underline">
+              See received alerts
+            </Link>
           </p>
         </div>
         <button

@@ -236,6 +236,11 @@ export const api = {
     request<{ ok: boolean }>("/api/alert-routes", { method: "PUT", body: JSON.stringify(route) }),
   deleteAlertRoute: (topic_arn: string) =>
     request<void>(`/api/alert-routes?topic_arn=${encodeURIComponent(topic_arn)}`, { method: "DELETE" }),
+  listAlerts: (after?: string) =>
+    request<{ alerts: AlertEvent[]; next?: string | null }>(
+      `/api/alerts${after ? `?after=${encodeURIComponent(after)}` : ""}`,
+    ),
+  getAlert: (id: string) => request<AlertEventDetail>(`/api/alerts/event?id=${encodeURIComponent(id)}`),
   listAwsConnections: () => request<{ connections: AwsConnection[] }>("/api/aws-connections"),
   createAwsConnection: (role_arn: string, region?: string, external_id?: string) =>
     request<{ connection_id?: string; external_id?: string; status?: string; error?: string; message?: string }>("/api/aws-connections", { method: "POST", body: JSON.stringify({ role_arn, region, external_id }) }),
@@ -786,6 +791,23 @@ export interface AlertRoute {
   match_terms: string[];
   enabled: boolean;
   updated_at?: string;
+}
+
+/** One alert CoderHelm received, and what it did with it. */
+export interface AlertEvent {
+  id: string;
+  received_at?: string | null;
+  topic_arn?: string | null;
+  repo?: string | null;
+  kind?: string | null;
+  title?: string | null;
+  outcome: string;
+  ticket_id?: string | null;
+}
+
+export interface AlertEventDetail {
+  alert: AlertEvent & { body?: string | null };
+  runs: { run_id: string; status?: string | null; title?: string | null; pr_url?: string | null; created_at?: string | null }[];
 }
 
 /** Base URL of the CoderHelm API (shown to users who subscribe endpoints). */
