@@ -80,6 +80,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/settings/github", label: "GitHub", icon: <GitHubIcon />, adminOnly: true },
       { href: "/settings/aws", label: "AWS", icon: <AwsIcon />, adminOnly: true },
+      { href: "/settings/alerts", label: "Alerts", icon: <BellIcon />, adminOnly: true },
       { href: "/settings/jira", label: "Jira", icon: <AtlassianIcon />, adminOnly: true },
       { href: "/settings/plugins", label: "MCP Servers", icon: <PluginIcon />, adminOnly: true },
       { href: "/settings/models", label: "AI Models", icon: <CpuIcon />, adminOnly: true },

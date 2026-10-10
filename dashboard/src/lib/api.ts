@@ -230,6 +230,12 @@ export const api = {
   mfaDisable: () => request<{ status: string }>("/api/users/mfa", { method: "DELETE" }),
 
   // AWS Connections (Log Analyzer)
+  // Alert routes: SNS topic → repo, turning alerts into pull requests
+  listAlertRoutes: () => request<{ endpoint_path: string; routes: AlertRoute[] }>("/api/alert-routes"),
+  saveAlertRoute: (route: Omit<AlertRoute, "updated_at">) =>
+    request<{ ok: boolean }>("/api/alert-routes", { method: "PUT", body: JSON.stringify(route) }),
+  deleteAlertRoute: (topic_arn: string) =>
+    request<void>(`/api/alert-routes?topic_arn=${encodeURIComponent(topic_arn)}`, { method: "DELETE" }),
   listAwsConnections: () => request<{ connections: AwsConnection[] }>("/api/aws-connections"),
   createAwsConnection: (role_arn: string, region?: string, external_id?: string) =>
     request<{ connection_id?: string; external_id?: string; status?: string; error?: string; message?: string }>("/api/aws-connections", { method: "POST", body: JSON.stringify({ role_arn, region, external_id }) }),
@@ -772,6 +778,18 @@ export interface JiraProject {
   lead?: string | null;
   style?: string;
 }
+
+export interface AlertRoute {
+  topic_arn: string;
+  repo: string;
+  instructions: string;
+  match_terms: string[];
+  enabled: boolean;
+  updated_at?: string;
+}
+
+/** Base URL of the CoderHelm API (shown to users who subscribe endpoints). */
+export const API_BASE_URL = API_BASE;
 
 export interface AwsConnection {
   connection_id: string;
