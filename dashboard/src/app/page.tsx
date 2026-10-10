@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { api, type Run } from "@/lib/api";
 import { TableSkeleton } from "@/components/skeleton";
+import { usePagedList, LoadMoreButton } from "@/components/load-more";
 
 interface RunGroup {
   ticket_id: string;
@@ -47,17 +48,16 @@ function groupRunsByTicket(runs: Run[]): RunGroup[] {
 }
 
 export default function RunsPage() {
-  const [runs, setRuns] = useState<Run[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    api.listRuns()
-      .then((data) => setRuns(data.runs))
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-  }, []);
+  const {
+    items: runs,
+    next,
+    loading,
+    loadingMore,
+    error,
+    loadMore,
+  } = usePagedList<Run>((cursor) => api.listRuns(cursor).then((d) => ({ items: d.runs, next: d.next })), []);
 
   const groups = groupRunsByTicket(runs);
 
@@ -121,6 +121,7 @@ export default function RunsPage() {
           </table>
         </div>
       )}
+      <LoadMoreButton hasMore={!!next} loading={loadingMore} onClick={loadMore} />
     </div>
   );
 }

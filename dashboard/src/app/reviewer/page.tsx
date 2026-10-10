@@ -7,6 +7,7 @@ import { TableSkeleton } from "@/components/skeleton";
 import { RoleGuard } from "@/components/role-guard";
 import { RepoCombobox } from "@/components/repo-combobox";
 import { ReReviewButton } from "@/components/re-review-button";
+import { usePagedList, LoadMoreButton } from "@/components/load-more";
 
 export default function ReviewerPageGuarded() {
   return (
@@ -83,10 +84,8 @@ function groupByPr(reviews: Review[]): PrGroup[] {
 }
 
 function ReviewerPage() {
-  const [reviews, setReviews] = useState<Review[]>([]);
   const [repos, setRepos] = useState<Repo[]>([]);
   const [repoFilter, setRepoFilter] = useState("");
-  const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [reviewRepo, setReviewRepo] = useState("");
   const [reviewPr, setReviewPr] = useState("");
@@ -95,14 +94,16 @@ function ReviewerPage() {
     api.listRepos().then((d) => setRepos(d.repos)).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    setLoading(true);
-    api
-      .listReviews(repoFilter || undefined)
-      .then((d) => setReviews(d.reviews))
-      .catch(() => setReviews([]))
-      .finally(() => setLoading(false));
-  }, [repoFilter]);
+  const {
+    items: reviews,
+    next,
+    loading,
+    loadingMore,
+    loadMore,
+  } = usePagedList<Review>(
+    (cursor) => api.listReviews(repoFilter || undefined, cursor).then((d) => ({ items: d.reviews, next: d.next })),
+    [repoFilter],
+  );
 
   const toggle = (key: string) =>
     setExpanded((prev) => {
@@ -196,6 +197,7 @@ function ReviewerPage() {
           </table>
         </div>
       )}
+      <LoadMoreButton hasMore={!!next} loading={loadingMore} onClick={loadMore} />
     </div>
   );
 }

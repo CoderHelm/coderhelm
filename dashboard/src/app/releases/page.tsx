@@ -7,6 +7,7 @@ import { RepoCombobox } from "@/components/repo-combobox";
 import { Markdown } from "@/components/markdown";
 import { TableSkeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
+import { usePagedList, LoadMoreButton } from "@/components/load-more";
 
 export default function ReleasesGuarded() {
   return (
@@ -19,8 +20,6 @@ export default function ReleasesGuarded() {
 function ReleasesPage() {
   const [repos, setRepos] = useState<Repo[]>([]);
   const [repoFilter, setRepoFilter] = useState("");
-  const [releases, setReleases] = useState<Release[]>([]);
-  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
   const [newRepo, setNewRepo] = useState("");
   const [newTag, setNewTag] = useState("");
@@ -31,15 +30,17 @@ function ReleasesPage() {
     api.listRepos().then((d) => setRepos(d.repos)).catch(() => {});
   }, []);
 
-  const load = () => {
-    setLoading(true);
-    api
-      .listReleases(repoFilter || undefined)
-      .then((d) => setReleases(d.releases))
-      .catch(() => setReleases([]))
-      .finally(() => setLoading(false));
-  };
-  useEffect(load, [repoFilter]);
+  const {
+    items: releases,
+    next,
+    loading,
+    loadingMore,
+    loadMore,
+    reload,
+  } = usePagedList<Release>(
+    (cursor) => api.listReleases(repoFilter || undefined, cursor).then((d) => ({ items: d.releases, next: d.next })),
+    [repoFilter],
+  );
 
   const send = async (repo: string, tag: string, resend: "" | "email" | "all") => {
     const key = `${repo}@${tag}:${resend}`;
@@ -160,7 +161,7 @@ function ReleasesPage() {
                       <button onClick={() => send(r.repo, r.tag, "all")} disabled={!!busy} className="text-xs px-2.5 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 disabled:opacity-50">
                         Rewrite + re-publish
                       </button>
-                      <button onClick={load} className="text-xs px-2.5 py-1 text-zinc-500 hover:text-zinc-300">Refresh</button>
+                      <button onClick={reload} className="text-xs px-2.5 py-1 text-zinc-500 hover:text-zinc-300">Refresh</button>
                     </div>
                   </div>
                 )}
@@ -169,6 +170,7 @@ function ReleasesPage() {
           })}
         </div>
       )}
+      <LoadMoreButton hasMore={!!next} loading={loadingMore} onClick={loadMore} />
     </div>
   );
 }
