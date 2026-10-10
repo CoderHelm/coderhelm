@@ -68,7 +68,8 @@ export const api = {
   renameTeam: (name: string) => request<{ status: string; name: string }>("/api/teams/rename", { method: "PUT", body: JSON.stringify({ name }) }),
 
   // Runs
-  listRuns: () => request<{ runs: Run[] }>("/api/runs"),
+  listRuns: (cursor?: string) =>
+    request<{ runs: Run[]; next?: string | null }>(`/api/runs${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),
   listJiraEvents: () => request<{ events: JiraEvent[]; total: number }>("/api/integrations/jira/events?limit=20"),
   getRun: (id: string) => request<RunDetail>(`/api/runs/${id}`),
   getRunOpenspec: (id: string) => request<Openspec>(`/api/runs/${id}/openspec`),
@@ -314,10 +315,11 @@ export const api = {
     request<{ instructions: string }>(`/api/reviewer/org-config`),
   updateOrgReviewInstructions: (instructions: string) =>
     request<void>(`/api/reviewer/org-config`, { method: "PUT", body: JSON.stringify({ instructions }) }),
-  listReviews: (repo?: string, limit = 100) => {
+  listReviews: (repo?: string, cursor?: string, limit = 50) => {
     const params = new URLSearchParams({ limit: String(limit) });
     if (repo) params.set("repo", repo);
-    return request<{ reviews: Review[] }>(`/api/reviewer/reviews?${params}`);
+    if (cursor) params.set("cursor", cursor);
+    return request<{ reviews: Review[]; next?: string | null }>(`/api/reviewer/reviews?${params}`);
   },
   getReview: (sk: string) =>
     request<Review>(`/api/reviewer/review?sk=${encodeURIComponent(sk)}`),
@@ -328,8 +330,13 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ repo, pr }),
     }),
-  listReleases: (repo?: string) =>
-    request<{ releases: Release[] }>(`/api/releases${repo ? `?repo=${encodeURIComponent(repo)}` : ""}`),
+  listReleases: (repo?: string, cursor?: string) => {
+    const params = new URLSearchParams();
+    if (repo) params.set("repo", repo);
+    if (cursor) params.set("cursor", cursor);
+    const qs = params.toString();
+    return request<{ releases: Release[]; next?: string | null }>(`/api/releases${qs ? `?${qs}` : ""}`);
+  },
   sendRelease: (repo: string, tag: string, resend: "" | "email" | "all") =>
     request<{ status: string }>(`/api/releases/send`, {
       method: "POST",
