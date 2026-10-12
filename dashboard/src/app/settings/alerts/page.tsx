@@ -620,8 +620,12 @@ function RuleSummary({ rules }: { rules: AlertRule[] }) {
   return (
     <div className="mt-2 space-y-1 text-xs">
       {rules.map((rule, i) => (
-        <div key={rule.id ?? i} className="flex items-center gap-2 min-w-0">
-          <span className="text-zinc-300 truncate">
+        <div
+          key={rule.id ?? i}
+          className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"
+        >
+          <span className="text-emerald-400 shrink-0">Opens a PR:</span>
+          <span className="text-zinc-300 break-words">
             {rule.alarms.length > 0
               ? rule.alarms.length === 1
                 ? rule.alarms[0]
@@ -630,11 +634,11 @@ function RuleSummary({ rules }: { rules: AlertRule[] }) {
                 ? `contains “${rule.terms.join("”, “")}”`
                 : "every alert"}
           </span>
-          <span className="text-zinc-600 shrink-0">→ PR in</span>
-          <span className="font-mono text-zinc-300 truncate">{rule.repo}</span>
+          <span className="text-zinc-600 shrink-0">→</span>
+          <span className="font-mono text-zinc-300 break-all">{rule.repo}</span>
         </div>
       ))}
-      <div className="flex items-center gap-2 text-zinc-500">
+      <div className="flex items-baseline gap-2 text-zinc-500">
         <span>{rules.length ? "Everything else" : "Every alert"}</span>
         <span className="text-zinc-600">→</span>
         <span className="text-sky-400">Teams only</span>
