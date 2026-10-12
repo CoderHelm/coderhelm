@@ -32,6 +32,7 @@ const EMPTY: AlertRoute = {
   enabled: true,
   notify_mode: "team",
   teams_webhook_url: "",
+  post_recoveries: false,
 };
 
 /** Teams webhook hosts the API accepts (Workflows and legacy incoming webhooks). */
@@ -377,8 +378,9 @@ function TeamsChannel() {
           <p className="text-zinc-200 font-medium">Teams channel for alerts</p>
           <p className="text-xs text-zinc-500 mt-0.5">
             Every alert on your routes posts a card here: red when an alarm
-            fires, green when it recovers, and a follow-up with the PR link when
-            CoderHelm opens one. A route can use its own channel instead.
+            fires, a follow-up with the PR link when CoderHelm opens one, and
+            green recoveries for routes that turn them on. A route can use its
+            own channel instead.
           </p>
         </div>
         <label className="flex items-center gap-2 text-xs text-zinc-300 shrink-0">
@@ -542,6 +544,7 @@ function RouteEditor({
           route.notify_mode === "custom"
             ? (route.teams_webhook_url ?? "").trim()
             : "",
+        post_recoveries: !!route.post_recoveries,
       });
       toast("Route saved", "success");
       onSaved();
@@ -703,6 +706,27 @@ function RouteEditor({
             </span>
           )}
         </div>
+
+        {route.notify_mode !== "off" && (
+          <label className="flex items-start gap-2 text-sm text-zinc-300">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={!!route.post_recoveries}
+              onChange={(e) =>
+                setRoute({ ...route, post_recoveries: e.target.checked })
+              }
+            />
+            <span>
+              Post recoveries
+              <span className="block text-[11px] text-zinc-500">
+                Also post a green card when an alarm returns to OK. Off keeps
+                the channel to alarms only; recoveries still show on the
+                alert&apos;s page.
+              </span>
+            </span>
+          </label>
+        )}
 
         <label className="flex items-center gap-2 text-sm text-zinc-300">
           <input
