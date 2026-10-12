@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   api,
   API_BASE_URL,
+  type AlertBudget,
   type AlertNotifySettings,
   type AlertRoute,
   type AlertRule,
@@ -221,6 +222,8 @@ function AlertsPage() {
       </div>
 
       <TeamsChannel />
+
+      <AlertBudgetCard />
 
       <SetupSteps endpoint={endpoint} />
 
@@ -463,6 +466,92 @@ function TeamsChannel() {
   );
 }
 
+function AlertBudgetCard() {
+  const { toast } = useToast();
+  const [budget, setBudget] = useState<AlertBudget | null>(null);
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    api
+      .getAlertBudget()
+      .then((b) => {
+        setBudget(b);
+        setValue(String(b.daily_usd));
+      })
+      .catch(() => {});
+  }, []);
+  const n = Number(value);
+  const valid =
+    value.trim() !== "" && Number.isFinite(n) && n >= 0 && n <= 10000;
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.saveAlertBudget(n);
+      setBudget(budget ? { ...budget, daily_usd: n } : budget);
+      toast("Alert budget saved", "success");
+    } catch {
+      toast("Failed to save the budget", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+  const used = budget
+    ? Math.min(
+        100,
+        (budget.spent_24h_usd / Math.max(budget.daily_usd, 0.01)) * 100,
+      )
+    : 0;
+  return (
+    <div className="border border-zinc-800 rounded-lg p-4 mb-4 text-sm">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-zinc-200 font-medium">Daily alert budget</p>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            Alert runs stop for the day once they&apos;ve cost this much (runs
+            still in progress count as $5 each). Alerts keep posting to Teams.
+            Each rule also starts at most{" "}
+            {budget?.max_runs_per_rule_per_day ?? 5} runs a day. 0 turns alert
+            runs off.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-zinc-500">$</span>
+          <input
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            inputMode="decimal"
+            className="w-20 px-2 py-1.5 bg-zinc-950 border border-zinc-700 rounded-lg text-sm text-zinc-100"
+          />
+          <button
+            onClick={save}
+            disabled={
+              !valid || saving || (budget !== null && n === budget.daily_usd)
+            }
+            className="px-3 py-1.5 text-xs font-medium bg-white text-zinc-900 rounded-lg hover:bg-zinc-200 disabled:opacity-40 cursor-pointer"
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </div>
+      {budget && (
+        <div className="mt-3">
+          <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+            <div
+              className={`h-full ${used >= 100 ? "bg-red-400" : used >= 75 ? "bg-amber-400" : "bg-emerald-400"}`}
+              style={{ width: `${used}%` }}
+            />
+          </div>
+          <p className="text-[11px] text-zinc-500 mt-1">
+            ${budget.spent_24h_usd.toFixed(2)} spent in the last 24 hours
+            {budget.open_runs > 0 &&
+              ` · ${budget.open_runs} run${budget.open_runs > 1 ? "s" : ""} in progress`}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SetupSteps({ endpoint }: { endpoint: string }) {
   const { toast } = useToast();
   return (
@@ -665,6 +754,21 @@ function RuleEditor({
 }) {
   const [terms, setTerms] = useState(rule.terms.join(", "));
   const [names, setNames] = useState(rule.alarms.join(", "));
+  const [by, setBy] = useState<"alarms" | "text">(
+    rule.alarms.length === 0 && rule.terms.length > 0 ? "text" : "alarms",
+  );
+  // A rule matches one way: switching clears the other, so a hidden field
+  // never widens what the rule takes.
+  const switchTo = (mode: "alarms" | "text") => {
+    setBy(mode);
+    if (mode === "alarms") {
+      setTerms("");
+      onChange({ ...rule, terms: [] });
+    } else {
+      setNames("");
+      onChange({ ...rule, alarms: [] });
+    }
+  };
   const split = (v: string) =>
     v
       .split(",")
@@ -684,52 +788,89 @@ function RuleEditor({
         </button>
       </div>
       <div>
-        <span className="text-xs text-zinc-400">Alarms that open a PR</span>
-        <div className="mt-1">
-          {alarms ? (
-            <AlarmPicker
-              alarms={alarms}
-              selected={rule.alarms}
-              onChange={(a) => onChange({ ...rule, alarms: a })}
-            />
-          ) : (
-            <>
-              <input
-                value={names}
-                onChange={(e) => {
-                  setNames(e.target.value);
-                  onChange({ ...rule, alarms: split(e.target.value) });
-                }}
-                placeholder="Alarm names, comma-separated"
-                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-xs font-mono text-zinc-100"
-              />
-              {alarmsError && (
-                <span className="text-[11px] text-yellow-400">
-                  {alarmsError}
-                </span>
-              )}
-            </>
-          )}
+        <span className="text-xs text-zinc-400">Match by</span>
+        <div className="mt-1 grid grid-cols-2 gap-1 p-1 bg-zinc-950 border border-zinc-700 rounded-lg">
+          {(
+            [
+              ["alarms", "CloudWatch alarms"],
+              ["text", "Alert text"],
+            ] as const
+          ).map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => switchTo(mode)}
+              className={`px-2 py-1.5 text-xs rounded-md cursor-pointer transition-colors ${
+                by === mode
+                  ? "bg-zinc-700 text-white"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
-      <label className="block">
-        <span className="text-xs text-zinc-400">
-          Or alerts containing (optional, comma-separated)
-        </span>
-        <input
-          value={terms}
-          onChange={(e) => {
-            setTerms(e.target.value);
-            onChange({ ...rule, terms: split(e.target.value) });
-          }}
-          placeholder="e.g. crawler TLS fingerprint"
-          className="mt-1 w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-xs text-zinc-100"
-        />
-        <span className="text-[11px] text-zinc-500">
-          For non-CloudWatch alerts. Pick no alarms and no text to take every
-          alert.
-        </span>
-      </label>
+      {by === "alarms" ? (
+        <div>
+          <span className="text-xs text-zinc-400">Alarms that open a PR</span>
+          <div className="mt-1">
+            {alarms ? (
+              <AlarmPicker
+                alarms={alarms}
+                selected={rule.alarms}
+                onChange={(a) => onChange({ ...rule, alarms: a })}
+              />
+            ) : (
+              <>
+                <input
+                  value={names}
+                  onChange={(e) => {
+                    setNames(e.target.value);
+                    onChange({ ...rule, alarms: split(e.target.value) });
+                  }}
+                  placeholder="Alarm names, comma-separated"
+                  className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-xs font-mono text-zinc-100"
+                />
+                {alarmsError && (
+                  <span className="text-[11px] text-yellow-400">
+                    {alarmsError}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+          {rule.alarms.length === 0 && (
+            <span className="text-[11px] text-yellow-400">
+              Pick at least one alarm.
+            </span>
+          )}
+        </div>
+      ) : (
+        <label className="block">
+          <span className="text-xs text-zinc-400">
+            Alerts containing (comma-separated)
+          </span>
+          <input
+            value={terms}
+            onChange={(e) => {
+              setTerms(e.target.value);
+              onChange({ ...rule, terms: split(e.target.value) });
+            }}
+            placeholder="e.g. crawler TLS fingerprint"
+            className="mt-1 w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-xs text-zinc-100"
+          />
+          <span className="text-[11px] text-zinc-500">
+            For alerts that aren&apos;t CloudWatch alarms, like the crawler
+            fingerprint detector. Matches the alert&apos;s title or text.
+          </span>
+          {rule.terms.length === 0 && (
+            <span className="block text-[11px] text-yellow-400">
+              Add at least one phrase.
+            </span>
+          )}
+        </label>
+      )}
       <div>
         <span className="text-xs text-zinc-400">Repository</span>
         <div className="mt-1">
@@ -802,7 +943,9 @@ function RouteEditor({
     !!account &&
     !accountError &&
     !customUrlError &&
-    route.rules.every((r) => !!r.repo) &&
+    route.rules.every(
+      (r) => !!r.repo && (r.alarms.length > 0 || r.terms.length > 0),
+    ) &&
     !silent &&
     !saving;
   const setRule = (i: number, r: AlertRule) =>
