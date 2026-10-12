@@ -46,6 +46,12 @@ export const OUTCOMES: Record<
     detail: "The team's token limit was reached, so no run started.",
     cls: "bg-amber-500/10 border-amber-500/20 text-amber-400",
   },
+  alert_budget: {
+    label: "Alert budget reached",
+    detail:
+      "Alert runs in the last 24 hours reached the team's daily alert budget, so no run started. Change it under Alert routes.",
+    cls: "bg-amber-500/10 border-amber-500/20 text-amber-400",
+  },
   daily_cap: {
     label: "Daily cap",
     detail: "The route already started 20 runs in the last day.",

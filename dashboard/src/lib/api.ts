@@ -526,6 +526,12 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(route),
     }),
+  getAlertBudget: () => request<AlertBudget>("/api/alert-budget"),
+  saveAlertBudget: (daily_usd: number) =>
+    request<{ ok: boolean }>("/api/alert-budget", {
+      method: "PUT",
+      body: JSON.stringify({ daily_usd }),
+    }),
   listTopicAlarms: (topic_arn: string) =>
     request<{ alarms: TopicAlarm[]; error?: string }>(
       `/api/alert-routes/alarms?topic_arn=${encodeURIComponent(topic_arn)}`,
@@ -1235,6 +1241,14 @@ export interface AlertRoute {
   /** Post recoveries (OK) and other non-alarm state changes to Teams. Off by default. */
   post_recoveries?: boolean;
   updated_at?: string;
+}
+
+/** The team's daily spending limit for alert runs, and the last 24 hours' spend. */
+export interface AlertBudget {
+  daily_usd: number;
+  spent_24h_usd: number;
+  open_runs: number;
+  max_runs_per_rule_per_day: number;
 }
 
 /** A CloudWatch alarm whose ALARM action publishes to a route's topic. */
