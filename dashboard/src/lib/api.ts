@@ -13,7 +13,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     let serverMsg = "";
-    try { serverMsg = body ? JSON.parse(body).error || "" : ""; } catch {}
+    try {
+      serverMsg = body ? JSON.parse(body).error || "" : "";
+    } catch {}
     throw new Error(serverMsg || `API ${res.status}: ${res.statusText}`);
   }
   const text = await res.text();
@@ -22,29 +24,67 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   // Auth
-  me: () => request<{ user_id: string; team_id: string; github_login: string | null; email: string; avatar_url: string; role: string; status?: string; auth_provider?: string; mfa_enabled?: boolean }>("/api/me"),
+  me: () =>
+    request<{
+      user_id: string;
+      team_id: string;
+      github_login: string | null;
+      email: string;
+      avatar_url: string;
+      role: string;
+      status?: string;
+      auth_provider?: string;
+      mfa_enabled?: boolean;
+    }>("/api/me"),
   signup: (email: string, password: string) =>
-    request<{ status: string; message: string }>("/auth/signup", { method: "POST", body: JSON.stringify({ email, password }) }),
+    request<{ status: string; message: string }>("/auth/signup", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
   joinWaitlist: (email: string) =>
-    request<{ status: string; message: string }>("/auth/waitlist", { method: "POST", body: JSON.stringify({ email }) }),
+    request<{ status: string; message: string }>("/auth/waitlist", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
   loginEmail: (email: string, password: string) =>
-    request<{ status: string; session?: string; team_id?: string }>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+    request<{ status: string; session?: string; team_id?: string }>(
+      "/auth/login",
+      { method: "POST", body: JSON.stringify({ email, password }) },
+    ),
   verifyEmail: (email: string, code: string) =>
-    request<{ status: string; message: string }>("/auth/verify-email", { method: "POST", body: JSON.stringify({ email, code }) }),
+    request<{ status: string; message: string }>("/auth/verify-email", {
+      method: "POST",
+      body: JSON.stringify({ email, code }),
+    }),
   forgotPassword: (email: string) =>
-    request<{ status: string; message: string }>("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }),
+    request<{ status: string; message: string }>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
   confirmReset: (email: string, code: string, new_password: string) =>
-    request<{ status: string; message: string }>("/auth/confirm-reset", { method: "POST", body: JSON.stringify({ email, code, new_password }) }),
+    request<{ status: string; message: string }>("/auth/confirm-reset", {
+      method: "POST",
+      body: JSON.stringify({ email, code, new_password }),
+    }),
   mfaVerify: (session: string, code: string, email: string) =>
-    request<{ status: string; team_id?: string }>("/auth/mfa/verify", { method: "POST", body: JSON.stringify({ session, code, email }) }),
+    request<{ status: string; team_id?: string }>("/auth/mfa/verify", {
+      method: "POST",
+      body: JSON.stringify({ session, code, email }),
+    }),
   logout: () => request<void>("/auth/logout", { method: "POST" }),
 
   // Allowlist
   listAllowlist: () => request<{ emails: string[] }>("/api/allowlist"),
   addToAllowlist: (email: string) =>
-    request<{ status: string }>("/api/allowlist", { method: "POST", body: JSON.stringify({ email }) }),
+    request<{ status: string }>("/api/allowlist", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
   removeFromAllowlist: (email: string) =>
-    request<{ status: string }>("/api/allowlist", { method: "DELETE", body: JSON.stringify({ email }) }),
+    request<{ status: string }>("/api/allowlist", {
+      method: "DELETE",
+      body: JSON.stringify({ email }),
+    }),
 
   // Health
   getHealth: () => request<HealthCheck>("/api/health"),
@@ -52,11 +92,16 @@ export const api = {
   // DLQ Management
   getDlqMessages: () => request<DlqList>("/api/dlq"),
   redriveDlqMessage: (receipt_handle: string, body: unknown) =>
-    request<void>("/api/dlq/redrive", { method: "POST", body: JSON.stringify({ receipt_handle, body }) }),
+    request<void>("/api/dlq/redrive", {
+      method: "POST",
+      body: JSON.stringify({ receipt_handle, body }),
+    }),
   deleteDlqMessage: (receipt_handle: string) =>
-    request<void>("/api/dlq/delete", { method: "POST", body: JSON.stringify({ receipt_handle }) }),
-  purgeDlq: () =>
-    request<void>("/api/dlq/purge", { method: "POST" }),
+    request<void>("/api/dlq/delete", {
+      method: "POST",
+      body: JSON.stringify({ receipt_handle }),
+    }),
+  purgeDlq: () => request<void>("/api/dlq/purge", { method: "POST" }),
 
   // Banners
   getBanners: () => request<{ banners: Banner[] }>("/api/banners"),
@@ -64,127 +109,307 @@ export const api = {
   // Account
   resetAccount: () => request<void>("/api/account/reset", { method: "POST" }),
   listTeams: () => request<{ teams: TeamInfo[] }>("/api/teams"),
-  switchTeam: (teamId: string) => request<{ team_id: string }>("/api/teams/switch", { method: "POST", body: JSON.stringify({ team_id: teamId }) }),
-  renameTeam: (name: string) => request<{ status: string; name: string }>("/api/teams/rename", { method: "PUT", body: JSON.stringify({ name }) }),
+  switchTeam: (teamId: string) =>
+    request<{ team_id: string }>("/api/teams/switch", {
+      method: "POST",
+      body: JSON.stringify({ team_id: teamId }),
+    }),
+  renameTeam: (name: string) =>
+    request<{ status: string; name: string }>("/api/teams/rename", {
+      method: "PUT",
+      body: JSON.stringify({ name }),
+    }),
 
   // Runs
   listRuns: (cursor?: string) =>
-    request<{ runs: Run[]; next?: string | null }>(`/api/runs${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),
-  listJiraEvents: () => request<{ events: JiraEvent[]; total: number }>("/api/integrations/jira/events?limit=20"),
+    request<{ runs: Run[]; next?: string | null }>(
+      `/api/runs${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+    ),
+  listJiraEvents: () =>
+    request<{ events: JiraEvent[]; total: number }>(
+      "/api/integrations/jira/events?limit=20",
+    ),
   getRun: (id: string) => request<RunDetail>(`/api/runs/${id}`),
   getRunOpenspec: (id: string) => request<Openspec>(`/api/runs/${id}/openspec`),
-  getAgentLog: (id: string) => request<{ passes: AgentLogPass[]; live_events: { tool: string; input_summary: string; duration_ms: number; is_error: boolean; timestamp: string }[] }>(`/api/runs/${id}/agent-log`),
-  retryRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/retry`, { method: "POST" }),
-  resetRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/reset`, { method: "POST" }),
-  reReviewRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/re-review`, { method: "POST" }),
-  cancelRun: (id: string) => request<{ status: string }>(`/api/runs/${id}/cancel`, { method: "POST" }),
-  getRunTraces: (id: string) => request<{ traces: PassTrace[] }>(`/api/runs/${id}/traces`),
+  getAgentLog: (id: string) =>
+    request<{
+      passes: AgentLogPass[];
+      live_events: {
+        tool: string;
+        input_summary: string;
+        duration_ms: number;
+        is_error: boolean;
+        timestamp: string;
+      }[];
+    }>(`/api/runs/${id}/agent-log`),
+  retryRun: (id: string) =>
+    request<{ status: string }>(`/api/runs/${id}/retry`, { method: "POST" }),
+  resetRun: (id: string) =>
+    request<{ status: string }>(`/api/runs/${id}/reset`, { method: "POST" }),
+  reReviewRun: (id: string) =>
+    request<{ status: string }>(`/api/runs/${id}/re-review`, {
+      method: "POST",
+    }),
+  cancelRun: (id: string) =>
+    request<{ status: string }>(`/api/runs/${id}/cancel`, { method: "POST" }),
+  getRunTraces: (id: string) =>
+    request<{ traces: PassTrace[] }>(`/api/runs/${id}/traces`),
 
   // Repos
   listRepos: () => request<{ repos: Repo[] }>("/api/repos"),
-  syncRepos: () => request<{ total: number; added: number }>("/api/repos/sync", { method: "POST" }),
-  toggleRepo: (repo: string, enabled: boolean) => request<void>(`/api/repos/${repo}`, { method: "POST", body: JSON.stringify({ enabled }) }),
-  setRepoRole: (repo: string, role: string) => request<void>(`/api/repos/${repo}/role`, { method: "POST", body: JSON.stringify({ role }) }),
-  deleteRepo: (repo: string) => request<void>(`/api/repos/${repo}`, { method: "DELETE" }),
+  syncRepos: () =>
+    request<{ total: number; added: number }>("/api/repos/sync", {
+      method: "POST",
+    }),
+  toggleRepo: (repo: string, enabled: boolean) =>
+    request<void>(`/api/repos/${repo}`, {
+      method: "POST",
+      body: JSON.stringify({ enabled }),
+    }),
+  setRepoRole: (repo: string, role: string) =>
+    request<void>(`/api/repos/${repo}/role`, {
+      method: "POST",
+      body: JSON.stringify({ role }),
+    }),
+  deleteRepo: (repo: string) =>
+    request<void>(`/api/repos/${repo}`, { method: "DELETE" }),
 
   // Stats
   getStats: () => request<{ month: Stats; all_time: Stats }>("/api/stats"),
-  getStatsHistory: () => request<{ months: MonthStats[] }>("/api/stats/history"),
+  getStatsHistory: () =>
+    request<{ months: MonthStats[] }>("/api/stats/history"),
 
   // GitHub App installation
-  getInstallationStatus: () => request<{ status: string; github_org?: string; installation_id?: number }>("/api/github/installation-status"),
+  getInstallationStatus: () =>
+    request<{ status: string; github_org?: string; installation_id?: number }>(
+      "/api/github/installation-status",
+    ),
   linkGithubInstallation: (installation_id: number) =>
-    request<{ status?: string; error?: string; github_org?: string; installation_id?: number; repos_synced?: number }>("/api/github/link-installation", { method: "POST", body: JSON.stringify({ installation_id }) }),
+    request<{
+      status?: string;
+      error?: string;
+      github_org?: string;
+      installation_id?: number;
+      repos_synced?: number;
+    }>("/api/github/link-installation", {
+      method: "POST",
+      body: JSON.stringify({ installation_id }),
+    }),
 
   // Rules (guardrails)
   getGlobalRules: () => request<{ rules: string[] }>("/api/rules/global"),
-  updateGlobalRules: (rules: string[]) => request<void>("/api/rules/global", { method: "PUT", body: JSON.stringify({ rules }) }),
-  getRepoRules: (repo: string) => request<{ rules: string[] }>(`/api/rules/repo/${repo}`),
-  updateRepoRules: (repo: string, rules: string[]) => request<void>(`/api/rules/repo/${repo}`, { method: "PUT", body: JSON.stringify({ rules }) }),
+  updateGlobalRules: (rules: string[]) =>
+    request<void>("/api/rules/global", {
+      method: "PUT",
+      body: JSON.stringify({ rules }),
+    }),
+  getRepoRules: (repo: string) =>
+    request<{ rules: string[] }>(`/api/rules/repo/${repo}`),
+  updateRepoRules: (repo: string, rules: string[]) =>
+    request<void>(`/api/rules/repo/${repo}`, {
+      method: "PUT",
+      body: JSON.stringify({ rules }),
+    }),
 
   // Voice
   getGlobalVoice: () => request<{ content: string }>("/api/voice/global"),
-  updateGlobalVoice: (content: string) => request<void>("/api/voice/global", { method: "PUT", body: JSON.stringify({ content }) }),
-  getRepoVoice: (repo: string) => request<{ content: string }>(`/api/voice/repo/${repo}`),
-  updateRepoVoice: (repo: string, content: string) => request<void>(`/api/voice/repo/${repo}`, { method: "PUT", body: JSON.stringify({ content }) }),
+  updateGlobalVoice: (content: string) =>
+    request<void>("/api/voice/global", {
+      method: "PUT",
+      body: JSON.stringify({ content }),
+    }),
+  getRepoVoice: (repo: string) =>
+    request<{ content: string }>(`/api/voice/repo/${repo}`),
+  updateRepoVoice: (repo: string, content: string) =>
+    request<void>(`/api/voice/repo/${repo}`, {
+      method: "PUT",
+      body: JSON.stringify({ content }),
+    }),
 
   // Agents
   getGlobalAgents: () => request<{ content: string }>("/api/agents/global"),
-  getRepoAgents: (repo: string) => request<{ content: string }>(`/api/agents/repo/${repo}`),
-  updateRepoAgents: (repo: string, content: string) => request<void>(`/api/agents/repo/${repo}`, { method: "PUT", body: JSON.stringify({ content }) }),
+  getRepoAgents: (repo: string) =>
+    request<{ content: string }>(`/api/agents/repo/${repo}`),
+  updateRepoAgents: (repo: string, content: string) =>
+    request<void>(`/api/agents/repo/${repo}`, {
+      method: "PUT",
+      body: JSON.stringify({ content }),
+    }),
 
   // Instructions
-  getGlobalInstructions: () => request<{ content: string }>("/api/instructions/global"),
-  updateGlobalInstructions: (content: string) => request<void>("/api/instructions/global", { method: "PUT", body: JSON.stringify({ content }) }),
-  getRepoInstructions: (repo: string) => request<{ content: string }>(`/api/instructions/repo/${repo}`),
-  updateRepoInstructions: (repo: string, content: string) => request<void>(`/api/instructions/repo/${repo}`, { method: "PUT", body: JSON.stringify({ content }) }),
+  getGlobalInstructions: () =>
+    request<{ content: string }>("/api/instructions/global"),
+  updateGlobalInstructions: (content: string) =>
+    request<void>("/api/instructions/global", {
+      method: "PUT",
+      body: JSON.stringify({ content }),
+    }),
+  getRepoInstructions: (repo: string) =>
+    request<{ content: string }>(`/api/instructions/repo/${repo}`),
+  updateRepoInstructions: (repo: string, content: string) =>
+    request<void>(`/api/instructions/repo/${repo}`, {
+      method: "PUT",
+      body: JSON.stringify({ content }),
+    }),
 
   // Regenerate (re-run onboard for a repo)
-  regenerateRepo: (repo: string) => request<{ status: string }>(`/api/repos/${repo}/regenerate`, { method: "POST" }),
+  regenerateRepo: (repo: string) =>
+    request<{ status: string }>(`/api/repos/${repo}/regenerate`, {
+      method: "POST",
+    }),
 
   // Notifications
   getNotifications: () => request<NotificationPrefs>("/api/notifications"),
-  updateNotifications: (prefs: NotificationPrefs) => request<void>("/api/notifications", { method: "PUT", body: JSON.stringify(prefs) }),
+  updateNotifications: (prefs: NotificationPrefs) =>
+    request<void>("/api/notifications", {
+      method: "PUT",
+      body: JSON.stringify(prefs),
+    }),
 
   // Jira integration
   getJiraCheck: () => request<JiraCheck>("/api/integrations/jira/check"),
-  generateJiraSecret: () => request<{ token: string; webhook_secret: string }>("/api/integrations/jira/secret", { method: "POST" }),
-  deleteJiraSecret: () => request<void>("/api/integrations/jira/secret", { method: "DELETE" }),
-  deleteJiraIntegration: () => request<void>("/api/integrations/jira/check", { method: "DELETE" }),
+  generateJiraSecret: () =>
+    request<{ token: string; webhook_secret: string }>(
+      "/api/integrations/jira/secret",
+      { method: "POST" },
+    ),
+  deleteJiraSecret: () =>
+    request<void>("/api/integrations/jira/secret", { method: "DELETE" }),
+  deleteJiraIntegration: () =>
+    request<void>("/api/integrations/jira/check", { method: "DELETE" }),
   getJiraConfig: () => request<JiraConfig>("/api/integrations/jira/config"),
   updateJiraConfig: (body: Partial<JiraConfig>) =>
-    request<void>("/api/integrations/jira/config", { method: "PUT", body: JSON.stringify(body) }),
-  fetchJiraProjects: () => request<{ projects: JiraProject[] }>("/api/integrations/jira/projects/fetch"),
+    request<void>("/api/integrations/jira/config", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  fetchJiraProjects: () =>
+    request<{ projects: JiraProject[] }>(
+      "/api/integrations/jira/projects/fetch",
+    ),
   updateJiraProjects: (projects: JiraProject[]) =>
-    request<void>("/api/integrations/jira/projects", { method: "PUT", body: JSON.stringify({ projects }) }),
+    request<void>("/api/integrations/jira/projects", {
+      method: "PUT",
+      body: JSON.stringify({ projects }),
+    }),
 
   // Usage
   getUsage: () => request<UsageInfo>("/api/usage"),
 
   // Token Limit
   getBudget: () => request<{ max_tokens: number }>("/api/settings/budget"),
-  updateBudget: (max_tokens: number) => request<void>("/api/settings/budget", { method: "PUT", body: JSON.stringify({ max_tokens }) }),
+  updateBudget: (max_tokens: number) =>
+    request<void>("/api/settings/budget", {
+      method: "PUT",
+      body: JSON.stringify({ max_tokens }),
+    }),
 
   // Model Provider
-  getModelProvider: () => request<ModelProviderConfig>("/api/settings/model-provider"),
-  updateModelProvider: (config: { api_key?: string; primary_model: string; heavy_model: string }) =>
-    request<{ status: string; provider: string }>("/api/settings/model-provider", { method: "PUT", body: JSON.stringify(config) }),
-  deleteModelProvider: () => request<void>("/api/settings/model-provider", { method: "DELETE" }),
+  getModelProvider: () =>
+    request<ModelProviderConfig>("/api/settings/model-provider"),
+  updateModelProvider: (config: {
+    api_key?: string;
+    primary_model: string;
+    heavy_model: string;
+  }) =>
+    request<{ status: string; provider: string }>(
+      "/api/settings/model-provider",
+      { method: "PUT", body: JSON.stringify(config) },
+    ),
+  deleteModelProvider: () =>
+    request<void>("/api/settings/model-provider", { method: "DELETE" }),
 
   // Workflow
-  getWorkflowSettings: () => request<WorkflowSettings>("/api/settings/workflow"),
-  updateWorkflowSettings: (settings: WorkflowSettings) => request<void>("/api/settings/workflow", { method: "PUT", body: JSON.stringify(settings) }),
+  getWorkflowSettings: () =>
+    request<WorkflowSettings>("/api/settings/workflow"),
+  updateWorkflowSettings: (settings: WorkflowSettings) =>
+    request<void>("/api/settings/workflow", {
+      method: "PUT",
+      body: JSON.stringify(settings),
+    }),
 
   // Plans
-  listPlans: (cursor?: string) => request<{ plans: Plan[]; next_cursor?: string }>(`/api/plans${cursor ? `?cursor=${cursor}` : ""}`),
+  listPlans: (cursor?: string) =>
+    request<{ plans: Plan[]; next_cursor?: string }>(
+      `/api/plans${cursor ? `?cursor=${cursor}` : ""}`,
+    ),
   planChat: (messages: { role: string; content: string }[]) =>
-    request<{ content: string; mcp_servers?: string[] }>("/api/plans/chat", { method: "POST", body: JSON.stringify({ messages }) }),
-  createPlan: (body: { title: string; description?: string; repo?: string; destination?: "github" | "jira"; tasks?: Partial<Task>[]; mcp_servers?: string[] }) =>
-    request<{ plan_id: string }>("/api/plans", { method: "POST", body: JSON.stringify(body) }),
-  getPlan: (planId: string) => request<Plan & { tasks: Task[] }>(`/api/plans/${planId}`),
-  updatePlan: (planId: string, body: Partial<{ title: string; description: string; status: string; destination: string }>) =>
-    request<void>(`/api/plans/${planId}`, { method: "PUT", body: JSON.stringify(body) }),
-  deletePlan: (planId: string) => request<void>(`/api/plans/${planId}`, { method: "DELETE" }),
+    request<{ content: string; mcp_servers?: string[] }>("/api/plans/chat", {
+      method: "POST",
+      body: JSON.stringify({ messages }),
+    }),
+  createPlan: (body: {
+    title: string;
+    description?: string;
+    repo?: string;
+    destination?: "github" | "jira";
+    tasks?: Partial<Task>[];
+    mcp_servers?: string[];
+  }) =>
+    request<{ plan_id: string }>("/api/plans", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getPlan: (planId: string) =>
+    request<Plan & { tasks: Task[] }>(`/api/plans/${planId}`),
+  updatePlan: (
+    planId: string,
+    body: Partial<{
+      title: string;
+      description: string;
+      status: string;
+      destination: string;
+    }>,
+  ) =>
+    request<void>(`/api/plans/${planId}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  deletePlan: (planId: string) =>
+    request<void>(`/api/plans/${planId}`, { method: "DELETE" }),
   addTask: (planId: string, body: Partial<Task>) =>
-    request<{ task_id: string }>(`/api/plans/${planId}/tasks`, { method: "POST", body: JSON.stringify(body) }),
+    request<{ task_id: string }>(`/api/plans/${planId}/tasks`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   updateTask: (planId: string, taskId: string, body: Partial<Task>) =>
-    request<void>(`/api/plans/${planId}/tasks/${taskId}`, { method: "PUT", body: JSON.stringify(body) }),
+    request<void>(`/api/plans/${planId}/tasks/${taskId}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
   deleteTask: (planId: string, taskId: string) =>
     request<void>(`/api/plans/${planId}/tasks/${taskId}`, { method: "DELETE" }),
   approveTask: (planId: string, taskId: string) =>
-    request<void>(`/api/plans/${planId}/tasks/${taskId}/approve`, { method: "POST" }),
+    request<void>(`/api/plans/${planId}/tasks/${taskId}/approve`, {
+      method: "POST",
+    }),
   rejectTask: (planId: string, taskId: string) =>
-    request<void>(`/api/plans/${planId}/tasks/${taskId}/reject`, { method: "POST" }),
+    request<void>(`/api/plans/${planId}/tasks/${taskId}/reject`, {
+      method: "POST",
+    }),
   forceRunTask: (planId: string, taskId: string) =>
-    request<{ status: string }>(`/api/plans/${planId}/tasks/${taskId}/force-run`, { method: "POST" }),
+    request<{ status: string }>(
+      `/api/plans/${planId}/tasks/${taskId}/force-run`,
+      { method: "POST" },
+    ),
   executePlan: (planId: string) =>
-    request<{ status: string; tasks_queued: number }>(`/api/plans/${planId}/execute`, { method: "POST" }),
+    request<{ status: string; tasks_queued: number }>(
+      `/api/plans/${planId}/execute`,
+      { method: "POST" },
+    ),
   approveAllAndExecute: (planId: string) =>
-    request<{ status: string; tasks_queued: number }>(`/api/plans/${planId}/approve-and-execute`, { method: "POST" }),
+    request<{ status: string; tasks_queued: number }>(
+      `/api/plans/${planId}/approve-and-execute`,
+      { method: "POST" },
+    ),
   generatePlanOpenspec: (planId: string) =>
-    request<{ files: string[] }>(`/api/plans/${planId}/openspec/generate`, { method: "POST" }),
+    request<{ files: string[] }>(`/api/plans/${planId}/openspec/generate`, {
+      method: "POST",
+    }),
   getPlanOpenspec: (planId: string) =>
-    request<{ proposal: string; design: string; tasks: string; spec: string }>(`/api/plans/${planId}/openspec`),
+    request<{ proposal: string; design: string; tasks: string; spec: string }>(
+      `/api/plans/${planId}/openspec`,
+    ),
 
   // Plan Templates
   listTemplates: (params?: { limit?: number; cursor?: string }) => {
@@ -192,54 +417,126 @@ export const api = {
     if (params?.limit) qs.set("limit", String(params.limit));
     if (params?.cursor) qs.set("cursor", params.cursor);
     const q = qs.toString();
-    return request<{ templates: Template[]; next_cursor?: string }>(`/api/plans/templates${q ? `?${q}` : ""}`);
+    return request<{ templates: Template[]; next_cursor?: string }>(
+      `/api/plans/templates${q ? `?${q}` : ""}`,
+    );
   },
-  createTemplate: (body: { title: string; description?: string; category?: string; tags?: string[]; task_templates?: TaskTemplate[] }) =>
-    request<{ template_id: string }>("/api/plans/templates", { method: "POST", body: JSON.stringify(body) }),
-  createTemplateFromPlan: (planId: string, body: { title?: string; description?: string; category?: string; tags?: string[] }) =>
-    request<{ template_id: string }>(`/api/plans/templates/from-plan/${planId}`, { method: "POST", body: JSON.stringify(body) }),
-  getTemplate: (templateId: string) => request<Template>(`/api/plans/templates/${templateId}`),
-  deleteTemplate: (templateId: string) => request<void>(`/api/plans/templates/${templateId}`, { method: "DELETE" }),
-  useTemplate: (templateId: string, body: { title?: string; description?: string; repo?: string; destination?: string }) =>
-    request<{ plan_id: string }>(`/api/plans/templates/${templateId}/use`, { method: "POST", body: JSON.stringify(body) }),
+  createTemplate: (body: {
+    title: string;
+    description?: string;
+    category?: string;
+    tags?: string[];
+    task_templates?: TaskTemplate[];
+  }) =>
+    request<{ template_id: string }>("/api/plans/templates", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  createTemplateFromPlan: (
+    planId: string,
+    body: {
+      title?: string;
+      description?: string;
+      category?: string;
+      tags?: string[];
+    },
+  ) =>
+    request<{ template_id: string }>(
+      `/api/plans/templates/from-plan/${planId}`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  getTemplate: (templateId: string) =>
+    request<Template>(`/api/plans/templates/${templateId}`),
+  deleteTemplate: (templateId: string) =>
+    request<void>(`/api/plans/templates/${templateId}`, { method: "DELETE" }),
+  useTemplate: (
+    templateId: string,
+    body: {
+      title?: string;
+      description?: string;
+      repo?: string;
+      destination?: string;
+    },
+  ) =>
+    request<{ plan_id: string }>(`/api/plans/templates/${templateId}/use`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   // Infrastructure
   getInfrastructure: () => request<InfraAnalysis>("/api/infrastructure"),
   refreshInfrastructure: () =>
-    request<{ status: string }>("/api/infrastructure/refresh", { method: "POST" }),
+    request<{ status: string }>("/api/infrastructure/refresh", {
+      method: "POST",
+    }),
   getRepoInfrastructure: (repo: string) =>
     request<InfraAnalysis>(`/api/infrastructure/repo/${repo}`),
   refreshRepoInfrastructure: (repo: string) =>
-    request<{ status: string }>(`/api/infrastructure/repo/${repo}/refresh`, { method: "POST" }),
+    request<{ status: string }>(`/api/infrastructure/repo/${repo}/refresh`, {
+      method: "POST",
+    }),
 
   // User management
   listUsers: () => request<{ users: TeamUser[] }>("/api/users"),
   inviteUser: (email: string, role?: string) =>
-    request<{ status: string; user_id: string }>("/api/users/invite", { method: "POST", body: JSON.stringify({ email, role }) }),
+    request<{ status: string; user_id: string }>("/api/users/invite", {
+      method: "POST",
+      body: JSON.stringify({ email, role }),
+    }),
   updateUserRole: (userId: string, role: string) =>
-    request<{ status: string }>(`/api/users/${encodeURIComponent(userId)}/role`, { method: "PUT", body: JSON.stringify({ role }) }),
+    request<{ status: string }>(
+      `/api/users/${encodeURIComponent(userId)}/role`,
+      { method: "PUT", body: JSON.stringify({ role }) },
+    ),
   removeUser: (userId: string) =>
-    request<{ status: string }>(`/api/users/${encodeURIComponent(userId)}`, { method: "DELETE" }),
+    request<{ status: string }>(`/api/users/${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    }),
   resendInvite: (userId: string) =>
-    request<{ status: string }>(`/api/users/${encodeURIComponent(userId)}/resend`, { method: "POST" }),
+    request<{ status: string }>(
+      `/api/users/${encodeURIComponent(userId)}/resend`,
+      { method: "POST" },
+    ),
   changePassword: (current_password: string, new_password: string) =>
-    request<{ status: string }>("/api/users/password", { method: "PUT", body: JSON.stringify({ current_password, new_password }) }),
+    request<{ status: string }>("/api/users/password", {
+      method: "PUT",
+      body: JSON.stringify({ current_password, new_password }),
+    }),
   mfaSetup: (password: string) =>
-    request<{ secret: string; qr_uri: string; session: string }>("/api/users/mfa/setup", { method: "POST", body: JSON.stringify({ password }) }),
+    request<{ secret: string; qr_uri: string; session: string }>(
+      "/api/users/mfa/setup",
+      { method: "POST", body: JSON.stringify({ password }) },
+    ),
   mfaVerifySetup: (password: string, code: string, session: string) =>
-    request<{ status: string }>("/api/users/mfa/verify", { method: "POST", body: JSON.stringify({ password, code, session }) }),
-  mfaDisable: () => request<{ status: string }>("/api/users/mfa", { method: "DELETE" }),
+    request<{ status: string }>("/api/users/mfa/verify", {
+      method: "POST",
+      body: JSON.stringify({ password, code, session }),
+    }),
+  mfaDisable: () =>
+    request<{ status: string }>("/api/users/mfa", { method: "DELETE" }),
 
   // AWS Connections (Log Analyzer)
   // Alert routes: SNS topic → repo, turning alerts into pull requests
-  listAlertRoutes: () => request<{ endpoint_path: string; routes: AlertRoute[] }>("/api/alert-routes"),
+  listAlertRoutes: () =>
+    request<{ endpoint_path: string; routes: AlertRoute[] }>(
+      "/api/alert-routes",
+    ),
   saveAlertRoute: (route: Omit<AlertRoute, "updated_at">) =>
-    request<{ ok: boolean }>("/api/alert-routes", { method: "PUT", body: JSON.stringify(route) }),
+    request<{ ok: boolean }>("/api/alert-routes", {
+      method: "PUT",
+      body: JSON.stringify(route),
+    }),
   deleteAlertRoute: (topic_arn: string) =>
-    request<void>(`/api/alert-routes?topic_arn=${encodeURIComponent(topic_arn)}`, { method: "DELETE" }),
+    request<void>(
+      `/api/alert-routes?topic_arn=${encodeURIComponent(topic_arn)}`,
+      { method: "DELETE" },
+    ),
   getAlertNotify: () => request<AlertNotifySettings>("/api/alert-notify"),
   saveAlertNotify: (s: AlertNotifySettings) =>
-    request<{ ok: boolean }>("/api/alert-notify", { method: "PUT", body: JSON.stringify(s) }),
+    request<{ ok: boolean }>("/api/alert-notify", {
+      method: "PUT",
+      body: JSON.stringify(s),
+    }),
   testAlertNotify: (teams_webhook_url: string) =>
     request<{ ok: boolean; error?: string }>("/api/alert-notify/test", {
       method: "POST",
@@ -249,61 +546,131 @@ export const api = {
     request<{ alerts: AlertEvent[]; next?: string | null }>(
       `/api/alerts${after ? `?after=${encodeURIComponent(after)}` : ""}`,
     ),
-  getAlert: (id: string) => request<AlertEventDetail>(`/api/alerts/event?id=${encodeURIComponent(id)}`),
-  listAwsConnections: () => request<{ connections: AwsConnection[] }>("/api/aws-connections"),
+  getAlert: (id: string) =>
+    request<AlertEventDetail>(`/api/alerts/event?id=${encodeURIComponent(id)}`),
+  listAwsConnections: () =>
+    request<{ connections: AwsConnection[] }>("/api/aws-connections"),
   createAwsConnection: (role_arn: string, region?: string) =>
-    request<{ connection_id?: string; external_id?: string; status?: string; error?: string; message?: string }>("/api/aws-connections", { method: "POST", body: JSON.stringify({ role_arn, region }) }),
+    request<{
+      connection_id?: string;
+      external_id?: string;
+      status?: string;
+      error?: string;
+      message?: string;
+    }>("/api/aws-connections", {
+      method: "POST",
+      body: JSON.stringify({ role_arn, region }),
+    }),
   getRecNotify: () =>
-    request<{ notify_mode: "team" | "custom" | "off"; teams_webhook_url: string }>("/api/recommendations/notify"),
-  saveRecNotify: (notify_mode: "team" | "custom" | "off", teams_webhook_url: string) =>
+    request<{
+      notify_mode: "team" | "custom" | "off";
+      teams_webhook_url: string;
+    }>("/api/recommendations/notify"),
+  saveRecNotify: (
+    notify_mode: "team" | "custom" | "off",
+    teams_webhook_url: string,
+  ) =>
     request<{ ok: boolean }>("/api/recommendations/notify", {
       method: "PUT",
       body: JSON.stringify({ notify_mode, teams_webhook_url }),
     }),
-  updateAwsConnection: (id: string, body: Partial<{ role_arn: string; region: string; log_groups: string[] }>) =>
-    request<{ status: string }>(`/api/aws-connections/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  updateAwsConnection: (
+    id: string,
+    body: Partial<{ role_arn: string; region: string; log_groups: string[] }>,
+  ) =>
+    request<{ status: string }>(`/api/aws-connections/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
   deleteAwsConnection: (id: string) =>
-    request<{ status: string }>(`/api/aws-connections/${id}`, { method: "DELETE" }),
+    request<{ status: string }>(`/api/aws-connections/${id}`, {
+      method: "DELETE",
+    }),
   testAwsConnection: (id: string) =>
-    request<{ status: string; message: string }>(`/api/aws-connections/${id}/test`, { method: "POST" }),
+    request<{ status: string; message: string }>(
+      `/api/aws-connections/${id}/test`,
+      { method: "POST" },
+    ),
   discoverLogGroups: (id: string) =>
-    request<{ log_groups: LogGroup[] }>(`/api/aws-connections/${id}/log-groups`),
+    request<{ log_groups: LogGroup[] }>(
+      `/api/aws-connections/${id}/log-groups`,
+    ),
   getCfnUrl: () =>
-    request<{ cfn_url: string; external_id: string }>("/api/aws-connections/cfn-url"),
+    request<{ cfn_url: string; external_id: string }>(
+      "/api/aws-connections/cfn-url",
+    ),
 
   // Recommendations
   listRecommendations: (params?: { status?: string; severity?: string }) =>
-    request<{ recommendations: Recommendation[] }>(`/api/recommendations${params ? `?${new URLSearchParams(params as Record<string, string>)}` : ""}`),
+    request<{ recommendations: Recommendation[] }>(
+      `/api/recommendations${params ? `?${new URLSearchParams(params as Record<string, string>)}` : ""}`,
+    ),
   createPlanFromRecommendation: (id: string) =>
-    request<{ plan_id: string; status: string }>(`/api/recommendations/${id}/plan`, { method: "POST" }),
+    request<{ plan_id: string; status: string }>(
+      `/api/recommendations/${id}/plan`,
+      { method: "POST" },
+    ),
   dismissRecommendation: (id: string) =>
-    request<{ status: string }>(`/api/recommendations/${id}/dismiss`, { method: "POST" }),
+    request<{ status: string }>(`/api/recommendations/${id}/dismiss`, {
+      method: "POST",
+    }),
 
   // Plugins
-  getPluginCatalog: () => request<{ plugins: PluginDef[] }>("/api/plugins/catalog"),
-  listEnabledPlugins: () => request<{ plugins: EnabledPlugin[] }>("/api/plugins"),
+  getPluginCatalog: () =>
+    request<{ plugins: PluginDef[] }>("/api/plugins/catalog"),
+  listEnabledPlugins: () =>
+    request<{ plugins: EnabledPlugin[] }>("/api/plugins"),
   enablePlugin: (id: string) =>
-    request<{ status: string; plugin_id: string }>(`/api/plugins/${id}/enable`, { method: "POST" }),
+    request<{ status: string; plugin_id: string }>(
+      `/api/plugins/${id}/enable`,
+      { method: "POST" },
+    ),
   disablePlugin: (id: string) =>
-    request<{ status: string; plugin_id: string }>(`/api/plugins/${id}`, { method: "DELETE" }),
+    request<{ status: string; plugin_id: string }>(`/api/plugins/${id}`, {
+      method: "DELETE",
+    }),
   updatePluginCredentials: (id: string, credentials: Record<string, string>) =>
-    request<{ status: string; error?: string }>(`/api/plugins/${id}/credentials`, { method: "PUT", body: JSON.stringify({ credentials }) }),
+    request<{ status: string; error?: string }>(
+      `/api/plugins/${id}/credentials`,
+      { method: "PUT", body: JSON.stringify({ credentials }) },
+    ),
   updatePluginPrompt: (id: string, custom_prompt: string) =>
-    request<{ status: string; error?: string }>(`/api/plugins/${id}/prompt`, { method: "PUT", body: JSON.stringify({ custom_prompt }) }),
+    request<{ status: string; error?: string }>(`/api/plugins/${id}/prompt`, {
+      method: "PUT",
+      body: JSON.stringify({ custom_prompt }),
+    }),
   testPluginConnection: (id: string) =>
-    request<{ status: string; tool_count?: number; message?: string }>(`/api/plugins/${id}/test`, { method: "POST" }),
+    request<{ status: string; tool_count?: number; message?: string }>(
+      `/api/plugins/${id}/test`,
+      { method: "POST" },
+    ),
 
   // Memory
-  listMemories: (repo: string, page = 1, pageSize = 50, search?: string, memoryType?: string) => {
-    const params = new URLSearchParams({ repo, page: String(page), page_size: String(pageSize) });
+  listMemories: (
+    repo: string,
+    page = 1,
+    pageSize = 50,
+    search?: string,
+    memoryType?: string,
+  ) => {
+    const params = new URLSearchParams({
+      repo,
+      page: String(page),
+      page_size: String(pageSize),
+    });
     if (search) params.set("search", search);
     if (memoryType) params.set("memory_type", memoryType);
     return request<MemoryListResponse>(`/api/memories?${params}`);
   },
   getMemoryStats: (repo: string) =>
-    request<MemoryStats>(`/api/memories/stats?repo=${encodeURIComponent(repo)}`),
+    request<MemoryStats>(
+      `/api/memories/stats?repo=${encodeURIComponent(repo)}`,
+    ),
   deleteMemory: (id: string, repo: string) =>
-    request<{ deleted: string }>(`/api/memories/${id}?repo=${encodeURIComponent(repo)}`, { method: "DELETE" }),
+    request<{ deleted: string }>(
+      `/api/memories/${id}?repo=${encodeURIComponent(repo)}`,
+      { method: "DELETE" },
+    ),
 
   // Reviewer agent
   // Code graph — its own feature (serves the reviewer AND the PR maker)
@@ -323,34 +690,51 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ enabled }),
     }),
-  getReviewerConfig: (repo: string) => request<ReviewerConfig>(`/api/reviewer/config/${repo}`),
+  getReviewerConfig: (repo: string) =>
+    request<ReviewerConfig>(`/api/reviewer/config/${repo}`),
   updateReviewerConfig: (repo: string, config: ReviewerConfig) =>
-    request<void>(`/api/reviewer/config/${repo}`, { method: "PUT", body: JSON.stringify(config) }),
+    request<void>(`/api/reviewer/config/${repo}`, {
+      method: "PUT",
+      body: JSON.stringify(config),
+    }),
   getOrgReviewInstructions: () =>
     request<{ instructions: string }>(`/api/reviewer/org-config`),
   updateOrgReviewInstructions: (instructions: string) =>
-    request<void>(`/api/reviewer/org-config`, { method: "PUT", body: JSON.stringify({ instructions }) }),
+    request<void>(`/api/reviewer/org-config`, {
+      method: "PUT",
+      body: JSON.stringify({ instructions }),
+    }),
   listReviews: (repo?: string, cursor?: string, limit = 50) => {
     const params = new URLSearchParams({ limit: String(limit) });
     if (repo) params.set("repo", repo);
     if (cursor) params.set("cursor", cursor);
-    return request<{ reviews: Review[]; next?: string | null }>(`/api/reviewer/reviews?${params}`);
+    return request<{ reviews: Review[]; next?: string | null }>(
+      `/api/reviewer/reviews?${params}`,
+    );
   },
   getReview: (sk: string) =>
     request<Review>(`/api/reviewer/review?sk=${encodeURIComponent(sk)}`),
   rateReview: (sk: string, rating: "up" | "down" | "none", comment?: string) =>
-    request<void>(`/api/reviewer/review/rate`, { method: "POST", body: JSON.stringify({ sk, rating, comment }) }),
-  reReview: (repo: string, pr: number) =>
-    request<{ status: "queued" | "skipped"; reason?: string }>(`/api/reviewer/re-review`, {
+    request<void>(`/api/reviewer/review/rate`, {
       method: "POST",
-      body: JSON.stringify({ repo, pr }),
+      body: JSON.stringify({ sk, rating, comment }),
     }),
+  reReview: (repo: string, pr: number) =>
+    request<{ status: "queued" | "skipped"; reason?: string }>(
+      `/api/reviewer/re-review`,
+      {
+        method: "POST",
+        body: JSON.stringify({ repo, pr }),
+      },
+    ),
   listReleases: (repo?: string, cursor?: string) => {
     const params = new URLSearchParams();
     if (repo) params.set("repo", repo);
     if (cursor) params.set("cursor", cursor);
     const qs = params.toString();
-    return request<{ releases: Release[]; next?: string | null }>(`/api/releases${qs ? `?${qs}` : ""}`);
+    return request<{ releases: Release[]; next?: string | null }>(
+      `/api/releases${qs ? `?${qs}` : ""}`,
+    );
   },
   sendRelease: (repo: string, tag: string, resend: "" | "email" | "all") =>
     request<{ status: string }>(`/api/releases/send`, {
@@ -565,7 +949,12 @@ export interface AgentLogTurn {
   turn: number;
   role: string;
   content: unknown[];
-  usage?: { input_tokens: number; output_tokens: number; cache_read: number; cache_write: number };
+  usage?: {
+    input_tokens: number;
+    output_tokens: number;
+    cache_read: number;
+    cache_write: number;
+  };
   stop_reason?: string;
 }
 
@@ -672,7 +1061,15 @@ export interface Task {
   title: string;
   description: string;
   acceptance_criteria: string;
-  status: "draft" | "approved" | "rejected" | "queued" | "running" | "done" | "waiting" | string;
+  status:
+    | "draft"
+    | "approved"
+    | "rejected"
+    | "queued"
+    | "running"
+    | "done"
+    | "waiting"
+    | string;
   order: number;
   repo?: string;
   depends_on?: string;
@@ -712,7 +1109,6 @@ export interface Template {
   created_at: string;
 }
 
-
 export interface InfraFinding {
   severity: "error" | "warning" | "info";
   category: "security" | "performance" | "reliability";
@@ -740,7 +1136,13 @@ export interface HealthCheckItem {
   depth?: number;
   visible?: number;
   in_flight?: number;
-  items?: { run_id?: string; title?: string; status?: string; error?: string; created_at?: string }[];
+  items?: {
+    run_id?: string;
+    title?: string;
+    status?: string;
+    error?: string;
+    created_at?: string;
+  }[];
 }
 
 export interface HealthCheck {
@@ -808,6 +1210,9 @@ export interface JiraProject {
 
 export interface AlertRoute {
   topic_arn: string;
+  /** "fix" opens a pull request for each alert; "notify" only posts it to Teams. */
+  action?: "fix" | "notify";
+  /** Empty on notify-only routes. */
   repo: string;
   instructions: string;
   match_terms: string[];
@@ -837,7 +1242,13 @@ export interface AlertEvent {
 
 export interface AlertEventDetail {
   alert: AlertEvent & { body?: string | null };
-  runs: { run_id: string; status?: string | null; title?: string | null; pr_url?: string | null; created_at?: string | null }[];
+  runs: {
+    run_id: string;
+    status?: string | null;
+    title?: string | null;
+    pr_url?: string | null;
+    created_at?: string | null;
+  }[];
 }
 
 /** Base URL of the CoderHelm API (shown to users who subscribe endpoints). */

@@ -25,6 +25,7 @@ export default function AlertsPageGuarded() {
 
 const EMPTY: AlertRoute = {
   topic_arn: "",
+  action: "fix",
   repo: "",
   instructions: "",
   match_terms: [],
@@ -41,12 +42,26 @@ function validTeamsUrl(url: string): boolean {
     return (
       u.protocol === "https:" &&
       !u.username &&
-      [".powerplatform.com", ".logic.azure.com", ".webhook.office.com"].some((s) => host.endsWith(s))
+      [".powerplatform.com", ".logic.azure.com", ".webhook.office.com"].some(
+        (s) => host.endsWith(s),
+      )
     );
   } catch {
     return false;
   }
 }
+
+const ACTION_LABEL: Record<"fix" | "notify", { label: string; hint: string }> =
+  {
+    fix: {
+      label: "Open a PR",
+      hint: "CoderHelm makes the change your instructions describe and opens a PR. Every alert also posts to Teams.",
+    },
+    notify: {
+      label: "Notify only",
+      hint: "Each alert posts straight to Teams as a card. No run, no PR, no repo needed.",
+    },
+  };
 
 const NOTIFY_LABEL: Record<string, string> = {
   team: "Team channel",
@@ -57,7 +72,13 @@ const NOTIFY_LABEL: Record<string, string> = {
 /** `arn:aws:sns:<region>:<account>:<name>` → account, when well-formed. */
 function topicAccount(arn: string): string | null {
   const p = arn.trim().split(":");
-  if (p.length !== 6 || p[0] !== "arn" || !p[1].startsWith("aws") || p[2] !== "sns") return null;
+  if (
+    p.length !== 6 ||
+    p[0] !== "arn" ||
+    !p[1].startsWith("aws") ||
+    p[2] !== "sns"
+  )
+    return null;
   if (!/^\d{12}$/.test(p[4]) || !p[3] || !p[5]) return null;
   return p[4];
 }
@@ -80,8 +101,14 @@ function AlertsPage() {
         setRoutes(r.routes);
         setEndpointPath(r.endpoint_path);
       }),
-      api.listRepos().then((r) => setRepos(r.repos.filter((x) => x.enabled))).catch(() => {}),
-      api.listAwsConnections().then((r) => setConnections(r.connections)).catch(() => {}),
+      api
+        .listRepos()
+        .then((r) => setRepos(r.repos.filter((x) => x.enabled)))
+        .catch(() => {}),
+      api
+        .listAwsConnections()
+        .then((r) => setConnections(r.connections))
+        .catch(() => {}),
     ])
       .catch(() => toast("Failed to load alert routes", "error"))
       .finally(() => setLoading(false));
@@ -97,7 +124,8 @@ function AlertsPage() {
   const remove = async (arn: string) => {
     const ok = await confirm({
       title: "Remove alert route?",
-      message: "Alerts on this topic will no longer start runs. Unsubscribe the endpoint from the topic in AWS as well.",
+      message:
+        "Alerts on this topic will no longer start runs. Unsubscribe the endpoint from the topic in AWS as well.",
       confirmLabel: "Remove",
       destructive: true,
     });
@@ -126,10 +154,14 @@ function AlertsPage() {
         <div>
           <h1 className="text-2xl font-bold">Alert routes</h1>
           <p className="text-sm text-zinc-500 mt-1">
-            Turn monitoring alerts into pull requests. CoderHelm reads the alerts on an SNS topic, makes the change your
-            instructions describe in the mapped repo, and opens a PR for review. Nothing merges without a person&apos;s
-            approval.{" "}
-            <Link href="/alerts" className="text-zinc-400 hover:text-zinc-200 underline">
+            Turn monitoring alerts into pull requests or Teams cards. For each
+            SNS topic, CoderHelm either makes the change your instructions
+            describe in the mapped repo and opens a PR for review, or just posts
+            the alert to Teams. Nothing merges without a person&apos;s approval.{" "}
+            <Link
+              href="/alerts"
+              className="text-zinc-400 hover:text-zinc-200 underline"
+            >
               See received alerts
             </Link>
           </p>
@@ -154,7 +186,9 @@ function AlertsPage() {
       ) : routes.length === 0 ? (
         <div className="border border-dashed border-zinc-700 rounded-xl p-8 text-center mt-6">
           <p className="text-sm text-zinc-400">No alert routes yet.</p>
-          <p className="text-xs text-zinc-500 mt-1">Add a route to map an SNS topic to a repository.</p>
+          <p className="text-xs text-zinc-500 mt-1">
+            Add a route to map an SNS topic to a repository.
+          </p>
         </div>
       ) : (
         <div className="space-y-3 mt-6">
@@ -162,7 +196,10 @@ function AlertsPage() {
             const account = topicAccount(r.topic_arn);
             const connected = account ? connectedAccounts.has(account) : false;
             return (
-              <div key={r.topic_arn} className="border border-zinc-800 rounded-lg bg-zinc-900/50 p-4">
+              <div
+                key={r.topic_arn}
+                className="border border-zinc-800 rounded-lg bg-zinc-900/50 p-4"
+              >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -174,25 +211,37 @@ function AlertsPage() {
                         {r.topic_arn.split(":").pop()}
                       </span>
                       <span className="text-zinc-600">→</span>
-                      <span className="font-mono text-sm text-zinc-300 truncate">{r.repo}</span>
+                      {r.action === "notify" ? (
+                        <span className="text-sm text-sky-400">Teams only</span>
+                      ) : (
+                        <span className="font-mono text-sm text-zinc-300 truncate">
+                          {r.repo}
+                        </span>
+                      )}
                     </div>
-                    <p className="text-[11px] font-mono text-zinc-500 mt-1 truncate">{r.topic_arn}</p>
-                    {r.match_terms.length > 0 && (
+                    <p className="text-[11px] font-mono text-zinc-500 mt-1 truncate">
+                      {r.topic_arn}
+                    </p>
+                    {r.action !== "notify" && r.match_terms.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
                         {r.match_terms.map((t) => (
-                          <span key={t} className="px-2 py-0.5 text-[11px] bg-zinc-800 text-zinc-300 rounded">
+                          <span
+                            key={t}
+                            className="px-2 py-0.5 text-[11px] bg-zinc-800 text-zinc-300 rounded"
+                          >
                             {t}
                           </span>
                         ))}
                       </div>
                     )}
                     <p className="text-[11px] text-zinc-500 mt-2">
-                      Teams: {NOTIFY_LABEL[r.notify_mode ?? "team"] ?? "Team channel"}
+                      Teams:{" "}
+                      {NOTIFY_LABEL[r.notify_mode ?? "team"] ?? "Team channel"}
                     </p>
                     {!connected && (
                       <p className="text-xs text-yellow-400 mt-2">
-                        The topic&apos;s AWS account ({account ?? "unknown"}) is not connected — alerts are ignored until
-                        it is.
+                        The topic&apos;s AWS account ({account ?? "unknown"}) is
+                        not connected — alerts are ignored until it is.
                       </p>
                     )}
                   </div>
@@ -239,12 +288,17 @@ function AlertsPage() {
           }}
         />
       )}
-
     </div>
   );
 }
 
-function WebhookField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function WebhookField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
   const { toast } = useToast();
   const [testing, setTesting] = useState(false);
   const test = async () => {
@@ -252,7 +306,11 @@ function WebhookField({ value, onChange }: { value: string; onChange: (v: string
     try {
       const r = await api.testAlertNotify(value.trim());
       if (r.ok) toast("Test card sent. Check the channel.", "success");
-      else toast(r.error ? `Teams rejected it: ${r.error}` : "Teams rejected the card", "error");
+      else
+        toast(
+          r.error ? `Teams rejected it: ${r.error}` : "Teams rejected the card",
+          "error",
+        );
     } catch {
       toast("That URL isn't a Teams webhook URL", "error");
     } finally {
@@ -281,7 +339,10 @@ function WebhookField({ value, onChange }: { value: string; onChange: (v: string
 
 function TeamsChannel() {
   const { toast } = useToast();
-  const [settings, setSettings] = useState<AlertNotifySettings>({ teams_webhook_url: "", enabled: false });
+  const [settings, setSettings] = useState<AlertNotifySettings>({
+    teams_webhook_url: "",
+    enabled: false,
+  });
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -297,7 +358,10 @@ function TeamsChannel() {
   const save = async () => {
     setSaving(true);
     try {
-      await api.saveAlertNotify({ ...settings, teams_webhook_url: settings.teams_webhook_url.trim() });
+      await api.saveAlertNotify({
+        ...settings,
+        teams_webhook_url: settings.teams_webhook_url.trim(),
+      });
       toast("Teams channel saved", "success");
     } catch {
       toast("Failed to save. Check the webhook URL.", "error");
@@ -312,8 +376,9 @@ function TeamsChannel() {
         <div>
           <p className="text-zinc-200 font-medium">Teams channel for alerts</p>
           <p className="text-xs text-zinc-500 mt-0.5">
-            Every alert on your routes posts a card here: red when an alarm fires, green when it recovers, and a
-            follow-up with the PR link when CoderHelm opens one. A route can use its own channel instead.
+            Every alert on your routes posts a card here: red when an alarm
+            fires, green when it recovers, and a follow-up with the PR link when
+            CoderHelm opens one. A route can use its own channel instead.
           </p>
         </div>
         <label className="flex items-center gap-2 text-xs text-zinc-300 shrink-0">
@@ -321,7 +386,9 @@ function TeamsChannel() {
             type="checkbox"
             checked={settings.enabled}
             disabled={!loaded}
-            onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })}
+            onChange={(e) =>
+              setSettings({ ...settings, enabled: e.target.checked })
+            }
           />
           On
         </label>
@@ -333,18 +400,34 @@ function TeamsChannel() {
         />
       </div>
       <details className="mt-2 text-xs text-zinc-500">
-        <summary className="cursor-pointer hover:text-zinc-300">How to get a webhook URL</summary>
+        <summary className="cursor-pointer hover:text-zinc-300">
+          How to get a webhook URL
+        </summary>
         <ol className="list-decimal list-inside space-y-1 mt-2">
           <li>In the Teams channel, open ⋯ → Workflows.</li>
-          <li>Pick “Send webhook alerts to a channel” (or “Post to a channel when a webhook request is received”).</li>
-          <li>Name it, choose the team and channel, then copy the URL it shows and paste it above.</li>
-          <li>Add a co-owner to the workflow so it keeps working if its creator leaves.</li>
+          <li>
+            Pick “Send webhook alerts to a channel” (or “Post to a channel when
+            a webhook request is received”).
+          </li>
+          <li>
+            Name it, choose the team and channel, then copy the URL it shows and
+            paste it above.
+          </li>
+          <li>
+            Add a co-owner to the workflow so it keeps working if its creator
+            leaves.
+          </li>
         </ol>
       </details>
       <div className="flex justify-end mt-3">
         <button
           onClick={save}
-          disabled={!loaded || saving || (settings.enabled && !urlOk) || (!!settings.teams_webhook_url && !urlOk)}
+          disabled={
+            !loaded ||
+            saving ||
+            (settings.enabled && !urlOk) ||
+            (!!settings.teams_webhook_url && !urlOk)
+          }
           className="px-4 py-1.5 text-sm font-medium bg-white text-zinc-900 rounded-lg hover:bg-zinc-200 disabled:opacity-40 cursor-pointer"
         >
           {saving ? "Saving..." : "Save"}
@@ -361,15 +444,23 @@ function SetupSteps({ endpoint }: { endpoint: string }) {
       <p className="text-zinc-200 font-medium">How to connect a topic</p>
       <ol className="list-decimal list-inside space-y-1">
         <li>Connect the topic&apos;s AWS account under Integrations → AWS.</li>
-        <li>Add a route below: the topic ARN, the repo, and how your team acts on its alerts.</li>
         <li>
-          Subscribe this HTTPS endpoint to the topic (CoderHelm confirms the subscription automatically):
+          Add a route below: the topic ARN, the repo, and how your team acts on
+          its alerts.
+        </li>
+        <li>
+          Subscribe this HTTPS endpoint to the topic (CoderHelm confirms the
+          subscription automatically):
           <div className="flex items-center gap-2 mt-1.5">
             <code className="flex-1 px-2 py-1.5 bg-zinc-950 border border-zinc-800 rounded font-mono text-xs text-zinc-200 truncate">
               {endpoint}
             </code>
             <button
-              onClick={() => navigator.clipboard.writeText(endpoint).then(() => toast("Copied", "success"))}
+              onClick={() =>
+                navigator.clipboard
+                  .writeText(endpoint)
+                  .then(() => toast("Copied", "success"))
+              }
               className="px-2.5 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-md text-zinc-300 hover:text-white cursor-pointer"
             >
               Copy
@@ -378,9 +469,10 @@ function SetupSteps({ endpoint }: { endpoint: string }) {
         </li>
       </ol>
       <p className="text-xs text-zinc-500">
-        Works with CloudWatch alarm notifications (only the ALARM state opens a PR; recoveries just notify), AWS Chatbot custom notifications,
-        EventBridge events and plain messages. Repeats of the same alert collapse into one run, and each route starts at
-        most 20 runs a day.
+        Works with CloudWatch alarm notifications (only the ALARM state opens a
+        PR; recoveries just notify), AWS Chatbot custom notifications,
+        EventBridge events and plain messages. Repeats of the same alert
+        collapse into one run, and each route starts at most 20 runs a day.
       </p>
     </div>
   );
@@ -407,31 +499,49 @@ function RouteEditor({
   const [saving, setSaving] = useState(false);
 
   const account = topicAccount(route.topic_arn);
-  const arnError = route.topic_arn && !account ? "Not an SNS topic ARN (arn:aws:sns:<region>:<account>:<name>)." : "";
+  const arnError =
+    route.topic_arn && !account
+      ? "Not an SNS topic ARN (arn:aws:sns:<region>:<account>:<name>)."
+      : "";
   const accountError =
     account && !connectedAccounts.has(account)
       ? `Connect AWS account ${account} under Integrations → AWS first.`
       : "";
   const customUrlError =
-    route.notify_mode === "custom" && !validTeamsUrl(route.teams_webhook_url ?? "")
+    route.notify_mode === "custom" &&
+    !validTeamsUrl(route.teams_webhook_url ?? "")
       ? "Paste a Teams Workflows webhook URL."
       : "";
-  const canSave = !!account && !accountError && !customUrlError && !!route.repo && !saving;
+  const notifyOnly = route.action === "notify";
+  const silent = notifyOnly && route.notify_mode === "off";
+  const canSave =
+    !!account &&
+    !accountError &&
+    !customUrlError &&
+    (notifyOnly || !!route.repo) &&
+    !silent &&
+    !saving;
 
   const save = async () => {
     setSaving(true);
     try {
       await api.saveAlertRoute({
         topic_arn: route.topic_arn.trim(),
-        repo: route.repo,
-        instructions: route.instructions,
-        match_terms: terms
-          .split(",")
-          .map((t) => t.trim())
-          .filter(Boolean),
+        action: notifyOnly ? "notify" : "fix",
+        repo: notifyOnly ? "" : route.repo,
+        instructions: notifyOnly ? "" : route.instructions,
+        match_terms: notifyOnly
+          ? []
+          : terms
+              .split(",")
+              .map((t) => t.trim())
+              .filter(Boolean),
         enabled: route.enabled,
         notify_mode: route.notify_mode ?? "team",
-        teams_webhook_url: route.notify_mode === "custom" ? (route.teams_webhook_url ?? "").trim() : "",
+        teams_webhook_url:
+          route.notify_mode === "custom"
+            ? (route.teams_webhook_url ?? "").trim()
+            : "",
       });
       toast("Route saved", "success");
       onSaved();
@@ -451,12 +561,17 @@ function RouteEditor({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={onClose}
+    >
       <div
         className="w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-semibold">{isNew ? "Add alert route" : "Edit alert route"}</h2>
+        <h2 className="text-lg font-semibold">
+          {isNew ? "Add alert route" : "Edit alert route"}
+        </h2>
 
         <label className="block">
           <span className="text-xs text-zinc-400">SNS topic ARN</span>
@@ -467,59 +582,106 @@ function RouteEditor({
             placeholder="arn:aws:sns:us-east-1:123456789012:alarms"
             className="mt-1 w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-sm font-mono text-zinc-100 disabled:opacity-60"
           />
-          {(arnError || accountError) && <span className="text-xs text-yellow-400">{arnError || accountError}</span>}
+          {(arnError || accountError) && (
+            <span className="text-xs text-yellow-400">
+              {arnError || accountError}
+            </span>
+          )}
         </label>
 
         <div>
-          <span className="text-xs text-zinc-400">Repository</span>
-          <div className="mt-1">
-            <RepoCombobox repos={repos} selected={route.repo} onSelect={(name) => setRoute({ ...route, repo: name })} />
+          <span className="text-xs text-zinc-400">When an alert fires</span>
+          <div className="mt-1 grid grid-cols-2 gap-1 p-1 bg-zinc-950 border border-zinc-700 rounded-lg">
+            {(["fix", "notify"] as const).map((a) => (
+              <button
+                key={a}
+                type="button"
+                onClick={() => setRoute({ ...route, action: a })}
+                className={`px-2 py-1.5 text-xs rounded-md cursor-pointer transition-colors ${
+                  (route.action ?? "fix") === a
+                    ? "bg-zinc-700 text-white"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                {ACTION_LABEL[a].label}
+              </button>
+            ))}
           </div>
+          <span className="text-[11px] text-zinc-500">
+            {ACTION_LABEL[notifyOnly ? "notify" : "fix"].hint}
+          </span>
         </div>
 
-        <label className="block">
-          <span className="text-xs text-zinc-400">How your team acts on these alerts</span>
-          <textarea
-            value={route.instructions}
-            onChange={(e) => setRoute({ ...route, instructions: e.target.value })}
-            rows={7}
-            maxLength={8000}
-            placeholder="e.g. For a new crawler fingerprint, add it to the block list in envs/prod/main.tf, or to the challenge list when the alert says it may be real users. Quote the request and IP counts in the PR."
-            className="mt-1 w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-sm text-zinc-100"
-          />
-          <span className="text-[11px] text-zinc-500">
-            Alert text itself is treated as data, never as instructions — put every rule here.
-          </span>
-        </label>
+        {!notifyOnly && (
+          <>
+            <div>
+              <span className="text-xs text-zinc-400">Repository</span>
+              <div className="mt-1">
+                <RepoCombobox
+                  repos={repos}
+                  selected={route.repo}
+                  onSelect={(name) => setRoute({ ...route, repo: name })}
+                />
+              </div>
+            </div>
 
-        <label className="block">
-          <span className="text-xs text-zinc-400">Only open PRs for alerts containing (optional, comma-separated)</span>
-          <input
-            value={terms}
-            onChange={(e) => setTerms(e.target.value)}
-            placeholder="e.g. fingerprint, 5xx"
-            className="mt-1 w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-sm text-zinc-100"
-          />
-          <span className="text-[11px] text-zinc-500">
-            Empty = every alert on the topic. Teams notifications cover every alert either way.
-          </span>
-        </label>
+            <label className="block">
+              <span className="text-xs text-zinc-400">
+                How your team acts on these alerts
+              </span>
+              <textarea
+                value={route.instructions}
+                onChange={(e) =>
+                  setRoute({ ...route, instructions: e.target.value })
+                }
+                rows={7}
+                maxLength={8000}
+                placeholder="e.g. For a new crawler fingerprint, add it to the block list in envs/prod/main.tf, or to the challenge list when the alert says it may be real users. Quote the request and IP counts in the PR."
+                className="mt-1 w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-sm text-zinc-100"
+              />
+              <span className="text-[11px] text-zinc-500">
+                Alert text itself is treated as data, never as instructions —
+                put every rule here.
+              </span>
+            </label>
+
+            <label className="block">
+              <span className="text-xs text-zinc-400">
+                Only open PRs for alerts containing (optional, comma-separated)
+              </span>
+              <input
+                value={terms}
+                onChange={(e) => setTerms(e.target.value)}
+                placeholder="e.g. fingerprint, 5xx"
+                className="mt-1 w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-sm text-zinc-100"
+              />
+              <span className="text-[11px] text-zinc-500">
+                Empty = every alert on the topic. Teams notifications cover
+                every alert either way.
+              </span>
+            </label>
+          </>
+        )}
 
         <div>
           <span className="text-xs text-zinc-400">Teams notifications</span>
           <div className="mt-1 grid grid-cols-3 gap-1 p-1 bg-zinc-950 border border-zinc-700 rounded-lg">
-            {(["team", "custom", "off"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setRoute({ ...route, notify_mode: m })}
-                className={`px-2 py-1.5 text-xs rounded-md cursor-pointer transition-colors ${
-                  (route.notify_mode ?? "team") === m ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                {NOTIFY_LABEL[m]}
-              </button>
-            ))}
+            {(["team", "custom", "off"] as const)
+              .filter((m) => !notifyOnly || m !== "off")
+              .map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setRoute({ ...route, notify_mode: m })}
+                  className={`px-2 py-1.5 text-xs rounded-md cursor-pointer transition-colors ${
+                    (route.notify_mode ?? "team") === m
+                      ? "bg-zinc-700 text-white"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  {NOTIFY_LABEL[m]}
+                </button>
+              ))}
           </div>
           {route.notify_mode === "custom" ? (
             <div className="mt-2">
@@ -528,7 +690,9 @@ function RouteEditor({
                 onChange={(v) => setRoute({ ...route, teams_webhook_url: v })}
               />
               {customUrlError && route.teams_webhook_url && (
-                <span className="text-xs text-yellow-400">{customUrlError}</span>
+                <span className="text-xs text-yellow-400">
+                  {customUrlError}
+                </span>
               )}
             </div>
           ) : (
@@ -550,7 +714,10 @@ function RouteEditor({
         </label>
 
         <div className="flex justify-end gap-2 pt-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-zinc-400 hover:text-white cursor-pointer">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-zinc-400 hover:text-white cursor-pointer"
+          >
             Cancel
           </button>
           <button
