@@ -49,7 +49,7 @@ export const OUTCOMES: Record<
   alert_budget: {
     label: "Alert budget reached",
     detail:
-      "Alert runs in the last 24 hours reached the team's daily alert budget, so no run started. Change it under Alert routes.",
+      "Alert runs in the last 24 hours used the team's daily alert token budget, so no run started. Change it under Alert routes.",
     cls: "bg-amber-500/10 border-amber-500/20 text-amber-400",
   },
   daily_cap: {

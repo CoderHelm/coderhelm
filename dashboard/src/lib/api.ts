@@ -527,13 +527,13 @@ export const api = {
       body: JSON.stringify(route),
     }),
   getAlertBudget: () => request<AlertBudget>("/api/alert-budget"),
-  saveAlertBudget: (daily_usd: number) =>
+  saveAlertBudget: (daily_tokens: number) =>
     request<{ ok: boolean }>("/api/alert-budget", {
       method: "PUT",
-      body: JSON.stringify({ daily_usd }),
+      body: JSON.stringify({ daily_tokens }),
     }),
   listTopicAlarms: (topic_arn: string) =>
-    request<{ alarms: TopicAlarm[]; error?: string }>(
+    request<{ alarms: TopicAlarm[]; messages?: string[]; error?: string }>(
       `/api/alert-routes/alarms?topic_arn=${encodeURIComponent(topic_arn)}`,
     ),
   deleteAlertRoute: (topic_arn: string) =>
@@ -1245,9 +1245,12 @@ export interface AlertRoute {
 
 /** The team's daily spending limit for alert runs, and the last 24 hours' spend. */
 export interface AlertBudget {
-  daily_usd: number;
-  spent_24h_usd: number;
+  /** Most tokens (input + output) alert runs may use per rolling day. */
+  daily_tokens: number;
+  used_24h_tokens: number;
   open_runs: number;
+  /** Tokens counted for each run still in progress. */
+  open_run_reserve_tokens: number;
   max_runs_per_rule_per_day: number;
 }
 
