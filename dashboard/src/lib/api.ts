@@ -526,6 +526,10 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(route),
     }),
+  listTopicAlarms: (topic_arn: string) =>
+    request<{ alarms: TopicAlarm[]; error?: string }>(
+      `/api/alert-routes/alarms?topic_arn=${encodeURIComponent(topic_arn)}`,
+    ),
   deleteAlertRoute: (topic_arn: string) =>
     request<void>(
       `/api/alert-routes?topic_arn=${encodeURIComponent(topic_arn)}`,
@@ -1208,14 +1212,22 @@ export interface JiraProject {
   style?: string;
 }
 
-export interface AlertRoute {
-  topic_arn: string;
-  /** "fix" opens a pull request for each alert; "notify" only posts it to Teams. */
-  action?: "fix" | "notify";
-  /** Empty on notify-only routes. */
+/** One rule on an alert route: the alerts it takes open a PR in `repo`. */
+export interface AlertRule {
+  /** Kept across saves so the rule's daily cap carries over. */
+  id?: string;
+  /** CloudWatch alarm names this rule takes. */
+  alarms: string[];
+  /** Or: alerts whose text contains any of these. */
+  terms: string[];
   repo: string;
   instructions: string;
-  match_terms: string[];
+}
+
+export interface AlertRoute {
+  topic_arn: string;
+  /** First matching rule opens a PR; alerts no rule takes only post to Teams. */
+  rules: AlertRule[];
   enabled: boolean;
   /** Teams notifications: the team channel, the route's own channel, or none. */
   notify_mode?: "team" | "custom" | "off";
@@ -1223,6 +1235,14 @@ export interface AlertRoute {
   /** Post recoveries (OK) and other non-alarm state changes to Teams. Off by default. */
   post_recoveries?: boolean;
   updated_at?: string;
+}
+
+/** A CloudWatch alarm whose ALARM action publishes to a route's topic. */
+export interface TopicAlarm {
+  name: string;
+  state?: string | null;
+  description?: string | null;
+  metric?: string | null;
 }
 
 export interface AlertNotifySettings {
