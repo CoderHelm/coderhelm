@@ -7,8 +7,10 @@ import {
   API_BASE_URL,
   type AlertNotifySettings,
   type AlertRoute,
+  type AlertRule,
   type AwsConnection,
   type Repo,
+  type TopicAlarm,
 } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
@@ -25,10 +27,7 @@ export default function AlertsPageGuarded() {
 
 const EMPTY: AlertRoute = {
   topic_arn: "",
-  action: "fix",
-  repo: "",
-  instructions: "",
-  match_terms: [],
+  rules: [],
   enabled: true,
   notify_mode: "team",
   teams_webhook_url: "",
@@ -52,17 +51,60 @@ function validTeamsUrl(url: string): boolean {
   }
 }
 
-const ACTION_LABEL: Record<"fix" | "notify", { label: string; hint: string }> =
-  {
-    fix: {
-      label: "Open a PR",
-      hint: "CoderHelm makes the change your instructions describe and opens a PR. Every alert also posts to Teams.",
-    },
-    notify: {
-      label: "Notify only",
-      hint: "Each alert posts straight to Teams as a card. No run, no PR, no repo needed.",
-    },
-  };
+const EMPTY_RULE: AlertRule = {
+  alarms: [],
+  terms: [],
+  repo: "",
+  instructions: "",
+};
+
+const STATE_DOT: Record<string, string> = {
+  ALARM: "bg-red-400",
+  OK: "bg-emerald-400",
+  INSUFFICIENT_DATA: "bg-zinc-500",
+};
+
+/** The first rule that takes an alarm by name, as the backend picks it. */
+function ruleForAlarm(rules: AlertRule[], name: string): AlertRule | undefined {
+  return rules.find(
+    (r) =>
+      r.alarms.includes(name) ||
+      (r.alarms.length === 0 && r.terms.every((t) => !t.trim())) ||
+      r.terms.some(
+        (t) => t.trim() && name.toLowerCase().includes(t.trim().toLowerCase()),
+      ),
+  );
+}
+
+function alarmsError(error?: string): string {
+  if (error === "permission")
+    return "CoderHelm can't read this account's alarms yet. Update the CoderHelm stack in AWS to the latest template (it adds read-only cloudwatch:DescribeAlarms).";
+  if (error === "not_connected")
+    return "Connect the topic's AWS account under Integrations → AWS to list its alarms.";
+  return error ? "Couldn't list the topic's alarms right now." : "";
+}
+
+/** The topic's alarms, loaded once per topic. */
+function useTopicAlarms(topicArn: string, enabled: boolean) {
+  const [alarms, setAlarms] = useState<TopicAlarm[] | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (!enabled || !topicArn) return;
+    let live = true;
+    api
+      .listTopicAlarms(topicArn)
+      .then((r) => {
+        if (!live) return;
+        setAlarms(r.alarms);
+        setError(alarmsError(r.error));
+      })
+      .catch(() => live && setError(alarmsError("unavailable")));
+    return () => {
+      live = false;
+    };
+  }, [topicArn, enabled]);
+  return { alarms, error };
+}
 
 const NOTIFY_LABEL: Record<string, string> = {
   team: "Team channel",
@@ -155,10 +197,10 @@ function AlertsPage() {
         <div>
           <h1 className="text-2xl font-bold">Alert routes</h1>
           <p className="text-sm text-zinc-500 mt-1">
-            Turn monitoring alerts into pull requests or Teams cards. For each
-            SNS topic, CoderHelm either makes the change your instructions
-            describe in the mapped repo and opens a PR for review, or just posts
-            the alert to Teams. Nothing merges without a person&apos;s approval.{" "}
+            Turn monitoring alerts into pull requests or Teams cards. Each SNS
+            topic gets rules: pick the alarms that should open a PR, the repo,
+            and how to fix them. Every other alert just posts to Teams. Nothing
+            merges without a person&apos;s approval.{" "}
             <Link
               href="/alerts"
               className="text-zinc-400 hover:text-zinc-200 underline"
@@ -211,30 +253,11 @@ function AlertsPage() {
                       <span className="font-mono text-sm text-zinc-100 truncate">
                         {r.topic_arn.split(":").pop()}
                       </span>
-                      <span className="text-zinc-600">→</span>
-                      {r.action === "notify" ? (
-                        <span className="text-sm text-sky-400">Teams only</span>
-                      ) : (
-                        <span className="font-mono text-sm text-zinc-300 truncate">
-                          {r.repo}
-                        </span>
-                      )}
                     </div>
                     <p className="text-[11px] font-mono text-zinc-500 mt-1 truncate">
                       {r.topic_arn}
                     </p>
-                    {r.action !== "notify" && r.match_terms.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {r.match_terms.map((t) => (
-                          <span
-                            key={t}
-                            className="px-2 py-0.5 text-[11px] bg-zinc-800 text-zinc-300 rounded"
-                          >
-                            {t}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    <RuleSummary rules={r.rules} />
                     <p className="text-[11px] text-zinc-500 mt-2">
                       Teams:{" "}
                       {NOTIFY_LABEL[r.notify_mode ?? "team"] ?? "Team channel"}
@@ -245,6 +268,7 @@ function AlertsPage() {
                         not connected — alerts are ignored until it is.
                       </p>
                     )}
+                    {connected && <RouteAlarms route={r} />}
                   </div>
                   <div className="flex gap-2 shrink-0">
                     <button
@@ -480,6 +504,261 @@ function SetupSteps({ endpoint }: { endpoint: string }) {
   );
 }
 
+function RuleSummary({ rules }: { rules: AlertRule[] }) {
+  return (
+    <div className="mt-2 space-y-1 text-xs">
+      {rules.map((rule, i) => (
+        <div key={rule.id ?? i} className="flex items-center gap-2 min-w-0">
+          <span className="text-zinc-300 truncate">
+            {rule.alarms.length > 0
+              ? rule.alarms.length === 1
+                ? rule.alarms[0]
+                : `${rule.alarms[0]} +${rule.alarms.length - 1}`
+              : rule.terms.length > 0
+                ? `contains “${rule.terms.join("”, “")}”`
+                : "every alert"}
+          </span>
+          <span className="text-zinc-600 shrink-0">→ PR in</span>
+          <span className="font-mono text-zinc-300 truncate">{rule.repo}</span>
+        </div>
+      ))}
+      <div className="flex items-center gap-2 text-zinc-500">
+        <span>{rules.length ? "Everything else" : "Every alert"}</span>
+        <span className="text-zinc-600">→</span>
+        <span className="text-sky-400">Teams only</span>
+      </div>
+    </div>
+  );
+}
+
+function RouteAlarms({ route }: { route: AlertRoute }) {
+  const [open, setOpen] = useState(false);
+  const { alarms, error } = useTopicAlarms(route.topic_arn, open);
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => setOpen(!open)}
+        className="text-[11px] text-zinc-400 hover:text-zinc-200 cursor-pointer"
+      >
+        {open ? "Hide alarms" : "Show alarms on this topic"}
+      </button>
+      {open && (
+        <div className="mt-2 border border-zinc-800 rounded-md max-h-72 overflow-y-auto">
+          {error ? (
+            <p className="text-[11px] text-yellow-400 p-2">{error}</p>
+          ) : alarms === null ? (
+            <p className="text-[11px] text-zinc-500 p-2">Loading...</p>
+          ) : alarms.length === 0 ? (
+            <p className="text-[11px] text-zinc-500 p-2">
+              No alarms publish to this topic.
+            </p>
+          ) : (
+            <ul className="divide-y divide-zinc-800">
+              {alarms.map((a) => {
+                const rule = ruleForAlarm(route.rules, a.name);
+                return (
+                  <li
+                    key={a.name}
+                    className="flex items-center gap-2 px-2 py-1.5 text-[11px]"
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATE_DOT[a.state ?? ""] ?? "bg-zinc-600"}`}
+                      title={a.state ?? ""}
+                    />
+                    <span
+                      className="font-mono text-zinc-300 truncate flex-1"
+                      title={a.description ?? ""}
+                    >
+                      {a.name}
+                    </span>
+                    {rule ? (
+                      <span className="text-emerald-400 shrink-0">
+                        PR · {rule.repo.split("/").pop()}
+                      </span>
+                    ) : (
+                      <span className="text-sky-400 shrink-0">Teams</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AlarmPicker({
+  alarms,
+  selected,
+  onChange,
+}: {
+  alarms: TopicAlarm[];
+  selected: string[];
+  onChange: (names: string[]) => void;
+}) {
+  const [q, setQ] = useState("");
+  const shown = alarms.filter((a) =>
+    a.name.toLowerCase().includes(q.trim().toLowerCase()),
+  );
+  // Selected alarms that no longer exist stay listed so they can be removed.
+  const missing = selected.filter((n) => !alarms.some((a) => a.name === n));
+  const toggle = (name: string) =>
+    onChange(
+      selected.includes(name)
+        ? selected.filter((n) => n !== name)
+        : [...selected, name],
+    );
+  return (
+    <div className="border border-zinc-700 rounded-lg bg-zinc-950">
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder={`Search ${alarms.length} alarms`}
+        className="w-full px-3 py-2 bg-transparent border-b border-zinc-800 text-xs text-zinc-100"
+      />
+      <div className="max-h-48 overflow-y-auto py-1">
+        {[
+          ...missing.map((name) => ({ name, state: "missing" }) as TopicAlarm),
+          ...shown,
+        ].map((a) => (
+          <label
+            key={a.name}
+            className="flex items-center gap-2 px-3 py-1 text-[11px] text-zinc-300 hover:bg-zinc-900 cursor-pointer"
+          >
+            <input
+              type="checkbox"
+              checked={selected.includes(a.name)}
+              onChange={() => toggle(a.name)}
+            />
+            <span
+              className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATE_DOT[a.state ?? ""] ?? "bg-zinc-600"}`}
+            />
+            <span className="font-mono truncate">{a.name}</span>
+            {a.state === "missing" && (
+              <span className="text-yellow-400 shrink-0">not on topic</span>
+            )}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RuleEditor({
+  rule,
+  index,
+  repos,
+  alarms,
+  alarmsError,
+  onChange,
+  onRemove,
+}: {
+  rule: AlertRule;
+  index: number;
+  repos: Repo[];
+  alarms: TopicAlarm[] | null;
+  alarmsError: string;
+  onChange: (r: AlertRule) => void;
+  onRemove: () => void;
+}) {
+  const [terms, setTerms] = useState(rule.terms.join(", "));
+  const [names, setNames] = useState(rule.alarms.join(", "));
+  const split = (v: string) =>
+    v
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+  return (
+    <div className="border border-zinc-800 rounded-lg p-3 space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-zinc-300">
+          Rule {index + 1}
+        </span>
+        <button
+          onClick={onRemove}
+          className="text-[11px] text-red-400 hover:text-red-300 cursor-pointer"
+        >
+          Remove
+        </button>
+      </div>
+      <div>
+        <span className="text-xs text-zinc-400">Alarms that open a PR</span>
+        <div className="mt-1">
+          {alarms ? (
+            <AlarmPicker
+              alarms={alarms}
+              selected={rule.alarms}
+              onChange={(a) => onChange({ ...rule, alarms: a })}
+            />
+          ) : (
+            <>
+              <input
+                value={names}
+                onChange={(e) => {
+                  setNames(e.target.value);
+                  onChange({ ...rule, alarms: split(e.target.value) });
+                }}
+                placeholder="Alarm names, comma-separated"
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-xs font-mono text-zinc-100"
+              />
+              {alarmsError && (
+                <span className="text-[11px] text-yellow-400">
+                  {alarmsError}
+                </span>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+      <label className="block">
+        <span className="text-xs text-zinc-400">
+          Or alerts containing (optional, comma-separated)
+        </span>
+        <input
+          value={terms}
+          onChange={(e) => {
+            setTerms(e.target.value);
+            onChange({ ...rule, terms: split(e.target.value) });
+          }}
+          placeholder="e.g. crawler TLS fingerprint"
+          className="mt-1 w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-xs text-zinc-100"
+        />
+        <span className="text-[11px] text-zinc-500">
+          For non-CloudWatch alerts. Pick no alarms and no text to take every
+          alert.
+        </span>
+      </label>
+      <div>
+        <span className="text-xs text-zinc-400">Repository</span>
+        <div className="mt-1">
+          <RepoCombobox
+            repos={repos}
+            selected={rule.repo}
+            onSelect={(name) => onChange({ ...rule, repo: name })}
+          />
+        </div>
+      </div>
+      <label className="block">
+        <span className="text-xs text-zinc-400">How to fix these alerts</span>
+        <textarea
+          value={rule.instructions}
+          onChange={(e) => onChange({ ...rule, instructions: e.target.value })}
+          rows={5}
+          maxLength={8000}
+          placeholder="e.g. When memory passes 80%, resize the node in envs/prod/main.tf one size up. Quote the alarm's numbers in the PR."
+          className="mt-1 w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-xs text-zinc-100"
+        />
+        <span className="text-[11px] text-zinc-500">
+          Alert text is treated as data, never as instructions — put every rule
+          here.
+        </span>
+      </label>
+    </div>
+  );
+}
+
 function RouteEditor({
   initial,
   isNew,
@@ -497,7 +776,6 @@ function RouteEditor({
 }) {
   const { toast } = useToast();
   const [route, setRoute] = useState<AlertRoute>(initial);
-  const [terms, setTerms] = useState(initial.match_terms.join(", "));
   const [saving, setSaving] = useState(false);
 
   const account = topicAccount(route.topic_arn);
@@ -514,30 +792,28 @@ function RouteEditor({
     !validTeamsUrl(route.teams_webhook_url ?? "")
       ? "Paste a Teams Workflows webhook URL."
       : "";
-  const notifyOnly = route.action === "notify";
+  const { alarms, error: alarmsLoadError } = useTopicAlarms(
+    route.topic_arn.trim(),
+    !!account && !accountError,
+  );
+  const notifyOnly = route.rules.length === 0;
   const silent = notifyOnly && route.notify_mode === "off";
   const canSave =
     !!account &&
     !accountError &&
     !customUrlError &&
-    (notifyOnly || !!route.repo) &&
+    route.rules.every((r) => !!r.repo) &&
     !silent &&
     !saving;
+  const setRule = (i: number, r: AlertRule) =>
+    setRoute({ ...route, rules: route.rules.map((x, k) => (k === i ? r : x)) });
 
   const save = async () => {
     setSaving(true);
     try {
       await api.saveAlertRoute({
         topic_arn: route.topic_arn.trim(),
-        action: notifyOnly ? "notify" : "fix",
-        repo: notifyOnly ? "" : route.repo,
-        instructions: notifyOnly ? "" : route.instructions,
-        match_terms: notifyOnly
-          ? []
-          : terms
-              .split(",")
-              .map((t) => t.trim())
-              .filter(Boolean),
+        rules: route.rules,
         enabled: route.enabled,
         notify_mode: route.notify_mode ?? "team",
         teams_webhook_url:
@@ -569,7 +845,7 @@ function RouteEditor({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-semibold">
@@ -592,79 +868,41 @@ function RouteEditor({
           )}
         </label>
 
-        <div>
-          <span className="text-xs text-zinc-400">When an alert fires</span>
-          <div className="mt-1 grid grid-cols-2 gap-1 p-1 bg-zinc-950 border border-zinc-700 rounded-lg">
-            {(["fix", "notify"] as const).map((a) => (
-              <button
-                key={a}
-                type="button"
-                onClick={() => setRoute({ ...route, action: a })}
-                className={`px-2 py-1.5 text-xs rounded-md cursor-pointer transition-colors ${
-                  (route.action ?? "fix") === a
-                    ? "bg-zinc-700 text-white"
-                    : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                {ACTION_LABEL[a].label}
-              </button>
-            ))}
+        <div className="space-y-3">
+          <div>
+            <span className="text-xs text-zinc-400">Rules</span>
+            <p className="text-[11px] text-zinc-500">
+              The first rule that takes an alert opens a PR. Every alert no rule
+              takes only posts to Teams, at no token cost.
+            </p>
           </div>
-          <span className="text-[11px] text-zinc-500">
-            {ACTION_LABEL[notifyOnly ? "notify" : "fix"].hint}
-          </span>
+          {route.rules.map((rule, i) => (
+            <RuleEditor
+              key={rule.id ?? `new-${i}`}
+              rule={rule}
+              index={i}
+              repos={repos}
+              alarms={alarms}
+              alarmsError={alarmsLoadError}
+              onChange={(r) => setRule(i, r)}
+              onRemove={() =>
+                setRoute({
+                  ...route,
+                  rules: route.rules.filter((_, k) => k !== i),
+                })
+              }
+            />
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              setRoute({ ...route, rules: [...route.rules, { ...EMPTY_RULE }] })
+            }
+            className="w-full px-3 py-2 text-xs border border-dashed border-zinc-700 rounded-lg text-zinc-300 hover:text-white cursor-pointer"
+          >
+            Add rule
+          </button>
         </div>
-
-        {!notifyOnly && (
-          <>
-            <div>
-              <span className="text-xs text-zinc-400">Repository</span>
-              <div className="mt-1">
-                <RepoCombobox
-                  repos={repos}
-                  selected={route.repo}
-                  onSelect={(name) => setRoute({ ...route, repo: name })}
-                />
-              </div>
-            </div>
-
-            <label className="block">
-              <span className="text-xs text-zinc-400">
-                How your team acts on these alerts
-              </span>
-              <textarea
-                value={route.instructions}
-                onChange={(e) =>
-                  setRoute({ ...route, instructions: e.target.value })
-                }
-                rows={7}
-                maxLength={8000}
-                placeholder="e.g. For a new crawler fingerprint, add it to the block list in envs/prod/main.tf, or to the challenge list when the alert says it may be real users. Quote the request and IP counts in the PR."
-                className="mt-1 w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-sm text-zinc-100"
-              />
-              <span className="text-[11px] text-zinc-500">
-                Alert text itself is treated as data, never as instructions —
-                put every rule here.
-              </span>
-            </label>
-
-            <label className="block">
-              <span className="text-xs text-zinc-400">
-                Only open PRs for alerts containing (optional, comma-separated)
-              </span>
-              <input
-                value={terms}
-                onChange={(e) => setTerms(e.target.value)}
-                placeholder="e.g. fingerprint, 5xx"
-                className="mt-1 w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-sm text-zinc-100"
-              />
-              <span className="text-[11px] text-zinc-500">
-                Empty = every alert on the topic. Teams notifications cover
-                every alert either way.
-              </span>
-            </label>
-          </>
-        )}
 
         <div>
           <span className="text-xs text-zinc-400">Teams notifications</span>
