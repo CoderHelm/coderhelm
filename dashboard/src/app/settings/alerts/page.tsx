@@ -88,6 +88,7 @@ function alarmsError(error?: string): string {
 /** The topic's alarms, loaded once per topic. */
 function useTopicAlarms(topicArn: string, enabled: boolean) {
   const [alarms, setAlarms] = useState<TopicAlarm[] | null>(null);
+  const [messages, setMessages] = useState<string[]>([]);
   const [error, setError] = useState("");
   useEffect(() => {
     if (!enabled || !topicArn) return;
@@ -96,7 +97,8 @@ function useTopicAlarms(topicArn: string, enabled: boolean) {
       .listTopicAlarms(topicArn)
       .then((r) => {
         if (!live) return;
-        setAlarms(r.alarms);
+        setAlarms(r.error ? null : r.alarms);
+        setMessages(r.messages ?? []);
         setError(alarmsError(r.error));
       })
       .catch(() => live && setError(alarmsError("unavailable")));
@@ -104,7 +106,7 @@ function useTopicAlarms(topicArn: string, enabled: boolean) {
       live = false;
     };
   }, [topicArn, enabled]);
-  return { alarms, error };
+  return { alarms, messages, error };
 }
 
 const NOTIFY_LABEL: Record<string, string> = {
@@ -466,6 +468,24 @@ function TeamsChannel() {
   );
 }
 
+/** "500k", "1.5M", "250,000" → tokens; null when not a number. */
+function parseTokens(v: string): number | null {
+  const m = v
+    .trim()
+    .replace(/,/g, "")
+    .match(/^(\d+(?:\.\d+)?)\s*([km])?$/i);
+  if (!m) return null;
+  const mult =
+    { k: 1_000, m: 1_000_000 }[(m[2] ?? "").toLowerCase() as "k" | "m"] ?? 1;
+  return Math.round(Number(m[1]) * mult);
+}
+
+function fmtTokens(n: number): string {
+  if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `${+(n / 1_000).toFixed(1)}k`;
+  return String(n);
+}
+
 function AlertBudgetCard() {
   const { toast } = useToast();
   const [budget, setBudget] = useState<AlertBudget | null>(null);
@@ -476,19 +496,20 @@ function AlertBudgetCard() {
       .getAlertBudget()
       .then((b) => {
         setBudget(b);
-        setValue(String(b.daily_usd));
+        setValue(fmtTokens(b.daily_tokens));
       })
       .catch(() => {});
   }, []);
-  const n = Number(value);
-  const valid =
-    value.trim() !== "" && Number.isFinite(n) && n >= 0 && n <= 10000;
+  const n = parseTokens(value);
+  const valid = n !== null && n <= 100_000_000;
   const save = async () => {
+    if (n === null) return;
     setSaving(true);
     try {
       await api.saveAlertBudget(n);
-      setBudget(budget ? { ...budget, daily_usd: n } : budget);
-      toast("Alert budget saved", "success");
+      setBudget(budget ? { ...budget, daily_tokens: n } : budget);
+      setValue(fmtTokens(n));
+      toast("Alert token budget saved", "success");
     } catch {
       toast("Failed to save the budget", "error");
     } finally {
@@ -498,34 +519,35 @@ function AlertBudgetCard() {
   const used = budget
     ? Math.min(
         100,
-        (budget.spent_24h_usd / Math.max(budget.daily_usd, 0.01)) * 100,
+        (budget.used_24h_tokens / Math.max(budget.daily_tokens, 1)) * 100,
       )
     : 0;
   return (
     <div className="border border-zinc-800 rounded-lg p-4 mb-4 text-sm">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-zinc-200 font-medium">Daily alert budget</p>
+          <p className="text-zinc-200 font-medium">Daily alert token budget</p>
           <p className="text-xs text-zinc-500 mt-0.5">
-            Alert runs stop for the day once they&apos;ve cost this much (runs
-            still in progress count as $5 each). Alerts keep posting to Teams.
-            Each rule also starts at most{" "}
+            Alert runs stop for the day once they&apos;ve used this many tokens
+            (input + output, as in your monthly limit; a run in progress counts
+            as {fmtTokens(budget?.open_run_reserve_tokens ?? 50_000)}). Alerts
+            keep posting to Teams. Each rule also starts at most{" "}
             {budget?.max_runs_per_rule_per_day ?? 5} runs a day. 0 turns alert
             runs off.
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-zinc-500">$</span>
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            inputMode="decimal"
-            className="w-20 px-2 py-1.5 bg-zinc-950 border border-zinc-700 rounded-lg text-sm text-zinc-100"
+            placeholder="500k"
+            className="w-24 px-2 py-1.5 bg-zinc-950 border border-zinc-700 rounded-lg text-sm text-zinc-100"
           />
+          <span className="text-zinc-500 text-xs">tokens</span>
           <button
             onClick={save}
             disabled={
-              !valid || saving || (budget !== null && n === budget.daily_usd)
+              !valid || saving || (budget !== null && n === budget.daily_tokens)
             }
             className="px-3 py-1.5 text-xs font-medium bg-white text-zinc-900 rounded-lg hover:bg-zinc-200 disabled:opacity-40 cursor-pointer"
           >
@@ -542,7 +564,8 @@ function AlertBudgetCard() {
             />
           </div>
           <p className="text-[11px] text-zinc-500 mt-1">
-            ${budget.spent_24h_usd.toFixed(2)} spent in the last 24 hours
+            {fmtTokens(budget.used_24h_tokens)} of{" "}
+            {fmtTokens(budget.daily_tokens)} tokens used in the last 24 hours
             {budget.open_runs > 0 &&
               ` · ${budget.open_runs} run${budget.open_runs > 1 ? "s" : ""} in progress`}
           </p>
@@ -740,6 +763,7 @@ function RuleEditor({
   index,
   repos,
   alarms,
+  messages,
   alarmsError,
   onChange,
   onRemove,
@@ -748,6 +772,7 @@ function RuleEditor({
   index: number;
   repos: Repo[];
   alarms: TopicAlarm[] | null;
+  messages: string[];
   alarmsError: string;
   onChange: (r: AlertRule) => void;
   onRemove: () => void;
@@ -864,6 +889,38 @@ function RuleEditor({
             For alerts that aren&apos;t CloudWatch alarms, like the crawler
             fingerprint detector. Matches the alert&apos;s title or text.
           </span>
+          {messages.length > 0 && (
+            <div className="mt-2">
+              <span className="text-[11px] text-zinc-400">
+                Seen on this topic — click to use:
+              </span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {messages.map((m) => {
+                  const on = rule.terms.includes(m);
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => {
+                        const next = on
+                          ? rule.terms.filter((t) => t !== m)
+                          : [...rule.terms, m];
+                        setTerms(next.join(", "));
+                        onChange({ ...rule, terms: next });
+                      }}
+                      className={`px-2 py-0.5 text-[11px] rounded border cursor-pointer ${
+                        on
+                          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                          : "bg-zinc-900 border-zinc-700 text-zinc-300 hover:text-white"
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {rule.terms.length === 0 && (
             <span className="block text-[11px] text-yellow-400">
               Add at least one phrase.
@@ -933,10 +990,11 @@ function RouteEditor({
     !validTeamsUrl(route.teams_webhook_url ?? "")
       ? "Paste a Teams Workflows webhook URL."
       : "";
-  const { alarms, error: alarmsLoadError } = useTopicAlarms(
-    route.topic_arn.trim(),
-    !!account && !accountError,
-  );
+  const {
+    alarms,
+    messages,
+    error: alarmsLoadError,
+  } = useTopicAlarms(route.topic_arn.trim(), !!account && !accountError);
   const notifyOnly = route.rules.length === 0;
   const silent = notifyOnly && route.notify_mode === "off";
   const canSave =
@@ -1026,6 +1084,7 @@ function RouteEditor({
               index={i}
               repos={repos}
               alarms={alarms}
+              messages={messages}
               alarmsError={alarmsLoadError}
               onChange={(r) => setRule(i, r)}
               onRemove={() =>
