@@ -22,6 +22,36 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return text ? JSON.parse(text) : (undefined as T);
 }
 
+/**
+ * Like `request`, but a non-2xx response with a JSON body is returned instead of
+ * thrown. Used where the failure body carries detail the screen must show next
+ * to its cause (the named checks of a data source), not just a message.
+ */
+async function requestWithBody<T, E>(
+  path: string,
+  options?: RequestInit,
+): Promise<({ ok: true } & T) | ({ ok: false; error: string } & Partial<E>)> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    credentials: "include",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+  });
+  const text = await res.text().catch(() => "");
+  let body: Record<string, unknown> = {};
+  try {
+    body = text ? JSON.parse(text) : {};
+  } catch {}
+  if (!res.ok) {
+    const error = typeof body.error === "string" && body.error ? body.error : `API ${res.status}: ${res.statusText}`;
+    return { ...(body as Partial<E>), ok: false, error };
+  }
+  return { ...(body as T), ok: true };
+}
+
 export const api = {
   // Auth
   me: () =>
@@ -751,6 +781,55 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ repo, tag, resend }),
     }),
+
+  // Data sources
+  listDataSources: () => request<{ sources: DataSource[] }>("/api/data-sources"),
+  probeDataSourceApi: (url: string) =>
+    request<DataSourceProbe>("/api/data-sources/api/probe", {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    }),
+  checkDataSourceApi: (url: string, key: string) =>
+    request<DataSourceCheckResult>("/api/data-sources/api/check", {
+      method: "POST",
+      body: JSON.stringify({ url, key }),
+    }),
+  /** Does not throw on failed checks: the body (with `checks`) is returned so they can be shown. */
+  createDataSourceApi: (data: { url: string; key: string; name?: string }) =>
+    requestWithBody<{ source: DataSource; checks: DataSourceCheck[] }, { checks: DataSourceCheck[] }>(
+      "/api/data-sources/api",
+      { method: "POST", body: JSON.stringify(data) },
+    ),
+  updateDataSource: (
+    id: string,
+    data: { enabled?: boolean; hidden_fields?: string[]; repos?: string[]; name?: string },
+  ) =>
+    request<{ source: DataSource }>(`/api/data-sources/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  /** Does not throw on failed checks, like `createDataSourceApi`. */
+  replaceDataSourceKey: (id: string, key: string) =>
+    requestWithBody<{ source: DataSource; checks: DataSourceCheck[] }, { checks: DataSourceCheck[] }>(
+      `/api/data-sources/${encodeURIComponent(id)}/key`,
+      { method: "POST", body: JSON.stringify({ key }) },
+    ),
+  testDataSource: (id: string) =>
+    request<DataSourceCheckResult & { source: DataSource }>(
+      `/api/data-sources/${encodeURIComponent(id)}/test`,
+      { method: "POST" },
+    ),
+  deleteDataSource: (id: string) =>
+    request<{ ok: true }>(`/api/data-sources/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  getDataSourceSamples: (id: string) =>
+    request<{ samples: DataSourceSample[] }>(`/api/data-sources/${encodeURIComponent(id)}/samples`),
+  tryDataSource: (id: string, query: string) =>
+    request<DataSourceTryResult>(`/api/data-sources/${encodeURIComponent(id)}/try`, {
+      method: "POST",
+      body: JSON.stringify({ query }),
+    }),
+  listDataSourceActivity: (limit = 50) =>
+    request<{ events: DataSourceActivityEvent[] }>(`/api/data-sources/activity?limit=${limit}`),
 };
 
 export interface Release {
@@ -1381,4 +1460,93 @@ export interface MemoryListResponse {
 export interface MemoryStats {
   total: number;
   by_type: Record<string, number>;
+}
+
+// Data sources
+export interface DataSource {
+  id: string;
+  kind: "api";
+  name: string;
+  url: string;
+  status: "ready" | "error";
+  status_message?: string;
+  enabled: boolean;
+  /** True from the first time the source is turned on. The reviewer uses a source only when it is enabled and its status is "ready". */
+  setup_complete: boolean;
+  /** Last four characters of the key, or "" for a very short key. */
+  key_hint: string;
+  has_mutations: boolean;
+  kinds: number | null;
+  schema_available: boolean;
+  hidden_fields: string[];
+  /** Empty means all repositories. */
+  repos: string[];
+  last_checked_at: string;
+  created_at: string;
+  created_by: string;
+}
+
+export type DataSourceStepId = "reach" | "sign_in" | "read" | "read_only";
+
+export interface DataSourceCheck {
+  id: DataSourceStepId;
+  label: string;
+  ok: boolean;
+  detail: string;
+  fix?: string;
+}
+
+export interface DataSourceStepError {
+  /** A step id (see DataSourceStepId). Show its label, never the id. */
+  step: string;
+  message: string;
+  fix: string;
+}
+
+export interface DataSourceProbe {
+  ok: boolean;
+  kind: "graphql" | null;
+  needs_key: boolean;
+  error?: DataSourceStepError;
+}
+
+export interface DataSourceCheckResult {
+  ok: boolean;
+  checks: DataSourceCheck[];
+  kinds: number | null;
+  has_mutations: boolean;
+  schema_available: boolean;
+}
+
+export interface DataSourceSample {
+  label: string;
+  query: string;
+}
+
+export interface DataSourceTryResult {
+  ok: boolean;
+  query: string;
+  fields: string[];
+  result?: string;
+  hidden_count: number;
+  ms: number;
+  /** Why the lookup was refused, including what to do. */
+  refused?: string;
+  error?: DataSourceStepError;
+}
+
+export interface DataSourceActivityEvent {
+  at: string;
+  source_id: string;
+  source_name: string;
+  /** The literal string "reviewer" for a review, otherwise a person's email. */
+  actor: string;
+  repo?: string;
+  pr?: number;
+  summary: string;
+  /** Why a lookup was refused or failed. Empty when it worked. */
+  detail?: string;
+  ok: boolean;
+  outcome: "ok" | "refused" | "failed";
+  ms: number;
 }
