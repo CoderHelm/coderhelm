@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@iconify-json/logos": "^1.2.11",
@@ -21,6 +22,7 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "@tailwindcss/postcss": "^4.1.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.1.0",

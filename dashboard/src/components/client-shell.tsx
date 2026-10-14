@@ -12,7 +12,7 @@ import {
   GitBranchIcon, GearIcon, AtlassianIcon, GitHubIcon, UsersIcon,
   BellIcon, TargetIcon, RepeatIcon, ShieldCheckIcon,
   AwsIcon, PluginIcon, ShieldIcon, TemplateIcon, CpuIcon, BrainIcon,
-  LifeBuoyIcon, MailIcon, ExternalLinkIcon,
+  LifeBuoyIcon, MailIcon, ExternalLinkIcon, DatabaseIcon,
 } from "./icons";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
@@ -82,6 +82,7 @@ const navGroups: NavGroup[] = [
       { href: "/settings/github", label: "GitHub", icon: <GitHubIcon />, adminOnly: true },
       { href: "/settings/aws", label: "AWS", icon: <AwsIcon />, adminOnly: true },
       { href: "/settings/alerts", label: "Alert routes", icon: <BellIcon />, adminOnly: true },
+      { href: "/data-sources", label: "Data sources", icon: <DatabaseIcon />, adminOnly: true },
       { href: "/settings/jira", label: "Jira", icon: <AtlassianIcon />, adminOnly: true },
       { href: "/settings/plugins", label: "MCP Servers", icon: <PluginIcon />, adminOnly: true },
       { href: "/settings/models", label: "AI Models", icon: <CpuIcon />, adminOnly: true },
@@ -132,6 +133,68 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     });
   };
   const [authChecked, setAuthChecked] = useState(false);
+
+  // Small screens: the sidebar is a drawer opened from a top bar. From md up
+  // the wrapper is `display: contents`, so the desktop layout is untouched.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const menuWasOpen = useRef(false);
+
+  // Close on navigation.
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) {
+      // Hand focus back to the button that opened the menu.
+      if (menuWasOpen.current) menuButtonRef.current?.focus();
+      menuWasOpen.current = false;
+      return;
+    }
+    menuWasOpen.current = true;
+    const drawer = drawerRef.current;
+    const focusable = () =>
+      Array.from(drawer?.querySelectorAll<HTMLElement>("a[href], button:not([disabled])") ?? [])
+        .filter((el) => el.offsetParent !== null);
+    focusable()[0]?.focus();
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setMenuOpen(false);
+        return;
+      }
+      if (e.key !== "Tab") return;
+      // Keep focus inside the open menu.
+      const items = focusable();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !drawer?.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || !drawer?.contains(active))) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+
+    // The drawer only exists below md. If the window grows, close it.
+    const wide = window.matchMedia("(min-width: 768px)");
+    const onWide = () => { if (wide.matches) setMenuOpen(false); };
+    wide.addEventListener("change", onWide);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+      wide.removeEventListener("change", onWide);
+    };
+  }, [menuOpen]);
 
   useEffect(() => {
     api.me()
@@ -233,8 +296,52 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     <ToastProvider>
     <ConfirmProvider>
       <div className="flex min-h-screen bg-zinc-950">
-        <Sidebar usage={usage} user={user} teams={teams} />
-        <div className="flex-1 flex flex-col">
+        {menuOpen && (
+          <div aria-hidden="true" className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={() => setMenuOpen(false)} />
+        )}
+        <div
+          id="app-menu"
+          ref={drawerRef}
+          role={menuOpen ? "dialog" : undefined}
+          aria-modal={menuOpen ? true : undefined}
+          aria-label={menuOpen ? "Menu" : undefined}
+          // A link to the page you are already on does not change the path, so close on any link click too.
+          onClick={(e) => { if ((e.target as HTMLElement).closest("a")) setMenuOpen(false); }}
+          className={`${menuOpen ? "fixed inset-y-0 left-0 z-50 flex shadow-2xl" : "hidden"} md:contents`}
+        >
+          <Sidebar usage={usage} user={user} teams={teams} />
+          <button
+            type="button"
+            onClick={() => setMenuOpen(false)}
+            className="md:hidden absolute top-3 right-2 inline-flex h-8 items-center rounded-md px-2 text-xs text-zinc-400 hover:text-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100"
+          >
+            Close
+          </button>
+        </div>
+        <div className="flex-1 min-w-0 flex flex-col">
+          <header className="md:hidden sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-zinc-800/60 bg-zinc-950 px-4 py-2">
+            <Link href="/" className="flex items-center gap-2.5 rounded-md py-1">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" className="w-5 h-5 flex-shrink-0" aria-hidden="true">
+                <polygon points="106,416 158,416 226,96 174,96" fill="white"/>
+                <polygon points="196,416 248,416 316,96 264,96" fill="#3B82F6"/>
+                <polygon points="286,416 338,416 406,96 354,96" fill="white"/>
+              </svg>
+              <span className="text-sm font-semibold text-zinc-100">Coderhelm</span>
+            </Link>
+            <button
+              ref={menuButtonRef}
+              type="button"
+              aria-expanded={menuOpen}
+              aria-controls="app-menu"
+              onClick={() => setMenuOpen(true)}
+              className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-3 text-sm font-medium text-zinc-300 hover:bg-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                <line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" />
+              </svg>
+              Menu
+            </button>
+          </header>
           {banners.filter((b) => !dismissedBanners.has(b.id)).map((banner) => (
             <div
               key={banner.id}
@@ -296,7 +403,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                 </a>
               </div>
           )}
-          <main className="flex-1 p-8">{children}</main>
+          <main className="flex-1 p-4 md:p-8">{children}</main>
         </div>
       </div>
     </ConfirmProvider>

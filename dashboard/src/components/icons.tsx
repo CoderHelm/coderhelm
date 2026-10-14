@@ -42,3 +42,17 @@ export const BrainIcon = () => <svg {...s}><path d="M9.5 2A5.5 5.5 0 005 6.36V6.
 export const LifeBuoyIcon = () => <svg {...s}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" /><line x1="4.93" y1="4.93" x2="9.17" y2="9.17" /><line x1="14.83" y1="14.83" x2="19.07" y2="19.07" /><line x1="14.83" y1="9.17" x2="19.07" y2="4.93" /><line x1="4.93" y1="19.07" x2="9.17" y2="14.83" /></svg>;
 export const MailIcon = () => <svg {...s}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>;
 export const ExternalLinkIcon = () => <svg {...s}><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>;
+
+// Data sources + shared form component icons
+export const DatabaseIcon = () => <svg {...s}><ellipse cx="12" cy="6" rx="7" ry="3" /><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6" /><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" /></svg>;
+export const CodeIcon = () => <svg {...s}><polyline points="8 8 4 12 8 16" /><polyline points="16 8 20 12 16 16" /><line x1="13" y1="6" x2="11" y2="18" /></svg>;
+export const WrenchIcon = () => <svg {...s}><path d="M14.5 6.5a4 4 0 00-5.2 5.2L4 17l3 3 5.3-5.3a4 4 0 005.2-5.2l-2.6 2.6-2.4-.6-.6-2.4z" /></svg>;
+export const CheckIcon = () => <svg {...s} strokeWidth={2.5}><polyline points="20 6 9 17 4 12" /></svg>;
+export const XIcon = () => <svg {...s} strokeWidth={2}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>;
+export const CopyIcon = () => <svg {...s}><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>;
+export const ChevronRightIcon = () => <svg {...s} strokeWidth={2}><polyline points="9 6 15 12 9 18" /></svg>;
+export const WarningIcon = () => <svg {...s}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><circle cx="12" cy="17" r="0.5" fill="currentColor" /></svg>;
+export const InfoIcon = () => <svg {...s}><circle cx="12" cy="12" r="10" /><line x1="12" y1="11" x2="12" y2="16" /><circle cx="12" cy="8" r="0.5" fill="currentColor" /></svg>;
+export const AlertCircleIcon = () => <svg {...s}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="13" /><circle cx="12" cy="16" r="0.5" fill="currentColor" /></svg>;
+export const EyeIcon = () => <svg {...s}><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" /><circle cx="12" cy="12" r="3" /></svg>;
+export const EyeOffIcon = () => <svg {...s}><path d="M17.94 17.94A10.9 10.9 0 0112 19C5 19 1 12 1 12a20.3 20.3 0 015.06-5.94" /><path d="M9.9 4.24A10.4 10.4 0 0112 4c7 0 11 8 11 8a20.3 20.3 0 01-2.16 3.19" /><path d="M14.12 14.12a3 3 0 01-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>;
