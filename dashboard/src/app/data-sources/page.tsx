@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { api, type DataSource, type DataSourceActivityEvent } from "@/lib/api";
 import {
   DEFAULT_HIDDEN_FIELDS, errorMessage, formatDuration, readSetupHint, clearSetupHint,
-  runningChecks, timeAgo, toCheckItems,
+  runningChecks, actorLabel,
+  timeAgo, toCheckItems,
 } from "@/lib/data-sources";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
@@ -65,10 +66,10 @@ function DataSourcesPage() {
   return (
     <div className="max-w-4xl">
       <h1 className="text-2xl font-bold text-zinc-100 text-balance">
-        Let the reviewer check facts against your real systems
+        Let Coderhelm check facts against your real systems
       </h1>
       <p className="mt-2 max-w-prose text-sm text-zinc-400">
-        Connect a source and the reviewer can look things up while it reviews, like whether a field really exists or a
+        Connect a source and Coderhelm can look things up while it plans, writes code and reviews, like whether a field really exists or a
         setting is live. It can only read. It can never change your data.
       </p>
       {anyOn && (
@@ -558,9 +559,7 @@ function Activity({ events, error, loading }: { events: DataSourceActivityEvent[
                 )}
                 <p className="mt-1 break-words text-xs text-zinc-500">
                   <span className="text-zinc-400">
-                    {ev.actor === "reviewer"
-                      ? ev.repo ? `Reviewer on ${ev.repo}${ev.pr ? ` #${ev.pr}` : ""}` : "Reviewer"
-                      : ev.actor}
+                    {actorLabel(ev)}
                   </span>
                   <span aria-hidden="true"> · </span>
                   {ev.source_name}

@@ -175,7 +175,7 @@ test("hub: empty state", async ({ page }) => {
   await mockApi(page);
   await page.goto("/data-sources");
 
-  await expect(page.getByRole("heading", { level: 1, name: "Let the reviewer check facts against your real systems" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Let Coderhelm check facts against your real systems" })).toBeVisible();
   await expect(page.getByRole("link", { name: /An API/ })).toBeVisible();
   await expect(page.getByText("Coming next")).toHaveCount(2);
   await expect(page.getByRole("link", { name: /A database/ })).toHaveCount(0);
@@ -441,6 +441,7 @@ test("a source in error status says the reviewer is not using it, and activity e
       { at: now, source_id: "ds_1", source_name: "api.yourcompany.com", actor: "reviewer", repo: "your-team/backend", pr: 123, summary: "Checked the fields of an order", detail: "", ok: true, outcome: "ok", ms: 210 },
       { at: now, source_id: "ds_1", source_name: "api.yourcompany.com", actor: "admin@example.com", summary: "A write was attempted", detail: REFUSAL, ok: false, outcome: "refused", ms: 2 },
       { at: now, source_id: "ds_1", source_name: "api.yourcompany.com", actor: "reviewer", repo: "your-team/web", pr: 7, summary: "Looked up a setting", detail: "Your API did not answer in time.", ok: false, outcome: "failed", ms: 10000 },
+      { at: now, source_id: "ds_1", source_name: "api.yourcompany.com", actor: "planner", repo: "your-team/backend", pr: 0, summary: "Checked which fields an order has", detail: "", ok: true, outcome: "ok", ms: 160 },
     ],
   });
   await page.goto("/data-sources");
@@ -454,6 +455,7 @@ test("a source in error status says the reviewer is not using it, and activity e
 
   const activity = page.locator("#activity");
   await expect(activity.getByText("Reviewer on your-team/backend #123")).toBeVisible();
+  await expect(activity.getByText("Planner on your-team/backend", { exact: true })).toBeVisible();
   await expect(activity.getByText("admin@example.com")).toBeVisible();
   await expect(activity.getByText(REFUSAL)).toBeVisible();
   await expect(activity.getByText("Your API did not answer in time.")).toBeVisible();

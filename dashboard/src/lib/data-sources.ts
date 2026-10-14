@@ -119,3 +119,18 @@ export function prettyJson(text: string): string {
 export function errorMessage(e: unknown, fallback: string): string {
   return e instanceof Error && e.message ? e.message : fallback;
 }
+
+/** Agents that look things up, by the name the activity log records. */
+const AGENT_NAMES: Record<string, string> = {
+  reviewer: "Reviewer",
+  planner: "Planner",
+  coder: "Coding agent",
+};
+
+/** Who ran a lookup: an agent and where it was working, or a person's email. */
+export function actorLabel(ev: { actor: string; repo?: string; pr?: number }): string {
+  const agent = AGENT_NAMES[ev.actor];
+  if (!agent) return ev.actor;
+  if (!ev.repo) return agent;
+  return `${agent} on ${ev.repo}${ev.pr ? ` #${ev.pr}` : ""}`;
+}
