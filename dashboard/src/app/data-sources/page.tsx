@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { api, type DataSource, type DataSourceActivityEvent } from "@/lib/api";
+import { api, type AwsLogGroup, type DataSource, type DataSourceActivityEvent } from "@/lib/api";
 import {
-  DEFAULT_HIDDEN_FIELDS, errorMessage, formatDuration, readSetupHint, clearSetupHint,
-  runningChecks, actorLabel,
+  DEFAULT_HIDDEN_FIELDS, KIND_LABEL, errorMessage, formatDuration, readSetupHint, clearSetupHint,
+  runningChecks, actorLabel, checksFor, countLabel, hiddenNoun, whereLabel,
   timeAgo, toCheckItems,
 } from "@/lib/data-sources";
 import { RoleGuard } from "@/components/role-guard";
@@ -17,7 +17,8 @@ import { Field, SecretInput } from "@/components/field";
 import { HiddenFieldsEditor } from "@/components/hidden-fields-editor";
 import { StatusPill } from "@/components/status-pill";
 import { StepDot } from "@/components/stepper";
-import { CodeIcon, DatabaseIcon, WrenchIcon } from "@/components/icons";
+import { CodeIcon, DatabaseIcon, LogsIcon, WrenchIcon } from "@/components/icons";
+import { LogGroupPicker } from "@/components/log-group-picker";
 import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 
 export default function DataSourcesPageGuarded() {
@@ -25,6 +26,7 @@ export default function DataSourcesPageGuarded() {
 }
 
 const CONNECT = "/data-sources/connect";
+const CONNECT_AWS = "/data-sources/connect/aws";
 
 function DataSourcesPage() {
   const [sources, setSources] = useState<DataSource[] | null>(null);
@@ -85,19 +87,31 @@ function DataSourcesPage() {
         </div>
       )}
 
-      <div className="mt-7 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-        <Link
+      <div className="mt-7 grid gap-3.5 sm:grid-cols-2">
+        <ConnectCard
           href={`${CONNECT}?step=address`}
-          className={`flex min-h-40 flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-left hover:border-zinc-600 transition-colors motion-reduce:transition-none ${focusRing}`}
+          icon={<CodeIcon />}
+          title="An API"
+          time="About 2 minutes"
         >
-          <SourceIcon><CodeIcon /></SourceIcon>
-          <span className="font-semibold text-zinc-100">An API</span>
-          <span className="flex-1 text-sm text-zinc-400">The web address your apps already talk to. The reviewer asks it questions.</span>
-          <span className="text-xs text-zinc-500">About 2 minutes</span>
-        </Link>
-        <ComingNextCard icon={<DatabaseIcon />} title="A database">
-          Read-only access through your AWS account. No passwords shared with us.
-        </ComingNextCard>
+          The web address your apps already talk to. Coderhelm asks it questions.
+        </ConnectCard>
+        <ConnectCard
+          href={`${CONNECT_AWS}?for=logs`}
+          icon={<LogsIcon />}
+          title="Logs in your AWS account"
+          time="About 3 minutes"
+        >
+          Coderhelm searches your logs for the errors behind a bug report. Only the log groups you choose.
+        </ConnectCard>
+        <ConnectCard
+          href={`${CONNECT_AWS}?for=database`}
+          icon={<DatabaseIcon />}
+          title="A database in your AWS account"
+          time="About 5 minutes"
+        >
+          Read-only access to a PostgreSQL database, so Coderhelm can check the records a ticket names.
+        </ConnectCard>
         <ComingNextCard icon={<WrenchIcon />} title="Your own tools">
           Named lookups your engineers already trust, like &quot;find order by number&quot;.
         </ComingNextCard>
@@ -135,8 +149,8 @@ function DataSourcesPage() {
         <div id="what-we-store" className="mt-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm text-zinc-300">
           <h2 className="font-semibold text-zinc-100">What we store</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>The address of your API.</li>
-            <li>The key, encrypted. It is never shown again, not even to you.</li>
+            <li>For an API: its address, and the key, encrypted. The key is never shown again, not even to you.</li>
+            <li>For logs and databases: the name of the read-only role in your AWS account, and which log groups or database it may read. No passwords: the database password stays in your account.</li>
             <li>A log of every lookup: when it ran, who asked, what was asked and whether it worked.</li>
           </ul>
           <p className="mt-2">The activity log keeps the text of each lookup (not what came back) for 180 days.</p>
@@ -144,8 +158,8 @@ function DataSourcesPage() {
           <h2 className="mt-4 font-semibold text-zinc-100">How to turn it off</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             <li>Pause a source with its switch. Nothing is looked up while it is paused.</li>
-            <li>Remove the source. We delete the saved key.</li>
-            <li>Revoke the key at your API. That also cuts access immediately, without coming here.</li>
+            <li>Remove the source. For an API we delete the saved key.</li>
+            <li>Revoke the key at your API, or delete the CoderhelmReadOnly role in your AWS account. Either cuts access immediately, without coming here.</li>
           </ul>
         </div>
       )}
@@ -163,6 +177,32 @@ function SourceIcon({ children }: { children: ReactNode }) {
   );
 }
 
+function ConnectCard({
+  href,
+  icon,
+  title,
+  time,
+  children,
+}: {
+  href: string;
+  icon: ReactNode;
+  title: string;
+  time: string;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`flex min-h-40 flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-left hover:border-zinc-600 transition-colors motion-reduce:transition-none ${focusRing}`}
+    >
+      <SourceIcon>{icon}</SourceIcon>
+      <span className="font-semibold text-zinc-100">{title}</span>
+      <span className="flex-1 text-sm text-zinc-400">{children}</span>
+      <span className="text-xs text-zinc-500">{time}</span>
+    </Link>
+  );
+}
+
 function ComingNextCard({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
   return (
     <div aria-disabled="true" className="flex min-h-40 flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900/30 p-5">
@@ -176,7 +216,7 @@ function ComingNextCard({ icon, title, children }: { icon: ReactNode; title: str
 
 // ── One connected source ──────────────────────────────────────────
 
-type Panel = "test" | "key" | "hidden" | null;
+type Panel = "test" | "key" | "hidden" | "groups" | null;
 
 function SourceCard({
   source,
@@ -190,7 +230,7 @@ function SourceCard({
   const { toast } = useToast();
   const { confirm } = useConfirm();
   const [panel, setPanel] = useState<Panel>(null);
-  const [busy, setBusy] = useState<"" | "toggle" | "test" | "key" | "hidden" | "remove">("");
+  const [busy, setBusy] = useState<"" | "toggle" | "test" | "key" | "hidden" | "groups" | "remove">("");
   const [error, setError] = useState<{ title: string; body: string } | null>(null);
   const [checks, setChecks] = useState<CheckItem[] | null>(null);
   const [testOk, setTestOk] = useState<boolean | null>(null);
@@ -198,6 +238,12 @@ function SourceCard({
   const [keyChecks, setKeyChecks] = useState<CheckItem[] | null>(null);
   const [keyError, setKeyError] = useState("");
   const [hidden, setHidden] = useState<string[]>(source.hidden_fields);
+  const [groups, setGroups] = useState<string[]>(source.aws?.log_groups ?? []);
+  const [available, setAvailable] = useState<AwsLogGroup[] | null>(null);
+  const [groupsError, setGroupsError] = useState("");
+  const expected = checksFor(source.kind);
+  const noun = hiddenNoun(source.kind);
+  const isApi = source.kind === "api";
 
   const unfinished = !source.setup_complete;
   const hint = useMemo(() => (unfinished ? readSetupHint(source.id) : null), [unfinished, source.id]);
@@ -227,11 +273,11 @@ function SourceCard({
     setPanel("test");
     setError(null);
     setTestOk(null);
-    setChecks(runningChecks());
+    setChecks(runningChecks(expected));
     setBusy("test");
     try {
       const res = await api.testDataSource(source.id);
-      setChecks(toCheckItems(res.checks));
+      setChecks(toCheckItems(res.checks, expected));
       setTestOk(res.ok);
       if (res.source) onChange(res.source);
     } catch (e) {
@@ -273,11 +319,44 @@ function SourceCard({
     try {
       const res = await api.updateDataSource(source.id, { hidden_fields: hidden });
       onChange(res.source);
-      toast("Saved what the reviewer can't see");
+      toast("Saved what Coderhelm can't see");
       setPanel(null);
     } catch (e) {
       setError({
-        title: "We couldn't save the hidden fields",
+        title: `We couldn't save the hidden ${noun.many}`,
+        body: `${errorMessage(e, "The request failed.")} The earlier list is still in use. Press Save again.`,
+      });
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const openGroups = async () => {
+    setGroups(source.aws?.log_groups ?? []);
+    open("groups");
+    if (available || !source.aws) return;
+    setGroupsError("");
+    try {
+      const res = await api.connectAws({ role_arn: source.aws.role_arn, region: source.aws.region });
+      setAvailable(res.log_groups ?? []);
+      if (!res.ok) setGroupsError(res.checks.find((c) => !c.ok)?.detail ?? "We couldn't list your log groups.");
+    } catch (e) {
+      setAvailable([]);
+      setGroupsError(errorMessage(e, "The request failed."));
+    }
+  };
+
+  const saveGroups = async () => {
+    setBusy("groups");
+    setError(null);
+    try {
+      const res = await api.updateDataSource(source.id, { log_groups: groups });
+      onChange(res.source);
+      toast("Saved which log groups Coderhelm may search");
+      setPanel(null);
+    } catch (e) {
+      setError({
+        title: "We couldn't save the log groups",
         body: `${errorMessage(e, "The request failed.")} The earlier list is still in use. Press Save again.`,
       });
     } finally {
@@ -288,7 +367,9 @@ function SourceCard({
   const remove = async () => {
     const ok = await confirm({
       title: `Remove ${source.name}?`,
-      message: "The reviewer stops using it right away and we delete the saved key. This can't be undone.",
+      message: isApi
+        ? "Coderhelm stops using it right away and we delete the saved key. This can't be undone."
+        : "Coderhelm stops using it right away. The read-only role stays in your AWS account until you delete it there.",
       confirmLabel: "Remove",
       destructive: true,
     });
@@ -309,6 +390,8 @@ function SourceCard({
   };
 
   const hiddenDirty = hidden.join("\n") !== source.hidden_fields.join("\n");
+  const groupsDirty = groups.join("\n") !== (source.aws?.log_groups ?? []).join("\n");
+  const count = countLabel(source);
   const keyId = `key-${source.id}`;
 
   return (
@@ -317,13 +400,14 @@ function SourceCard({
         <div className="min-w-0 flex-1 basis-56">
           <h3 className="flex flex-wrap items-center gap-2 font-semibold text-zinc-100">
             <span className="break-words min-w-0">{source.name}</span>
+            <span className="rounded border border-zinc-700 px-1.5 py-0.5 text-xs font-medium text-zinc-400">{KIND_LABEL[source.kind]}</span>
             {source.status === "ready"
               ? <StatusPill tone="success">Ready</StatusPill>
               : <StatusPill tone="error">Needs attention</StatusPill>}
           </h3>
-          <p className="mt-1 break-all font-mono text-xs text-zinc-400">{source.url}</p>
+          <p className="mt-1 break-all font-mono text-xs text-zinc-400">{whereLabel(source)}</p>
           <p className="mt-2 text-xs text-zinc-500">
-            {source.key_hint ? `Key ending ${source.key_hint}` : "Key saved"}
+            {isApi ? (source.key_hint ? `Key ending ${source.key_hint}` : "Key saved") : count || "Read-only role"}
             <span aria-hidden="true"> · </span>
             Last checked {timeAgo(source.last_checked_at)}
           </p>
@@ -341,7 +425,7 @@ function SourceCard({
               type="button"
               role="switch"
               aria-checked={source.enabled}
-              aria-label={`Use ${source.name} in reviews`}
+              aria-label={`Let Coderhelm use ${source.name}`}
               disabled={busy === "toggle"}
               onClick={toggle}
               className={`relative h-6 w-11 shrink-0 rounded-full transition-colors motion-reduce:transition-none disabled:opacity-50 ${
@@ -363,7 +447,7 @@ function SourceCard({
       {source.status === "error" && (
         <div className="mt-4">
           <Callout variant="error" title="This source needs attention" live={false}>
-            <p className="font-semibold text-zinc-100">The reviewer is not using this source until the problem is fixed.</p>
+            <p className="font-semibold text-zinc-100">Coderhelm is not using this source until the problem is fixed.</p>
             <p>{source.status_message || "The last check failed."} Press Test again to see which check fails and what to do.</p>
           </Callout>
         </div>
@@ -373,16 +457,23 @@ function SourceCard({
         <button type="button" onClick={test} disabled={busy === "test"} className={secondaryButton}>
           {busy === "test" ? "Testing…" : "Test again"}
         </button>
-        <button type="button" aria-expanded={panel === "key"} onClick={() => open("key")} className={secondaryButton}>
-          Replace key
-        </button>
+        {isApi && (
+          <button type="button" aria-expanded={panel === "key"} onClick={() => open("key")} className={secondaryButton}>
+            Replace key
+          </button>
+        )}
+        {source.kind === "logs" && (
+          <button type="button" aria-expanded={panel === "groups"} onClick={openGroups} className={secondaryButton}>
+            Log groups
+          </button>
+        )}
         <button
           type="button"
           aria-expanded={panel === "hidden"}
           onClick={() => { setHidden(source.hidden_fields); open("hidden"); }}
           className={secondaryButton}
         >
-          What the reviewer can&apos;t see
+          What Coderhelm can&apos;t see
         </button>
         <button
           type="button"
@@ -403,7 +494,7 @@ function SourceCard({
       {panel === "test" && checks && (
         <div className="mt-4 flex flex-col gap-3 border-t border-zinc-800 pt-4">
           <CheckList items={checks} label={`Checks for ${source.name}`} />
-          {testOk === true && <Callout variant="success"><p>All checks passed. The reviewer can read from this source and cannot change it.</p></Callout>}
+          {testOk === true && <Callout variant="success"><p>All checks passed. Coderhelm can read from this source and cannot change it.</p></Callout>}
           {testOk === false && (
             <Callout variant="error" title={`${checks.find((c) => c.state === "failed")?.label ?? "A check"} failed`}>
               <p>{checks.find((c) => c.state === "failed")?.fix ?? "See the failed check above for what to do."}</p>
@@ -439,14 +530,34 @@ function SourceCard({
 
       {panel === "hidden" && (
         <div className="mt-4 flex flex-col gap-3 border-t border-zinc-800 pt-4">
-          <p className="text-sm text-zinc-400">Fields with these names are hidden from the reviewer wherever they appear.</p>
-          <HiddenFieldsEditor value={hidden} onChange={setHidden} idPrefix={`hub-${source.id}`} />
+          <p className="text-sm text-zinc-400">
+            {noun.many[0].toUpperCase() + noun.many.slice(1)} with these names are hidden from Coderhelm wherever they appear.
+          </p>
+          <HiddenFieldsEditor value={hidden} onChange={setHidden} idPrefix={`hub-${source.id}`} noun={noun.one as "field" | "column"} />
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={saveHidden} disabled={!hiddenDirty || busy === "hidden"} className={primaryButton}>
               {busy === "hidden" ? "Saving…" : "Save"}
             </button>
             <button type="button" onClick={() => setHidden(DEFAULT_HIDDEN_FIELDS)} className={secondaryButton}>
               Use the suggested list
+            </button>
+            <button type="button" onClick={() => setPanel(null)} className={secondaryButton}>Close</button>
+          </div>
+        </div>
+      )}
+      {panel === "groups" && (
+        <div className="mt-4 flex flex-col gap-3 border-t border-zinc-800 pt-4">
+          <p className="text-sm text-zinc-400">Coderhelm can search only the log groups chosen here.</p>
+          {groupsError && <Callout variant="warning" title="We couldn't list every log group"><p>{groupsError} You can still remove groups below.</p></Callout>}
+          {available === null ? (
+            <p role="status" className="text-sm text-zinc-500">Loading your log groups…</p>
+          ) : (
+            <LogGroupPicker groups={available} value={groups} onChange={setGroups} />
+          )}
+          {groups.length === 0 && <p role="alert" className="text-sm text-red-400">Keep at least one log group, or remove the source.</p>}
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={saveGroups} disabled={!groupsDirty || groups.length === 0 || busy === "groups"} className={primaryButton}>
+              {busy === "groups" ? "Saving…" : "Save"}
             </button>
             <button type="button" onClick={() => setPanel(null)} className={secondaryButton}>Close</button>
           </div>
@@ -478,9 +589,9 @@ function ProgressList({ sources, events }: { sources: DataSource[]; events: Data
   const anyOn = sources.some((s) => s.enabled);
 
   const rows: { title: string; text: string; action?: ReactNode }[] = [
-    { title: "Connect a source", text: any ? "Add more any time." : "Pick An API above to start." },
+    { title: "Connect a source", text: any ? "Add more any time." : "Pick a source above to start." },
     {
-      title: "Choose what the reviewer may use",
+      title: "Choose what Coderhelm may use",
       text: "You decide which repositories use it and which fields stay hidden.",
       action: pending && (
         <Link href={`${CONNECT}?step=choose${q}`} className={now === 1 ? primaryButton : secondaryButton}>
@@ -490,7 +601,7 @@ function ProgressList({ sources, events }: { sources: DataSource[]; events: Data
     },
     {
       title: "Try it",
-      text: "Run a lookup and see exactly what the reviewer would see.",
+      text: "Run a lookup and see exactly what Coderhelm would see.",
       action: pending && pendingChosen && (
         <Link href={`${CONNECT}?step=try${q}`} className={now === 2 ? primaryButton : secondaryButton}>Try it</Link>
       ),
@@ -498,7 +609,7 @@ function ProgressList({ sources, events }: { sources: DataSource[]; events: Data
     {
       title: "Turn it on",
       text: !any || pending
-        ? "One last check, then the next review uses it."
+        ? "One last check, then Coderhelm uses it."
         : anyOn
           ? "On. Pause any source with its switch."
           : "Every source is paused. Turn one back on with its switch.",
@@ -546,7 +657,7 @@ function Activity({ events, error, loading }: { events: DataSourceActivityEvent[
         </Callout>
       ) : events.length === 0 ? (
         <p className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm text-zinc-400">
-          {loading ? "Loading…" : "No lookups yet. They appear here the moment the reviewer or a teammate runs one."}
+          {loading ? "Loading…" : "No lookups yet. They appear here the moment Coderhelm or a teammate runs one."}
         </p>
       ) : (
         <ul className="rounded-lg border border-zinc-800 bg-zinc-900/50 divide-y divide-zinc-800">

@@ -8,8 +8,8 @@ import {
   type DataSourceTryResult, type Repo,
 } from "@/lib/api";
 import {
-  DEFAULT_HIDDEN_FIELDS, clearSetupHint, errorMessage, formatDuration, prettyJson, readSetupHint,
-  runningChecks, stepLabel, toCheckItems, writeSetupHint,
+  AWS_FLOW_STEPS, DEFAULT_HIDDEN_FIELDS, clearSetupHint, errorMessage, formatDuration, hiddenNoun, prettyJson,
+  readSetupHint, runningChecks, stepLabel, toCheckItems, whereLabel, writeSetupHint,
 } from "@/lib/data-sources";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
@@ -20,7 +20,7 @@ import { Disclosure } from "@/components/disclosure";
 import { Field, SecretInput } from "@/components/field";
 import { HiddenFieldsEditor } from "@/components/hidden-fields-editor";
 import { Segmented } from "@/components/segmented";
-import { Stepper } from "@/components/stepper";
+import { FlowShell as BaseFlowShell } from "@/components/data-source-flow-shell";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 
 export default function ConnectDataSourcePageGuarded() {
@@ -36,6 +36,7 @@ export default function ConnectDataSourcePageGuarded() {
 const HUB = "/data-sources";
 const CONNECT = "/data-sources/connect";
 const WRITE_QUERY = "mutation { __typename }";
+const WRITE_SQL = "DELETE FROM coderhelm_example";
 const DEBOUNCE_MS = 600;
 
 const STEPS = [
@@ -105,7 +106,7 @@ function ConnectDataSourcePage() {
     return (
       <FlowShell
         step="key"
-        title="Paste a key the reviewer can use"
+        title="Paste a key Coderhelm can use"
         back={{ href: `${CONNECT}?${new URLSearchParams({ step: "address", url }).toString()}`, label: "Back" }}
       >
         <KeyStep
@@ -120,8 +121,8 @@ function ConnectDataSourcePage() {
   }
 
   const titles: Record<Exclude<StepId, "address" | "key">, string> = {
-    choose: "Choose what the reviewer may use",
-    try: "Run a lookup the way the reviewer would",
+    choose: "Choose what Coderhelm may use",
+    try: "Run a lookup the way Coderhelm would",
     review: "Check before you turn it on",
     done: "Fact-checking is on",
   };
@@ -169,8 +170,8 @@ function ConnectDataSourcePage() {
       <div className="max-w-4xl">
         <h1 id="step-heading" tabIndex={-1} className="text-2xl font-bold text-zinc-100 focus:outline-none">Fact-checking is on</h1>
         <p className="mt-2 max-w-prose text-sm text-zinc-400">
-          The next review will use it. When the reviewer looks something up, the pull request shows what it asked and
-          what came back.
+          Coderhelm uses it from now on, while it plans, writes code and reviews. When it looks something up, the plan or
+          pull request shows what it asked and what came back.
         </p>
         {!source.enabled && (
           <div className="mt-5 max-w-prose">
@@ -182,14 +183,14 @@ function ConnectDataSourcePage() {
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href={HUB} className={primaryButton}>Back to data sources</Link>
           <Link href={`${HUB}#activity`} className={secondaryButton}>See activity</Link>
-          <Link href={`${CONNECT}?step=address`} className={secondaryButton}>Add another source</Link>
+          <Link href={HUB} className={secondaryButton}>Add another source</Link>
         </div>
       </div>
     );
   }
 
   return (
-    <FlowShell step={step} title={titles[step]} back={backs[step]}>
+    <FlowShell step={step} title={titles[step]} back={backs[step]} steps={source && source.kind !== "api" ? AWS_FLOW_STEPS : undefined}>
       {body}
     </FlowShell>
   );
@@ -197,44 +198,16 @@ function ConnectDataSourcePage() {
 
 // ── Layout shared by every setup screen ───────────────────────────
 
-function FlowShell({
-  step,
-  title,
-  back,
-  children,
-}: {
-  step: StepId;
+function FlowShell(props: {
+  step: string;
   title: string;
   back: { href: string; label: string };
   children: ReactNode;
+  steps?: { id: string; label: string }[];
 }) {
-  return (
-    <div className="max-w-4xl">
-      <Link href={back.href} className={`inline-flex min-h-6 items-center text-sm text-zinc-400 hover:text-zinc-100 rounded ${focusRing}`}>
-        <span aria-hidden="true">←&nbsp;</span>{back.label}
-      </Link>
-      <div className="mt-3 grid gap-5 md:grid-cols-[200px_minmax(0,1fr)] md:gap-10">
-        <nav aria-label="Setup steps">
-          <Stepper steps={[...STEPS]} current={step} />
-        </nav>
-        <div className="flex min-w-0 flex-col gap-5">
-          <h1 id="step-heading" tabIndex={-1} className="text-xl font-bold text-zinc-100 text-balance focus:outline-none">
-            {title}
-          </h1>
-          {children}
-          <div>
-            <CopyButton
-              variant="link"
-              text={() => window.location.href}
-              label="Not the right person? Send this step to a teammate"
-              copiedLabel="Link copied. Any admin on your team can open it and finish this step."
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return <BaseFlowShell {...props} steps={props.steps ?? [...STEPS]} />;
 }
+
 
 function StepErrorText({ error }: { error: DataSourceStepError }) {
   return (
@@ -511,7 +484,7 @@ function KeyStep({ url, onConnected }: { url: string; onConnected: (source: Data
       {ready && result?.has_mutations && (
         <Callout variant="warning" title="This API can also change data.">
           <p>
-            The reviewer can&apos;t: every lookup is checked before it leaves Coderhelm and anything that isn&apos;t a
+            Coderhelm can&apos;t: every lookup is checked before it leaves Coderhelm and anything that isn&apos;t a
             pure read is refused.
           </p>
         </Callout>
@@ -569,6 +542,7 @@ function ChooseStep({ source, onSaved }: { source: DataSource; onSaved: (saved: 
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const noun = hiddenNoun(source.kind);
 
   useEffect(() => {
     api.listRepos()
@@ -610,7 +584,7 @@ function ChooseStep({ source, onSaved }: { source: DataSource; onSaved: (saved: 
       <section aria-labelledby="repos-heading" className="flex flex-col gap-3">
         <div>
           <h2 id="repos-heading" className="text-sm font-semibold text-zinc-100">Which repositories may use {source.name}?</h2>
-          <p className="mt-1 text-sm text-zinc-400 max-w-prose">Reviews in other repositories won&apos;t look anything up here.</p>
+          <p className="mt-1 text-sm text-zinc-400 max-w-prose">Work in other repositories won&apos;t look anything up here.</p>
         </div>
         <div>
           <Segmented
@@ -659,12 +633,17 @@ function ChooseStep({ source, onSaved }: { source: DataSource; onSaved: (saved: 
 
       <section aria-labelledby="hidden-heading" className="flex flex-col gap-3">
         <div>
-          <h2 id="hidden-heading" className="text-sm font-semibold text-zinc-100">What the reviewer can&apos;t see</h2>
+          <h2 id="hidden-heading" className="text-sm font-semibold text-zinc-100">What Coderhelm can&apos;t see</h2>
           <p className="mt-1 text-sm text-zinc-400 max-w-prose">
-            Fields with these names are hidden from the reviewer wherever they appear. Remove one to show it, or add your own.
+            {source.kind === "database"
+              ? "Columns with these names are hidden wherever they appear: a lookup that asks for one, or filters or sorts by one, is refused."
+              : source.kind === "logs"
+                ? "Fields with these names are hidden wherever they appear. Secrets, email addresses and card numbers inside log lines are always hidden too."
+                : "Fields with these names are hidden from Coderhelm wherever they appear."}{" "}
+            Remove one to show it, or add your own.
           </p>
         </div>
-        <HiddenFieldsEditor value={hidden} onChange={setHidden} idPrefix="choose" />
+        <HiddenFieldsEditor value={hidden} onChange={setHidden} idPrefix="choose" noun={noun.one as "field" | "column"} />
       </section>
 
       {error && <Callout variant="error" title="We couldn't save your choices"><p>{error}</p></Callout>}
@@ -680,22 +659,42 @@ function ChooseStep({ source, onSaved }: { source: DataSource; onSaved: (saved: 
 
 // ── Step 4: try ───────────────────────────────────────────────────
 
+const TRY_RANGES = [
+  { value: "1h", label: "Last hour" },
+  { value: "24h", label: "Last day" },
+  { value: "7d", label: "Last 7 days" },
+] as const;
+type TryRange = (typeof TRY_RANGES)[number]["value"];
+
 function TryStep({ source, onContinue }: { source: DataSource; onContinue: () => void }) {
+  const kind = source.kind;
+  const exactGroups = (source.aws?.log_groups ?? []).filter((g) => !g.endsWith("*"));
   const [samples, setSamples] = useState<DataSourceSample[] | null>(null);
   const [samplesError, setSamplesError] = useState("");
   const [query, setQuery] = useState("");
+  const [group, setGroup] = useState(exactGroups[0] ?? "");
+  const [range, setRange] = useState<TryRange>("1h");
   const [running, setRunning] = useState(false);
   const [asked, setAsked] = useState("");
   const [result, setResult] = useState<DataSourceTryResult | null>(null);
   const [runError, setRunError] = useState("");
   const [succeeded, setSucceeded] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
+  const noun = hiddenNoun(kind);
 
   useEffect(() => {
     api.getDataSourceSamples(source.id)
       .then((res) => setSamples(res.samples))
       .catch((e) => { setSamples([]); setSamplesError(errorMessage(e, "The request failed.")); });
   }, [source.id]);
+
+  const pickSample = (sample: DataSourceSample) => {
+    setQuery(sample.query);
+    const g = sample.log_groups?.find((x) => x && exactGroups.includes(x));
+    if (g) setGroup(g);
+    const r = TRY_RANGES.find((x) => x.value === sample.since);
+    if (r) setRange(r.value);
+  };
 
   const run = async (q: string) => {
     const text = q.trim();
@@ -705,7 +704,11 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
     setResult(null);
     setAsked(text);
     try {
-      const res = await api.tryDataSource(source.id, text);
+      const res = await api.tryDataSource(
+        source.id,
+        text,
+        kind === "logs" ? { log_groups: group ? [group] : [], since: range } : {},
+      );
       setResult(res);
       if (res.ok && !res.refused && !res.error) {
         setSucceeded(true);
@@ -724,23 +727,33 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
   const panel = "rounded-lg border border-zinc-800 bg-zinc-900/50 p-5";
   const panelTitle = "text-xs font-semibold uppercase tracking-wider text-zinc-500";
   const pre = "mt-2 max-h-96 overflow-auto rounded-lg border border-zinc-800 bg-zinc-950 p-3 font-mono text-xs leading-relaxed text-zinc-300 whitespace-pre";
+  const queryLabel = kind === "database" ? "One SQL SELECT" : kind === "logs" ? "A Logs Insights search" : "A GraphQL read query";
+  const placeholder =
+    kind === "database"
+      ? "SELECT id, status FROM orders ORDER BY id DESC LIMIT 5"
+      : kind === "logs"
+        ? "fields @timestamp, @message | filter @message like /error/ | sort @timestamp desc | limit 20"
+        : "{ __typename }";
+  const writeQuery = kind === "database" ? WRITE_SQL : kind === "api" ? WRITE_QUERY : "";
+  const lookupWord = kind === "logs" ? "search" : "lookup";
+  const canRun = !!query.trim() && !running && (kind !== "logs" || !!group);
 
   return (
     <div className="flex flex-col gap-5">
       <p className="text-sm text-zinc-400 max-w-prose">
-        This runs a real lookup on {source.name} with the access you just set up, so you can see exactly what the
-        reviewer sees before you turn it on.
+        This runs a real {lookupWord} on {source.name} with the access you just set up, so you can see exactly what
+        Coderhelm sees before you turn it on.
       </p>
 
       <div>
-        <h2 className="text-sm font-semibold text-zinc-100">Pick a lookup</h2>
+        <h2 className="text-sm font-semibold text-zinc-100">Pick a {lookupWord}</h2>
         {samples === null ? (
           <p role="status" className="mt-2 text-sm text-zinc-500">Loading examples…</p>
         ) : samples.length === 0 ? (
           <p className="mt-2 text-sm text-zinc-400">
             {samplesError
               ? `We couldn't load examples (${samplesError}). You can still write your own below.`
-              : "There are no examples for this API. Write your own below."}
+              : `There are no examples for this ${kind === "database" ? "database" : kind === "logs" ? "source" : "API"}. Write your own below.`}
           </p>
         ) : (
           <div className="mt-2 flex flex-wrap gap-2">
@@ -749,7 +762,7 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
                 key={s.label}
                 type="button"
                 aria-pressed={query === s.query}
-                onClick={() => setQuery(s.query)}
+                onClick={() => pickSample(s)}
                 className={`min-h-8 rounded-full border px-3 py-1 text-left text-sm ${
                   query === s.query
                     ? "border-zinc-100 bg-zinc-100 text-zinc-900 font-medium"
@@ -763,30 +776,58 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
         )}
       </div>
 
-      <Disclosure summary="Write your own" defaultOpen={samples !== null && samples.length === 0}>
-        <label htmlFor="try-query" className="text-sm font-semibold text-zinc-100">A GraphQL read query</label>
+      {kind === "logs" && (
+        <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
+          <div className="min-w-56 flex-1">
+            <label htmlFor="try-group" className="block mb-1.5 text-sm font-semibold text-zinc-100">Log group</label>
+            {exactGroups.length > 0 ? (
+              <select
+                id="try-group"
+                value={group}
+                onChange={(e) => setGroup(e.target.value)}
+                className={`${inputClass} font-mono text-xs`}
+              >
+                {exactGroups.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+            ) : (
+              <p className="text-sm text-amber-200">
+                This source only names groups by prefix. Choose exact log groups on the data sources page to try a search here.
+              </p>
+            )}
+          </div>
+          <div>
+            <p className="mb-1.5 text-sm font-semibold text-zinc-100">Time</p>
+            <Segmented label="Time to search" options={[...TRY_RANGES]} value={range} onChange={setRange} />
+          </div>
+        </div>
+      )}
+
+      <Disclosure summary="Write your own" defaultOpen={kind !== "api" || (samples !== null && samples.length === 0)}>
+        <label htmlFor="try-query" className="text-sm font-semibold text-zinc-100">{queryLabel}</label>
         <textarea
           id="try-query"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           rows={5}
           spellCheck={false}
-          placeholder={"{ __typename }"}
+          placeholder={placeholder}
           className={`${inputClass} font-mono text-xs`}
         />
       </Disclosure>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <button type="button" onClick={() => run(query)} disabled={!query.trim() || running} className={primaryButton}>
+        <button type="button" onClick={() => run(query)} disabled={!canRun} className={primaryButton}>
           {running ? "Running…" : "Run"}
         </button>
-        <button type="button" onClick={() => run(WRITE_QUERY)} disabled={running} className={linkButton}>
-          Try a write, to see it refused
-        </button>
+        {writeQuery && (
+          <button type="button" onClick={() => run(writeQuery)} disabled={running} className={linkButton}>
+            Try a write, to see it refused
+          </button>
+        )}
       </div>
 
       <div ref={resultRef} className="flex flex-col gap-3">
-        {runError && <Callout variant="error" title="The lookup couldn't run"><p>{runError}</p></Callout>}
+        {runError && <Callout variant="error" title={`The ${lookupWord} couldn't run`}><p>{runError}</p></Callout>}
         {result && (
           <>
             <section aria-labelledby="asked-heading" className={panel}>
@@ -795,6 +836,9 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
                 <CopyButton text={result.query || asked} />
               </div>
               <pre className={pre} tabIndex={0}>{result.query || asked}</pre>
+              {kind === "logs" && result.fields.length > 0 && (
+                <p className="mt-2 text-xs text-zinc-500">In {result.fields.join(", ")}</p>
+              )}
             </section>
             <section aria-labelledby="back-heading" className={panel}>
               <h2 id="back-heading" className={panelTitle}>What came back</h2>
@@ -806,24 +850,30 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
                 </div>
               ) : result.error ? (
                 <div className="mt-2">
-                  <Callout variant="error" title={`${stepLabel(result.error.step)} failed`}>
+                  <Callout variant="error" title={`${stepLabel(result.error.step, kind)} failed`}>
                     <p>{result.error.message}</p>
                     <p><span className="font-semibold text-zinc-100">What to do: </span>{result.error.fix}</p>
                   </Callout>
                 </div>
               ) : !result.ok ? (
                 <div className="mt-2">
-                  <Callout variant="error" title="The lookup failed">
-                    <p>Your API did not return a result. Try one of the examples, or check the query.</p>
+                  <Callout variant="error" title={`The ${lookupWord} failed`}>
+                    <p>No result came back. Try one of the examples, or check what you wrote.</p>
                   </Callout>
                 </div>
               ) : (
                 <>
                   <pre className={pre} tabIndex={0}>{prettyJson(result.result ?? "")}</pre>
                   <p className="mt-2 text-xs text-zinc-500">
+                    {result.note && (
+                      <span>
+                        {result.note}
+                        <span aria-hidden="true"> · </span>
+                      </span>
+                    )}
                     {result.hidden_count > 0 && (
                       <span className="text-amber-300">
-                        {result.hidden_count} field{result.hidden_count === 1 ? "" : "s"} hidden
+                        {result.hidden_count} {kind === "api" ? noun.one : "value"}{result.hidden_count === 1 ? "" : "s"} hidden
                         <span aria-hidden="true"> · </span>
                       </span>
                     )}
@@ -832,7 +882,7 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
                 </>
               )}
             </section>
-            <p className="text-sm text-zinc-400">Nothing was changed. This lookup is in your activity log.</p>
+            <p className="text-sm text-zinc-400">Nothing was changed. This {lookupWord} is in your activity log.</p>
           </>
         )}
       </div>
@@ -866,40 +916,61 @@ function ReviewStep({ source, onTurnedOn }: { source: DataSource; onTurnedOn: (s
     }
   };
 
+  const kind = source.kind;
+  const noun = hiddenNoun(kind);
+  const where = whereLabel(source);
+  const cannot: ReactNode[] =
+    kind === "database"
+      ? [
+          "Change or delete anything. Each lookup is one SELECT, run as a database user that can only read, inside a transaction that is always rolled back",
+          "Read more than 200 rows at a time",
+        ]
+      : kind === "logs"
+        ? [
+            "Change or delete anything",
+            `Search log groups you didn't choose${source.aws?.log_groups.length ? ` (it may search ${source.aws.log_groups.length === 1 ? "one group" : `${source.aws.log_groups.length} groups`})` : ""}`,
+            "Search more than two weeks at a time",
+            "See secrets, email addresses or card numbers in log lines. They are hidden before Coderhelm reads them",
+          ]
+        : ["Change or delete anything"];
+
   const rows: { k: string; v: ReactNode; change?: { href: string; label: string } }[] = [
     {
       k: "Connected",
       v: (
         <>
           <span className="break-words">{source.name}</span>
-          <span className="block break-all font-mono text-xs text-zinc-400">{source.url}</span>
+          {where && <span className="block break-all font-mono text-xs text-zinc-400">{where}</span>}
+          {kind === "logs" && source.aws?.log_groups.length ? (
+            <span className="block break-all font-mono text-xs text-zinc-400">{source.aws.log_groups.join(", ")}</span>
+          ) : null}
         </>
       ),
       change: { href: HUB, label: "Change what is connected" },
     },
     {
-      k: "The reviewer can",
+      k: "Coderhelm can",
       v: (
         <ul className="list-disc space-y-1 pl-5">
           <li>
-            Look things up while reviewing a pull request
+            {kind === "logs" ? "Search these logs" : "Look things up"} while it plans, writes code and reviews
             {source.repos.length === 0 ? " in any repository" : ` in ${source.repos.length === 1 ? "one repository" : `${source.repos.length} repositories`}`}
             {source.repos.length > 0 && <span className="block break-all text-xs text-zinc-400">{source.repos.join(", ")}</span>}
           </li>
-          <li>Quote what it found, with the lookup it ran</li>
+          <li>Quote what it found, with the {kind === "logs" ? "search" : "lookup"} it ran</li>
         </ul>
       ),
-      change: { href: chooseHref, label: "Change what the reviewer can do" },
+      change: { href: chooseHref, label: "Change what Coderhelm can do" },
     },
     {
-      k: "The reviewer cannot",
+      k: "Coderhelm cannot",
       v: (
         <ul className="list-disc space-y-1 pl-5">
-          <li>Change or delete anything</li>
+          {cannot.map((c, i) => <li key={i}>{c}</li>)}
           <li>
             {source.hidden_fields.length === 0
-              ? "No fields are hidden"
-              : `See ${source.hidden_fields.length === 1 ? "the hidden field" : `the ${source.hidden_fields.length} hidden fields`}`}
+              ? `No ${noun.many} are hidden`
+              : `See ${source.hidden_fields.length === 1 ? `the hidden ${noun.one}` : `the ${source.hidden_fields.length} hidden ${noun.many}`}`}
             {source.hidden_fields.length > 0 && (
               <span className="block break-words font-mono text-xs text-zinc-400">{source.hidden_fields.join(", ")}</span>
             )}
@@ -907,15 +978,21 @@ function ReviewStep({ source, onTurnedOn }: { source: DataSource; onTurnedOn: (s
           <li>Use a source that is paused or needs attention</li>
         </ul>
       ),
-      change: { href: chooseHref, label: "Change what the reviewer cannot see" },
+      change: { href: chooseHref, label: "Change what Coderhelm cannot see" },
     },
     {
       k: "We store",
-      v: "The address, the key (encrypted, never shown again) and a log of every lookup. Not your data.",
+      v:
+        kind === "api"
+          ? "The address, the key (encrypted, never shown again) and a log of every lookup. Not your data."
+          : `The name of the read-only role in your AWS account, ${kind === "logs" ? "which log groups it may search" : "which database it may read"}, and a log of every lookup. No passwords, and not your data.`,
     },
     {
       k: "Turning it off",
-      v: "Pause it with one switch on the data sources page, or remove the source. Revoking the key at your API also cuts access immediately.",
+      v:
+        kind === "api"
+          ? "Pause it with one switch on the data sources page, or remove the source. Revoking the key at your API also cuts access immediately."
+          : "Pause it with one switch on the data sources page, or remove the source. Deleting the CoderhelmReadOnly role in your AWS account also cuts access immediately.",
     },
   ];
 
@@ -939,7 +1016,7 @@ function ReviewStep({ source, onTurnedOn }: { source: DataSource; onTurnedOn: (s
 
       {source.status === "error" && (
         <Callout variant="warning" title={`${source.name} needs attention`}>
-          <p>{source.status_message || "Its last check failed."} You can turn it on, but the reviewer won&apos;t use it until the problem is fixed. Use Test again on the data sources page to see what to do.</p>
+          <p>{source.status_message || "Its last check failed."} You can turn it on, but Coderhelm won&apos;t use it until the problem is fixed. Use Test again on the data sources page to see what to do.</p>
         </Callout>
       )}
       {error && <Callout variant="error" title="We couldn't turn it on"><p>{error}</p></Callout>}

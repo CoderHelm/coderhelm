@@ -45,6 +45,7 @@ export const ExternalLinkIcon = () => <svg {...s}><path d="M18 13v6a2 2 0 01-2 2
 
 // Data sources + shared form component icons
 export const DatabaseIcon = () => <svg {...s}><ellipse cx="12" cy="6" rx="7" ry="3" /><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6" /><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" /></svg>;
+export const LogsIcon = () => <svg {...s}><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z" /><polyline points="14 3 14 9 20 9" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="13" y2="17" /></svg>;
 export const CodeIcon = () => <svg {...s}><polyline points="8 8 4 12 8 16" /><polyline points="16 8 20 12 16 16" /><line x1="13" y1="6" x2="11" y2="18" /></svg>;
 export const WrenchIcon = () => <svg {...s}><path d="M14.5 6.5a4 4 0 00-5.2 5.2L4 17l3 3 5.3-5.3a4 4 0 005.2-5.2l-2.6 2.6-2.4-.6-.6-2.4z" /></svg>;
 export const CheckIcon = () => <svg {...s} strokeWidth={2.5}><polyline points="20 6 9 17 4 12" /></svg>;

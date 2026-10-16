@@ -12,11 +12,14 @@ export function HiddenFieldsEditor({
   value,
   onChange,
   idPrefix,
+  noun = "field",
 }: {
   value: string[];
   onChange: (next: string[]) => void;
   /** Keeps ids unique when more than one editor is on the page. */
   idPrefix: string;
+  /** What a hidden name is: "field" (an API or logs) or "column" (a database). */
+  noun?: "field" | "column";
 }) {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
@@ -38,9 +41,13 @@ export function HiddenFieldsEditor({
   return (
     <div className="flex flex-col gap-3">
       {value.length === 0 ? (
-        <p className="text-sm text-amber-200">Nothing is hidden. The reviewer can see every field the key can read.</p>
+        <p className="text-sm text-amber-200">
+          {noun === "column"
+            ? "Nothing is hidden. Coderhelm can read every column."
+            : "Nothing is hidden. The reviewer can see every field the key can read."}
+        </p>
       ) : (
-        <ul aria-label="Hidden field names" className="flex flex-wrap gap-2">
+        <ul aria-label={`Hidden ${noun} names`} className="flex flex-wrap gap-2">
           {value.map((name) => (
             <li
               key={name}
@@ -61,7 +68,7 @@ export function HiddenFieldsEditor({
       )}
       <div>
         <label htmlFor={inputId} className="block mb-1.5 text-sm font-semibold text-zinc-100">
-          Hide another field name
+          Hide another {noun} name
         </label>
         <div className="flex flex-wrap gap-2">
           <input

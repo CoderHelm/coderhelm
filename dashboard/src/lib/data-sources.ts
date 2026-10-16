@@ -1,4 +1,4 @@
-import type { DataSourceCheck } from "./api";
+import type { DataSource, DataSourceCheck, DataSourceKind } from "./api";
 import type { CheckItem } from "@/components/check-list";
 
 /** Field names hidden from the reviewer unless the team changes the list. */
@@ -6,46 +6,135 @@ export const DEFAULT_HIDDEN_FIELDS = [
   "password", "secret", "token", "api_key", "ssn", "card", "cvv", "email", "phone", "address", "birthday",
 ];
 
-/** The four checks, in the order they run. Used while waiting for the real results. */
-export const CHECK_LABELS: { id: DataSourceCheck["id"]; label: string }[] = [
+type CheckLabel = { id: DataSourceCheck["id"]; label: string };
+
+/** The four checks for an API, in the order they run. Used while waiting for the real results. */
+export const CHECK_LABELS: CheckLabel[] = [
   { id: "reach", label: "Reach the address" },
   { id: "sign_in", label: "The key is accepted" },
   { id: "read", label: "Read the list of data" },
   { id: "read_only", label: "Only reads are possible" },
 ];
 
-const LABEL_BY_ID: Record<string, string> = Object.fromEntries(CHECK_LABELS.map((c) => [c.id, c.label]));
+const ROLE_CHECK: CheckLabel = { id: "role", label: "Use the role in your AWS account" };
+
+/** Checks when connecting an AWS account, before choosing what to share. */
+export const AWS_CONNECT_CHECKS: CheckLabel[] = [ROLE_CHECK, { id: "logs", label: "See your log groups" }];
+
+/** Checks for a logs source. */
+export const LOGS_CHECKS: CheckLabel[] = [ROLE_CHECK];
+
+/** Checks for a database, in the order they run. */
+export const DATABASE_CHECKS: CheckLabel[] = [
+  ROLE_CHECK,
+  { id: "sign_in", label: "Sign in to the database" },
+  { id: "read_only", label: "The database user can only read" },
+  { id: "read", label: "Read the list of tables" },
+];
+
+export function checksFor(kind: DataSourceKind): CheckLabel[] {
+  return kind === "database" ? DATABASE_CHECKS : kind === "logs" ? LOGS_CHECKS : CHECK_LABELS;
+}
+
+/** What a failed lookup step is called, for each kind of source. */
+const STEP_LABELS: Record<DataSourceKind, Record<string, string>> = {
+  api: Object.fromEntries(CHECK_LABELS.map((c) => [c.id, c.label])),
+  database: {
+    reach: "Reach the database",
+    role: ROLE_CHECK.label,
+    sign_in: "Sign in to the database",
+    read: "Run the lookup",
+    read_only: "Only reads are possible",
+  },
+  logs: {
+    reach: "Reach your logs",
+    role: ROLE_CHECK.label,
+    sign_in: ROLE_CHECK.label,
+    read: "Run the search",
+    read_only: "Only reads are possible",
+  },
+};
 
 /**
  * The server names a step by id (`reach`, `sign_in`, …). People see the label.
  * An id we don't know is never printed raw.
  */
-export function stepLabel(step: string): string {
-  if (LABEL_BY_ID[step]) return LABEL_BY_ID[step];
+export function stepLabel(step: string, kind: DataSourceKind = "api"): string {
+  const label = STEP_LABELS[kind][step];
+  if (label) return label;
   return /^[a-z0-9_.-]*$/.test(step) ? "This step" : step;
 }
 
-export function runningChecks(): CheckItem[] {
-  return CHECK_LABELS.map((c) => ({ ...c, state: "running" as const }));
+export function runningChecks(expected: CheckLabel[] = CHECK_LABELS): CheckItem[] {
+  return expected.map((c) => ({ ...c, state: "running" as const }));
 }
 
 /**
  * Turn the server's checks into list items. Checks run in order, so anything
  * after the first failure that the server did not report is shown as not run.
  */
-export function toCheckItems(checks: DataSourceCheck[]): CheckItem[] {
+export function toCheckItems(checks: DataSourceCheck[], expected: CheckLabel[] = CHECK_LABELS): CheckItem[] {
+  const labels: Record<string, string> = Object.fromEntries(expected.map((c) => [c.id, c.label]));
   const items: CheckItem[] = checks.map((c) => ({
     id: c.id,
-    label: LABEL_BY_ID[c.id] ?? c.label,
+    label: labels[c.id] ?? c.label,
     state: c.ok ? "passed" : "failed",
     detail: c.detail,
     fix: c.fix,
   }));
   const seen = new Set(checks.map((c) => c.id));
-  for (const c of CHECK_LABELS) {
+  for (const c of expected) {
     if (!seen.has(c.id)) items.push({ ...c, state: "pending", detail: "Not run, because an earlier check failed." });
   }
   return items;
+}
+
+// ── Kinds of source ───────────────────────────────────────────────
+
+/** Setup steps for a logs or database source. The last three are shared with an API. */
+export const AWS_FLOW_STEPS = [
+  { id: "access", label: "Give read-only access" },
+  { id: "pick", label: "Choose what to share" },
+  { id: "choose", label: "Choose what it may use" },
+  { id: "try", label: "Try it" },
+  { id: "review", label: "Check and turn on" },
+];
+
+export const KIND_LABEL: Record<DataSourceKind, string> = {
+  api: "API",
+  logs: "Logs",
+  database: "Database",
+};
+
+/** "14 kinds of data", "3 log groups", "42 tables". Empty when unknown. */
+export function countLabel(source: Pick<DataSource, "kind" | "kinds">): string {
+  const n = source.kinds;
+  if (typeof n !== "number") return "";
+  const [one, many] =
+    source.kind === "database" ? ["table", "tables"] : source.kind === "logs" ? ["log group", "log groups"] : ["kind of data", "kinds of data"];
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+/** Where a source reads from, in one line: the address, or the AWS account and what in it. */
+export function whereLabel(source: Pick<DataSource, "kind" | "url" | "aws">): string {
+  if (source.kind === "api" || !source.aws) return source.url;
+  const acct = `AWS account ${source.aws.account}, ${source.aws.region}`;
+  if (source.kind === "database") {
+    return `${source.aws.cluster}${source.aws.database ? ` / ${source.aws.database}` : ""} · ${acct}`;
+  }
+  return acct;
+}
+
+/** What hidden names are called for this kind: columns in a database, fields elsewhere. */
+export function hiddenNoun(kind: DataSourceKind): { one: string; many: string } {
+  return kind === "database" ? { one: "column", many: "columns" } : { one: "field", many: "fields" };
+}
+
+export function formatSize(mb: number): string {
+  if (!Number.isFinite(mb) || mb <= 0) return "empty";
+  if (mb < 1) return "under 1 MB";
+  if (mb < 1000) return `${Math.round(mb)} MB`;
+  return `${(mb / 1000).toFixed(1)} GB`;
 }
 
 // ── Setup progress hint ───────────────────────────────────────────

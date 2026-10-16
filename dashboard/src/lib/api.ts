@@ -802,7 +802,7 @@ export const api = {
     ),
   updateDataSource: (
     id: string,
-    data: { enabled?: boolean; hidden_fields?: string[]; repos?: string[]; name?: string },
+    data: { enabled?: boolean; hidden_fields?: string[]; repos?: string[]; name?: string; log_groups?: string[] },
   ) =>
     request<{ source: DataSource }>(`/api/data-sources/${encodeURIComponent(id)}`, {
       method: "PUT",
@@ -823,11 +823,30 @@ export const api = {
     request<{ ok: true }>(`/api/data-sources/${encodeURIComponent(id)}`, { method: "DELETE" }),
   getDataSourceSamples: (id: string) =>
     request<{ samples: DataSourceSample[] }>(`/api/data-sources/${encodeURIComponent(id)}/samples`),
-  tryDataSource: (id: string, query: string) =>
+  tryDataSource: (id: string, query: string, opts: { log_groups?: string[]; since?: string } = {}) =>
     request<DataSourceTryResult>(`/api/data-sources/${encodeURIComponent(id)}/try`, {
       method: "POST",
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query, ...opts }),
     }),
+  getAwsSetup: () => request<AwsSetup>("/api/data-sources/aws/setup"),
+  /** Checks a role and lists what it can reach. Saves nothing. Failed checks come back with `ok: false`. */
+  connectAws: (access: AwsAccess) =>
+    request<AwsConnectResult>("/api/data-sources/aws/connect", {
+      method: "POST",
+      body: JSON.stringify(access),
+    }),
+  /** Does not throw on failed checks, like `createDataSourceApi`. */
+  createLogsSource: (data: AwsAccess & { log_groups: string[]; name?: string }) =>
+    requestWithBody<{ source: DataSource; checks: DataSourceCheck[] }, { checks: DataSourceCheck[] }>(
+      "/api/data-sources/logs",
+      { method: "POST", body: JSON.stringify(data) },
+    ),
+  /** Does not throw on failed checks, like `createDataSourceApi`. */
+  createDatabaseSource: (data: { code: string; name?: string }) =>
+    requestWithBody<{ source: DataSource; checks: DataSourceCheck[] }, { checks: DataSourceCheck[] }>(
+      "/api/data-sources/database",
+      { method: "POST", body: JSON.stringify(data) },
+    ),
   listDataSourceActivity: (limit = 50) =>
     request<{ events: DataSourceActivityEvent[] }>(`/api/data-sources/activity?limit=${limit}`),
 };
@@ -1463,10 +1482,26 @@ export interface MemoryStats {
 }
 
 // Data sources
+export type DataSourceKind = "api" | "logs" | "database";
+
+/** Where in a team's AWS account a logs or database source reads. */
+export interface DataSourceAws {
+  account: string;
+  region: string;
+  role_arn: string;
+  log_groups: string[];
+  /** Database cluster name, "" for logs. */
+  cluster: string;
+  database: string;
+}
+
 export interface DataSource {
   id: string;
-  kind: "api";
+  kind: DataSourceKind;
+  /** Set for logs and database sources, null for an API. */
+  aws?: DataSourceAws | null;
   name: string;
+  /** The API's address. Empty for logs and databases. */
   url: string;
   status: "ready" | "error";
   status_message?: string;
@@ -1476,6 +1511,7 @@ export interface DataSource {
   /** Last four characters of the key, or "" for a very short key. */
   key_hint: string;
   has_mutations: boolean;
+  /** API: kinds of data. Logs: shared log groups. Database: tables. */
   kinds: number | null;
   schema_available: boolean;
   hidden_fields: string[];
@@ -1486,7 +1522,7 @@ export interface DataSource {
   created_by: string;
 }
 
-export type DataSourceStepId = "reach" | "sign_in" | "read" | "read_only";
+export type DataSourceStepId = "reach" | "sign_in" | "read" | "read_only" | "role" | "logs";
 
 export interface DataSourceCheck {
   id: DataSourceStepId;
@@ -1521,6 +1557,41 @@ export interface DataSourceCheckResult {
 export interface DataSourceSample {
   label: string;
   query: string;
+  /** Logs samples name the groups and time range they search. */
+  log_groups?: string[];
+  since?: string;
+}
+
+/** How Coderhelm reaches a team's AWS account: the line the setup script printed, or a role it already uses. */
+export type AwsAccess = { code: string } | { role_arn: string; region: string };
+
+export interface AwsExistingConnection {
+  role_arn: string;
+  account: string;
+  region: string;
+  log_groups: string[];
+}
+
+export interface AwsSetup {
+  script: string;
+  existing: AwsExistingConnection[];
+  role_prefix: string;
+}
+
+export interface AwsLogGroup {
+  name: string;
+  stored_mb: number;
+  retention_days: number | null;
+}
+
+export interface AwsConnectResult {
+  ok: boolean;
+  checks: DataSourceCheck[];
+  account?: string;
+  region?: string;
+  role_arn?: string;
+  log_groups?: AwsLogGroup[];
+  database?: { cluster: string; database: string } | null;
 }
 
 export interface DataSourceTryResult {
@@ -1533,6 +1604,8 @@ export interface DataSourceTryResult {
   /** Why the lookup was refused, including what to do. */
   refused?: string;
   error?: DataSourceStepError;
+  /** A short summary, like "12 rows" or "40 lines, 3.2 MB scanned". */
+  note?: string;
 }
 
 export interface DataSourceActivityEvent {
