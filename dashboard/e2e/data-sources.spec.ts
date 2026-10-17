@@ -325,7 +325,8 @@ test("hub: empty state", async ({ page }) => {
 
   await expect(page.getByRole("heading", { level: 1, name: "Let Coderhelm check facts against your real systems" })).toBeVisible();
   await expect(page.getByRole("link", { name: /An API/ })).toBeVisible();
-  await expect(page.getByText("Coming next")).toHaveCount(1);
+  await expect(page.getByText("Coming next")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Your own tools/ })).toHaveAttribute("href", /^\/data-sources\/tools\/?$/);
   await expect(page.getByRole("link", { name: /Logs in your AWS account/ })).toHaveAttribute("href", /^\/data-sources\/connect\/aws\/?\?for=logs$/);
   await expect(page.getByRole("link", { name: /A database in your AWS account/ })).toHaveAttribute("href", /^\/data-sources\/connect\/aws\/?\?for=database$/);
   await expect(page.getByText("No lookups yet. They appear here the moment Coderhelm or a teammate runs one.")).toBeVisible();

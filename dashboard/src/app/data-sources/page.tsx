@@ -112,9 +112,9 @@ function DataSourcesPage() {
         >
           Read-only access to a PostgreSQL database or a Redshift warehouse, so Coderhelm can check the records a ticket names.
         </ConnectCard>
-        <ComingNextCard icon={<WrenchIcon />} title="Your own tools">
-          Named lookups your engineers already trust, like &quot;find order by number&quot;.
-        </ComingNextCard>
+        <ConnectCard href="/data-sources/tools" icon={<WrenchIcon />} title="Your own tools" time="About 5 minutes">
+          Named lookups your engineers already trust, like &quot;find order by number&quot;. Written once, approved by another admin.
+        </ConnectCard>
       </div>
 
       {sources === null && !loadError && (
@@ -203,16 +203,6 @@ function ConnectCard({
   );
 }
 
-function ComingNextCard({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
-  return (
-    <div aria-disabled="true" className="flex min-h-40 flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900/30 p-5">
-      <SourceIcon>{icon}</SourceIcon>
-      <span className="font-semibold text-zinc-300">{title}</span>
-      <span className="flex-1 text-sm text-zinc-500">{children}</span>
-      <span><StatusPill>Coming next</StatusPill></span>
-    </div>
-  );
-}
 
 // ── One connected source ──────────────────────────────────────────
 
