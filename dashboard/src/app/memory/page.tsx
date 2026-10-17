@@ -646,7 +646,7 @@ function TeachDialog({ repo, onClose, onSaved }: { repo: string; onClose: () => 
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="teach-title" className="text-lg font-semibold">Teach Coderhelm something about {repo}</h2>
-        <p className="mt-1 text-sm text-zinc-400">One fact or rule per memory works best, written the way you'd tell a new teammate.</p>
+        <p className="mt-1 text-sm text-zinc-400">One fact or rule per memory works best, written the way you&apos;d tell a new teammate.</p>
         <label htmlFor="teach-text" className="mt-4 block text-sm text-zinc-300">What should it remember?</label>
         <textarea
           id="teach-text"
