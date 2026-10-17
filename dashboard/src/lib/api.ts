@@ -1702,6 +1702,10 @@ export interface AnalyticsSummary {
   cost_usd: number;
   cost_per_run: number | null;
   cost_per_merged_pr: number | null;
+  /** Tokens in plus out. */
+  tokens?: number;
+  tokens_per_run?: number | null;
+  tokens_per_merged_pr?: number | null;
   tokens_in: number;
   tokens_out: number;
   median_run_minutes: number | null;
@@ -1721,9 +1725,9 @@ export interface Analytics {
   previous_period: { start: string; end: string };
   summary: AnalyticsSummary;
   previous: AnalyticsSummary;
-  daily: { day: string; runs: number; prs_opened: number; merged: number; failed: number; cost_usd: number; reviews: number }[];
+  daily: { day: string; runs: number; prs_opened: number; merged: number; failed: number; cost_usd: number; tokens?: number; reviews: number }[];
   sources: { source: string; runs: number; prs: number; merged: number; merge_rate: number | null }[];
-  repos: { repo: string; runs: number; prs: number; merged: number; failed: number; cost_usd: number; merge_rate: number | null; reviews: number }[];
+  repos: { repo: string; runs: number; prs: number; merged: number; failed: number; cost_usd: number; tokens?: number; merge_rate: number | null; reviews: number }[];
   people: { person: string; runs: number; merged: number }[];
   failures: { reason: string; count: number; last_run_id: string; last_at: string }[];
   ci: { runs_with_red_ci: number; fixed_by_coderhelm: number; fix_rate: number | null; fix_attempts: number; fix_commits: number };
