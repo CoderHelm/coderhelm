@@ -1318,8 +1318,8 @@ export default function Home() {
                   icon: (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
                   ),
-                  title: "A role only you can open",
-                  desc: "Access goes through a role in your AWS account that only works with your team's private ID, and is never allowed to commit a change.",
+                  title: "A role tied to your team",
+                  desc: "Access goes through a role you create in your AWS account. Coderhelm can only use it with your team's private ID, and it is never allowed to commit a change. Delete the role and access ends.",
                 },
                 {
                   icon: (
