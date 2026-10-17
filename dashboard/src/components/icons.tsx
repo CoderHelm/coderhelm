@@ -5,6 +5,8 @@ const s = { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "
 export const TestTubeIcon = () => <svg {...s}><path d="M9 3h6" /><path d="M10 3v6.2L4.6 18.4A1.7 1.7 0 006.1 21h11.8a1.7 1.7 0 001.5-2.6L14 9.2V3" /><path d="M7.5 15h9" /></svg>;
 /** Three connected nodes: the code graph. */
 export const GraphIcon = () => <svg {...s}><circle cx="5.5" cy="6" r="2.5" /><circle cx="18.5" cy="6" r="2.5" /><circle cx="12" cy="18.5" r="2.5" /><path d="M8 6h8" /><path d="M6.8 8.2l4 8" /><path d="M17.2 8.2l-4 8" /></svg>;
+/** An open book: the team's written skills. */
+export const BookIcon = () => <svg {...s}><path d="M2.5 5.5A1.5 1.5 0 014 4h5a3 3 0 013 3v13a2.5 2.5 0 00-2.5-2.5h-5.5a1.5 1.5 0 01-1.5-1.5z" /><path d="M21.5 5.5A1.5 1.5 0 0020 4h-5a3 3 0 00-3 3v13a2.5 2.5 0 012.5-2.5H20a1.5 1.5 0 001.5-1.5z" /></svg>;
 /** A checklist: plans and their steps. */
 export const PlanIcon = () => <svg {...s}><path d="M3.5 6.5l1.5 1.5 3-3" /><path d="M3.5 12.5l1.5 1.5 3-3" /><path d="M3.5 18.5l1.5 1.5 3-3" /><path d="M12 7h8.5" /><path d="M12 13h8.5" /><path d="M12 19h8.5" /></svg>;
 export const PlayIcon = () => <svg {...s}><polygon points="6 3 20 12 6 21 6 3" /></svg>;
