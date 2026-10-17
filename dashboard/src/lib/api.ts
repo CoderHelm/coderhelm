@@ -208,6 +208,9 @@ export const api = {
   getStats: () => request<{ month: Stats; all_time: Stats }>("/api/stats"),
   getStatsHistory: () =>
     request<{ months: MonthStats[] }>("/api/stats/history"),
+  /** The analytics page: one period (7, 30 or 90 days) and the one before it. */
+  getAnalytics: (days: AnalyticsDays, repo?: string) =>
+    request<Analytics>(`/api/analytics?days=${days}${repo ? `&repo=${encodeURIComponent(repo)}` : ""}`),
 
   // GitHub App installation
   getInstallationStatus: () =>
@@ -1636,4 +1639,63 @@ export interface DataSourceActivityEvent {
   ok: boolean;
   outcome: "ok" | "refused" | "failed";
   ms: number;
+}
+
+// ── Analytics ──────────────────────────────────────────────────────────────
+
+export type AnalyticsDays = 7 | 30 | 90;
+
+export interface AnalyticsSummary {
+  runs: number;
+  prs_opened: number;
+  prs_merged: number;
+  prs_closed: number;
+  prs_open: number;
+  /** Merged out of opened, 0-1; null with no PRs. */
+  merge_rate: number | null;
+  failed_runs: number;
+  failure_rate: number | null;
+  cost_usd: number;
+  cost_per_run: number | null;
+  cost_per_merged_pr: number | null;
+  tokens_in: number;
+  tokens_out: number;
+  median_run_minutes: number | null;
+  median_hours_to_merge: number | null;
+  /** How many merged PRs have both an open and a merge time. */
+  time_to_merge_known: number;
+  merged_untouched: number;
+  merged_with_edits: number;
+  /** How many merged PRs have a known count of people's commits. */
+  edits_known: number;
+  reviews: number;
+}
+
+export interface Analytics {
+  days: AnalyticsDays;
+  period: { start: string; end: string };
+  previous_period: { start: string; end: string };
+  summary: AnalyticsSummary;
+  previous: AnalyticsSummary;
+  daily: { day: string; runs: number; prs_opened: number; merged: number; failed: number; cost_usd: number; reviews: number }[];
+  sources: { source: string; runs: number; prs: number; merged: number; merge_rate: number | null }[];
+  repos: { repo: string; runs: number; prs: number; merged: number; failed: number; cost_usd: number; merge_rate: number | null; reviews: number }[];
+  people: { person: string; runs: number; merged: number }[];
+  failures: { reason: string; count: number; last_run_id: string; last_at: string }[];
+  ci: { runs_with_red_ci: number; fixed_by_coderhelm: number; fix_rate: number | null; fix_attempts: number; fix_commits: number };
+  reviews: {
+    posted: number; approve: number; request_changes: number; comment: number; questions: number; prs_reviewed: number;
+    findings: number; findings_fixed: number; findings_settled_by_person: number; acted_on_rate: number | null;
+    outcomes_known_reviews: number; thumbs_up: number; thumbs_down: number;
+  };
+  lookups: {
+    total: number; refused: number; failed: number;
+    by_source: { source: string; total: number; refused: number; failed: number }[];
+    by_actor: { actor: string; total: number }[];
+  };
+  steps: { step: string; count: number; tokens_in: number; tokens_out: number; avg_seconds: number }[];
+  steps_window_days: number;
+  merged_recent: { run_id: string; title: string; repo: string; pr_number: number; pr_url: string; hours_to_merge: number | null; human_commits: number | null }[];
+  failed_recent: { run_id: string; title: string; repo: string; reason: string; at: string }[];
+  repo_names: string[];
 }
