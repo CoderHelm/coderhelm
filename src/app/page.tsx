@@ -30,7 +30,8 @@ export default function Home() {
 
           <p className="mx-auto mt-6 max-w-2xl text-lg text-text-secondary sm:text-xl">
             Assign a GitHub issue or Jira ticket — get a production-ready PR. Autonomous
-            AI that reads your codebase, plans changes, implements, and self-reviews.
+            AI that reads your codebase, plans changes, implements, and self-reviews, then
+            keeps the code healthy after it ships.
           </p>
 
           <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -250,11 +251,11 @@ export default function Home() {
           <div className="text-center">
             <p className="text-sm font-semibold text-blue-400 tracking-wider uppercase">How it works</p>
             <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
-              Three steps. That&apos;s it.
+              Four steps, and the last one never ends.
             </h2>
           </div>
 
-          <div className="mt-16 grid gap-8 md:grid-cols-3">
+          <div className="mt-16 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
             {[
               {
                 step: "01",
@@ -288,6 +289,17 @@ export default function Home() {
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="9 11 12 14 22 4" />
                     <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                  </svg>
+                ),
+              },
+              {
+                step: "04",
+                title: "It keeps going",
+                desc: "After merge it watches the deploy, turns alerts into fixes and keeps its PRs current. Maintenance, not a handoff.",
+                icon: (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12a9 9 0 1 1-3-6.7" />
+                    <polyline points="21 3 21 9 15 9" />
                   </svg>
                 ),
               },
@@ -1203,6 +1215,57 @@ export default function Home() {
                 <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-400/10 text-blue-400 mb-3">
                   {f.icon}
                 </div>
+                <h3 className="text-sm font-semibold text-text-primary">{f.title}</h3>
+                <p className="mt-1.5 text-[13px] text-text-secondary leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Maintenance */}
+      <section id="maintain" className="border-t border-surface-border py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="max-w-3xl">
+            <p className="text-sm font-semibold text-amber-400 tracking-wider uppercase">Maintain</p>
+            <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
+              It doesn&apos;t hand off and walk away.<br className="hidden sm:block" />
+              <span className="text-amber-400">It stays on the code it ships.</span>
+            </h2>
+            <p className="mt-4 text-text-secondary leading-relaxed">
+              Most AI tools stop at an open pull request. Coderhelm keeps working: it answers review comments, fixes the CI
+              it broke, keeps its PRs current with main, checks every deploy for new failures, and turns production alerts
+              into fixes your team reviews.
+            </p>
+          </div>
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                title: "Answers review comments",
+                desc: "Request changes or ask a question on its PR and it replies, pushes the fix and says what changed.",
+              },
+              {
+                title: "Fixes the CI it broke",
+                desc: "When a check fails on its own PR, it reads the logs, fixes the cause and pushes again.",
+              },
+              {
+                title: "Keeps PRs current",
+                desc: "Resolves merge conflicts with main before it works on feedback, so a PR doesn't go stale while it waits for review.",
+              },
+              {
+                title: "Watches every deploy",
+                desc: "After merge, it waits for the deploy checks to finish and reports only failures that are new compared with before the merge. It never rolls back a shared branch on its own.",
+              },
+              {
+                title: "Turns alerts into fixes",
+                desc: "Route your monitoring alerts to Coderhelm and the ones you choose become analyzed pull requests in the right repo. A person still approves every merge.",
+              },
+              {
+                title: "Tags releases",
+                desc: "Optionally batches merged work into tagged releases on your schedule, with notes your team can read.",
+              },
+            ].map((f) => (
+              <div key={f.title} className="rounded-lg bg-white/[0.03] p-5 transition-colors hover:bg-white/[0.05]">
                 <h3 className="text-sm font-semibold text-text-primary">{f.title}</h3>
                 <p className="mt-1.5 text-[13px] text-text-secondary leading-relaxed">{f.desc}</p>
               </div>

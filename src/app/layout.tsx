@@ -144,6 +144,7 @@ export default function RootLayout({
                     "AWS CloudWatch log analyzer",
                     "Read only lookups in your API, logs and PostgreSQL database while planning, coding and reviewing",
                     "Bug ticket investigation using your real records and logs",
+                    "Ongoing maintenance: answers review comments, fixes its own CI, keeps PRs current, watches deploys, turns alerts into fixes",
                     "Custom code guardrails and team voice",
                     "Openspec architecture documents",
                     "Works with any stack — React, Python, Go, Rust, and more",
