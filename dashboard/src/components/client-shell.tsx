@@ -11,7 +11,7 @@ import {
   PlayIcon, CircleDotIcon, TrendingUpIcon, HexagonIcon, HeartIcon,
   GitBranchIcon, GearIcon, AtlassianIcon, GitHubIcon, UsersIcon,
   BellIcon, TargetIcon, RepeatIcon, ShieldCheckIcon,
-  AwsIcon, PluginIcon, ShieldIcon, TemplateIcon, CpuIcon, BrainIcon,
+  AwsIcon, PluginIcon, ShieldIcon, TemplateIcon, CpuIcon, MemoryIcon,
   LifeBuoyIcon, MailIcon, ExternalLinkIcon, DatabaseIcon, TestTubeIcon,
 } from "./icons";
 
@@ -66,7 +66,7 @@ const navGroups: NavGroup[] = [
       { href: "/infrastructure", label: "Infrastructure", icon: <HexagonIcon />, memberOnly: true },
       { href: "/alerts", label: "Alerts", icon: <BellIcon />, memberOnly: true },
       { href: "/health", label: "Health", icon: <HeartIcon />, adminOnly: true },
-      { href: "/memory", label: "Memory", icon: <BrainIcon />, memberOnly: true },
+      { href: "/memory", label: "Memory", icon: <MemoryIcon />, memberOnly: true },
     ],
   },
   {
