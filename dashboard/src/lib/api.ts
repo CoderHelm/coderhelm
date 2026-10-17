@@ -847,8 +847,10 @@ export const api = {
       "/api/data-sources/database",
       { method: "POST", body: JSON.stringify(data) },
     ),
-  listDataSourceActivity: (limit = 50) =>
-    request<{ events: DataSourceActivityEvent[] }>(`/api/data-sources/activity?limit=${limit}`),
+  listDataSourceActivity: (limit = 50, before?: string) =>
+    request<{ events: DataSourceActivityEvent[] }>(
+      `/api/data-sources/activity?limit=${limit}${before ? `&before=${encodeURIComponent(before)}` : ""}`,
+    ),
 };
 
 export interface Release {
@@ -1617,7 +1619,11 @@ export interface DataSourceActivityEvent {
   repo?: string;
   pr?: number;
   summary: string;
-  /** Why a lookup was refused or failed. Empty when it worked. */
+  /** The full lookup text as recorded. Older servers send only `summary`. */
+  query?: string;
+  /** Opaque position of this lookup, for paging further back with `before`. */
+  cursor?: string;
+  /** For a lookup that worked, a short note like "12 rows"; otherwise why it was refused or failed. */
   detail?: string;
   ok: boolean;
   outcome: "ok" | "refused" | "failed";
