@@ -12,7 +12,7 @@ import {
   GitBranchIcon, GearIcon, AtlassianIcon, GitHubIcon, UsersIcon,
   BellIcon, TargetIcon, RepeatIcon, ShieldCheckIcon,
   AwsIcon, PluginIcon, ShieldIcon, TemplateIcon, CpuIcon, MemoryIcon,
-  LifeBuoyIcon, MailIcon, ExternalLinkIcon, DatabaseIcon, TestTubeIcon, GraphIcon, PlanIcon } from "./icons";
+  LifeBuoyIcon, MailIcon, ExternalLinkIcon, DatabaseIcon, TestTubeIcon, GraphIcon, PlanIcon, BookIcon } from "./icons";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
 
@@ -83,6 +83,7 @@ const navGroups: NavGroup[] = [
       { href: "/settings/aws", label: "AWS", icon: <AwsIcon />, adminOnly: true },
       { href: "/settings/alerts", label: "Alert routes", icon: <BellIcon />, adminOnly: true },
       { href: "/data-sources", label: "Data sources", icon: <DatabaseIcon />, adminOnly: true },
+      { href: "/skills", label: "Skills", icon: <BookIcon />, memberOnly: true },
       { href: "/settings/jira", label: "Jira", icon: <AtlassianIcon />, adminOnly: true },
       { href: "/settings/plugins", label: "MCP Servers", icon: <PluginIcon />, adminOnly: true },
       { href: "/settings/models", label: "AI Models", icon: <CpuIcon />, adminOnly: true },

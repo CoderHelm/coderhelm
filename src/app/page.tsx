@@ -1357,6 +1357,7 @@ export default function Home() {
                   "Setup takes minutes: paste one script into AWS CloudShell, no engineer needed",
                   "Your own tools: named lookups your engineers write once, like \"find order by number\", run only after an admin approves each version",
                   "Every lookup is recorded, and your team can follow them live",
+                  "Your team's skills: keep them in a repo and Coderhelm reads the ones that fit the work, kept in step with every merge. Text only, never run",
                 ].map((t) => (
                   <li key={t} className="flex items-start gap-2">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="mt-1 shrink-0 text-emerald-400"><polyline points="20 6 9 17 4 12" /></svg>
