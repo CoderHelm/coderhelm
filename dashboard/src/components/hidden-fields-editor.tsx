@@ -93,6 +93,9 @@ export function HiddenFieldsEditor({
             Hide it
           </button>
         </div>
+        <p className="mt-2 text-xs text-zinc-500">
+          A name hides every field that contains it (<code>salary</code> also hides <code>base_salary</code>). Start with = to hide only an exact name: <code>=ip</code> hides <code>ip</code> but not <code>membership</code>.
+        </p>
         {error && <p id={errorId} role="alert" className="mt-2 text-sm text-red-400">{error}</p>}
       </div>
     </div>
