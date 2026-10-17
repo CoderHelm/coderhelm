@@ -12,8 +12,7 @@ import {
   GitBranchIcon, GearIcon, AtlassianIcon, GitHubIcon, UsersIcon,
   BellIcon, TargetIcon, RepeatIcon, ShieldCheckIcon,
   AwsIcon, PluginIcon, ShieldIcon, TemplateIcon, CpuIcon, MemoryIcon,
-  LifeBuoyIcon, MailIcon, ExternalLinkIcon, DatabaseIcon, TestTubeIcon,
-} from "./icons";
+  LifeBuoyIcon, MailIcon, ExternalLinkIcon, DatabaseIcon, TestTubeIcon, GraphIcon, PlanIcon } from "./icons";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
 
@@ -54,8 +53,8 @@ const navGroups: NavGroup[] = [
       { href: "/reviewer", label: "Reviewer", icon: <ShieldCheckIcon />, memberOnly: true },
       { href: "/tests", label: "Tests", icon: <TestTubeIcon />, memberOnly: true },
       { href: "/releases", label: "Releases", icon: <GitBranchIcon />, memberOnly: true },
-      { href: "/graph", label: "Code Graph", icon: <CircleDotIcon />, memberOnly: true },
-      { href: "/plans", label: "Plans", icon: <CircleDotIcon /> },
+      { href: "/graph", label: "Code Graph", icon: <GraphIcon />, memberOnly: true },
+      { href: "/plans", label: "Plans", icon: <PlanIcon /> },
       { href: "/plans/templates", label: "Templates", icon: <TemplateIcon /> },
     ],
   },
