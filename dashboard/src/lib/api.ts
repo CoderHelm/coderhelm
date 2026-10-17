@@ -854,7 +854,51 @@ export const api = {
     request<{ events: DataSourceActivityEvent[] }>(
       `/api/data-sources/activity?limit=${limit}${before ? `&before=${encodeURIComponent(before)}` : ""}`,
     ),
+
+  // E2E test intelligence
+  getTestSettings: () => request<TestSettings>("/api/tests/settings"),
+  updateTestSettings: (settings: TestSettings) =>
+    request<TestSettings>("/api/tests/settings", { method: "PUT", body: JSON.stringify(settings) }),
+  getTestSummary: (repo?: string) => request<TestSummary>(`/api/tests/summary${qs({ repo })}`),
+  listTestRuns: (opts: { repo?: string; branch?: string; pr?: number; before?: string; limit?: number } = {}) =>
+    request<{ runs: TestRun[]; next?: string | null }>(`/api/tests/runs${qs(opts)}`),
+  getTestRun: (runKey: string) =>
+    request<{ run: TestRun; executions: TestRunExecution[] }>(`/api/tests/runs/${encodeURIComponent(runKey)}`),
+  listTests: (opts: { repo?: string; state?: TestState; q?: string; sort?: TestSort; before?: string; limit?: number } = {}) =>
+    request<{ tests: TestCase[]; next?: string | null }>(`/api/tests${qs(opts)}`),
+  getTest: (id: string) =>
+    request<{ test: TestCase; history: TestHistoryRun[]; events: TestStateEvent[] }>(`/api/tests/${encodeURIComponent(id)}`),
+  quarantineTest: (id: string, on: boolean, reason?: string) =>
+    request<{ test: TestCase }>(`/api/tests/${encodeURIComponent(id)}/quarantine`, {
+      method: "POST",
+      body: JSON.stringify({ on, reason }),
+    }),
+  pinTest: (id: string, neverQuarantine: boolean) =>
+    request<{ test: TestCase }>(`/api/tests/${encodeURIComponent(id)}/pin`, {
+      method: "POST",
+      body: JSON.stringify({ never_quarantine: neverQuarantine }),
+    }),
+  fixTest: (id: string) =>
+    request<{ queued: boolean }>(`/api/tests/${encodeURIComponent(id)}/fix`, { method: "POST", body: "{}" }),
+  listFailureGroups: (repo?: string) => request<{ groups: FailureGroup[] }>(`/api/tests/failure-groups${qs({ repo })}`),
+  getTestCoverage: (repo?: string) =>
+    request<{ areas: CoverageArea[]; recommendations: TestRecommendation[] }>(`/api/tests/coverage${qs({ repo })}`),
+  acceptTestRecommendation: (id: string) =>
+    request<{ queued: boolean }>(`/api/tests/recommendations/${encodeURIComponent(id)}/accept`, { method: "POST", body: "{}" }),
+  dismissTestRecommendation: (id: string, reason?: string) =>
+    request<{ ok: boolean }>(`/api/tests/recommendations/${encodeURIComponent(id)}/dismiss`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
 };
+
+/** A query string from the set values only, e.g. `?repo=a%2Fb&limit=50`. */
+function qs(params: Record<string, string | number | undefined | null>): string {
+  const parts = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== null && v !== "")
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
+  return parts.length ? `?${parts.join("&")}` : "";
+}
 
 export interface Release {
   repo: string;
@@ -1698,4 +1742,162 @@ export interface Analytics {
   merged_recent: { run_id: string; title: string; repo: string; pr_number: number; pr_url: string; hours_to_merge: number | null; human_commits: number | null }[];
   failed_recent: { run_id: string; title: string; repo: string; reason: string; at: string }[];
   repo_names: string[];
+}
+
+// ── E2E test intelligence ─────────────────────────────────────────
+
+export type TestState = "healthy" | "flaky" | "broken" | "quarantined" | "fixed";
+export type TestSort = "impact" | "flake_rate" | "slowest" | "recent";
+export type AttemptStatus = "passed" | "failed" | "timedOut" | "skipped" | "interrupted";
+export type RunOutcome = "passed" | "failed" | "flaky" | "skipped";
+export type FixStatus = "reproducing" | "fixing" | "burn_in" | "opened" | "merged" | "failed";
+export type CauseLabel =
+  | "selector_changed"
+  | "missing_wait"
+  | "test_data_clash"
+  | "environment"
+  | "network"
+  | "timing"
+  | "order_dependence"
+  | "animation_loader"
+  | "unknown";
+
+export interface TestSettings {
+  enabled: boolean;
+  auto_quarantine: boolean;
+  fix_prs: boolean;
+  tickets: "github" | "jira" | "off";
+  burn_in: boolean;
+  /** Empty means every repo. */
+  repos: string[];
+}
+
+export interface TestSummary {
+  repos: string[];
+  counts: Record<TestState, number>;
+  prs_blocked_7d: number;
+  ci_minutes_lost_7d: number;
+  prs_rescued_7d: number;
+  runs_7d: number;
+  pass_rate_7d: number;
+  flake_rate_7d: number;
+  /** 30 days, oldest first. Rates are 0–1. */
+  trend: { day: string; runs: number; pass_rate: number; flake_rate: number }[];
+}
+
+export interface TestRun {
+  run_key: string;
+  repo: string;
+  workflow: string;
+  run_id: number;
+  run_attempt: number;
+  branch: string;
+  pr?: number | null;
+  sha: string;
+  event: string;
+  framework: string;
+  started_at: string;
+  duration_ms: number;
+  passed: number;
+  failed: number;
+  flaky: number;
+  skipped: number;
+  bad_run: boolean;
+  url: string;
+  status: "passed" | "failed";
+}
+
+export interface TestAttempt {
+  retry: number;
+  status: AttemptStatus;
+  duration_ms: number;
+  error?: { message: string; signature: string } | null;
+  trace_url?: string | null;
+  video_url?: string | null;
+  screenshot_url?: string | null;
+}
+
+export interface TestRunExecution {
+  test_id: string;
+  title: string;
+  file: string;
+  project?: string | null;
+  attempts: TestAttempt[];
+  outcome: RunOutcome;
+}
+
+export interface TestCase {
+  id: string;
+  repo: string;
+  framework: string;
+  file: string;
+  title: string;
+  project?: string | null;
+  state: TestState;
+  flags: string[];
+  owner?: string | null;
+  cause?: { label: CauseLabel; evidence: string } | null;
+  runs_30d: number;
+  fail_rate_30d: number;
+  flake_rate_30d: number;
+  flips_14d: number;
+  prs_blocked_7d: number;
+  minutes_lost_7d: number;
+  p50_ms: number;
+  p95_ms: number;
+  last_seen: string;
+  quarantined_since?: string | null;
+  never_quarantine: boolean;
+  ticket_url?: string | null;
+  fix_pr_url?: string | null;
+  fix_status?: FixStatus | null;
+}
+
+export interface TestHistoryRun {
+  run_key: string;
+  sha: string;
+  branch: string;
+  pr?: number | null;
+  at: string;
+  outcome: RunOutcome;
+  attempts: TestAttempt[];
+}
+
+export interface TestStateEvent {
+  at: string;
+  from: TestState;
+  to: TestState;
+  reason: string;
+  actor: string;
+}
+
+export interface FailureGroup {
+  signature: string;
+  message: string;
+  selector?: string | null;
+  step?: string | null;
+  tests: number;
+  failures_7d: number;
+  last_seen: string;
+  test_ids: string[];
+  cause?: CauseLabel | null;
+}
+
+export interface CoverageArea {
+  area: string;
+  paths: string[];
+  tests: { id: string; title: string }[];
+  runs_30d: number;
+  covered: boolean;
+}
+
+export interface TestRecommendation {
+  id: string;
+  repo: string;
+  area?: string | null;
+  title: string;
+  why: string;
+  evidence: { kind: "bug_ticket" | "changed_code" | "route" | "traffic"; text: string; url?: string | null }[];
+  status: "open" | "accepted" | "generating" | "pr_opened" | "dismissed";
+  pr_url?: string | null;
 }
