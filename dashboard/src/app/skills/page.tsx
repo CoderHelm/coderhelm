@@ -120,9 +120,9 @@ function SkillsPage() {
       <h1 className="text-2xl font-bold text-zinc-100 text-balance">Skills</h1>
       <p className="mt-2 max-w-prose text-sm text-zinc-400">
         Keep your team&apos;s skills, agent briefs and commands in a repository, and Coderhelm&apos;s planner, coder and reviewer read
-        the ones that fit the work. Coderhelm reads the default branch, so only merged changes count, and reads it again on
-        every push. Skills are text: nothing in them is ever run, and they can&apos;t give Coderhelm any access it doesn&apos;t
-        already have.
+        the ones that fit the work, and can ask your agents a question. Coderhelm reads the default branch, so only merged
+        changes count, and reads it again on every push. Nothing in them is ever run, and they can&apos;t give Coderhelm any
+        access it doesn&apos;t already have: an agent that&apos;s asked gets no tools, only its brief and what it&apos;s sent.
       </p>
 
       {error && (
@@ -151,7 +151,7 @@ function SkillsPage() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1 basis-64">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono font-semibold text-zinc-100 break-all">{r.repo}</span>
+                      <span className="font-mono font-semibold text-zinc-100 [overflow-wrap:anywhere]">{r.repo}</span>
                       {!r.synced_at ? (
                         <StatusPill tone="warning">Reading…</StatusPill>
                       ) : r.error ? (
@@ -172,7 +172,7 @@ function SkillsPage() {
                         <summary className={`cursor-pointer rounded ${focusRing}`}>{r.skipped.length} file{r.skipped.length === 1 ? "" : "s"} left out</summary>
                         <ul className="mt-1 list-disc pl-5 space-y-0.5">
                           {r.skipped.map((s) => (
-                            <li key={s} className="break-all">{s}</li>
+                            <li key={s} className="[overflow-wrap:anywhere]">{s}</li>
                           ))}
                         </ul>
                       </details>
@@ -229,16 +229,19 @@ function SkillsPage() {
                 <li key={key} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1 basis-64">
-                      <button
-                        type="button"
-                        className={`font-mono font-semibold text-zinc-100 hover:underline rounded text-left break-all ${focusRing}`}
-                        aria-expanded={isOpen}
-                        onClick={() => view(s)}
-                      >
-                        {handle(s, items)}
-                      </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          className={`font-mono font-semibold text-zinc-100 hover:underline rounded text-left [overflow-wrap:anywhere] ${focusRing}`}
+                          aria-expanded={isOpen}
+                          onClick={() => view(s)}
+                        >
+                          {handle(s, items)}
+                        </button>
+                        {s.kind === "agent" && <StatusPill tone="success">Agent · can be asked</StatusPill>}
+                      </div>
                       {s.description && <p className="mt-1 text-sm text-zinc-400">{s.description}</p>}
-                      <p className="mt-1 text-xs text-zinc-500 break-all">
+                      <p className="mt-1 text-xs text-zinc-500 [overflow-wrap:anywhere]">
                         {s.repo} · {s.path}
                         {s.files.length > 0 && <> · {s.files.length} file{s.files.length === 1 ? "" : "s"} with it</>}
                         {" · "}
@@ -255,7 +258,7 @@ function SkillsPage() {
                     <div className="mt-4">
                       <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-950 px-4 py-3 font-mono text-xs text-zinc-300">{open.body}</pre>
                       {open.files.length > 0 && (
-                        <p className="mt-2 text-xs text-zinc-500 break-all">Files with it: {open.files.join(", ")}</p>
+                        <p className="mt-2 text-xs text-zinc-500 [overflow-wrap:anywhere]">Files with it: {open.files.join(", ")}</p>
                       )}
                       <button type="button" className={`${linkButton} mt-2 text-sm`} onClick={() => setOpen(null)}>
                         Close
