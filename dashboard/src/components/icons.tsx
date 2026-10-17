@@ -1,7 +1,12 @@
 const s = { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
 // Sidebar nav icons
-export const TestTubeIcon = () => <svg {...s}><path d="M9 3h6" /><path d="M10 3v12.5a2.5 2.5 0 005 0V3" /><path d="M10 11h5" /></svg>;
+/** A lab flask: tests and their results. */
+export const TestTubeIcon = () => <svg {...s}><path d="M9 3h6" /><path d="M10 3v6.2L4.6 18.4A1.7 1.7 0 006.1 21h11.8a1.7 1.7 0 001.5-2.6L14 9.2V3" /><path d="M7.5 15h9" /></svg>;
+/** Three connected nodes: the code graph. */
+export const GraphIcon = () => <svg {...s}><circle cx="5.5" cy="6" r="2.5" /><circle cx="18.5" cy="6" r="2.5" /><circle cx="12" cy="18.5" r="2.5" /><path d="M8 6h8" /><path d="M6.8 8.2l4 8" /><path d="M17.2 8.2l-4 8" /></svg>;
+/** A checklist: plans and their steps. */
+export const PlanIcon = () => <svg {...s}><path d="M3.5 6.5l1.5 1.5 3-3" /><path d="M3.5 12.5l1.5 1.5 3-3" /><path d="M3.5 18.5l1.5 1.5 3-3" /><path d="M12 7h8.5" /><path d="M12 13h8.5" /><path d="M12 19h8.5" /></svg>;
 export const PlayIcon = () => <svg {...s}><polygon points="6 3 20 12 6 21 6 3" /></svg>;
 export const CircleDotIcon = () => <svg {...s}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" /></svg>;
 export const BarChartIcon = () => <svg {...s}><rect x="3" y="12" width="4" height="9" rx="1" /><rect x="10" y="7" width="4" height="14" rx="1" /><rect x="17" y="3" width="4" height="18" rx="1" /></svg>;

@@ -567,6 +567,10 @@ export default function Home() {
               Every run builds a living knowledge graph of your repository. Patterns, mistakes, conventions, architecture decisions — all
               connected, weighted, and retrieved exactly when the agent needs them.
             </p>
+            <p className="mx-auto mt-3 max-w-2xl text-text-secondary">
+              And you can see all of it: a profile for each agent showing what it knows and where it learned it, how often each memory
+              is used, what it would remember for a given ticket, and a way to pin, edit, forget or teach it something new.
+            </p>
           </div>
 
           {/* Neural graph visualization + stats */}
@@ -1351,6 +1355,7 @@ export default function Home() {
                   "Bug tickets come with evidence: the record, the error, the code that raised it",
                   "Reviews confirm a field or table really exists before flagging it",
                   "Setup takes minutes: paste one script into AWS CloudShell, no engineer needed",
+                  "Your own tools: named lookups your engineers write once, like \"find order by number\", run only after an admin approves each version",
                   "Every lookup is recorded, and your team can follow them live",
                 ].map((t) => (
                   <li key={t} className="flex items-start gap-2">
