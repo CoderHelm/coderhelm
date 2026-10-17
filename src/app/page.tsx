@@ -1246,7 +1246,7 @@ export default function Home() {
               },
               {
                 title: "Fixes the CI it broke",
-                desc: "When a check fails on its own PR, it reads the logs, fixes the cause and pushes again.",
+                desc: "When a check fails on its own PR, it reads the logs, fixes the cause and pushes again. When the failure isn't from its change, such as a flaky test, it re-runs it once and says so with the evidence.",
               },
               {
                 title: "Keeps PRs current",
@@ -1274,6 +1274,61 @@ export default function Home() {
         </div>
       </section>
 
+      {/* E2E test intelligence */}
+      <section id="tests" className="border-t border-surface-border py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="max-w-3xl">
+            <p className="text-sm font-semibold text-rose-400 tracking-wider uppercase">Tests</p>
+            <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
+              Flaky tests stop blocking you.<br className="hidden sm:block" />
+              <span className="text-rose-400">Broken ones never hide.</span>
+            </h2>
+            <p className="mt-4 text-text-secondary leading-relaxed">
+              Coderhelm reads every end-to-end run your CI already produces, tells a flaky test from a broken one, and
+              acts on it: a note on each PR saying whether a failure is known flaky, a bad run or caused by the change, a
+              quarantine that keeps flaky tests from failing builds, and fix PRs that have to pass twenty runs in a row before they are ready.
+            </p>
+          </div>
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                title: "Flaky or broken, told apart",
+                desc: "A test that passed and failed on the same commit is flaky; one that fails almost every time is broken. A run where a fifth of the tests fail together is a bad run, not twenty flaky tests.",
+              },
+              {
+                title: "\"Is this failure mine?\"",
+                desc: "Each failing test on a PR gets one calm line in the review: known flaky with its history, a bad run, or likely caused by the files this PR changed.",
+              },
+              {
+                title: "Quarantine, never for broken tests",
+                desc: "Flaky tests keep running and keep being recorded, but stop failing the build. A broken test is a real regression and is never quarantined. Owners get a ticket after two weeks.",
+              },
+              {
+                title: "Fix PRs with proof",
+                desc: "Coderhelm reproduces the flake first, fixes it with the trace and only the code that ran, and marks the PR ready only after twenty green runs. It never weakens or deletes an assertion to make a test pass.",
+              },
+              {
+                title: "Every run on one page",
+                desc: "Runs, each test's history attempt by attempt, failures grouped by cause, trends, the slowest tests and the quarantine list, ranked by the PRs and CI minutes they cost.",
+              },
+              {
+                title: "Tests you're missing",
+                desc: "Bug fixes with no test, changes to areas nothing covers and busy routes with no journey become suggested tests. A suggestion must fail on the code before the fix and pass ten times before it's proposed.",
+              },
+            ].map((f) => (
+              <div key={f.title} className="rounded-lg bg-white/[0.03] p-5 transition-colors hover:bg-white/[0.05]">
+                <h3 className="text-sm font-semibold text-text-primary">{f.title}</h3>
+                <p className="mt-1.5 text-[13px] text-text-secondary leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-6 text-sm text-text-muted">
+            Works with Playwright, JUnit and Cucumber reports. Results that never reach GitHub, such as a device farm, upload with a
+            GitHub Actions token: no secrets to store.
+          </p>
+        </div>
+      </section>
+
       {/* Live data sources */}
       <section id="data-sources" className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-6xl px-6">
@@ -1292,7 +1347,7 @@ export default function Home() {
               </p>
               <ul className="mt-6 space-y-2 text-sm text-text-secondary">
                 {[
-                  "Your GraphQL API, your CloudWatch logs and your PostgreSQL database",
+                  "Your GraphQL API, your CloudWatch logs, your PostgreSQL databases and your Redshift warehouse",
                   "Bug tickets come with evidence: the record, the error, the code that raised it",
                   "Reviews confirm a field or table really exists before flagging it",
                   "Setup takes minutes: paste one script into AWS CloudShell, no engineer needed",
