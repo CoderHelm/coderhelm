@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, type AwsLogGroup, type DataSource, type DataSourceActivityEvent } from "@/lib/api";
 import {
-  DEFAULT_HIDDEN_FIELDS, KIND_LABEL, errorMessage, formatDuration, readSetupHint, clearSetupHint,
-  runningChecks, actorLabel, checksFor, countLabel, hiddenNoun, whereLabel,
+  DEFAULT_HIDDEN_FIELDS, errorMessage, formatDuration, readSetupHint, clearSetupHint,
+  runningChecks, actorLabel, checksFor, countLabel, hiddenNoun, isWarehouse, kindLabel, whereLabel,
   timeAgo, toCheckItems,
 } from "@/lib/data-sources";
 import { RoleGuard } from "@/components/role-guard";
@@ -110,7 +110,7 @@ function DataSourcesPage() {
           title="A database in your AWS account"
           time="About 5 minutes"
         >
-          Read-only access to a PostgreSQL database, so Coderhelm can check the records a ticket names.
+          Read-only access to a PostgreSQL database or a Redshift warehouse, so Coderhelm can check the records a ticket names.
         </ConnectCard>
         <ComingNextCard icon={<WrenchIcon />} title="Your own tools">
           Named lookups your engineers already trust, like &quot;find order by number&quot;.
@@ -241,7 +241,7 @@ function SourceCard({
   const [groups, setGroups] = useState<string[]>(source.aws?.log_groups ?? []);
   const [available, setAvailable] = useState<AwsLogGroup[] | null>(null);
   const [groupsError, setGroupsError] = useState("");
-  const expected = checksFor(source.kind);
+  const expected = checksFor(source.kind, isWarehouse(source));
   const noun = hiddenNoun(source.kind);
   const isApi = source.kind === "api";
 
@@ -400,7 +400,7 @@ function SourceCard({
         <div className="min-w-0 flex-1 basis-56">
           <h3 className="flex flex-wrap items-center gap-2 font-semibold text-zinc-100">
             <span className="break-words min-w-0">{source.name}</span>
-            <span className="rounded border border-zinc-700 px-1.5 py-0.5 text-xs font-medium text-zinc-400">{KIND_LABEL[source.kind]}</span>
+            <span className="rounded border border-zinc-700 px-1.5 py-0.5 text-xs font-medium text-zinc-400">{kindLabel(source)}</span>
             {source.status === "ready"
               ? <StatusPill tone="success">Ready</StatusPill>
               : <StatusPill tone="error">Needs attention</StatusPill>}

@@ -823,7 +823,7 @@ export const api = {
     request<{ ok: true }>(`/api/data-sources/${encodeURIComponent(id)}`, { method: "DELETE" }),
   getDataSourceSamples: (id: string) =>
     request<{ samples: DataSourceSample[] }>(`/api/data-sources/${encodeURIComponent(id)}/samples`),
-  tryDataSource: (id: string, query: string, opts: { log_groups?: string[]; since?: string } = {}) =>
+  tryDataSource: (id: string, query: string, opts: { log_groups?: string[]; since?: string; database?: string } = {}) =>
     request<DataSourceTryResult>(`/api/data-sources/${encodeURIComponent(id)}/try`, {
       method: "POST",
       body: JSON.stringify({ query, ...opts }),
@@ -842,7 +842,7 @@ export const api = {
       { method: "POST", body: JSON.stringify(data) },
     ),
   /** Does not throw on failed checks, like `createDataSourceApi`. */
-  createDatabaseSource: (data: { code: string; name?: string }) =>
+  createDatabaseSource: (data: { code: string; name?: string; engine?: "postgres" | "redshift" }) =>
     requestWithBody<{ source: DataSource; checks: DataSourceCheck[] }, { checks: DataSourceCheck[] }>(
       "/api/data-sources/database",
       { method: "POST", body: JSON.stringify(data) },
@@ -1492,9 +1492,13 @@ export interface DataSourceAws {
   region: string;
   role_arn: string;
   log_groups: string[];
-  /** Database cluster name, "" for logs. */
+  /** Database cluster or Redshift warehouse name, "" for logs. */
   cluster: string;
   database: string;
+  /** "redshift" for a data warehouse; PostgreSQL otherwise. */
+  engine?: "postgres" | "redshift";
+  /** Redshift: every database the team shared. */
+  databases?: string[];
 }
 
 export interface DataSource {
@@ -1562,6 +1566,8 @@ export interface DataSourceSample {
   /** Logs samples name the groups and time range they search. */
   log_groups?: string[];
   since?: string;
+  /** Warehouse samples name the database they read. */
+  database?: string | null;
 }
 
 /** How Coderhelm reaches a team's AWS account: the line the setup script printed, or a role it already uses. */
@@ -1594,6 +1600,8 @@ export interface AwsConnectResult {
   role_arn?: string;
   log_groups?: AwsLogGroup[];
   database?: { cluster: string; database: string } | null;
+  /** A Redshift warehouse the pasted line includes, with its shared databases. */
+  warehouse?: { cluster: string; databases: string[] } | null;
 }
 
 export interface DataSourceTryResult {
