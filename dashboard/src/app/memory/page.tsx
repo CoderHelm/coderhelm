@@ -1,377 +1,678 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { api, type Repo, type MemoryItem, type MemoryListResponse, type MemoryStats } from "@/lib/api";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  api,
+  type AgentProfile,
+  type MemoryFilters,
+  type MemoryItem,
+  type MemoryPreview,
+  type Repo,
+} from "@/lib/api";
+import { Callout } from "@/components/callout";
+import { Segmented } from "@/components/segmented";
+import { Skeleton } from "@/components/skeleton";
+import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm-dialog";
+import { ChatIcon, CodeIcon, MemoryIcon, PinIcon, PlannerIcon, ReviewerIcon } from "@/components/icons";
+import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 
-const TYPE_COLORS: Record<string, string> = {
-  semantic: "bg-blue-500/20 text-blue-400",
-  procedural: "bg-purple-500/20 text-purple-400",
-  correction: "bg-yellow-500/20 text-yellow-400",
-  anti_pattern: "bg-red-500/20 text-red-400",
-  episodic: "bg-green-500/20 text-green-400",
-  reasoning: "bg-cyan-500/20 text-cyan-400",
+// What each memory can be about, in the order they're shown. Mirrors the
+// platform's memory_meta::TOPICS.
+const TOPICS: { value: string; label: string; hint: string }[] = [
+  { value: "procedure", label: "How things are done here", hint: "Steps, commands and conventions to follow." },
+  { value: "code-style", label: "Code style", hint: "How code in this repo is written." },
+  { value: "architecture", label: "How the code is built", hint: "Where things live and how parts fit." },
+  { value: "anti-pattern", label: "Things to avoid", hint: "Mistakes that were made before." },
+  { value: "correction", label: "Corrections", hint: "Something it got wrong and the right answer." },
+  { value: "learned", label: "Other things it learned", hint: "Anything else." },
+];
+const topicLabel = (t?: string) => TOPICS.find((x) => x.value === t)?.label ?? "Other things it learned";
+
+const AGENT_ICON: Record<AgentProfile["id"], ReactNode> = {
+  reviewer: <ReviewerIcon />,
+  planner: <PlannerIcon />,
+  coder: <CodeIcon />,
+  feedback: <ChatIcon />,
 };
 
-const TYPE_LABELS: Record<string, string> = {
-  semantic: "Finding",
-  procedural: "Procedure",
-  correction: "Correction",
-  anti_pattern: "Anti-pattern",
-  episodic: "Episode",
-  reasoning: "Reasoning",
-};
+type Show = "all" | "pinned" | "run" | "person";
+type Sort = "newest" | "most_used";
 
-function formatDate(microseconds: number): string {
-  if (!microseconds) return "—";
-  const ms = microseconds > 1e15 ? microseconds / 1000 : microseconds;
-  const d = new Date(ms);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+const ROLE_LEVEL: Record<string, number> = { viewer: 0, member: 1, billing: 2, admin: 3, owner: 4 };
+
+function errorText(e: unknown, fallback: string) {
+  const m = e instanceof Error ? e.message : "";
+  return m || fallback;
 }
 
-function TypeBadge({ type: t }: { type: string }) {
-  return (
-    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${TYPE_COLORS[t] || "bg-zinc-700 text-zinc-300"}`}>
-      {TYPE_LABELS[t] || t}
-    </span>
-  );
+function day(value: string | number | undefined): string {
+  if (!value) return "";
+  const ms = typeof value === "number" ? (value > 1e15 ? value / 1000 : value) : Date.parse(value);
+  if (!Number.isFinite(ms) || ms <= 0) return "";
+  const d = new Date(ms);
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString("en-US", sameYear ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", year: "numeric" });
+}
+
+function where(m: MemoryItem): string {
+  const o = m.origin;
+  if (!o) return "Learned on a ticket";
+  if (o.source === "person") return o.added_by ? `Added by ${o.added_by}` : "Added by a person";
+  return o.title ? `Learned on “${o.title}”` : "Learned on a ticket";
 }
 
 export default function MemoryPage() {
-  const [repos, setRepos] = useState<Repo[]>([]);
-  const [selectedRepo, setSelectedRepo] = useState("");
-  const [memories, setMemories] = useState<MemoryItem[]>([]);
-  // Unfiltered sample for the Agent Profile digest (independent of
-  // search/type/page so the profile stays stable while browsing).
-  const [profileItems, setProfileItems] = useState<MemoryItem[]>([]);
-  const [stats, setStats] = useState<MemoryStats | null>(null);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [deleting, setDeleting] = useState<string | null>(null);
-  const pageSize = 50;
+  const { toast } = useToast();
+  const { confirm } = useConfirm();
+  const [repos, setRepos] = useState<Repo[] | null>(null);
+  const [repo, setRepo] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  // Load repos
+  const [profiles, setProfiles] = useState<AgentProfile[] | null>(null);
+  const [profilesError, setProfilesError] = useState("");
+  const [openAgent, setOpenAgent] = useState<AgentProfile["id"] | null>(null);
+
+  const [memories, setMemories] = useState<MemoryItem[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [listError, setListError] = useState("");
+  const [show, setShow] = useState<Show>("all");
+  const [topic, setTopic] = useState("");
+  const [sort, setSort] = useState<Sort>("newest");
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  const [teaching, setTeaching] = useState(false);
+  const [reload, setReload] = useState(0);
+
   useEffect(() => {
-    api.listRepos().then(({ repos }) => {
-      const enabled = repos.filter((r) => r.enabled);
-      setRepos(enabled);
-      if (enabled.length > 0 && !selectedRepo) {
-        setSelectedRepo(enabled[0].name); // name is "owner/repo"
-      }
-    }).catch(() => {});
+    api.me().then((u) => setIsAdmin((ROLE_LEVEL[u.role] ?? 0) >= 3)).catch(() => setIsAdmin(false));
+    api
+      .listRepos()
+      .then(({ repos }) => {
+        const enabled = repos.filter((r) => r.enabled);
+        setRepos(enabled);
+        if (enabled.length > 0) setRepo((cur) => cur || enabled[0].name);
+      })
+      .catch(() => setRepos([]));
   }, []);
 
-  // Load memories when repo/page/search/filter changes
-  const loadMemories = useCallback(async () => {
-    if (!selectedRepo) return;
-    setLoading(true);
-    try {
-      const [memRes, statsRes, profileRes] = await Promise.all([
-        api.listMemories(selectedRepo, page, pageSize, search || undefined, typeFilter || undefined),
-        api.getMemoryStats(selectedRepo),
-        api.listMemories(selectedRepo, 1, 200),
-      ]);
-      setMemories(memRes.memories);
-      setTotal(memRes.total);
-      setStats(statsRes);
-      setProfileItems(profileRes.memories);
-    } catch {
-      setMemories([]);
-      setTotal(0);
-      setStats(null);
-      setProfileItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedRepo, page, search, typeFilter]);
-
+  // Searching waits for a pause in typing.
   useEffect(() => {
-    loadMemories();
-  }, [loadMemories]);
-
-  // Debounced search
-  const [searchInput, setSearchInput] = useState("");
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setSearch(searchInput);
-      setPage(1);
-    }, 300);
+    const t = setTimeout(() => setQuery(search.trim()), 300);
     return () => clearTimeout(t);
-  }, [searchInput]);
+  }, [search]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this memory? This cannot be undone.")) return;
-    setDeleting(id);
+  useEffect(() => {
+    if (!repo) return;
+    setProfiles(null);
+    setProfilesError("");
+    api
+      .getAgentProfiles(repo)
+      .then((r) => setProfiles(r.profiles))
+      .catch((e) => setProfilesError(errorText(e, "The request failed.")));
+  }, [repo, reload]);
+
+  const loadMemories = useCallback(async () => {
+    if (!repo) return;
+    setListError("");
+    const filters: MemoryFilters = { sort };
+    if (show === "pinned") filters.pinned = true;
+    if (show === "run" || show === "person") filters.source = show;
+    if (topic) filters.topic = topic;
     try {
-      await api.deleteMemory(id, selectedRepo);
-      await loadMemories();
-    } catch {
-      alert("Failed to delete memory");
-    } finally {
-      setDeleting(null);
+      const r = await api.listMemories(repo, 1, 100, query || undefined, undefined, filters);
+      setMemories(r.memories);
+      setTotal(r.total);
+    } catch (e) {
+      setMemories([]);
+      setListError(errorText(e, "The request failed."));
+    }
+  }, [repo, show, topic, sort, query]);
+
+  useEffect(() => {
+    setMemories(null);
+    loadMemories();
+  }, [loadMemories, reload]);
+
+  const refresh = () => setReload((n) => n + 1);
+
+  const togglePin = async (m: MemoryItem) => {
+    try {
+      await api.updateMemory(m.id, { repo, pinned: !m.pinned });
+      toast(m.pinned ? "Unpinned" : "Pinned: it now reaches the planner and coding agent on every ticket");
+      refresh();
+    } catch (e) {
+      toast(errorText(e, "Couldn't change the pin. Try again."));
     }
   };
 
-  const toggleExpand = (id: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
+  const forget = async (m: MemoryItem) => {
+    const ok = await confirm({
+      title: "Forget this memory?",
+      message: `Coderhelm will stop using it on ${repo}. This can't be undone.\n\n“${m.content.slice(0, 200)}${m.content.length > 200 ? "…" : ""}”`,
+      confirmLabel: "Forget it",
+      destructive: true,
     });
+    if (!ok) return;
+    try {
+      await api.deleteMemory(m.id, repo);
+      toast("Forgotten");
+      refresh();
+    } catch (e) {
+      toast(errorText(e, "Couldn't forget it. Try again."));
+    }
   };
 
-  const totalPages = Math.ceil(total / pageSize);
+  const save = async (m: MemoryItem, content: string, newTopic: string) => {
+    await api.updateMemory(m.id, { repo, content: content !== m.content ? content : undefined, topic: newTopic !== m.topic ? newTopic : undefined });
+    toast("Saved");
+    refresh();
+  };
+
+  const grouped = useMemo(() => {
+    if (!memories) return [];
+    if (sort === "most_used" || topic || query) return [{ topic: "", items: memories }];
+    const by = new Map<string, MemoryItem[]>();
+    for (const m of memories) {
+      const key = m.topic || "learned";
+      by.set(key, [...(by.get(key) ?? []), m]);
+    }
+    return TOPICS.filter((t) => by.has(t.value)).map((t) => ({ topic: t.value, items: by.get(t.value)! }));
+  }, [memories, sort, topic, query]);
+
+  const filtered = show !== "all" || !!topic || !!query;
+  const agent = profiles?.find((p) => p.id === openAgent) ?? null;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">Agent Memory</h1>
-        <p className="text-zinc-400 text-sm mt-1">
-          Browse, search, and manage memories CoderHelm has learned from past runs.
-        </p>
+    <div className="max-w-5xl">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold">Memory</h1>
+          <p className="mt-1 max-w-2xl text-sm text-zinc-400">
+            What Coderhelm knows about each repository, where it learned it, and what each agent actually uses.
+          </p>
+        </div>
+        {isAdmin && repo && (
+          <button type="button" onClick={() => setTeaching(true)} className={primaryButton}>
+            Teach it something
+          </button>
+        )}
       </div>
 
-      {repos.length === 0 ? (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
-          <svg className="w-12 h-12 mx-auto mb-4 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75" />
-          </svg>
-          <p className="text-zinc-400 text-sm">No active repositories.</p>
-          <p className="text-zinc-500 text-xs mt-1">Enable a repository in Settings to start building agent memory.</p>
+      {repos === null ? (
+        <div className="mt-6"><Skeleton className="h-10 w-64" /></div>
+      ) : repos.length === 0 ? (
+        <div className="mt-6">
+          <Callout variant="info" title="No repositories yet">
+            <p>Turn on a repository in Settings. Coderhelm starts remembering things about it after its first finished ticket.</p>
+          </Callout>
         </div>
       ) : (
-      <>
-      {/* Controls */}
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Repo picker */}
-        <select
-          value={selectedRepo}
-          onChange={(e) => {
-            setSelectedRepo(e.target.value);
-            setPage(1);
-            setExpanded(new Set());
-          }}
-          className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:outline-none"
-        >
-          {repos.map((r) => (
-            <option key={r.name} value={r.name}>
-              {r.name}
-            </option>
-          ))}
-        </select>
-
-        {/* Search */}
-        <input
-          type="text"
-          placeholder="Search memories…"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 w-64 focus:border-blue-500 focus:outline-none"
-        />
-
-        {/* Type filter */}
-        <select
-          value={typeFilter}
-          onChange={(e) => {
-            setTypeFilter(e.target.value);
-            setPage(1);
-          }}
-          className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:outline-none"
-        >
-          <option value="">All types</option>
-          {Object.entries(TYPE_LABELS).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Stats bar */}
-      {stats && stats.total > 0 && (
-        <div className="flex flex-wrap gap-3">
-          <div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-4 py-2">
-            <span className="text-zinc-400 text-xs">Total</span>
-            <p className="text-white font-semibold text-lg">{stats.total}</p>
-          </div>
-          {Object.entries(stats.by_type).sort((a, b) => b[1] - a[1]).map(([type_, count]) => (
-            <div key={type_} className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-4 py-2">
-              <span className="text-zinc-400 text-xs">{TYPE_LABELS[type_] || type_}</span>
-              <p className="text-white font-semibold text-lg">{count}</p>
-            </div>
-          ))}
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <label htmlFor="memory-repo" className="text-sm text-zinc-400">Repository</label>
+          <select
+            id="memory-repo"
+            aria-label="Repository"
+            value={repo}
+            onChange={(e) => { setRepo(e.target.value); setOpenAgent(null); }}
+            className={`${inputClass} !w-auto min-w-0 max-w-full`}
+          >
+            {repos.map((r) => <option key={r.name} value={r.name}>{r.name}</option>)}
+          </select>
         </div>
       )}
 
-      {/* Agent Profile — a living digest of what the agent knows about this
-          repo, derived from the memory store, so it updates automatically as
-          runs learn (and as memories are deleted). */}
-      {profileItems.length > 0 && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-white font-semibold">Agent Profile</h2>
-              <p className="text-zinc-500 text-xs mt-0.5">
-                What CoderHelm currently knows about {selectedRepo} — updates automatically as it learns. Delete anything wrong below.
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(
-              [
-                ["semantic", "Repo knowledge"],
-                ["procedural", "How-tos it follows"],
-                ["correction", "Corrections it learned"],
-                ["anti_pattern", "Pitfalls it avoids"],
-              ] as const
-            ).map(([t, heading]) => {
-              const items = profileItems
-                .filter((m) => m.memory_type === t)
-                .sort(
-                  (a, b) =>
-                    b.confidence - a.confidence ||
-                    b.access_count - a.access_count ||
-                    b.created_at - a.created_at,
-                )
-                .slice(0, 4);
-              if (items.length === 0) return null;
-              return (
-                <div key={t} className="bg-zinc-800/40 border border-zinc-700/40 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <TypeBadge type={t} />
-                    <span className="text-zinc-300 text-sm font-medium">{heading}</span>
-                  </div>
-                  <ul className="space-y-1.5">
-                    {items.map((m) => (
-                      <li key={m.id} className="text-zinc-400 text-xs leading-relaxed line-clamp-2">
-                        {m.content}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Table */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-zinc-500">Loading memories…</div>
-        ) : memories.length === 0 ? (
-          <div className="p-8 text-center text-zinc-500">
-            No memories yet. CoderHelm will learn from future runs on this repository.
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-zinc-800 text-left text-zinc-400">
-                <th className="px-4 py-3 font-medium">Content</th>
-                <th className="px-4 py-3 font-medium w-28">Type</th>
-                <th className="px-4 py-3 font-medium w-40">Tags</th>
-                <th className="px-4 py-3 font-medium w-28">Created</th>
-                <th className="px-4 py-3 font-medium w-16"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {memories.map((m) => {
-                const isExpanded = expanded.has(m.id);
-                return (
-                  <tr
-                    key={m.id}
-                    className="border-b border-zinc-800/50 hover:bg-zinc-800/30 cursor-pointer"
-                    onClick={() => toggleExpand(m.id)}
-                  >
-                    <td className="px-4 py-3">
-                      <div className={`text-zinc-200 ${isExpanded ? "" : "line-clamp-2"}`}>
-                        {m.content}
-                      </div>
-                      {isExpanded && (
-                        <div className="mt-2 text-xs text-zinc-500 space-y-1">
-                          <div>ID: <span className="font-mono text-zinc-400">{m.id}</span></div>
-                          <div>Confidence: {(m.confidence * 100).toFixed(0)}%</div>
-                          <div>Accessed: {m.access_count} time{m.access_count !== 1 ? "s" : ""}</div>
+      {repo && (
+        <>
+          {/* ── Agents ───────────────────────────────────────── */}
+          <section aria-labelledby="agents-heading" className="mt-10">
+            <h2 id="agents-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">Who knows what</h2>
+            {profilesError ? (
+              <Callout variant="error" title="We couldn't load the agents">
+                <p>{profilesError} Reload the page to try again.</p>
+              </Callout>
+            ) : profiles === null ? (
+              <div className="grid gap-3 sm:grid-cols-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-36" />)}</div>
+            ) : (
+              <>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {profiles.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      aria-expanded={openAgent === p.id}
+                      aria-controls="agent-profile"
+                      onClick={() => setOpenAgent(openAgent === p.id ? null : p.id)}
+                      className={`text-left rounded-lg border p-5 transition-colors motion-reduce:transition-none ${
+                        openAgent === p.id ? "border-zinc-500 bg-zinc-900" : "border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900"
+                      } ${focusRing}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-zinc-300" aria-hidden="true">
+                          {AGENT_ICON[p.id]}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-zinc-100">{p.name}</p>
+                          <p className="mt-1 text-sm text-zinc-400">{p.role}</p>
                         </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <TypeBadge type={m.memory_type} />
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <div className="flex flex-wrap gap-1">
-                        {m.tags.slice(0, isExpanded ? undefined : 2).map((tag) => (
-                          <span key={tag} className="text-xs bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded">
-                            {tag}
-                          </span>
-                        ))}
-                        {!isExpanded && m.tags.length > 2 && (
-                          <span className="text-xs text-zinc-500">+{m.tags.length - 2}</span>
-                        )}
                       </div>
-                    </td>
-                    <td className="px-4 py-3 align-top text-zinc-400 text-xs">
-                      {formatDate(m.created_at)}
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(m.id);
-                        }}
-                        disabled={deleting === m.id}
-                        className="text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-50"
-                        title="Delete memory"
-                      >
-                        {deleting === m.id ? (
-                          <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
-                            <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-                          </svg>
-                        ) : (
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                          </svg>
-                        )}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
+                      <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                        <span className="text-zinc-100"><span className="font-semibold">{p.activity_count}</span> <span className="text-zinc-400">{p.activity_label}</span></span>
+                      </div>
+                      <p className="mt-2 text-xs text-zinc-500">
+                        {p.uses_repo_memory ? "Uses this repo's memories" : "Doesn't use repo memories"}
+                        <span aria-hidden="true"> · </span>
+                        {openAgent === p.id ? "Hide profile" : "Open profile"}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+                {agent && <AgentDetail agent={agent} />}
+              </>
+            )}
+          </section>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-800">
-            <span className="text-xs text-zinc-500">
-              {total} memor{total === 1 ? "y" : "ies"} · Page {page} of {totalPages}
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                className="px-3 py-1 text-xs rounded bg-zinc-800 text-zinc-300 hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                className="px-3 py-1 text-xs rounded bg-zinc-800 text-zinc-300 hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
+          {/* ── Try it ───────────────────────────────────────── */}
+          <TryIt repo={repo} />
+
+          {/* ── Memories ─────────────────────────────────────── */}
+          <section aria-labelledby="memories-heading" className="mt-10">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+              <h2 id="memories-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                Memories{memories !== null && !listError ? ` (${total})` : ""}
+              </h2>
+              <p className="text-xs text-zinc-500">The planner and coding agent get every pinned memory and the five most relevant on each ticket.</p>
             </div>
+
+            <div className="flex flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="max-w-full overflow-x-auto">
+                  <Segmented<Show>
+                    label="Show"
+                    value={show}
+                    onChange={setShow}
+                    options={[
+                      { value: "all", label: "All" },
+                      { value: "pinned", label: "Pinned" },
+                      { value: "run", label: "Learned on tickets" },
+                      { value: "person", label: "Added by people" },
+                    ]}
+                  />
+                </div>
+                <Segmented<Sort>
+                  label="Sort"
+                  value={sort}
+                  onChange={setSort}
+                  options={[{ value: "newest", label: "Newest" }, { value: "most_used", label: "Most used" }]}
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  type="search"
+                  aria-label="Search memories"
+                  placeholder="Search memories"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className={`${inputClass} !w-auto min-w-0 flex-1 basis-48`}
+                />
+                <select aria-label="Topic" value={topic} onChange={(e) => setTopic(e.target.value)} className={`${inputClass} !w-auto min-w-0 max-w-full`}>
+                  <option value="">Every topic</option>
+                  {TOPICS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              {listError ? (
+                <Callout variant="error" title="We couldn't load the memories">
+                  <p>{listError} Your agents still use them. Reload the page to try again.</p>
+                </Callout>
+              ) : memories === null ? (
+                <div className="flex flex-col gap-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-24" />)}</div>
+              ) : memories.length === 0 ? (
+                filtered ? (
+                  <p className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm text-zinc-400">
+                    Nothing matches. <button type="button" className={linkButton} onClick={() => { setShow("all"); setTopic(""); setSearch(""); }}>Clear the filters</button>
+                  </p>
+                ) : (
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-zinc-300" aria-hidden="true"><MemoryIcon /></span>
+                    <p className="mt-3 font-semibold text-zinc-100">Nothing remembered about {repo} yet</p>
+                    <p className="mt-1 max-w-prose text-sm text-zinc-400">
+                      After each ticket it finishes here, Coderhelm saves up to five things it learned: conventions, mistakes to avoid,
+                      where things live. You can also teach it directly, and pin what should always apply.
+                    </p>
+                    {isAdmin && <button type="button" onClick={() => setTeaching(true)} className={`${secondaryButton} mt-4`}>Teach it something</button>}
+                  </div>
+                )
+              ) : (
+                <div className="flex flex-col gap-6">
+                  {grouped.map((g) => (
+                    <div key={g.topic || "all"}>
+                      {g.topic && (
+                        <h3 className="mb-2 text-sm font-semibold text-zinc-300">
+                          {topicLabel(g.topic)} <span className="font-normal text-zinc-500">{g.items.length}</span>
+                        </h3>
+                      )}
+                      <ul className="flex flex-col gap-3">
+                        {g.items.map((m) => (
+                          <MemoryCard
+                            key={m.id}
+                            m={m}
+                            showTopic={!g.topic}
+                            isAdmin={isAdmin}
+                            onPin={() => togglePin(m)}
+                            onForget={() => forget(m)}
+                            onSave={(c, t) => save(m, c, t)}
+                          />
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                  {total > memories.length && (
+                    <p className="text-sm text-zinc-500">Showing the first {memories.length} of {total}. Search or filter to find the rest.</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </section>
+        </>
+      )}
+
+      {teaching && repo && (
+        <TeachDialog
+          repo={repo}
+          onClose={() => setTeaching(false)}
+          onSaved={() => { setTeaching(false); toast("Remembered"); refresh(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AgentDetail({ agent }: { agent: AgentProfile }) {
+  return (
+    <div id="agent-profile" role="region" aria-label={`${agent.name} profile`} className="mt-3 rounded-lg border border-zinc-700 bg-zinc-900 p-5">
+      <div className="flex items-center gap-3">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-800 text-zinc-300" aria-hidden="true">{AGENT_ICON[agent.id]}</span>
+        <h3 className="text-lg font-semibold">{agent.name}</h3>
+      </div>
+      <div className="mt-5 grid gap-6 md:grid-cols-2">
+        <div className="min-w-0">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">What it knows</h4>
+          <dl className="mt-2 flex flex-col gap-3">
+            {agent.knows.map((k) => (
+              <div key={k.label}>
+                <dt className="text-sm text-zinc-200">{k.label}</dt>
+                <dd className="mt-0.5 break-words text-sm text-zinc-400">{k.detail}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+        <div className="min-w-0">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">What it learned</h4>
+          {agent.learned.length === 0 ? (
+            <p className="mt-2 text-sm text-zinc-400">
+              {agent.id === "feedback"
+                ? "It works from each PR's conversation, so it keeps no memories of its own."
+                : agent.id === "reviewer"
+                  ? "No notes on its reviews yet. Rate a review with a note and it reads it before the next ones."
+                  : "Nothing yet. It learns as it finishes tickets here."}
+            </p>
+          ) : (
+            <ul className="mt-2 flex flex-col gap-3">
+              {agent.learned.map((l, i) => (
+                <li key={i} className="rounded-md border border-zinc-800 bg-zinc-950/50 p-3">
+                  <p className="break-words text-sm text-zinc-200">{l.text}</p>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    {l.link ? <a href={l.link} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-zinc-300">{l.source}</a> : l.source}
+                    {day(l.at) && <><span aria-hidden="true"> · </span>{day(l.at)}</>}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+      <div className="mt-6">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Recent work</h4>
+        {agent.recent.length === 0 ? (
+          <p className="mt-2 text-sm text-zinc-400">Nothing on this repository yet.</p>
+        ) : (
+          <ul className="mt-2 divide-y divide-zinc-800 rounded-md border border-zinc-800">
+            {agent.recent.map((r, i) => (
+              <li key={i} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-3 py-2 text-sm">
+                <span className="min-w-0 break-words text-zinc-200">
+                  {r.link ? <a href={r.link} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-zinc-100">{r.title || "Untitled"}</a> : r.title || "Untitled"}
+                </span>
+                <span className="text-xs text-zinc-500">{r.outcome}{day(r.at) && <> · {day(r.at)}</>}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MemoryCard({
+  m,
+  showTopic,
+  isAdmin,
+  onPin,
+  onForget,
+  onSave,
+}: {
+  m: MemoryItem;
+  showTopic: boolean;
+  isAdmin: boolean;
+  onPin: () => void;
+  onForget: () => void;
+  onSave: (content: string, topic: string) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [content, setContent] = useState(m.content);
+  const [topic, setTopic] = useState(m.topic || "learned");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      await onSave(content.trim(), topic);
+      setEditing(false);
+    } catch (e) {
+      setError(errorText(e, "Couldn't save. Try again."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const uses = m.uses ?? 0;
+  return (
+    <li className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4" data-testid="memory">
+      {editing ? (
+        <div className="flex flex-col gap-3">
+          <label className="sr-only" htmlFor={`edit-${m.id}`}>Memory</label>
+          <textarea id={`edit-${m.id}`} value={content} onChange={(e) => setContent(e.target.value)} rows={3} maxLength={1000} className={inputClass} />
+          <div className="flex flex-wrap items-center gap-3">
+            <select aria-label="Topic for this memory" value={topic} onChange={(e) => setTopic(e.target.value)} className={`${inputClass} !w-auto min-w-0 max-w-full`}>
+              {TOPICS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+            <button type="button" onClick={submit} disabled={saving || !content.trim()} className={primaryButton}>{saving ? "Saving…" : "Save"}</button>
+            <button type="button" onClick={() => { setEditing(false); setContent(m.content); setTopic(m.topic || "learned"); setError(""); }} className={secondaryButton}>Cancel</button>
+          </div>
+          {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
+        </div>
+      ) : (
+        <>
+          <div className="flex items-start gap-3">
+            <p className="min-w-0 flex-1 break-words text-sm text-zinc-100">{m.content}</p>
+            {m.pinned && (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-300">
+                <PinIcon /> Pinned
+              </span>
+            )}
+          </div>
+          <p className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
+            {showTopic && <><span className="text-zinc-400">{topicLabel(m.topic)}</span><span aria-hidden="true">·</span></>}
+            <span>{where(m)}{day(m.created_at) && `, ${day(m.created_at)}`}</span>
+            {m.origin?.edited_by && <><span aria-hidden="true">·</span><span>Edited by {m.origin.edited_by}</span></>}
+            <span aria-hidden="true">·</span>
+            <span>
+              {uses === 0
+                ? "Not used yet"
+                : `Used on ${uses} ticket${uses === 1 ? "" : "s"}${m.last_used?.title ? `, last “${m.last_used.title}”` : ""}${day(m.last_used?.at) ? ` ${day(m.last_used?.at)}` : ""}`}
+            </span>
+          </p>
+          {isAdmin && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" onClick={onPin} className={secondaryButton} aria-label={`${m.pinned ? "Unpin" : "Pin"} this memory`}>
+                {m.pinned ? "Unpin" : "Pin"}
+              </button>
+              <button type="button" onClick={() => setEditing(true)} className={secondaryButton}>Edit</button>
+              <button type="button" onClick={onForget} className={`${secondaryButton} !text-red-300`}>Forget</button>
+            </div>
+          )}
+        </>
+      )}
+    </li>
+  );
+}
+
+function TryIt({ repo }: { repo: string }) {
+  const [text, setText] = useState("");
+  const [result, setResult] = useState<MemoryPreview | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => { setResult(null); setError(""); }, [repo]);
+
+  const run = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      setResult(await api.previewMemoryRecall(repo, text));
+    } catch (e) {
+      setResult(null);
+      setError(errorText(e, "The request failed."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const nothing = result && result.pinned.length === 0 && result.recalled.length === 0;
+  return (
+    <section aria-labelledby="try-heading" className="mt-10">
+      <h2 id="try-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">What would it remember for a ticket?</h2>
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+        <label htmlFor="try-text" className="text-sm text-zinc-300">Describe a ticket, the way someone would write it</label>
+        <textarea
+          id="try-text"
+          rows={2}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="For example: the checkout page shows the wrong total after a coupon"
+          className={`${inputClass} mt-2`}
+        />
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button type="button" onClick={run} disabled={busy || !text.trim()} className={secondaryButton}>{busy ? "Looking…" : "Show what it would remember"}</button>
+          <span className="text-xs text-zinc-500">The planner and coding agent get exactly this. Nothing is saved.</span>
+        </div>
+        {error && <p role="alert" className="mt-3 text-sm text-red-400">{error}</p>}
+        {result && (
+          <div className="mt-4" aria-live="polite">
+            {nothing ? (
+              <p className="text-sm text-zinc-400">Nothing it remembers is close enough to this ticket, so it would start fresh.</p>
+            ) : (
+              <ol className="flex flex-col gap-2">
+                {result.pinned.map((m) => (
+                  <li key={m.id} className="rounded-md border border-zinc-800 bg-zinc-950/50 p-3">
+                    <p className="break-words text-sm text-zinc-200">{m.content}</p>
+                    <p className="mt-1 text-xs text-amber-300">Pinned, so always included</p>
+                  </li>
+                ))}
+                {result.recalled.map(({ memory: m, score }) => (
+                  <li key={m.id} className="rounded-md border border-zinc-800 bg-zinc-950/50 p-3">
+                    <p className="break-words text-sm text-zinc-200">{m.content}</p>
+                    <p className="mt-1 text-xs text-zinc-500">{topicLabel(m.topic)} · {where(m)} · match {Math.round(Math.min(1, score / 0.08) * 100)}%</p>
+                  </li>
+                ))}
+              </ol>
+            )}
           </div>
         )}
       </div>
-      </>
-      )}
+    </section>
+  );
+}
+
+function TeachDialog({ repo, onClose, onSaved }: { repo: string; onClose: () => void; onSaved: () => void }) {
+  const [content, setContent] = useState("");
+  const [topic, setTopic] = useState("procedure");
+  const [pinned, setPinned] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const first = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    first.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const submit = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      await api.createMemory({ repo, content: content.trim(), topic, pinned });
+      onSaved();
+    } catch (e) {
+      setError(errorText(e, "Couldn't save it. Try again."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="teach-title"
+        className="w-full max-w-lg rounded-xl border border-zinc-700 bg-zinc-900 p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="teach-title" className="text-lg font-semibold">Teach Coderhelm something about {repo}</h2>
+        <p className="mt-1 text-sm text-zinc-400">One fact or rule per memory works best, written the way you'd tell a new teammate.</p>
+        <label htmlFor="teach-text" className="mt-4 block text-sm text-zinc-300">What should it remember?</label>
+        <textarea
+          id="teach-text"
+          ref={first}
+          rows={4}
+          maxLength={1000}
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder="For example: run the unit tests with pnpm test:unit; the e2e suite needs staging."
+          className={`${inputClass} mt-2`}
+        />
+        <p className="mt-1 text-right text-xs text-zinc-500">{content.length} / 1000</p>
+        <label htmlFor="teach-topic" className="mt-2 block text-sm text-zinc-300">Topic</label>
+        <select id="teach-topic" value={topic} onChange={(e) => setTopic(e.target.value)} className={`${inputClass} mt-2`}>
+          {TOPICS.map((t) => <option key={t.value} value={t.value}>{t.label}: {t.hint}</option>)}
+        </select>
+        <label className="mt-4 flex items-start gap-2 text-sm text-zinc-300">
+          <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} className="mt-1" />
+          <span>Pin it: the planner and coding agent get it on every ticket, not only when it seems relevant.</span>
+        </label>
+        {error && <p role="alert" className="mt-3 text-sm text-red-400">{error}</p>}
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <button type="button" onClick={onClose} className={secondaryButton}>Cancel</button>
+          <button type="button" onClick={submit} disabled={saving || !content.trim()} className={primaryButton}>{saving ? "Saving…" : "Remember this"}</button>
+        </div>
+      </div>
     </div>
   );
 }

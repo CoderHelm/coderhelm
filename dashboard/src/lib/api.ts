@@ -695,6 +695,7 @@ export const api = {
     pageSize = 50,
     search?: string,
     memoryType?: string,
+    filters: MemoryFilters = {},
   ) => {
     const params = new URLSearchParams({
       repo,
@@ -703,8 +704,20 @@ export const api = {
     });
     if (search) params.set("search", search);
     if (memoryType) params.set("memory_type", memoryType);
+    if (filters.source) params.set("source", filters.source);
+    if (filters.topic) params.set("topic", filters.topic);
+    if (filters.pinned !== undefined) params.set("pinned", String(filters.pinned));
+    if (filters.sort) params.set("sort", filters.sort);
     return request<MemoryListResponse>(`/api/memories?${params}`);
   },
+  createMemory: (data: { repo: string; content: string; topic: string; pinned: boolean }) =>
+    request<{ id: string }>(`/api/memories`, { method: "POST", body: JSON.stringify(data) }),
+  updateMemory: (id: string, data: { repo: string; content?: string; topic?: string; pinned?: boolean }) =>
+    request<{ updated: string }>(`/api/memories/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(data) }),
+  previewMemoryRecall: (repo: string, text: string) =>
+    request<MemoryPreview>(`/api/memories/preview`, { method: "POST", body: JSON.stringify({ repo, text }) }),
+  getAgentProfiles: (repo: string) =>
+    request<{ repo: string; profiles: AgentProfile[] }>(`/api/memories/agents?repo=${encodeURIComponent(repo)}`),
   getMemoryStats: (repo: string) =>
     request<MemoryStats>(
       `/api/memories/stats?repo=${encodeURIComponent(repo)}`,
@@ -1507,6 +1520,16 @@ export interface EnabledPlugin {
   custom_prompt: string | null;
 }
 
+export interface MemoryOrigin {
+  /** "run" (learned on a ticket) or "person" (someone added it). */
+  source: string;
+  run_id?: string;
+  ticket_id?: string;
+  title?: string;
+  added_by?: string;
+  edited_by?: string;
+}
+
 export interface MemoryItem {
   id: string;
   content: string;
@@ -1516,6 +1539,36 @@ export interface MemoryItem {
   created_at: number;
   accessed_at: number;
   access_count: number;
+  topic?: string;
+  topic_label?: string;
+  pinned?: boolean;
+  origin?: MemoryOrigin;
+  uses?: number;
+  last_used?: { at: string; run_id: string; title: string } | null;
+}
+
+export interface MemoryFilters {
+  source?: "run" | "person";
+  topic?: string;
+  pinned?: boolean;
+  sort?: "newest" | "most_used";
+}
+
+export interface MemoryPreview {
+  pinned: MemoryItem[];
+  recalled: { memory: MemoryItem; score: number }[];
+}
+
+export interface AgentProfile {
+  id: "reviewer" | "planner" | "coder" | "feedback";
+  name: string;
+  role: string;
+  uses_repo_memory: boolean;
+  knows: { label: string; detail: string }[];
+  learned: { text: string; source: string; at: string; link?: string | null }[];
+  activity_label: string;
+  activity_count: number;
+  recent: { title: string; at: string; outcome: string; link?: string | null }[];
 }
 
 export interface MemoryListResponse {
