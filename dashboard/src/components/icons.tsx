@@ -1,6 +1,7 @@
 const s = { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
 // Sidebar nav icons
+export const TestTubeIcon = () => <svg {...s}><path d="M9 3h6" /><path d="M10 3v12.5a2.5 2.5 0 005 0V3" /><path d="M10 11h5" /></svg>;
 export const PlayIcon = () => <svg {...s}><polygon points="6 3 20 12 6 21 6 3" /></svg>;
 export const CircleDotIcon = () => <svg {...s}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" /></svg>;
 export const BarChartIcon = () => <svg {...s}><rect x="3" y="12" width="4" height="9" rx="1" /><rect x="10" y="7" width="4" height="14" rx="1" /><rect x="17" y="3" width="4" height="18" rx="1" /></svg>;
