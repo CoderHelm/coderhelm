@@ -9,7 +9,7 @@ import {
 } from "@/lib/api";
 import {
   AWS_FLOW_STEPS, DEFAULT_HIDDEN_FIELDS, clearSetupHint, errorMessage, formatDuration, hiddenNoun, prettyJson,
-  readSetupHint, runningChecks, stepLabel, toCheckItems, whereLabel, writeSetupHint,
+  isWarehouse, readSetupHint, runningChecks, stepLabel, toCheckItems, whereLabel, writeSetupHint,
 } from "@/lib/data-sources";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
@@ -668,11 +668,14 @@ type TryRange = (typeof TRY_RANGES)[number]["value"];
 
 function TryStep({ source, onContinue }: { source: DataSource; onContinue: () => void }) {
   const kind = source.kind;
+  const warehouse = isWarehouse(source);
+  const databases = warehouse ? source.aws?.databases ?? [] : [];
   const exactGroups = (source.aws?.log_groups ?? []).filter((g) => !g.endsWith("*"));
   const [samples, setSamples] = useState<DataSourceSample[] | null>(null);
   const [samplesError, setSamplesError] = useState("");
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState(exactGroups[0] ?? "");
+  const [database, setDatabase] = useState(databases[0] ?? "");
   const [range, setRange] = useState<TryRange>("1h");
   const [running, setRunning] = useState(false);
   const [asked, setAsked] = useState("");
@@ -694,6 +697,7 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
     if (g) setGroup(g);
     const r = TRY_RANGES.find((x) => x.value === sample.since);
     if (r) setRange(r.value);
+    if (sample.database && databases.includes(sample.database)) setDatabase(sample.database);
   };
 
   const run = async (q: string) => {
@@ -707,7 +711,7 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
       const res = await api.tryDataSource(
         source.id,
         text,
-        kind === "logs" ? { log_groups: group ? [group] : [], since: range } : {},
+        kind === "logs" ? { log_groups: group ? [group] : [], since: range } : warehouse ? { database } : {},
       );
       setResult(res);
       if (res.ok && !res.refused && !res.error) {
@@ -736,7 +740,7 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
         : "{ __typename }";
   const writeQuery = kind === "database" ? WRITE_SQL : kind === "api" ? WRITE_QUERY : "";
   const lookupWord = kind === "logs" ? "search" : "lookup";
-  const canRun = !!query.trim() && !running && (kind !== "logs" || !!group);
+  const canRun = !!query.trim() && !running && (kind !== "logs" || !!group) && (!warehouse || !!database);
 
   return (
     <div className="flex flex-col gap-5">
@@ -753,7 +757,7 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
           <p className="mt-2 text-sm text-zinc-400">
             {samplesError
               ? `We couldn't load examples (${samplesError}). You can still write your own below.`
-              : `There are no examples for this ${kind === "database" ? "database" : kind === "logs" ? "source" : "API"}. Write your own below.`}
+              : `There are no examples for this ${warehouse ? "warehouse" : kind === "database" ? "database" : kind === "logs" ? "source" : "API"}. Write your own below.`}
           </p>
         ) : (
           <div className="mt-2 flex flex-wrap gap-2">
@@ -799,6 +803,20 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
             <p className="mb-1.5 text-sm font-semibold text-zinc-100">Time</p>
             <Segmented label="Time to search" options={[...TRY_RANGES]} value={range} onChange={setRange} />
           </div>
+        </div>
+      )}
+
+      {warehouse && databases.length > 0 && (
+        <div className="max-w-sm">
+          <label htmlFor="try-database" className="block mb-1.5 text-sm font-semibold text-zinc-100">Database</label>
+          <select
+            id="try-database"
+            value={database}
+            onChange={(e) => setDatabase(e.target.value)}
+            className={`${inputClass} font-mono text-xs`}
+          >
+            {databases.map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
         </div>
       )}
 
@@ -919,8 +937,15 @@ function ReviewStep({ source, onTurnedOn }: { source: DataSource; onTurnedOn: (s
   const kind = source.kind;
   const noun = hiddenNoun(kind);
   const where = whereLabel(source);
+  const sharedDbs = source.aws?.databases ?? [];
   const cannot: ReactNode[] =
-    kind === "database"
+    kind === "database" && isWarehouse(source)
+      ? [
+          "Change or delete anything. Each lookup is one SELECT, run as a warehouse user with no password that can only read. Coderhelm checks it can't change any table before it connects and again before it reads",
+          `Read databases you didn't share${sharedDbs.length ? ` (it may read ${sharedDbs.length === 1 ? "one database" : `${sharedDbs.length} databases`})` : ""}`,
+          "Read more than 200 rows at a time",
+        ]
+      : kind === "database"
       ? [
           "Change or delete anything. Each lookup is one SELECT, run as a database user that can only read, inside a transaction that is always rolled back",
           "Read more than 200 rows at a time",
@@ -985,7 +1010,7 @@ function ReviewStep({ source, onTurnedOn }: { source: DataSource; onTurnedOn: (s
       v:
         kind === "api"
           ? "The address, the key (encrypted, never shown again) and a log of every lookup. Not your data."
-          : `The name of the read-only role in your AWS account, ${kind === "logs" ? "which log groups it may search" : "which database it may read"}, and a log of every lookup. No passwords, and not your data.`,
+          : `The name of the read-only role in your AWS account, ${kind === "logs" ? "which log groups it may search" : isWarehouse(source) ? "which warehouse databases it may read" : "which database it may read"}, and a log of every lookup. No passwords, and not your data.`,
     },
     {
       k: "Turning it off",

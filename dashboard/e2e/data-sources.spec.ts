@@ -10,7 +10,10 @@ const REFUSAL = "This lookup would change data, so it was refused before it left
 const KEY_REJECTED = "The new key was not accepted. The old key is still in place.";
 const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots");
 
-interface Aws { account: string; region: string; role_arn: string; log_groups: string[]; cluster: string; database: string }
+interface Aws {
+  account: string; region: string; role_arn: string; log_groups: string[]; cluster: string; database: string;
+  engine?: "postgres" | "redshift"; databases?: string[];
+}
 interface Source {
   id: string; kind: "api" | "logs" | "database"; aws?: Aws | null; name: string; url: string; status: "ready" | "error"; status_message?: string;
   enabled: boolean; setup_complete: boolean; key_hint: string; has_mutations: boolean; kinds: number | null;
@@ -32,6 +35,9 @@ interface Backend {
 const ACCOUNT = "123456789012";
 const ROLE = `arn:aws:iam::${ACCOUNT}:role/CoderhelmReadOnly`;
 const DB_CODE = "coderhelm:eyJyb2xlX2FybiI6ImFybjphd3M6aWFtOjoxMjM0NTY3ODkwMTI6cm9sZS9Db2RlcmhlbG1SZWFkT25seSJ9";
+/** A pasted line that carries both a PostgreSQL database and a Redshift warehouse. */
+const BOTH_CODE = "coderhelm:eyJyb2xlX2FybiI6ImFybjphd3M6aWFtOjoxMjM0NTY3ODkwMTI6cm9sZS9Db2RlcmhlbG1SZWFkT25seSIsImVuZ2luZSI6InJlZHNoaWZ0In0";
+
 const SCRIPT = "coderhelm_setup() (\n  echo example\n)\ncoderhelm_setup\n";
 const LOG_GROUPS = [
   { name: "/ecs/api", stored_mb: 2400, retention_days: 30 },
@@ -45,6 +51,12 @@ const DB_PASSED = [
   { id: "sign_in", label: "Sign in to the database", ok: true, detail: "Signed in as coderhelm_readonly." },
   { id: "read_only", label: "The database user can only read", ok: true, detail: "It can't change any table, the database defaults it to read-only, and every lookup is rolled back." },
   { id: "read", label: "Read the list of tables", ok: true, detail: "It can read 42 tables." },
+];
+const WAREHOUSE_PASSED = [
+  ROLE_CHECK,
+  { id: "sign_in", label: "Sign in to the warehouse", ok: true, detail: "Signed in as coderhelm_readonly, with no password." },
+  { id: "read_only", label: "The user can only read, in every database", ok: true, detail: "It can't change any table in 2 databases." },
+  { id: "read", label: "Read the list of tables", ok: true, detail: "It can read 18 tables across dev, marts." },
 ];
 const DB_WRITABLE = [
   ROLE_CHECK,
@@ -70,6 +82,17 @@ const REJECTED_CHECKS = [
     fix: "Paste the key again, or ask whoever runs your API for a new read-only key.",
   },
 ];
+
+function warehouseSource(over: Partial<Source> = {}): Source {
+  return awsSource("database", {
+    id: "ds_wh", name: "analytics-dw warehouse", kinds: 18,
+    aws: {
+      account: ACCOUNT, region: "us-east-1", role_arn: ROLE, log_groups: [], cluster: "analytics-dw", database: "",
+      engine: "redshift", databases: ["dev", "marts"],
+    },
+    ...over,
+  });
+}
 
 function awsSource(kind: "logs" | "database", over: Partial<Source> = {}): Source {
   const now = new Date().toISOString();
@@ -164,12 +187,18 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
         ok: true, checks: AWS_CONNECT_CHECKS, account: ACCOUNT, region: "us-east-1",
         role_arn: viaCode ? ROLE : String(body?.role_arn), log_groups: LOG_GROUPS,
         database: viaCode ? { cluster: "orders-db", database: "orders" } : null,
+        warehouse: body?.code === BOTH_CODE ? { cluster: "analytics-dw", databases: ["dev", "marts"] } : null,
       });
     }
     if (p === "/api/data-sources/logs" && method === "POST") {
       const source = awsSource("logs", { aws: { ...awsSource("logs").aws!, log_groups: body?.log_groups as string[] }, kinds: (body?.log_groups as string[]).length });
       db.sources.push(source);
       return json(route, { source, checks: [ROLE_CHECK] });
+    }
+    if (p === "/api/data-sources/database" && method === "POST" && body?.engine === "redshift") {
+      const source = warehouseSource();
+      db.sources.push(source);
+      return json(route, { source, checks: WAREHOUSE_PASSED });
     }
     if (p === "/api/data-sources/database" && method === "POST") {
       if (db.dbWritable) return json(route, { error: "The connection checks didn't pass.", checks: DB_WRITABLE }, 400);
@@ -201,6 +230,19 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
         if (db.rejectKey) return json(route, { error: KEY_REJECTED, ok: false, checks: REJECTED_CHECKS }, 400);
         source.key_hint = String(body?.key).slice(-4);
         return json(route, { source, checks: PASSED_CHECKS });
+      }
+      if (sub === "samples" && source.aws?.engine === "redshift") {
+        return json(route, { samples: [
+          { label: "Count rows in public.orders (database dev)", query: "SELECT count(*) FROM public.orders", database: "dev" },
+          { label: "Count rows in marts.daily (database marts)", query: "SELECT count(*) FROM marts.daily", database: "marts" },
+        ] });
+      }
+      if (sub === "try" && source.aws?.engine === "redshift") {
+        const query = String(body?.query);
+        return json(route, {
+          ok: true, query, fields: ["marts.daily"], hidden_count: 0, ms: 840, note: `1 row in ${String(body?.database)}`,
+          result: JSON.stringify([{ count: 365 }]),
+        });
       }
       if (sub === "samples" && source.kind === "database") {
         return json(route, { samples: [
@@ -720,7 +762,8 @@ test("connect a database: script, pasted line, and a failed read-only check expl
   await expect(page.getByRole("link", { name: /Open AWS CloudShell/ })).toHaveAttribute("target", "_blank");
   await expect(page.getByRole("button", { name: "Copy script" })).toBeVisible();
   await expect(page.getByLabel("Setup script")).toContainText("coderhelm_setup");
-  await expect(page.getByText("Type the number of the one Coderhelm should read")).toBeVisible();
+  await expect(page.getByText(/lists your PostgreSQL databases first/)).toBeVisible();
+  await expect(page.getByText(/Then it lists your Redshift warehouses/)).toBeVisible();
   await page.getByText("What does this script do?").click();
   await expect(page.getByText("creates a database user called coderhelm_readonly that can read every table and change none")).toBeVisible();
 
@@ -732,7 +775,7 @@ test("connect a database: script, pasted line, and a failed read-only check expl
   await shot(page, "connect-aws-db-access");
   await page.getByRole("button", { name: "Continue" }).click();
 
-  await expect(page.getByRole("heading", { level: 1, name: "Check the database and connect it" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Check and connect" })).toBeVisible();
   expect(callsTo(db, "POST", /\/aws\/connect$/)[0].body).toEqual({ code: DB_CODE });
   await expect(page.getByRole("definition").filter({ hasText: /^orders$/ })).toBeVisible();
   await expect(page.getByRole("definition").filter({ hasText: /^orders-db$/ })).toBeVisible();
@@ -751,7 +794,7 @@ test("connect a database: script, pasted line, and a failed read-only check expl
   await page.getByRole("button", { name: "Check again" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Choose what Coderhelm may use" })).toBeVisible();
   expect(page.url()).toContain("id=ds_db");
-  expect(callsTo(db, "POST", /\/api\/data-sources\/database$/).at(-1)!.body).toEqual({ code: DB_CODE });
+  expect(callsTo(db, "POST", /\/api\/data-sources\/database$/).at(-1)!.body).toEqual({ code: DB_CODE, engine: "postgres" });
   await expect(page.getByRole("list", { name: "Hidden column names" })).toBeVisible();
   await expect(page.getByText("a lookup that asks for one, or filters or sorts by one, is refused")).toBeVisible();
 });
@@ -910,3 +953,52 @@ test("activity: an older server without cursors still lists lookups, with no pag
   await expect(row.locator("pre")).toHaveText("SELECT id, status FROM orders WHERE id = 1");
 });
 
+test("connect a warehouse and a database from one pasted line", async ({ page }) => {
+  const db = await mockApi(page);
+  await page.goto("/data-sources/connect/aws?for=database");
+  await page.getByText("What does this script do?").click();
+  await expect(page.getByText(/creates a warehouse user called coderhelm_readonly with no password/)).toBeVisible();
+  await page.getByLabel("The line from CloudShell").fill(BOTH_CODE);
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  await expect(page.getByRole("heading", { level: 1, name: "Check and connect" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "PostgreSQL database" })).toBeVisible();
+  const wh = page.getByRole("region", { name: "Redshift warehouse" });
+  await expect(wh.getByRole("definition").filter({ hasText: /^analytics-dw$/ })).toBeVisible();
+  await expect(wh.getByRole("definition").filter({ hasText: /^dev, marts$/ })).toBeVisible();
+  await shot(page, "connect-aws-warehouse-pick");
+
+  await page.getByRole("button", { name: "Check and connect the warehouse" }).click();
+  expect(callsTo(db, "POST", /\/api\/data-sources\/database$/)[0].body).toEqual({ code: BOTH_CODE, engine: "redshift" });
+  // The database from the same line is still on offer.
+  await expect(page.getByText("One source is connected")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Check and connect the database" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Check and connect the warehouse" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Choose what Coderhelm may use" })).toBeVisible();
+  expect(page.url()).toContain("id=ds_wh");
+});
+
+test("try a warehouse: pick a database, samples set it, and it is sent", async ({ page }) => {
+  const db = await mockApi(page, { sources: [warehouseSource()] });
+  await page.goto("/data-sources");
+  const card = page.getByRole("article", { name: "analytics-dw warehouse" });
+  await expect(card).toContainText("Redshift warehouse");
+  await expect(card).toContainText("analytics-dw / dev, marts");
+  await expect(card).toContainText("18 tables in 2 databases");
+
+  await page.goto("/data-sources/connect?step=try&id=ds_wh");
+  const select = page.getByLabel("Database");
+  await expect(select).toHaveValue("dev");
+  await page.getByRole("button", { name: "Count rows in marts.daily (database marts)" }).click();
+  await expect(select).toHaveValue("marts");
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.getByText("1 row in marts")).toBeVisible();
+  expect(callsTo(db, "POST", /\/try$/)[0].body).toEqual({ query: "SELECT count(*) FROM marts.daily", database: "marts" });
+  await shot(page, "connect-4-try-warehouse");
+
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByText(/run as a warehouse user with no password that can only read/)).toBeVisible();
+  await expect(page.getByText(/Read databases you didn't share \(it may read 2 databases\)/)).toBeVisible();
+  await expect(page.getByText(/rolled back/)).toHaveCount(0);
+});

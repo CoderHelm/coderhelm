@@ -32,8 +32,21 @@ export const DATABASE_CHECKS: CheckLabel[] = [
   { id: "read", label: "Read the list of tables" },
 ];
 
-export function checksFor(kind: DataSourceKind): CheckLabel[] {
-  return kind === "database" ? DATABASE_CHECKS : kind === "logs" ? LOGS_CHECKS : CHECK_LABELS;
+export const WAREHOUSE_CHECKS: CheckLabel[] = [
+  ROLE_CHECK,
+  { id: "sign_in", label: "Sign in to the warehouse" },
+  { id: "read_only", label: "The user can only read, in every database" },
+  { id: "read", label: "Read the list of tables" },
+];
+
+/** True for a Redshift data warehouse source. */
+export function isWarehouse(source: Pick<DataSource, "aws">): boolean {
+  return source.aws?.engine === "redshift";
+}
+
+export function checksFor(kind: DataSourceKind, warehouse = false): CheckLabel[] {
+  if (kind === "database") return warehouse ? WAREHOUSE_CHECKS : DATABASE_CHECKS;
+  return kind === "logs" ? LOGS_CHECKS : CHECK_LABELS;
 }
 
 /** What a failed lookup step is called, for each kind of source. */
@@ -106,10 +119,19 @@ export const KIND_LABEL: Record<DataSourceKind, string> = {
   database: "Database",
 };
 
+/** "API", "Logs", "Database" or "Redshift warehouse". */
+export function kindLabel(source: Pick<DataSource, "kind" | "aws">): string {
+  return isWarehouse(source) ? "Redshift warehouse" : KIND_LABEL[source.kind];
+}
+
 /** "14 kinds of data", "3 log groups", "42 tables". Empty when unknown. */
-export function countLabel(source: Pick<DataSource, "kind" | "kinds">): string {
+export function countLabel(source: Pick<DataSource, "kind" | "kinds"> & Partial<Pick<DataSource, "aws">>): string {
   const n = source.kinds;
   if (typeof n !== "number") return "";
+  const dbs = source.aws?.engine === "redshift" ? source.aws.databases?.length ?? 0 : 0;
+  if (dbs > 0) {
+    return `${n} ${n === 1 ? "table" : "tables"} in ${dbs} ${dbs === 1 ? "database" : "databases"}`;
+  }
   const [one, many] =
     source.kind === "database" ? ["table", "tables"] : source.kind === "logs" ? ["log group", "log groups"] : ["kind of data", "kinds of data"];
   return `${n} ${n === 1 ? one : many}`;
@@ -119,6 +141,10 @@ export function countLabel(source: Pick<DataSource, "kind" | "kinds">): string {
 export function whereLabel(source: Pick<DataSource, "kind" | "url" | "aws">): string {
   if (source.kind === "api" || !source.aws) return source.url;
   const acct = `AWS account ${source.aws.account}, ${source.aws.region}`;
+  if (source.kind === "database" && source.aws.engine === "redshift") {
+    const dbs = source.aws.databases ?? [];
+    return `${source.aws.cluster}${dbs.length ? ` / ${dbs.join(", ")}` : ""} · ${acct}`;
+  }
   if (source.kind === "database") {
     return `${source.aws.cluster}${source.aws.database ? ` / ${source.aws.database}` : ""} · ${acct}`;
   }

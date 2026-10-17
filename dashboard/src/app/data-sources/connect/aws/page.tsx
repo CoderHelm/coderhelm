@@ -7,7 +7,7 @@ import {
   api, type AwsAccess, type AwsConnectResult, type AwsExistingConnection, type AwsSetup,
 } from "@/lib/api";
 import {
-  AWS_CONNECT_CHECKS, AWS_FLOW_STEPS, DATABASE_CHECKS, LOGS_CHECKS, errorMessage, runningChecks, toCheckItems,
+  AWS_CONNECT_CHECKS, AWS_FLOW_STEPS, DATABASE_CHECKS, LOGS_CHECKS, WAREHOUSE_CHECKS, errorMessage, runningChecks, toCheckItems,
   writeSetupHint,
 } from "@/lib/data-sources";
 import { RoleGuard } from "@/components/role-guard";
@@ -88,7 +88,7 @@ function ConnectAwsPage() {
       <FlowShell
         steps={AWS_FLOW_STEPS}
         step="pick"
-        title={goal === "logs" ? "Choose which logs Coderhelm may search" : "Check the database and connect it"}
+        title={goal === "logs" ? "Choose which logs Coderhelm may search" : "Check and connect"}
         back={{ href: `${CONNECT}/aws?for=${goal}`, label: "Back" }}
       >
         {goal === "logs"
@@ -148,8 +148,8 @@ function AccessStep({
         setError("A check didn't pass. Nothing was saved.");
         return;
       }
-      if (goal === "database" && !res.database) {
-        setError("That line doesn't include a database. Run the script again and type the number of the database when it asks.");
+      if (goal === "database" && !res.database && !res.warehouse) {
+        setError("That line doesn't include a database or a warehouse. Run the script again and type the number of the one Coderhelm should read when it asks.");
         return;
       }
       onConnected({ access, result: res, preselect });
@@ -170,7 +170,7 @@ function AccessStep({
       <p className="max-w-prose text-sm text-zinc-400">
         {goal === "logs"
           ? "Coderhelm needs permission to search your logs in AWS. It gets a role that can only read, and only Coderhelm can use it."
-          : "Coderhelm needs permission to read one database in AWS. It gets a role and a database user that can only read, and only Coderhelm can use them."}
+          : "Coderhelm needs permission to read a PostgreSQL database or a Redshift warehouse in AWS. It gets a role and a database user that can only read, and only Coderhelm can use them."}
       </p>
 
       {reusable.length > 0 && mode === "existing" && (
@@ -214,11 +214,20 @@ function AccessStep({
                 </pre>
               </div>
             </Instruction>
-            <Instruction n={3} title="Answer its one question">
+            <Instruction n={3} title="Answer its questions">
               {goal === "database" ? (
-                <p>It lists your databases. Type the number of the one Coderhelm should read and press Enter. Press Enter again to keep the suggested database name.</p>
+                <>
+                  <p>
+                    It lists your PostgreSQL databases first. Type the number of the one Coderhelm should read and press Enter, then press
+                    Enter again to keep the suggested database name. Type 0 to skip.
+                  </p>
+                  <p>
+                    Then it lists your Redshift warehouses. Type the number of the one Coderhelm should read, or 0 to skip. Every database in that
+                    warehouse is shared; you can still hide columns afterwards.
+                  </p>
+                </>
               ) : (
-                <p>It asks whether to share a database too. Type 0 and press Enter to share only logs.</p>
+                <p>It asks whether to share a database and a warehouse too. Type 0 and press Enter at each question to share only logs.</p>
               )}
             </Instruction>
             <Instruction n={4} title="Copy the last line it prints">
@@ -271,6 +280,10 @@ function AccessStep({
                 If you choose a database, it creates a database user called coderhelm_readonly that can read every table and change none,
                 and stores its password as a secret in your account that only that role can read.
               </li>
+              <li>
+                If you choose a Redshift warehouse, it creates a warehouse user called coderhelm_readonly with no password, gives it read
+                access in every database, and lets the role sign in only as that user.
+              </li>
               <li>You can remove access any time by deleting the role in your AWS account.</li>
             </ul>
           </Disclosure>
@@ -280,6 +293,11 @@ function AccessStep({
             <p>
               Database: through the RDS Data API, the role may begin a transaction, run a statement and roll back, on the one database you
               choose. Committing is explicitly denied. The database user defaults to read-only, and every lookup runs read-only and is rolled back.
+            </p>
+            <p>
+              Warehouse: through the Redshift Data API, the role may sign in only as coderhelm_readonly and run one statement at a time; batches
+              and every other way of signing in are explicitly denied. Redshift has no read-only transaction, so Coderhelm checks that the user
+              can&apos;t change any table before it connects and again before it reads.
             </p>
             <p>The role can read only secrets whose names start with coderhelm-readonly-.</p>
           </Disclosure>
@@ -386,27 +404,101 @@ function PickLogs({ connected, onConnected }: { connected: Connected; onConnecte
   );
 }
 
+type Engine = "postgres" | "redshift";
+
+/** One database or warehouse the pasted line includes. */
+interface DbTarget {
+  engine: Engine;
+  title: string;
+  rows: [string, string][];
+}
+
+function dbTargets(connected: Connected): DbTarget[] {
+  const r = connected.result;
+  const account = `${r.account}, ${r.region}`;
+  const out: DbTarget[] = [];
+  if (r.database) {
+    out.push({
+      engine: "postgres",
+      title: "PostgreSQL database",
+      rows: [["Database", r.database.database], ["Cluster", r.database.cluster], ["AWS account", account]],
+    });
+  }
+  if (r.warehouse) {
+    out.push({
+      engine: "redshift",
+      title: "Redshift warehouse",
+      rows: [["Warehouse", r.warehouse.cluster], ["Databases", r.warehouse.databases.join(", ")], ["AWS account", account]],
+    });
+  }
+  return out;
+}
+
 function PickDatabase({ connected, onConnected }: { connected: Connected; onConnected: (id: string) => void }) {
+  const targets = dbTargets(connected);
+  // Both came in one line: connecting the first keeps the second on offer.
+  const [done, setDone] = useState<{ engine: Engine; id: string }[]>([]);
+  const remaining = targets.filter((t) => !done.some((d) => d.engine === t.engine));
+
+  const connectedOne = (engine: Engine, id: string) => {
+    const next = [...done, { engine, id }];
+    if (next.length >= targets.length) {
+      onConnected(next[0].id);
+    } else {
+      setDone(next);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-8">
+      {done.length > 0 && (
+        <Callout variant="success" title={`${done.length === 1 ? "One source is" : "Sources are"} connected`}>
+          <p>You can connect the {remaining.map((t) => t.title.toLowerCase()).join(" and ")} below too, or continue with what you connected.</p>
+          <p>
+            <button type="button" className={primaryButton} onClick={() => onConnected(done[0].id)}>Continue</button>
+          </p>
+        </Callout>
+      )}
+      {remaining.map((t) => (
+        <ConnectDbTarget key={t.engine} target={t} connected={connected} showTitle={targets.length > 1} onConnected={(id) => connectedOne(t.engine, id)} />
+      ))}
+    </div>
+  );
+}
+
+function ConnectDbTarget({
+  target,
+  connected,
+  showTitle,
+  onConnected,
+}: {
+  target: DbTarget;
+  connected: Connected;
+  showTitle: boolean;
+  onConnected: (id: string) => void;
+}) {
   const { toast } = useToast();
-  const db = connected.result.database!;
   const [saving, setSaving] = useState(false);
   const [items, setItems] = useState<CheckItem[] | null>(null);
   const [error, setError] = useState("");
   const code = "code" in connected.access ? connected.access.code : "";
+  const warehouse = target.engine === "redshift";
+  const expected = warehouse ? WAREHOUSE_CHECKS : DATABASE_CHECKS;
+  const noun = warehouse ? "warehouse" : "database";
 
   const save = async () => {
     setSaving(true);
     setError("");
-    setItems(runningChecks(DATABASE_CHECKS));
+    setItems(runningChecks(expected));
     try {
-      const res = await api.createDatabaseSource({ code });
+      const res = await api.createDatabaseSource({ code, engine: target.engine });
       if (res.ok) {
-        setItems(toCheckItems(res.checks, DATABASE_CHECKS));
-        toast("Database connected");
+        setItems(toCheckItems(res.checks, expected));
+        toast(warehouse ? "Warehouse connected" : "Database connected");
         onConnected(res.source.id);
         return;
       }
-      setItems(res.checks ? toCheckItems(res.checks, DATABASE_CHECKS) : null);
+      setItems(res.checks ? toCheckItems(res.checks, expected) : null);
       setError(`${res.error} Nothing was saved.`);
     } catch (e) {
       setItems(null);
@@ -416,14 +508,12 @@ function PickDatabase({ connected, onConnected }: { connected: Connected; onConn
     }
   };
 
+  const headingId = `target-${target.engine}`;
   return (
-    <div className="flex flex-col gap-5">
+    <section aria-labelledby={showTitle ? headingId : undefined} className="flex flex-col gap-5">
+      {showTitle && <h2 id={headingId} className="text-sm font-semibold text-zinc-100">{target.title}</h2>}
       <dl className="rounded-lg border border-zinc-800 bg-zinc-900/50 divide-y divide-zinc-800">
-        {[
-          ["Database", db.database],
-          ["Cluster", db.cluster],
-          ["AWS account", `${connected.result.account}, ${connected.result.region}`],
-        ].map(([k, v]) => (
+        {target.rows.map(([k, v]) => (
           <div key={k} className="grid gap-x-4 gap-y-1 px-5 py-3.5 sm:grid-cols-[150px_minmax(0,1fr)]">
             <dt className="text-sm text-zinc-400">{k}</dt>
             <dd className="min-w-0 break-all font-mono text-xs text-zinc-100">{v}</dd>
@@ -431,20 +521,24 @@ function PickDatabase({ connected, onConnected }: { connected: Connected; onConn
         ))}
       </dl>
       <p className="max-w-prose text-sm text-zinc-400">
-        Before connecting, Coderhelm signs in as the new user and proves it can&apos;t change any table. If it could, nothing is saved.
+        {warehouse
+          ? "Before connecting, Coderhelm signs in as the new user in every shared database and proves it can't change any table. If it could, nothing is saved."
+          : "Before connecting, Coderhelm signs in as the new user and proves it can't change any table. If it could, nothing is saved."}
       </p>
       {items && (
         <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
-          <CheckList items={items} label="Checks for this database" />
+          <CheckList items={items} label={`Checks for this ${noun}`} />
         </div>
       )}
-      {error && <Callout variant="error" title="We couldn't connect this database"><p>{error}</p></Callout>}
+      {error && <Callout variant="error" title={`We couldn't connect this ${noun}`}><p>{error}</p></Callout>}
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={save} disabled={saving} className={primaryButton}>
-          {saving ? "Checking…" : items && error ? "Check again" : "Check and connect"}
+          {saving ? "Checking…" : items && error ? "Check again" : showTitle ? `Check and connect the ${noun}` : "Check and connect"}
         </button>
-        <Link href={`${CONNECT}/aws?for=database`} className={secondaryButton}>Use a different database</Link>
+        {!showTitle && (
+          <Link href={`${CONNECT}/aws?for=database`} className={secondaryButton}>Use a different {noun}</Link>
+        )}
       </div>
-    </div>
+    </section>
   );
 }
