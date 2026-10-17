@@ -23,8 +23,6 @@ const MINUTES_KEY = "coderhelm.analytics.minutesPerPr";
 // ── Formatting ─────────────────────────────────────────────────────────────
 
 const pct = (v: number | null | undefined) => (v == null ? "—" : `${Math.round(v * 100)}%`);
-const money = (v: number | null | undefined) =>
-  v == null ? "—" : v >= 100 ? `$${Math.round(v).toLocaleString()}` : `$${v.toFixed(2)}`;
 const count = (v: number) => v.toLocaleString();
 function hours(v: number | null | undefined) {
   if (v == null) return "—";
@@ -39,9 +37,13 @@ function tokens(v: number) {
   return String(Math.round(v));
 }
 const plural = (n: number, one: string, many = `${one}s`) => `${count(n)} ${n === 1 ? one : many}`;
+/** Tokens in and out, the measure of what Coderhelm used. */
+const totalTokens = (s: { tokens?: number; tokens_in: number; tokens_out: number }) => s.tokens ?? s.tokens_in + s.tokens_out;
+const perPr = (s: { tokens?: number; tokens_in: number; tokens_out: number; prs_merged: number; tokens_per_merged_pr?: number | null }) =>
+  s.tokens_per_merged_pr ?? (s.prs_merged ? Math.round(totalTokens(s) / s.prs_merged) : null);
 
 /** "+12% vs previous 30 days", or points for rates. Neutral ink: the reader judges. */
-function delta(cur: number | null, prev: number | null, kind: "count" | "rate" | "money" | "hours", days: number): string {
+function delta(cur: number | null, prev: number | null, kind: "count" | "rate" | "hours", days: number): string {
   const vs = `vs previous ${days} days`;
   if (cur == null || prev == null) return `— ${vs}`;
   if (kind === "rate") {
@@ -190,7 +192,7 @@ export default function AnalyticsPage() {
         <div className="min-w-0">
           <h1 className="text-2xl font-bold">Analytics</h1>
           <p className="mt-1 max-w-prose text-sm text-zinc-400">
-            What Coderhelm delivered, what it cost, and where it struggles. Every number comes from your runs, reviews and lookups; open any row to see the work behind it.
+            What Coderhelm delivered, the tokens it used, and where it struggles. Every number comes from your runs, reviews and lookups; open any row to see the work behind it.
           </p>
         </div>
       </div>
@@ -256,7 +258,7 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
           <Tile testId="tile-merged" label="PRs merged" value={count(s.prs_merged)} change={delta(s.prs_merged, p.prs_merged, "count", d)} basis={`${plural(s.prs_opened, "PR")} opened, ${count(s.prs_open)} still open`} />
           <Tile testId="tile-merge-rate" label="Merge rate" value={pct(s.merge_rate)} change={delta(s.merge_rate, p.merge_rate, "rate", d)} basis="Merged out of opened" />
           <Tile testId="tile-time-to-merge" label="Median time to merge" value={hours(s.median_hours_to_merge)} change={delta(s.median_hours_to_merge, p.median_hours_to_merge, "hours", d)} basis={s.time_to_merge_known ? `From ${plural(s.time_to_merge_known, "merged PR")}` : "Recorded for PRs merged from now on"} />
-          <Tile testId="tile-cost-per-pr" label="Cost per merged PR" value={money(s.cost_per_merged_pr)} change={delta(s.cost_per_merged_pr, p.cost_per_merged_pr, "money", d)} basis={`${money(s.cost_usd)} across ${plural(s.runs, "run")}`} />
+          <Tile testId="tile-tokens-per-pr" label="Tokens per merged PR" value={perPr(s) == null ? "—" : tokens(perPr(s)!)} change={delta(perPr(s), perPr(p), "count", d)} basis={`${tokens(totalTokens(s))} tokens across ${plural(s.runs, "run")}`} />
           <Tile testId="tile-untouched" label="Merged as written" value={s.edits_known ? pct(s.merged_untouched / s.edits_known) : "—"} basis={s.edits_known ? `${count(s.merged_untouched)} of ${plural(s.edits_known, "merged PR")} had no commits from people` : "Recorded for PRs merged from now on"} />
           <Tile testId="tile-ci" label="Red CI fixed by Coderhelm" value={pct(data.ci.fix_rate)} basis={data.ci.runs_with_red_ci ? `${count(data.ci.fixed_by_coderhelm)} of ${plural(data.ci.runs_with_red_ci, "run")} went green after its fixes` : "No red CI on Coderhelm's PRs"} />
           <Tile testId="tile-findings" label="Review findings acted on" value={pct(data.reviews.acted_on_rate)} basis={data.reviews.outcomes_known_reviews ? `${count(data.reviews.findings_fixed)} fixed in code, ${count(data.reviews.findings_settled_by_person)} settled by a person` : "Counted from re-reviews from now on"} />
@@ -284,17 +286,17 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
           </div>
         </ChartCard>
         <ChartCard
-          title="Spend per day"
-          table={<Table label="Spend per day" head={["Day", "Spend", "Runs"]} rows={data.daily.map((r) => [shortDay(r.day), money(r.cost_usd), r.runs])} empty="No days." />}
+          title="Tokens per day"
+          table={<Table label="Tokens per day" head={["Day", "Tokens", "Runs"]} rows={data.daily.map((r) => [shortDay(r.day), tokens(r.tokens ?? 0), r.runs])} empty="No days." />}
         >
-          <div className="h-56" role="img" aria-label="Bar chart of model spend per day">
+          <div className="h-56" role="img" aria-label="Bar chart of tokens used per day">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.daily} barCategoryGap="20%">
                 <CartesianGrid vertical={false} stroke="#27272a" />
                 <XAxis dataKey="day" tickFormatter={shortDay} {...axis} minTickGap={24} />
-                <YAxis width={40} tickFormatter={(v: number) => `$${v}`} {...axis} />
-                <Tooltip cursor={{ fill: "#27272a66" }} content={<ChartTip format={(v) => money(v)} />} />
-                <Bar dataKey="cost_usd" name="Spend" fill={SERIES.first} radius={[4, 4, 0, 0]} maxBarSize={18} />
+                <YAxis width={44} tickFormatter={(v: number) => tokens(v)} {...axis} />
+                <Tooltip cursor={{ fill: "#27272a66" }} content={<ChartTip format={(v) => `${tokens(v)} tokens`} />} />
+                <Bar dataKey="tokens" name="Tokens" fill={SERIES.first} radius={[4, 4, 0, 0]} maxBarSize={18} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -333,8 +335,8 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
       <Section title="By repository" id="repos">
         <Table
           label="By repository"
-          head={["Repository", "Runs", "PRs", "Merged", "Merge rate", "Failed", "Reviews", "Spend"]}
-          rows={data.repos.map((r) => [r.repo || "—", r.runs, r.prs, r.merged, pct(r.merge_rate), r.failed, r.reviews, money(r.cost_usd)])}
+          head={["Repository", "Runs", "PRs", "Merged", "Merge rate", "Failed", "Reviews", "Tokens"]}
+          rows={data.repos.map((r) => [r.repo || "—", r.runs, r.prs, r.merged, pct(r.merge_rate), r.failed, r.reviews, tokens(r.tokens ?? 0)])}
           empty="No repositories in this period."
         />
       </Section>

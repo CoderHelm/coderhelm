@@ -127,7 +127,8 @@ test("the scorecard answers whether it is worth it, against the previous period"
   await expect(page.getByTestId("tile-merge-rate")).toContainText("▲ 10 pts");
   await expect(page.getByTestId("tile-time-to-merge")).toContainText("5.2 h");
   await expect(page.getByTestId("tile-time-to-merge")).toContainText("From 12 merged PRs");
-  await expect(page.getByTestId("tile-cost-per-pr")).toContainText("$4.59");
+  await expect(page.getByTestId("tile-tokens-per-pr")).toContainText("tokens across");
+  await expect(page.getByText("$")).toHaveCount(0);
   await expect(page.getByTestId("tile-untouched")).toContainText("75%");
   await expect(page.getByTestId("tile-ci")).toContainText("6 of 8 runs went green");
   await expect(page.getByTestId("tile-findings")).toContainText("24 fixed in code, 8 settled by a person");
