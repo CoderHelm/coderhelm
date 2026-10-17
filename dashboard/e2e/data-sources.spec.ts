@@ -132,7 +132,13 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
 
     // Data sources
     if (p === "/api/data-sources" && method === "GET") return json(route, { sources: db.sources });
-    if (p === "/api/data-sources/activity") return json(route, { events: db.events });
+    if (p === "/api/data-sources/activity") {
+      // Newest first; `before` starts just after the event with that cursor.
+      const limit = Number(url.searchParams.get("limit") || 50);
+      const before = url.searchParams.get("before");
+      const from = before ? db.events.findIndex((e) => e.cursor === before) + 1 : 0;
+      return json(route, { events: db.events.slice(from, from + limit) });
+    }
     if (p === "/api/data-sources/api/probe") {
       if (String(body?.url).includes("yourcompany.com")) return json(route, { ok: true, kind: "graphql", needs_key: true });
       return json(route, { ok: false, kind: null, needs_key: false, error: {
@@ -798,3 +804,109 @@ test("try logs: the search names its log group and time range", async ({ page })
   await expect(page.getByText("Search more than two weeks at a time")).toBeVisible();
   await expect(page.getByText("/ecs/api, /ecs/worker")).toBeVisible();
 });
+
+// ── Activity feed ────────────────────────────────────────────────
+
+function lookup(i: number, over: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    at: new Date(Date.now() - i * 60_000).toISOString(), cursor: `DSLOG#${String(1000 - i).padStart(4, "0")}`,
+    source_id: "ds_db", source_name: "orders-db database", actor: "planner", repo: "your-team/backend", pr: 40 + i,
+    summary: `SELECT id, status FROM orders WHERE id = ${i}`, query: `SELECT id, status\nFROM orders\nWHERE id = ${i}`,
+    detail: "1 rows", ok: true, outcome: "ok", ms: 120, ...over,
+  };
+}
+
+test("activity: follows new lookups live, and pausing stops it", async ({ page }) => {
+  await page.clock.install();
+  const db = await mockApi(page, { sources: [awsSource("database", { enabled: true, setup_complete: true })], events: [lookup(1)] });
+  await page.goto("/data-sources");
+  const activity = page.locator("#activity");
+  await expect(activity.getByText("Following live")).toBeVisible();
+  await expect(activity.getByTestId("activity-row")).toHaveCount(1);
+
+  db.events.unshift(lookup(0, { actor: "reviewer", summary: "Checked a new column exists", cursor: "DSLOG#9999" }));
+  await page.clock.fastForward(10_500);
+  await expect(activity.getByText("Checked a new column exists")).toBeVisible();
+  await expect(activity.getByTestId("activity-row").first()).toContainText("Checked a new column exists");
+
+  await activity.getByRole("button", { name: "Pause" }).click();
+  await expect(activity.getByText("Paused", { exact: true })).toBeVisible();
+  db.events.unshift(lookup(0, { summary: "Searched the logs for a timeout", cursor: "DSLOG#9998", source_id: "ds_logs", source_name: "Logs" }));
+  await page.clock.fastForward(30_000);
+  await expect(activity.getByText("Searched the logs for a timeout")).toHaveCount(0);
+  await activity.getByRole("button", { name: "Resume" }).click();
+  await page.clock.fastForward(10_500);
+  await expect(activity.getByText("Searched the logs for a timeout")).toBeVisible();
+});
+
+test("activity: filters, and a row opens to the full lookup and its pull request", async ({ page }) => {
+  await mockApi(page, {
+    sources: [awsSource("database", { enabled: true, setup_complete: true }), awsSource("logs", { enabled: true, setup_complete: true })],
+    events: [
+      lookup(1),
+      lookup(2, { actor: "reviewer", source_id: "ds_logs", source_name: `Logs in AWS account ${ACCOUNT}`, summary: "fields @message | filter @message like /timeout/", query: "fields @message | filter @message like /timeout/", detail: "40 lines from /ecs/api" }),
+      lookup(3, { actor: "admin@example.com", repo: undefined, pr: undefined, summary: "DELETE FROM orders", query: "DELETE FROM orders", outcome: "refused", ok: false, detail: "That lookup would change something or is not a query." }),
+    ],
+  });
+  await page.goto("/data-sources");
+  const activity = page.locator("#activity");
+  await expect(activity.getByTestId("activity-row")).toHaveCount(3);
+
+  await activity.getByLabel("Who").selectOption("reviewer");
+  await expect(activity.getByTestId("activity-row")).toHaveCount(1);
+  await expect(activity.getByText("40 lines from /ecs/api")).toBeVisible();
+  await activity.getByLabel("Who").selectOption("people");
+  await expect(activity.getByTestId("activity-row")).toHaveCount(1);
+  await expect(activity.getByText("That lookup would change something or is not a query.")).toBeVisible();
+  await activity.getByLabel("Who").selectOption("all");
+  await activity.getByLabel("Result").selectOption("refused");
+  await expect(activity.getByTestId("activity-row")).toHaveCount(1);
+  await activity.getByLabel("Result").selectOption("all");
+  await activity.getByLabel("Source").selectOption({ label: "orders-db database" });
+  await expect(activity.getByTestId("activity-row")).toHaveCount(2);
+  await activity.getByLabel("Source").selectOption("all");
+
+  const row = activity.getByTestId("activity-row").first();
+  await row.getByRole("button").first().click();
+  await expect(row.getByRole("button").first()).toHaveAttribute("aria-expanded", "true");
+  await expect(row.locator("pre")).toHaveText("SELECT id, status\nFROM orders\nWHERE id = 1");
+  await expect(row.getByRole("button", { name: "Copy" })).toBeVisible();
+  await expect(row.getByRole("link", { name: "Open your-team/backend #41 on GitHub" })).toHaveAttribute("href", "https://github.com/your-team/backend/pull/41");
+  await shot(page, "activity-feed-open");
+});
+
+test("activity: older lookups load page by page, on the full activity page too", async ({ page }) => {
+  const events = Array.from({ length: 120 }, (_, i) => lookup(i + 1));
+  await mockApi(page, { sources: [awsSource("database", { enabled: true, setup_complete: true })], events });
+  await page.goto("/data-sources");
+  const activity = page.locator("#activity");
+  await expect(activity.getByTestId("activity-row")).toHaveCount(50);
+  await activity.getByRole("button", { name: "Load older" }).click();
+  await expect(activity.getByTestId("activity-row")).toHaveCount(100);
+  await activity.getByRole("button", { name: "Load older" }).click();
+  await expect(activity.getByTestId("activity-row")).toHaveCount(120);
+  await expect(activity.getByRole("button", { name: "Load older" })).toHaveCount(0);
+
+  await activity.getByRole("link", { name: "Open the full activity log" }).click();
+  await expect(page.getByRole("heading", { name: "Every lookup, as it happens" })).toBeVisible();
+  await expect(page.locator("#activity").getByTestId("activity-row")).toHaveCount(100);
+  await shot(page, "activity-page");
+});
+
+test("activity: an older server without cursors still lists lookups, with no paging", async ({ page }) => {
+  const events = Array.from({ length: 3 }, (_, i) => {
+    const e = lookup(i + 1);
+    delete e.cursor;
+    delete e.query;
+    return e;
+  });
+  await mockApi(page, { sources: [], events });
+  await page.goto("/data-sources");
+  const activity = page.locator("#activity");
+  await expect(activity.getByTestId("activity-row")).toHaveCount(3);
+  await expect(activity.getByRole("button", { name: "Load older" })).toHaveCount(0);
+  const row = activity.getByTestId("activity-row").first();
+  await row.getByRole("button").first().click();
+  await expect(row.locator("pre")).toHaveText("SELECT id, status FROM orders WHERE id = 1");
+});
+

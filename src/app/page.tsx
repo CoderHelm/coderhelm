@@ -1211,6 +1211,144 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Live data sources */}
+      <section id="data-sources" className="border-t border-surface-border py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="grid gap-12 md:grid-cols-2 md:items-center">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-emerald-400 tracking-wider uppercase">Check the facts</p>
+              <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
+                It looks before it guesses.<br className="hidden sm:block" />
+                <span className="text-emerald-400">In your real systems, read only.</span>
+              </h2>
+              <p className="mt-4 text-text-secondary leading-relaxed">
+                Connect your API, your logs and your database. While Coderhelm plans, writes code and reviews, it checks
+                what the running system really has instead of guessing: whether a field exists, what a setting is, what the
+                service logged. Given a bug ticket, it looks up the records the ticket names and the errors in the logs
+                before it plans a fix.
+              </p>
+              <ul className="mt-6 space-y-2 text-sm text-text-secondary">
+                {[
+                  "Your GraphQL API, your CloudWatch logs and your PostgreSQL database",
+                  "Bug tickets come with evidence: the record, the error, the code that raised it",
+                  "Reviews confirm a field or table really exists before flagging it",
+                  "Setup takes minutes: paste one script into AWS CloudShell, no engineer needed",
+                  "Every lookup is recorded, and your team can follow them live",
+                ].map((t) => (
+                  <li key={t} className="flex items-start gap-2">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="mt-1 shrink-0 text-emerald-400"><polyline points="20 6 9 17 4 12" /></svg>
+                    {t}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Bug investigation mockup */}
+            <div className="min-w-0 rounded-xl border border-[#21262d] bg-[#0d1117] overflow-hidden">
+              <div className="flex items-center gap-2.5 border-b border-[#21262d] px-5 py-3">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3" /><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5" /><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" /></svg>
+                <span className="truncate text-[11px] font-semibold text-text-secondary">Bug: renewal date shows last year</span>
+                <span className="ml-auto shrink-0 text-[9px] text-text-muted">planning</span>
+              </div>
+
+              <div className="p-4 space-y-3">
+                <div className="rounded-lg border border-[#21262d] bg-[#161b22] overflow-hidden">
+                  <div className="flex items-center gap-2 px-3.5 py-2 border-b border-[#21262d]">
+                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border bg-emerald-500/15 text-emerald-400 border-emerald-500/20">database</span>
+                    <span className="text-[9px] text-text-muted ml-auto">read only · 3 rows</span>
+                  </div>
+                  <pre className="px-3.5 py-2 text-[10px] text-text-secondary font-mono whitespace-pre-wrap break-words">SELECT id, renews_on FROM memberships WHERE id = 4182</pre>
+                </div>
+
+                <div className="rounded-lg border border-[#21262d] bg-[#161b22] overflow-hidden">
+                  <div className="flex items-center gap-2 px-3.5 py-2 border-b border-[#21262d]">
+                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border bg-orange-500/15 text-orange-400 border-orange-500/20">logs</span>
+                    <span className="text-[9px] text-text-muted ml-auto">/ecs/api · last 24h</span>
+                  </div>
+                  <pre className="px-3.5 py-2 text-[10px] text-text-secondary font-mono whitespace-pre-wrap break-words">filter @message like /renewal/ | sort @timestamp desc</pre>
+                  <p className="px-3.5 pb-2.5 text-[10px] text-red-300 font-mono break-words">RenewalJob: skipped 214 rows, timezone not set</p>
+                </div>
+
+                <div className="rounded-lg border border-[#21262d] bg-[#161b22] px-3.5 py-3">
+                  <div className="text-[9px] text-text-muted">Root cause, with evidence</div>
+                  <p className="mt-1 text-[11px] text-text-secondary leading-relaxed">
+                    The record is stale in the database, so the screen is right. The renewal job skips rows with no timezone.
+                    Plan: fix the job, not the screen.
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-[#21262d] text-center">
+                  <span className="text-[10px] text-text-muted">2 lookups · recorded in your activity log</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Safety grid */}
+          <div className="mt-12">
+            <h3 className="text-lg font-semibold text-text-primary">Read only, enforced in code at every step</h3>
+            <p className="mt-2 max-w-3xl text-sm text-text-secondary leading-relaxed">
+              Not a promise in a prompt. Each lock below stops a write on its own, so a change would have to get past all of
+              them at once.
+            </p>
+            <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {[
+                {
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="9" y1="15" x2="15" y2="15" /></svg>
+                  ),
+                  title: "One read at a time",
+                  desc: "Each lookup is checked before it is sent: one SELECT, one GraphQL query or one log search. Anything that could change data is refused and never leaves Coderhelm.",
+                },
+                {
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.5 15a9 9 0 102.1-9.4L1 10" /></svg>
+                  ),
+                  title: "Rolled back, every time",
+                  desc: "Database lookups run in a read only transaction that is always rolled back. The database must confirm it is read only before anything runs.",
+                },
+                {
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 21v-1a6 6 0 0112 0v1" /><line x1="18" y1="8" x2="23" y2="13" /><line x1="23" y1="8" x2="18" y2="13" /></svg>
+                  ),
+                  title: "A user that can only read",
+                  desc: "Coderhelm signs in as a database user that cannot change any table. It is checked when you connect and again before it is used.",
+                },
+                {
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
+                  ),
+                  title: "A role only you can open",
+                  desc: "Access goes through a role in your AWS account that only works with your team's private ID, and is never allowed to commit a change.",
+                },
+                {
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17.9 17.4A10 10 0 016.6 6.1" /><path d="M1 1l22 22" /><path d="M9.9 4.2A10 10 0 0123 12c-.6 1.3-1.4 2.6-2.4 3.6" /></svg>
+                  ),
+                  title: "Hidden stays hidden",
+                  desc: "Fields and columns you hide are refused wherever they appear. Secrets, email addresses and card numbers are scrubbed from results, and only the log groups you choose can be searched.",
+                },
+                {
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><circle cx="4" cy="6" r="1" /><circle cx="4" cy="12" r="1" /><circle cx="4" cy="18" r="1" /></svg>
+                  ),
+                  title: "Every lookup on the record",
+                  desc: "Each lookup is logged with who asked, what they asked and for which pull request. Follow it live, and switch any source off with one click.",
+                },
+              ].map((f) => (
+                <div key={f.title} className="rounded-lg bg-white/[0.03] p-5 transition-colors hover:bg-white/[0.05]">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-400/10 text-emerald-400 mb-3">
+                    {f.icon}
+                  </div>
+                  <h4 className="text-sm font-semibold text-text-primary">{f.title}</h4>
+                  <p className="mt-1.5 text-[13px] text-text-secondary leading-relaxed">{f.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="border-t border-surface-border py-24">
         <div className="mx-auto max-w-6xl px-6">
           <div className="grid gap-12 md:grid-cols-2 md:items-center">

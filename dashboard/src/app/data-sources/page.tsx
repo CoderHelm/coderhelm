@@ -19,6 +19,7 @@ import { StatusPill } from "@/components/status-pill";
 import { StepDot } from "@/components/stepper";
 import { CodeIcon, DatabaseIcon, LogsIcon, WrenchIcon } from "@/components/icons";
 import { LogGroupPicker } from "@/components/log-group-picker";
+import { ActivityFeed } from "@/components/data-source-activity";
 import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 
 export default function DataSourcesPageGuarded() {
@@ -31,7 +32,6 @@ const CONNECT_AWS = "/data-sources/connect/aws";
 function DataSourcesPage() {
   const [sources, setSources] = useState<DataSource[] | null>(null);
   const [events, setEvents] = useState<DataSourceActivityEvent[]>([]);
-  const [activityError, setActivityError] = useState("");
   const [loadError, setLoadError] = useState("");
   const [storeOpen, setStoreOpen] = useState(false);
 
@@ -45,11 +45,11 @@ function DataSourcesPage() {
       setSources((prev) => prev ?? []);
     }
     try {
+      // For the setup progress list; the activity feed loads its own.
       const res = await api.listDataSourceActivity(50);
       setEvents(res.events);
-      setActivityError("");
-    } catch (e) {
-      setActivityError(errorMessage(e, "The request failed."));
+    } catch {
+      // The feed shows the error; progress just stays where it was.
     }
   }, []);
 
@@ -164,7 +164,7 @@ function DataSourcesPage() {
         </div>
       )}
 
-      <Activity events={events} error={activityError} loading={sources === null} />
+      <ActivityFeed sources={list} fullPageLink />
     </div>
   );
 }
@@ -645,50 +645,3 @@ function ProgressList({ sources, events }: { sources: DataSource[]; events: Data
   );
 }
 
-// ── Activity ──────────────────────────────────────────────────────
-
-function Activity({ events, error, loading }: { events: DataSourceActivityEvent[]; error: string; loading: boolean }) {
-  return (
-    <section id="activity" aria-labelledby="activity-heading" className="mt-10 scroll-mt-8">
-      <h2 id="activity-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">Activity</h2>
-      {error ? (
-        <Callout variant="error" title="We couldn't load the activity log">
-          <p>{error} Your sources are not affected. Reload the page to try again.</p>
-        </Callout>
-      ) : events.length === 0 ? (
-        <p className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm text-zinc-400">
-          {loading ? "Loading…" : "No lookups yet. They appear here the moment Coderhelm or a teammate runs one."}
-        </p>
-      ) : (
-        <ul className="rounded-lg border border-zinc-800 bg-zinc-900/50 divide-y divide-zinc-800">
-          {events.map((ev, i) => (
-            <li key={`${ev.at}-${i}`} className="flex flex-wrap items-start gap-x-4 gap-y-2 px-5 py-3.5">
-              <div className="min-w-0 flex-1 basis-64">
-                <p className="break-words text-sm text-zinc-100">{ev.summary}</p>
-                {ev.outcome !== "ok" && ev.detail && (
-                  <p className={`mt-0.5 break-words text-sm ${ev.outcome === "refused" ? "text-amber-200" : "text-red-200"}`}>{ev.detail}</p>
-                )}
-                <p className="mt-1 break-words text-xs text-zinc-500">
-                  <span className="text-zinc-400">
-                    {actorLabel(ev)}
-                  </span>
-                  <span aria-hidden="true"> · </span>
-                  {ev.source_name}
-                  <span aria-hidden="true"> · </span>
-                  <time dateTime={ev.at} title={new Date(ev.at).toLocaleString()}>{timeAgo(ev.at)}</time>
-                  <span aria-hidden="true"> · </span>
-                  {formatDuration(ev.ms)}
-                </p>
-              </div>
-              {ev.outcome === "ok"
-                ? <StatusPill tone="success">OK</StatusPill>
-                : ev.outcome === "refused"
-                  ? <StatusPill tone="warning">Refused</StatusPill>
-                  : <StatusPill tone="error">Failed</StatusPill>}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
