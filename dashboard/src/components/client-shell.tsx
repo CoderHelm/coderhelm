@@ -92,7 +92,7 @@ const navGroups: NavGroup[] = [
   {
     label: "Team",
     items: [
-      { href: "/settings/team", label: "Members", icon: <UsersIcon />, adminOnly: true },
+      { href: "/settings/team", label: "Members", icon: <UsersIcon /> },
     ],
   },
   {

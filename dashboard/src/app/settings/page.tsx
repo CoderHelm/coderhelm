@@ -46,7 +46,7 @@ export default function SettingsPage() {
       label: "Team & Access",
       items: [
         { href: "/settings/repos", title: "Repositories", description: "Connected repos and their status.", memberOnly: true },
-        { href: "/settings/team", title: "Team", description: "Invite members, assign roles, and manage who has access.", adminOnly: true },
+        { href: "/settings/team", title: "Team", description: "Who is on the team, their roles, and what each role can do." },
         { href: "/settings/budget", title: "Token Limit", description: "Set a monthly token usage limit.", adminOnly: true },
       ],
     },
