@@ -7,6 +7,7 @@ import { api, type RunDetail, type Openspec, type UsageInfo, type EnabledPlugin,
 import { Skeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
 import { Markdown } from "@/components/markdown";
+import { TeamAgentAsks } from "./team-asks";
 
 const PASSES = ["triage", "plan", "implement", "test", "security", "pr", "review"];
 
@@ -867,6 +868,8 @@ function RunDetailInner() {
           </div>
         )}
       </div>
+
+      <TeamAgentAsks runId={runId} status={run.status} />
 
       {/* Activity trail */}
       {(run.pass_history?.length || run.created_at) && (

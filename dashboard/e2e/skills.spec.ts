@@ -12,9 +12,10 @@ interface Repo { repo: string; added_by: string; added_at: string; sha: string; 
 interface Item {
   repo: string; path: string; kind: "skill" | "agent" | "command"; name: string; description: string; sha: string; hash: string;
   enabled: boolean; files: string[]; uses: number; last_used_at: string; last_used_by: string; updated_at: string;
+  asks: number; last_asked_at: string; switched_by: string; switched_at: string;
 }
 interface Ask {
-  id: string; by: string; origin: string; question: string; context_chars: number; outcome: string; answer: string;
+  id: string; repo: string; path: string; run_id: string; sha: string; by: string; origin: string; question: string; context_chars: number; outcome: string; answer: string;
   model: string; input_tokens: number; output_tokens: number; ms: number; at: string;
 }
 interface Backend { repos: Repo[]; items: Item[]; asks: Ask[]; role: string; calls: { method: string; path: string; body: Record<string, unknown> | null }[] }
@@ -26,14 +27,15 @@ const REPOS: Repo[] = [
   { repo: "acme/old-guides", added_by: "lead@example.com", added_at: ago(9000), sha: "9a8b7c6d5e4f", synced_at: ago(25), error: "Coderhelm's GitHub App can't read this repository. Install the app on it, then sync again.", items: 1, skipped: [] },
 ];
 const item = (p: Partial<Item> & Pick<Item, "path" | "kind" | "name" | "description">): Item => ({
-  repo: "acme/playbook", sha: SHA, hash: "h", enabled: true, files: [], uses: 0, last_used_at: "", last_used_by: "", updated_at: ago(60), ...p,
+  repo: "acme/playbook", sha: SHA, hash: "h", enabled: true, files: [], uses: 0, last_used_at: "", last_used_by: "", updated_at: ago(60),
+  asks: 0, last_asked_at: "", switched_by: "", switched_at: "", ...p,
 });
 const ITEMS: Item[] = [
   item({ path: "skills/debug/SKILL.md", kind: "skill", name: "debug", description: "Find the cause before the fix: reproduce, read the logs around the failure, then follow the data back.", files: ["skills/debug/reference.md", "skills/debug/checklist.md"], uses: 14, last_used_at: ago(42), last_used_by: "planner" }),
   item({ path: "skills/api-conventions/SKILL.md", kind: "skill", name: "api-conventions", description: "How the team names things, structures modules and writes tests.", uses: 31, last_used_at: ago(8), last_used_by: "reviewer" }),
   item({ path: "skills/copy-tone/SKILL.md", kind: "skill", name: "copy-tone", description: "Plain words in user-facing copy and pull request text.", enabled: false }),
-  item({ path: "agents/spec-checker.md", kind: "agent", name: "spec-checker", description: "Checks a spec or ticket for gaps, contradictions and untestable requirements before work starts.", uses: 3, last_used_at: ago(120), last_used_by: "reviewer (asked)" }),
-  item({ path: "agents/tech-debt-manager.md", kind: "agent", name: "tech-debt-manager", description: "Weighs whether a shortcut is worth taking and what it will cost later." }),
+  item({ path: "agents/spec-checker.md", kind: "agent", name: "spec-checker", description: "Checks a spec or ticket for gaps, contradictions and untestable requirements before work starts.", uses: 3, last_used_at: ago(120), last_used_by: "reviewer (asked)", asks: 2, last_asked_at: ago(35) }),
+  item({ path: "agents/tech-debt-manager.md", kind: "agent", name: "tech-debt-manager", description: "Shortcuts." }),
   item({ path: "commands/release-notes.md", kind: "command", name: "release-notes", description: "Write release notes from the merged pull requests since the last tag.", uses: 2, last_used_at: ago(2000), last_used_by: "coder" }),
   item({ repo: "acme/old-guides", sha: "9a8b7c6d5e4f", path: ".claude/commands/deploy.md", kind: "command", name: "deploy", description: "The old deploy checklist.", enabled: false }),
 ];
@@ -59,13 +61,13 @@ You review specs before work starts. For each requirement, say whether it can be
 what is missing, and what contradicts something else. Be specific; quote the line.
 `;
 const ASKS: Ask[] = [
-  { id: "01J3", by: "reviewer", origin: "acme/web#412", question: "Does this PR's spec for the refund flow cover partial refunds and what happens when the payment provider is down?", context_chars: 6120, outcome: "answered",
+  { id: "01J3", repo: "acme/playbook", path: "agents/spec-checker.md", run_id: "", sha: SHA, by: "reviewer", origin: "acme/web#412", question: "Does this PR's spec for the refund flow cover partial refunds and what happens when the payment provider is down?", context_chars: 6120, outcome: "answered",
     answer: "Two gaps.\n\n1. Partial refunds: the spec says \"refund the order\" but never says whether a line item can be refunded alone. Untestable as written.\n2. Provider outage: nothing says what the customer sees or whether the refund is retried. Add a retry rule and a message.",
     model: "claude-opus-4-8", input_tokens: 3480, output_tokens: 410, ms: 14200, at: ago(35) },
-  { id: "01J2", by: "admin@example.com (try)", origin: "", question: "Is \"the page should load fast\" a testable requirement?", context_chars: 0, outcome: "answered",
+  { id: "01J2", repo: "acme/playbook", path: "agents/spec-checker.md", run_id: "", sha: SHA, by: "admin@example.com (try)", origin: "", question: "Is \"the page should load fast\" a testable requirement?", context_chars: 0, outcome: "answered",
     answer: "No. Give a number and a condition, for example: the first page of results shows within 1.5 s at the 95th percentile on a mid-range phone.",
     model: "claude-opus-4-8", input_tokens: 610, output_tokens: 95, ms: 4100, at: ago(300) },
-  { id: "01J1", by: "planner", origin: "acme/api · ABC-88", question: "Check this ticket for contradictions before I plan it.", context_chars: 2200, outcome: "timed_out", answer: "",
+  { id: "01J1", repo: "acme/playbook", path: "agents/spec-checker.md", run_id: "run_77", sha: "1111111aaaa", by: "planner", origin: "acme/api · ABC-88", question: "Check this ticket for contradictions before I plan it.", context_chars: 2200, outcome: "timed_out", answer: "",
     model: "claude-opus-4-8", input_tokens: 0, output_tokens: 0, ms: 120000, at: ago(2900) },
 ];
 
@@ -100,17 +102,24 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     }
     if (p === "/api/skills/item" && method === "GET") {
       const it = db.items.find((i) => i.repo === url.searchParams.get("repo") && i.path === url.searchParams.get("path"));
-      return it ? json(route, { ...it, body: it.kind === "agent" ? AGENT_BODY : BODY }) : json(route, { error: "No such skill." }, 404);
+      if (!it) return json(route, { error: "No such skill." }, 404);
+      return json(route, it.kind === "agent" ? { ...it, body: AGENT_BODY, prompt: "You are one of this team's own agents, asked a question by Coderhelm's reviewer.\n\n## Your brief\nYou review specs before work starts." } : { ...it, body: BODY });
     }
     if (p === "/api/skills/item" && method === "PUT") {
       const it = db.items.find((i) => i.repo === body?.repo && i.path === body?.path);
       if (!it) return json(route, { error: "No such skill." }, 404);
       it.enabled = Boolean(body?.enabled);
+      Object.assign(it, { switched_by: "admin@example.com", switched_at: new Date().toISOString() });
       return json(route, { ok: true, enabled: it.enabled });
     }
+    if (p === "/api/runs/run_77") return json(route, { run_id: "run_77", status: "completed", ticket_id: "ABC-88", title: "Add partial refunds", repo: "acme/api", created_at: ago(2900), pass_history: [], progress_notes: [] });
+    if (/^\/api\/runs\/run_77\/agent-log$/.test(p)) return json(route, { passes: [], live_events: [] });
+    if (/^\/api\/runs\/run_77\/traces$/.test(p)) return json(route, { traces: [] });
     if (p === "/api/skills/asks" && method === "GET") {
+      const runId = url.searchParams.get("run_id");
+      if (runId) return json(route, { asks: db.asks.filter((a) => a.run_id === runId) });
       const id = url.searchParams.get("id");
-      if (!id) return json(route, { asks: db.asks, tries_per_day: 20 });
+      if (!id) return json(route, { asks: db.asks, tries_per_day: 20, tries_left: 20 - db.asks.filter((a) => a.by.endsWith("(try)")).length });
       const a = db.asks.find((x) => x.id === id);
       if (!a) return json(route, { error: "No such ask." }, 404);
       // The worker answers on the second check.
@@ -120,7 +129,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       return json(route, a);
     }
     if (p === "/api/skills/asks" && method === "POST") {
-      const a: Ask = { id: "01J9", by: "admin@example.com (try)", origin: "", question: String(body?.question ?? ""), context_chars: String(body?.context ?? "").length, outcome: "pending", answer: "", model: "", input_tokens: 0, output_tokens: 0, ms: 0, at: new Date().toISOString() };
+      const a: Ask = { id: "01J9", repo: String(body?.repo), path: String(body?.path), run_id: "", sha: SHA, by: "admin@example.com (try)", origin: "", question: String(body?.question ?? ""), context_chars: String(body?.context ?? "").length, outcome: "pending", answer: "", model: "", input_tokens: 0, output_tokens: 0, ms: 0, at: new Date().toISOString() };
       db.asks.unshift(a);
       return json(route, { id: a.id });
     }
@@ -197,29 +206,46 @@ test("members see the items but can't change them", async ({ page }) => {
 
 const AGENT_URL = "/skills/agent?repo=acme%2Fplaybook&path=agents%2Fspec-checker.md";
 
-test("an agent's page: how it runs, its refused tools, recent asks and its brief", async ({ page }) => {
+test("an agent's page: when it's asked, how it runs, recent asks and its instructions", async ({ page }) => {
   await mockApi(page);
   await page.goto("/skills");
+  await expect(page.getByText("asked 2 times, last 35 min ago")).toBeVisible();
+  await expect(page.getByText("Short description: Coderhelm's agents decide when to ask it from this line.")).toBeVisible();
   await page.getByRole("link", { name: "agent:spec-checker" }).click();
   await expect(page).toHaveURL(/\/skills\/agent\/?\?repo=acme%2Fplaybook&path=agents%2Fspec-checker\.md/);
   await expect(page.getByRole("heading", { name: "spec-checker", level: 1 })).toBeVisible();
+  await expect(page.getByText("Coderhelm asks this agent when")).toBeVisible();
+  await expect(page.getByText("A Coderhelm setting. It doesn't change the file.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open on GitHub" })).toHaveAttribute("href", `https://github.com/acme/playbook/blob/${SHA}/agents/spec-checker.md`);
+  await expect(page.getByText("None when Coderhelm asks it.")).toBeVisible();
+  await expect(page.getByText("Read, Grep, Bash, WebFetch", { exact: true })).toBeVisible();
   await expect(page.getByText("Your team's heavy model")).toBeVisible();
-  for (const t of ["Read", "Grep", "Bash", "WebFetch"]) await expect(page.getByTitle("Not given").getByText(t, { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "acme/web#412" })).toHaveAttribute("href", "https://github.com/acme/web/issues/412");
-  await expect(page.getByText("acme/api · ABC-88")).toBeVisible();
-  await expect(page.getByText("Took too long")).toBeVisible();
-  await expect(page.getByText("With 6,120 characters of context (not kept).")).toBeVisible();
+  await expect(page.getByRole("link", { name: "View run" })).toHaveAttribute("href", /\/runs\/detail\/?\?id=run_77/);
+  await expect(page.getByText("(an older version)")).toBeVisible();
+  await expect(page.getByText("sent 6,120 characters of context, not kept")).toBeVisible();
+  // Instructions render as text, the file's settings fold away.
   await expect(page.getByText("You review specs before work starts.")).toBeVisible();
+  await expect(page.getByText("tools: Read, Grep, Bash, WebFetch")).toBeHidden();
   await shot(page, "agent-page");
+
+  await page.getByRole("button", { name: "No answer" }).click();
+  await expect(page.getByText("Check this ticket for contradictions before I plan it.")).toBeVisible();
+  await expect(page.getByText("Does this PR's spec for the refund flow")).toHaveCount(0);
 });
 
-test("an admin tries the agent and sees the answer", async ({ page }) => {
+test("an admin tries the agent, sees what gets sent, and asks a past question again", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto(AGENT_URL);
-  await page.getByLabel("Your question").fill("Is \"the page should load fast\" testable?");
+  await expect(page.getByText("19 of 20 tries left today")).toBeVisible();
+  await page.getByRole("button", { name: "Ask again" }).first().click();
+  await expect(page.getByLabel("Question")).toHaveValue(/refund flow/);
+  await page.getByLabel("Question").fill("Is \"the page should load fast\" testable?");
   await page.getByLabel(/Context/).fill("Spec line 4: the page should load fast.");
+  await page.getByRole("button", { name: "What gets sent" }).click();
+  await expect(page.getByText(/--- The question ---\s+Is "the page should load fast" testable\?/)).toBeVisible();
   await page.getByRole("button", { name: "Ask spec-checker" }).click();
-  await expect(page.getByText("Testable once it names a number").first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 15_000 });
   const post = db.calls.find((c) => c.method === "POST" && c.path === "/api/skills/asks");
   expect(post?.body).toEqual({ repo: "acme/playbook", path: "agents/spec-checker.md", question: "Is \"the page should load fast\" testable?", context: "Spec line 4: the page should load fast." });
   await shot(page, "agent-try");
@@ -230,8 +256,10 @@ test("members see an agent's asks but can't try it or switch it", async ({ page 
   await page.goto(AGENT_URL);
   await expect(page.getByRole("heading", { name: "spec-checker", level: 1 })).toBeVisible();
   await expect(page.getByRole("link", { name: "acme/web#412" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Try it" })).toHaveCount(0);
+  await expect(page.getByText("Admins can try this agent with a question of their own.")).toBeVisible();
+  await expect(page.getByLabel("Question")).toHaveCount(0);
   await expect(page.getByRole("switch")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Ask again" })).toHaveCount(0);
 });
 
 test("an agent with no asks yet, and an unknown agent", async ({ page }) => {
@@ -240,4 +268,13 @@ test("an agent with no asks yet, and an unknown agent", async ({ page }) => {
   await expect(page.getByText("Nobody has asked spec-checker anything yet.")).toBeVisible();
   await page.goto("/skills/agent?repo=acme%2Fplaybook&path=agents%2Fgone.md");
   await expect(page.getByText("Agent not found")).toBeVisible();
+});
+
+test("a run's page lists the team agents it asked, linked to each agent", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/runs/detail?id=run_77");
+  await expect(page.getByRole("heading", { name: "Team agents asked (1)" })).toBeVisible();
+  await expect(page.getByText("Check this ticket for contradictions before I plan it.")).toBeVisible();
+  await expect(page.getByText("Took too long")).toBeVisible();
+  await expect(page.getByRole("link", { name: "spec-checker" })).toHaveAttribute("href", /\/skills\/agent\/?\?repo=acme%2Fplaybook&path=agents%2Fspec-checker\.md/);
 });
