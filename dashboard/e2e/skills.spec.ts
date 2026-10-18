@@ -18,7 +18,7 @@ interface Ask {
   id: string; repo: string; path: string; run_id: string; sha: string; by: string; origin: string; question: string; context_chars: number; outcome: string; answer: string;
   model: string; input_tokens: number; output_tokens: number; ms: number; at: string;
 }
-interface Backend { repos: Repo[]; items: Item[]; asks: Ask[]; role: string; calls: { method: string; path: string; body: Record<string, unknown> | null }[] }
+interface Backend { repos: Repo[]; items: Item[]; asks: Ask[]; stats: unknown; role: string; calls: { method: string; path: string; body: Record<string, unknown> | null }[] }
 
 const SHA = "4f2c9a1e7b3d5c8a9e0f1b2c3d4e5f6a7b8c9d0e";
 const REPOS: Repo[] = [
@@ -71,8 +71,41 @@ const ASKS: Ask[] = [
     model: "claude-opus-4-8", input_tokens: 0, output_tokens: 0, ms: 120000, at: ago(2900) },
 ];
 
+const day = (back: number) => new Date(Date.now() - back * 86_400_000).toISOString().slice(0, 10);
+const STATS = {
+  days_covered: 30,
+  since: day(29),
+  reads: 48,
+  asks: 5,
+  answered: 4,
+  no_answer: 1,
+  tries: 1,
+  input_tokens: 15400,
+  output_tokens: 1900,
+  median_answer_ms: 12400,
+  days: Array.from({ length: 30 }, (_, i) => {
+    const back = 29 - i;
+    const reads = [0, 3, 1, 4, 0, 6, 2][back % 7] * (back < 20 ? 1 : 0);
+    const asks = back === 1 ? 3 : back === 9 ? 2 : 0;
+    return { date: day(back), reads, asks, answered: back === 1 ? 2 : asks };
+  }),
+  by_reader: [
+    { reader: "planner", reads: 12, asks: 2 },
+    { reader: "coder", reads: 21, asks: 0 },
+    { reader: "reviewer", reads: 15, asks: 3 },
+  ],
+  top: [
+    { repo: "acme/playbook", path: "skills/api-conventions/SKILL.md", name: "api-conventions", kind: "skill", reads: 26, asks: 0, answered: 0 },
+    { repo: "acme/playbook", path: "skills/debug/SKILL.md", name: "debug", kind: "skill", reads: 14, asks: 0, answered: 0 },
+    { repo: "acme/playbook", path: "agents/spec-checker.md", name: "spec-checker", kind: "agent", reads: 0, asks: 5, answered: 4 },
+    { repo: "acme/playbook", path: "commands/release-notes.md", name: "release-notes", kind: "command", reads: 2, asks: 0, answered: 0 },
+  ],
+  unused_count: 1,
+  unused: [{ repo: "acme/playbook", path: "agents/tech-debt-manager.md", name: "tech-debt-manager", kind: "agent" }],
+};
+
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
-  const db: Backend = { repos: structuredClone(REPOS), items: structuredClone(ITEMS), asks: structuredClone(ASKS), role: "admin", calls: [], ...init };
+  const db: Backend = { repos: structuredClone(REPOS), items: structuredClone(ITEMS), asks: structuredClone(ASKS), stats: structuredClone(STATS), role: "admin", calls: [], ...init };
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
   await page.route((url) => url.hostname === "localhost" && /^\/(api|auth)\//.test(url.pathname), async (route) => {
@@ -86,6 +119,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/usage") return json(route, { month: "2026-01", total_tokens: 0, tokens_in: 0, tokens_out: 0, total_runs: 0, max_tokens: 0 });
     if (p === "/api/banners") return json(route, { banners: [] });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }] });
+    if (p === "/api/skills/stats") return db.stats === null ? json(route, { error: "Unavailable" }, 500) : json(route, db.stats);
     if (p === "/api/skills" && method === "GET") return json(route, { repos: db.repos, items: db.items, can_manage: db.role === "admin" || db.role === "owner" });
     if (p === "/api/skills/repos" && method === "POST") {
       const repo = String(body?.repo ?? "");
@@ -184,6 +218,35 @@ test("repositories in each state, items by kind, agents marked as askable, one o
   expect(db.calls.some((c) => c.method === "PUT" && c.path === "/api/skills/item" && c.body?.enabled === true)).toBe(true);
 });
 
+test("page stats: reads and asks per day, who used them, most used, and what sits unused", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/skills");
+  const usage = page.getByRole("region", { name: "Use in the last 30 days" });
+  await expect(usage).toBeVisible();
+  await expect(usage.getByRole("paragraph").filter({ hasText: /^Reads$/ })).toBeVisible();
+  await expect(usage.getByText("48", { exact: true })).toBeVisible();
+  await expect(usage.getByText("4 answered, 1 not")).toBeVisible();
+  await expect(usage.getByText("12 s", { exact: true })).toBeVisible();
+  await expect(usage.getByRole("img", { name: /^Busiest day .*: \d+ reads?, \d+ asks?\.$/ })).toBeVisible();
+  await expect(usage.getByText("21 reads · 0 asks")).toBeVisible();
+  await expect(usage.getByRole("link", { name: "agent:spec-checker" })).toHaveAttribute("href", /\/skills\/agent\/?\?repo=acme%2Fplaybook&path=agents%2Fspec-checker\.md/);
+  await expect(usage.getByText("5 asks, 4 answered")).toBeVisible();
+  await expect(usage.getByRole("heading", { name: "Switched on but not used" })).toBeVisible();
+  await expect(usage.getByRole("link", { name: "agent:tech-debt-manager" })).toBeVisible();
+  await expect(usage.getByText("Tries from agent pages (1) aren't counted here.")).toBeVisible();
+  await shot(page, "skills-stats");
+});
+
+test("page stats: nothing used yet says so, and a failed stats call leaves the page working", async ({ page }) => {
+  const db = await mockApi(page, { stats: { ...STATS, reads: 0, asks: 0, answered: 0, no_answer: 0, top: [], days: STATS.days.map((d) => ({ ...d, reads: 0, asks: 0, answered: 0 })) } });
+  await page.goto("/skills");
+  await expect(page.getByText("Coderhelm hasn't read a skill or asked an agent yet.")).toBeVisible();
+  db.stats = null;
+  await page.reload();
+  await expect(page.getByRole("heading", { name: /Skills \(3\)/ })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Use in the last 30 days" })).toHaveCount(0);
+});
+
 test("connect a repository and sync another", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/skills");
@@ -211,7 +274,7 @@ test("an agent's page: when it's asked, how it runs, recent asks and its instruc
   await page.goto("/skills");
   await expect(page.getByText("asked 2 times, last 35 min ago")).toBeVisible();
   await expect(page.getByText("Short description: Coderhelm's agents decide when to ask it from this line.")).toBeVisible();
-  await page.getByRole("link", { name: "agent:spec-checker" }).click();
+  await page.getByRole("region", { name: /Agents \(2\)/ }).getByRole("link", { name: "agent:spec-checker" }).click();
   await expect(page).toHaveURL(/\/skills\/agent\/?\?repo=acme%2Fplaybook&path=agents%2Fspec-checker\.md/);
   await expect(page.getByRole("heading", { name: "spec-checker", level: 1 })).toBeVisible();
   await expect(page.getByText("Coderhelm asks this agent when")).toBeVisible();

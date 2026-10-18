@@ -8,7 +8,8 @@ import { useToast } from "@/components/toast";
 import { ToolSwitch } from "@/components/tools";
 import { inputClass, linkButton, primaryButton, secondaryButton, focusRing } from "@/components/ui";
 import Link from "next/link";
-import { KIND_LABEL, agentHref, ago, handle, skillsApi, thinDescription, type Skill, type SkillKind, type SkillRepo, type SkillWithBody } from "@/lib/skills";
+import { KIND_LABEL, agentHref, ago, handle, skillsApi, thinDescription, type Skill, type SkillKind, type SkillRepo, type SkillStats, type SkillWithBody } from "@/lib/skills";
+import { UsageStats } from "./usage-stats";
 
 export default function SkillsPageGuarded() {
   return (
@@ -29,6 +30,7 @@ function SkillsPage() {
   const [busy, setBusy] = useState("");
   const [newRepo, setNewRepo] = useState("");
   const [open, setOpen] = useState<SkillWithBody | null>(null);
+  const [stats, setStats] = useState<SkillStats | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -45,6 +47,8 @@ function SkillsPage() {
 
   useEffect(() => {
     load();
+    // The stats are extra: the page works without them.
+    skillsApi.stats().then((s) => setStats(Array.isArray(s?.days) ? s : null), () => setStats(null));
   }, [load]);
 
   // A sync runs in the background: check back while one is waiting for its
@@ -133,6 +137,8 @@ function SkillsPage() {
           </Callout>
         </div>
       )}
+
+      {stats && items.length > 0 && <UsageStats stats={stats} />}
 
       <section aria-labelledby="repos-heading" className="mt-8">
         <h2 id="repos-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">Repositories</h2>

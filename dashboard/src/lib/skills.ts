@@ -90,8 +90,39 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 
 const repoPath = (repo: string) => repo.split("/").map(encodeURIComponent).join("/");
 
+/** One item in the usage stats. */
+export interface SkillUse extends Pick<Skill, "repo" | "path" | "name" | "kind"> {
+  reads?: number;
+  asks?: number;
+  answered?: number;
+}
+
+/** How a team's skills and agents were used over the last 30 days. */
+export interface SkillStats {
+  days_covered: number;
+  since: string;
+  /** Reads by Coderhelm's agents of a skill, agent brief or command. */
+  reads: number;
+  /** Questions Coderhelm's agents put to a team agent. Tries not counted. */
+  asks: number;
+  answered: number;
+  no_answer: number;
+  /** An admin's tries from an agent's page. */
+  tries: number;
+  input_tokens: number;
+  output_tokens: number;
+  median_answer_ms: number | null;
+  days: { date: string; reads: number; asks: number; answered: number }[];
+  by_reader: { reader: "planner" | "coder" | "reviewer"; reads: number; asks: number }[];
+  top: SkillUse[];
+  /** Switched on, yet neither read nor asked in the period. */
+  unused_count: number;
+  unused: SkillUse[];
+}
+
 export const skillsApi = {
   list: () => call<{ repos: SkillRepo[]; items: Skill[]; can_manage: boolean }>("/api/skills"),
+  stats: () => call<SkillStats>("/api/skills/stats"),
   connect: (repo: string) =>
     call<{ ok: true; repo: string; syncing: boolean }>("/api/skills/repos", { method: "POST", body: JSON.stringify({ repo }) }),
   disconnect: (repo: string) => call<{ ok: true }>(`/api/skills/repos/${repoPath(repo)}`, { method: "DELETE" }),
