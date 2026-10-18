@@ -9,7 +9,7 @@ const GITHUB_APP_INSTALL_URL = "https://github.com/apps/coderhelm/installations/
 const STATE_STORAGE_KEY = "gh_install_state";
 
 export default function GitHubSettingsPageGuarded() {
-  return <RoleGuard minRole="admin"><GitHubSettingsPage /></RoleGuard>;
+  return <RoleGuard minRole="member"><GitHubSettingsPage /></RoleGuard>;
 }
 
 type InstallStatus = "not_connected" | "connected" | "linking";
@@ -116,8 +116,7 @@ function GitHubSettingsPage() {
   if (loading) {
     return (
       <div className="max-w-2xl">
-        <a href="/settings" className="text-zinc-500 hover:text-zinc-300 text-sm">← Settings</a>
-        <h1 className="text-2xl font-bold mt-4 mb-6">GitHub</h1>
+        <h1 className="text-2xl font-bold mb-6">GitHub</h1>
         <Skeleton className="h-24 w-full" />
       </div>
     );
@@ -128,8 +127,7 @@ function GitHubSettingsPage() {
 
   return (
     <div className="max-w-2xl">
-      <a href="/settings" className="text-zinc-500 hover:text-zinc-300 text-sm">← Settings</a>
-      <h1 className="text-2xl font-bold mt-4 mb-6">GitHub</h1>
+      <h1 className="text-2xl font-bold mb-6">GitHub</h1>
 
       {/* Error banner */}
       {error && (

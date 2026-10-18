@@ -1,0 +1,104 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import { formatTokens, usageTone } from "@/lib/usage";
+import { hasRole } from "@/lib/roles";
+import { SETTINGS_ITEMS, type SettingsStatusKey } from "@/components/settings-items";
+
+export type StatusTone = "neutral" | "success" | "warning" | "error";
+
+export interface ItemStatus {
+  text: string;
+  tone: StatusTone;
+}
+
+export interface Me {
+  role: string;
+  auth_provider?: string;
+  github_login: string | null;
+  mfa_enabled?: boolean;
+}
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+// One small request per value, each on its own: a slow or failing one leaves
+// its line empty and never holds up the page or the other lines.
+const LOADERS: Record<SettingsStatusKey, (me: Me) => Promise<ItemStatus | null>> = {
+  usage: async () => {
+    const u = await api.getUsage();
+    if (u.max_tokens <= 0) return { text: `No limit · ${formatTokens(u.total_tokens)} used this month`, tone: "neutral" };
+    return { text: `${formatTokens(u.total_tokens)} of ${formatTokens(u.max_tokens)} used this month`, tone: usageTone(u.total_tokens, u.max_tokens) };
+  },
+  repos: async () => {
+    const { repos } = await api.listRepos();
+    const on = repos.filter((r) => r.enabled).length;
+    if (repos.length === 0) return { text: "No repositories yet", tone: "warning" };
+    return { text: `${on} of ${plural(repos.length, "repository", "repositories")} on`, tone: on > 0 ? "success" : "neutral" };
+  },
+  github: async () => {
+    const s = await api.getInstallationStatus();
+    return s.status === "connected"
+      ? { text: s.github_org ? `Connected to ${s.github_org}` : "Connected", tone: "success" }
+      : { text: "Not connected", tone: "warning" };
+  },
+  team: async () => {
+    const { users } = await api.listUsers();
+    return { text: plural(users.length, "person", "people"), tone: "neutral" };
+  },
+  alerts: async () => {
+    const { routes } = await api.listAlertRoutes();
+    const on = routes.filter((r) => r.enabled).length;
+    return routes.length === 0 ? { text: "No routes yet", tone: "neutral" } : { text: `${plural(routes.length, "route")}, ${on} on`, tone: on > 0 ? "success" : "neutral" };
+  },
+  dataSources: async () => {
+    const { sources } = await api.listDataSources();
+    return sources.length === 0 ? { text: "None connected", tone: "neutral" } : { text: `${sources.length} connected`, tone: "success" };
+  },
+  plugins: async () => {
+    const { plugins } = await api.listEnabledPlugins();
+    const on = plugins.filter((p) => p.enabled).length;
+    return on === 0 ? { text: "None connected", tone: "neutral" } : { text: `${on} connected`, tone: "success" };
+  },
+  jira: async () => {
+    const j = await api.getJiraCheck();
+    if (j.ready) return { text: "Connected", tone: "success" };
+    return j.secret_configured ? { text: "Waiting for the first Jira event", tone: "warning" } : { text: "Not connected", tone: "neutral" };
+  },
+  models: async () => {
+    const m = await api.getModelProvider();
+    return m.api_key_masked ? { text: "Your own API key", tone: "success" } : { text: "Coderhelm's key", tone: "neutral" };
+  },
+  security: async (me) => {
+    if (me.auth_provider && me.auth_provider !== "email") {
+      return { text: `Signs in with ${me.auth_provider === "github" ? "GitHub" : "Google"}`, tone: "neutral" };
+    }
+    if (!me.auth_provider && me.github_login) return { text: "Signs in with GitHub", tone: "neutral" };
+    return me.mfa_enabled ? { text: "Two step sign in on", tone: "success" } : { text: "Two step sign in off", tone: "warning" };
+  },
+};
+
+/** The at a glance line for each hub item the person can open. */
+export function useSettingsStatus(me: Me | null): Partial<Record<SettingsStatusKey, ItemStatus>> {
+  const [status, setStatus] = useState<Partial<Record<SettingsStatusKey, ItemStatus>>>({});
+
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    const keys = new Set(
+      SETTINGS_ITEMS.filter((i) => i.status && hasRole(me.role, i.view)).map((i) => i.status as SettingsStatusKey),
+    );
+    for (const key of keys) {
+      LOADERS[key](me)
+        .then((s) => {
+          if (live && s) setStatus((prev) => ({ ...prev, [key]: s }));
+        })
+        .catch(() => {});
+    }
+    return () => {
+      live = false;
+    };
+  }, [me]);
+
+  return status;
+}

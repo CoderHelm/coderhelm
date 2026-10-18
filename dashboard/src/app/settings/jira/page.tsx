@@ -84,7 +84,7 @@ function JiraPage() {
   if (loading) {
     return (
       <div className="max-w-2xl">
-        <h1 className="text-2xl font-bold mb-6">Jira Integration</h1>
+        <h1 className="text-2xl font-bold mb-6">Jira</h1>
         <div className="space-y-4">
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-40 w-full" />
@@ -96,7 +96,7 @@ function JiraPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-2">Jira Integration</h1>
+      <h1 className="text-2xl font-bold mb-2">Jira</h1>
       <p className="text-zinc-400 text-sm mb-6">
         Connect Jira so assigning or transitioning issues triggers Coderhelm automatically.
       </p>

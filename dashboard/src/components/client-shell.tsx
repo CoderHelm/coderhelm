@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { api, type UsageInfo, type Banner, type TeamInfo } from "@/lib/api";
 import { pushToDataLayer } from "@/lib/gtm";
+import { formatTokens, USAGE_CHANGED } from "@/lib/usage";
 import { ToastProvider } from "./toast";
 import { ConfirmProvider } from "./confirm-dialog";
 import {
@@ -16,11 +17,6 @@ import {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
 
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
-  return n.toString();
-}
 
 interface User {
   user_id: string;
@@ -72,14 +68,14 @@ const navGroups: NavGroup[] = [
     label: "Configure",
     items: [
       { href: "/settings/repos", label: "Repos", icon: <GitBranchIcon />, memberOnly: true },
-      { href: "/settings", label: "Settings", icon: <GearIcon />, adminOnly: true },
+      { href: "/settings", label: "Settings", icon: <GearIcon /> },
       { href: "/settings/notifications", label: "Notifications", icon: <BellIcon /> },
     ],
   },
   {
     label: "Integrations",
     items: [
-      { href: "/settings/github", label: "GitHub", icon: <GitHubIcon />, adminOnly: true },
+      { href: "/settings/github", label: "GitHub", icon: <GitHubIcon />, memberOnly: true },
       { href: "/settings/aws", label: "AWS", icon: <AwsIcon />, adminOnly: true },
       { href: "/settings/alerts", label: "Alert routes", icon: <BellIcon />, adminOnly: true },
       { href: "/data-sources", label: "Data sources", icon: <DatabaseIcon />, adminOnly: true },
@@ -99,7 +95,7 @@ const navGroups: NavGroup[] = [
     label: "Account",
     items: [
       { href: "/settings/security", label: "Security", icon: <ShieldCheckIcon /> },
-      { href: "/settings/budget", label: "Token Limit", icon: <TargetIcon />, adminOnly: true },
+      { href: "/settings/budget", label: "Token limit", icon: <TargetIcon />, memberOnly: true },
       { href: "/admin", label: "Admin", icon: <ShieldIcon />, superAdminOnly: true },
     ],
   },
@@ -218,6 +214,13 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       api.getUsage().then(setUsage).catch(() => {});
     }
   }, [pathname, user]);
+
+  // ...and right after someone changes the limit.
+  useEffect(() => {
+    const refresh = () => api.getUsage().then(setUsage).catch(() => {});
+    window.addEventListener(USAGE_CHANGED, refresh);
+    return () => window.removeEventListener(USAGE_CHANGED, refresh);
+  }, []);
 
   if (!authChecked) {
     return (
@@ -400,7 +403,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                   href="/settings/budget"
                   className="shrink-0 rounded-md bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-500 transition-colors"
                 >
-                  Adjust Limit
+                  {user?.role === "owner" ? "Adjust limit" : "See usage"}
                 </a>
               </div>
           )}

@@ -4,80 +4,134 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { Callout } from "@/components/callout";
+import { StatusPill } from "@/components/status-pill";
+import { Skeleton } from "@/components/skeleton";
+import { ChevronRightIcon } from "@/components/icons";
+import { focusRing, inputClass, secondaryButton } from "@/components/ui";
+import { SETTINGS_GROUPS, type SettingsItem } from "@/components/settings-items";
+import { hasRole, ROLE_LABEL, whoCan, type Role } from "@/lib/roles";
+import { useSettingsStatus, type ItemStatus, type Me } from "./use-settings-status";
 
 export default function SettingsPage() {
-  const [resetting, setResetting] = useState(false);
-  const [showResetModal, setShowResetModal] = useState(false);
+  const [me, setMe] = useState<Me | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const status = useSettingsStatus(me);
+
+  useEffect(() => {
+    api.me().then(setMe).catch(() => setLoadError(true));
+  }, []);
+
+  const groups = me
+    ? SETTINGS_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => hasRole(me.role, i.view)) })).filter((g) => g.items.length > 0)
+    : [];
+  const roleLabel = me ? ROLE_LABEL[me.role as Role] ?? me.role : null;
+
+  return (
+    <div className="max-w-3xl">
+      <header className="mb-8">
+        <h1 className="text-2xl font-bold">Settings</h1>
+        <p className="text-sm text-zinc-400 mt-1">
+          How Coderhelm works for your team, and the settings that are just yours.
+        </p>
+        {roleLabel && (
+          <p className="text-xs text-zinc-500 mt-3">
+            Your role: <span className="text-zinc-300 font-medium">{roleLabel}</span>. Pages marked View only show the
+            current setup; ask someone with a higher role to change them.
+          </p>
+        )}
+      </header>
+
+      {loadError && (
+        <Callout variant="error" title="Could not load your settings">
+          <p>Reload the page to try again.</p>
+        </Callout>
+      )}
+
+      {!me && !loadError && (
+        <div className="space-y-8" aria-busy="true" aria-label="Loading settings">
+          {[0, 1, 2].map((i) => (
+            <div key={i}>
+              <Skeleton className="h-3 w-32 mb-3" />
+              <Skeleton className="h-36 w-full rounded-lg" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="space-y-8">
+        {groups.map((group) => (
+          <section key={group.id} aria-labelledby={`settings-group-${group.id}`}>
+            <h2 id={`settings-group-${group.id}`} className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
+              {group.label}
+            </h2>
+            <ul className="rounded-lg border border-zinc-800 bg-zinc-900/40 divide-y divide-zinc-800 overflow-hidden">
+              {group.items.map((item) => (
+                <li key={item.href}>
+                  <SettingsRow item={item} readOnly={!hasRole(me?.role, item.edit)} status={item.status ? status[item.status] : undefined} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+
+      {me && hasRole(me.role, "owner") && <DangerZone />}
+    </div>
+  );
+}
+
+function SettingsRow({ item, readOnly, status }: { item: SettingsItem; readOnly: boolean; status?: ItemStatus }) {
+  return (
+    <Link
+      href={item.href}
+      className={`group flex items-start gap-3 sm:gap-4 px-4 py-4 hover:bg-zinc-800/40 transition-colors motion-reduce:transition-none ${focusRing} focus-visible:-outline-offset-2`}
+    >
+      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-300" aria-hidden="true">
+        {item.icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-sm font-medium text-zinc-100">{item.title}</span>
+          {readOnly && (
+            <span title={`Only ${whoCan(item.edit)} can change this`}>
+              <StatusPill>View only</StatusPill>
+            </span>
+          )}
+        </span>
+        <span className="block text-sm text-zinc-400 mt-0.5">{item.description}</span>
+        {status && (
+          <span className="mt-2 flex">
+            <StatusPill tone={status.tone}>{status.text}</StatusPill>
+          </span>
+        )}
+      </span>
+      <span className="mt-2 shrink-0 text-zinc-600 group-hover:text-zinc-300 transition-colors motion-reduce:transition-none" aria-hidden="true">
+        <ChevronRightIcon />
+      </span>
+    </Link>
+  );
+}
+
+function DangerZone() {
+  const [open, setOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
-  const [role, setRole] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    api.me().then((u) => setRole(u.role)).catch(() => {});
-  }, []);
-
-  const isAdminOrOwner = role === "admin" || role === "owner";
-  const isBillingOrAbove = isAdminOrOwner || role === "billing";
-  const isMemberOrAbove = isBillingOrAbove || role === "member";
-
-  const groups = [
-    {
-      label: "AI Configuration",
-      adminOnly: true,
-      items: [
-        { href: "/settings/guardrails", title: "Guardrails", description: "Must-rules Coderhelm always follows. Never pushes to main." },
-        { href: "/settings/voice", title: "Team Voice", description: "Control how Coderhelm writes — tone, commit style, PR format." },
-        { href: "/settings/instructions", title: "Custom Instructions", description: "Global conventions and preferences for all repos." },
-        { href: "/settings/workflow", title: "Workflow", description: "Openspec output, commit behavior, and pipeline preferences." },
-      ],
-    },
-    {
-      label: "Integrations",
-      items: [
-        { href: "/settings/github", title: "GitHub", description: "Connected GitHub account and installed repositories." },
-        { href: "/settings/aws", title: "AWS", description: "Connect AWS accounts to analyze CloudWatch Logs and get recommendations.", adminOnly: true },
-        { href: "/data-sources", title: "Data sources", description: "Connect a live system so the reviewer can check facts while it reviews. Read-only.", adminOnly: true },
-        { href: "/settings/jira", title: "Jira", description: "Connect Jira to create tickets from plans and sync issue status." },
-        { href: "/settings/plugins", title: "MCP Servers", description: "Connect MCP servers like Figma, Sentry, and Linear.", adminOnly: true },
-        { href: "/settings/models", title: "AI Models", description: "Configure your Anthropic API key and choose which Claude models to use.", adminOnly: true },
-      ],
-    },
-    {
-      label: "Team & Access",
-      items: [
-        { href: "/settings/repos", title: "Repositories", description: "Connected repos and their status.", memberOnly: true },
-        { href: "/settings/team", title: "Team", description: "Who is on the team, their roles, and what each role can do." },
-        { href: "/settings/budget", title: "Token Limit", description: "Set a monthly token usage limit.", adminOnly: true },
-      ],
-    },
-    {
-      label: "Account",
-      items: [
-        { href: "/settings/notifications", title: "Notifications", description: "Choose which emails Coderhelm sends you." },
-        { href: "/settings/security", title: "Security", description: "Change your password and enable two-factor authentication." },
-      ],
-    },
-  ];
-
-  const visibleGroups = groups
-    .filter((g) => !("adminOnly" in g && g.adminOnly) || isAdminOrOwner)
-    .map((g) => ({
-      ...g,
-      items: g.items.filter((s) => {
-        if ("adminOnly" in s && (s as { adminOnly?: boolean }).adminOnly) return isAdminOrOwner;
-        if ("billingOnly" in s && (s as { billingOnly?: boolean }).billingOnly) return isBillingOrAbove;
-        if ("memberOnly" in s && (s as { memberOnly?: boolean }).memberOnly) return isMemberOrAbove;
-        return true;
-      }),
-    }))
-    .filter((g) => g.items.length > 0);
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !resetting && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, resetting]);
 
   const handleReset = async () => {
     if (confirmText !== "DELETE") return;
     setResetting(true);
     try {
       await api.resetAccount();
-      setShowResetModal(false);
+      setOpen(false);
       toast("All data has been cleared. Refreshing...");
       setTimeout(() => window.location.reload(), 1500);
     } catch {
@@ -88,82 +142,56 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-6">Settings</h1>
+    <section aria-labelledby="danger-zone" className="mt-12 rounded-lg border border-red-500/20 p-5">
+      <h2 id="danger-zone" className="text-sm font-semibold text-red-400 mb-1">Danger zone</h2>
+      <p className="text-sm text-zinc-400 mb-4">
+        Delete every run, plan, repository, setting and Jira connection for this team. Your sign in stays; everything else is gone for good.
+      </p>
+      <button
+        type="button"
+        onClick={() => { setOpen(true); setConfirmText(""); }}
+        className={`${secondaryButton} !bg-red-500/10 !border-red-500/30 !text-red-400 hover:!bg-red-500/20`}
+      >
+        Reset all data
+      </button>
 
-      {visibleGroups.map((group, gi) => (
-        <div key={group.label} className={gi > 0 ? "mt-8" : ""}>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">{group.label}</h2>
-          <div className="space-y-3">
-            {group.items.map((s) => (
-              <Link
-                key={s.href}
-                href={s.href}
-                className="block px-4 py-4 bg-zinc-900/50 border border-zinc-800 rounded-lg hover:border-zinc-700 transition-colors"
-              >
-                <h3 className="text-sm font-medium text-zinc-100">{s.title}</h3>
-                <p className="text-xs text-zinc-500 mt-1">{s.description}</p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      ))}
-
-      {/* Danger zone */}
-      {isAdminOrOwner && (
-      <div className="mt-12 border border-red-500/20 rounded-lg p-5">
-        <h2 className="text-sm font-semibold text-red-400 mb-1">Danger Zone</h2>
-        <p className="text-xs text-zinc-500 mb-4">
-          Permanently delete all data — runs, plans, repos, settings, Jira config. Your account will remain but all content will be wiped.
-        </p>
-        <button
-          onClick={() => { setShowResetModal(true); setConfirmText(""); }}
-          disabled={resetting}
-          className="px-4 py-2 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/20 disabled:opacity-50 transition-colors cursor-pointer"
-        >
-          {resetting ? "Resetting..." : "Reset all data"}
-        </button>
-      </div>
-      )}
-
-      {/* Reset confirmation modal */}
-      {showResetModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowResetModal(false)} />
-          <div className="relative bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
-            <h3 className="text-lg font-semibold text-red-400 mb-2">Reset all data</h3>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !resetting && setOpen(false)} />
+          <div role="dialog" aria-modal="true" aria-labelledby="reset-title" className="relative w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-900 p-6 shadow-2xl">
+            <h3 id="reset-title" className="text-lg font-semibold text-red-400 mb-2">Reset all data</h3>
             <p className="text-sm text-zinc-400 mb-4">
-              This will permanently delete all your data including runs, plans, repos, settings, and Jira config. This action cannot be undone.
+              This permanently deletes runs, plans, repositories, settings and the Jira connection. It cannot be undone.
             </p>
-            <label className="text-xs text-zinc-500 mb-1.5 block">
+            <label htmlFor="reset-confirm" className="text-xs text-zinc-400 mb-1.5 block">
               Type <span className="text-red-400 font-mono font-semibold">DELETE</span> to confirm
             </label>
             <input
+              id="reset-confirm"
               type="text"
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
               placeholder="DELETE"
               autoFocus
-              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-red-500/50 mb-4"
+              autoComplete="off"
+              className={`${inputClass} mb-4`}
             />
             <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowResetModal(false)}
-                className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
-              >
+              <button type="button" onClick={() => setOpen(false)} disabled={resetting} className={secondaryButton}>
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleReset}
                 disabled={confirmText !== "DELETE" || resetting}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                className={`inline-flex items-center justify-center min-h-9 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${focusRing}`}
               >
-                {resetting ? "Resetting..." : "Delete everything"}
+                {resetting ? "Deleting..." : "Delete everything"}
               </button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

@@ -51,8 +51,7 @@ export default function SecurityPage() {
   if (authProvider === null) {
     return (
       <div className="max-w-xl">
-        <a href="/settings" className="text-zinc-500 hover:text-zinc-300 text-sm">← Settings</a>
-        <h1 className="text-2xl font-bold mt-4 mb-2">Security</h1>
+        <h1 className="text-2xl font-bold mb-2">Security</h1>
         <p className="text-sm text-zinc-500 mb-6">
           Manage your password and two-factor authentication.
         </p>
@@ -153,8 +152,7 @@ export default function SecurityPage() {
 
   return (
     <div className="max-w-xl">
-      <a href="/settings" className="text-zinc-500 hover:text-zinc-300 text-sm">← Settings</a>
-      <h1 className="text-2xl font-bold mt-4 mb-2">Security</h1>
+      <h1 className="text-2xl font-bold mb-2">Security</h1>
       <p className="text-sm text-zinc-500 mb-6">
         Manage your password and two-factor authentication.
       </p>

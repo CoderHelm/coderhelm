@@ -1,35 +1,57 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { api } from "@/lib/api";
+import { hasRole, whoCan, type Role } from "@/lib/roles";
+import { Callout } from "./callout";
+import { linkButton } from "./ui";
 
-type MinRole = "member" | "billing" | "admin" | "owner";
+type MinRole = Exclude<Role, "viewer">;
 
-const ROLE_LEVEL: Record<string, number> = {
-  viewer: 0,
-  member: 1,
-  billing: 2,
-  admin: 3,
-  owner: 4,
-};
+type Access = "checking" | "allowed" | "denied" | "error";
 
+/**
+ * Renders its children only for `minRole` or higher. Anyone else sees why the
+ * page is closed to them and who can open it, instead of being sent away
+ * without a word.
+ */
 export function RoleGuard({ minRole, children }: { minRole: MinRole; children: ReactNode }) {
-  const router = useRouter();
-  const [allowed, setAllowed] = useState<boolean | null>(null);
+  const [access, setAccess] = useState<Access>("checking");
+  const inSettings = (usePathname() ?? "").startsWith("/settings");
 
   useEffect(() => {
-    api.me().then((u) => {
-      const level = ROLE_LEVEL[u.role] ?? 0;
-      const required = ROLE_LEVEL[minRole] ?? 0;
-      if (level >= required) {
-        setAllowed(true);
-      } else {
-        router.replace("/settings");
-      }
-    }).catch(() => router.replace("/settings"));
-  }, [minRole, router]);
+    let live = true;
+    api
+      .me()
+      .then((u) => live && setAccess(hasRole(u.role, minRole) ? "allowed" : "denied"))
+      .catch(() => live && setAccess("error"));
+    return () => {
+      live = false;
+    };
+  }, [minRole]);
 
-  if (allowed === null) return null;
-  return <>{children}</>;
+  if (access === "checking") return null;
+  if (access === "allowed") return <>{children}</>;
+
+  return (
+    <div className="max-w-xl">
+      <Callout
+        variant={access === "error" ? "error" : "info"}
+        title={access === "error" ? "Could not check your access" : "This page needs a different role"}
+      >
+        <p>
+          {access === "error"
+            ? "Reload the page to try again."
+            : `Only ${whoCan(minRole)} can open this page. Ask them if you need a change here.`}
+        </p>
+        <p className="pt-1">
+          <Link href={inSettings ? "/settings" : "/"} className={linkButton}>
+            {inSettings ? "Back to Settings" : "Back to Runs"}
+          </Link>
+        </p>
+      </Callout>
+    </div>
+  );
 }
