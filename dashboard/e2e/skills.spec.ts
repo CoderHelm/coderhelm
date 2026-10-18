@@ -11,7 +11,7 @@ const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
 interface Repo { repo: string; added_by: string; added_at: string; sha: string; synced_at: string; error: string; items: number; skipped: string[] }
 interface Item {
   repo: string; path: string; kind: "skill" | "agent" | "command"; name: string; description: string; sha: string; hash: string;
-  enabled: boolean; files: string[]; uses: number; last_used_at: string; last_used_by: string; updated_at: string;
+  enabled: boolean; files: string[]; missing_tools: string[]; uses: number; last_used_at: string; last_used_by: string; updated_at: string;
   asks: number; last_asked_at: string; switched_by: string; switched_at: string;
 }
 interface Ask {
@@ -27,16 +27,16 @@ const REPOS: Repo[] = [
   { repo: "acme/old-guides", added_by: "lead@example.com", added_at: ago(9000), sha: "9a8b7c6d5e4f", synced_at: ago(25), error: "Coderhelm's GitHub App can't read this repository. Install the app on it, then sync again.", items: 1, skipped: [] },
 ];
 const item = (p: Partial<Item> & Pick<Item, "path" | "kind" | "name" | "description">): Item => ({
-  repo: "acme/playbook", sha: SHA, hash: "h", enabled: true, files: [], uses: 0, last_used_at: "", last_used_by: "", updated_at: ago(60),
+  repo: "acme/playbook", sha: SHA, hash: "h", enabled: true, files: [], missing_tools: [], uses: 0, last_used_at: "", last_used_by: "", updated_at: ago(60),
   asks: 0, last_asked_at: "", switched_by: "", switched_at: "", ...p,
 });
 const ITEMS: Item[] = [
   item({ path: "skills/debug/SKILL.md", kind: "skill", name: "debug", description: "Find the cause before the fix: reproduce, read the logs around the failure, then follow the data back.", files: ["skills/debug/reference.md", "skills/debug/checklist.md"], uses: 14, last_used_at: ago(42), last_used_by: "planner" }),
   item({ path: "skills/api-conventions/SKILL.md", kind: "skill", name: "api-conventions", description: "How the team names things, structures modules and writes tests.", uses: 31, last_used_at: ago(8), last_used_by: "reviewer" }),
   item({ path: "skills/copy-tone/SKILL.md", kind: "skill", name: "copy-tone", description: "Plain words in user-facing copy and pull request text.", enabled: false }),
-  item({ path: "agents/spec-checker.md", kind: "agent", name: "spec-checker", description: "Checks a spec or ticket for gaps, contradictions and untestable requirements before work starts.", uses: 3, last_used_at: ago(120), last_used_by: "reviewer (asked)", asks: 2, last_asked_at: ago(35) }),
+  item({ path: "agents/spec-checker.md", kind: "agent", name: "spec-checker", description: "Checks a spec or ticket for gaps, contradictions and untestable requirements before work starts.", uses: 3, last_used_at: ago(120), last_used_by: "reviewer (asked)", asks: 2, last_asked_at: ago(35), missing_tools: ["Read", "Grep", "Bash", "WebFetch"] }),
   item({ path: "agents/tech-debt-manager.md", kind: "agent", name: "tech-debt-manager", description: "Shortcuts." }),
-  item({ path: "commands/release-notes.md", kind: "command", name: "release-notes", description: "Write release notes from the merged pull requests since the last tag.", uses: 2, last_used_at: ago(2000), last_used_by: "coder" }),
+  item({ path: "commands/release-notes.md", kind: "command", name: "release-notes", description: "Write release notes from the merged pull requests since the last tag.", uses: 2, last_used_at: ago(2000), last_used_by: "coder", missing_tools: ["Bash", "mcp__tracker__list_issues"] }),
   item({ repo: "acme/old-guides", sha: "9a8b7c6d5e4f", path: ".claude/commands/deploy.md", kind: "command", name: "deploy", description: "The old deploy checklist.", enabled: false }),
 ];
 const BODY = `---
@@ -216,6 +216,22 @@ test("repositories in each state, items by kind, agents marked as askable, one o
   await page.getByRole("switch", { name: "Let Coderhelm read copy-tone" }).click();
   await expect(page.getByRole("switch", { name: "Let Coderhelm read copy-tone" })).toHaveAttribute("aria-checked", "true");
   expect(db.calls.some((c) => c.method === "PUT" && c.path === "/api/skills/item" && c.body?.enabled === true)).toBe(true);
+});
+
+test("an item that asks for tools Coderhelm doesn't have says so, and which ones", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/skills");
+  const notes = page.getByRole("note");
+  await expect(notes).toHaveCount(2);
+  const command = page.getByRole("listitem").filter({ hasText: "command:release-notes" });
+  await expect(command.getByRole("note")).toContainText("Asks for tools Coderhelm doesn't have: Bash, mcp__tracker__list_issues.");
+  await expect(command.getByRole("note")).toContainText("Coderhelm will run it without those tools.");
+  const agent = page.getByRole("listitem").filter({ hasText: "agent:spec-checker" });
+  await expect(agent.getByRole("note")).toContainText("Lists tools it won't get: Read, Grep, Bash, WebFetch.");
+  await expect(agent.getByRole("note")).toContainText("Team agents answer without tools, so Coderhelm will run it without those tools.");
+  // An item asking for nothing it lacks shows no warning.
+  await expect(page.getByRole("listitem").filter({ hasText: "skill:debug" }).getByRole("note")).toHaveCount(0);
+  await shot(page, "skills-missing-tools");
 });
 
 test("page stats: reads and asks per day, who used them, most used, and what sits unused", async ({ page }) => {

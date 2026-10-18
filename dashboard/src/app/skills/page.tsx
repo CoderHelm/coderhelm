@@ -11,6 +11,24 @@ import Link from "next/link";
 import { KIND_LABEL, agentHref, ago, handle, skillsApi, thinDescription, type Skill, type SkillKind, type SkillRepo, type SkillStats, type SkillWithBody } from "@/lib/skills";
 import { UsageStats } from "./usage-stats";
 
+/** The tools an item asks for in its front matter that it won't get. */
+function MissingTools({ item }: { item: Skill }) {
+  const tools = item.missing_tools ?? [];
+  return (
+    <div role="note" className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+      <p>
+        {item.kind === "agent" ? "Lists tools it won't get" : "Asks for tools Coderhelm doesn't have"}:{" "}
+        <span className="font-mono [overflow-wrap:anywhere]">{tools.join(", ")}</span>.
+      </p>
+      <p className="mt-0.5 text-amber-200/80">
+        {item.kind === "agent"
+          ? "Team agents answer without tools, so Coderhelm will run it without those tools."
+          : "Coderhelm will run it without those tools."}
+      </p>
+    </div>
+  );
+}
+
 export default function SkillsPageGuarded() {
   return (
     <RoleGuard minRole="member">
@@ -269,6 +287,7 @@ function SkillsPage() {
                           {s.description ? "Short description" : "No description"}: Coderhelm&apos;s agents decide when to ask it from this line.
                         </p>
                       )}
+                      {(s.missing_tools?.length ?? 0) > 0 && <MissingTools item={s} />}
                       <p className="mt-1 text-xs text-zinc-500 [overflow-wrap:anywhere]">
                         {s.repo} · {s.path}
                         {s.files.length > 0 && <> · {s.files.length} file{s.files.length === 1 ? "" : "s"} with it</>}
