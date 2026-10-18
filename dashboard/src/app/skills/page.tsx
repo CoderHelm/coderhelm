@@ -7,7 +7,8 @@ import { StatusPill } from "@/components/status-pill";
 import { useToast } from "@/components/toast";
 import { ToolSwitch } from "@/components/tools";
 import { inputClass, linkButton, primaryButton, secondaryButton, focusRing } from "@/components/ui";
-import { KIND_LABEL, ago, handle, skillsApi, type Skill, type SkillKind, type SkillRepo, type SkillWithBody } from "@/lib/skills";
+import Link from "next/link";
+import { KIND_LABEL, agentHref, ago, handle, skillsApi, thinDescription, type Skill, type SkillKind, type SkillRepo, type SkillWithBody } from "@/lib/skills";
 
 export default function SkillsPageGuarded() {
   return (
@@ -230,22 +231,49 @@ function SkillsPage() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1 basis-64">
                       <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          className={`font-mono font-semibold text-zinc-100 hover:underline rounded text-left [overflow-wrap:anywhere] ${focusRing}`}
-                          aria-expanded={isOpen}
-                          onClick={() => view(s)}
-                        >
-                          {handle(s, items)}
-                        </button>
-                        {s.kind === "agent" && <StatusPill tone="success">Agent · can be asked</StatusPill>}
+                        {s.kind === "agent" ? (
+                          <Link
+                            href={agentHref(s)}
+                            className={`font-mono font-semibold text-zinc-100 hover:underline rounded [overflow-wrap:anywhere] ${focusRing}`}
+                          >
+                            {handle(s, items)}
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            className={`font-mono font-semibold text-zinc-100 hover:underline rounded text-left [overflow-wrap:anywhere] ${focusRing}`}
+                            aria-expanded={isOpen}
+                            onClick={() => view(s)}
+                          >
+                            {handle(s, items)}
+                          </button>
+                        )}
+                        {s.kind === "agent" && (
+                          <>
+                            <StatusPill tone="success">Agent · can be asked</StatusPill>
+                            <Link href={agentHref(s)} className={`${linkButton} text-xs`}>
+                              {canManage ? "Open, see asks, try it" : "Open, see asks"}
+                            </Link>
+                          </>
+                        )}
                       </div>
                       {s.description && <p className="mt-1 text-sm text-zinc-400">{s.description}</p>}
+                      {s.kind === "agent" && thinDescription(s.description) && (
+                        <p className="mt-1 text-xs text-amber-300">
+                          {s.description ? "Short description" : "No description"}: Coderhelm&apos;s agents decide when to ask it from this line.
+                        </p>
+                      )}
                       <p className="mt-1 text-xs text-zinc-500 [overflow-wrap:anywhere]">
                         {s.repo} · {s.path}
                         {s.files.length > 0 && <> · {s.files.length} file{s.files.length === 1 ? "" : "s"} with it</>}
                         {" · "}
-                        {s.uses > 0 ? `read ${s.uses} time${s.uses === 1 ? "" : "s"}, last by the ${s.last_used_by} ${ago(s.last_used_at)}` : "not read yet"}
+                        {s.kind === "agent"
+                          ? s.asks > 0
+                            ? `asked ${s.asks} time${s.asks === 1 ? "" : "s"}, last ${ago(s.last_asked_at)}`
+                            : "not asked yet"
+                          : s.uses > 0
+                            ? `read ${s.uses} time${s.uses === 1 ? "" : "s"}, last by the ${s.last_used_by} ${ago(s.last_used_at)}`
+                            : "not read yet"}
                       </p>
                     </div>
                     {canManage ? (
