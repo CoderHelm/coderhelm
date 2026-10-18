@@ -704,6 +704,12 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
       setError("Coderhelm is in closed beta. Join the waitlist to get notified.");
       setView("waitlist");
       window.history.replaceState({}, "", window.location.pathname);
+    } else if (params.get("error") === "ask_admin_invite") {
+      const org = params.get("org");
+      setError(
+        `${org ? `${org} already uses Coderhelm` : "Your GitHub organization already uses Coderhelm"}. Ask one of its admins to invite you from Settings → Team, then sign in with the email they invite.`,
+      );
+      window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
 
