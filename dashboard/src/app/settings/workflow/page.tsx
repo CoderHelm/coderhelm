@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api, type WorkflowSettings, type JiraCheck, type AwsConnection } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
+import { Callout } from "@/components/callout";
 
 type WorkflowToggleKey = "commit_openspec" | "allow_plan_log_analyzer";
 
@@ -41,6 +42,8 @@ function WorkflowPage() {
         setJira(j);
         setAwsConnected(aws.connections.some((c: AwsConnection) => c.status === "active"));
       })
+      // A failed load leaves `settings` empty and the page explains it below.
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
@@ -82,6 +85,17 @@ function WorkflowPage() {
       <div className="max-w-xl">
         <h1 className="text-2xl font-bold mb-6">Workflow</h1>
         <div className="h-48 bg-zinc-900/50 border border-zinc-800 rounded-lg animate-pulse" />
+      </div>
+    );
+  }
+
+  if (!settings) {
+    return (
+      <div className="max-w-xl">
+        <h1 className="text-2xl font-bold mb-6">Workflow</h1>
+        <Callout variant="error" title="Could not load workflow settings">
+          <p>Reload the page to try again.</p>
+        </Callout>
       </div>
     );
   }

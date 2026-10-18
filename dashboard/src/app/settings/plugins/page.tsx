@@ -179,7 +179,7 @@ function PluginsPage() {
   if (loading) {
     return (
       <div className="max-w-4xl">
-        <h1 className="text-2xl font-bold mb-6">MCP Servers</h1>
+        <h1 className="text-2xl font-bold mb-6">MCP servers</h1>
         <div className="flex items-center gap-2 text-zinc-500 text-sm">
           <div className="w-4 h-4 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
           Loading servers...
@@ -194,7 +194,7 @@ function PluginsPage() {
   return (
     <div className="max-w-4xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">MCP Servers</h1>
+        <h1 className="text-2xl font-bold">MCP servers</h1>
         <p className="text-sm text-zinc-500 mt-1">
           Connect MCP servers to give Coderhelm access to third-party tools during runs.
         </p>

@@ -87,7 +87,7 @@ function AwsConnectionsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">AWS Connections</h1>
+            <h1 className="text-2xl font-bold">AWS</h1>
             {recommendations.length > 0 && (
               <span className="px-2.5 py-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-xs font-medium rounded-full">
                 {recommendations.length} finding{recommendations.length !== 1 ? "s" : ""}

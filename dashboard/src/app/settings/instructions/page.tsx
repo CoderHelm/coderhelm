@@ -102,7 +102,7 @@ function InstructionsPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-2">Custom Instructions</h1>
+      <h1 className="text-2xl font-bold mb-2">Custom instructions</h1>
       <p className="text-zinc-400 text-sm mb-6">
         Conventions and preferences that Coderhelm follows. Global instructions apply to all repos.
         Per-repo instructions add repo-specific guidance on top.

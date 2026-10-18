@@ -91,7 +91,7 @@ function ModelProviderPage() {
   if (loading) {
     return (
       <div className="max-w-xl">
-        <h1 className="text-2xl font-bold mb-6">AI Models</h1>
+        <h1 className="text-2xl font-bold mb-6">AI models</h1>
         <div className="h-64 bg-zinc-900/50 border border-zinc-800 rounded-lg animate-pulse" />
       </div>
     );
@@ -101,7 +101,7 @@ function ModelProviderPage() {
 
   return (
     <div className="max-w-xl">
-      <h1 className="text-2xl font-bold mb-2">AI Models</h1>
+      <h1 className="text-2xl font-bold mb-2">AI models</h1>
       <p className="text-sm text-zinc-500 mb-6">
         Add your Anthropic API key to power CoderHelm runs.
       </p>

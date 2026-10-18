@@ -1164,9 +1164,12 @@ export interface MonthStats {
   total_tokens_out: number;
 }
 
+/** One person's email choices. Every field defaults to on. */
 export interface NotificationPrefs {
   email_token_warning: boolean;
   email_weekly_summary: boolean;
+  email_run_complete?: boolean;
+  email_run_failed?: boolean;
 }
 
 export interface WorkflowSettings {
