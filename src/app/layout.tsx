@@ -102,12 +102,12 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <head>
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-N333B1RWMB" />
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-T14Q1LDRC0" />
         <script dangerouslySetInnerHTML={{ __html: `
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
           gtag('js', new Date());
-          gtag('config', 'G-N333B1RWMB');
+          gtag('config', 'G-T14Q1LDRC0');
         `}} />
       </head>
       <body className={`${inter.className} bg-surface text-text-primary antialiased`}>
