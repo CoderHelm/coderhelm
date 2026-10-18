@@ -4,7 +4,7 @@ import { ClientShell } from "@/components/client-shell";
 import { GoogleAnalytics } from "@/components/google-analytics";
 
 export const metadata: Metadata = {
-  title: "Coderhelm — Dashboard",
+  // No title here: the shell names each tab after its page (client-shell.tsx).
   description: "Manage your Coderhelm settings and monitor runs",
   icons: { icon: "/favicon.svg" },
 };

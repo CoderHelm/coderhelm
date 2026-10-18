@@ -1,0 +1,416 @@
+import { expect, test, type Page, type Route } from "@playwright/test";
+import fs from "node:fs";
+import path from "node:path";
+
+// Reviewer list, review detail, reviewer settings and releases. Every API call
+// is answered here; nothing reaches a real backend.
+
+const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots");
+
+const now = Date.now();
+const iso = (minsAgo: number) => new Date(now - minsAgo * 60_000).toISOString();
+
+function review(over: Record<string, unknown> = {}) {
+  return {
+    sk: "REVIEW#your-team/web#000101#2026-01-02T10:00:00Z",
+    repo: "your-team/web",
+    pr_number: 101,
+    head_sha: "abcdef1234567",
+    verdict: "APPROVE",
+    risk: "LOW",
+    body: "## Summary\n\nLooks good. One small note on the retry loop.",
+    posted_as: "coderhelm[bot]",
+    trigger: "labeled",
+    action_summary: "",
+    thumbs_up: 2,
+    thumbs_down: 0,
+    rating_comments: [{ by: "a-person", text: "Right call on the retry.", rating: "up", at: iso(30) }],
+    created_at: iso(5),
+    ...over,
+  };
+}
+
+const REVIEWS = [
+  review(),
+  review({ sk: "REVIEW#your-team/web#000101#2026-01-01T10:00:00Z", verdict: "REQUEST_CHANGES", risk: "HIGH", trigger: "synchronize", created_at: iso(120) }),
+  review({ sk: "REVIEW#your-team/backend#000055#2026-01-01T09:00:00Z", repo: "your-team/backend", pr_number: 55, verdict: "QUESTION", risk: "N/A", trigger: "rerequest", thumbs_up: 0, thumbs_down: 1, created_at: iso(300) }),
+];
+
+const RELEASES = [
+  {
+    repo: "your-team/web", tag: "v2.3.0", prev_tag: "v2.2.9", pr_count: 4, headline: "Faster checkout and a clearer receipt page",
+    entry_md: "Checkout is faster.", github_release_md: "## Changes\n- Faster checkout (#101)", unclear: "",
+    github_release_url: "https://github.com/your-team/web/releases/tag/v2.3.0", confluence_url: "", email_sent_at: iso(60), updated_at: iso(60),
+  },
+];
+
+const CONFIG = {
+  enabled: true, label: "ch-review", killed: false, instructions: "Watch database changes.", auto_merge: false, merge_method: "squash",
+  require_human_approval: true, auto_tag: false, tag_mode: "semver", tag_prefix: "v", tag_batch_minutes: 15, health_check: false,
+  verify_tests: false, require_tests: false, auto_labels: false, auto_label_allow: "", auto_label_requires: "", auto_label_guide: "",
+  release_notes: false, release_notes_branch: "", release_notes_confluence_space: "", release_notes_confluence_parent_id: "",
+  release_notes_confluence_container: "Changelog", release_notes_email_webhook_url: "", release_notes_email_webhook_secret_set: false,
+  release_notes_guide: "", release_notes_instructions: "", graph_enabled: false, deploy_label: "", health_log_groups: [],
+  reminders_enabled: false, teams_webhook_url: "", reminder_cooldown_hours: 4,
+};
+
+interface Backend {
+  calls: string[];
+  bodies: Record<string, unknown>[];
+  role: string;
+  empty: boolean;
+  failList: boolean;
+  failMore: boolean;
+  failConfig: boolean;
+  failOrg: boolean;
+  failDetail: boolean;
+  missingDetail: boolean;
+}
+
+async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
+  const db: Backend = {
+    calls: [], bodies: [], role: "admin", empty: false, failList: false, failMore: false,
+    failConfig: false, failOrg: false, failDetail: false, missingDetail: false, ...init,
+  };
+  const json = (route: Route, body: unknown, status = 200) =>
+    route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+  await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
+  await page.route((url) => url.hostname === "localhost" && /^\/(api|auth)\//.test(url.pathname), async (route) => {
+    const req = route.request();
+    const url = new URL(req.url());
+    const p = url.pathname;
+    db.calls.push(`${req.method()} ${p}${url.search}`);
+    if (req.method() !== "GET") db.bodies.push(JSON.parse(req.postData() || "{}"));
+    if (p === "/api/me") return json(route, { user_id: "u_1", team_id: "t_1", github_login: null, email: "someone@example.com", avatar_url: "", role: db.role });
+    if (p === "/api/usage") return json(route, { month: "2026-01", total_tokens: 0, tokens_in: 0, tokens_out: 0, total_runs: 0, max_tokens: 0 });
+    if (p === "/api/banners") return json(route, { banners: [] });
+    if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }] });
+    if (p === "/api/repos") return json(route, { repos: [{ name: "your-team/web", enabled: true, ticket_source: "github" }, { name: "your-team/backend", enabled: true, ticket_source: "github" }] });
+    if (p === "/api/aws-connections") return json(route, { connections: [] });
+    if (p === "/api/reviewer/reviews") {
+      const cursor = url.searchParams.get("cursor");
+      if (cursor) return db.failMore ? json(route, { error: "boom" }, 500) : json(route, { reviews: [], next: null });
+      if (db.failList) return json(route, { error: "boom" }, 500);
+      if (db.empty) return json(route, { reviews: [], next: null });
+      const repo = url.searchParams.get("repo");
+      const list = repo ? REVIEWS.filter((r) => r.repo === repo) : REVIEWS;
+      return json(route, { reviews: list, next: db.failMore ? "page2" : null });
+    }
+    if (p === "/api/reviewer/review") {
+      if (db.failDetail) return json(route, { error: "boom" }, 500);
+      if (db.missingDetail) return route.fulfill({ status: 404, body: "" });
+      const sk = url.searchParams.get("sk");
+      const r = REVIEWS.find((x) => x.sk === sk);
+      return r ? json(route, r) : route.fulfill({ status: 404, body: "" });
+    }
+    if (p === "/api/reviewer/review/rate") return route.fulfill({ status: 200, body: "" });
+    if (p === "/api/reviewer/re-review") return json(route, { status: "queued" });
+    if (p === "/api/reviewer/org-config") {
+      if (req.method() === "PUT") return route.fulfill({ status: 200, body: "" });
+      if (db.failOrg) return json(route, { error: "boom" }, 500);
+      return json(route, { instructions: "Never log secrets." });
+    }
+    if (p.startsWith("/api/reviewer/config/")) {
+      if (req.method() === "PUT") return db.role === "member" ? route.fulfill({ status: 403, body: "" }) : route.fulfill({ status: 200, body: "" });
+      if (db.failConfig) return json(route, { error: "boom" }, 500);
+      return json(route, CONFIG);
+    }
+    if (p === "/api/releases") {
+      if (url.searchParams.get("cursor")) return db.failMore ? json(route, { error: "boom" }, 500) : json(route, { releases: [], next: null });
+      if (db.failList) return json(route, { error: "boom" }, 500);
+      if (db.empty) return json(route, { releases: [], next: null });
+      return json(route, { releases: RELEASES, next: db.failMore ? "page2" : null });
+    }
+    if (p === "/api/releases/send") return json(route, { status: "queued" });
+    return json(route, { error: `Not mocked: ${req.method()} ${p}` }, 404);
+  });
+  return db;
+}
+
+/** Console errors and page errors. Deliberately failed responses are logged by the browser; tests that cause them pass `allowFailedLoads`. */
+function watchConsole(page: Page, allowFailedLoads = false) {
+  const errors: string[] = [];
+  page.on("console", (msg) => {
+    if (msg.type() !== "error") return;
+    const text = msg.text();
+    if (text.includes("net::ERR_ABORTED") || text.includes("net::ERR_FAILED")) return;
+    if (allowFailedLoads && text.startsWith("Failed to load resource")) return;
+    errors.push(text);
+  });
+  page.on("pageerror", (err) => errors.push(err.message));
+  return errors;
+}
+
+async function shot(page: Page, name: string) {
+  fs.mkdirSync(SHOTS_DIR, { recursive: true });
+  await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(250);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow, `${name} scrolls sideways at ${width}px`).toBeLessThanOrEqual(0);
+    await page.screenshot({ path: path.join(SHOTS_DIR, `${name}-${width}.png`), fullPage: true });
+  }
+  await page.setViewportSize({ width: 1280, height: 800 });
+}
+
+// ── Reviewer list ────────────────────────────────────────────────────
+
+test("the reviewer list groups reviews by PR and says what started each in words", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page);
+  await page.goto("/reviewer");
+  await expect(page.getByRole("heading", { level: 1, name: "Reviewer" })).toBeVisible();
+  const prLink = page.getByRole("link", { name: /your-team\/web #101/ });
+  await expect(prLink).toHaveAttribute("href", /\/reviewer\/detail\/?\?sk=REVIEW%23your-team%2Fweb%23000101/);
+  await expect(page.getByText("Approved").first()).toBeVisible();
+  await expect(page.getByText("Low risk")).toBeVisible();
+  await expect(page.getByText("Label added")).toBeVisible();
+  await expect(page.getByText("labeled", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Asked again")).toBeVisible();
+  // The earlier review of the same PR opens under it, with a named toggle.
+  const toggle = page.getByRole("button", { name: /Show earlier reviews of your-team\/web #101/ });
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await toggle.click();
+  await expect(page.getByRole("button", { name: /Hide earlier reviews/ })).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("link", { name: "New commits" })).toBeVisible();
+  await expect(page.getByText("High risk")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Pull request number" })).toBeVisible();
+  await shot(page, "audit-reviewer-list");
+  expect(errors).toEqual([]);
+});
+
+test("a failed reviews load says so and retries, instead of claiming there are none", async ({ page }) => {
+  const errors = watchConsole(page, true);
+  const db = await mockApi(page, { failList: true });
+  await page.goto("/reviewer");
+  await expect(page.getByText("Could not load reviews")).toBeVisible();
+  await expect(page.getByText("No reviews yet")).toHaveCount(0);
+  await shot(page, "audit-reviewer-list-error");
+  db.failList = false;
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByRole("link", { name: /your-team\/web #101/ })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("an empty reviewer list points to the settings", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page, { empty: true });
+  await page.goto("/reviewer");
+  await expect(page.getByText("No reviews yet")).toBeVisible();
+  await expect(page.getByRole("main").getByRole("link", { name: "Configure" }).last()).toHaveAttribute("href", /\/reviewer\/config/);
+  await shot(page, "audit-reviewer-empty");
+  expect(errors).toEqual([]);
+});
+
+test("a failed next page of reviews says so and offers to try again", async ({ page }) => {
+  const errors = watchConsole(page, true);
+  await mockApi(page, { failMore: true });
+  await page.goto("/reviewer");
+  await page.getByRole("button", { name: "Load more" }).click();
+  await expect(page.getByText("The next page did not load.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("?repo= opens the reviewer list filtered to that repo", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page);
+  await page.goto("/reviewer?repo=your-team%2Fbackend");
+  await expect(page.getByRole("link", { name: /your-team\/backend #55/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /your-team\/web #101/ })).toHaveCount(0);
+  expect(db.calls.filter((c) => c.startsWith("GET /api/reviewer/reviews")).every((c) => c.includes("repo=your-team%2Fbackend"))).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+// ── Review detail ────────────────────────────────────────────────────
+
+test("a review page shows the verdict, risk and trigger in words and rates once", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page);
+  await page.goto(`/reviewer/detail?sk=${encodeURIComponent(REVIEWS[0].sk)}`);
+  await expect(page.getByRole("heading", { level: 1, name: /your-team\/web #101/ })).toBeVisible();
+  await expect(page.getByText("Approved")).toBeVisible();
+  await expect(page.getByText("Low risk")).toBeVisible();
+  await expect(page.getByText(/started by: label added/)).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Leave a note so the reviewer learns" })).toBeVisible();
+  await shot(page, "audit-reviewer-detail");
+  const helpful = page.getByRole("button", { name: /Helpful/ }).first();
+  await helpful.click();
+  await expect(page.getByText("Thanks, your rating is saved.")).toBeVisible();
+  // A second press would count the same person twice.
+  await expect(helpful).toBeDisabled();
+  await expect(page.getByRole("button", { name: /Not helpful/ })).toBeDisabled();
+  expect(db.bodies.filter((b) => b.rating === "up")).toHaveLength(1);
+  expect(errors).toEqual([]);
+});
+
+test("a review page with no ?sk says the link is wrong instead of loading forever", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page);
+  await page.goto("/reviewer/detail");
+  await expect(page.getByText("Review not found")).toBeVisible();
+  await expect(page.getByRole("link", { name: "See all reviews" })).toHaveAttribute("href", /\/reviewer\/?$/);
+  expect(db.calls.some((c) => c.includes("/api/reviewer/review?"))).toBe(false);
+  await shot(page, "audit-reviewer-detail-missing");
+  expect(errors).toEqual([]);
+});
+
+test("a review that does not exist says not found", async ({ page }) => {
+  const errors = watchConsole(page, true);
+  await mockApi(page, { missingDetail: true });
+  await page.goto("/reviewer/detail?sk=REVIEW%23gone");
+  await expect(page.getByText("Review not found")).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("a review that fails to load offers to try again", async ({ page }) => {
+  const errors = watchConsole(page, true);
+  const db = await mockApi(page, { failDetail: true });
+  await page.goto(`/reviewer/detail?sk=${encodeURIComponent(REVIEWS[0].sk)}`);
+  await expect(page.getByText("Could not load this review")).toBeVisible();
+  db.failDetail = false;
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: /your-team\/web #101/ })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+// ── Reviewer settings ────────────────────────────────────────────────
+
+test("reviewer settings load for a repo, with labelled fields and switches", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page);
+  await page.goto("/reviewer/config?repo=your-team%2Fweb");
+  await expect(page.getByRole("heading", { level: 1, name: "Reviewer settings" })).toBeVisible();
+  await expect(page.getByRole("switch", { name: /Enable reviewer for this repo/ })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("textbox", { name: "Trigger label" })).toHaveValue("ch-review");
+  await expect(page.getByRole("textbox", { name: "Review standards for every repo" })).toHaveValue("Never log secrets.");
+  await page.getByRole("button", { name: /Actions after approval/ }).click();
+  await expect(page.getByRole("combobox", { name: "Merge method" })).toBeVisible();
+  await shot(page, "audit-reviewer-config");
+  expect(errors).toEqual([]);
+});
+
+test("reviewer settings with no repo picked explain what to do", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page);
+  await page.goto("/reviewer/config");
+  await expect(page.getByText(/Pick a repository above/)).toBeVisible();
+  await shot(page, "audit-reviewer-config-empty");
+  expect(errors).toEqual([]);
+});
+
+test("a failed settings load hides the form so defaults cannot overwrite saved settings", async ({ page }) => {
+  const errors = watchConsole(page, true);
+  const db = await mockApi(page, { failConfig: true });
+  await page.goto("/reviewer/config?repo=your-team%2Fweb");
+  await expect(page.getByText("Could not load the settings for your-team/web")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save settings" })).toHaveCount(0);
+  await shot(page, "audit-reviewer-config-error");
+  db.failConfig = false;
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByRole("textbox", { name: "Trigger label" })).toHaveValue("ch-review");
+  expect(db.calls.some((c) => c.startsWith("PUT /api/reviewer/config/"))).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test("a failed load of the shared review standards turns their save off", async ({ page }) => {
+  const errors = watchConsole(page, true);
+  const db = await mockApi(page, { failOrg: true });
+  await page.goto("/reviewer/config");
+  await expect(page.getByText("Could not load the review standards")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save standards" })).toHaveCount(0);
+  db.failOrg = false;
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByRole("textbox", { name: "Review standards for every repo" })).toHaveValue("Never log secrets.");
+  expect(errors).toEqual([]);
+});
+
+test("a Teams webhook that is not https is caught before saving", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page);
+  await page.goto("/reviewer/config?repo=your-team%2Fweb");
+  await page.getByRole("switch", { name: /Remind reviewers in Microsoft Teams/ }).click();
+  await page.getByRole("textbox", { name: "Teams incoming webhook URL" }).fill("http://example.com/hook");
+  await page.getByRole("button", { name: "Save settings" }).click();
+  await expect(page.getByText("The Teams webhook URL must start with https://.")).toBeVisible();
+  expect(db.calls.some((c) => c.startsWith("PUT /api/reviewer/config/"))).toBe(false);
+  await page.getByRole("textbox", { name: "Teams incoming webhook URL" }).fill("https://example.com/hook");
+  await page.getByRole("button", { name: "Save settings" }).click();
+  await expect(page.getByText("Reviewer settings saved")).toBeVisible();
+  expect(db.calls.some((c) => c.startsWith("PUT /api/reviewer/config/your-team/web"))).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test("members see reviewer settings read only, without save buttons that would fail", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page, { role: "member" });
+  await page.goto("/reviewer/config?repo=your-team%2Fweb");
+  await expect(page.getByText("You can view these settings")).toBeVisible();
+  await expect(page.getByRole("switch", { name: /Enable reviewer for this repo/ })).toBeDisabled();
+  await expect(page.getByRole("textbox", { name: "Trigger label" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Save settings" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Save standards" })).toHaveCount(0);
+  await shot(page, "audit-reviewer-config-member");
+  expect(errors).toEqual([]);
+});
+
+// ── Releases ─────────────────────────────────────────────────────────
+
+test("releases list each tag and open its notes and actions", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page);
+  await page.goto("/releases");
+  await expect(page.getByRole("heading", { level: 1, name: "Releases" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Reviewer settings" })).toHaveAttribute("href", /\/reviewer\/config/);
+  const row = page.getByRole("button", { name: /your-team\/web v2\.3\.0/ });
+  await expect(row).toHaveAttribute("aria-expanded", "false");
+  await row.click();
+  await expect(row).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("button", { name: "Rewrite and publish again" })).toBeVisible();
+  await page.getByRole("button", { name: "Send email again" }).click();
+  await expect(page.getByText("Email queued for your-team/web v2.3.0")).toBeVisible();
+  expect(db.bodies).toContainEqual({ repo: "your-team/web", tag: "v2.3.0", resend: "email" });
+  await shot(page, "audit-releases");
+  expect(errors).toEqual([]);
+});
+
+test("a failed releases load says so and retries, instead of claiming there are none", async ({ page }) => {
+  const errors = watchConsole(page, true);
+  const db = await mockApi(page, { failList: true });
+  await page.goto("/releases");
+  await expect(page.getByText("Could not load release notes")).toBeVisible();
+  await expect(page.getByText("No release notes yet")).toHaveCount(0);
+  await shot(page, "audit-releases-error");
+  db.failList = false;
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByRole("button", { name: /your-team\/web v2\.3\.0/ })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("an empty releases list says when notes appear", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page, { empty: true });
+  await page.goto("/releases");
+  await expect(page.getByText("No release notes yet")).toBeVisible();
+  await shot(page, "audit-releases-empty");
+  expect(errors).toEqual([]);
+});
+
+test("a tag with characters the backend refuses is caught before sending", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page);
+  await page.goto("/releases");
+  await page.getByRole("button", { name: /Select repo/ }).first().click();
+  await page.getByRole("button", { name: "your-team/web", exact: true }).click();
+  const tag = page.getByRole("textbox", { name: "Release tag" });
+  await tag.fill("v2.3.0!");
+  await expect(page.getByText("A tag can use letters, numbers and . _ - + / only.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Write notes" })).toBeDisabled();
+  await tag.fill("v2.3.1");
+  await page.getByRole("button", { name: "Write notes" }).click();
+  await expect(page.getByText("Release notes queued for your-team/web v2.3.1")).toBeVisible();
+  expect(db.bodies).toContainEqual({ repo: "your-team/web", tag: "v2.3.1", resend: "" });
+  expect(errors).toEqual([]);
+});

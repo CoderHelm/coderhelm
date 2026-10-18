@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { secondaryButton } from "./ui";
 
 /**
  * A list read page by page from a cursor-paginated endpoint. Changing `deps`
@@ -16,6 +17,7 @@ export function usePagedList<T>(
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(false);
+  const [moreFailed, setMoreFailed] = useState(false);
   const generation = useRef(0);
   const fetchRef = useRef(fetchPage);
   fetchRef.current = fetchPage;
@@ -24,6 +26,7 @@ export function usePagedList<T>(
     const gen = ++generation.current;
     setLoading(true);
     setError(false);
+    setMoreFailed(false);
     fetchRef
       .current()
       .then((p) => {
@@ -49,6 +52,7 @@ export function usePagedList<T>(
     if (!next || loadingMore) return;
     const gen = generation.current;
     setLoadingMore(true);
+    setMoreFailed(false);
     fetchRef
       .current(next)
       .then((p) => {
@@ -56,31 +60,38 @@ export function usePagedList<T>(
         setItems((prev) => [...prev, ...p.items]);
         setNext(p.next ?? null);
       })
-      .catch(() => {})
+      .catch(() => {
+        // Keep `next` so the button can try the same page again.
+        if (gen === generation.current) setMoreFailed(true);
+      })
       .finally(() => setLoadingMore(false));
   }, [next, loadingMore]);
 
-  return { items, next, loading, loadingMore, error, loadMore, reload };
+  return { items, next, loading, loadingMore, error, moreFailed, loadMore, reload };
 }
 
 export function LoadMoreButton({
   hasMore,
   loading,
   onClick,
+  failed = false,
 }: {
   hasMore: boolean;
   loading: boolean;
   onClick: () => void;
+  /** The last "load more" failed; say so and offer the same page again. */
+  failed?: boolean;
 }) {
   if (!hasMore) return null;
   return (
-    <div className="mt-4 flex justify-center">
-      <button
-        onClick={onClick}
-        disabled={loading}
-        className="text-sm px-4 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 disabled:opacity-50 transition-colors"
-      >
-        {loading ? "Loading…" : "Load more"}
+    <div className="mt-4 flex flex-col items-center gap-2">
+      {failed && !loading && (
+        <p role="alert" className="text-sm text-red-400">
+          The next page did not load.
+        </p>
+      )}
+      <button type="button" onClick={onClick} disabled={loading} className={secondaryButton}>
+        {loading ? "Loading…" : failed ? "Try again" : "Load more"}
       </button>
     </div>
   );

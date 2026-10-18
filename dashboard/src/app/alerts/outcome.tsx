@@ -1,11 +1,11 @@
-/** What CoderHelm did with an alert, as a badge. */
+/** What Coderhelm did with an alert, as a badge. */
 export const OUTCOMES: Record<
   string,
   { label: string; detail: string; cls: string }
 > = {
   run_started: {
     label: "Run started",
-    detail: "CoderHelm started a run on the mapped repo to act on this alert.",
+    detail: "Coderhelm started a run on the mapped repo to act on this alert.",
     cls: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
   },
   duplicate: {
@@ -84,7 +84,7 @@ export const OUTCOMES: Record<
 
 export function OutcomeBadge({ outcome }: { outcome: string }) {
   const o = OUTCOMES[outcome] ?? {
-    label: outcome,
+    label: humanize(outcome),
     cls: "bg-zinc-800 border-zinc-700 text-zinc-400",
   };
   return (
@@ -101,3 +101,18 @@ export function formatWhen(iso?: string | null): string {
   const d = new Date(iso);
   return isNaN(d.getTime()) ? "—" : d.toLocaleString();
 }
+
+/** "run_started" becomes "Run started", for values this page doesn't know yet. */
+export function humanize(value?: string | null): string {
+  if (!value) return "—";
+  const words = value.replace(/[_-]+/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** Where an alert came from, in words. Mirrors the platform's alert kinds. */
+export const KIND_LABEL: Record<string, string> = {
+  cloudwatch_alarm: "CloudWatch alarm",
+  chatbot_custom: "Custom notification",
+  eventbridge: "EventBridge event",
+  message: "Message",
+};

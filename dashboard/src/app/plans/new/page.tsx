@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
+import { Suspense, useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, type Repo, type Template } from "@/lib/api";
 import { useToast } from "@/components/toast";
@@ -13,6 +14,7 @@ import { ToolCallCard } from "@/components/tool-call-card";
 import { StreamingCursor } from "@/components/streaming-cursor";
 import { useSmartScroll, ScrollPill } from "@/components/smart-scroll";
 import { SquareIcon, RefreshIcon, ZapIcon, PenIcon, CheckIcon, XIcon, CopyIcon } from "@/components/stream-icons";
+import { focusRing } from "@/components/ui";
 
 interface DraftTask {
   title: string;
@@ -123,8 +125,10 @@ function MessageCopyButton({ text }: { text: string }) {
           setTimeout(() => setCopied(false), 1500);
         });
       }}
-      className="p-1 text-zinc-600 hover:text-zinc-400 transition-colors opacity-0 group-hover/msg:opacity-100 cursor-pointer"
-      title={copied ? "Copied!" : "Copy message"}
+      type="button"
+      aria-label={copied ? "Copied" : "Copy message"}
+      className={`p-1 rounded text-zinc-600 hover:text-zinc-400 transition-colors opacity-0 group-hover/msg:opacity-100 focus-visible:opacity-100 cursor-pointer ${focusRing}`}
+      title={copied ? "Copied" : "Copy message"}
     >
       {copied ? <CheckIcon /> : <CopyIcon />}
     </button>
@@ -181,6 +185,7 @@ const EditableUserBubble = memo(function EditableUserBubble({
             }}
             autoFocus
             rows={3}
+            aria-label="Edit your message"
             className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-600 rounded-xl text-sm text-zinc-100 focus:outline-none focus:border-zinc-500 resize-none"
           />
           <div className="flex justify-end gap-2 mt-1.5">
@@ -211,8 +216,10 @@ const EditableUserBubble = memo(function EditableUserBubble({
         {textContent}
         {!disabled && (
           <button
+            type="button"
             onClick={startEdit}
-            className="absolute -left-8 top-1/2 -translate-y-1/2 p-1 text-zinc-600 hover:text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+            aria-label="Edit message"
+            className={`absolute -left-8 top-1/2 -translate-y-1/2 p-1 rounded text-zinc-600 hover:text-zinc-400 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity cursor-pointer ${focusRing}`}
             title="Edit message"
           >
             <PenIcon />
@@ -296,7 +303,7 @@ const MessageBubble = memo(function MessageBubble({ msg }: { msg: StreamMessage 
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Plan generated — see preview
+              Plan ready, see the preview
             </span>
           </div>
         )}
@@ -331,12 +338,22 @@ const MessageBubble = memo(function MessageBubble({ msg }: { msg: StreamMessage 
 // Main page
 // ---------------------------------------------------------------------------
 
+// useSearchParams needs a Suspense boundary in a static export.
 export default function NewPlanPage() {
+  return (
+    <Suspense fallback={<p className="text-sm text-zinc-500">Loading…</p>}>
+      <NewPlan />
+    </Suspense>
+  );
+}
+
+function NewPlan() {
   const { messages, status, error, send, stop, retry, clear, editAndResend } = useStreamingChat();
   const [input, setInput] = useState("");
   const [draft, setDraft] = useState<DraftPlan | null>(null);
   const [saving, setSaving] = useState(false);
   const [destination, setDestination] = useState<"github" | "jira">("github");
+  const [jiraReady, setJiraReady] = useState(false);
   const [repos, setRepos] = useState<Repo[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [usingTemplate, setUsingTemplate] = useState<string | null>(null);
@@ -364,6 +381,7 @@ export default function NewPlanPage() {
   useEffect(() => {
     prefetchStreamToken();
     api.getWorkflowSettings().then((s) => setDestination(s.default_destination ?? "github")).catch(() => {});
+    api.getJiraCheck().then((c) => setJiraReady(c.ready)).catch(() => {});
     api.listRepos().then((r) => setRepos(r.repos.filter((repo) => repo.enabled))).catch(() => {});
     api.listTemplates({ limit: 6 }).then((data) => setTemplates(data.templates)).catch(() => {});
   }, []);
@@ -426,13 +444,15 @@ export default function NewPlanPage() {
         for (const s of messageServers(msg)) usedServers.add(s);
       }
       const mcp_servers = usedServers.size > 0 ? Array.from(usedServers) : undefined;
-      const { plan_id } = await api.createPlan({ ...draft, destination, mcp_servers });
+      // A Jira default with no working Jira connection would make tickets that never send.
+      const dest = destination === "jira" && !jiraReady ? "github" : destination;
+      const { plan_id } = await api.createPlan({ ...draft, destination: dest, mcp_servers });
       clear();
       setDraft(null);
-      toast("Plan created!");
+      toast("Plan saved");
       router.push(`/plans/detail?id=${plan_id}`);
     } catch {
-      toast("Failed to save plan", "error");
+      toast("Couldn't save the plan", "error");
       setSaving(false);
     }
   };
@@ -474,7 +494,7 @@ export default function NewPlanPage() {
       const { plan_id } = await api.useTemplate(templateId, {});
       router.push(`/plans/detail?id=${plan_id}`);
     } catch {
-      toast("Failed to create plan from template", "error");
+      toast("Couldn't create a plan from this template", "error");
       setUsingTemplate(null);
     }
   };
@@ -482,9 +502,10 @@ export default function NewPlanPage() {
   const isActive = status === "submitted" || status === "streaming";
 
   return (
-    <div className="max-w-4xl flex flex-col h-[calc(100vh-4rem)]">
+    <div className="max-w-4xl flex flex-col md:h-[calc(100vh-4rem)]">
+      <h1 className="sr-only">New plan</h1>
       <div className="flex items-center gap-3 mb-4">
-        <a href="/plans" className="text-zinc-500 hover:text-zinc-300 text-sm">← Plans</a>
+        <Link href="/plans" className={`text-zinc-500 hover:text-zinc-300 text-sm rounded ${focusRing}`}>← Plans</Link>
         {messages.length > 1 && (
           <button
             onClick={() => {
@@ -492,39 +513,42 @@ export default function NewPlanPage() {
               setDraft(null);
               setInput("");
             }}
+            type="button"
             disabled={isActive}
-            className="ml-auto px-3 py-1.5 text-sm text-zinc-400 border border-zinc-700 rounded-lg hover:text-zinc-200 hover:border-zinc-600 transition-colors cursor-pointer disabled:opacity-50"
+            className={`ml-auto px-3 py-1.5 text-sm text-zinc-400 border border-zinc-700 rounded-lg hover:text-zinc-200 hover:border-zinc-600 transition-colors cursor-pointer disabled:opacity-50 ${focusRing}`}
           >
             Start over
           </button>
         )}
       </div>
 
-      <div className="flex gap-6 flex-1 min-h-0">
+      <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0">
         {/* Chat panel */}
-        <div className="flex flex-col flex-1 min-h-0 relative">
+        <div className="flex flex-col flex-1 h-[70vh] md:h-auto md:min-h-0 min-w-0 relative">
           <div className="px-3 py-2 mb-2 text-xs text-zinc-500 bg-zinc-900/50 border border-zinc-800 rounded-lg">
             Responses are AI-generated and may contain errors. Review all suggestions carefully.
           </div>
 
-          {messages.length === 0 && templates.length > 0 && (
+          {/* The chat always opens with one greeting, so a fresh chat has one message. */}
+          {messages.length <= 1 && templates.length > 0 && (
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs text-zinc-600">Quick start from a template</p>
-                <a href="/plans/templates" className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
+                <p className="text-xs text-zinc-500">Start from a template</p>
+                <Link href="/plans/templates" className={`text-xs text-zinc-500 hover:text-zinc-300 rounded transition-colors ${focusRing}`}>
                   View all →
-                </a>
+                </Link>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {templates.map((t) => (
                   <button
                     key={t.template_id}
+                    type="button"
                     onClick={() => handleUseTemplate(t.template_id)}
                     disabled={usingTemplate === t.template_id}
-                    className="text-left p-3 rounded-lg border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800/50 transition-colors disabled:opacity-50"
+                    className={`text-left p-3 rounded-lg border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800/50 transition-colors disabled:opacity-50 min-w-0 ${focusRing}`}
                   >
                     <div className="text-sm font-medium text-zinc-300 truncate">{t.title}</div>
-                    <div className="text-xs text-zinc-600 mt-0.5">{t.task_count} tasks · Used {t.usage_count}×</div>
+                    <div className="text-xs text-zinc-500 mt-0.5">{t.task_count} task{t.task_count === 1 ? "" : "s"} · used {t.usage_count} time{t.usage_count === 1 ? "" : "s"}</div>
                   </button>
                 ))}
               </div>
@@ -546,8 +570,9 @@ export default function NewPlanPage() {
           {/* Error + retry bar */}
           {status === "error" && error && (
             <div className="flex items-center gap-2 px-3 py-2 mb-2 text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 rounded-lg">
-              <span className="text-zinc-500">Failed: {error}</span>
+              <span className="text-zinc-400 min-w-0 break-words" role="alert">Couldn&apos;t get a reply: {error}</span>
               <button
+                type="button"
                 onClick={retry}
                 className="ml-auto flex items-center gap-1 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
               >
@@ -580,10 +605,11 @@ export default function NewPlanPage() {
                   handleSend();
                 }
               }}
-              placeholder="Describe what you want to build... (Enter to send)"
+              aria-label="Message"
+              placeholder="Describe what you want to build (Enter to send)"
               rows={2}
               disabled={isActive}
-              className="flex-1 px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 resize-none disabled:opacity-50"
+              className="flex-1 min-w-0 px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 resize-none disabled:opacity-50"
             />
             {isActive ? (
               <button
@@ -608,7 +634,7 @@ export default function NewPlanPage() {
 
         {/* Draft plan panel */}
         {(draft || isStreamingPlan) && (
-          <div className="w-96 flex-shrink-0 flex flex-col min-h-0">
+          <div className="w-full md:w-96 flex-shrink-0 flex flex-col min-h-0">
             <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-4 overflow-y-auto flex-1">
               {isStreamingPlan && !draft ? (
                 /* Live incremental plan while JSON is streaming in */
@@ -745,9 +771,11 @@ export default function NewPlanPage() {
                     <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Destination</p>
                     <div className="flex gap-2">
                       <button
+                        type="button"
+                        aria-pressed={destination === "github" || !jiraReady}
                         onClick={() => setDestination("github")}
                         className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors cursor-pointer ${
-                          destination === "github"
+                          destination === "github" || !jiraReady
                             ? "border-zinc-600 bg-zinc-800 text-zinc-100"
                             : "border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
                         }`}
@@ -756,9 +784,13 @@ export default function NewPlanPage() {
                         GitHub Issues
                       </button>
                       <button
+                        type="button"
+                        aria-pressed={destination === "jira" && jiraReady}
+                        disabled={!jiraReady}
+                        title={jiraReady ? undefined : "Connect Jira in settings first"}
                         onClick={() => setDestination("jira")}
-                        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors cursor-pointer ${
-                          destination === "jira"
+                        className={`disabled:opacity-40 disabled:cursor-not-allowed flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors cursor-pointer ${
+                          destination === "jira" && jiraReady
                             ? "border-zinc-600 bg-zinc-800 text-zinc-100"
                             : "border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
                         }`}
@@ -770,13 +802,14 @@ export default function NewPlanPage() {
                   </div>
 
                   <button
+                    type="button"
                     onClick={savePlan}
                     disabled={saving}
                     className="w-full px-4 py-2.5 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-50 cursor-pointer"
                   >
                     {saving ? "Saving..." : "Save plan"}
                   </button>
-                  <p className="text-xs text-zinc-500 text-center">You can edit tasks before executing</p>
+                  <p className="text-xs text-zinc-500 text-center">You can still edit tasks before the plan starts</p>
                 </>
               ) : null}
             </div>

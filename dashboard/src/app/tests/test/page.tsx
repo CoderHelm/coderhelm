@@ -38,7 +38,7 @@ function TestDetail() {
   const { confirm } = useConfirm();
   const [isAdmin, setIsAdmin] = useState(false);
   const [busy, setBusy] = useState("");
-  const { data, setData, error, loading, reload } = useLoad(() => api.getTest(id), `test:${id}`);
+  const { data, setData, error, loading, reload } = useLoad(() => (id ? api.getTest(id) : Promise.resolve(null)), `test:${id}`);
 
   useEffect(() => {
     api.me().then((u) => setIsAdmin(ADMIN_ROLES.has(u.role))).catch(() => setIsAdmin(false));

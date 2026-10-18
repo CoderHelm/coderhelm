@@ -1,5 +1,34 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
 
+/**
+ * Words for a failed request when the server sent no message of its own (the
+ * gateway often answers with a bare status). Pages used to show
+ * "API 500: Internal Server Error". The code stays in the text, because some
+ * pages pick their own message by it ("403", "409").
+ */
+export function httpErrorMessage(status: number): string {
+  if (status === 401) return "You are signed out. Sign in again (error 401).";
+  if (status === 403) return "Your role does not allow this. Ask an admin on your team (error 403).";
+  if (status === 404) return "Not found. It may have been deleted (error 404).";
+  if (status === 409) return "That conflicts with the current state. Refresh and try again (error 409).";
+  if (status === 429) return "Too many requests, or the token limit is reached. Wait a moment and try again (error 429).";
+  if (status >= 500) return `The server had a problem. Try again in a moment (error ${status}).`;
+  return `The request was not accepted (error ${status}).`;
+}
+
+/** A failed request, with its HTTP status for pages that branch on it. */
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+/** The HTTP status of a failed request, if `e` is one. */
+export function errorStatus(e: unknown): number | undefined {
+  return e instanceof ApiError ? e.status : undefined;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -16,7 +45,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     try {
       serverMsg = body ? JSON.parse(body).error || "" : "";
     } catch {}
-    throw new Error(serverMsg || `API ${res.status}: ${res.statusText}`);
+    throw new ApiError(serverMsg || httpErrorMessage(res.status), res.status);
   }
   const text = await res.text();
   return text ? JSON.parse(text) : (undefined as T);
@@ -46,7 +75,7 @@ async function requestWithBody<T, E>(
     body = text ? JSON.parse(text) : {};
   } catch {}
   if (!res.ok) {
-    const error = typeof body.error === "string" && body.error ? body.error : `API ${res.status}: ${res.statusText}`;
+    const error = typeof body.error === "string" && body.error ? body.error : httpErrorMessage(res.status);
     return { ...(body as Partial<E>), ok: false, error };
   }
   return { ...(body as T), ok: true };
@@ -106,7 +135,7 @@ export const api = {
   // Allowlist
   listAllowlist: () => request<{ emails: string[] }>("/api/allowlist"),
   addToAllowlist: (email: string) =>
-    request<{ status: string }>("/api/allowlist", {
+    request<{ status: string; email: string }>("/api/allowlist", {
       method: "POST",
       body: JSON.stringify({ email }),
     }),
@@ -363,8 +392,9 @@ export const api = {
 
   // Plans
   listPlans: (cursor?: string) =>
-    request<{ plans: Plan[]; next_cursor?: string }>(
-      `/api/plans${cursor ? `?cursor=${cursor}` : ""}`,
+    request<{ plans: Plan[]; next_cursor?: string | null }>(
+      // The cursor is a sort key like "PLAN#01…": unencoded, "#" starts a URL fragment.
+      `/api/plans${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
     ),
   planChat: (messages: { role: string; content: string }[]) =>
     request<{ content: string; mcp_servers?: string[] }>("/api/plans/chat", {
@@ -1216,7 +1246,7 @@ export interface Plan {
   description: string;
   repo: string;
   destination?: "github" | "jira" | string;
-  status: "draft" | "executing" | "done" | string;
+  status: "draft" | "executing" | "waiting" | "done" | string;
   task_count: number;
   tokens_in?: number;
   tokens_out?: number;
@@ -1242,6 +1272,7 @@ export interface Task {
     | "running"
     | "done"
     | "waiting"
+    | "failed"
     | string;
   order: number;
   repo?: string;
@@ -1284,7 +1315,7 @@ export interface Template {
 
 export interface InfraFinding {
   severity: "error" | "warning" | "info";
-  category: "security" | "performance" | "reliability";
+  category: "security" | "performance" | "cost" | "reliability";
   title: string;
   detail: string;
   file?: string;

@@ -2,15 +2,21 @@
 
 import { useEffect, useState, useRef } from "react";
 import { type Repo } from "@/lib/api";
+import { focusRing } from "./ui";
 
 export function RepoCombobox({
   repos,
   selected,
   onSelect,
+  label = "Repository",
+  id,
 }: {
   repos: Repo[];
   selected: string;
   onSelect: (name: string) => void;
+  /** Spoken name of the picker; a visible <label htmlFor={id}> also works. */
+  label?: string;
+  id?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -20,8 +26,13 @@ export function RepoCombobox({
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", onKey);
+    };
   }, []);
 
   const filtered = repos.filter((r) =>
@@ -33,11 +44,17 @@ export function RepoCombobox({
     <div ref={ref} className="relative mb-4">
       <button
         type="button"
+        id={id}
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 hover:border-zinc-500 transition-colors"
+        aria-haspopup="true"
+        aria-expanded={open}
+        className={`w-full flex items-center justify-between gap-2 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 hover:border-zinc-500 transition-colors ${focusRing}`}
       >
-        <span className="font-mono truncate">{selected || "Select repo..."}</span>
-        <svg className={`w-4 h-4 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <span className="font-mono truncate">
+          <span className="sr-only">{label}: </span>
+          {selected || "Select repo..."}
+        </span>
+        <svg aria-hidden="true" className={`w-4 h-4 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
@@ -50,6 +67,7 @@ export function RepoCombobox({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search repos..."
+              aria-label="Search repos"
               autoFocus
               className="w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
             />
@@ -62,12 +80,13 @@ export function RepoCombobox({
                 <button
                   key={r.name}
                   type="button"
+                  aria-current={r.name === selected ? "true" : undefined}
                   onClick={() => {
                     onSelect(r.name);
                     setOpen(false);
                     setSearch("");
                   }}
-                  className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                  className={`w-full text-left px-3 py-2 text-sm transition-colors break-all ${focusRing} ${
                     r.name === selected
                       ? "bg-zinc-800 text-zinc-100"
                       : "text-zinc-300 hover:bg-zinc-800/50"

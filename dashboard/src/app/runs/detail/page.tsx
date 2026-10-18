@@ -3,32 +3,50 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, type RunDetail, type Openspec, type UsageInfo, type EnabledPlugin, type PluginDef, type PassTrace, type AgentLogPass } from "@/lib/api";
+import { api, type RunDetail, type Openspec, type UsageInfo, type PluginDef, type PassTrace, type AgentLogPass, errorStatus } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm-dialog";
+import { Callout } from "@/components/callout";
 import { Markdown } from "@/components/markdown";
+import { focusRing, primaryButton, secondaryButton } from "@/components/ui";
+import { RunStatusBadge, runIsLive } from "@/components/run-status";
 import { TeamAgentAsks } from "./team-asks";
 
 const PASSES = ["triage", "plan", "implement", "test", "security", "pr", "review"];
 
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { dot: string; text: string; bg: string }> = {
-    running: { dot: "bg-blue-400", text: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20" },
-    awaiting_ci: { dot: "bg-cyan-400", text: "text-cyan-400", bg: "bg-cyan-500/10 border-cyan-500/20" },
-    completed: { dot: "bg-emerald-400", text: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
-    failed: { dot: "bg-red-400", text: "text-red-400", bg: "bg-red-500/10 border-red-500/20" },
-    pending: { dot: "bg-yellow-400", text: "text-yellow-400", bg: "bg-yellow-500/10 border-yellow-500/20" },
-    archived: { dot: "bg-zinc-500", text: "text-zinc-500", bg: "bg-zinc-800/50 border-zinc-700/50" },
-    cancelled: { dot: "bg-amber-400", text: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },
-    retried: { dot: "bg-zinc-400", text: "text-zinc-400", bg: "bg-zinc-500/10 border-zinc-500/20" },
-  };
-  const s = map[status] ?? { dot: "bg-zinc-500", text: "text-zinc-400", bg: "bg-zinc-800 border-zinc-700" };
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap ${s.bg} ${s.text}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${s.dot} ${status === "running" || status === "awaiting_ci" ? "animate-pulse" : ""}`} />
-      {status === "awaiting_ci" ? "Awaiting CI" : status}
-    </span>
-  );
+/** Words people read for each step name the worker records. */
+const PASS_LABEL: Record<string, string> = {
+  triage: "Triage",
+  plan: "Plan",
+  implement: "Build",
+  test: "Test",
+  security: "Security",
+  pr: "Pull request",
+  review: "Review",
+  feedback: "Feedback",
+  ci_fix: "CI fix",
+};
+
+function passLabel(raw: string): string {
+  const [base, n] = raw.split(":");
+  const word = PASS_LABEL[base] ?? (base.charAt(0).toUpperCase() + base.slice(1)).replace(/_/g, " ");
+  return n ? `${word} #${n}` : word;
+}
+
+/** Still working: keep refreshing. Queued runs are about to start, so they refresh too. */
+const isActive = (status: string) => runIsLive(status) || status === "queued";
+
+const ROLE_LEVEL: Record<string, number> = { viewer: 0, member: 1, billing: 2, admin: 3, owner: 4 };
+
+/** Plain words for a failed run action. The gateway answers with a bare status code. */
+function actionError(e: unknown, what: string): string {
+  const msg = e instanceof Error ? e.message : "";
+  if (msg.includes("403")) return `Only members can ${what}. Ask an admin for member access.`;
+  if (msg.includes("429")) return "The monthly token limit is reached, so no new work can start.";
+  if (msg.includes("409")) return "The pull request is already merged.";
+  if (msg.includes("400")) return `This run can't ${what} in its current state. Refresh the page to see where it is now.`;
+  return `Couldn't ${what}. Try again in a moment.`;
 }
 
 function PassProgress({ currentPass, status, passHistory }: { currentPass?: string; status: string; passHistory?: { pass: string }[] }) {
@@ -38,18 +56,18 @@ function PassProgress({ currentPass, status, passHistory }: { currentPass?: stri
     const idx = PASSES.indexOf(entry.pass);
     if (idx > maxIdx) maxIdx = idx;
   });
-  const doneIdx = status === "completed" ? PASSES.length : maxIdx;
+  const doneIdx = ["completed", "merged", "success"].includes(status) ? PASSES.length : maxIdx;
   const awaiting = status === "awaiting_ci";
   return (
-    <div className="flex items-center gap-1">
+    <ol aria-label="Steps" className="flex flex-wrap items-center gap-y-2">
       {PASSES.map((pass, i) => {
         const done = i < doneIdx;
         const active = i === doneIdx && (status === "running" || awaiting);
         const failed = status === "failed" && i === doneIdx;
         return (
-          <div key={pass} className="flex items-center">
+          <li key={pass} className="flex items-center" aria-current={active ? "step" : undefined}>
             {i > 0 && (
-              <div className={`w-6 h-px ${done ? "bg-emerald-500/50" : active ? (awaiting ? "bg-cyan-500/30" : "bg-blue-500/30") : "bg-zinc-700/60"}`} />
+              <div aria-hidden="true" className={`w-3 sm:w-6 h-px ${done ? "bg-emerald-500/50" : active ? (awaiting ? "bg-cyan-500/30" : "bg-blue-500/30") : "bg-zinc-700/60"}`} />
             )}
             <div
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
@@ -63,7 +81,7 @@ function PassProgress({ currentPass, status, passHistory }: { currentPass?: stri
               }`}
             >
               {done ? (
-                <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <svg aria-hidden="true" className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               ) : active ? (
@@ -77,12 +95,13 @@ function PassProgress({ currentPass, status, passHistory }: { currentPass?: stri
               ) : (
                 <span className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
               )}
-              {pass}
+              {PASS_LABEL[pass]}
+              {(done || failed) && <span className="sr-only">{done ? " (done)" : " (failed)"}</span>}
             </div>
-          </div>
+          </li>
         );
       })}
-    </div>
+    </ol>
   );
 }
 
@@ -179,9 +198,9 @@ function AgentLogPassView({ pass }: { pass: AgentLogPass }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="p-3">
-      <button onClick={() => setOpen((o) => !o)} className="text-xs font-medium text-zinc-300 uppercase flex items-center gap-1 hover:text-zinc-100 cursor-pointer">
-        <span className={`transition-transform ${open ? "rotate-90" : ""}`}>▶</span>
-        {pass.pass} ({pass.conversation.length} turns)
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={`text-xs font-medium text-zinc-300 flex items-center gap-1 hover:text-zinc-100 cursor-pointer rounded ${focusRing}`}>
+        <span aria-hidden="true" className={`transition-transform ${open ? "rotate-90" : ""}`}>▶</span>
+        {passLabel(pass.pass)} ({pass.conversation.length} {pass.conversation.length === 1 ? "turn" : "turns"})
       </button>
       {open && (
         <div className="mt-2 space-y-2 max-h-[600px] overflow-y-auto">
@@ -221,7 +240,7 @@ function AgentLogTurnView({ turn }: { turn: AgentLogPass["conversation"][number]
         tools: (turn.content as Record<string, unknown>[]).map((r) => {
           const content = typeof r.content === "string" ? r.content : "";
           const isErr = !!r.is_error;
-          return `${isErr ? "❌ " : ""}${content.slice(0, 150)}${content.length > 150 ? "…" : ""}`;
+          return `${isErr ? "Error: " : ""}${content.slice(0, 150)}${content.length > 150 ? "…" : ""}`;
         }),
       };
     }
@@ -230,23 +249,23 @@ function AgentLogTurnView({ turn }: { turn: AgentLogPass["conversation"][number]
 
   return (
     <div className="border border-zinc-800 rounded text-xs">
-      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-800/50 cursor-pointer">
-        <span className={`transition-transform text-[10px] ${open ? "rotate-90" : ""}`}>▶</span>
-        <span className={`font-medium uppercase ${roleColors[turn.role] ?? "text-zinc-400"}`}>
-          {turn.role === "tool_results" ? "Tools" : turn.role}
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={`w-full flex flex-wrap items-center gap-x-2 gap-y-0.5 px-2 py-1.5 text-left hover:bg-zinc-800/50 cursor-pointer ${focusRing}`}>
+        <span aria-hidden="true" className={`transition-transform text-[10px] ${open ? "rotate-90" : ""}`}>▶</span>
+        <span className={`font-medium ${roleColors[turn.role] ?? "text-zinc-400"}`}>
+          {turn.role === "tool_results" ? "Tool results" : turn.role === "assistant" ? "Agent" : turn.role}
         </span>
         <span className="text-zinc-600">Turn {turn.turn}</span>
+        {contentSummary.tools.length > 0 && turn.role === "assistant" && (
+          <span className="min-w-0 text-zinc-500 [overflow-wrap:anywhere]">{contentSummary.tools.join(", ")}</span>
+        )}
         {turn.usage && (
           <span className="text-zinc-600 ml-auto">
             {((turn.usage.input_tokens + turn.usage.output_tokens) / 1000).toFixed(1)}k tokens
           </span>
         )}
-        {contentSummary.tools.length > 0 && turn.role === "assistant" && (
-          <span className="text-zinc-500 ml-1">{contentSummary.tools.join(", ")}</span>
-        )}
       </button>
       {open && (
-        <div className="px-3 py-2 border-t border-zinc-800 bg-zinc-900/50 font-mono whitespace-pre-wrap text-zinc-400 max-h-80 overflow-y-auto">
+        <div className="px-3 py-2 border-t border-zinc-800 bg-zinc-900/50 font-mono whitespace-pre-wrap [overflow-wrap:anywhere] text-zinc-400 max-h-80 overflow-y-auto">
           {turn.role === "assistant" && contentSummary.texts.map((t, i) => (
             <div key={i} className="mb-2">{t}</div>
           ))}
@@ -259,10 +278,10 @@ function AgentLogTurnView({ turn }: { turn: AgentLogPass["conversation"][number]
             const content = typeof r.content === "string" ? r.content : JSON.stringify(r.content);
             return (
               <details key={i} className="mb-1">
-                <summary className={`cursor-pointer ${r.is_error ? "text-red-400" : "text-zinc-400"}`}>
-                  Result {i + 1} ({content.length > 1000 ? `${(content.length / 1024).toFixed(1)}KB` : `${content.length}B`})
+                <summary className={`cursor-pointer rounded ${focusRing} ${r.is_error ? "text-red-400" : "text-zinc-400"}`}>
+                  {r.is_error ? "Error " : "Result "}{i + 1} ({content.length > 1000 ? `${(content.length / 1024).toFixed(1)}KB` : `${content.length}B`})
                 </summary>
-                <pre className="mt-1 text-[11px] leading-relaxed overflow-x-auto">{content.slice(0, 5000)}{content.length > 5000 ? "\n… (truncated)" : ""}</pre>
+                <pre className="mt-1 max-w-full text-[11px] leading-relaxed overflow-x-auto">{content.slice(0, 5000)}{content.length > 5000 ? "\n… (truncated)" : ""}</pre>
               </details>
             );
           })}
@@ -280,36 +299,40 @@ function RunDetailInner() {
   const [openspec, setOpenspec] = useState<Openspec | null>(null);
   const openspecLoaded = useRef(false);
   const [loading, setLoading] = useState(true);
-  const [retrying, setRetrying] = useState(false);
-  const [reReviewing, setReReviewing] = useState(false);
-  const [resetting, setResetting] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
+  // "missing" when the gateway says there is no such run, "failed" for anything else.
+  const [loadError, setLoadError] = useState<"missing" | "failed" | null>(null);
+  const [busy, setBusy] = useState<"retry" | "review" | "reset" | "cancel" | null>(null);
   const [specTab, setSpecTab] = useState<keyof Openspec>("proposal");
   const [usage, setUsage] = useState<UsageInfo | null>(null);
-  const [plugins, setPlugins] = useState<{ catalog: PluginDef[]; enabled: EnabledPlugin[] }>({ catalog: [], enabled: [] });
+  const [role, setRole] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<PluginDef[]>([]);
   const [traces, setTraces] = useState<PassTrace[]>([]);
   const tracesLoaded = useRef(false);
   const [pipelineOpen, setPipelineOpen] = useState(false);
   const [agentLog, setAgentLog] = useState<{ passes: AgentLogPass[]; live_events: { tool: string; input_summary: string; duration_ms: number; is_error: boolean; timestamp: string }[] } | null>(null);
   const [agentLogOpen, setAgentLogOpen] = useState(false);
+  const [agentLogFailed, setAgentLogFailed] = useState(false);
   const agentLogLoaded = useRef(false);
   const { toast } = useToast();
+  const { confirm } = useConfirm();
 
   useEffect(() => { api.getUsage().then(setUsage).catch(() => {}); }, []);
-  useEffect(() => {
-    Promise.all([api.getPluginCatalog(), api.listEnabledPlugins()])
-      .then(([c, e]) => setPlugins({ catalog: c.plugins, enabled: e.plugins }))
-      .catch(() => {});
-  }, []);
+  useEffect(() => { api.me().then((u) => setRole(u.role)).catch(() => {}); }, []);
+  // Only the catalog is needed: it turns the run's server ids into names.
+  useEffect(() => { api.getPluginCatalog().then((c) => setCatalog(c.plugins)).catch(() => {}); }, []);
   const tokensExceeded = usage ? (
     usage.max_tokens > 0 && usage.total_tokens >= usage.max_tokens
   ) : false;
+  // Retry, review, start over and cancel are member-only on the gateway; a viewer
+  // would only ever see them fail. Unknown role (still loading) hides them too.
+  const canAct = role != null && (ROLE_LEVEL[role] ?? 0) >= 1;
 
   const fetchRun = useCallback(() => {
     if (!runId) return;
     api.getRun(runId)
       .then((r) => {
         setRun(r);
+        setLoadError(null);
         if (r.status !== "running" || PASSES.indexOf(r.current_pass ?? "") >= 1) {
           if (!openspecLoaded.current) {
             openspecLoaded.current = true;
@@ -323,27 +346,36 @@ function RunDetailInner() {
           }
         }
       })
-      .catch(() => {})
+      .catch((e: unknown) => {
+        // A failed refresh keeps the run already on screen.
+        setLoadError(errorStatus(e) === 404 ? "missing" : "failed");
+      })
       .finally(() => setLoading(false));
   }, [runId]);
 
   useEffect(() => { fetchRun(); }, [fetchRun]);
 
-  // Auto-poll running runs every 5s
+  // Keep refreshing while the run is still working.
   useEffect(() => {
-    if (!run || (run.status !== "running" && run.status !== "awaiting_ci")) return;
+    if (!run || !isActive(run.status)) return;
     const interval = setInterval(fetchRun, run.status === "awaiting_ci" ? 15000 : 3000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run?.status, fetchRun]);
 
-  // Auto-poll agent log every 10s when panel is open and run is active
+  const loadAgentLog = useCallback(() => {
+    setAgentLogFailed(false);
+    api.getAgentLog(runId).then(setAgentLog).catch(() => { agentLogLoaded.current = false; setAgentLogFailed(true); });
+  }, [runId]);
+
+  // Refresh the agent log every 10s while the panel is open and the run is working.
   useEffect(() => {
-    if (!agentLogOpen || !run || (run.status !== "running" && run.status !== "awaiting_ci")) return;
+    if (!agentLogOpen || !run || !isActive(run.status)) return;
     const interval = setInterval(() => {
       api.getAgentLog(runId).then(setAgentLog).catch(() => {});
     }, 10000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentLogOpen, run?.status, runId]);
 
   const taskItems = useMemo(() => parseTaskItems(openspec?.tasks), [openspec?.tasks]);
@@ -359,22 +391,28 @@ function RunDetailInner() {
     return max;
   }, [run?.current_pass, run?.pass_history]);
 
+  const backLink = (
+    <Link href="/" className={`text-zinc-500 hover:text-zinc-300 text-sm rounded ${focusRing}`}>← Runs</Link>
+  );
+
   if (!runId) {
     return (
-      <div className="max-w-3xl">
-        <Link href="/" className="text-zinc-500 hover:text-zinc-300 text-sm">← Runs</Link>
-        <p className="text-zinc-500 mt-4">No run selected.</p>
+      <div className="max-w-3xl space-y-4">
+        {backLink}
+        <Callout variant="info" title="No run picked">
+          <p>This link has no run in it. Open a run from the runs list.</p>
+        </Callout>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="max-w-3xl">
+      <div className="max-w-3xl" aria-busy="true">
         <Skeleton className="h-4 w-16 mb-4" />
-        <Skeleton className="h-6 w-64 mb-2" />
-        <Skeleton className="h-4 w-96 mb-6" />
-        <div className="grid grid-cols-4 gap-4">
+        <Skeleton className="h-6 w-64 max-w-full mb-2" />
+        <Skeleton className="h-4 w-96 max-w-full mb-6" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />)}
         </div>
       </div>
@@ -383,9 +421,24 @@ function RunDetailInner() {
 
   if (!run) {
     return (
-      <div className="max-w-3xl">
-        <Link href="/" className="text-zinc-500 hover:text-zinc-300 text-sm">← Runs</Link>
-        <p className="text-zinc-500 mt-4">Run not found.</p>
+      <div className="max-w-3xl space-y-4">
+        {backLink}
+        {loadError === "missing" ? (
+          <Callout variant="info" title="Run not found">
+            <p>No run with this id exists for your team. It may belong to another team you are in.</p>
+          </Callout>
+        ) : (
+          <Callout variant="error" title="Couldn't load this run">
+            <p>The server didn&apos;t answer. Check your connection and try again.</p>
+            <button
+              type="button"
+              className={`${secondaryButton} mt-2`}
+              onClick={() => { setLoading(true); fetchRun(); }}
+            >
+              Try again
+            </button>
+          </Callout>
+        )}
       </div>
     );
   }
@@ -393,28 +446,95 @@ function RunDetailInner() {
   const specTabs = openspec
     ? (Object.keys(openspec) as (keyof Openspec)[]).filter((k) => openspec[k] && k !== "tasks")
     : [];
+  // The first spec document may not be the proposal; never show an empty tab.
+  const activeSpecTab = specTabs.includes(specTab) ? specTab : specTabs[0];
 
-  const implementStarted = maxPassIdx >= 2 || run.status === "completed" || run.status === "failed" || run.status === "archived" || run.status === "cancelled";
+  const implementStarted = maxPassIdx >= 2 || ["completed", "merged", "failed", "archived", "cancelled"].includes(run.status);
   const showTaskSidebar = taskItems.length > 0 && implementStarted;
   const filesModified = run.files_modified ?? [];
 
   const doneCount = taskItems.filter((t) => isTaskDone(t, filesModified, run.status, maxPassIdx)).length;
 
+  // What each action is allowed for, matching the gateway's own checks.
+  const canRetry = ["failed", "needs_input", "cancelled"].includes(run.status) && run.current_pass !== "feedback";
+  const canReview = !!run.pr_url && !["running", "queued", "merged"].includes(run.status);
+  // Starting over closes the pull request: never offered once it is merged.
+  const canReset = ["completed", "failed", "needs_input", "cancelled", "success"].includes(run.status);
+  const limitTitle = tokensExceeded ? "The monthly token limit is reached" : undefined;
+
+  const retry = async () => {
+    setBusy("retry");
+    try {
+      await api.retryRun(runId);
+      toast("Run started again. It shows at the top of the runs list.");
+      router.push("/");
+    } catch (e) {
+      toast(actionError(e, "start this run again"), "error");
+      setBusy(null);
+    }
+  };
+  const review = async () => {
+    setBusy("review");
+    try {
+      await api.reReviewRun(runId);
+      setRun((r) => r ? { ...r, status: "running", current_pass: "feedback", error: undefined } : r);
+      toast("Reading the pull request comments again");
+    } catch (e) {
+      toast(actionError(e, "review this pull request again"), "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+  const reset = async () => {
+    const ok = await confirm({
+      title: "Start this run over?",
+      message: "This closes the pull request, deletes the working branch and starts a new run from scratch. Work on the branch that isn't merged is lost.",
+      confirmLabel: "Start over",
+      destructive: true,
+    });
+    if (ok !== "primary") return;
+    setBusy("reset");
+    try {
+      await api.resetRun(runId);
+      toast("Branch removed. A new run is starting.");
+      router.push("/");
+    } catch (e) {
+      toast(actionError(e, "start this run over"), "error");
+      setBusy(null);
+    }
+  };
+  const cancel = async () => {
+    setBusy("cancel");
+    try {
+      await api.cancelRun(runId);
+      setRun((r) => r ? { ...r, status: "cancelled" } : r);
+      toast("Run cancelled");
+    } catch (e) {
+      toast(actionError(e, "cancel this run"), "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
-    <div className={showTaskSidebar ? "max-w-6xl flex gap-6" : "max-w-3xl"}>
+    <div className={showTaskSidebar ? "max-w-6xl flex flex-col lg:flex-row gap-6" : "max-w-3xl"}>
     <div className={showTaskSidebar ? "flex-1 min-w-0" : ""}>
-      <Link href="/" className="text-zinc-500 hover:text-zinc-300 text-sm">← Runs</Link>
+      {backLink}
+
+      {loadError === "failed" && (
+        <p role="status" className="mt-3 text-xs text-amber-400">Couldn&apos;t refresh this run. What you see may be out of date.</p>
+      )}
 
       {/* Header */}
       <div className="mt-4 mb-6">
-        <div className="flex items-center gap-3 mb-1">
-          <h1 className="text-xl font-bold text-zinc-100">{run.title}</h1>
-          <StatusBadge status={run.status} />
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-1">
+          <h1 className="min-w-0 text-2xl font-bold text-zinc-100 [overflow-wrap:anywhere]">{run.title || "Untitled run"}</h1>
+          <RunStatusBadge status={run.status} />
         </div>
-        <p className="text-sm text-zinc-500 font-mono">{run.repo || "Determining repo…"}</p>
+        <p className="text-sm text-zinc-500 font-mono [overflow-wrap:anywhere]">{run.repo || "Choosing a repo…"}</p>
         {run.ticket_id && (
-          <p className="text-xs text-zinc-600 mt-1">
-            {run.ticket_source === "jira" ? "Jira" : "Issue"}: {run.ticket_id}
+          <p className="text-xs text-zinc-600 mt-1 [overflow-wrap:anywhere]">
+            {run.ticket_source === "jira" ? "Jira" : run.ticket_source === "alert" ? "Alert" : "Issue"}: {run.ticket_id}
           </p>
         )}
       </div>
@@ -424,178 +544,69 @@ function RunDetailInner() {
         <PassProgress currentPass={run.current_pass} status={run.status} passHistory={run.pass_history} />
       </div>
 
-      {/* Cancel button for running jobs */}
-      {run.status === "running" && (
-        <div className="mb-6">
-          <button
-            onClick={async () => {
-              setCancelling(true);
-              try {
-                await api.cancelRun(runId);
-                setRun((r) => r ? { ...r, status: "cancelled" } : r);
-                toast("Run cancelled");
-              } catch {
-                toast("Failed to cancel run", "error");
-                setCancelling(false);
-              }
-            }}
-            disabled={cancelling}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50 cursor-pointer"
-          >
-            {cancelling ? "Cancelling..." : "Cancel Run"}
-          </button>
-        </div>
-      )}
-
-      {/* Error / clarification banner */}
+      {/* Error / clarification */}
       {run.error && (
         <div className={`mb-6 rounded-lg border p-4 ${
           run.status === "needs_input"
             ? "border-amber-500/20 bg-amber-500/5"
             : "border-red-500/20 bg-red-500/5"
         }`}>
-          <div className="flex items-start justify-between">
-            <div>
-              <p className={`text-sm font-medium mb-1 ${
-                run.status === "needs_input" ? "text-amber-400" : "text-red-400"
-              }`}>
-                {run.status === "needs_input" ? "Needs more detail" : "Error"}
-              </p>
-              <pre className={`text-sm whitespace-pre-wrap font-mono leading-relaxed ${
-                run.status === "needs_input" ? "text-amber-300/80" : "text-red-300/80"
-              }`}>{sanitizeError(run.error)}</pre>
-            </div>
-            {run.status === "failed" && run.current_pass === "feedback" && run.pr_url && (
-              <button
-                onClick={async () => {
-                  setReReviewing(true);
-                  try {
-                    await api.reReviewRun(runId);
-                    setRun((r) => r ? { ...r, status: "running", current_pass: "feedback", error: undefined } : r);
-                    toast("Re-review started");
-                  } catch {
-                    toast("Failed to re-review", "error");
-                    setReReviewing(false);
-                  }
-                }}
-                disabled={reReviewing || tokensExceeded}
-                title={tokensExceeded ? "Token limit reached" : undefined}
-                className="flex-shrink-0 ml-4 px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 cursor-pointer"
-              >
-                {reReviewing ? "Re-reviewing…" : "Re-review"}
-              </button>
-            )}
-            {(run.status === "failed" || run.status === "needs_input") && run.current_pass !== "feedback" && (
-              <button
-                onClick={async () => {
-                  setRetrying(true);
-                  try {
-                    await api.retryRun(runId);
-                    toast("Run retried — redirecting to runs list");
-                    router.push("/");
-                  } catch {
-                    toast("Failed to retry run", "error");
-                    setRetrying(false);
-                  }
-                }}
-                disabled={retrying || tokensExceeded}
-                title={tokensExceeded ? "Token limit reached" : undefined}
-                className="flex-shrink-0 ml-4 px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 cursor-pointer"
-              >
-                {retrying ? "Retrying..." : "Retry"}
-              </button>
-            )}
-          </div>
+          <p className={`text-sm font-medium mb-1 ${
+            run.status === "needs_input" ? "text-amber-400" : "text-red-400"
+          }`}>
+            {run.status === "needs_input" ? "Needs more detail" : "What went wrong"}
+          </p>
+          <pre className={`text-sm whitespace-pre-wrap [overflow-wrap:anywhere] font-mono leading-relaxed ${
+            run.status === "needs_input" ? "text-amber-300/80" : "text-red-300/80"
+          }`}>{sanitizeError(run.error)}</pre>
         </div>
       )}
 
-      {/* Retry for runs that failed/needs_input without an error message (not feedback) */}
-      {(run.status === "failed" || run.status === "needs_input") && !run.error && run.current_pass !== "feedback" && (
-        <div className="mb-6">
-          <button
-            onClick={async () => {
-              setRetrying(true);
-              try {
-                await api.retryRun(runId);
-                toast("Run retried — redirecting to runs list");
-                router.push("/");
-              } catch {
-                toast("Failed to retry run", "error");
-                setRetrying(false);
-              }
-            }}
-            disabled={retrying || tokensExceeded}
-            title={tokensExceeded ? "Token limit reached" : undefined}
-            className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-semibold hover:bg-white disabled:opacity-50 cursor-pointer"
-          >
-            {retrying ? "Retrying..." : "Retry this run"}
-          </button>
-        </div>
-      )}
-
-      {/* Retry for cancelled runs */}
-      {run.status === "cancelled" && (
-        <div className="mb-6">
-          <button
-            onClick={async () => {
-              setRetrying(true);
-              try {
-                await api.retryRun(runId);
-                toast("Run retried — redirecting to runs list");
-                router.push("/");
-              } catch {
-                toast("Failed to retry run", "error");
-                setRetrying(false);
-              }
-            }}
-            disabled={retrying || tokensExceeded}
-            title={tokensExceeded ? "Token limit reached" : undefined}
-            className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-semibold hover:bg-white disabled:opacity-50 cursor-pointer"
-          >
-            {retrying ? "Retrying..." : "Retry this run"}
-          </button>
-        </div>
-      )}
-
-      {/* Reset & re-run — clean slate for any terminal run: closes the PR,
-          deletes the branch, and starts fresh. */}
-      {["completed", "failed", "needs_input", "cancelled", "merged", "success"].includes(run.status) && (
-        <div className="mb-6">
-          <button
-            onClick={async () => {
-              if (
-                !window.confirm(
-                  "Reset & re-run will CLOSE the PR, DELETE the working branch, and start a brand-new run from scratch. Any unmerged work on this branch is discarded. Continue?"
-                )
-              ) {
-                return;
-              }
-              setResetting(true);
-              try {
-                await api.resetRun(runId);
-                toast("Run reset — branch cleaned, starting fresh. Redirecting…");
-                router.push("/");
-              } catch {
-                toast("Failed to reset run", "error");
-                setResetting(false);
-              }
-            }}
-            disabled={resetting || tokensExceeded}
-            title={tokensExceeded ? "Token limit reached" : "Close the PR, delete the branch, and run again from scratch"}
-            className="px-4 py-2 border border-red-500/40 text-red-400 rounded-lg text-sm font-semibold hover:bg-red-500/10 disabled:opacity-50 cursor-pointer"
-          >
-            {resetting ? "Resetting…" : "Reset & re-run from scratch"}
-          </button>
+      {/* Actions, each shown only when the gateway would accept it */}
+      {canAct && (run.status === "running" || canRetry || canReset) && (
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          {run.status === "running" && (
+            <button
+              type="button"
+              onClick={cancel}
+              disabled={busy !== null}
+              className={`inline-flex min-h-9 items-center px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50 cursor-pointer ${focusRing}`}
+            >
+              {busy === "cancel" ? "Cancelling…" : "Cancel run"}
+            </button>
+          )}
+          {canRetry && (
+            <button
+              type="button"
+              onClick={retry}
+              disabled={busy !== null || tokensExceeded}
+              title={limitTitle}
+              className={primaryButton}
+            >
+              {busy === "retry" ? "Starting…" : "Retry"}
+            </button>
+          )}
+          {canReset && (
+            <button
+              type="button"
+              onClick={reset}
+              disabled={busy !== null || tokensExceeded}
+              title={limitTitle ?? "Close the pull request, delete the branch and run again from scratch"}
+              className={`inline-flex min-h-9 items-center px-4 py-2 border border-red-500/40 text-red-400 rounded-lg text-sm font-semibold hover:bg-red-500/10 disabled:opacity-50 cursor-pointer ${focusRing}`}
+            >
+              {busy === "reset" ? "Starting over…" : "Start over from scratch"}
+            </button>
+          )}
         </div>
       )}
 
       {/* Stats cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
         <StatCard label="Duration" value={formatDuration(run.duration_s)} />
-        <StatCard label="Tokens In" value={formatTokens(run.tokens_in)} />
-        <StatCard label="Tokens Out" value={formatTokens(run.tokens_out)} />
-        <StatCard label="Cache Read" value={formatTokens(run.cache_read_tokens)} />
-        <StatCard label="Cache Write" value={formatTokens(run.cache_write_tokens)} />
+        <StatCard label="Tokens in" value={formatTokens(run.tokens_in)} />
+        <StatCard label="Tokens out" value={formatTokens(run.tokens_out)} />
+        <StatCard label="Cache read" value={formatTokens(run.cache_read_tokens)} />
+        <StatCard label="Cache write" value={formatTokens(run.cache_write_tokens)} />
       </div>
 
       {/* Pass pipeline (collapsed by default) */}
@@ -625,8 +636,11 @@ function RunDetailInner() {
           <div className="mb-6 border border-zinc-800 rounded-lg overflow-hidden">
             {/* Clickable summary header */}
             <button
+              type="button"
+              aria-expanded={pipelineOpen}
+              aria-label={`Time per step${pipelineOpen ? "" : ", show details"}`}
               onClick={() => setPipelineOpen((o) => !o)}
-              className="w-full text-left cursor-pointer"
+              className={`w-full text-left cursor-pointer rounded-t-lg ${focusRing}`}
             >
               {/* Stacked proportional bar */}
               <div className="flex h-1.5">
@@ -646,7 +660,7 @@ function RunDetailInner() {
               <div className="px-4 py-2.5 flex items-center gap-3 flex-wrap">
                 {traces.map((trace) => {
                   const baseName = trace.pass.split(":")[0];
-                  const label = trace.pass.includes(":") ? trace.pass.replace(":", " #") : trace.pass;
+                  const label = passLabel(trace.pass);
                   const dur = trace.duration_ms >= 60000
                     ? `${(trace.duration_ms / 60000).toFixed(1)}m`
                     : `${(trace.duration_ms / 1000).toFixed(1)}s`;
@@ -658,7 +672,7 @@ function RunDetailInner() {
                     </span>
                   );
                 })}
-                <span className="ml-auto text-[11px] text-zinc-600">
+                <span aria-hidden="true" className="ml-auto text-[11px] text-zinc-600">
                   {pipelineOpen ? "▲" : "▼"}
                 </span>
               </div>
@@ -669,7 +683,7 @@ function RunDetailInner() {
               <div className="divide-y divide-zinc-800/50 border-t border-zinc-800/50">
                 {traces.map((trace) => {
                   const baseName = trace.pass.split(":")[0];
-                  const passLabel = trace.pass.includes(":") ? trace.pass.replace(":", " #") : trace.pass;
+                  const stepLabel = passLabel(trace.pass);
                   const pct = (trace.duration_ms / maxDuration) * 100;
                   const passTokens = (trace.input_tokens || 0) + (trace.output_tokens || 0);
                   const tokenPct = totalTokens > 0 ? (passTokens / totalTokens) * 100 : 0;
@@ -683,7 +697,7 @@ function RunDetailInner() {
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 rounded-full ${dotColors[baseName] || "bg-zinc-400"}`} />
-                          <span className="text-sm font-medium text-zinc-200">{passLabel}</span>
+                          <span className="text-sm font-medium text-zinc-200">{stepLabel}</span>
                           {trace.error && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-medium">error</span>
                           )}
@@ -709,7 +723,7 @@ function RunDetailInner() {
                             <span className="ml-auto text-zinc-600 tabular-nums">{tokenPct.toFixed(0)}% of tokens</span>
                           </>
                         ) : (
-                          <span className="text-zinc-600 italic">no LLM calls</span>
+                          <span className="text-zinc-600 italic">No model calls</span>
                         )}
                       </div>
                     </div>
@@ -724,9 +738,9 @@ function RunDetailInner() {
       {/* MCP servers used in this run */}
       {run.mcp_servers && run.mcp_servers.length > 0 && (
         <div className="flex items-center gap-2 mb-6 flex-wrap">
-          <span className="text-xs text-zinc-500">MCP Servers</span>
+          <span className="text-xs text-zinc-500">MCP servers</span>
           {run.mcp_servers.map((id) => {
-            const def = plugins.catalog.find((c) => c.id === id);
+            const def = catalog.find((c) => c.id === id);
             return (
               <span key={id} className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 border border-zinc-700 text-zinc-300">
                 {def?.name ?? id}
@@ -742,37 +756,29 @@ function RunDetailInner() {
           {/* Multi-repo PRs */}
           {run.pr_urls && run.pr_urls.length > 1 ? (
             run.pr_urls.map((url, i) => (
-              <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-400 hover:text-blue-300">
-                PR #{run.pr_numbers?.[i] ?? i + 1} →
+              <a key={url} href={url} target="_blank" rel="noopener noreferrer" className={`text-sm text-blue-400 hover:text-blue-300 rounded ${focusRing}`}>
+                Pull request #{run.pr_numbers?.[i] ?? i + 1} →
               </a>
             ))
           ) : run.pr_url ? (
-            <a href={run.pr_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-400 hover:text-blue-300">
-              View Pull Request →
+            <a href={run.pr_url} target="_blank" rel="noopener noreferrer" className={`text-sm text-blue-400 hover:text-blue-300 rounded ${focusRing}`}>
+              {run.pr_number ? `Pull request #${run.pr_number}` : "View pull request"} →
             </a>
           ) : null}
-          {run.pr_url && run.status !== "running" && run.status !== "merged" && (
+          {canAct && canReview && (
             <button
-              onClick={async () => {
-                setReReviewing(true);
-                try {
-                  await api.reReviewRun(runId);
-                  setRun((r) => r ? { ...r, status: "running", current_pass: "feedback", error: undefined } : r);
-                  toast("Re-review started");
-                } catch {
-                  toast("Failed to re-review", "error");
-                  setReReviewing(false);
-                }
-              }}
-              disabled={reReviewing}
-              className="px-3 py-1 text-sm font-medium text-zinc-300 bg-zinc-800 border border-zinc-700 rounded-lg hover:bg-zinc-700 disabled:opacity-50 cursor-pointer"
+              type="button"
+              onClick={review}
+              disabled={busy !== null || tokensExceeded}
+              title={limitTitle ?? "Read the pull request comments again and push fixes"}
+              className={`${secondaryButton} min-h-8 py-1 px-3`}
             >
-              {reReviewing ? "Re-reviewing…" : "Re-review"}
+              {busy === "review" ? "Starting review…" : "Review again"}
             </button>
           )}
           {run.branch && (
-            <span className="text-sm text-zinc-500">
-              Branch: <code className="text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded text-xs">{run.branch}</code>
+            <span className="min-w-0 text-sm text-zinc-500">
+              Branch: <code className="text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded text-xs [overflow-wrap:anywhere]">{run.branch}</code>
             </span>
           )}
         </div>
@@ -784,7 +790,7 @@ function RunDetailInner() {
           <h2 className="text-sm font-medium text-zinc-300 mb-2">Files modified ({run.files_modified.length})</h2>
           <div className="border border-zinc-800 rounded-lg divide-y divide-zinc-800">
             {run.files_modified.map((file) => (
-              <div key={file} className="px-3 py-2 text-sm text-zinc-400 font-mono">{file}</div>
+              <div key={file} className="px-3 py-2 text-sm text-zinc-400 font-mono [overflow-wrap:anywhere]">{file}</div>
             ))}
           </div>
         </div>
@@ -793,15 +799,17 @@ function RunDetailInner() {
       {/* Openspec tabs (excluding tasks — those go in sidebar) */}
       {specTabs.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-sm font-medium text-zinc-300 mb-2">OpenSpec</h2>
+          <h2 className="text-sm font-medium text-zinc-300 mb-2">Spec documents</h2>
           <div className="border border-zinc-800 rounded-lg overflow-hidden">
-            <div className="flex border-b border-zinc-800 bg-zinc-900">
+            <div className="flex overflow-x-auto border-b border-zinc-800 bg-zinc-900">
               {specTabs.map((tab) => (
                 <button
                   key={tab}
+                  type="button"
+                  aria-pressed={activeSpecTab === tab}
                   onClick={() => setSpecTab(tab)}
-                  className={`px-4 py-2 text-sm capitalize transition-colors cursor-pointer ${
-                    specTab === tab
+                  className={`px-4 py-2 text-sm capitalize transition-colors cursor-pointer ${focusRing} ${
+                    activeSpecTab === tab
                       ? "text-zinc-100 border-b-2 border-zinc-100"
                       : "text-zinc-500 hover:text-zinc-300"
                   }`}
@@ -811,7 +819,7 @@ function RunDetailInner() {
               ))}
             </div>
             <div className="p-4 max-h-96 overflow-y-auto">
-              <Markdown>{String(openspec![specTab])}</Markdown>
+              <Markdown>{String(openspec?.[activeSpecTab] ?? "")}</Markdown>
             </div>
           </div>
         </div>
@@ -820,35 +828,48 @@ function RunDetailInner() {
       {/* Agent Log */}
       <div className="mb-6">
         <button
+          type="button"
+          aria-expanded={agentLogOpen}
           onClick={() => {
             setAgentLogOpen((o) => !o);
             if (!agentLogLoaded.current) {
               agentLogLoaded.current = true;
-              api.getAgentLog(runId).then(setAgentLog).catch(() => { agentLogLoaded.current = false; });
+              loadAgentLog();
             }
           }}
-          className="text-sm font-medium text-zinc-300 mb-2 flex items-center gap-1 hover:text-zinc-100 transition-colors cursor-pointer"
+          className={`text-sm font-medium text-zinc-300 mb-2 flex items-center gap-1 hover:text-zinc-100 transition-colors cursor-pointer rounded ${focusRing}`}
         >
-          <span className={`transition-transform ${agentLogOpen ? "rotate-90" : ""}`}>▶</span>
-          Agent Log
+          <span aria-hidden="true" className={`transition-transform ${agentLogOpen ? "rotate-90" : ""}`}>▶</span>
+          Agent log
         </button>
         {agentLogOpen && (
           <div className="border border-zinc-800 rounded-lg overflow-hidden">
-            {!agentLog ? (
+            {agentLogFailed && !agentLog ? (
+              <div className="p-4 text-sm text-zinc-400">
+                Couldn&apos;t load the agent log.{" "}
+                <button
+                  type="button"
+                  className={`text-zinc-200 underline underline-offset-4 rounded ${focusRing}`}
+                  onClick={() => { agentLogLoaded.current = true; loadAgentLog(); }}
+                >
+                  Try again
+                </button>
+              </div>
+            ) : !agentLog ? (
               <div className="p-4 text-zinc-500 text-sm">Loading…</div>
             ) : (
               <div className="divide-y divide-zinc-800">
                 {/* Live tool events (shown during/after run) */}
                 {agentLog.live_events.length > 0 && (
                   <div className="p-3">
-                    <h3 className="text-xs font-medium text-zinc-400 uppercase mb-2">Live Tool Calls ({agentLog.live_events.length})</h3>
+                    <h3 className="text-xs font-medium text-zinc-400 mb-2">Tool calls ({agentLog.live_events.length})</h3>
                     <div className="space-y-1 max-h-64 overflow-y-auto" ref={(el) => { if (el) el.scrollTop = el.scrollHeight; }}>
                       {agentLog.live_events.map((evt, i) => (
-                        <div key={i} className={`text-xs font-mono flex items-start gap-2 ${evt.is_error ? "text-red-400" : "text-zinc-400"}`}>
+                        <div key={i} className={`min-w-0 text-xs font-mono flex items-start gap-2 ${evt.is_error ? "text-red-400" : "text-zinc-400"}`}>
                           <span className="text-zinc-600 shrink-0">{new Date(evt.timestamp).toLocaleTimeString()}</span>
                           <span className="text-zinc-200">{evt.tool}</span>
-                          {evt.input_summary && <span className="truncate text-zinc-500">{evt.input_summary}</span>}
-                          <span className="text-zinc-600 shrink-0">{evt.duration_ms}ms</span>
+                          {evt.input_summary && <span className="min-w-0 truncate text-zinc-500">{evt.input_summary}</span>}
+                          <span className="ml-auto text-zinc-600 shrink-0">{evt.duration_ms}ms</span>
                         </div>
                       ))}
                     </div>
@@ -861,7 +882,7 @@ function RunDetailInner() {
                     <AgentLogPassView key={p.pass} pass={p} />
                   ))
                 ) : agentLog.live_events.length === 0 ? (
-                  <div className="p-4 text-zinc-500 text-sm">No agent logs available yet. Logs are captured during the implement pass.</div>
+                  <div className="p-4 text-zinc-500 text-sm">No agent log yet. The log starts once the build step begins.</div>
                 ) : null}
               </div>
             )}
@@ -890,7 +911,7 @@ function RunDetailInner() {
                   const passEvents: { label: string; time: string; kind: "pass" | "terminal"; idx: number; tools: { label: string; time: string }[] }[] = [];
                   run.pass_history?.forEach((entry, i) => {
                     passEvents.push({
-                      label: `${entry.pass.charAt(0).toUpperCase()}${entry.pass.slice(1)} started`,
+                      label: `${passLabel(entry.pass)} started`,
                       time: entry.started_at,
                       kind: "pass",
                       idx: i,
@@ -929,6 +950,13 @@ function RunDetailInner() {
                     );
                   });
                 })()}
+                {run.status === "merged" && (
+                  <TrailEntry
+                    label="Pull request merged"
+                    time={run.updated_at}
+                    status="done"
+                  />
+                )}
                 {run.status === "completed" && (
                   <TrailEntry
                     label="Run completed"
@@ -966,8 +994,8 @@ function RunDetailInner() {
 
     {/* Task checklist sidebar */}
     {showTaskSidebar && (
-      <div className="w-80 flex-shrink-0">
-        <div className="sticky top-4">
+      <div className="w-full lg:w-80 flex-shrink-0">
+        <div className="lg:sticky lg:top-4">
           <div className="border border-zinc-800 rounded-lg bg-zinc-900/50 overflow-hidden">
             <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
               <h3 className="text-sm font-medium text-zinc-300">Tasks</h3>
@@ -982,7 +1010,7 @@ function RunDetailInner() {
                 style={{ width: `${taskItems.length > 0 ? (doneCount / taskItems.length) * 100 : 0}%` }}
               />
             </div>
-            <div className="p-3 max-h-[calc(100vh-12rem)] overflow-y-auto space-y-1">
+            <div className="p-3 max-h-96 lg:max-h-[calc(100vh-12rem)] overflow-y-auto space-y-1">
               {(() => {
                 let lastSection = "";
                 return taskItems.map((task, i) => {
@@ -997,7 +1025,7 @@ function RunDetailInner() {
                         </p>
                       )}
                       <div className="flex items-start gap-2 py-1 group">
-                        <div className={`mt-0.5 w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border transition-colors ${
+                        <div aria-hidden="true" className={`mt-0.5 w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border transition-colors ${
                           done
                             ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
                             : "border-zinc-700 text-transparent"
@@ -1008,9 +1036,10 @@ function RunDetailInner() {
                             </svg>
                           )}
                         </div>
-                        <span className={`text-xs leading-relaxed ${
+                        <span className={`min-w-0 text-xs leading-relaxed [overflow-wrap:anywhere] ${
                           done ? "text-zinc-500" : "text-zinc-400"
                         }`}>
+                          <span className="sr-only">{done ? "Done: " : "To do: "}</span>
                           {task.text.length > 120 ? task.text.slice(0, 120) + "…" : task.text}
                         </span>
                       </div>
@@ -1052,23 +1081,25 @@ function TrailEntry({ label, time, status, tools }: { label: string; time?: stri
   const [expanded, setExpanded] = useState(false);
   const dotColor =
     status === "failed" ? "bg-red-400" :
-    status === "active" ? "bg-blue-400 animate-pulse" :
+    status === "active" ? "bg-blue-400 animate-pulse motion-reduce:animate-none" :
     "bg-emerald-400";
   const dotSize = "w-[11px] h-[11px]";
   const hasTools = tools && tools.length > 0;
   return (
     <div>
-      <div className="flex items-center gap-3 relative pl-0">
-        <div className={`${dotSize} rounded-full ${dotColor} z-10 flex-shrink-0`} />
-        <span className={`text-sm ${status === "failed" ? "text-red-400" : status === "active" ? "text-blue-400" : "text-zinc-300"}`}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 relative pl-0">
+        <div aria-hidden="true" className={`${dotSize} rounded-full ${dotColor} z-10 flex-shrink-0`} />
+        <span className={`min-w-0 text-sm ${status === "failed" ? "text-red-400" : status === "active" ? "text-blue-400" : "text-zinc-300"}`}>
           {label}
         </span>
         {hasTools && (
           <button
+            type="button"
+            aria-expanded={expanded}
             onClick={() => setExpanded(!expanded)}
-            className="text-xs text-zinc-500 hover:text-zinc-400 transition-colors ml-1"
+            className={`text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors ml-1 rounded ${focusRing}`}
           >
-            {expanded ? "hide" : `${tools.length} tool call${tools.length > 1 ? "s" : ""}`}
+            {expanded ? "Hide tool calls" : `${tools.length} tool call${tools.length > 1 ? "s" : ""}`}
           </button>
         )}
         {time && (
@@ -1080,8 +1111,8 @@ function TrailEntry({ label, time, status, tools }: { label: string; time?: stri
       {expanded && hasTools && (
         <div className="ml-6 mt-1 mb-1 space-y-0.5 border-l border-zinc-800 pl-3">
           {tools.map((t, i) => (
-            <div key={i} className="flex items-center gap-2 text-xs text-zinc-500">
-              <span>{t.label}</span>
+            <div key={i} className="flex items-start gap-2 text-xs text-zinc-500">
+              <span className="min-w-0 [overflow-wrap:anywhere]">{t.label}</span>
               <span className="text-zinc-700 ml-auto whitespace-nowrap">
                 {new Date(t.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
               </span>
