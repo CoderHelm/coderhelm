@@ -40,6 +40,24 @@ export interface SkillWithBody extends Skill {
   body: string;
 }
 
+/** One question put to a team agent, and its answer. */
+export interface AgentAsk {
+  id: string;
+  /** "planner", "coder", "reviewer", or "<email> (try)". */
+  by: string;
+  /** The work it was asked during, e.g. "owner/name#12". Empty for a try. */
+  origin: string;
+  question: string;
+  context_chars: number;
+  outcome: "pending" | "answered" | "failed" | "timed_out";
+  answer: string;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  ms: number;
+  at: string;
+}
+
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -68,7 +86,49 @@ export const skillsApi = {
     call<SkillWithBody>(`/api/skills/item?repo=${encodeURIComponent(repo)}&path=${encodeURIComponent(path)}`),
   setEnabled: (repo: string, path: string, enabled: boolean) =>
     call<{ ok: true; enabled: boolean }>("/api/skills/item", { method: "PUT", body: JSON.stringify({ repo, path, enabled }) }),
+  asks: (repo: string, path: string) =>
+    call<{ asks: AgentAsk[]; tries_per_day: number }>(`/api/skills/asks?repo=${encodeURIComponent(repo)}&path=${encodeURIComponent(path)}`),
+  ask: (repo: string, path: string, id: string) =>
+    call<AgentAsk>(`/api/skills/asks?repo=${encodeURIComponent(repo)}&path=${encodeURIComponent(path)}&id=${encodeURIComponent(id)}`),
+  tryAgent: (repo: string, path: string, question: string, context: string) =>
+    call<{ id: string }>("/api/skills/asks", { method: "POST", body: JSON.stringify({ repo, path, question, context }) }),
 };
+
+/** Where an agent's page lives. */
+export const agentHref = (s: Pick<Skill, "repo" | "path">) =>
+  `/skills/agent?repo=${encodeURIComponent(s.repo)}&path=${encodeURIComponent(s.path)}`;
+
+/**
+ * The settings an agent's brief asks for in its front matter. Coderhelm
+ * reads `model` (as a hint for which of the team's models to use) and shows
+ * `tools`, which it never gives.
+ */
+export function briefSettings(body: string): { model: string; tools: string[] } {
+  const m = /^---\r?\n([\s\S]*?)\r?\n---/.exec(body);
+  const out = { model: "", tools: [] as string[] };
+  if (!m) return out;
+  const lines = m[1].split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const kv = /^([A-Za-z_-]+)\s*:\s*(.*)$/.exec(lines[i]);
+    if (!kv) continue;
+    const [, key, raw] = kv;
+    const value = raw.trim().replace(/^["']|["']$/g, "");
+    if (key === "model") out.model = value;
+    if (key !== "tools") continue;
+    if (value) {
+      out.tools = value.replace(/^\[|\]$/g, "").split(",").map((t) => t.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
+    } else {
+      // A YAML list on the lines below.
+      while (i + 1 < lines.length && /^\s*-\s+/.test(lines[i + 1])) {
+        out.tools.push(lines[++i].replace(/^\s*-\s+/, "").trim().replace(/^["']|["']$/g, ""));
+      }
+    }
+  }
+  return out;
+}
+
+/** Which of the team's models an agent runs on, from its brief's hint. */
+export const modelFor = (hint: string) => (hint.toLowerCase().includes("opus") ? "heavy" : "primary");
 
 export const KIND_LABEL: Record<SkillKind, string> = {
   skill: "Skills",
