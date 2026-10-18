@@ -609,8 +609,10 @@ function SetupSteps({ endpoint }: { endpoint: string }) {
       <p className="text-xs text-zinc-500">
         Works with CloudWatch alarm notifications (only the ALARM state opens a
         PR; recoveries just notify), AWS Chatbot custom notifications,
-        EventBridge events and plain messages. Repeats of the same alert
-        collapse into one run, and each route starts at most 20 runs a day.
+        EventBridge events and plain messages. A plain message with a{" "}
+        <code className="text-zinc-400">Recovers: &lt;alert title&gt;</code>{" "}
+        line is the recovery of that alert. Repeats of the same alert collapse
+        into one run, and each route starts at most 20 runs a day.
       </p>
     </div>
   );
@@ -1164,9 +1166,10 @@ function RouteEditor({
             <span>
               Post recoveries
               <span className="block text-[11px] text-zinc-500">
-                Also post a green card when an alarm returns to OK. Off keeps
-                the channel to alarms only; recoveries still show on the
-                alert&apos;s page.
+                Post one green card, linking the alert, when an alert whose card
+                was posted recovers. Later recoveries stay quiet until the alert
+                fires again. Off keeps the channel to alerts only; recoveries
+                still show on the alert&apos;s page.
               </span>
             </span>
           </label>
