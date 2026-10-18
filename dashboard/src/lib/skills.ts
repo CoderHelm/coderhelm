@@ -30,6 +30,9 @@ export interface Skill {
   enabled: boolean;
   /** Text files kept next to a skill. */
   files: string[];
+  /** Tools its front matter asks for that it won't get. For an agent that's
+   * every tool it lists, since team agents answer without tools. */
+  missing_tools?: string[];
   uses: number;
   last_used_at: string;
   last_used_by: string;
