@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, type Template } from "@/lib/api";
@@ -8,150 +8,131 @@ import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { TrashIcon } from "@/components/icons";
 import { TableSkeleton } from "@/components/skeleton";
+import { Callout } from "@/components/callout";
+import { usePagedList, LoadMoreButton } from "@/components/load-more";
+import { focusRing, linkButton } from "@/components/ui";
 
 export default function TemplatesPage() {
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [nextCursor, setNextCursor] = useState<string | undefined>();
-  const [loadingMore, setLoadingMore] = useState(false);
   const [usingTemplate, setUsingTemplate] = useState<string | null>(null);
   const router = useRouter();
   const { toast } = useToast();
   const { confirm } = useConfirm();
-
-  useEffect(() => {
-    api.listTemplates({ limit: 50 })
-      .then((data) => {
-        setTemplates(data.templates);
-        setNextCursor(data.next_cursor ?? undefined);
-      })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const loadMore = useCallback(() => {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    api.listTemplates({ limit: 50, cursor: nextCursor })
-      .then((data) => {
-        setTemplates((prev) => [...prev, ...data.templates]);
-        setNextCursor(data.next_cursor ?? undefined);
-      })
-      .catch(() => {})
-      .finally(() => setLoadingMore(false));
-  }, [nextCursor, loadingMore]);
+  const { items: templates, next, loading, loadingMore, error, loadMore, reload } = usePagedList<Template>(
+    (cursor) => api.listTemplates({ limit: 50, cursor }).then((d) => ({ items: d.templates, next: d.next_cursor })),
+    [],
+  );
+  const [removed, setRemoved] = useState<Set<string>>(new Set());
+  const shown = templates.filter((t) => !removed.has(t.template_id));
 
   const handleUseTemplate = async (templateId: string) => {
     setUsingTemplate(templateId);
     try {
       const { plan_id } = await api.useTemplate(templateId, {});
       router.push(`/plans/detail?id=${plan_id}`);
-    } catch {
-      toast("Failed to create plan from template", "error");
+    } catch (e) {
+      toast(e instanceof Error && e.message.includes("403") ? "Your role can't create plans. Ask an admin." : "Couldn't create a plan from this template", "error");
       setUsingTemplate(null);
     }
   };
 
-  const handleDelete = async (templateId: string) => {
-    if (!(await confirm({ title: "Delete Template", message: "Delete this template? This cannot be undone.", confirmLabel: "Delete", destructive: true }))) return;
+  const handleDelete = async (t: Template) => {
+    if (!(await confirm({ title: "Delete template", message: `Delete "${t.title}"? Plans already made from it stay.`, confirmLabel: "Delete", destructive: true }))) return;
     try {
-      await api.deleteTemplate(templateId);
-      setTemplates((prev) => prev.filter((t) => t.template_id !== templateId));
+      await api.deleteTemplate(t.template_id);
+      setRemoved((prev) => new Set(prev).add(t.template_id));
       toast("Template deleted");
     } catch {
-      toast("Failed to delete template", "error");
+      toast("Couldn't delete the template", "error");
     }
   };
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <Link href="/plans" className="text-zinc-500 hover:text-zinc-300 text-sm">← Plans</Link>
-          <h1 className="text-2xl font-bold mt-1">Plan Templates</h1>
-          <p className="text-sm text-zinc-500 mt-1">
-            Reusable plan templates to quickly spin up new plans.
-          </p>
-        </div>
+      <div className="mb-6">
+        <Link href="/plans" className={`text-zinc-500 hover:text-zinc-300 text-sm rounded ${focusRing}`}>← Plans</Link>
+        <h1 className="text-2xl font-bold text-zinc-100 mt-1">Plan templates</h1>
+        <p className="text-sm text-zinc-500 mt-1">
+          Saved plans you can start again with one click.
+        </p>
       </div>
 
       {loading ? (
         <TableSkeleton rows={3} cols={3} />
       ) : error ? (
-        <div className="text-red-400 border border-red-500/20 bg-red-500/5 rounded-lg p-8 text-center">
-          <p className="text-sm">Failed to load templates. Please refresh.</p>
-        </div>
-      ) : templates.length === 0 ? (
-        <div className="border border-zinc-800 rounded-lg p-12 text-center text-zinc-500">
-          <p className="text-lg mb-2">No templates yet</p>
+        <Callout variant="error" title="Couldn't load your templates">
+          <button type="button" onClick={reload} className={linkButton}>
+            Try again
+          </button>
+        </Callout>
+      ) : shown.length === 0 ? (
+        <div className="border border-zinc-800 rounded-lg p-8 sm:p-12 text-center text-zinc-500">
+          <p className="text-lg mb-2 text-zinc-300">No templates yet</p>
           <p className="text-sm mb-4">
-            Save a plan as a template to get started.
+            Open a plan and choose &ldquo;Save as template&rdquo; to reuse it later.
           </p>
-          <Link href="/plans" className="text-zinc-300 underline text-sm">
-            Go to Plans
+          <Link href="/plans" className={linkButton}>
+            Go to plans
           </Link>
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {templates.map((t) => (
-              <div
+          <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {shown.map((t) => (
+              <li
                 key={t.template_id}
-                className="group relative rounded-lg border border-zinc-800 bg-zinc-900 p-5 hover:border-zinc-700 transition-colors"
+                className="flex flex-col rounded-lg border border-zinc-800 bg-zinc-900 p-5 hover:border-zinc-700 transition-colors min-w-0"
               >
-                <div className="mb-3">
-                  <h3 className="text-sm font-semibold text-zinc-100 truncate">{t.title}</h3>
+                <div className="mb-3 min-w-0">
+                  <h2 className="text-sm font-semibold text-zinc-100 break-words">{t.title}</h2>
                   {t.description && (
                     <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{t.description}</p>
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 mb-3">
-                  {t.category && (
-                    <span className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 border border-zinc-700 text-zinc-300">
-                      {t.category}
-                    </span>
-                  )}
-                  {t.tags?.map((tag) => (
-                    <span key={tag} className="px-1.5 py-0.5 rounded text-xs bg-zinc-800/50 text-zinc-500">
-                      {tag}
-                    </span>
-                  ))}
+                {(t.category || (t.tags && t.tags.length > 0)) && (
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                    {t.category && (
+                      <span className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 border border-zinc-700 text-zinc-300">
+                        {t.category}
+                      </span>
+                    )}
+                    {t.tags?.map((tag) => (
+                      <span key={tag} className="px-1.5 py-0.5 rounded text-xs bg-zinc-800/50 text-zinc-500">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500 mb-4">
+                  <span>{t.task_count} task{t.task_count === 1 ? "" : "s"}</span>
+                  <span>Used {t.usage_count} time{t.usage_count === 1 ? "" : "s"}</span>
+                  {t.created_by && <span className="truncate max-w-full">by {t.created_by}</span>}
                 </div>
 
-                <div className="flex items-center gap-3 text-xs text-zinc-600 mb-4">
-                  <span>{t.task_count} tasks</span>
-                  <span>Used {t.usage_count}×</span>
-                  <span className="truncate">{t.created_by}</span>
-                </div>
-
-                <div className="flex items-center gap-2">
+                <div className="mt-auto flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={() => handleUseTemplate(t.template_id)}
                     disabled={usingTemplate === t.template_id}
-                    className="flex-1 px-3 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-xs font-semibold hover:bg-white transition-colors disabled:opacity-50"
+                    className={`flex-1 min-h-9 px-3 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-xs font-semibold hover:bg-white transition-colors disabled:opacity-50 ${focusRing}`}
                   >
-                    {usingTemplate === t.template_id ? "Creating..." : "Use Template"}
+                    {usingTemplate === t.template_id ? "Creating…" : "Use template"}
                   </button>
                   <button
-                    onClick={() => handleDelete(t.template_id)}
-                    className="px-2 py-2 text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                    type="button"
+                    onClick={() => handleDelete(t)}
+                    aria-label={`Delete template ${t.title}`}
                     title="Delete template"
+                    className={`min-h-9 px-2 py-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-colors ${focusRing}`}
                   >
                     <TrashIcon />
                   </button>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
-          {nextCursor && (
-            <div className="mt-6 text-center">
-              <button onClick={loadMore} disabled={loadingMore} className="text-sm text-zinc-400 hover:text-zinc-200 disabled:opacity-50">
-                {loadingMore ? "Loading..." : "Load more"}
-              </button>
-            </div>
-          )}
+          </ul>
+          <LoadMoreButton hasMore={!!next} loading={loadingMore} onClick={loadMore} />
         </>
       )}
     </div>

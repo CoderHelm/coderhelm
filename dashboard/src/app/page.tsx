@@ -5,6 +5,9 @@ import Link from "next/link";
 import { api, type Run } from "@/lib/api";
 import { TableSkeleton } from "@/components/skeleton";
 import { usePagedList, LoadMoreButton } from "@/components/load-more";
+import { Callout } from "@/components/callout";
+import { RunStatusBadge } from "@/components/run-status";
+import { focusRing, secondaryButton } from "@/components/ui";
 
 interface RunGroup {
   ticket_id: string;
@@ -23,6 +26,19 @@ function formatTimeAgo(iso: string): string {
   if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
   const days = Math.floor(hours / 24);
   return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+/** 754 → "12m 34s"; the list showed raw seconds before. */
+function formatDuration(s: number): string {
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${s % 60}s`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
+}
+
+function runTitle(run: Run): string {
+  return run.title || run.ticket_id || "Untitled run";
 }
 
 function groupRunsByTicket(runs: Run[]): RunGroup[] {
@@ -56,7 +72,9 @@ export default function RunsPage() {
     loading,
     loadingMore,
     error,
+    moreFailed,
     loadMore,
+    reload,
   } = usePagedList<Run>((cursor) => api.listRuns(cursor).then((d) => ({ items: d.runs, next: d.next })), []);
 
   const groups = groupRunsByTicket(runs);
@@ -73,7 +91,7 @@ export default function RunsPage() {
   return (
     <div>
          <div className="mb-8">
-           <h1 className="text-xl font-semibold text-zinc-100">Runs</h1>
+           <h1 className="text-2xl font-bold text-zinc-100">Runs</h1>
            <p className="text-sm text-zinc-500 mt-1">
              All agent runs across your repositories.
            </p>
@@ -81,23 +99,36 @@ export default function RunsPage() {
       {loading ? (
         <TableSkeleton rows={5} cols={5} />
       ) : error ? (
-        <div className="text-red-400 border border-red-500/20 bg-red-500/5 rounded-lg p-8 text-center">
-          <p className="text-sm">Failed to load runs. Please refresh.</p>
-        </div>
+        <Callout variant="error" title="Runs could not be loaded">
+          <p>The server did not answer. Try again in a moment.</p>
+          <button type="button" onClick={reload} className={`${secondaryButton} mt-2`}>
+            Try again
+          </button>
+        </Callout>
       ) : runs.length === 0 ? (
         <div className="text-zinc-500 border border-zinc-800 rounded-lg p-8 text-center">
-          <p className="text-lg mb-2">No runs yet</p>
-          <p className="text-sm">Assign an issue to the Coderhelm bot to start a run.</p>
+          <p className="text-lg text-zinc-300 mb-2">No runs yet</p>
+          <p className="text-sm">
+            Assign a GitHub issue to the Coderhelm bot, add the <code className="text-zinc-300">coderhelm</code> label to it, or
+            send a Jira ticket to start a run.
+          </p>
+          <p className="text-sm mt-2">
+            Or{" "}
+            <Link href="/plans/new" className={`text-zinc-300 underline underline-offset-4 hover:text-zinc-100 rounded ${focusRing}`}>
+              write a plan
+            </Link>{" "}
+            and let Coderhelm do the tasks.
+          </p>
         </div>
       ) : (
-        <div className="border border-zinc-800 rounded-lg overflow-hidden">
+        <div className="relative border border-zinc-800 rounded-lg overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-zinc-900 text-zinc-400 text-left">
               <tr>
-                <th className="px-4 py-3 font-medium">Title</th>
-                <th className="px-4 py-3 font-medium">Repo</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Time</th>
+                <th scope="col" className="px-4 py-3 font-medium">Title</th>
+                <th scope="col" className="hidden sm:table-cell px-4 py-3 font-medium">Repo</th>
+                <th scope="col" className="hidden sm:table-cell px-4 py-3 font-medium">Status</th>
+                <th scope="col" className="hidden sm:table-cell px-4 py-3 font-medium">Started</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
@@ -121,7 +152,7 @@ export default function RunsPage() {
           </table>
         </div>
       )}
-      <LoadMoreButton hasMore={!!next} loading={loadingMore} onClick={loadMore} />
+      <LoadMoreButton hasMore={!!next} loading={loadingMore} onClick={loadMore} failed={moreFailed} />
     </div>
   );
 }
@@ -142,13 +173,16 @@ function TicketGroup({
   return (
     <>
       {/* Latest attempt row */}
-      <tr className="hover:bg-zinc-900/50 cursor-pointer">
+      <tr className="hover:bg-zinc-900/50">
         <td className="px-4 py-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2">
             {hasMultiple && (
               <button
+                type="button"
                 onClick={onToggle}
-                className="text-zinc-500 hover:text-zinc-300 transition-colors shrink-0"
+                aria-expanded={isExpanded}
+                aria-label={`${isExpanded ? "Hide" : "Show"} ${group.attempts.length - 1} earlier attempt${group.attempts.length === 2 ? "" : "s"}`}
+                className={`mt-0.5 rounded text-zinc-500 hover:text-zinc-300 transition-colors shrink-0 ${focusRing}`}
               >
                 <svg
                   className={`w-3.5 h-3.5 transition-transform ${isExpanded ? "rotate-90" : ""}`}
@@ -156,33 +190,46 @@ function TicketGroup({
                   viewBox="0 0 24 24"
                   stroke="currentColor"
                   strokeWidth={2}
+                  aria-hidden="true"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                 </svg>
               </button>
             )}
-            <div>
-              <Link href={`/runs/detail?id=${latest.run_id}`} className="text-zinc-100 hover:underline font-medium">
-                {latest.title}
+            <div className="min-w-0">
+              <Link
+                href={`/runs/detail?id=${encodeURIComponent(latest.run_id)}`}
+                className={`text-zinc-100 hover:underline font-medium break-words rounded ${focusRing}`}
+              >
+                {runTitle(latest)}
               </Link>
               {hasMultiple && (
-                <span className="ml-2 text-[10px] text-zinc-500 border border-zinc-700 rounded px-1.5 py-0.5">
+                <span className="ml-2 text-[10px] text-zinc-500 border border-zinc-700 rounded px-1.5 py-0.5 whitespace-nowrap">
                   {group.attempts.length} attempts
                 </span>
               )}
+              {/* On a phone the status, repo and time columns are hidden; show them here. */}
+              <div className="sm:hidden mt-1.5 space-y-1.5 text-xs text-zinc-500">
+                <RunStatusBadge status={latest.status} />
+                <p>
+                  <span className="font-mono break-all">{latest.repo}</span>
+                  {" · "}
+                  <span className="whitespace-nowrap">{formatTimeAgo(latest.created_at)}</span>
+                </p>
+              </div>
             </div>
           </div>
         </td>
-        <td className="px-4 py-3 text-zinc-400 font-mono text-xs">{latest.repo}</td>
-        <td className="px-4 py-3">
-          <StatusBadge status={latest.status} />
+        <td className="hidden sm:table-cell px-4 py-3 text-zinc-400 font-mono text-xs break-all">{latest.repo}</td>
+        <td className="hidden sm:table-cell px-4 py-3">
+          <RunStatusBadge status={latest.status} />
         </td>
-        <td className="px-4 py-3">
-          <time title={new Date(latest.created_at).toLocaleString()} className="text-zinc-400 text-xs">
+        <td className="hidden sm:table-cell px-4 py-3 whitespace-nowrap">
+          <time dateTime={latest.created_at} title={new Date(latest.created_at).toLocaleString()} className="text-zinc-400 text-xs">
             {formatTimeAgo(latest.created_at)}
           </time>
           {latest.duration_s != null && latest.duration_s > 0 && (
-            <span className="block text-zinc-600 text-xs">{latest.duration_s}s</span>
+            <span className="block text-zinc-600 text-xs">took {formatDuration(latest.duration_s)}</span>
           )}
         </td>
       </tr>
@@ -192,45 +239,31 @@ function TicketGroup({
         group.attempts.slice(1).map((run, i) => (
           <tr key={run.run_id} className="bg-zinc-950/50 hover:bg-zinc-900/30">
             <td className="px-4 py-2 pl-10">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[10px] text-zinc-600 font-mono">#{group.attempts.length - i - 1}</span>
-                <Link href={`/runs/detail?id=${run.run_id}`} className="text-zinc-500 hover:text-zinc-300 hover:underline text-xs">
-                  {run.title}
+                <Link
+                  href={`/runs/detail?id=${encodeURIComponent(run.run_id)}`}
+                  className={`text-zinc-500 hover:text-zinc-300 hover:underline text-xs break-words rounded ${focusRing}`}
+                >
+                  {runTitle(run)}
                 </Link>
+                <span className="sm:hidden"><RunStatusBadge status={run.status} /></span>
               </div>
             </td>
-            <td className="px-4 py-2 text-zinc-600 font-mono text-xs">{run.repo}</td>
-            <td className="px-4 py-2">
-              <StatusBadge status={run.status} />
+            <td className="hidden sm:table-cell px-4 py-2 text-zinc-600 font-mono text-xs break-all">{run.repo}</td>
+            <td className="hidden sm:table-cell px-4 py-2">
+              <RunStatusBadge status={run.status} />
             </td>
-            <td className="px-4 py-2">
-              <time title={new Date(run.created_at).toLocaleString()} className="text-zinc-600 text-xs">
+            <td className="hidden sm:table-cell px-4 py-2 whitespace-nowrap">
+              <time dateTime={run.created_at} title={new Date(run.created_at).toLocaleString()} className="text-zinc-600 text-xs">
                 {formatTimeAgo(run.created_at)}
               </time>
               {run.duration_s != null && run.duration_s > 0 && (
-                <span className="block text-zinc-600 text-xs">{run.duration_s}s</span>
+                <span className="block text-zinc-600 text-xs">took {formatDuration(run.duration_s)}</span>
               )}
             </td>
           </tr>
         ))}
     </>
   );
-}
-
-function StatusBadge({ status }: { status: string }) {
-   const map: Record<string, { dot: string; text: string; bg: string }> = {
-     running: { dot: "bg-blue-400", text: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20" },
-     awaiting_ci: { dot: "bg-cyan-400", text: "text-cyan-400", bg: "bg-cyan-500/10 border-cyan-500/20" },
-     completed: { dot: "bg-emerald-400", text: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
-     failed: { dot: "bg-red-400", text: "text-red-400", bg: "bg-red-500/10 border-red-500/20" },
-     pending: { dot: "bg-yellow-400", text: "text-yellow-400", bg: "bg-yellow-500/10 border-yellow-500/20" },
-     cancelled: { dot: "bg-amber-400", text: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },
-   };
-   const s = map[status] ?? { dot: "bg-zinc-500", text: "text-zinc-400", bg: "bg-zinc-800 border-zinc-700" };
-   return (
-     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${s.bg} ${s.text}`}>
-       <span className={`w-1.5 h-1.5 rounded-full ${s.dot} ${status === "running" || status === "awaiting_ci" ? "animate-pulse" : ""}`} />
-       {status === "awaiting_ci" ? "Awaiting CI" : status}
-     </span>
-   );
 }

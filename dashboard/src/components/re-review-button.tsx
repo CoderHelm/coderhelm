@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { focusRing } from "@/components/ui";
 
 /** Queue a fresh review of a PR's current head — no GitHub label or comment needed. */
 export function ReReviewButton({
   repo,
   pr,
-  label = "Re-review",
+  label = "Review again",
   className = "",
 }: {
   repo: string;
@@ -35,11 +36,13 @@ export function ReReviewButton({
 
   return (
     <button
+      type="button"
       onClick={run}
       disabled={busy || !repo || !pr}
-      className={`text-xs px-2.5 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 transition-colors disabled:opacity-50 ${className}`}
+      aria-label={label === "Review again" ? `Review ${repo} #${pr} again` : undefined}
+      className={`text-xs px-2.5 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 transition-colors disabled:opacity-50 ${focusRing} ${className}`}
     >
-      {busy ? "Queuing…" : label}
+      {busy ? "Queueing…" : label}
     </button>
   );
 }

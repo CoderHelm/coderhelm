@@ -113,8 +113,12 @@ function handler(event) {
     // CloudFront distribution
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       defaultBehavior: {
+        // LIST lets S3 answer 404 for a page that does not exist. With READ
+        // only, S3 hides missing keys behind 403, so a mistyped address
+        // showed "Access denied" instead of "Page not found".
         origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket, {
           originAccessControl: oac,
+          originAccessLevels: [cloudfront.AccessLevel.READ, cloudfront.AccessLevel.LIST],
         }),
         viewerProtocolPolicy:
           cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,

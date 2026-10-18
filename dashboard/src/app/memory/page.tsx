@@ -66,6 +66,8 @@ export default function MemoryPage() {
   const { toast } = useToast();
   const { confirm } = useConfirm();
   const [repos, setRepos] = useState<Repo[] | null>(null);
+  const [reposError, setReposError] = useState("");
+  const [reposAttempt, setReposAttempt] = useState(0);
   const [repo, setRepo] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -86,6 +88,11 @@ export default function MemoryPage() {
 
   useEffect(() => {
     api.me().then((u) => setIsAdmin((ROLE_LEVEL[u.role] ?? 0) >= 3)).catch(() => setIsAdmin(false));
+  }, []);
+
+  useEffect(() => {
+    setRepos(null);
+    setReposError("");
     api
       .listRepos()
       .then(({ repos }) => {
@@ -93,8 +100,9 @@ export default function MemoryPage() {
         setRepos(enabled);
         if (enabled.length > 0) setRepo((cur) => cur || enabled[0].name);
       })
-      .catch(() => setRepos([]));
-  }, []);
+      // A failed request is not "no repositories": say so and offer a retry.
+      .catch((e) => setReposError(errorText(e, "The request failed.")));
+  }, [reposAttempt]);
 
   // Searching waits for a pause in typing.
   useEffect(() => {
@@ -187,7 +195,7 @@ export default function MemoryPage() {
     <div className="max-w-5xl">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold">Memory</h1>
+          <h1 className="text-2xl font-bold text-zinc-100">Memory</h1>
           <p className="mt-1 max-w-2xl text-sm text-zinc-400">
             What Coderhelm knows about each repository, where it learned it, and what each agent actually uses.
           </p>
@@ -199,7 +207,14 @@ export default function MemoryPage() {
         )}
       </div>
 
-      {repos === null ? (
+      {reposError ? (
+        <div className="mt-6">
+          <Callout variant="error" title="We couldn't load your repositories">
+            <p>{reposError}</p>
+            <p><button type="button" onClick={() => setReposAttempt((n) => n + 1)} className={linkButton}>Try again</button></p>
+          </Callout>
+        </div>
+      ) : repos === null ? (
         <div className="mt-6"><Skeleton className="h-10 w-64" /></div>
       ) : repos.length === 0 ? (
         <div className="mt-6">
@@ -229,7 +244,8 @@ export default function MemoryPage() {
             <h2 id="agents-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">Who knows what</h2>
             {profilesError ? (
               <Callout variant="error" title="We couldn't load the agents">
-                <p>{profilesError} Reload the page to try again.</p>
+                <p>{profilesError}</p>
+                <p><button type="button" onClick={refresh} className={linkButton}>Try again</button></p>
               </Callout>
             ) : profiles === null ? (
               <div className="grid gap-3 sm:grid-cols-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-36" />)}</div>
@@ -325,7 +341,8 @@ export default function MemoryPage() {
             <div className="mt-4">
               {listError ? (
                 <Callout variant="error" title="We couldn't load the memories">
-                  <p>{listError} Your agents still use them. Reload the page to try again.</p>
+                  <p>{listError} Your agents still use them.</p>
+                  <p><button type="button" onClick={refresh} className={linkButton}>Try again</button></p>
                 </Callout>
               ) : memories === null ? (
                 <div className="flex flex-col gap-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-24" />)}</div>

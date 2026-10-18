@@ -34,7 +34,7 @@ const ORDER: Record<RunOutcome, number> = { failed: 0, flaky: 1, passed: 2, skip
 function RunDetail() {
   const key = useSearchParams().get("key") || "";
   const [filter, setFilter] = useState<Filter>("problems");
-  const { data, error, loading, reload } = useLoad(() => api.getTestRun(key), `run:${key}`);
+  const { data, error, loading, reload } = useLoad(() => (key ? api.getTestRun(key) : Promise.resolve(null)), `run:${key}`);
 
   const executions = useMemo(() => {
     const list = [...(data?.executions ?? [])].sort((a, b) => ORDER[a.outcome] - ORDER[b.outcome] || a.title.localeCompare(b.title));

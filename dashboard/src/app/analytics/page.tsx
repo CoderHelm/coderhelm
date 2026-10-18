@@ -7,6 +7,7 @@ import { api, type Analytics, type AnalyticsDays, type AnalyticsSummary } from "
 import { CardSkeleton, ChartSkeleton } from "@/components/skeleton";
 import { Segmented } from "@/components/segmented";
 import { Callout } from "@/components/callout";
+import { focusRing } from "@/components/ui";
 
 // Categorical slots for the dark chart surface, checked for color-vision
 // separation and contrast (blue, orange). Text never takes a series color.
@@ -90,7 +91,7 @@ function ChartCard({ title, children, table }: { title: string; children: ReactN
     <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="text-sm font-medium text-zinc-200">{title}</h3>
-        <button type="button" onClick={() => setShowTable((v) => !v)} className="text-xs text-zinc-400 underline-offset-2 hover:text-zinc-200 hover:underline">
+        <button type="button" onClick={() => setShowTable((v) => !v)} aria-label={`${showTable ? "Show chart" : "Show table"}: ${title}`} className={`rounded text-xs text-zinc-400 underline-offset-2 hover:text-zinc-200 hover:underline ${focusRing}`}>
           {showTable ? "Show chart" : "Show table"}
         </button>
       </div>
@@ -205,7 +206,7 @@ export default function AnalyticsPage() {
             aria-label="Repository"
             value={repo}
             onChange={(e) => setRepo(e.target.value)}
-            className="min-h-8 max-w-[220px] truncate rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm text-zinc-100"
+            className={`min-h-8 max-w-[220px] truncate rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 ${focusRing}`}
           >
             <option value="">All repositories</option>
             {repoNames.map((r) => (
@@ -219,7 +220,7 @@ export default function AnalyticsPage() {
         <div className="mt-6">
           <Callout variant="error" title="We couldn't load analytics">
             <p>{error} Your data is not affected.</p>
-            <button type="button" onClick={() => void load()} className="mt-2 text-sm font-medium underline">Try again</button>
+            <button type="button" onClick={() => void load()} className={`mt-2 rounded text-sm font-medium underline ${focusRing}`}>Try again</button>
           </Callout>
         </div>
       ) : loading && !data ? (
@@ -462,7 +463,7 @@ function TimeSaved({ merged, days }: { merged: number; days: number }) {
             onChange={(e) => save(e.target.value)}
             placeholder="minutes"
             aria-label="Minutes a person would spend on one PR"
-            className="w-24 rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1 text-zinc-100"
+            className={`w-24 rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1 text-zinc-100 ${focusRing}`}
           />
           <span>minutes,</span>
         </label>

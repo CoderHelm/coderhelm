@@ -6,6 +6,8 @@ import { api, type AlertEvent } from "@/lib/api";
 import { TableSkeleton } from "@/components/skeleton";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
+import { Callout } from "@/components/callout";
+import { linkButton, secondaryButton } from "@/components/ui";
 import { OutcomeBadge, formatWhen } from "./outcome";
 
 export default function AlertsHistoryGuarded() {
@@ -22,19 +24,26 @@ function AlertsHistory() {
   const [next, setNext] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState("");
 
   const load = useCallback(
     (after?: string) => {
       const first = !after;
-      if (first) setLoading(true);
-      else setLoadingMore(true);
+      if (first) {
+        setLoading(true);
+        setError("");
+      } else setLoadingMore(true);
       api
         .listAlerts(after)
         .then((r) => {
           setAlerts((prev) => (first ? r.alerts : [...prev, ...r.alerts]));
           setNext(r.next ?? null);
         })
-        .catch(() => toast("Failed to load alerts", "error"))
+        .catch((e) => {
+          // A failed first page must not read as "no alerts yet".
+          if (first) setError(e instanceof Error && e.message ? e.message : "The request failed.");
+          else toast("Couldn't load more alerts. Try again.", "error");
+        })
         .finally(() => {
           setLoading(false);
           setLoadingMore(false);
@@ -50,10 +59,10 @@ function AlertsHistory() {
   return (
     <div className="max-w-5xl">
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-zinc-100">Alerts</h1>
+        <h1 className="text-2xl font-bold text-zinc-100">Alerts</h1>
         <p className="text-sm text-zinc-500 mt-1">
-          Every alert CoderHelm received on your alert routes and what it did with it. Open one to share its link.{" "}
-          <Link href="/settings/alerts" className="text-zinc-400 hover:text-zinc-200 underline">
+          Every alert Coderhelm received on your alert routes and what it did with it. Open one to share its link.{" "}
+          <Link href="/settings/alerts" className={linkButton}>
             Alert routes
           </Link>
         </p>
@@ -61,6 +70,15 @@ function AlertsHistory() {
 
       {loading ? (
         <TableSkeleton rows={5} cols={4} />
+      ) : error ? (
+        <Callout variant="error" title="We couldn't load your alerts">
+          <p>{error}</p>
+          <p>
+            <button type="button" onClick={() => load()} className={linkButton}>
+              Try again
+            </button>
+          </p>
+        </Callout>
       ) : alerts.length === 0 ? (
         <div className="text-zinc-500 border border-zinc-800 rounded-lg p-8 text-center">
           <p className="text-lg mb-2">No alerts yet</p>
@@ -98,12 +116,8 @@ function AlertsHistory() {
         </div>
       )}
 
-      {next && !loading && (
-        <button
-          onClick={() => load(next)}
-          disabled={loadingMore}
-          className="mt-4 text-sm px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 disabled:opacity-50"
-        >
+      {next && !loading && !error && (
+        <button type="button" onClick={() => load(next)} disabled={loadingMore} className={`${secondaryButton} mt-4`}>
           {loadingMore ? "Loading…" : "Load more"}
         </button>
       )}

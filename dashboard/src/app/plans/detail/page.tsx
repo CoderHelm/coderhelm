@@ -3,53 +3,20 @@
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, type Plan, type Task, type Repo, type JiraCheck, type Openspec, type Template } from "@/lib/api";
+import { api, type Plan, type Task, type Repo, type Openspec, errorStatus } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Skeleton, TableSkeleton } from "@/components/skeleton";
 import { RepoCombobox } from "@/components/repo-combobox";
 import { ChatMarkdown } from "@/components/chat-markdown";
-
-const TASK_STATUS_STYLES: Record<string, string> = {
-  draft: "bg-zinc-800 text-zinc-400 border-zinc-700",
-  approved: "bg-green-500/10 text-green-400 border-green-500/20",
-  rejected: "bg-red-500/10 text-red-400 border-red-500/20",
-  queued: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-  running: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  done: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  waiting: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-};
-
-const TASK_BORDER_COLORS: Record<string, string> = {
-  draft: "border-l-zinc-700",
-  approved: "border-l-green-500/50",
-  rejected: "border-l-red-500/50",
-  queued: "border-l-yellow-500/50",
-  running: "border-l-blue-500",
-  done: "border-l-emerald-500",
-  waiting: "border-l-orange-500/50",
-};
-
-const TASK_DOT_COLORS: Record<string, string> = {
-  draft: "bg-zinc-700",
-  approved: "bg-green-500/60",
-  rejected: "bg-red-500/60",
-  queued: "bg-yellow-500/60",
-  running: "bg-blue-500",
-  done: "bg-emerald-500",
-  waiting: "bg-orange-500/60",
-};
-
-const PLAN_STATUS_STYLES: Record<string, string> = {
-  draft: "bg-zinc-800 text-zinc-400 border-zinc-700",
-  executing: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  waiting: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-  done: "bg-green-500/10 text-green-400 border-green-500/20",
-};
+import { Callout } from "@/components/callout";
+import { CopyButton } from "@/components/copy-button";
+import { focusRing, inputClass, linkButton } from "@/components/ui";
+import { PlanStatusPill, TaskStatusPill, TASK_ORDER, taskInfo } from "../status";
 
 export default function PlanDetailPage() {
   return (
-    <Suspense fallback={<div className="max-w-3xl"><Skeleton className="h-6 w-64 mb-2" /><Skeleton className="h-4 w-96 mb-6" /><TableSkeleton rows={4} cols={3} /></div>}>
+    <Suspense fallback={<div className="max-w-3xl"><Skeleton className="h-6 w-full max-w-64 mb-2" /><Skeleton className="h-4 w-full max-w-96 mb-6" /><TableSkeleton rows={4} cols={3} /></div>}>
       <PlanDetail />
     </Suspense>
   );
@@ -61,6 +28,8 @@ function PlanDetail() {
   const planId = searchParams.get("id") ?? "";
   const [plan, setPlan] = useState<(Plan & { tasks: Task[] }) | null>(null);
   const [loading, setLoading] = useState(true);
+  // "missing" = the API answered 404; "failed" = anything else (offline, 500).
+  const [loadError, setLoadError] = useState<"missing" | "failed" | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Task>>({});
@@ -88,16 +57,20 @@ function PlanDetail() {
     api.getJiraCheck().then((c) => setJiraReady(c.ready)).catch(() => {});
   }, []);
 
+  // Reload in place: the skeleton shows only on the first load, so approving or
+  // editing a task does not blank the page and lose the scroll position.
   const refresh = useCallback(() => {
     if (!planId) return;
-    setLoading(true);
     api.getPlan(planId)
       .then((p) => {
         setPlan(p);
+        setLoadError(null);
       })
-      .catch(() => toast("Failed to load plan", "error"))
+      .catch((e: unknown) => {
+        setLoadError(errorStatus(e) === 400 || errorStatus(e) === 404 ? "missing" : "failed");
+      })
       .finally(() => setLoading(false));
-  }, [planId, toast]);
+  }, [planId]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -189,23 +162,24 @@ function PlanDetail() {
     setExecuting(true);
     try {
       const result = await api.approveAllAndExecute(planId);
-      toast(`Executing — ${result.tasks_queued} task${result.tasks_queued !== 1 ? "s" : ""} queued`);
+      toast(`Started: ${result.tasks_queued} task${result.tasks_queued !== 1 ? "s" : ""} queued`);
       refresh();
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Failed to execute plan", "error");
+      toast(e instanceof Error ? e.message : "Couldn't start the plan", "error");
     } finally {
       setExecuting(false);
     }
   };
 
   const handleDeletePlan = async () => {
-    if (!(await confirm({ title: "Delete Plan", message: "Delete this plan and all its tasks? This cannot be undone.", confirmLabel: "Delete", destructive: true }))) return;
+    if (!(await confirm({ title: "Delete plan", message: "Delete this plan and all its tasks? This cannot be undone.", confirmLabel: "Delete", destructive: true }))) return;
     try {
       await api.deletePlan(planId);
       toast("Plan deleted");
       router.push("/plans");
-    } catch {
-      toast("Failed to delete plan", "error");
+    } catch (e) {
+      // Deleting a plan needs an admin; say so instead of a bare failure.
+      toast(e instanceof Error && e.message.includes("403") ? "Only admins can delete plans" : "Couldn't delete the plan", "error");
     }
   };
 
@@ -220,7 +194,7 @@ function PlanDetail() {
         category: templateForm.category.trim() || undefined,
         tags,
       });
-      toast("Template saved!");
+      toast("Saved as a template");
       setShowTemplateModal(false);
     } catch {
       toast("Failed to save template", "error");
@@ -231,7 +205,7 @@ function PlanDetail() {
 
   const openTemplateModal = () => {
     setTemplateForm({
-      title: (plan?.title ?? "") + " Template",
+      title: (plan?.title ?? "") + " template",
       description: plan?.description ?? "",
       category: "",
       tags: "",
@@ -258,7 +232,7 @@ function PlanDetail() {
       await api.generatePlanOpenspec(planId);
       const data = await api.getPlanOpenspec(planId);
       setOpenspec(data);
-      toast("Openspec generated!");
+      toast("Openspec written");
     } catch {
       toast("Failed to generate openspec", "error");
     } finally {
@@ -297,17 +271,17 @@ function PlanDetail() {
   if (!planId) {
     return (
       <div className="max-w-3xl">
-        <Link href="/plans" className="text-zinc-500 hover:text-zinc-300 text-sm">← Plans</Link>
-        <p className="text-zinc-500 mt-4">No plan selected.</p>
+        <Link href="/plans" className={`text-zinc-500 hover:text-zinc-300 text-sm rounded ${focusRing}`}>← Plans</Link>
+        <p className="text-zinc-500 mt-4">No plan selected. Pick one from the plans list.</p>
       </div>
     );
   }
 
-  if (loading) {
+  if (loading && !plan) {
     return (
       <div className="max-w-3xl">
-        <Skeleton className="h-6 w-64 mb-2" />
-        <Skeleton className="h-4 w-96 mb-6" />
+        <Skeleton className="h-6 w-full max-w-64 mb-2" />
+        <Skeleton className="h-4 w-full max-w-96 mb-6" />
         <TableSkeleton rows={4} cols={3} />
       </div>
     );
@@ -315,30 +289,40 @@ function PlanDetail() {
 
   if (!plan) {
     return (
-      <div className="max-w-3xl">
-        <Link href="/plans" className="text-zinc-500 hover:text-zinc-300 text-sm">← Plans</Link>
-        <p className="text-zinc-500 mt-4">Plan not found.</p>
+      <div className="max-w-3xl space-y-4">
+        <Link href="/plans" className={`text-zinc-500 hover:text-zinc-300 text-sm rounded ${focusRing}`}>← Plans</Link>
+        {loadError === "missing" ? (
+          <Callout variant="warning" title="Plan not found">
+            <p>It may have been deleted, or it belongs to another team.</p>
+          </Callout>
+        ) : (
+          <Callout variant="error" title="Couldn't load this plan">
+            <button type="button" onClick={() => { setLoading(true); refresh(); }} className={linkButton}>
+              Try again
+            </button>
+          </Callout>
+        )}
       </div>
     );
   }
 
   return (
     <div className="max-w-3xl">
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <Link href="/plans" className="text-zinc-500 hover:text-zinc-300 text-sm">← Plans</Link>
-          <h1 className="text-2xl font-bold mt-1">{plan.title}</h1>
+      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+        <div className="min-w-0">
+          <Link href="/plans" className={`text-zinc-500 hover:text-zinc-300 text-sm rounded ${focusRing}`}>← Plans</Link>
+          <h1 className="text-2xl font-bold text-zinc-100 mt-1 break-words">{plan.title || "Untitled plan"}</h1>
           {plan.description && <p className="text-zinc-400 text-sm mt-1">{plan.description}</p>}
-          <div className="flex items-center gap-3 mt-2">
-            {plan.repo && <span className="text-xs text-zinc-600 font-mono">{plan.repo}</span>}
-            <span className={`px-2 py-0.5 rounded-full text-xs border ${PLAN_STATUS_STYLES[plan.status] || PLAN_STATUS_STYLES.draft}`}>{plan.status}</span>
-            <span className="text-xs text-zinc-600">{plan.tasks.length} tasks</span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-2">
+            {plan.repo && <span className="text-xs text-zinc-500 font-mono break-all">{plan.repo}</span>}
+            <PlanStatusPill status={plan.status} />
+            <span className="text-xs text-zinc-500">{plan.tasks.length} task{plan.tasks.length === 1 ? "" : "s"}</span>
             {((plan.tokens_in ?? 0) + (plan.tokens_out ?? 0)) > 0 && (
-              <span className="text-xs text-zinc-600">{(((plan.tokens_in ?? 0) + (plan.tokens_out ?? 0)) / 1000).toFixed(1)}K tokens</span>
+              <span className="text-xs text-zinc-500">{(((plan.tokens_in ?? 0) + (plan.tokens_out ?? 0)) / 1000).toFixed(1)}K tokens</span>
             )}
             {plan.mcp_servers && plan.mcp_servers.length > 0 && (
               <>
-                <span className="text-xs text-zinc-600">MCP Servers:</span>
+                <span className="text-xs text-zinc-500">MCP servers:</span>
                 {plan.mcp_servers.map((id) => (
                     <span key={id} className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 border border-zinc-700 text-zinc-300">
                       {id}
@@ -348,57 +332,46 @@ function PlanDetail() {
             )}
           </div>
         </div>
-        {plan.status === "draft" && draftCount > 0 && (
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={openTemplateModal}
+            className={`min-h-9 px-3 py-2 text-zinc-400 hover:text-zinc-200 text-sm border border-zinc-700 rounded-lg transition-colors ${focusRing}`}
+          >
+            Save as template
+          </button>
+          <button
+            type="button"
+            onClick={handleDeletePlan}
+            className={`min-h-9 px-3 py-2 text-zinc-500 hover:text-red-400 text-sm rounded-lg transition-colors ${focusRing}`}
+          >
+            Delete
+          </button>
+          {plan.status === "draft" && draftCount > 0 && (
             <button
-              onClick={openTemplateModal}
-              className="px-3 py-2 text-zinc-500 hover:text-zinc-300 text-sm border border-zinc-700 rounded-lg transition-colors"
-            >
-              Save as Template
-            </button>
-            <button
-              onClick={handleDeletePlan}
-              className="px-3 py-2 text-zinc-600 hover:text-red-400 text-sm transition-colors"
-            >
-              Delete
-            </button>
-            <button
+              type="button"
               onClick={handleExecute}
               disabled={executing}
-              className="px-5 py-2.5 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-40"
+              className={`min-h-9 px-5 py-2 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-40 ${focusRing}`}
             >
-              {executing ? "Executing..." : "Approve"}
+              {executing ? "Starting…" : "Approve all and start"}
             </button>
-          </div>
-        )}
-        {plan.status !== "draft" && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={openTemplateModal}
-              className="px-3 py-2 text-zinc-500 hover:text-zinc-300 text-sm border border-zinc-700 rounded-lg transition-colors"
-            >
-              Save as Template
-            </button>
-            <button
-              onClick={handleDeletePlan}
-              className="px-3 py-2 text-zinc-600 hover:text-red-400 text-sm transition-colors"
-            >
-              Delete
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Plan-level destination picker */}
-      <div className="mb-6 flex items-center gap-3 p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+      <div className="mb-6 flex flex-wrap items-center gap-3 p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
         <span className="text-xs text-zinc-500 uppercase tracking-wider font-medium whitespace-nowrap">Destination</span>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Destination">
           {(["github", "jira"] as const).map((d) => (
             <button
               key={d}
+              type="button"
+              aria-pressed={(plan.destination ?? "github") === d}
               disabled={(d === "jira" && !jiraReady) || updatingDest || plan.status !== "draft"}
               onClick={() => handleChangeDestination(d)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${focusRing} ${
                 d === "jira" && !jiraReady ? "opacity-40 cursor-not-allowed" :
                 plan.status !== "draft" ? "cursor-default" :
                 "cursor-pointer"
@@ -419,14 +392,14 @@ function PlanDetail() {
             </button>
           ))}
         </div>
-        {!jiraReady && <span className="text-xs text-zinc-600">Connect Jira in Settings to enable</span>}
-        {plan.status !== "draft" && <span className="text-xs text-zinc-600">Locked after execution starts</span>}
+        {!jiraReady && plan.status === "draft" && <span className="text-xs text-zinc-500">Connect Jira in <Link href="/settings/jira" className="underline hover:text-zinc-300">settings</Link> to send tasks there</span>}
+        {plan.status !== "draft" && <span className="text-xs text-zinc-500">Locked once the plan starts</span>}
       </div>
 
       {plan.tasks.length > 0 && (plan.status === "executing" || plan.status === "done") && (
         <div className="mb-6">
           <div className="flex items-center justify-between text-xs mb-2">
-            <span className="text-zinc-500">Execution progress</span>
+            <span className="text-zinc-500">Progress</span>
             <span className="text-zinc-400 font-medium">
               {plan.tasks.filter((t) => t.status === "done").length} / {plan.tasks.length} complete
             </span>
@@ -443,11 +416,11 @@ function PlanDetail() {
       )}
 
       {plan.tasks.length > 0 && plan.status === "draft" && (
-        <div className="grid grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           {[
             { label: "Draft", count: draftCount, style: "text-zinc-400" },
             { label: "Approved", count: approvedCount, style: "text-green-400" },
-            { label: "Rejected", count: plan.tasks.filter((t) => t.status === "rejected").length, style: "text-red-400" },
+            { label: "Skipped", count: plan.tasks.filter((t) => t.status === "rejected").length, style: "text-red-400" },
             { label: "Total", count: plan.tasks.length, style: "text-zinc-300" },
           ].map(({ label, count, style }) => (
             <div key={label} className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg text-center">
@@ -459,38 +432,40 @@ function PlanDetail() {
       )}
 
       {/* Tab bar */}
-      <div className="flex items-center gap-1 border-b border-zinc-800 mb-4">
-        <button onClick={() => setActiveTab('tasks')} className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'tasks' ? 'text-zinc-100 border-zinc-100' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}>
+      <div role="tablist" aria-label="Plan views" className="flex items-center gap-1 border-b border-zinc-800 mb-4">
+        <button type="button" role="tab" aria-selected={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} className={`px-3 py-2 text-sm font-medium border-b-2 rounded-t transition-colors ${focusRing} ${activeTab === 'tasks' ? 'text-zinc-100 border-zinc-100' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}>
           Tasks ({plan.tasks.length})
         </button>
-        <button onClick={() => { setActiveTab('openspec'); loadOpenspec(); }} className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'openspec' ? 'text-zinc-100 border-zinc-100' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}>
+        <button type="button" role="tab" aria-selected={activeTab === 'openspec'} onClick={() => { setActiveTab('openspec'); loadOpenspec(); }} className={`px-3 py-2 text-sm font-medium border-b-2 rounded-t transition-colors ${focusRing} ${activeTab === 'openspec' ? 'text-zinc-100 border-zinc-100' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}>
           Openspec
         </button>
       </div>
 
       {activeTab === 'openspec' && (
         <div>
-          {!openspec ? (
+          {!openspec && openspecLoading ? (
+            <p className="text-sm text-zinc-500 text-center py-12">Loading…</p>
+          ) : !openspec ? (
             <div className="text-center py-12">
               <p className="text-sm text-zinc-500 mb-4">Generate an Openspec to document this plan&apos;s proposal, design, tasks, and acceptance criteria.</p>
-              <button onClick={generateOpenspec} disabled={openspecLoading} className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-semibold hover:bg-white disabled:opacity-50">
+              <button type="button" onClick={generateOpenspec} disabled={openspecLoading} className={`min-h-9 px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-semibold hover:bg-white disabled:opacity-50 ${focusRing}`}>
                 {openspecLoading ? 'Generating...' : 'Generate Openspec'}
               </button>
             </div>
           ) : (
             <div className="space-y-6">
               <div className="flex justify-end">
-                <button onClick={downloadOpenspec} className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-400 border border-zinc-700 rounded-lg hover:text-zinc-200 hover:border-zinc-600 transition-colors">
-                  Download All
+                <button type="button" onClick={downloadOpenspec} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-400 border border-zinc-700 rounded-lg hover:text-zinc-200 hover:border-zinc-600 transition-colors ${focusRing}`}>
+                  Download all
                 </button>
               </div>
               {(['proposal', 'design', 'tasks', 'spec'] as const).map(file => (
                 <div key={file} className="rounded-lg border border-zinc-800 overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-2 bg-zinc-800/50 border-b border-zinc-800">
                     <span className="text-sm font-medium text-zinc-300">{file}.md</span>
-                    <button onClick={() => navigator.clipboard.writeText(openspec[file] ?? '')} className="text-xs text-zinc-500 hover:text-zinc-300">Copy</button>
+                    <CopyButton text={openspec[file] ?? ''} label={<>Copy<span className="sr-only"> {file}.md</span></>} />
                   </div>
-                  <div className="p-4">
+                  <div className="p-4 min-w-0 overflow-x-auto">
                     <ChatMarkdown>{openspec[file] ?? ''}</ChatMarkdown>
                   </div>
                 </div>
@@ -505,32 +480,35 @@ function PlanDetail() {
       {plan.tasks.length > 3 && (
         <div className="mb-4 space-y-3">
           <input
-            type="text"
-            placeholder="Search tasks..."
+            type="search"
+            aria-label="Search tasks"
+            placeholder="Search tasks…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
           />
           <div className="flex items-center gap-2 flex-wrap">
-            {["draft", "approved", "rejected", "queued", "running", "waiting", "done"].map((s) => {
+            {TASK_ORDER.map((s) => {
               const count = plan.tasks.filter((t) => t.status === s).length;
               if (count === 0) return null;
               const active = statusFilters.has(s);
               return (
                 <button
                   key={s}
+                  type="button"
+                  aria-pressed={active}
                   onClick={() => setStatusFilters((prev) => {
                     const next = new Set(prev);
                     if (next.has(s)) next.delete(s); else next.add(s);
                     return next;
                   })}
-                  className={`px-2.5 py-1 rounded-full text-xs border transition-colors cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-full text-xs border transition-colors cursor-pointer ${focusRing} ${
                     active
-                      ? TASK_STATUS_STYLES[s] || TASK_STATUS_STYLES.draft
+                      ? taskInfo(s).style
                       : "bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-zinc-300"
                   }`}
                 >
-                  {s} ({count})
+                  {taskInfo(s).label} ({count})
                 </button>
               );
             })}
@@ -549,8 +527,8 @@ function PlanDetail() {
       {(() => {
         const uniqueRepos = [...new Set(plan.tasks.map((t) => t.repo || plan.repo).filter(Boolean))];
         return uniqueRepos.length > 1 ? (
-          <div className="flex items-center gap-2 text-xs text-zinc-500 mb-3">
-            <span>Multi-repo plan:</span>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500 mb-3">
+            <span>Repos in this plan:</span>
             {uniqueRepos.map((r) => (
               <span key={r} className="px-1.5 py-0.5 bg-zinc-800/50 rounded font-mono text-[10px]">{r}</span>
             ))}
@@ -574,33 +552,34 @@ function PlanDetail() {
               {/* Timeline dot */}
               <div className="absolute left-0 top-5 z-10 flex items-center justify-center">
                 <div
-                  className={`w-[10px] h-[10px] rounded-full ring-2 ring-zinc-950 ${TASK_DOT_COLORS[task.status] || TASK_DOT_COLORS.draft} ${
+                  className={`w-[10px] h-[10px] rounded-full ring-2 ring-zinc-950 ${taskInfo(task.status).dot} ${
                     task.status === "running" ? "animate-pulse" : ""
                   }`}
                 />
               </div>
 
               {/* Task card */}
-              <div className={`ml-8 mb-3 border border-zinc-800 rounded-lg bg-zinc-900/30 border-l-2 ${TASK_BORDER_COLORS[task.status] || TASK_BORDER_COLORS.draft} ${
+              <div className={`ml-8 mb-3 border border-zinc-800 rounded-lg bg-zinc-900/30 border-l-2 ${taskInfo(task.status).border} ${
                 task.status === "running" ? "ring-1 ring-blue-500/20" : ""
               }`}>
                 {editingTask === task.task_id ? (
               <div className="p-4 space-y-3">
-                <input value={editForm.title ?? task.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 focus:outline-none focus:border-zinc-500" />
-                <textarea value={editForm.description ?? task.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} rows={3} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 resize-y" placeholder="Description" />
-                <textarea value={editForm.acceptance_criteria ?? task.acceptance_criteria} onChange={(e) => setEditForm((f) => ({ ...f, acceptance_criteria: e.target.value }))} rows={3} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 resize-y" placeholder="Acceptance criteria" />
+                <input aria-label="Task title" value={editForm.title ?? task.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 focus:outline-none focus:border-zinc-500" />
+                <textarea aria-label="Description" value={editForm.description ?? task.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} rows={3} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 resize-y" placeholder="Description" />
+                <textarea aria-label="Acceptance criteria" value={editForm.acceptance_criteria ?? task.acceptance_criteria} onChange={(e) => setEditForm((f) => ({ ...f, acceptance_criteria: e.target.value }))} rows={3} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 resize-y" placeholder="Acceptance criteria" />
                 {repos.length > 0 ? (
                   <div>
-                    <label className="text-xs text-zinc-500 mb-1 block">Repo override (blank uses plan default)</label>
+                    <label className="text-xs text-zinc-500 mb-1 block">Repo override (blank uses the plan&apos;s repo)</label>
                     <RepoCombobox repos={repos} selected={editForm.repo ?? task.repo ?? ""} onSelect={(v) => setEditForm((f) => ({ ...f, repo: v }))} />
                   </div>
                 ) : (
-                  <input value={editForm.repo ?? task.repo ?? ""} onChange={(e) => setEditForm((f) => ({ ...f, repo: e.target.value }))} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Repo override (owner/repo) — blank uses plan default" />
+                  <input aria-label="Repo override" value={editForm.repo ?? task.repo ?? ""} onChange={(e) => setEditForm((f) => ({ ...f, repo: e.target.value }))} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Repo override (owner/repo), blank uses the plan's repo" />
                 )}
                 {plan.tasks.filter((t) => t.task_id !== task.task_id).length > 0 && (
                   <div>
-                    <label className="text-xs text-zinc-500 mb-1 block">Run after (only start after this task&apos;s PR merges)</label>
+                    <label htmlFor={`edit-dep-${task.task_id}`} className="text-xs text-zinc-500 mb-1 block">Run after (only start after this task&apos;s PR merges)</label>
                     <select
+                      id={`edit-dep-${task.task_id}`}
                       value={editForm.depends_on ?? task.depends_on ?? ""}
                       onChange={(e) => setEditForm((f) => ({ ...f, depends_on: e.target.value }))}
                       className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
@@ -615,20 +594,20 @@ function PlanDetail() {
                   </div>
                 )}
                 <div className="flex gap-2">
-                  <button onClick={() => handleSaveEdit(task.task_id)} disabled={actionLoading === task.task_id + ":save"} className="px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded text-xs font-medium hover:bg-white disabled:opacity-50">Save</button>
-                  <button onClick={() => setEditingTask(null)} className="px-3 py-1.5 text-zinc-500 hover:text-zinc-300 text-xs">Cancel</button>
+                  <button type="button" onClick={() => handleSaveEdit(task.task_id)} disabled={actionLoading === task.task_id + ":save"} className={`px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded text-xs font-medium hover:bg-white disabled:opacity-50 ${focusRing}`}>Save</button>
+                  <button type="button" onClick={() => setEditingTask(null)} className={`px-3 py-1.5 text-zinc-500 hover:text-zinc-300 text-xs rounded ${focusRing}`}>Cancel</button>
                 </div>
               </div>
             ) : (
               <div className="p-4">
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-zinc-600 font-mono w-5 text-right flex-shrink-0">{idx + 1}</span>
-                      <h3 className={`text-base font-semibold ${task.status === "done" ? "text-zinc-400" : "text-zinc-100"}`}>{task.title}</h3>
-                      <span className={`px-1.5 py-0.5 rounded-full text-xs border ${TASK_STATUS_STYLES[task.status] || TASK_STATUS_STYLES.draft}`}>{task.status}</span>
+                      <h3 className={`text-base font-semibold break-words min-w-0 ${task.status === "done" ? "text-zinc-400" : "text-zinc-100"}`}>{task.title}</h3>
+                      <TaskStatusPill status={task.status} />
                     </div>
-                    <div className="flex items-center gap-3 mt-1.5 ml-7">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-1.5 ml-7">
                       {task.issue_url && (
                         <a href={task.issue_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-1">
                           <svg className="w-3 h-3" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M8 5v3M8 10v1" /></svg>
@@ -660,7 +639,7 @@ function PlanDetail() {
                             try {
                               await api.forceRunTask(plan.plan_id, task.task_id);
                               toast("Task retried");
-                              api.getPlan(plan.plan_id).then(setPlan);
+                              refresh();
                             } catch {
                               toast("Failed to retry task", "error");
                             }
@@ -695,7 +674,7 @@ function PlanDetail() {
                     {task.status === "waiting" && task.depends_on && (() => {
                       const dep = plan.tasks.find((t) => t.task_id === task.depends_on);
                       return (
-                        <div className="flex items-center gap-2 mt-1.5 ml-7">
+                        <div className="flex flex-wrap items-center gap-2 mt-1.5 ml-7">
                           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20">
                             <svg className="w-3 h-3 text-orange-400" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5"><path d="M8 2v4M8 10v4M2 8h4M10 8h4" /></svg>
                             <span className="text-xs text-orange-400">Blocked on &ldquo;{dep?.title || "dependency"}&rdquo;</span>
@@ -725,8 +704,9 @@ function PlanDetail() {
                     )}
                     {plan.status === "draft" && plan.tasks.filter((t) => t.task_id !== task.task_id).length > 0 && (
                       <div className="mt-3 ml-7">
-                        <label className="text-xs text-zinc-500 mb-1 block">Run after</label>
+                        <label htmlFor={`dep-${task.task_id}`} className="text-xs text-zinc-500 mb-1 block">Run after</label>
                         <select
+                          id={`dep-${task.task_id}`}
                           value={task.depends_on ?? ""}
                           onChange={async (e) => {
                             const val = e.target.value;
@@ -749,7 +729,7 @@ function PlanDetail() {
                     )}
                   </div>
                   {plan.status === "draft" && (
-                    <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
+                    <div className="flex flex-wrap items-center sm:justify-end gap-1.5 flex-shrink-0 mt-0.5 ml-7 sm:ml-0">
                       {task.status === "draft" && (
                         <>
                           <button onClick={() => handleApprove(task.task_id)} disabled={!!actionLoading} className="px-2.5 py-1 bg-green-500/10 border border-green-500/20 text-green-400 rounded text-xs hover:bg-green-500/20 disabled:opacity-50">Approve</button>
@@ -758,8 +738,8 @@ function PlanDetail() {
                       )}
                       {task.status === "approved" && <button onClick={() => handleReject(task.task_id)} disabled={!!actionLoading} className="px-2.5 py-1 bg-zinc-800 border border-zinc-700 text-zinc-400 rounded text-xs hover:text-zinc-200 disabled:opacity-50">Undo</button>}
                       {task.status === "rejected" && <button onClick={() => handleApprove(task.task_id)} disabled={!!actionLoading} className="px-2.5 py-1 bg-zinc-800 border border-zinc-700 text-zinc-400 rounded text-xs hover:text-green-400 disabled:opacity-50">Re-approve</button>}
-                      <button onClick={() => { setEditingTask(task.task_id); setEditForm({}); }} className="px-2.5 py-1 text-zinc-600 hover:text-zinc-300 text-xs">Edit</button>
-                      <button onClick={() => handleDeleteTask(task.task_id)} disabled={!!actionLoading} className="px-2.5 py-1 text-zinc-700 hover:text-red-400 text-xs disabled:opacity-50">✕</button>
+                      <button type="button" onClick={() => { setEditingTask(task.task_id); setEditForm({}); }} className={`px-2.5 py-1 text-zinc-500 hover:text-zinc-300 text-xs rounded ${focusRing}`}>Edit</button>
+                      <button type="button" onClick={() => handleDeleteTask(task.task_id)} disabled={!!actionLoading} aria-label={`Remove task ${task.title}`} title="Remove task" className={`px-2.5 py-1 text-zinc-500 hover:text-red-400 text-xs rounded disabled:opacity-50 ${focusRing}`}><span aria-hidden="true">✕</span></button>
                     </div>
                   )}
                 </div>
@@ -775,21 +755,22 @@ function PlanDetail() {
         <div className="relative ml-8">
           {showAddTask ? (
             <div className="border border-zinc-700 border-dashed rounded-lg p-4 space-y-3">
-              <input autoFocus value={newTask.title} onChange={(e) => setNewTask((t) => ({ ...t, title: e.target.value }))} onKeyDown={(e) => e.key === "Enter" && handleAddTask()} placeholder="Task title" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
-              <textarea value={newTask.description} onChange={(e) => setNewTask((t) => ({ ...t, description: e.target.value }))} rows={2} placeholder="Description (optional)" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 font-mono placeholder-zinc-600 focus:outline-none focus:border-zinc-500 resize-none" />
-              <textarea value={newTask.acceptance_criteria} onChange={(e) => setNewTask((t) => ({ ...t, acceptance_criteria: e.target.value }))} rows={2} placeholder="Acceptance criteria (optional)" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 font-mono placeholder-zinc-600 focus:outline-none focus:border-zinc-500 resize-none" />
+              <input autoFocus aria-label="Task title" value={newTask.title} onChange={(e) => setNewTask((t) => ({ ...t, title: e.target.value }))} onKeyDown={(e) => e.key === "Enter" && handleAddTask()} placeholder="Task title" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
+              <textarea aria-label="Description" value={newTask.description} onChange={(e) => setNewTask((t) => ({ ...t, description: e.target.value }))} rows={2} placeholder="Description (optional)" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 font-mono placeholder-zinc-600 focus:outline-none focus:border-zinc-500 resize-none" />
+              <textarea aria-label="Acceptance criteria" value={newTask.acceptance_criteria} onChange={(e) => setNewTask((t) => ({ ...t, acceptance_criteria: e.target.value }))} rows={2} placeholder="Acceptance criteria (optional)" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 font-mono placeholder-zinc-600 focus:outline-none focus:border-zinc-500 resize-none" />
               {repos.length > 0 ? (
                 <div>
-                  <label className="text-xs text-zinc-500 mb-1 block">Repo override (blank uses plan default)</label>
+                  <label className="text-xs text-zinc-500 mb-1 block">Repo override (blank uses the plan&apos;s repo)</label>
                   <RepoCombobox repos={repos} selected={newTask.repo} onSelect={(v) => setNewTask((t) => ({ ...t, repo: v }))} />
                 </div>
               ) : (
-                <input value={newTask.repo} onChange={(e) => setNewTask((t) => ({ ...t, repo: e.target.value }))} placeholder="Repo override (owner/repo) — blank uses plan default" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
+                <input aria-label="Repo override" value={newTask.repo} onChange={(e) => setNewTask((t) => ({ ...t, repo: e.target.value }))} placeholder="Repo override (owner/repo), blank uses the plan's repo" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
               )}
               {plan.tasks.length > 0 && (
                 <div>
-                  <label className="text-xs text-zinc-500 mb-1 block">Run after (only start after this task&apos;s PR merges)</label>
+                  <label htmlFor="new-task-dep" className="text-xs text-zinc-500 mb-1 block">Run after (only start after this task&apos;s PR merges)</label>
                   <select
+                    id="new-task-dep"
                     value={newTask.depends_on}
                     onChange={(e) => setNewTask((t) => ({ ...t, depends_on: e.target.value }))}
                     className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
@@ -804,78 +785,93 @@ function PlanDetail() {
                 </div>
               )}
               <div className="flex gap-2">
-                <button onClick={handleAddTask} disabled={!newTask.title.trim() || actionLoading === "add"} className="px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded text-xs font-medium hover:bg-white disabled:opacity-50">Add task</button>
-                <button onClick={() => setShowAddTask(false)} className="px-3 py-1.5 text-zinc-500 hover:text-zinc-300 text-xs">Cancel</button>
+                <button type="button" onClick={handleAddTask} disabled={!newTask.title.trim() || actionLoading === "add"} className={`px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded text-xs font-medium hover:bg-white disabled:opacity-50 ${focusRing}`}>Add task</button>
+                <button type="button" onClick={() => setShowAddTask(false)} className={`px-3 py-1.5 text-zinc-500 hover:text-zinc-300 text-xs rounded ${focusRing}`}>Cancel</button>
               </div>
             </div>
           ) : (
-            <button onClick={() => setShowAddTask(true)} className="w-full py-3 border border-dashed border-zinc-800 rounded-lg text-sm text-zinc-600 hover:text-zinc-400 hover:border-zinc-700 transition-colors">+ Add task</button>
+            <button type="button" onClick={() => setShowAddTask(true)} className={`w-full py-3 border border-dashed border-zinc-800 rounded-lg text-sm text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition-colors ${focusRing}`}>+ Add task</button>
           )}
         </div>
         )}
 
       {draftCount > 0 && plan.status === "draft" && (
-        <p className="text-xs text-zinc-600 mt-6 ml-8">Approve individual tasks or click &ldquo;Approve&rdquo; to start. Approving the last task auto-triggers execution.</p>
+        <p className="text-xs text-zinc-500 mt-6 ml-8">Approve tasks one at a time, or choose &ldquo;Approve all and start&rdquo;. Approving the last draft task starts the plan.</p>
       )}
       </>)}
 
       {showTemplateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-900 p-6">
-            <h2 className="text-lg font-semibold mb-4">Save as Template</h2>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onKeyDown={(e) => { if (e.key === "Escape") setShowTemplateModal(false); }}
+        >
+          <form
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="save-template-title"
+            onSubmit={(e) => { e.preventDefault(); handleSaveTemplate(); }}
+            className="w-full max-w-md max-h-full overflow-y-auto rounded-xl border border-zinc-700 bg-zinc-900 p-6"
+          >
+            <h2 id="save-template-title" className="text-lg font-semibold mb-4">Save as template</h2>
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-zinc-500 block mb-1">Title</label>
+                <label htmlFor="tpl-title" className="text-xs text-zinc-400 block mb-1">Title</label>
                 <input
+                  id="tpl-title"
+                  autoFocus
                   value={templateForm.title}
                   onChange={(e) => setTemplateForm((f) => ({ ...f, title: e.target.value }))}
-                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
+                  className={inputClass}
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-500 block mb-1">Description</label>
+                <label htmlFor="tpl-description" className="text-xs text-zinc-400 block mb-1">Description</label>
                 <textarea
+                  id="tpl-description"
                   value={templateForm.description}
                   onChange={(e) => setTemplateForm((f) => ({ ...f, description: e.target.value }))}
                   rows={2}
-                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-zinc-500 resize-none"
+                  className={`${inputClass} resize-none`}
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-500 block mb-1">Category (optional)</label>
+                <label htmlFor="tpl-category" className="text-xs text-zinc-400 block mb-1">Category (optional)</label>
                 <input
+                  id="tpl-category"
                   value={templateForm.category}
                   onChange={(e) => setTemplateForm((f) => ({ ...f, category: e.target.value }))}
                   placeholder="e.g. backend, frontend, devops"
-                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
+                  className={inputClass}
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-500 block mb-1">Tags (optional, comma-separated)</label>
+                <label htmlFor="tpl-tags" className="text-xs text-zinc-400 block mb-1">Tags (optional, separated by commas)</label>
                 <input
+                  id="tpl-tags"
                   value={templateForm.tags}
                   onChange={(e) => setTemplateForm((f) => ({ ...f, tags: e.target.value }))}
                   placeholder="e.g. api, auth, migration"
-                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
+                  className={inputClass}
                 />
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-5">
               <button
+                type="button"
                 onClick={() => setShowTemplateModal(false)}
-                className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
+                className={`min-h-9 px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors ${focusRing}`}
               >
                 Cancel
               </button>
               <button
-                onClick={handleSaveTemplate}
+                type="submit"
                 disabled={savingTemplate || !templateForm.title.trim()}
-                className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-semibold hover:bg-white transition-colors disabled:opacity-50"
+                className={`min-h-9 px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-semibold hover:bg-white transition-colors disabled:opacity-50 ${focusRing}`}
               >
-                {savingTemplate ? "Saving..." : "Save Template"}
+                {savingTemplate ? "Saving…" : "Save template"}
               </button>
             </div>
-          </div>
+          </form>
         </div>
       )}
     </div>

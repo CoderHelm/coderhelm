@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { api, type Release, type Repo } from "@/lib/api";
 import { RoleGuard } from "@/components/role-guard";
 import { RepoCombobox } from "@/components/repo-combobox";
@@ -8,6 +9,20 @@ import { Markdown } from "@/components/markdown";
 import { TableSkeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
 import { usePagedList, LoadMoreButton } from "@/components/load-more";
+import { Callout } from "@/components/callout";
+import { focusRing, linkButton, secondaryButton } from "@/components/ui";
+
+// The characters the backend accepts in a tag (anything else is a bare 400).
+const TAG_PATTERN = /^[A-Za-z0-9._+/-]{1,200}$/;
+
+/** Turn a failed send into words: the endpoint answers with bare status codes. */
+function sendError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : "";
+  if (/\b403\b/.test(msg)) return "Your role cannot write release notes. Ask an admin on your team.";
+  // 400 = a tag the backend refuses, or no GitHub App installation for the team.
+  if (/\b400\b/.test(msg)) return "Not accepted. Check the tag name, and that the GitHub App is installed.";
+  return msg && !/^API \d+/.test(msg) ? msg : "Could not queue it. Try again.";
+}
 
 export default function ReleasesGuarded() {
   return (
@@ -25,6 +40,7 @@ function ReleasesPage() {
   const [newTag, setNewTag] = useState("");
   const [busy, setBusy] = useState("");
   const { toast } = useToast();
+  const tagInvalid = newTag !== "" && !TAG_PATTERN.test(newTag);
 
   useEffect(() => {
     api.listRepos().then((d) => setRepos(d.repos)).catch(() => {});
@@ -35,6 +51,8 @@ function ReleasesPage() {
     next,
     loading,
     loadingMore,
+    error,
+    moreFailed,
     loadMore,
     reload,
   } = usePagedList<Release>(
@@ -55,8 +73,8 @@ function ReleasesPage() {
             ? `Rewriting and re-publishing ${repo} ${tag}`
             : `Release notes queued for ${repo} ${tag}`
       );
-    } catch {
-      toast("Could not queue it", "error");
+    } catch (e) {
+      toast(sendError(e), "error");
     } finally {
       setBusy("");
     }
@@ -65,50 +83,70 @@ function ReleasesPage() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-xl font-semibold text-zinc-100">Releases</h1>
+        <h1 className="text-2xl font-bold text-zinc-100">Releases</h1>
         <p className="text-sm text-zinc-500 mt-1">
-          Release notes CoderHelm wrote for each release tag: the GitHub Release, the Confluence changelog entry, and the
-          email to your team. Turn it on per repo in Reviewer → Configure → Release notes.
+          Release notes Coderhelm wrote for each release tag: the GitHub Release, the Confluence changelog entry, and the
+          email to your team. Turn them on for a repo in{" "}
+          <Link href="/reviewer/config" className={linkButton}>Reviewer settings</Link>, under Release notes.
         </p>
       </div>
 
       <div className="mb-6 p-4 rounded-lg bg-zinc-900 border border-zinc-800">
         <h2 className="text-sm font-semibold text-zinc-200">Write notes for a tag</h2>
-        <p className="text-xs text-zinc-500 mt-1 mb-3">For a tag CoderHelm didn&apos;t cut, or an older release. Publishes to whatever the repo has set up.</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="w-full sm:w-72">
+        <p className="text-xs text-zinc-500 mt-1 mb-3">For a tag Coderhelm didn&apos;t cut, or an older release. Publishes to whatever the repo has set up.</p>
+        <div className="flex flex-wrap items-start gap-2">
+          <div className="w-full sm:w-72 [&>div]:mb-0">
             <RepoCombobox repos={repos} selected={newRepo} onSelect={setNewRepo} />
           </div>
           <input
+            aria-label="Release tag"
+            aria-invalid={tagInvalid || undefined}
+            aria-describedby={tagInvalid ? "release-tag-error" : undefined}
             placeholder="v2.3.0"
             value={newTag}
             onChange={(e) => setNewTag(e.target.value.trim())}
-            className="w-36 px-3 py-1.5 text-sm rounded-lg bg-zinc-950 border border-zinc-700 text-zinc-100 placeholder:text-zinc-600 font-mono"
+            className={`w-36 px-3 py-2 text-sm rounded-lg bg-zinc-950 border text-zinc-100 placeholder:text-zinc-600 font-mono ${tagInvalid ? "border-red-500/60" : "border-zinc-700"} ${focusRing}`}
           />
           <button
+            type="button"
             onClick={() => send(newRepo, newTag, "")}
-            disabled={!newRepo || !newTag || !!busy}
-            className="text-xs px-2.5 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 disabled:opacity-50"
+            disabled={!newRepo || !newTag || tagInvalid || !!busy}
+            className={secondaryButton}
           >
             Write notes
           </button>
         </div>
+        {tagInvalid && (
+          <p id="release-tag-error" role="alert" className="mt-2 text-xs text-red-400">
+            A tag can use letters, numbers and . _ - + / only.
+          </p>
+        )}
       </div>
 
       <div className="mb-5 max-w-sm">
-        <RepoCombobox repos={repos} selected={repoFilter} onSelect={setRepoFilter} />
+        <p className="mb-1 text-xs text-zinc-500">Show releases for</p>
+        <div className="[&>div]:mb-0">
+          <RepoCombobox repos={repos} selected={repoFilter} onSelect={setRepoFilter} />
+        </div>
         {repoFilter && (
-          <button onClick={() => setRepoFilter("")} className="mt-2 text-xs text-zinc-500 hover:text-zinc-300">
-            Clear filter
+          <button type="button" onClick={() => setRepoFilter("")} className={`mt-2 ${linkButton} text-xs`}>
+            Show all repos
           </button>
         )}
       </div>
 
       {loading ? (
         <TableSkeleton rows={4} cols={4} />
+      ) : error ? (
+        <Callout variant="error" title="Could not load release notes">
+          <p>Check your connection and try again.</p>
+          <button type="button" onClick={reload} className={`mt-2 ${secondaryButton}`}>
+            Try again
+          </button>
+        </Callout>
       ) : releases.length === 0 ? (
         <div className="text-zinc-500 border border-zinc-800 rounded-lg p-8 text-center">
-          <p className="text-lg mb-2">No release notes yet</p>
+          <p className="text-lg mb-2">{repoFilter ? `No release notes for ${repoFilter} yet` : "No release notes yet"}</p>
           <p className="text-sm">They appear here after the next release tag on a repo with release notes on.</p>
         </div>
       ) : (
@@ -118,12 +156,17 @@ function ReleasesPage() {
             const isOpen = open === key;
             return (
               <div key={key} className="rounded-lg border border-zinc-800 bg-zinc-900/40">
-                <button onClick={() => setOpen(isOpen ? null : key)} className="w-full text-left px-4 py-3 flex flex-wrap items-center gap-3">
-                  <span className="font-mono text-xs text-zinc-100">{r.repo}</span>
+                <button
+                  type="button"
+                  onClick={() => setOpen(isOpen ? null : key)}
+                  aria-expanded={isOpen}
+                  className={`w-full text-left px-4 py-3 flex flex-wrap items-center gap-3 rounded-lg ${focusRing}`}
+                >
+                  <span className="font-mono text-xs text-zinc-100 break-all">{r.repo}</span>
                   <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-200">{r.tag}</span>
                   {r.prev_tag && <span className="text-[11px] text-zinc-500">since {r.prev_tag} · {r.pr_count} PRs</span>}
-                  <span className="text-xs text-zinc-400 truncate max-w-md">{r.headline}</span>
-                  <span className="ml-auto flex items-center gap-2 text-[11px]">
+                  <span className="text-xs text-zinc-400 truncate min-w-0 max-w-full sm:max-w-md">{r.headline}</span>
+                  <span className="ml-auto flex flex-wrap items-center gap-2 text-[11px]">
                     <Step done={!!r.github_release_url} label="GitHub" />
                     <Step done={!!r.confluence_url} label="Confluence" />
                     <Step done={!!r.email_sent_at} label="Email" />
@@ -132,8 +175,8 @@ function ReleasesPage() {
                 {isOpen && (
                   <div className="px-4 pb-4 space-y-4">
                     <div className="flex flex-wrap gap-2 text-xs">
-                      {r.github_release_url && <a href={r.github_release_url} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">GitHub Release ↗</a>}
-                      {r.confluence_url && r.confluence_url.startsWith("http") && <a href={r.confluence_url} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">Confluence ↗</a>}
+                      {r.github_release_url && <a href={r.github_release_url} target="_blank" rel="noreferrer" className={`rounded text-blue-400 hover:underline ${focusRing}`}>GitHub Release <span aria-hidden="true">↗</span><span className="sr-only">(opens in a new tab)</span></a>}
+                      {r.confluence_url && r.confluence_url.startsWith("http") && <a href={r.confluence_url} target="_blank" rel="noreferrer" className={`rounded text-blue-400 hover:underline ${focusRing}`}>Confluence <span aria-hidden="true">↗</span><span className="sr-only">(opens in a new tab)</span></a>}
                       {r.email_sent_at && <span className="text-zinc-500">emailed {new Date(r.email_sent_at).toLocaleString()}</span>}
                     </div>
                     {r.unclear && (
@@ -142,26 +185,26 @@ function ReleasesPage() {
                       </div>
                     )}
                     <div className="grid gap-4 lg:grid-cols-2">
-                      <div className="p-3 rounded bg-zinc-950 border border-zinc-800">
-                        <div className="text-[11px] uppercase tracking-wide text-zinc-500 mb-2">Business summary (Confluence + email)</div>
+                      <div className="p-3 rounded bg-zinc-950 border border-zinc-800 min-w-0 overflow-x-auto">
+                        <div className="text-[11px] uppercase tracking-wide text-zinc-500 mb-2">Business summary (Confluence and email)</div>
                         <Markdown>{r.entry_md || "_Not written yet._"}</Markdown>
                       </div>
-                      <div className="p-3 rounded bg-zinc-950 border border-zinc-800">
+                      <div className="p-3 rounded bg-zinc-950 border border-zinc-800 min-w-0 overflow-x-auto">
                         <div className="text-[11px] uppercase tracking-wide text-zinc-500 mb-2">GitHub Release</div>
                         <Markdown>{r.github_release_md || "_Not written yet._"}</Markdown>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <button onClick={() => send(r.repo, r.tag, "")} disabled={!!busy} className="text-xs px-2.5 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 disabled:opacity-50">
+                      <button type="button" onClick={() => send(r.repo, r.tag, "")} disabled={!!busy} className={secondaryButton}>
                         Finish missing steps
                       </button>
-                      <button onClick={() => send(r.repo, r.tag, "email")} disabled={!!busy} className="text-xs px-2.5 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 disabled:opacity-50">
+                      <button type="button" onClick={() => send(r.repo, r.tag, "email")} disabled={!!busy} className={secondaryButton}>
                         Send email again
                       </button>
-                      <button onClick={() => send(r.repo, r.tag, "all")} disabled={!!busy} className="text-xs px-2.5 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 disabled:opacity-50">
-                        Rewrite + re-publish
+                      <button type="button" onClick={() => send(r.repo, r.tag, "all")} disabled={!!busy} className={secondaryButton}>
+                        Rewrite and publish again
                       </button>
-                      <button onClick={reload} className="text-xs px-2.5 py-1 text-zinc-500 hover:text-zinc-300">Refresh</button>
+                      <button type="button" onClick={reload} className={linkButton}>Refresh</button>
                     </div>
                   </div>
                 )}
@@ -170,15 +213,16 @@ function ReleasesPage() {
           })}
         </div>
       )}
-      <LoadMoreButton hasMore={!!next} loading={loadingMore} onClick={loadMore} />
+      <LoadMoreButton hasMore={!!next} loading={loadingMore} failed={moreFailed} onClick={loadMore} />
     </div>
   );
 }
 
 function Step({ done, label }: { done: boolean; label: string }) {
   return (
-    <span className={`px-1.5 py-0.5 rounded border ${done ? "border-emerald-500/30 text-emerald-400 bg-emerald-500/10" : "border-zinc-700 text-zinc-500"}`}>
-      {done ? "✓" : "·"} {label}
+    <span className={`px-1.5 py-0.5 rounded border whitespace-nowrap ${done ? "border-emerald-500/30 text-emerald-400 bg-emerald-500/10" : "border-zinc-700 text-zinc-500"}`}>
+      <span aria-hidden="true">{done ? "✓" : "·"}</span> {label}
+      <span className="sr-only">{done ? ": done" : ": not done"}</span>
     </span>
   );
 }

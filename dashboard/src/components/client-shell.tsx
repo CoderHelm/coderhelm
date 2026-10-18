@@ -8,6 +8,7 @@ import { pushToDataLayer } from "@/lib/gtm";
 import { formatTokens, USAGE_CHANGED } from "@/lib/usage";
 import { ToastProvider } from "./toast";
 import { ConfirmProvider } from "./confirm-dialog";
+import { focusRing } from "./ui";
 import {
   PlayIcon, CircleDotIcon, TrendingUpIcon, HexagonIcon, HeartIcon,
   GitBranchIcon, GearIcon, AtlassianIcon, GitHubIcon, UsersIcon,
@@ -26,6 +27,10 @@ interface User {
   avatar_url: string;
   role: string;
   status?: string;
+}
+
+function isAdmin(user: User | null): boolean {
+  return user?.role === "admin" || user?.role === "owner";
 }
 
 interface NavItem {
@@ -101,6 +106,32 @@ const navGroups: NavGroup[] = [
   },
 ];
 
+// Pages that are not in the menu, by path. Menu pages use their menu label.
+const EXTRA_TITLES: Record<string, string> = {
+  "/runs/detail": "Run",
+  "/plans/detail": "Plan",
+  "/plans/new": "New plan",
+  "/reviewer/detail": "Review",
+  "/reviewer/config": "Reviewer settings",
+  "/alerts/detail": "Alert",
+  "/tests/run": "Test run",
+  "/tests/test": "Test",
+};
+
+function pageTitle(pathname: string | null): string {
+  const path = (pathname || "/").replace(/\/+$/, "") || "/";
+  if (EXTRA_TITLES[path]) return EXTRA_TITLES[path];
+  // The longest menu path that this page sits under.
+  let best: NavItem | null = null;
+  for (const group of navGroups) {
+    for (const item of group.items) {
+      const under = item.href === "/" ? path === "/" : path === item.href || path.startsWith(`${item.href}/`);
+      if (under && (!best || item.href.length > best.href.length)) best = item;
+    }
+  }
+  return best?.label ?? "";
+}
+
 export function ClientShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
@@ -109,15 +140,16 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const [teams, setTeams] = useState<TeamInfo[]>([]);
   const [dismissedBanners, setDismissedBanners] = useState<Set<string>>(new Set());
   // Load persisted dismissals once usage data is available (keyed to usage month)
+  const usageMonth = usage?.month;
   useEffect(() => {
-    if (!usage) return;
+    if (!usageMonth) return;
     try {
       const stored = JSON.parse(localStorage.getItem("dismissedBanners") || "{}");
-      if (stored.period === usage.month && Array.isArray(stored.ids)) {
+      if (stored.period === usageMonth && Array.isArray(stored.ids)) {
         setDismissedBanners(new Set<string>(stored.ids));
       }
     } catch { /* ignore */ }
-  }, [usage?.month]);
+  }, [usageMonth]);
   const dismissBanner = (id: string) => {
     setDismissedBanners((prev) => {
       const next = new Set(prev).add(id);
@@ -222,9 +254,15 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener(USAGE_CHANGED, refresh);
   }, []);
 
+  // Every page used to share one browser tab title; name the tab after the
+  // page. React hoists <title> into the document head.
+  const tabName = pageTitle(pathname);
+  const tabTitle = <title>{tabName ? `${tabName} · Coderhelm` : "Coderhelm"}</title>;
+
   if (!authChecked) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+        {tabTitle}
         <div className="flex flex-col items-center gap-3">
           <div className="w-5 h-5 border-2 border-zinc-700 border-t-zinc-300 rounded-full animate-spin" />
           <span className="text-zinc-500 text-sm">Loading...</span>
@@ -234,23 +272,24 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    return <AuthScreen onAuth={(u) => {
+    return <><title>Sign in · Coderhelm</title><AuthScreen onAuth={(u) => {
       setUser(u);
       pushToDataLayer({ event: "identify", user_id: u.user_id, team_id: u.team_id });
       api.getUsage().then(setUsage).catch(() => {});
       api.getBanners().then((r) => setBanners(r.banners)).catch(() => {});
       api.listTeams().then((r) => setTeams(r.teams)).catch(() => {});
-    }} />;
+    }} /></>;
   }
 
   if (user.status === "deactivated") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+        {tabTitle}
         <div className="flex flex-col items-center gap-6 max-w-md text-center px-6">
           <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
-            <span className="text-2xl">⚠</span>
+            <span className="text-2xl" aria-hidden="true">⚠</span>
           </div>
-          <h1 className="text-xl font-bold text-zinc-100">GitHub App Uninstalled</h1>
+          <h1 className="text-xl font-bold text-zinc-100">The GitHub app was removed</h1>
           <p className="text-sm text-zinc-400">
             The Coderhelm GitHub App has been removed from your organization.
             All runs, webhooks, and automation are paused.
@@ -268,10 +307,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               Reinstall GitHub App
             </a>
             <a
-              href={`${API_BASE}/auth/login`}
-              className="text-sm text-zinc-400 hover:text-zinc-200 underline transition-colors"
+              href={`${API_BASE}/auth/github`}
+              className={`text-sm text-zinc-400 hover:text-zinc-200 underline transition-colors rounded ${focusRing}`}
             >
-              Then log in here
+              Then sign in with GitHub again
             </a>
           </div>
           {teams.filter((t) => t.status !== "deactivated").length > 0 && (
@@ -280,11 +319,16 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               {teams.filter((t) => t.status !== "deactivated" && !t.current).map((t) => (
                 <button
                   key={t.team_id}
+                  type="button"
                   onClick={async () => {
-                    await api.switchTeam(t.team_id);
-                    window.location.reload();
+                    try {
+                      await api.switchTeam(t.team_id);
+                      window.location.reload();
+                    } catch {
+                      window.alert(`Could not switch to ${t.org}. Try again.`);
+                    }
                   }}
-                  className="block mx-auto mt-1 text-sm text-zinc-300 hover:text-white underline"
+                  className={`block mx-auto mt-1 text-sm text-zinc-300 hover:text-white underline rounded ${focusRing}`}
                 >
                   Switch to {t.org}
                 </button>
@@ -299,6 +343,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
     <ConfirmProvider>
+      {tabTitle}
       <div className="flex min-h-screen bg-zinc-950">
         {menuOpen && (
           <div aria-hidden="true" className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={() => setMenuOpen(false)} />
@@ -349,7 +394,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           {banners.filter((b) => !dismissedBanners.has(b.id)).map((banner) => (
             <div
               key={banner.id}
-              className={`border-b px-6 py-3 flex items-center justify-between ${
+              role={banner.type === "error" ? "alert" : "status"}
+              className={`border-b px-4 md:px-6 py-3 flex items-center justify-between ${
                 banner.type === "error"
                   ? "bg-red-900/80 border-red-700"
                   : banner.type === "warning"
@@ -358,7 +404,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               }`}
             >
               <div className="flex items-center gap-3 min-w-0">
-                <span className={`text-lg shrink-0 ${
+                <span aria-hidden="true" className={`text-lg shrink-0 ${
                   banner.type === "error" ? "text-red-300" : banner.type === "warning" ? "text-yellow-300" : "text-blue-300"
                 }`}>
                   {banner.type === "error" ? "⚠" : banner.type === "warning" ? "⚡" : "ℹ"}
@@ -368,7 +414,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                 }`}>
                   {banner.message}
                   {banner.link_url && banner.link_text && (
-                    <a href={banner.link_url} className="ml-2 underline hover:no-underline">
+                    <a href={banner.link_url} className={`ml-2 underline hover:no-underline rounded ${focusRing}`}>
                       {banner.link_text}
                     </a>
                   )}
@@ -376,8 +422,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               </div>
               {banner.dismissible && (
                 <button
+                  type="button"
+                  aria-label="Dismiss this message"
                   onClick={() => dismissBanner(banner.id)}
-                  className={`shrink-0 ml-4 text-lg leading-none opacity-60 hover:opacity-100 transition-opacity ${
+                  className={`shrink-0 ml-4 text-lg leading-none opacity-60 hover:opacity-100 transition-opacity rounded ${focusRing} ${
                     banner.type === "error" ? "text-red-300" : banner.type === "warning" ? "text-yellow-300" : "text-blue-300"
                   }`}
                 >
@@ -387,24 +435,25 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             </div>
           ))}
           {usage && usage.max_tokens > 0 && usage.total_tokens >= usage.max_tokens && !dismissedBanners.has("token-limit-banner") && (
-              <div className="bg-red-900/90 border-b-2 border-red-500 px-6 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-red-300 text-xl">⚠</span>
+              <div role="alert" className="bg-red-900/90 border-b-2 border-red-500 px-4 md:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-red-300 text-xl" aria-hidden="true">⚠</span>
                   <div>
                     <p className="text-sm font-bold text-red-100">
                       Token limit reached — all runs are paused
                     </p>
                     <p className="text-xs text-red-300 mt-0.5">
-                      You&apos;ve used {formatTokens(usage.total_tokens)} of your {formatTokens(usage.max_tokens)} token limit this month. Increase your limit or wait for the next month.
+                      You&apos;ve used {formatTokens(usage.total_tokens)} of your {formatTokens(usage.max_tokens)} token limit this month.{" "}
+                      {user?.role === "owner" ? "Raise the limit or wait for next month." : "Ask the team owner to raise the limit, or wait for next month."}
                     </p>
                   </div>
                 </div>
-                <a
+                <Link
                   href="/settings/budget"
-                  className="shrink-0 rounded-md bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-500 transition-colors"
+                  className={`shrink-0 rounded-md bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-500 transition-colors ${focusRing}`}
                 >
-                  {user?.role === "owner" ? "Adjust limit" : "See usage"}
-                </a>
+                  {user?.role === "owner" ? "Raise the limit" : "See usage"}
+                </Link>
               </div>
           )}
           <main className="flex-1 p-4 md:p-8">{children}</main>
@@ -435,8 +484,13 @@ function TeamSwitcher({
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", onKey);
+    };
   }, []);
 
   if (!currentTeam) return null;
@@ -445,9 +499,12 @@ function TeamSwitcher({
     <div ref={ref} className="relative mb-3 pb-3 border-b border-zinc-800/60">
       <p className="px-2 mb-1.5 text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">Team</p>
       <button
+        type="button"
         onClick={() => canSwitch && setOpen(!open)}
         disabled={switching}
-        className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors disabled:opacity-50 border ${
+        aria-expanded={canSwitch ? open : undefined}
+        aria-label={canSwitch ? `Team: ${currentTeam.org}. Switch team` : `Team: ${currentTeam.org}`}
+        className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors disabled:opacity-50 border ${focusRing} ${
           canSwitch
             ? "hover:bg-zinc-800/60 border-zinc-800 cursor-pointer"
             : "border-transparent cursor-default"
@@ -460,7 +517,7 @@ function TeamSwitcher({
           <span className="text-sm font-medium text-zinc-100 truncate block">{currentTeam.org}</span>
         </div>
         {canSwitch && (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-500 shrink-0">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-500 shrink-0" aria-hidden="true">
             <polyline points="7 15 12 20 17 15" />
             <polyline points="7 9 12 4 17 9" />
           </svg>
@@ -471,9 +528,11 @@ function TeamSwitcher({
           <p className="px-3 py-1.5 text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">Switch team</p>
           {activeTeams.map((t) => (
             <button
+              type="button"
               key={t.team_id}
+              aria-current={t.team_id === currentTeam.team_id ? "true" : undefined}
               onClick={() => { onSwitch(t.team_id); setOpen(false); }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${focusRing} ${
                 t.team_id === currentTeam.team_id
                   ? "text-zinc-100 bg-zinc-800"
                   : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
@@ -484,7 +543,7 @@ function TeamSwitcher({
               </span>
               <span className="truncate">{t.org}</span>
               {t.team_id === currentTeam.team_id && (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="ml-auto text-blue-400 shrink-0">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="ml-auto text-blue-400 shrink-0" aria-hidden="true">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               )}
@@ -528,12 +587,12 @@ function Sidebar({
   };
 
   return (
-    <nav className="w-56 border-r border-zinc-800/60 bg-zinc-950 p-3 flex flex-col h-screen sticky top-0">
+    <nav aria-label="Main" className="w-56 border-r border-zinc-800/60 bg-zinc-950 p-3 flex flex-col h-screen sticky top-0">
       <Link
         href="/"
-        className="flex items-center gap-2.5 px-2 py-2.5 mb-2 rounded-md"
+        className={`flex items-center gap-2.5 px-2 py-2.5 mb-2 rounded-md ${focusRing}`}
       >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" className="w-5 h-5 flex-shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" className="w-5 h-5 flex-shrink-0" aria-hidden="true">
           <polygon points="106,416 158,416 226,96 174,96" fill="white"/>
           <polygon points="196,416 248,416 316,96 264,96" fill="#3B82F6"/>
           <polygon points="286,416 338,416 406,96 354,96" fill="white"/>
@@ -545,7 +604,7 @@ function Sidebar({
 
       <div className="flex-1 space-y-4 overflow-y-auto min-h-0">
         {navGroups.map((group, index) => {
-          const isAdminOrOwner = user?.role === "admin" || user?.role === "owner";
+          const isAdminOrOwner = isAdmin(user);
           const isBilling = user?.role === "billing";
           const isMemberOrAbove = isAdminOrOwner || isBilling || user?.role === "member";
           const isSuperAdmin = user?.email === "admin@coderhelm.com";
@@ -573,14 +632,15 @@ function Sidebar({
                     key={item.href}
                     href={item.href}
                     prefetch={false}
-                    className={`flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors ${
+                    aria-current={isActive(item.href) ? "page" : undefined}
+                    className={`flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors ${focusRing} ${
                       isActive(item.href)
                         ? "text-zinc-100 bg-zinc-800"
                         : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
                     }`}
                   >
                     <span className="flex items-center gap-2.5">
-                      <span className="w-4 flex items-center justify-center">{item.icon}</span>
+                      <span className="w-4 flex items-center justify-center" aria-hidden="true">{item.icon}</span>
                       {item.label}
                     </span>
                   </Link>
@@ -599,20 +659,21 @@ function Sidebar({
           href="https://github.com/CoderHelm/coderhelm/issues"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-between px-2 py-1.5 rounded-md text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 transition-colors"
+          className={`flex items-center justify-between px-2 py-1.5 rounded-md text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 transition-colors ${focusRing}`}
         >
           <span className="flex items-center gap-2.5">
-            <span className="w-4 flex items-center justify-center"><CircleDotIcon /></span>
+            <span className="w-4 flex items-center justify-center" aria-hidden="true"><CircleDotIcon /></span>
             Report Issue
+            <span className="sr-only">(opens in a new tab)</span>
           </span>
-          <span className="w-3 text-zinc-600"><ExternalLinkIcon /></span>
+          <span className="w-3 text-zinc-600" aria-hidden="true"><ExternalLinkIcon /></span>
         </a>
         <a
           href="mailto:support@coderhelm.com"
-          className="flex items-center justify-between px-2 py-1.5 rounded-md text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 transition-colors"
+          className={`flex items-center justify-between px-2 py-1.5 rounded-md text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 transition-colors ${focusRing}`}
         >
           <span className="flex items-center gap-2.5">
-            <span className="w-4 flex items-center justify-center"><MailIcon /></span>
+            <span className="w-4 flex items-center justify-center" aria-hidden="true"><MailIcon /></span>
             Contact Us
           </span>
         </a>
@@ -655,11 +716,11 @@ function Sidebar({
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={user.avatar_url}
-              alt={user.github_login || user.email}
+              alt=""
               className="w-6 h-6 rounded-full"
             />
           ) : (
-            <span className="w-6 h-6 rounded-full bg-zinc-800 text-zinc-400 text-xs flex items-center justify-center">
+            <span aria-hidden="true" className="w-6 h-6 rounded-full bg-zinc-800 text-zinc-400 text-xs flex items-center justify-center">
               {(user.github_login || user.email || "?").charAt(0).toUpperCase()}
             </span>
           )}
@@ -668,11 +729,13 @@ function Sidebar({
             {user.github_login && <p className="text-xs text-zinc-500 truncate">{user.email}</p>}
           </div>
           <button
+            type="button"
             onClick={async () => { try { await api.logout(); } catch {} window.location.href = "/"; }}
             title="Log out"
-            className="text-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer"
+            aria-label="Log out"
+            className={`rounded p-1 text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer ${focusRing}`}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
               <polyline points="16 17 21 12 16 7" />
               <line x1="21" y1="12" x2="9" y2="12" />
@@ -834,7 +897,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
       <div className="w-full max-w-sm px-6">
         <div className="flex flex-col items-center gap-6">
           <div className="flex flex-col items-center gap-3">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" className="w-12 h-12">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" className="w-12 h-12" aria-hidden="true">
               <polygon points="106,416 158,416 226,96 174,96" fill="white"/>
               <polygon points="196,416 248,416 316,96 264,96" fill="#3B82F6"/>
               <polygon points="286,416 338,416 406,96 354,96" fill="white"/>
@@ -843,13 +906,13 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
           </div>
 
           {error && (
-            <div className="mt-2 w-full rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2.5 text-sm text-red-400">
+            <div role="alert" className="mt-2 w-full rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2.5 text-sm text-red-400">
               {error}
             </div>
           )}
 
           {message && (
-            <div className="w-full rounded-lg bg-blue-500/10 border border-blue-500/20 px-4 py-2.5 text-sm text-blue-400">
+            <div role="status" className="w-full rounded-lg bg-blue-500/10 border border-blue-500/20 px-4 py-2.5 text-sm text-blue-400">
               {message}
             </div>
           )}
@@ -887,9 +950,9 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
               </div>
 
               <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} className="space-y-3">
-                <input type="email" name="email" id="login-email" autoComplete="email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); setMessage(""); }}
+                <input type="email" name="email" id="login-email" autoComplete="email" aria-label="Email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); setMessage(""); }}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
-                <input type="password" name="password" id="login-password" autoComplete="current-password" placeholder="Password" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                <input type="password" name="password" id="login-password" autoComplete="current-password" aria-label="Password" placeholder="Password" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
                 <button type="submit" disabled={loading || !email || !password}
                   className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed">
@@ -915,9 +978,9 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
                 <p className="text-xs text-zinc-500">Only users with an invite can create an account.</p>
               </div>
               <form onSubmit={(e) => { e.preventDefault(); if (password.length >= 8 && agreedTos) handleSignup(); }} className="space-y-3">
-                <input type="email" name="email" id="signup-email" autoComplete="email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); setMessage(""); }}
+                <input type="email" name="email" id="signup-email" autoComplete="email" aria-label="Email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); setMessage(""); }}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
-                <input type="password" name="password" id="signup-password" autoComplete="new-password" placeholder="Password (8+ chars)" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                <input type="password" name="password" id="signup-password" autoComplete="new-password" aria-label="Password, at least 8 characters" placeholder="Password (8+ chars)" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
                 <label className="flex items-start gap-2 cursor-pointer">
                   <input type="checkbox" checked={agreedTos} onChange={(e) => setAgreedTos(e.target.checked)}
@@ -948,7 +1011,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
                 <p className="text-xs text-zinc-500 mt-1">Join the waitlist and we&apos;ll notify you when we open up.</p>
               </div>
               <div className="space-y-3">
-                <input type="email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                <input type="email" autoComplete="email" aria-label="Email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }}
                   onKeyDown={(e) => e.key === "Enter" && handleWaitlist()}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
                 <button onClick={handleWaitlist} disabled={loading || !email}
@@ -967,7 +1030,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
             <div className="w-full space-y-4">
               <p className="text-sm text-zinc-400 text-center">Enter the verification code sent to <span className="text-zinc-200">{email}</span></p>
               <div className="space-y-3">
-                <input type="text" placeholder="Verification code" value={code} onChange={(e) => { setCode(e.target.value); setError(""); }}
+                <input type="text" inputMode="numeric" autoComplete="one-time-code" aria-label="Verification code" placeholder="Verification code" value={code} onChange={(e) => { setCode(e.target.value); setError(""); }}
                   onKeyDown={(e) => e.key === "Enter" && handleVerify()}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600 text-center tracking-widest" />
                 <button onClick={handleVerify} disabled={loading || !code}
@@ -986,7 +1049,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
             <div className="w-full space-y-4">
               <p className="text-sm text-zinc-400 text-center">Enter your email to receive a reset code</p>
               <div className="space-y-3">
-                <input type="email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                <input type="email" autoComplete="email" aria-label="Email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }}
                   onKeyDown={(e) => e.key === "Enter" && handleForgot()}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
                 <button onClick={handleForgot} disabled={loading || !email}
@@ -1005,9 +1068,9 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
             <div className="w-full space-y-4">
               <p className="text-sm text-zinc-400 text-center">Enter the code and your new password</p>
               <div className="space-y-3">
-                <input type="text" placeholder="Reset code" value={code} onChange={(e) => { setCode(e.target.value); setError(""); }}
+                <input type="text" inputMode="numeric" autoComplete="one-time-code" aria-label="Reset code" placeholder="Reset code" value={code} onChange={(e) => { setCode(e.target.value); setError(""); }}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600 text-center tracking-widest" />
-                <input type="password" placeholder="New password (8+ chars)" value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setError(""); }}
+                <input type="password" autoComplete="new-password" aria-label="New password, at least 8 characters" placeholder="New password (8+ chars)" value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setError(""); }}
                   onKeyDown={(e) => e.key === "Enter" && handleReset()}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
                 <button onClick={handleReset} disabled={loading || !code || newPassword.length < 8}
@@ -1026,7 +1089,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
             <div className="w-full space-y-4">
               <p className="text-sm text-zinc-400 text-center">Enter the code from your authenticator app</p>
               <div className="space-y-3">
-                <input type="text" placeholder="6-digit code" value={code} onChange={(e) => { setCode(e.target.value); setError(""); }}
+                <input type="text" inputMode="numeric" autoComplete="one-time-code" aria-label="Six digit code" placeholder="6-digit code" value={code} onChange={(e) => { setCode(e.target.value); setError(""); }}
                   onKeyDown={(e) => e.key === "Enter" && handleMfa()}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600 text-center tracking-widest text-lg" />
                 <button onClick={handleMfa} disabled={loading || code.length < 6}
