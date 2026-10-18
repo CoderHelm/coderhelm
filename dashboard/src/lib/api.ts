@@ -1398,7 +1398,7 @@ export interface AlertRoute {
   /** Teams notifications: the team channel, the route's own channel, or none. */
   notify_mode?: "team" | "custom" | "off";
   teams_webhook_url?: string;
-  /** Post recoveries (OK) and other non-alarm state changes to Teams. Off by default. */
+  /** Post recoveries (one per open alert card) and other non-alarm state changes to Teams. Off by default. */
   post_recoveries?: boolean;
   updated_at?: string;
 }

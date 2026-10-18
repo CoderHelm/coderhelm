@@ -36,6 +36,18 @@ export const OUTCOMES: Record<
       "The alert is a recovery or informational state change, so there was nothing to fix.",
     cls: "bg-zinc-800 border-zinc-700 text-zinc-400",
   },
+  recovered: {
+    label: "Recovered",
+    detail:
+      "The alert's card was still open, so this recovery closed it. Routes that post recoveries post one green card linking the alert; later recoveries stay quiet until a new alert.",
+    cls: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
+  },
+  no_open_alert: {
+    label: "Recovery, not posted",
+    detail:
+      "Nothing was open for this alert: its card was never posted or a recovery already closed it, so nothing went to Teams.",
+    cls: "bg-zinc-800 border-zinc-700 text-zinc-400",
+  },
   route_paused: {
     label: "Route paused",
     detail: "The route for this topic is paused.",
