@@ -25,6 +25,7 @@ import {
   type SkillRepo,
   type SkillWithBody,
 } from "@/lib/skills";
+import { ItemActivity } from "../skill-activity";
 
 export default function AgentPageGuarded() {
   return (
@@ -271,6 +272,8 @@ function AgentPage() {
           </section>
 
           <RecentAsks asks={asks} error={asksError} agent={agent} canAskAgain={canManage && agent.enabled} onAskAgain={askAgain} />
+
+          <ItemActivity item={agent} heading="Every read and ask" />
 
           <section aria-labelledby="instructions-heading">
             <h2 id="instructions-heading" className={sectionHeading}>

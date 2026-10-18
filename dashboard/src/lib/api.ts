@@ -863,9 +863,9 @@ export const api = {
       "/api/data-sources/database",
       { method: "POST", body: JSON.stringify(data) },
     ),
-  listDataSourceActivity: (limit = 50, before?: string) =>
-    request<{ events: DataSourceActivityEvent[] }>(
-      `/api/data-sources/activity?limit=${limit}${before ? `&before=${encodeURIComponent(before)}` : ""}`,
+  listDataSourceActivity: (limit = 50, before?: string, filter: DataSourceActivityFilter = {}) =>
+    request<{ events: DataSourceActivityEvent[]; next?: string | null }>(
+      `/api/data-sources/activity${qs({ limit, before, ...filter })}`,
     ),
 
   // E2E test intelligence
@@ -1736,6 +1736,21 @@ export interface DataSourceActivityEvent {
   ok: boolean;
   outcome: "ok" | "refused" | "failed";
   ms: number;
+  /** The run the lookup was made during, for a link to it. */
+  run_id?: string;
+  /** The work it was made during, e.g. "owner/name#12" or "owner/name · ABC-1". */
+  origin?: string;
+}
+
+/** What to show of the lookup log. Empty fields match everything. */
+export interface DataSourceActivityFilter {
+  source?: string;
+  /** An outcome, or "problems" for refused and failed. */
+  outcome?: string;
+  /** An agent ("reviewer", "planner", "coder"), or "people". */
+  who?: string;
+  q?: string;
+  since?: string;
 }
 
 // ── Analytics ──────────────────────────────────────────────────────────────
