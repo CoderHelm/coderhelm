@@ -3,9 +3,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 // Settings → Integrations. Every API call is answered here; nothing reaches a
-// real backend. The backend works out each card's status; these tests check
-// the page shows it, offers one action, and that admins act while members
-// only read.
+// real backend. The backend works out each integration's status; these tests
+// check the list shows it, offers one action, and that admins act while
+// members only read.
 
 const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots");
 
@@ -170,45 +170,74 @@ async function shot(page: Page, name: string) {
   await page.setViewportSize({ width: 1280, height: 800 });
 }
 
-test("sections in order, each card with its status, what it does and one action", async ({ page }) => {
+const row = (page: Page, id: string) => page.getByTestId(`integration-${id}`);
+/** The row's one control, found by the name it starts with. */
+const control = (page: Page, id: string, name: string, role: "button" | "link" = "button") =>
+  row(page, id).getByRole(role, { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")},`) });
+
+test("one list per section, each row with its status in the same column and one action", async ({ page }) => {
   await mockApi(page);
   await page.goto("/settings/integrations");
   await expect(page.getByRole("heading", { name: "Integrations", level: 1 })).toBeVisible();
   const headings = page.getByRole("main").getByRole("heading", { level: 2 });
   await expect(headings).toHaveText(["Code and tickets", "Cloud", "Monitoring", "Docs and design", "Chat", "Other tools", "Your websites", "Data sources"]);
   await expect(page.getByTestId("integrations-summary")).toContainText("4 connected · 3 need credentials");
+  // Lists, not card grids.
+  await expect(page.getByRole("main").getByRole("list", { name: "Monitoring" }).getByRole("listitem")).toHaveCount(2);
 
-  const gh = page.getByTestId("integration-github");
-  await expect(gh.getByText("Connected", { exact: true })).toBeVisible();
-  await expect(gh.getByRole("link", { name: "GitHub" })).toHaveAttribute("href", /\/settings\/integrations\/github\/?$/);
-  const jira = page.getByTestId("integration-jira");
-  await expect(jira.getByText("Not connected", { exact: true })).toBeVisible();
-  await expect(jira.getByRole("link", { name: "Connect" })).toBeVisible();
-  await expect(page.getByTestId("integration-newrelic").getByText("Connected", { exact: true })).toBeVisible();
-  await expect(page.getByTestId("integration-newrelic").getByText(/Checked 1 h(ou)?r? ago|Checked 60 min ago/)).toBeVisible();
+  const gh = control(page, "github", "GitHub", "link");
+  await expect(gh).toHaveAccessibleName("GitHub, Connected. Manage");
+  await expect(gh).toHaveAttribute("href", /\/settings\/integrations\/github\/?$/);
+  const jira = control(page, "jira", "Jira", "link");
+  await expect(jira).toHaveAccessibleName("Jira, Not connected. Connect");
+  await expect(row(page, "jira").getByTestId("integration-action")).toHaveText("Connect");
+  await expect(row(page, "newrelic").getByTestId("integration-status")).toContainText("Connected");
+  await expect(row(page, "newrelic").getByTestId("integration-status")).toContainText(/Checked (1 h(ou)?r? ago|60 min ago)/);
 
-  // Switched on without credentials: said plainly, with the action to fix it.
-  for (const id of ["sentry", "figma", "sanity"]) {
-    const c = page.getByTestId(`integration-${id}`);
-    await expect(c).toHaveAttribute("data-status", "needs_credentials");
-    await expect(c.getByText("Needs credentials", { exact: true })).toBeVisible();
-    await expect(c.getByText("Switched on, but no credentials are saved, so agents don't get it.")).toBeVisible();
-    await expect(c.getByRole("button", { name: "Add credentials" })).toBeVisible();
+  // Switched on without credentials: the status says it and the action fixes it; the why is inside.
+  for (const [id, name] of [["sentry", "Sentry"], ["figma", "Figma"], ["sanity", "Sanity"]]) {
+    const r = row(page, id);
+    await expect(r).toHaveAttribute("data-status", "needs_credentials");
+    await expect(r.getByTestId("integration-status")).toHaveText("Needs credentials");
+    await expect(control(page, id, name)).toHaveAccessibleName(`${name}, Needs credentials. Add credentials`);
+    await expect(r.getByText("Switched on, but no credentials are saved, so agents don't get it.")).toHaveCount(0);
   }
+  // Problems sort to the top of their section.
+  await expect(page.getByRole("list", { name: "Docs and design" }).getByRole("listitem").first()).toHaveAttribute("data-status", "needs_credentials");
+
+  // Rows line up: every status column starts at the same x, and rows are one height.
+  const boxes = await page.locator('[data-testid^="integration-"][data-status]').evaluateAll((els) =>
+    els.map((el) => ({ h: (el as HTMLElement).getBoundingClientRect().height, x: el.querySelector('[data-testid="integration-status"]')!.getBoundingClientRect().left })),
+  );
+  expect(new Set(boxes.map((b) => Math.round(b.x))).size, "status column is aligned").toBe(1);
+  for (const b of boxes) expect(b.h, "rows stay compact").toBeLessThanOrEqual(80);
+
   await expect(page.getByRole("main").getByRole("link", { name: "Data sources" }).first()).toHaveAttribute("href", /\/data-sources\/?$/);
   await shot(page, "integrations");
+});
+
+test("opening a row explains it and holds its settings", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/settings/integrations");
+  await control(page, "sentry", "Sentry").click();
+  const panel = row(page, "sentry").getByTestId("integration-panel");
+  await expect(panel.getByText("Switched on, but no credentials are saved, so agents don't get it.")).toBeVisible();
+  await expect(panel.getByText(DOES.sentry)).toBeVisible();
+  await expect(panel.getByLabel("API token")).toBeVisible();
+  await shot(page, "integrations-open");
 });
 
 test("an AWS account shows its abilities; an admin switches one off and deselects an environment", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/settings/integrations");
-  const aws = page.getByTestId(`integration-aws-${ACCOUNT}`);
+  const aws = row(page, `aws-${ACCOUNT}`);
+  await control(page, `aws-${ACCOUNT}`, `AWS account ${ACCOUNT}`).click();
   const summary = aws.getByTestId(`aws-abilities-${ACCOUNT}`);
   await expect(summary.getByText("Logs")).toBeVisible();
   await expect(summary.getByText("CloudWatch, us-east-1")).toBeVisible();
   await expect(summary.getByText("prod-airflow, staging-airflow")).toBeVisible();
+  await expect(aws.getByRole("link", { name: "Log groups, findings and more accounts" })).toHaveAttribute("href", /\/settings\/integrations\/aws\/?$/);
 
-  await aws.getByRole("button", { name: `AWS account ${ACCOUNT}` }).click();
   const panel = aws.getByTestId(`aws-panel-${ACCOUNT}`);
   await expect(panel.getByRole("checkbox", { name: "prod-airflow" })).toBeChecked();
   await panel.getByRole("checkbox", { name: "staging-airflow" }).click();
@@ -239,9 +268,9 @@ test("an AWS role without the permissions offers the one-click stack", async ({ 
   );
   await mockApi(page, { items: list });
   await page.goto("/settings/integrations");
-  const aws = page.getByTestId(`integration-aws-${ACCOUNT}`);
+  const aws = row(page, `aws-${ACCOUNT}`);
+  await control(page, `aws-${ACCOUNT}`, `AWS account ${ACCOUNT}`).click();
   await expect(aws.getByTestId(`aws-abilities-${ACCOUNT}`).getByText("No access yet")).toHaveCount(2);
-  await aws.getByRole("button", { name: `AWS account ${ACCOUNT}` }).click();
   await expect(aws.getByRole("link", { name: "Add access in AWS" })).toHaveAttribute("href", /stackName=CoderHelmLogReaderOps/);
   await expect(aws.getByRole("switch", { name: "Let agents read Airflow" })).toBeDisabled();
 });
@@ -249,8 +278,8 @@ test("an AWS role without the permissions offers the one-click stack", async ({ 
 test("adding credentials to a switched-on server makes it connected", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/settings/integrations");
-  const sentry = page.getByTestId("integration-sentry");
-  await sentry.getByRole("button", { name: "Add credentials" }).click();
+  const sentry = row(page, "sentry");
+  await control(page, "sentry", "Sentry").click();
   await sentry.getByLabel("API token").fill("sntrys_example");
   await sentry.getByRole("button", { name: "Save and test" }).click();
   await expect(sentry).toHaveAttribute("data-status", "connected");
@@ -261,9 +290,9 @@ test("adding credentials to a switched-on server makes it connected", async ({ p
 test("connecting a server that is off asks for credentials first, then switches it on", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/settings/integrations");
-  const notion = page.getByTestId("integration-notion");
-  await expect(notion.getByText("Not connected", { exact: true })).toBeVisible();
-  await notion.getByRole("button", { name: "Connect" }).click();
+  const notion = row(page, "notion");
+  await expect(notion.getByTestId("integration-status")).toHaveText("Not connected");
+  await control(page, "notion", "Notion").click();
   // Opening it changes nothing: no half-on server waiting for credentials.
   await expect(notion.getByLabel("API token")).toBeVisible();
   await expect(notion).toHaveAttribute("data-status", "not_connected");
@@ -275,92 +304,82 @@ test("connecting a server that is off asks for credentials first, then switches 
   expect(order.slice(0, 2)).toEqual(["/api/plugins/notion/enable", "/api/plugins/notion/credentials"]);
 });
 
-test("every card says what Coderhelm does with it and what opening it lets you do", async ({ page }) => {
+test("every row says in a short line what Coderhelm does with it, never a placeholder", async ({ page }) => {
   await mockApi(page);
   await page.goto("/settings/integrations");
-  const cards = page.locator('[data-testid^="integration-"][data-status]');
-  await expect(cards).toHaveCount(items().length);
-  const generic = /^(what coderhelm does with|manage|settings|open|configure|more|details)\b|^[\w ]+ for agents\.$/i;
-  const does: string[] = [];
-  for (const card of await cards.all()) {
-    const name = (await card.getByRole("heading", { level: 3 }).innerText()).trim();
-    const d = (await card.getByTestId("integration-does").innerText()).trim();
-    expect(d.length, `${name} has a description`).toBeGreaterThan(30);
-    expect(d, `${name} has a real description, not a template`).not.toMatch(generic);
-    expect(d.toLowerCase(), `${name}'s description is not just its name`).not.toBe(`what coderhelm does with ${name.toLowerCase()}.`);
-    does.push(d);
-    const can = (await card.getByTestId("integration-can-do").innerText()).trim();
-    expect(can.length, `${name} says what you can do inside`).toBeGreaterThan(25);
-    expect(can, `${name}'s line is specific`).not.toMatch(generic);
+  const rows = page.locator('[data-testid^="integration-"][data-status]');
+  await expect(rows).toHaveCount(items().length);
+  const generic = /^(what coderhelm does with|manage|settings|open|configure|more|details)\b|^[\w ]+ for agents\.?$/i;
+  const lines: string[] = [];
+  for (const r of await rows.all()) {
+    const id = (await r.getAttribute("data-testid"))!.replace("integration-", "");
+    const line = r.getByTestId("integration-does");
+    const text = (await line.innerText()).trim();
+    expect(text.length, `${id} has a line`).toBeGreaterThan(10);
+    expect(text.length, `${id}'s line fits one row`).toBeLessThanOrEqual(60);
+    expect(text, `${id}'s line is specific`).not.toMatch(generic);
+    // The full sentence is there on hover and inside.
+    expect((await line.getAttribute("title"))!.length, `${id} has a full description`).toBeGreaterThan(30);
+    lines.push(text);
   }
-  expect(new Set(does).size, "no two cards share a description").toBe(does.length);
-  await expect(page.getByTestId(`integration-aws-${ACCOUNT}`).getByTestId("integration-can-do")).toContainText("Turn Metrics and Airflow on or off, pick Airflow environments");
-  await expect(page.getByTestId("integration-newrelic").getByTestId("integration-can-do")).toContainText("Change the key, region or accounts");
+  expect(new Set(lines).size, "no two rows share a line").toBe(lines.length);
 });
 
-test("the whole card opens it, and Close folds it back", async ({ page }) => {
+test("the whole row opens it, from the mouse or the keyboard, and Close folds it back", async ({ page }) => {
   await mockApi(page);
   await page.goto("/settings/integrations");
-  const nr = page.getByTestId("integration-newrelic");
-  const control = nr.getByRole("button", { name: "New Relic", exact: true });
-  await expect(control).toHaveAttribute("aria-expanded", "false");
-  await expect(control).toHaveAccessibleDescription(/Change the key, region or accounts/);
+  const nr = row(page, "newrelic");
+  const ctl = control(page, "newrelic", "New Relic");
+  await expect(ctl).toHaveAttribute("aria-expanded", "false");
+  await expect(ctl).toHaveAccessibleDescription("Queries, deploy markers and error rates");
   fs.mkdirSync(SHOTS_DIR, { recursive: true });
-  await page.getByTestId("integration-sentry").hover();
+  await row(page, "sentry").hover();
   await page.getByRole("main").locator("#monitoring").screenshot({ path: path.join(SHOTS_DIR, "integrations-hover.png") });
-  // A click anywhere on the card face, not only the name, opens it.
-  await nr.getByTestId("integration-does").click({ force: true });
-  await expect(control).toHaveAttribute("aria-expanded", "true");
+  // A click on the status column, not only the name, opens it.
+  await nr.getByTestId("integration-status").click();
+  await expect(ctl).toHaveAttribute("aria-expanded", "true");
   await expect(nr.getByLabel("User key")).toBeVisible();
   await nr.getByRole("button", { name: "Close" }).click();
-  await expect(control).toHaveAttribute("aria-expanded", "false");
-  // Keyboard: the name is a real button.
-  await control.focus();
+  await expect(ctl).toHaveAttribute("aria-expanded", "false");
+  await ctl.focus();
   await page.keyboard.press("Enter");
-  await expect(control).toHaveAttribute("aria-expanded", "true");
-  // Cards with their own page are links.
-  await page.getByTestId("integration-github").getByTestId("integration-can-do").click({ force: true });
+  await expect(ctl).toHaveAttribute("aria-expanded", "true");
+  // Rows with their own page are links.
+  await row(page, "github").getByTestId("integration-does").click();
   await expect(page).toHaveURL(/\/settings\/integrations\/github\/?$/);
 });
 
-test("the menu shows Integrations near the top with a count that needs attention, and AWS under it", async ({ page }) => {
+test("the menu shows Integrations and Data sources under Connections, with no AWS item and no count", async ({ page }) => {
   await mockApi(page);
   await page.goto("/settings/integrations");
   const nav = page.getByRole("navigation", { name: "Main" });
-  const integrations = nav.getByRole("link", { name: /^Integrations/ });
+  const integrations = nav.getByRole("link", { name: "Integrations", exact: true });
   await expect(integrations).toHaveAttribute("href", /\/settings\/integrations\/?$/);
-  await expect(nav.getByTestId("nav-integrations-attention")).toHaveText("3 need attention");
   await expect(integrations).toHaveAttribute("aria-current", "page");
-  const aws = nav.getByRole("link", { name: "AWS", exact: true });
-  await expect(aws).toHaveAttribute("href", /\/settings\/integrations\/aws\/?$/);
+  await expect(integrations).toHaveText("Integrations");
+  await expect(nav.getByRole("link", { name: "AWS" })).toHaveCount(0);
+  await expect(nav.getByTestId("nav-integrations-attention")).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "Data sources" })).toHaveAttribute("href", /\/data-sources\/?$/);
   // Connections comes before Insights, so it is on screen without scrolling the menu.
   const groups = await nav.locator("p.uppercase").allInnerTexts();
   const order = groups.map((g) => g.toLowerCase());
   expect(order.indexOf("connections")).toBeGreaterThan(-1);
   expect(order.indexOf("connections")).toBeLessThan(order.indexOf("insights"));
-  // Fixing one lowers the count.
-  const sentry = page.getByTestId("integration-sentry");
-  await sentry.getByRole("button", { name: "Add credentials" }).click();
-  await sentry.getByLabel("API token").fill("sntrys_example");
-  await sentry.getByRole("button", { name: "Save and test" }).click();
-  await expect(nav.getByTestId("nav-integrations-attention")).toHaveText("2 need attention");
 });
 
-test("the menu badge shows on other pages too, and members see Integrations and AWS", async ({ page }) => {
+test("on the AWS page members see Integrations lit, and no AWS item", async ({ page }) => {
   await mockApi(page, { role: "member" });
   await page.goto("/settings/integrations/aws");
   const nav = page.getByRole("navigation", { name: "Main" });
-  await expect(nav.getByTestId("nav-integrations-attention")).toHaveText("3 need attention");
-  await expect(nav.getByRole("link", { name: "AWS", exact: true })).toHaveAttribute("aria-current", "page");
-  await expect(nav.getByRole("link", { name: /^Integrations/ })).not.toHaveAttribute("aria-current", "page");
+  await expect(nav.getByRole("link", { name: "Integrations", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(nav.getByRole("link", { name: "AWS" })).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "Data sources" })).toHaveCount(0);
 });
 
-test("a link to a card opens it (from a skill check)", async ({ page }) => {
+test("a link to a row opens it (from a skill check)", async ({ page }) => {
   await mockApi(page);
   await page.goto("/settings/integrations#integration-figma");
-  await expect(page.getByTestId("integration-figma").getByLabel("API token")).toBeVisible();
+  await expect(row(page, "figma").getByLabel("API token")).toBeVisible();
   await page.goto("/settings/integrations#integration-aws");
   await expect(page.getByTestId(`aws-panel-${ACCOUNT}`)).toBeVisible();
 });
@@ -369,12 +388,11 @@ test("members see every status but no actions", async ({ page }) => {
   await mockApi(page, { role: "member" });
   await page.goto("/settings/integrations");
   await expect(page.getByTestId("integrations-summary")).toContainText("Only admins can connect or change integrations.");
-  const sentry = page.getByTestId("integration-sentry");
-  await expect(sentry.getByText("Needs credentials", { exact: true })).toBeVisible();
-  await expect(sentry.getByText("Ask an admin to set this up.")).toBeVisible();
+  await expect(row(page, "sentry").getByTestId("integration-status")).toHaveText("Needs credentials");
+  await expect(row(page, "sentry").getByTestId("integration-action")).toHaveCount(0);
   await expect(page.getByRole("main").getByRole("button")).toHaveCount(0);
   // Members can still open the pages they may read.
-  await expect(page.getByTestId(`integration-aws-${ACCOUNT}`).getByRole("link", { name: `AWS account ${ACCOUNT}` })).toHaveAttribute("href", /\/settings\/integrations\/aws\/?$/);
+  await expect(control(page, `aws-${ACCOUNT}`, `AWS account ${ACCOUNT}`, "link")).toHaveAttribute("href", /\/settings\/integrations\/aws\/?$/);
   await shot(page, "integrations-member");
 });
 

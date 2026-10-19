@@ -10,14 +10,11 @@ import {
   type IntegrationSection,
   type IntegrationStatus,
   type PluginDef,
-  INTEGRATIONS_ATTENTION_EVENT,
-  needsAttention,
 } from "@/lib/api";
 import { errorMessage, timeAgo } from "@/lib/data-sources";
 import { RoleGuard } from "@/components/role-guard";
 import { Page, PageHeader, Section } from "@/components/page";
 import { Callout } from "@/components/callout";
-import { StatusPill } from "@/components/status-pill";
 import { Skeleton } from "@/components/skeleton";
 import { Field, SecretInput } from "@/components/field";
 import { AwsAbilitiesPanel, AwsAbilitySummary, ConnectorForm } from "@/components/connections";
@@ -27,13 +24,14 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { ChevronRightIcon } from "@/components/icons";
+import { BrandIcon } from "@/components/brand-icons";
 
-// Settings → Integrations: every outside system Coderhelm connects to, in one
-// place. Grouped by what it's for (like Vercel's and Sentry's integration
-// pages), each card carries its status, what Coderhelm does with it, when it
-// was last checked and one primary action (like Linear's). What a connected
-// AWS account can do is detected from its role, the way Datadog detects
-// what an integration can read, instead of asking for it again.
+// Settings → Integrations: every outside system Coderhelm connects to, as one
+// list per kind of tool. One row per integration with the same columns in the
+// same places (mark, name and a short line, status, one action), so the eye
+// runs down a column instead of zigzagging across cards. A row opens its
+// settings: in place, or on its own page for GitHub, Jira and AWS. Why
+// something isn't working is said inside, not on the row.
 
 export default function IntegrationsPageGuarded() {
   return (
@@ -43,26 +41,57 @@ export default function IntegrationsPageGuarded() {
   );
 }
 
-const SECTIONS: { id: IntegrationSection; anchor: string; title: string; description: string }[] = [
-  { id: "code", anchor: "code-and-tickets", title: "Code and tickets", description: "Where the work comes from and where it lands." },
-  { id: "cloud", anchor: "cloud", title: "Cloud", description: "AWS accounts, through a read-only role in each. One account covers logs, metrics and Airflow." },
-  { id: "monitoring", anchor: "monitoring", title: "Monitoring", description: "Errors, deploys and performance that agents check facts against." },
-  { id: "docs", anchor: "docs-and-design", title: "Docs and design", description: "Pages and designs agents read for context." },
-  { id: "chat", anchor: "chat", title: "Chat", description: "Where Coderhelm posts alerts and pull request links." },
-  { id: "other", anchor: "other-tools", title: "Other tools", description: "More MCP servers agents can use once they're on and have credentials." },
+const SECTIONS: { id: IntegrationSection; anchor: string; title: string }[] = [
+  { id: "code", anchor: "code-and-tickets", title: "Code and tickets" },
+  { id: "cloud", anchor: "cloud", title: "Cloud" },
+  { id: "monitoring", anchor: "monitoring", title: "Monitoring" },
+  { id: "docs", anchor: "docs-and-design", title: "Docs and design" },
+  { id: "chat", anchor: "chat", title: "Chat" },
+  { id: "other", anchor: "other-tools", title: "Other tools" },
 ];
 
-const STATUS: Record<IntegrationStatus, { label: string; tone: "success" | "warning" | "error" | "neutral" }> = {
-  connected: { label: "Connected", tone: "success" },
-  needs_credentials: { label: "Needs credentials", tone: "warning" },
-  not_connected: { label: "Not connected", tone: "neutral" },
-  error: { label: "Not working", tone: "error" },
+const STATUS: Record<IntegrationStatus, { label: string; dot: string; text: string }> = {
+  connected: { label: "Connected", dot: "bg-emerald-400", text: "text-zinc-200" },
+  needs_credentials: { label: "Needs credentials", dot: "bg-amber-400", text: "text-amber-300" },
+  not_connected: { label: "Not connected", dot: "bg-zinc-600", text: "text-zinc-500" },
+  error: { label: "Not working", dot: "bg-red-400", text: "text-red-300" },
 };
 
 /** Problems first, then what works, then what could be added. */
 const ORDER: Record<IntegrationStatus, number> = { needs_credentials: 0, error: 1, connected: 2, not_connected: 3 };
 
-/** The anchor a card answers to (`#integration-aws` for the first AWS account). */
+/** What each one is for, short enough for one line of a list. The full sentence is inside. */
+const SHORT: Record<string, string> = {
+  github: "Reads code, opens and reviews pull requests",
+  jira: "Starts work from tickets and keeps them in step",
+  aws: "Logs, metrics and Airflow through a read-only role",
+  newrelic: "Queries, deploy markers and error rates",
+  confluence: "Reads pages for context",
+  teams: "Posts alerts and pull request links to a channel",
+  sentry: "Error events, issues and incidents",
+  figma: "Design tokens, components and assets",
+  sanity: "Documents, schemas and content",
+  notion: "Pages, databases and docs",
+  linear: "Issues, projects and status",
+  stripe: "Charges, subscriptions and customers",
+  gitlab: "Repositories, merge requests and pipelines",
+  grafana: "Dashboards, metrics and alerts",
+  posthog: "Product analytics and feature flags",
+  vercel: "Deployments, domains and build logs",
+  snyk: "Vulnerabilities in code and dependencies",
+  mongodb: "Collections and queries",
+  redis: "Keys and values",
+  upstash: "Redis and queues",
+  turso: "Databases and queries",
+  neon: "Postgres databases and branches",
+  launchdarkly: "Feature flags and targeting",
+};
+
+function shortLine(item: Integration): string {
+  return SHORT[item.id.startsWith("aws") ? "aws" : item.id] ?? item.does;
+}
+
+/** The anchor a row answers to (`#integration-aws` for the first AWS account). */
 function anchorOf(item: Integration, firstAws: boolean): string {
   if (item.id.startsWith("aws")) return firstAws ? "integration-aws" : `integration-${item.id}`;
   return `integration-${item.id}`;
@@ -85,7 +114,7 @@ function IntegrationsPage() {
     load();
   }, [load]);
 
-  // Open the card a link points at (#integration-sentry from a skill check).
+  // Open the row a link points at (#integration-sentry from a skill check).
   const [target, setTarget] = useState("");
   useEffect(() => {
     const read = () => setTarget(window.location.hash.replace(/^#/, ""));
@@ -106,11 +135,6 @@ function IntegrationsPage() {
     return c;
   }, [data]);
 
-  // Keep the menu badge in step with what this page shows.
-  useEffect(() => {
-    if (data) window.dispatchEvent(new CustomEvent(INTEGRATIONS_ATTENTION_EVENT, { detail: needsAttention(data.items) }));
-  }, [data]);
-
   const replace = (next: Integration) =>
     setData((d) => (d ? { ...d, items: d.items.map((i) => (i.id === next.id ? next : i)) } : d));
 
@@ -120,8 +144,7 @@ function IntegrationsPage() {
         title="Integrations"
         lead={
           <>
-            Everything Coderhelm connects to, what it does with each, and whether it works. Keys you enter here are encrypted for your team and
-            never shown again. Databases, APIs and log searches agents query live in{" "}
+            What Coderhelm is connected to and whether each one works. Databases, APIs and log searches are in{" "}
             <Link href="/data-sources" className={linkButton}>
               Data sources
             </Link>
@@ -151,12 +174,16 @@ function IntegrationsPage() {
       )}
       {!data && !error && (
         <div className="mt-10 space-y-8" aria-busy="true" aria-label="Loading integrations">
-          {[0, 1].map((i) => (
+          {[3, 2].map((n, i) => (
             <div key={i}>
               <Skeleton className="mb-3 h-3 w-32" />
-              <div className="grid gap-3 lg:grid-cols-2">
-                <Skeleton className="h-32 w-full rounded-lg" />
-                <Skeleton className="h-32 w-full rounded-lg" />
+              <div className="divide-y divide-zinc-800 rounded-lg border border-zinc-800">
+                {Array.from({ length: n }, (_, j) => (
+                  <div key={j} className="flex items-center gap-3 px-4 py-3">
+                    <Skeleton className="h-8 w-8 rounded-md" />
+                    <Skeleton className="h-4 w-48" />
+                  </div>
+                ))}
               </div>
             </div>
           ))}
@@ -166,17 +193,20 @@ function IntegrationsPage() {
         SECTIONS.map((sec) => {
           const items = data.items.filter((i) => i.section === sec.id);
           if (items.length === 0) return null;
-          const sorted = sec.id === "other" ? [...items].sort((a, b) => ORDER[a.status] - ORDER[b.status] || a.name.localeCompare(b.name)) : items;
+          const sorted = [...items].sort((a, b) => ORDER[a.status] - ORDER[b.status]);
           let awsSeen = false;
           return (
-            <Section key={sec.id} id={sec.anchor} title={sec.title} description={sec.description}>
-              <div className="grid gap-3 lg:grid-cols-2">
+            <Section key={sec.id} id={sec.anchor} title={sec.title} className="!mt-8">
+              <ul
+                aria-labelledby={`${sec.anchor}-heading`}
+                className="divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/40"
+              >
                 {sorted.map((item) => {
                   const firstAws = item.id.startsWith("aws") && !awsSeen;
                   if (item.id.startsWith("aws")) awsSeen = true;
                   const anchor = anchorOf(item, firstAws);
                   return (
-                    <IntegrationCard
+                    <IntegrationRow
                       key={item.id}
                       item={item}
                       anchor={anchor}
@@ -187,7 +217,7 @@ function IntegrationsPage() {
                     />
                   );
                 })}
-              </div>
+              </ul>
             </Section>
           );
         })}
@@ -215,47 +245,16 @@ function IntegrationsPage() {
   );
 }
 
-const ACTION_LABEL = {
-  connect: "Connect",
-  add_credentials: "Add credentials",
-  check_again: "Check again",
-  manage: "Manage",
-} as const;
-
-/**
- * What opening a card lets you do, in one line, so it is plain that the card
- * leads somewhere. Written per integration from what its settings offer.
- */
-function canDoLine(item: Integration, canEdit: boolean): string {
-  const kind = kindOf(item);
-  const on = item.status !== "not_connected";
-  if (!canEdit) {
-    if (kind === "github") return "See the repositories Coderhelm works in";
-    if (kind === "aws_account" || kind === "aws_connect") return "See the accounts, log groups and findings";
-    return "";
-  }
-  switch (kind) {
-    case "github":
-      return on ? "Pick repositories, link another installation or check the app" : "Install the GitHub app and pick repositories";
-    case "jira":
-      return on ? "Choose projects, see recent ticket events, test or remove the connection" : "Connect with the Jira app or a webhook";
-    case "aws_connect":
-      return "Connect an account through a read-only role, made in one click";
-    case "aws_account":
-      return "Turn Metrics and Airflow on or off, pick Airflow environments, check access again";
-    case "connector":
-      if (item.id === "newrelic") return on ? "Change the key, region or accounts, test the connection or remove it" : "Add a user key and pick the region and accounts";
-      return on ? "Change the site, spaces or token, allow writing to listed pages, or remove it" : "Add your site, an account email and an API token";
-    case "teams":
-      return on ? "Change the channel webhook or turn alert posts on or off" : "Add a channel webhook so alerts and pull requests are posted";
-    case "plugin":
-      if (!on) return "Add credentials to switch it on for agents";
-      if (item.status === "needs_credentials") return "Add credentials, edit agent instructions or turn it off";
-      return "Replace credentials, test it, edit agent instructions or turn it off";
-  }
+/** The one thing a row offers, by status. Opening the row is how it's done. */
+function actionLabel(item: Integration, canEdit: boolean, hasPage: boolean): string {
+  if (!canEdit) return hasPage ? "View" : "";
+  if (item.status === "connected") return "Manage";
+  if (item.status === "needs_credentials") return "Add credentials";
+  if (item.status === "error") return "See why";
+  return "Connect";
 }
 
-function IntegrationCard({
+function IntegrationRow({
   item,
   anchor,
   canEdit,
@@ -280,8 +279,8 @@ function IntegrationCard({
   const st = STATUS[item.status];
   const kind = kindOf(item);
   const aws = kind === "aws_account" ? (item.detail as unknown as AwsAccountAbilities) : null;
-  const headingId = `${anchor}-name`;
-  const canDoId = `${anchor}-can-do`;
+  const lineId = `${anchor}-line`;
+  const panelId = `${anchor}-panel`;
 
   // GitHub, Jira and the first AWS connection have their own page; the rest open in place.
   const pageHref = kind === "github" || kind === "jira" || kind === "aws_connect" ? item.manage_href : "";
@@ -289,7 +288,8 @@ function IntegrationCard({
   const memberHref = kind === "github" || kind === "aws_connect" || kind === "aws_account" ? item.manage_href : "";
   const href = canEdit ? pageHref : memberHref;
   const opens = Boolean(href) || canEdit;
-  const canDo = canDoLine(item, canEdit);
+  const action = actionLabel(item, canEdit, Boolean(href));
+  const checked = item.last_check ? timeAgo(item.last_check) : "";
 
   const checkAgain = async () => {
     setBusy(true);
@@ -313,98 +313,102 @@ function IntegrationCard({
     }
   };
 
-  const last = item.last_check ? `Checked ${timeAgo(item.last_check)}` : kind === "aws_account" || kind === "plugin" || kind === "connector" ? (item.status === "not_connected" ? "" : "Not checked yet") : "";
-
-  // The name is the card's control; its ::after stretches over the summary so
-  // the whole top of the card opens it (a link for pages, a toggle in place).
-  const stretch =
-    "rounded-sm text-left outline-none after:absolute after:inset-0 after:rounded-t-lg after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-zinc-300";
-  const nameControl = !opens ? (
-    item.name
-  ) : href ? (
-    <Link href={href} className={stretch} aria-describedby={canDo ? canDoId : undefined}>
-      {item.name}
-    </Link>
-  ) : (
-    <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls={`${anchor}-panel`} className={stretch} aria-describedby={canDo ? canDoId : undefined}>
-      {item.name}
-    </button>
+  // Same columns on every row: mark · name and line · status · action.
+  // Below 640px the status moves under the name and the action becomes a chevron.
+  const grid = "grid w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 py-2.5 text-left sm:grid-cols-[2rem_minmax(0,1fr)_10.5rem_8.5rem]";
+  const statusText = (
+    <span className={`inline-flex items-center gap-1.5 ${st.text}`}>
+      <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${st.dot}`} />
+      {st.label}
+    </span>
+  );
+  const face = (
+    <>
+      <BrandIcon id={item.id} name={item.name} />
+      <span className="min-w-0">
+        <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+          <span className="min-w-0 break-words font-medium text-zinc-100 sm:truncate">{item.name}</span>
+          <span className="shrink-0 text-xs sm:hidden">{statusText}</span>
+        </span>
+        <span id={lineId} data-testid="integration-does" title={item.does} className="block text-sm text-zinc-500 sm:truncate">
+          {shortLine(item)}
+        </span>
+      </span>
+      <span data-testid="integration-status" className="hidden text-sm sm:block">
+        {statusText}
+        {checked && <span className="block pl-3 text-xs text-zinc-500">Checked {checked}</span>}
+      </span>
+      <span className="flex items-center justify-end gap-1 text-sm">
+        {action && !open && (
+          <span
+            data-testid="integration-action"
+            className={`hidden sm:inline ${
+              item.status === "connected" || !canEdit
+                ? "text-zinc-400 group-hover:text-zinc-100"
+                : "rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-100 group-hover:border-zinc-500"
+            }`}
+          >
+            {action}
+          </span>
+        )}
+        {opens && (
+          <span
+            aria-hidden="true"
+            className={`text-zinc-500 transition-transform motion-reduce:transition-none group-hover:text-zinc-200 ${open ? "rotate-90" : ""} ${
+              item.status === "connected" || !canEdit || open ? "" : "sm:hidden"
+            }`}
+          >
+            <ChevronRightIcon />
+          </span>
+        )}
+      </span>
+    </>
   );
 
-  // The one action shown on the card face: fixing something, or adding it.
-  const showAction = canEdit && item.status !== "connected" && !open;
+  // The row is one control; its name says what it is and how it's doing.
+  const label = `${item.name}, ${st.label}${action ? `. ${action}` : ""}`;
+  const control = `group ${grid} outline-none transition-colors motion-reduce:transition-none hover:bg-zinc-800/40 focus-visible:bg-zinc-800/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zinc-300`;
 
   return (
-    <article
-      id={anchor}
-      tabIndex={-1}
-      aria-labelledby={headingId}
-      className={`group min-w-0 rounded-lg border bg-zinc-900/50 outline-none transition-colors motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-zinc-400 ${
-        item.status === "needs_credentials" ? "border-amber-500/40" : item.status === "error" ? "border-red-500/40" : "border-zinc-800"
-      } ${opens ? (item.status === "needs_credentials" || item.status === "error" ? "hover:bg-zinc-900" : "hover:border-zinc-600 hover:bg-zinc-900") : ""}`}
-      data-testid={`integration-${item.id}`}
-      data-status={item.status}
-    >
-      <div className={`relative p-4 ${opens ? "cursor-pointer" : ""}`}>
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <h3 id={headingId} className="min-w-0 break-words font-semibold text-zinc-100">
-            {nameControl}
-          </h3>
-          <StatusPill tone={st.tone}>{st.label}</StatusPill>
-        </div>
-        <p className="mt-1 text-sm text-zinc-400" data-testid="integration-does">
-          {item.does}
-        </p>
-        {item.reason && (
-          <p className={`mt-2 text-sm ${item.status === "error" ? "text-red-300" : item.status === "needs_credentials" ? "font-medium text-amber-300" : "text-zinc-400"}`}>
-            {item.reason}
-          </p>
-        )}
-        {aws && <AwsAbilitySummary a={aws} />}
-        {last && <p className="mt-2 text-xs text-zinc-500">{last}</p>}
-        {canDo ? (
-          <p id={canDoId} data-testid="integration-can-do" className="mt-3 text-sm font-medium text-zinc-300 group-hover:text-zinc-100">
-            {canDo.slice(0, canDo.lastIndexOf(" ") + 1)}
-            {/* The last word and the chevron wrap together, so the chevron never sits alone on a line. */}
-            <span className="whitespace-nowrap">
-              {canDo.slice(canDo.lastIndexOf(" ") + 1)}
-              <span aria-hidden="true" className={`ml-1 inline-block align-[-3px] text-zinc-500 transition-transform motion-reduce:transition-none group-hover:text-zinc-200 ${open ? "rotate-90" : "group-hover:translate-x-0.5"}`}>
-                <ChevronRightIcon />
-              </span>
-            </span>
-          </p>
-        ) : (
-          !canEdit && item.status !== "connected" && <p className="mt-3 text-sm text-zinc-500">Ask an admin to set this up.</p>
-        )}
-      </div>
-
-      {(showAction || (canEdit && kind === "aws_account")) && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 pb-4">
-          {showAction &&
-            (pageHref ? (
-              <Link href={pageHref} className={primaryButton}>
-                {ACTION_LABEL[item.action]}
-              </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={() => (item.action === "check_again" && kind !== "teams" ? checkAgain() : setOpen(true))}
-                disabled={busy}
-                className={primaryButton}
-              >
-                {busy ? "Working…" : ACTION_LABEL[item.action]}
-              </button>
-            ))}
-          {canEdit && kind === "aws_account" && (
-            <Link href={item.manage_href} className={linkButton}>
-              Log groups, findings and more accounts
-            </Link>
-          )}
+    <li id={anchor} tabIndex={-1} className="min-w-0 scroll-mt-4 outline-none" data-testid={`integration-${item.id}`} data-status={item.status}>
+      {href ? (
+        <Link href={href} className={control} aria-label={label} aria-describedby={lineId}>
+          {face}
+        </Link>
+      ) : opens ? (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-controls={panelId}
+          aria-label={label}
+          aria-describedby={lineId}
+          className={control}
+        >
+          {face}
+        </button>
+      ) : (
+        <div className={grid} aria-label={`${item.name}, ${st.label}`} role="group">
+          {face}
         </div>
       )}
 
       {open && canEdit && (
-        <div id={`${anchor}-panel`} className="border-t border-zinc-800 px-4 pb-4 pt-1">
+        <div id={panelId} data-testid="integration-panel" className="border-t border-zinc-800 bg-zinc-950/40 px-4 pb-4 pt-3 sm:pl-[3.75rem]">
+          <p className="text-sm text-zinc-400">{item.does}</p>
+          {item.reason && (
+            <p className={`mt-2 text-sm ${item.status === "error" ? "text-red-300" : item.status === "needs_credentials" ? "text-amber-300" : "text-zinc-400"}`}>
+              {item.reason}
+            </p>
+          )}
+          {aws && <AwsAbilitySummary a={aws} />}
+          {item.status === "error" && kind !== "teams" && (
+            <p className="mt-3">
+              <button type="button" onClick={checkAgain} disabled={busy} className={secondaryButton}>
+                {busy ? "Checking…" : "Check again"}
+              </button>
+            </p>
+          )}
           {kind === "aws_account" && aws && (
             <AwsAbilitiesPanel
               a={aws}
@@ -422,14 +426,19 @@ function IntegrationCard({
           )}
           {kind === "plugin" && <PluginPanel item={item} onChanged={onReload} onClose={() => setOpen(false)} />}
           {kind === "teams" && <TeamsPanel onSaved={onReload} />}
-          <p className="mt-4">
+          <p className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
             <button type="button" onClick={() => setOpen(false)} className={linkButton}>
               Close
             </button>
+            {kind === "aws_account" && (
+              <Link href={item.manage_href} className={linkButton}>
+                Log groups, findings and more accounts
+              </Link>
+            )}
           </p>
         </div>
       )}
-    </article>
+    </li>
   );
 }
 

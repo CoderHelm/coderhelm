@@ -2136,14 +2136,6 @@ export interface Integration {
   detail: Record<string, unknown>;
 }
 
-/** Sent on `window` with the number of integrations that need attention, so the menu badge stays current. */
-export const INTEGRATIONS_ATTENTION_EVENT = "coderhelm:integrations-attention";
-
-/** Integrations that are switched on but not working: missing credentials or a failed check. */
-export function needsAttention(items: Integration[]): number {
-  return items.filter((i) => i.status === "needs_credentials" || i.status === "error").length;
-}
-
 export interface IntegrationsResponse {
   can_edit: boolean;
   items: Integration[];
