@@ -43,12 +43,81 @@ export interface Skill {
   /** Who last flipped its switch, and when. Empty if never. */
   switched_by: string;
   switched_at: string;
+  /** How Coderhelm runs it, from its last check. Null before the first. */
+  compat?: CompatShort | null;
+  /** An admin chose to give agents the translated version. */
+  use_translated?: boolean;
+  translated_by?: string;
+  translated_at?: string;
+}
+
+export type CompatStatus = "ready" | "translated" | "needs_tools";
+export type RequirementStatus = "available" | "translated" | "missing" | "blocked";
+
+/** The short form of an item's last check, as lists get it. */
+export interface CompatShort {
+  status: CompatStatus | "";
+  /** "7 of 10 steps run as written · 2 translated · 1 needs New Relic". */
+  summary: string;
+  /** What it needs that the team hasn't connected, by name. */
+  needs: string[];
+  at: string;
+  /** Why the last check failed, or empty. */
+  error: string;
+  /** Whether it was checked against its current text. */
+  current: boolean;
+}
+
+/** One thing a step relies on, and how Coderhelm covers it. */
+export interface Requirement {
+  /** What the item asks for, in its words. */
+  asks: string;
+  kind: "tool" | "command" | "data" | "path" | "other";
+  status: RequirementStatus;
+  /** Coderhelm tools that do it. */
+  uses: string[];
+  write: "none" | "repo" | "outside";
+  needs: string;
+  fix: string;
+  connect: "plugins" | "data_sources" | "github" | "none";
+}
+
+export interface CompatStep {
+  title: string;
+  does: string;
+  requirements: Requirement[];
+  /** Left out of the translated version. */
+  dropped: boolean;
+  status: RequirementStatus;
+}
+
+export interface CompatNeed {
+  name: string;
+  fix: string;
+  connect: Requirement["connect"];
+  status: "missing" | "blocked";
+  steps: number;
+}
+
+/** An item's full check, as its page gets it. */
+export interface Compat extends CompatShort {
+  steps?: CompatStep[];
+  counts?: { steps: number; as_written: number; translated: number; missing: number; blocked: number };
+  needs_detail?: CompatNeed[];
+  model?: string;
+  input_tokens?: number;
+  output_tokens?: number;
+  cost_usd?: number;
+  ms?: number;
 }
 
 export interface SkillWithBody extends Skill {
   body: string;
   /** For an agent: the exact instructions it answers under. */
   prompt?: string;
+  compat?: Compat | null;
+  /** The version rewritten for Coderhelm's tools. Empty before a check. */
+  translated?: string;
 }
 
 /** One question put to a team agent, and its answer. */
@@ -139,6 +208,10 @@ export const skillsApi = {
   ask: (repo: string, path: string, id: string) =>
     call<AgentAsk>(`/api/skills/asks?repo=${encodeURIComponent(repo)}&path=${encodeURIComponent(path)}&id=${encodeURIComponent(id)}`),
   runAsks: (runId: string) => call<{ asks: AgentAsk[] }>(`/api/skills/asks?run_id=${encodeURIComponent(runId)}`),
+  recheck: (repo: string, path?: string) =>
+    call<{ ok: true; checking: true }>("/api/skills/recheck", { method: "POST", body: JSON.stringify({ repo, path: path ?? "" }) }),
+  setUseTranslated: (repo: string, path: string, enabled: boolean) =>
+    call<{ ok: true; use_translated: boolean }>("/api/skills/translated", { method: "PUT", body: JSON.stringify({ repo, path, enabled }) }),
   tryAgent: (repo: string, path: string, question: string, context: string) =>
     call<{ id: string }>("/api/skills/asks", { method: "POST", body: JSON.stringify({ repo, path, question, context }) }),
 };
@@ -146,6 +219,13 @@ export const skillsApi = {
 /** Where an agent's page lives. */
 export const agentHref = (s: Pick<Skill, "repo" | "path">) =>
   `/skills/agent?repo=${encodeURIComponent(s.repo)}&path=${encodeURIComponent(s.path)}`;
+
+/** Where a skill's or command's page lives. */
+export const itemHref = (s: Pick<Skill, "repo" | "path">) =>
+  `/skills/item?repo=${encodeURIComponent(s.repo)}&path=${encodeURIComponent(s.path)}`;
+
+/** Any item's page: agents have their own. */
+export const pageHref = (s: Pick<Skill, "repo" | "path" | "kind">) => (s.kind === "agent" ? agentHref(s) : itemHref(s));
 
 /**
  * The settings an agent's brief asks for in its front matter. Coderhelm
