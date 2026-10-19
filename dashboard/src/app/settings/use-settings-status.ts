@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { formatTokens, usageTone } from "@/lib/usage";
+import { formatTokens, usageBreakdown, usageTone, usageTotal } from "@/lib/usage";
 import { hasRole } from "@/lib/roles";
 import { SETTINGS_ITEMS, type SettingsStatusKey } from "@/components/settings-items";
 
@@ -11,6 +11,8 @@ export type StatusTone = "neutral" | "success" | "warning" | "error";
 export interface ItemStatus {
   text: string;
   tone: StatusTone;
+  /** More detail on hover (the token limit's four parts). */
+  title?: string;
 }
 
 export interface Me {
@@ -27,8 +29,11 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 const LOADERS: Record<SettingsStatusKey, (me: Me) => Promise<ItemStatus | null>> = {
   usage: async () => {
     const u = await api.getUsage();
-    if (u.max_tokens <= 0) return { text: `No limit · ${formatTokens(u.total_tokens)} used this month`, tone: "neutral" };
-    return { text: `${formatTokens(u.total_tokens)} of ${formatTokens(u.max_tokens)} used this month`, tone: usageTone(u.total_tokens, u.max_tokens) };
+    // All four parts (new input, read from cache, written to cache, output).
+    const used = usageTotal(u);
+    const title = usageBreakdown(u);
+    if (u.max_tokens <= 0) return { text: `No limit · ${formatTokens(used)} used this month`, tone: "neutral", title };
+    return { text: `${formatTokens(used)} of ${formatTokens(u.max_tokens)} used this month`, tone: usageTone(used, u.max_tokens), title };
   },
   repos: async () => {
     const { repos } = await api.listRepos();

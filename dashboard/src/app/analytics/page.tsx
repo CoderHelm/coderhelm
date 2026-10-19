@@ -38,7 +38,7 @@ function tokens(v: number) {
   return String(Math.round(v));
 }
 const plural = (n: number, one: string, many = `${one}s`) => `${count(n)} ${n === 1 ? one : many}`;
-/** Tokens in and out, the measure of what Coderhelm used. */
+/** All four token parts (new input, cache read, cache write, output), the measure of what Coderhelm used. */
 const totalTokens = (s: { tokens?: number; tokens_in: number; tokens_out: number }) => s.tokens ?? s.tokens_in + s.tokens_out;
 const perPr = (s: { tokens?: number; tokens_in: number; tokens_out: number; prs_merged: number; tokens_per_merged_pr?: number | null }) =>
   s.tokens_per_merged_pr ?? (s.prs_merged ? Math.round(totalTokens(s) / s.prs_merged) : null);

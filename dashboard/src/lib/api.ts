@@ -1208,11 +1208,32 @@ export interface WorkflowSettings {
   allow_plan_log_analyzer: boolean;
 }
 
-export interface UsageInfo {
-  month: string;
+/** One feature's share of the month (all four parts). */
+export interface FeatureUsage {
+  feature: string;
   total_tokens: number;
   tokens_in: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
   tokens_out: number;
+}
+
+export interface UsageInfo {
+  month: string;
+  /** All four parts: new input + read from cache + written to cache + output. */
+  total_tokens: number;
+  /** New input (not read from or written to the cache). */
+  tokens_in: number;
+  tokens_out: number;
+  cache_read_tokens?: number;
+  cache_write_tokens?: number;
+  /** Read from cache ÷ (read from cache + written to cache + new input). */
+  cache_hit_rate?: number;
+  /** What the limit compares with max_tokens today. */
+  counted_tokens?: number;
+  /** False while the limit still counts new input and output only. */
+  limit_counts_cache?: boolean;
+  features?: FeatureUsage[];
   total_runs: number;
   max_tokens: number;
 }

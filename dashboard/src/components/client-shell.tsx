@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { api, type UsageInfo, type Banner, type TeamInfo } from "@/lib/api";
 import { pushToDataLayer } from "@/lib/gtm";
-import { formatTokens, USAGE_CHANGED } from "@/lib/usage";
+import { formatTokens, USAGE_CHANGED, usageBreakdown, usageTotal } from "@/lib/usage";
 import { ToastProvider } from "./toast";
 import { ConfirmProvider } from "./confirm-dialog";
 import { focusRing } from "./ui";
@@ -434,7 +434,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
           ))}
-          {usage && usage.max_tokens > 0 && usage.total_tokens >= usage.max_tokens && !dismissedBanners.has("token-limit-banner") && (
+          {usage && usage.max_tokens > 0 && (usage.counted_tokens ?? usage.total_tokens) >= usage.max_tokens && !dismissedBanners.has("token-limit-banner") && (
               <div role="alert" className="bg-red-900/90 border-b-2 border-red-500 px-4 md:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="text-red-300 text-xl" aria-hidden="true">⚠</span>
@@ -443,7 +443,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                       Token limit reached — all runs are paused
                     </p>
                     <p className="text-xs text-red-300 mt-0.5">
-                      You&apos;ve used {formatTokens(usage.total_tokens)} of your {formatTokens(usage.max_tokens)} token limit this month.{" "}
+                      You&apos;ve used {formatTokens(usageTotal(usage))} of your {formatTokens(usage.max_tokens)} token limit this month.{" "}
                       {user?.role === "owner" ? "Raise the limit or wait for next month." : "Ask the team owner to raise the limit, or wait for next month."}
                     </p>
                   </div>
@@ -680,34 +680,44 @@ function Sidebar({
       </div>
 
       {/* Tokens remaining */}
-      {usage && usage.max_tokens > 0 && (
-        <div className="mx-2 mt-3 pt-3 border-t border-zinc-800/60 shrink-0">
-          <div className="flex items-center justify-between text-xs" title={`${usage.total_tokens.toLocaleString()} tokens used of ${usage.max_tokens.toLocaleString()} limit`}>
-            <span className="text-zinc-500">Tokens used</span>
-            <span className={`font-medium ${
-              usage.total_tokens >= usage.max_tokens
-                ? "text-red-400"
-                : usage.total_tokens >= usage.max_tokens * 0.8
-                  ? "text-yellow-400"
-                  : "text-zinc-300"
-            }`}>
-              {formatTokens(usage.total_tokens)} / {formatTokens(usage.max_tokens)}
-            </span>
-          </div>
-          <div className="mt-1.5 h-1 bg-zinc-800 rounded-full overflow-hidden">
+      {usage && usage.max_tokens > 0 && (() => {
+        // All four parts: new input, read from cache, written to cache, output.
+        const used = usageTotal(usage);
+        return (
+          <div className="mx-2 mt-3 pt-3 border-t border-zinc-800/60 shrink-0" data-testid="sidebar-token-meter">
             <div
-              className={`h-full rounded-full transition-all ${
-                usage.total_tokens >= usage.max_tokens
-                  ? "bg-red-500"
-                  : usage.total_tokens >= usage.max_tokens * 0.8
-                    ? "bg-yellow-500"
-                    : "bg-emerald-500"
-              }`}
-              style={{ width: `${Math.min((usage.total_tokens / usage.max_tokens) * 100, 100)}%` }}
-            />
+              className="flex items-center justify-between text-xs"
+              title={`${usageBreakdown(usage)} · Limit ${formatTokens(usage.max_tokens)}`}
+            >
+              <span className="text-zinc-500">Tokens used</span>
+              <span
+                data-testid="sidebar-token-meter-value"
+                className={`font-medium ${
+                  used >= usage.max_tokens
+                    ? "text-red-400"
+                    : used >= usage.max_tokens * 0.8
+                      ? "text-yellow-400"
+                      : "text-zinc-300"
+                }`}
+              >
+                {formatTokens(used)} / {formatTokens(usage.max_tokens)}
+              </span>
+            </div>
+            <div className="mt-1.5 h-1 bg-zinc-800 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  used >= usage.max_tokens
+                    ? "bg-red-500"
+                    : used >= usage.max_tokens * 0.8
+                      ? "bg-yellow-500"
+                      : "bg-emerald-500"
+                }`}
+                style={{ width: `${Math.min((used / usage.max_tokens) * 100, 100)}%` }}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {user && (
         <div className="mt-3 pt-3 border-t border-zinc-800/60 shrink-0">
