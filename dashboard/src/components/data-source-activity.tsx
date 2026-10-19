@@ -38,7 +38,7 @@ export function feedFiltersFrom(params: URLSearchParams): FeedFilters {
   return {
     source: params.get("source") || "all",
     who: (["reviewer", "planner", "coder", "people"] as string[]).includes(who) ? (who as Who) : "all",
-    outcome: (["ok", "refused", "failed", "problems"] as string[]).includes(outcome) ? (outcome as Outcome) : "all",
+    outcome: (["ok", "refused", "failed", "unknown_name", "problems"] as string[]).includes(outcome) ? (outcome as Outcome) : "all",
     range: RANGES.some((r) => r.value === range) ? (range as Range) : "all",
     q: params.get("q") ?? "",
   };
@@ -105,6 +105,7 @@ function KindIcon({ kind }: { kind?: DataSourceKind }) {
 function OutcomePill({ outcome }: { outcome: DataSourceActivityEvent["outcome"] }) {
   if (outcome === "ok") return <StatusPill tone="success">OK</StatusPill>;
   if (outcome === "refused") return <StatusPill tone="warning">Refused</StatusPill>;
+  if (outcome === "unknown_name") return <StatusPill tone="warning">Unknown name</StatusPill>;
   return <StatusPill tone="error">Failed</StatusPill>;
 }
 
@@ -357,6 +358,7 @@ export function ActivityFeed({
             <option value="ok">Worked</option>
             <option value="refused">Refused</option>
             <option value="failed">Failed</option>
+            <option value="unknown_name">Unknown name (not sent)</option>
           </select>
         </label>
         <label className="text-xs text-zinc-400">
@@ -427,7 +429,7 @@ export function ActivityFeed({
                   <span className="min-w-0 flex-1">
                     <span className="block break-words text-sm text-zinc-100">{ev.summary}</span>
                     {ev.outcome !== "ok" && ev.detail && (
-                      <span className={`mt-0.5 block break-words text-sm ${ev.outcome === "refused" ? "text-amber-200" : "text-red-200"}`}>{ev.detail}</span>
+                      <span className={`mt-0.5 block break-words text-sm ${ev.outcome === "failed" ? "text-red-200" : "text-amber-200"}`}>{ev.detail}</span>
                     )}
                     <span className="mt-1 block break-words text-xs text-zinc-500">
                       <span className="text-zinc-400">{actorLabel(ev)}</span>
@@ -459,13 +461,13 @@ export function ActivityFeed({
                     </div>
                     {ev.detail && (
                       <p className="text-sm text-zinc-400">
-                        <span className="text-zinc-500">{ev.outcome === "ok" ? "Came back: " : ev.outcome === "refused" ? "Refused because: " : "Failed because: "}</span>
+                        <span className="text-zinc-500">{ev.outcome === "ok" ? "Came back: " : ev.outcome === "refused" ? "Refused because: " : ev.outcome === "unknown_name" ? "Not sent, because: " : "Failed because: "}</span>
                         {ev.detail}
                       </p>
                     )}
                     {repeats > 1 && (
                       <p className="text-sm text-zinc-400">
-                        The same lookup {ev.outcome === "refused" ? "was refused" : "failed"} {repeats} times in a row, from{" "}
+                        The same lookup {ev.outcome === "refused" ? "was refused" : ev.outcome === "unknown_name" ? "was stopped" : "failed"} {repeats} times in a row, from{" "}
                         <time dateTime={oldest.at}>{new Date(oldest.at).toLocaleString()}</time> to{" "}
                         <time dateTime={ev.at}>{new Date(ev.at).toLocaleString()}</time>.
                       </p>

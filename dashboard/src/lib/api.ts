@@ -883,6 +883,14 @@ export const api = {
     request<{ connector: Connector }>(`/api/connectors/${kind}/test`, { method: "POST" }),
   removeConnector: (kind: ConnectorKind) =>
     request<{ ok: true }>(`/api/connectors/${kind}`, { method: "DELETE" }),
+  getHiddenSuggestions: (id: string) =>
+    request<HiddenSuggestions>(`/api/data-sources/${encodeURIComponent(id)}/hidden-suggestions`),
+  /** Accepted entries join the hidden list; dismissed ones are never suggested again. */
+  decideHiddenSuggestions: (id: string, body: { accept?: string[]; dismiss?: string[]; refresh?: boolean }) =>
+    request<HiddenSuggestions & { source: DataSource }>(
+      `/api/data-sources/${encodeURIComponent(id)}/hidden-suggestions`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
   getDataSourceSamples: (id: string) =>
     request<{ samples: DataSourceSample[] }>(`/api/data-sources/${encodeURIComponent(id)}/samples`),
   tryDataSource: (id: string, query: string, opts: { log_groups?: string[]; since?: string; database?: string } = {}) =>
@@ -1799,6 +1807,20 @@ export interface DataSourceTryResult {
   note?: string;
 }
 
+/** A column a source's table and column names suggest holds a person's details. */
+export interface HiddenSuggestion {
+  /** `schema.table.column`, the form the hidden list takes. */
+  entry: string;
+  reason: string;
+}
+
+export interface HiddenSuggestions {
+  suggestions: HiddenSuggestion[];
+  dismissed: string[];
+  /** When they were last worked out; empty before the first time. */
+  checked_at?: string;
+}
+
 export interface DataSourceActivityEvent {
   at: string;
   source_id: string;
@@ -1815,7 +1837,8 @@ export interface DataSourceActivityEvent {
   /** For a lookup that worked, a short note like "12 rows"; otherwise why it was refused or failed. */
   detail?: string;
   ok: boolean;
-  outcome: "ok" | "refused" | "failed";
+  /** `unknown_name`: it named a table, column, type or field the source doesn't have, so it wasn't sent. */
+  outcome: "ok" | "refused" | "failed" | "unknown_name";
   ms: number;
   /** The run the lookup was made during, for a link to it. */
   run_id?: string;
