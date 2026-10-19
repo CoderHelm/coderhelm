@@ -6,6 +6,7 @@ import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
 import { TextareaSkeleton } from "@/components/skeleton";
 import { RepoCombobox } from "@/components/repo-combobox";
+import { Page, PageHeader } from "@/components/page";
 
 function Tab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
@@ -101,12 +102,13 @@ function InstructionsPage() {
   };
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-2">Custom instructions</h1>
-      <p className="text-zinc-400 text-sm mb-6">
-        Conventions and preferences that Coderhelm follows. Global instructions apply to all repos.
-        Per-repo instructions add repo-specific guidance on top.
-      </p>
+    <Page>
+      <div className="mb-6">
+        <PageHeader
+          title="Custom instructions"
+          lead="Conventions and preferences that Coderhelm follows. Global instructions apply to all repos. Per-repo instructions add repo-specific guidance on top."
+        />
+      </div>
 
       <div className="flex gap-1 border-b border-zinc-800 mb-6">
         <Tab label="Global" active={tab === "global"} onClick={() => setTab("global")} />
@@ -216,6 +218,6 @@ function InstructionsPage() {
           )}
         </>
       )}
-    </div>
+    </Page>
   );
 }

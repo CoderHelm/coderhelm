@@ -11,6 +11,7 @@ import { ReReviewButton } from "@/components/re-review-button";
 import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { Page, PageHeader, cardClass } from "@/components/page";
 import { VerdictPill, riskLabel, triggerLabel } from "../labels";
 
 export default function ReviewDetailGuarded() {
@@ -25,11 +26,13 @@ export default function ReviewDetailGuarded() {
 
 function DetailSkeleton() {
   return (
-    <div className="max-w-3xl space-y-3" aria-busy="true" aria-label="Loading the review">
-      <Skeleton className="h-4 w-24" />
-      <Skeleton className="h-6 w-72" />
-      <Skeleton className="h-48 w-full" />
-    </div>
+    <Page>
+      <div className="space-y-3" aria-busy="true" aria-label="Loading the review">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-6 w-72" />
+        <Skeleton className="h-48 w-full" />
+      </div>
+    </Page>
   );
 }
 
@@ -106,18 +109,18 @@ function ReviewDetailPage() {
   if (state === "loading") return <DetailSkeleton />;
   if (state === "missing" || (state === "ready" && !review)) {
     return (
-      <div className="max-w-3xl space-y-4">
+      <Page className="space-y-4">
         {backLink}
         <Callout variant="warning" title="Review not found">
           <p>This link does not point to a review. It may be mistyped, or the review was removed.</p>
           <Link href="/reviewer" className={`mt-2 ${secondaryButton}`}>See all reviews</Link>
         </Callout>
-      </div>
+      </Page>
     );
   }
   if (state === "error" || !review) {
     return (
-      <div className="max-w-3xl space-y-4">
+      <Page className="space-y-4">
         {backLink}
         <Callout variant="error" title="Could not load this review">
           <p>Check your connection and try again.</p>
@@ -129,7 +132,7 @@ function ReviewDetailPage() {
             Try again
           </button>
         </Callout>
-      </div>
+      </Page>
     );
   }
 
@@ -143,42 +146,48 @@ function ReviewDetailPage() {
   ].filter(Boolean) as string[];
 
   return (
-    <div className="max-w-3xl">
-      {backLink}
-
-      <div className="mt-3 flex items-center gap-3 flex-wrap">
-        <VerdictPill verdict={review.verdict} />
-        {risk && <span className="text-xs font-medium text-zinc-400">{risk}</span>}
-        <h1 className="min-w-0 break-all">
+    <Page>
+      <PageHeader
+        eyebrow={backLink}
+        titleClassName="break-all"
+        title={
           <a
             href={prUrl}
             target="_blank"
             rel="noreferrer"
-            className={`rounded text-lg font-semibold text-zinc-100 hover:underline ${focusRing}`}
+            className={`rounded text-zinc-100 hover:underline ${focusRing}`}
           >
             {review.repo} #{review.pr_number}
             <span className="sr-only"> (opens GitHub in a new tab)</span>
           </a>
-        </h1>
-        <ReReviewButton repo={review.repo} pr={review.pr_number} className="ml-auto min-h-9" />
-      </div>
-      {meta.length > 0 && (
-        <p className="mt-1 text-xs text-zinc-500">{meta.join(" · ")}</p>
-      )}
+        }
+        lead={
+          <>
+            <span className="flex flex-wrap items-center gap-3">
+              <VerdictPill verdict={review.verdict} />
+              {risk && <span className="text-xs font-medium text-zinc-400">{risk}</span>}
+            </span>
+            {meta.length > 0 && (
+              <span className="mt-1 block text-xs text-zinc-500">{meta.join(" · ")}</span>
+            )}
+          </>
+        }
+        actions={<ReReviewButton repo={review.repo} pr={review.pr_number} className="min-h-9" />}
+      />
 
-      <div className="mt-5 p-4 rounded-lg bg-zinc-900 border border-zinc-800 overflow-x-auto">
+      <div className={`mt-6 ${cardClass} overflow-x-auto`}>
         <Markdown>{review.body || "_The review has no text._"}</Markdown>
       </div>
 
       {review.action_summary && (
-        <div className="mt-4 p-4 rounded-lg bg-zinc-900 border border-zinc-800 overflow-x-auto">
+        <div className={`mt-4 ${cardClass} overflow-x-auto`}>
           <h2 className="text-sm font-semibold text-zinc-200 mb-2">What happened after the review</h2>
           <Markdown>{review.action_summary}</Markdown>
         </div>
       )}
 
       {/* Ratings */}
-      <section className="mt-6 p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+      <section className={`mt-6 ${cardClass}`}>
         <h2 className="text-sm font-semibold text-zinc-200 mb-3">Rate this review</h2>
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <button
@@ -247,6 +256,6 @@ function ReviewDetailPage() {
           More reviews of {review.repo}
         </Link>
       </p>
-    </div>
+    </Page>
   );
 }

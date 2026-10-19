@@ -7,6 +7,7 @@ import { RoleGuard } from "@/components/role-guard";
 import { useConfirm } from "@/components/confirm-dialog";
 import { TextareaSkeleton } from "@/components/skeleton";
 import { RepoCombobox } from "@/components/repo-combobox";
+import { Page, PageHeader } from "@/components/page";
 
 function Tab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
@@ -163,12 +164,13 @@ function VoicePage() {
   };
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-2">Team voice</h1>
-      <p className="text-zinc-400 text-sm mb-6">
-        Define how Coderhelm writes PR descriptions, commit messages, and code comments.
-        Global voice applies to all repos. Per-repo voice overrides it for a specific repo and is auto-generated during onboarding.
-      </p>
+    <Page>
+      <div className="mb-6">
+        <PageHeader
+          title="Team voice"
+          lead="Define how Coderhelm writes PR descriptions, commit messages, and code comments. Global voice applies to all repos. Per-repo voice overrides it for a specific repo and is auto-generated during onboarding."
+        />
+      </div>
 
       <div className="flex gap-1 border-b border-zinc-800 mb-6">
         <Tab label="Global" active={tab === "global"} onClick={() => setTab("global")} />
@@ -221,6 +223,6 @@ function VoicePage() {
           )}
         </>
       )}
-    </div>
+    </Page>
   );
 }

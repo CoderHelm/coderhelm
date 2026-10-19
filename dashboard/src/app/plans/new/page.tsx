@@ -15,6 +15,7 @@ import { StreamingCursor } from "@/components/streaming-cursor";
 import { useSmartScroll, ScrollPill } from "@/components/smart-scroll";
 import { SquareIcon, RefreshIcon, ZapIcon, PenIcon, CheckIcon, XIcon, CopyIcon } from "@/components/stream-icons";
 import { focusRing } from "@/components/ui";
+import { Page } from "@/components/page";
 
 interface DraftTask {
   title: string;
@@ -341,7 +342,7 @@ const MessageBubble = memo(function MessageBubble({ msg }: { msg: StreamMessage 
 // useSearchParams needs a Suspense boundary in a static export.
 export default function NewPlanPage() {
   return (
-    <Suspense fallback={<p className="text-sm text-zinc-500">Loading…</p>}>
+    <Suspense fallback={<Page><p className="text-sm text-zinc-500">Loading…</p></Page>}>
       <NewPlan />
     </Suspense>
   );
@@ -502,7 +503,7 @@ function NewPlan() {
   const isActive = status === "submitted" || status === "streaming";
 
   return (
-    <div className="max-w-4xl flex flex-col md:h-[calc(100vh-4rem)]">
+    <Page className="flex flex-col md:h-[calc(100vh-4rem)]">
       <h1 className="sr-only">New plan</h1>
       <div className="flex items-center gap-3 mb-4">
         <Link href="/plans" className={`text-zinc-500 hover:text-zinc-300 text-sm rounded ${focusRing}`}>← Plans</Link>
@@ -816,6 +817,6 @@ function NewPlan() {
           </div>
         )}
       </div>
-    </div>
+    </Page>
   );
 }

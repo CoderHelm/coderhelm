@@ -6,6 +6,7 @@ import { TableSkeleton } from "@/components/skeleton";
 import { Callout } from "@/components/callout";
 import { usePagedList, LoadMoreButton } from "@/components/load-more";
 import { focusRing, primaryButton, secondaryButton, linkButton } from "@/components/ui";
+import { Page, PageHeader } from "@/components/page";
 import { PlanStatusPill } from "./status";
 
 function timeAgo(iso: string): string {
@@ -31,26 +32,25 @@ export default function PlansPage() {
   const executingPlan = plans.find((p) => p.status === "executing");
 
   return (
-    <div>
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-zinc-100">Plans</h1>
-          <p className="text-sm text-zinc-500 mt-1">
-            Chat with Coderhelm to break work into ordered tasks, then approve them and let it build each one.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {executingPlan && (
-            <Link href={`/plans/detail?id=${executingPlan.plan_id}`} className={secondaryButton}>
-              Continue running plan
+    <Page>
+      <PageHeader
+        title="Plans"
+        lead="Chat with Coderhelm to break work into ordered tasks, then approve them and let it build each one."
+        actions={
+          <>
+            {executingPlan && (
+              <Link href={`/plans/detail?id=${executingPlan.plan_id}`} className={secondaryButton}>
+                Continue running plan
+              </Link>
+            )}
+            <Link href="/plans/new" className={primaryButton}>
+              New plan
             </Link>
-          )}
-          <Link href="/plans/new" className={primaryButton}>
-            New plan
-          </Link>
-        </div>
-      </div>
+          </>
+        }
+      />
 
+      <div className="mt-6">
       {loading ? (
         <TableSkeleton rows={4} cols={4} />
       ) : error ? (
@@ -60,7 +60,7 @@ export default function PlansPage() {
           </button>
         </Callout>
       ) : plans.length === 0 ? (
-        <div className="border border-zinc-800 rounded-lg p-8 sm:p-12 text-center text-zinc-500">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 sm:p-12 text-center text-zinc-500">
           <p className="text-lg mb-2 text-zinc-300">No plans yet</p>
           <p className="text-sm mb-4">
             A plan breaks a feature into ordered GitHub issues or Jira tickets that Coderhelm builds one by one.
@@ -112,6 +112,7 @@ export default function PlansPage() {
         </div>
       )}
       <LoadMoreButton hasMore={!!next} loading={loadingMore} onClick={loadMore} />
-    </div>
+      </div>
+    </Page>
   );
 }

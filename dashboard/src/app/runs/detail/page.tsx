@@ -11,6 +11,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { Callout } from "@/components/callout";
 import { Markdown } from "@/components/markdown";
 import { focusRing, primaryButton, secondaryButton } from "@/components/ui";
+import { Page } from "@/components/page";
 import { RunStatusBadge, runIsLive } from "@/components/run-status";
 import { TeamAgentAsks } from "./team-asks";
 
@@ -132,7 +133,7 @@ function formatDuration(seconds?: number): string {
 
 export default function RunDetailPage() {
   return (
-    <Suspense fallback={<div className="max-w-3xl"><Skeleton className="h-6 w-64 mb-2" /><Skeleton className="h-4 w-96 mb-6" /></div>}>
+    <Suspense fallback={<Page><Skeleton className="h-6 w-64 mb-2" /><Skeleton className="h-4 w-96 mb-6" /></Page>}>
       <RunDetailInner />
     </Suspense>
   );
@@ -408,31 +409,33 @@ function RunDetailInner() {
 
   if (!runId) {
     return (
-      <div className="max-w-3xl space-y-4">
+      <Page className="space-y-4">
         {backLink}
         <Callout variant="info" title="No run picked">
           <p>This link has no run in it. Open a run from the runs list.</p>
         </Callout>
-      </div>
+      </Page>
     );
   }
 
   if (loading) {
     return (
-      <div className="max-w-3xl" aria-busy="true">
+      <Page>
+        <div aria-busy="true">
         <Skeleton className="h-4 w-16 mb-4" />
         <Skeleton className="h-6 w-64 max-w-full mb-2" />
         <Skeleton className="h-4 w-96 max-w-full mb-6" />
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />)}
         </div>
-      </div>
+        </div>
+      </Page>
     );
   }
 
   if (!run) {
     return (
-      <div className="max-w-3xl space-y-4">
+      <Page className="space-y-4">
         {backLink}
         {loadError === "missing" ? (
           <Callout variant="info" title="Run not found">
@@ -450,7 +453,7 @@ function RunDetailInner() {
             </button>
           </Callout>
         )}
-      </div>
+      </Page>
     );
   }
 
@@ -528,7 +531,7 @@ function RunDetailInner() {
   };
 
   return (
-    <div className={showTaskSidebar ? "max-w-6xl flex flex-col lg:flex-row gap-6" : "max-w-3xl"}>
+    <Page className={showTaskSidebar ? "flex flex-col lg:flex-row gap-6" : ""}>
     <div className={showTaskSidebar ? "flex-1 min-w-0" : ""}>
       {backLink}
 
@@ -1071,7 +1074,7 @@ function RunDetailInner() {
         </div>
       </div>
     )}
-    </div>
+    </Page>
   );
 }
 

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { api, type Repo } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
 import { RoleGuard } from "@/components/role-guard";
+import { Page, PageHeader } from "@/components/page";
 const GITHUB_APP_INSTALL_URL = "https://github.com/apps/coderhelm/installations/new";
 const STATE_STORAGE_KEY = "gh_install_state";
 
@@ -115,10 +116,12 @@ function GitHubSettingsPage() {
 
   if (loading) {
     return (
-      <div className="max-w-2xl">
-        <h1 className="text-2xl font-bold mb-6">GitHub</h1>
+      <Page>
+        <div className="mb-6">
+          <PageHeader title="GitHub" />
+        </div>
         <Skeleton className="h-24 w-full" />
-      </div>
+      </Page>
     );
   }
 
@@ -126,8 +129,10 @@ function GitHubSettingsPage() {
   const isAdmin = role === "admin" || role === "owner";
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-6">GitHub</h1>
+    <Page>
+      <div className="mb-6">
+        <PageHeader title="GitHub" />
+      </div>
 
       {/* Error banner */}
       {error && (
@@ -240,7 +245,7 @@ function GitHubSettingsPage() {
           Manage repos in <a href="/settings/repos" className="text-zinc-400 underline hover:text-zinc-300">Repositories settings</a>.
         </p>
       </div>
-    </div>
+    </Page>
   );
 }
 

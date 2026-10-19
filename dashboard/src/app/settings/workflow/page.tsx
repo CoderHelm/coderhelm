@@ -5,6 +5,7 @@ import { api, type WorkflowSettings, type JiraCheck, type AwsConnection } from "
 import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
 import { Callout } from "@/components/callout";
+import { Page, PageHeader } from "@/components/page";
 
 type WorkflowToggleKey = "commit_openspec" | "allow_plan_log_analyzer";
 
@@ -82,32 +83,35 @@ function WorkflowPage() {
 
   if (loading) {
     return (
-      <div className="max-w-xl">
-        <h1 className="text-2xl font-bold mb-6">Workflow</h1>
+      <Page>
+        <div className="mb-6">
+          <PageHeader title="Workflow" />
+        </div>
         <div className="h-48 bg-zinc-900/50 border border-zinc-800 rounded-lg animate-pulse" />
-      </div>
+      </Page>
     );
   }
 
   if (!settings) {
     return (
-      <div className="max-w-xl">
-        <h1 className="text-2xl font-bold mb-6">Workflow</h1>
+      <Page>
+        <div className="mb-6">
+          <PageHeader title="Workflow" />
+        </div>
         <Callout variant="error" title="Could not load workflow settings">
           <p>Reload the page to try again.</p>
         </Callout>
-      </div>
+      </Page>
     );
   }
 
   return (
-    <div className="max-w-xl">
-      <h1 className="text-2xl font-bold mb-2">Workflow</h1>
-      <p className="text-sm text-zinc-500 mb-6">
-        Control how Coderhelm structures and commits its work.
-      </p>
+    <Page>
+      <div className="mb-6">
+        <PageHeader title="Workflow" lead="Control how Coderhelm structures and commits its work." />
+      </div>
 
-      <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-lg divide-y divide-zinc-800">
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 divide-y divide-zinc-800">
         {TOGGLES.map((t) => {
           const disabled = saving || (t.key === "allow_plan_log_analyzer" && !awsConnected);
           return (
@@ -140,7 +144,7 @@ function WorkflowPage() {
       </div>
 
       {/* Default task destination */}
-      <div className="mt-6 p-5 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+      <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
         <p className="text-sm font-medium text-zinc-100">Default task destination</p>
         <p className="text-xs text-zinc-500 mt-0.5 mb-4">
           Where new plan tasks create tickets by default. You can override per task.
@@ -178,6 +182,6 @@ function WorkflowPage() {
           )}
         </div>
       </div>
-    </div>
+    </Page>
   );
 }

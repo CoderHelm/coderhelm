@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api, type Repo } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
 import { RoleGuard } from "@/components/role-guard";
+import { Page, PageHeader } from "@/components/page";
 
 const PAGE_SIZE = 10;
 
@@ -75,12 +76,13 @@ function ReposPage() {
   useEffect(() => { setPage(0); }, [search]);
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-2">Repositories</h1>
-      <p className="text-zinc-400 text-sm mb-4">
-        Repos connected via the GitHub App. Enable the ones you want Coderhelm to work on, and set a
-        role (web, backend, …) so Jira tickets route to the right repo.
-      </p>
+    <Page>
+      <div className="mb-6">
+        <PageHeader
+          title="Repositories"
+          lead="Repos connected via the GitHub App. Enable the ones you want Coderhelm to work on, and set a role (web, backend, …) so Jira tickets route to the right repo."
+        />
+      </div>
 
       {!loading && (
         <div className="flex items-center gap-3 mb-6">
@@ -237,6 +239,6 @@ function ReposPage() {
           )}
         </>
       )}
-    </div>
+    </Page>
   );
 }

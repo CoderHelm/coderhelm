@@ -9,6 +9,7 @@ import { useToast } from "@/components/toast";
 import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { Page, PageHeader, cardClass } from "@/components/page";
 
 export default function ReviewerConfigGuarded() {
   return (
@@ -230,16 +231,19 @@ function ReviewerConfigPage() {
   const readOnly = isAdmin === false;
 
   return (
-    <div className="max-w-2xl">
-      <div className="flex items-center gap-2 mb-2">
-        <Link href="/reviewer" className={`text-sm text-zinc-500 hover:text-zinc-300 rounded ${focusRing}`}>← Reviewer</Link>
-      </div>
-      <h1 className="text-2xl font-bold text-zinc-100 mb-1">Reviewer settings</h1>
-      <p className="text-zinc-500 text-sm mb-5">
-        Settings for the pull request reviewer, one repository at a time. Everything is off by default. Pick a
-        repository below, then set up reviewing, actions after approval, Teams reminders and the health check after
-        merge. Turn the reviewer on and add the review label to a PR.
-      </p>
+    <Page>
+      <PageHeader
+        eyebrow={<Link href="/reviewer" className={`text-sm text-zinc-500 hover:text-zinc-300 rounded ${focusRing}`}>← Reviewer</Link>}
+        title="Reviewer settings"
+        lead={
+          <>
+            Settings for the pull request reviewer, one repository at a time. Everything is off by default. Pick a
+            repository below, then set up reviewing, actions after approval, Teams reminders and the health check after
+            merge. Turn the reviewer on and add the review label to a PR.
+          </>
+        }
+      />
+      <div className="mt-6">
 
       {readOnly && (
         <div className="mb-5">
@@ -249,7 +253,7 @@ function ReviewerConfigPage() {
         </div>
       )}
 
-      <section className="mb-6 p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+      <section className={`mb-6 ${cardClass}`}>
         <h2 className="text-sm font-semibold text-zinc-200 mb-1">
           <label htmlFor="org-standards">Review standards for every repo</label>
         </h2>
@@ -313,7 +317,7 @@ function ReviewerConfigPage() {
         <fieldset disabled={readOnly} className="space-y-6 min-w-0">
           <legend className="sr-only">Settings for {repo}</legend>
           {/* Core */}
-          <section className="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+          <section className={cardClass}>
             <h2 className="text-sm font-semibold text-zinc-200 mb-2">Reviewing</h2>
             <Toggle checked={cfg.enabled} onChange={(v) => set("enabled", v)} label="Enable reviewer for this repo" hint="Off = the reviewer ignores this repo entirely." />
             <Toggle checked={cfg.killed} onChange={(v) => set("killed", v)} label="Stop everything" hint="Stops all reviewer actions for this repo at once, whatever is set below." />
@@ -348,7 +352,7 @@ function ReviewerConfigPage() {
           </section>
 
           {/* CI labels picked by the reviewer */}
-          <section className="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+          <section className={cardClass}>
             <h2 className="text-sm font-semibold text-zinc-200 mb-2">PR labels</h2>
             <Toggle
               checked={cfg.auto_labels}
@@ -402,7 +406,7 @@ function ReviewerConfigPage() {
           </section>
 
           {/* Release notes */}
-          <section className="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+          <section className={cardClass}>
             <h2 className="text-sm font-semibold text-zinc-200 mb-2">Release notes</h2>
             <Toggle
               checked={cfg.release_notes}
@@ -487,7 +491,7 @@ function ReviewerConfigPage() {
           </section>
 
           {/* Advanced: auto-actions */}
-          <section className="rounded-lg bg-zinc-900 border border-zinc-800 overflow-hidden">
+          <section className="rounded-lg border border-zinc-800 bg-zinc-900/50 overflow-hidden">
             <button
               type="button"
               onClick={() => setShowAdvanced((s) => !s)}
@@ -665,7 +669,7 @@ function ReviewerConfigPage() {
           </section>
 
           {/* Teams reminders */}
-          <section className="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+          <section className={cardClass}>
             <h2 className="text-sm font-semibold text-zinc-200 mb-2">Teams reminders</h2>
             <Toggle
               checked={cfg.reminders_enabled}
@@ -712,6 +716,7 @@ function ReviewerConfigPage() {
           )}
         </fieldset>
       )}
-    </div>
+      </div>
+    </Page>
   );
 }

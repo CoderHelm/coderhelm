@@ -7,6 +7,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { focusRing, inputClass, primaryButton } from "@/components/ui";
+import { Page, PageHeader } from "@/components/page";
 
 const ADMIN_EMAIL = "admin@coderhelm.com";
 
@@ -47,15 +48,18 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <div className="max-w-2xl space-y-3" aria-busy="true">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-40 w-full" />
-      </div>
+      <Page className="space-y-3">
+        <div className="space-y-3" aria-busy="true">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      </Page>
     );
   }
 
   if (!authorized) {
     return (
+      <Page>
       <div className="max-w-md mx-auto mt-20 text-center">
         <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
           <svg aria-hidden="true" className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
@@ -63,6 +67,7 @@ export default function AdminPage() {
         <h1 className="text-2xl font-bold text-zinc-100 mb-2">Access denied</h1>
         <p className="text-sm text-zinc-500">This page is only for Coderhelm platform administrators.</p>
       </div>
+      </Page>
     );
   }
 
@@ -103,13 +108,9 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-2">Platform admin</h1>
-      <p className="text-sm text-zinc-500 mb-8">
-        Internal tools for managing the Coderhelm platform.
-      </p>
-
-      <section aria-labelledby="allowlist-heading" className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+    <Page>
+      <PageHeader title="Platform admin" lead="Internal tools for managing the Coderhelm platform." />
+      <section aria-labelledby="allowlist-heading" className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
         <h2 id="allowlist-heading" className="text-base font-semibold text-zinc-100 mb-1">Signup allowlist</h2>
         <p className="text-sm text-zinc-500 mb-4">
           Only these emails can create accounts. Use <code className="text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded text-xs">*@domain.com</code> to allow a whole domain.
@@ -170,6 +171,6 @@ export default function AdminPage() {
           <p className="text-sm text-zinc-500">No allowed emails yet, so nobody can sign up.</p>
         )}
       </section>
-    </div>
+    </Page>
   );
 }

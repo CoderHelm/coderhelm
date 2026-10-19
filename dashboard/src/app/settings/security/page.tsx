@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import QRCode from "qrcode";
+import { Page, PageHeader } from "@/components/page";
 
 export default function SecurityPage() {
   const { toast } = useToast();
@@ -50,15 +51,14 @@ export default function SecurityPage() {
 
   if (authProvider === null) {
     return (
-      <div className="max-w-xl">
-        <h1 className="text-2xl font-bold mb-2">Security</h1>
-        <p className="text-sm text-zinc-500 mb-6">
-          Manage your password and two-factor authentication.
-        </p>
+      <Page>
+        <div className="mb-6">
+          <PageHeader title="Security" lead="Manage your password and two-factor authentication." />
+        </div>
         <div className="animate-pulse space-y-4">
           <div className="h-40 bg-zinc-900/50 border border-zinc-800 rounded-lg" />
         </div>
-      </div>
+      </Page>
     );
   }
 
@@ -151,11 +151,10 @@ export default function SecurityPage() {
   };
 
   return (
-    <div className="max-w-xl">
-      <h1 className="text-2xl font-bold mb-2">Security</h1>
-      <p className="text-sm text-zinc-500 mb-6">
-        Manage your password and two-factor authentication.
-      </p>
+    <Page>
+      <div className="mb-6">
+        <PageHeader title="Security" lead="Manage your password and two-factor authentication." />
+      </div>
 
       {isOAuth && (
         <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg mb-6">
@@ -167,7 +166,7 @@ export default function SecurityPage() {
 
       {/* Change Password */}
       {!isOAuth && (
-      <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-lg mb-6">
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 mb-6">
         <h3 className="text-sm font-semibold text-zinc-100 mb-4">Change password</h3>
         <form onSubmit={(e) => { e.preventDefault(); handleChangePassword(); }} autoComplete="off" className="space-y-3">
           <div>
@@ -220,7 +219,7 @@ export default function SecurityPage() {
 
       {/* Two-Factor Authentication */}
       {!isOAuth && (
-      <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-sm font-semibold text-zinc-100">Two-factor authentication</h3>
@@ -360,6 +359,6 @@ export default function SecurityPage() {
         )}
       </div>
       )}
-    </div>
+    </Page>
   );
 }

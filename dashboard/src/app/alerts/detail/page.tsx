@@ -10,12 +10,13 @@ import { useToast } from "@/components/toast";
 import { Callout } from "@/components/callout";
 import { RunStatusBadge } from "@/components/run-status";
 import { linkButton, secondaryButton } from "@/components/ui";
+import { Page, PageHeader, cardClass } from "@/components/page";
 import { KIND_LABEL, OUTCOMES, OutcomeBadge, formatWhen, humanize } from "../outcome";
 
 export default function AlertDetailGuarded() {
   return (
     <RoleGuard minRole="member">
-      <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+      <Suspense fallback={<Page><Skeleton className="h-40 w-full" /></Page>}>
         <AlertDetail />
       </Suspense>
     </RoleGuard>
@@ -59,7 +60,8 @@ function AlertDetail() {
 
   if (!id || missing) {
     return (
-      <div className="max-w-3xl text-zinc-500 border border-zinc-800 rounded-lg p-8 text-center">
+      <Page>
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-500">
         <p className="text-lg mb-2">{id ? "Alert not found" : "No alert was named"}</p>
         <p className="text-sm">
           {id ? "It may belong to another team, or it is older than 90 days. " : "Pick one from the list. "}
@@ -68,11 +70,12 @@ function AlertDetail() {
           </Link>
         </p>
       </div>
+      </Page>
     );
   }
   if (error) {
     return (
-      <div className="max-w-3xl">
+      <Page>
         <Callout variant="error" title="We couldn't load this alert">
           <p>{error}</p>
           <p>
@@ -82,10 +85,10 @@ function AlertDetail() {
             or go back to <Link href="/alerts" className={linkButton}>all alerts</Link>.
           </p>
         </Callout>
-      </div>
+      </Page>
     );
   }
-  if (!data) return <Skeleton className="h-40 w-full max-w-3xl" />;
+  if (!data) return <Page><Skeleton className="h-40 w-full" /></Page>;
 
   const a = data.alert;
   // This delivery's run: the first one created at or after the alert arrived.
@@ -96,25 +99,29 @@ function AlertDetail() {
       : undefined;
 
   return (
-    <div className="max-w-3xl">
-      <Link href="/alerts" className="text-sm text-zinc-400 hover:text-zinc-100 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100">
-        ← All alerts
-      </Link>
-      <div className="mt-3 mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-zinc-100 break-words">{a.title || "(untitled alert)"}</h1>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+    <Page>
+      <PageHeader
+        eyebrow={
+          <Link href="/alerts" className="text-sm text-zinc-400 hover:text-zinc-100 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100">
+            ← All alerts
+          </Link>
+        }
+        title={a.title || "(untitled alert)"}
+        lead={
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
             <OutcomeBadge outcome={a.outcome} />
             <span>{formatWhen(a.received_at)}</span>
             <span className="font-mono">{a.ticket_id}</span>
           </div>
-        </div>
-        <button type="button" onClick={copyLink} className={`${secondaryButton} shrink-0`}>
-          Copy link
-        </button>
-      </div>
+        }
+        actions={
+          <button type="button" onClick={copyLink} className={`${secondaryButton} shrink-0`}>
+            Copy link
+          </button>
+        }
+      />
 
-      <div className="mb-6 p-4 rounded-lg bg-zinc-900 border border-zinc-800 text-sm">
+      <div className={`mt-6 mb-6 text-sm ${cardClass}`}>
         <p className="text-zinc-300">{OUTCOMES[a.outcome]?.detail ?? a.outcome}</p>
         <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
           <dt className="text-zinc-500">Repo</dt>
@@ -156,6 +163,6 @@ function AlertDetail() {
       <pre className="p-4 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 whitespace-pre-wrap break-words overflow-x-auto">
         {a.body || "(empty)"}
       </pre>
-    </div>
+    </Page>
   );
 }
