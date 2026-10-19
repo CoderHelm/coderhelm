@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { ChevronRightIcon } from "@/components/icons";
 import { focusRing } from "@/components/ui";
 import { settingsItemFor } from "@/components/settings-items";
+import { pageWidthClass } from "@/components/page";
 
 /** Every settings page gets the same way back to the Settings hub. */
 export default function SettingsLayout({ children }: { children: ReactNode }) {
@@ -16,7 +17,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
   return (
     <>
       {showCrumb && (
-        <nav aria-label="Breadcrumb" className="mb-4">
+        <nav aria-label="Breadcrumb" className={`mb-4 ${pageWidthClass}`}>
           <ol className="flex items-center gap-1.5 text-sm text-zinc-500">
             <li>
               <Link href="/settings" className={`rounded hover:text-zinc-200 transition-colors motion-reduce:transition-none ${focusRing}`}>
