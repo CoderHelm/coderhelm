@@ -11,7 +11,7 @@ type ToggleKey = "email_token_warning" | "email_weekly_summary";
 
 const TOGGLES: { key: ToggleKey; label: string; description: string }[] = [
   { key: "email_token_warning", label: "Token usage warnings", description: "Email when the team reaches 80% and 100% of its monthly token limit." },
-  { key: "email_weekly_summary", label: "Weekly summary", description: "A weekly digest of activity across your repositories." },
+  { key: "email_weekly_summary", label: "Weekly summary", description: "Every Monday: runs, reviews, alerts and usage from the past week." },
 ];
 
 export default function NotificationsPage() {

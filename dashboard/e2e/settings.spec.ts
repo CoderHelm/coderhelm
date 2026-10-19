@@ -28,7 +28,7 @@ const ITEMS: { title: string; href: string; view: Role; edit: Role; heading: str
   { title: "Skills", href: "/skills", view: "member", edit: "member", heading: "Skills" },
   { title: "Jira", href: "/settings/jira", view: "admin", edit: "admin", heading: "Jira" },
   { title: "MCP servers", href: "/settings/plugins", view: "admin", edit: "admin", heading: "MCP servers" },
-  { title: "Token limit", href: "/settings/budget", view: "member", edit: "owner", heading: "Token limit" },
+  { title: "Token limit", href: "/settings/budget", view: "member", edit: "admin", heading: "Token limit" },
 ];
 
 const LEVEL: Record<Role, number> = { viewer: 0, member: 1, billing: 2, admin: 3, owner: 4 };
@@ -59,8 +59,8 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/usage") return json(route, { month: "2026-01", total_tokens: db.usedTokens, tokens_in: db.usedTokens / 2, tokens_out: db.usedTokens / 2, total_runs: 14, max_tokens: db.maxTokens });
     if (p === "/api/settings/budget" && method === "GET") return json(route, { max_tokens: db.maxTokens });
     if (p === "/api/settings/budget" && method === "PUT") {
-      // The gateway lets only the owner change the limit.
-      if (db.role !== "owner") return forbidden(route);
+      // The gateway lets admins and the owner change the limit.
+      if (!admin) return forbidden(route);
       db.maxTokens = Number(body?.max_tokens ?? 0);
       return route.fulfill({ status: 200, body: "" });
     }
@@ -179,8 +179,9 @@ test("a member sees the hub with view only items", async ({ page }) => {
   await shot(page, "settings-hub-member-375.png");
 });
 
-test("the owner sets and removes the token limit", async ({ page }) => {
-  const db = await mockApi(page, { role: "owner" });
+for (const role of ["owner", "admin"] as Role[]) {
+test(`the ${role} sets and removes the token limit`, async ({ page }) => {
+  const db = await mockApi(page, { role });
   await page.goto("/settings/");
   await hubLink(page, "Token limit").click();
   await expect(page.getByRole("heading", { level: 1, name: "Token limit" })).toBeVisible();
@@ -202,7 +203,7 @@ test("the owner sets and removes the token limit", async ({ page }) => {
   await expect(page.getByText("of 2.5M tokens")).toBeVisible();
   // The sidebar meter picks up the new limit without a reload.
   await expect(page.getByText("1.2M / 2.5M")).toBeVisible();
-  await shot(page, "token-limit-owner-1280.png");
+  await shot(page, `token-limit-${role}-1280.png`);
 
   await input.fill("");
   await input.press("Enter");
@@ -214,18 +215,19 @@ test("the owner sets and removes the token limit", async ({ page }) => {
   await page.reload();
   await expect(page.getByText("tokens, no limit set")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
-  await shot(page, "token-limit-owner-375.png");
+  await shot(page, `token-limit-${role}-375.png`);
 });
+}
 
-test("an admin or member sees the token limit without a form", async ({ page }) => {
-  const db = await mockApi(page, { role: "admin" });
+test("a member sees the token limit without a form", async ({ page }) => {
+  const db = await mockApi(page, { role: "member" });
   await page.goto("/settings/budget/");
   await expect(page.getByRole("heading", { level: 1, name: "Token limit" })).toBeVisible();
   await expect(page.getByText("5M tokens a month")).toBeVisible();
-  await expect(page.getByText("Only the team owner can change the limit.")).toBeVisible();
+  await expect(page.getByText("Only admins and the owner can change the limit.")).toBeVisible();
   await expect(page.getByLabel("Millions of tokens a month")).toHaveCount(0);
   expect(db.calls.some((c) => c.method === "PUT")).toBe(false);
-  await shot(page, "token-limit-admin-1280.png");
+  await shot(page, "token-limit-member-1280.png");
 });
 
 test("the token limit page explains a failed load and retries", async ({ page }) => {
@@ -244,6 +246,7 @@ test("the token limit page explains a failed load and retries", async ({ page })
 test("the token usage email switch saves and stays off", async ({ page }) => {
   const db = await mockApi(page, { role: "member" });
   await page.goto("/settings/notifications/");
+  await expect(page.getByText("Every Monday: runs, reviews, alerts and usage from the past week.")).toBeVisible();
   const sw = page.getByRole("switch", { name: "Token usage warnings" });
   await expect(sw).toHaveAttribute("aria-checked", "true");
   await sw.click();

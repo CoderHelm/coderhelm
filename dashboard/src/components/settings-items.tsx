@@ -97,7 +97,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     id: "usage",
     label: "Usage and limits",
     items: [
-      { href: "/settings/budget", title: "Token limit", description: "A monthly cap on tokens. Runs pause when the team reaches it.", icon: <TargetIcon />, view: "member", edit: "owner", status: "usage" },
+      { href: "/settings/budget", title: "Token limit", description: "A monthly cap on tokens. Runs pause when the team reaches it.", icon: <TargetIcon />, view: "member", edit: "admin", status: "usage" },
     ],
   },
 ];
