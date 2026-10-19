@@ -1161,6 +1161,12 @@ export interface RunDetail extends Run {
   /** Team standards the run's passes were given in full ("Always apply"). */
   applied_standards?: string[];
   progress_notes?: { message: string; timestamp: string }[];
+  /** Where the planner decided the fix belongs: code, outside_code, both or unknown. */
+  fix_location?: string | null;
+  /** Markdown report when the fix is (partly) a change outside the code. */
+  outside_change_report?: string | null;
+  /** The lesson saved for the repository when people said the fix was elsewhere. */
+  lesson?: string | null;
 }
 
 export interface PassTrace {

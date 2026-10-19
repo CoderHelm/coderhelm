@@ -37,6 +37,18 @@ function passLabel(raw: string): string {
   return n ? `${word} #${n}` : word;
 }
 
+/** The report without its first bold line: the box carries its own heading. */
+function reportBody(report: string): string {
+  return report.replace(/^\s*\*\*[^*\n]+\*\*\s*\n+/, "");
+}
+
+/** The heading over the outside-the-code report, by what the run decided. */
+function outsideHeading(status: string, fixLocation?: string | null): string {
+  if (status === "needs_outside_change") return "The fix is a change outside the code";
+  if (fixLocation === "both") return "Also needed outside the code";
+  return "Not sure yet where the fix belongs";
+}
+
 /** Still working: keep refreshing. Queued runs are about to start, so they refresh too. */
 const isActive = (status: string) => runIsLive(status) || status === "queued";
 
@@ -59,7 +71,12 @@ function PassProgress({ currentPass, status, passHistory }: { currentPass?: stri
     const idx = PASSES.indexOf(entry.pass);
     if (idx > maxIdx) maxIdx = idx;
   });
-  const doneIdx = ["completed", "merged", "success"].includes(status) ? PASSES.length : maxIdx;
+  // A run whose fix is outside the code finished its plan and stopped there on purpose.
+  const doneIdx = ["completed", "merged", "success"].includes(status)
+    ? PASSES.length
+    : status === "needs_outside_change"
+      ? Math.max(maxIdx, PASSES.indexOf("plan")) + 1
+      : maxIdx;
   const awaiting = status === "awaiting_ci";
   return (
     <ol aria-label="Steps" className="flex flex-wrap items-center gap-y-2">
@@ -474,7 +491,7 @@ function RunDetailInner() {
   const canRetry = ["failed", "needs_input", "cancelled"].includes(run.status) && run.current_pass !== "feedback";
   const canReview = !!run.pr_url && !["running", "queued", "merged"].includes(run.status);
   // Starting over closes the pull request: never offered once it is merged.
-  const canReset = ["completed", "failed", "needs_input", "cancelled", "success"].includes(run.status);
+  const canReset = ["completed", "failed", "needs_input", "needs_outside_change", "cancelled", "success"].includes(run.status);
   const limitTitle = tokensExceeded ? "The monthly token limit is reached" : undefined;
 
   const retry = async () => {
@@ -575,6 +592,25 @@ function RunDetailInner() {
             run.status === "needs_input" ? "text-amber-300/80" : "text-red-300/80"
           }`}>{sanitizeError(run.error)}</pre>
         </div>
+      )}
+
+      {/* The fix (or part of it) is a change in another system: what was found and what to change */}
+      {run.outside_change_report && (
+        <section
+          aria-labelledby="outside-change-heading"
+          className="mb-6 rounded-lg border border-orange-500/20 bg-orange-500/5 p-4 min-w-0 [overflow-wrap:anywhere]"
+        >
+          <h2 id="outside-change-heading" className="text-sm font-medium text-orange-400 mb-2">
+            {outsideHeading(run.status, run.fix_location)}
+          </h2>
+          <Markdown>{reportBody(run.outside_change_report)}</Markdown>
+        </section>
+      )}
+      {run.lesson && (
+        <p className="mb-6 text-sm text-zinc-400 [overflow-wrap:anywhere]">
+          <span className="text-zinc-300 font-medium">Lesson saved for this repository: </span>
+          {run.lesson}
+        </p>
       )}
 
       {/* Actions, each shown only when the gateway would accept it */}
@@ -990,6 +1026,13 @@ function RunDetailInner() {
                 {run.status === "completed" && (
                   <TrailEntry
                     label="Run completed"
+                    time={run.updated_at}
+                    status="done"
+                  />
+                )}
+                {run.status === "needs_outside_change" && (
+                  <TrailEntry
+                    label="Reported the change to make outside the code"
                     time={run.updated_at}
                     status="done"
                   />

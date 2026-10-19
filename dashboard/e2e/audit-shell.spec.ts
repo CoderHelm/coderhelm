@@ -11,6 +11,7 @@ const iso = (minutesAgo: number) => new Date(Date.now() - minutesAgo * 60_000).t
 
 const RUNS = [
   { run_id: "01RUN00000000000000000003", status: "needs_input", ticket_id: "WEB-12", title: "Show the class schedule on the details page", repo: "your-team/web", created_at: iso(5), duration_s: 754 },
+  { run_id: "01RUN00000000000000000004", status: "needs_outside_change", ticket_id: "OPS-3", title: "Saturday class missing from the site", repo: "your-team/data-sync", created_at: iso(30), duration_s: 95 },
   { run_id: "01RUN00000000000000000002", status: "failed", ticket_id: "WEB-12", title: "Show the class schedule on the details page", repo: "your-team/web", created_at: iso(60), duration_s: 42 },
   { run_id: "01RUN00000000000000000001", status: "merged", ticket_id: "API-7", title: "Retry the sync job once when the upstream times out and log the second failure", repo: "your-team/a-backend-service-with-a-long-name", created_at: iso(600), duration_s: 4000 },
   { run_id: "01RUN00000000000000000000", status: "awaiting_ci", ticket_id: "", title: "", repo: "your-team/web", created_at: iso(3000) },
@@ -113,6 +114,9 @@ test("runs list: plain status words, readable times, grouped attempts with a nam
   await expect(table.getByText("Merged").filter({ visible: true })).toBeVisible();
   await expect(table.getByText("Waiting on CI").filter({ visible: true })).toBeVisible();
   await expect(table.getByText("needs_input")).toHaveCount(0);
+  // A run whose fix is a setting in another system says so in words.
+  await expect(table.getByText("Needs a change outside the code").filter({ visible: true })).toBeVisible();
+  await expect(table.getByText("needs_outside_change")).toHaveCount(0);
   // 754 s reads as minutes, not raw seconds.
   await expect(table.getByText("took 12m 34s")).toBeVisible();
   await expect(table.getByText("took 1h 6m")).toBeVisible();
