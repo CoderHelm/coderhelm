@@ -8,11 +8,21 @@ import { focusRing } from "@/components/ui";
 import { settingsItemFor } from "@/components/settings-items";
 import { pageWidthClass } from "@/components/page";
 
+/** Pages that sit under a settings item. */
+const SUB_TITLES: Record<string, string> = {
+  "/settings/integrations/aws": "AWS",
+  "/settings/integrations/github": "GitHub",
+  "/settings/integrations/jira": "Jira",
+};
+
 /** Every settings page gets the same way back to the Settings hub. */
 export default function SettingsLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? "";
   const item = settingsItemFor(pathname);
   const showCrumb = item && item.href.startsWith("/settings/");
+  // A page under an item (Settings → Integrations → AWS) names itself too.
+  const path = pathname.replace(/\/+$/, "");
+  const sub = item && path !== item.href ? SUB_TITLES[path] : undefined;
 
   return (
     <>
@@ -27,9 +37,25 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
             <li aria-hidden="true" className="scale-75 text-zinc-600">
               <ChevronRightIcon />
             </li>
-            <li aria-current="page" className="text-zinc-300">
-              {item.title}
-            </li>
+            {sub ? (
+              <>
+                <li>
+                  <Link href={item.href} className={`rounded hover:text-zinc-200 transition-colors motion-reduce:transition-none ${focusRing}`}>
+                    {item.title}
+                  </Link>
+                </li>
+                <li aria-hidden="true" className="scale-75 text-zinc-600">
+                  <ChevronRightIcon />
+                </li>
+                <li aria-current="page" className="text-zinc-300">
+                  {sub}
+                </li>
+              </>
+            ) : (
+              <li aria-current="page" className="text-zinc-300">
+                {item.title}
+              </li>
+            )}
           </ol>
         </nav>
       )}

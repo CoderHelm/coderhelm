@@ -41,9 +41,9 @@ const PAGES: { path: string; name: string }[] = [
   { path: "/settings/voice", name: "settings-voice" },
   { path: "/settings/instructions", name: "settings-instructions" },
   { path: "/settings/models", name: "settings-models" },
-  { path: "/settings/plugins", name: "settings-plugins" },
+  { path: "/settings/integrations", name: "settings-integrations" },
   { path: "/settings/budget", name: "settings-budget" },
-  { path: "/settings/github", name: "settings-github" },
+  { path: "/settings/integrations/github", name: "settings-github" },
   { path: "/settings/repos", name: "settings-repos" },
   { path: "/no-such-page", name: "not-found" },
 ];
@@ -57,6 +57,7 @@ async function mockApi(page: Page) {
     if (p === "/api/me") return json(route, { user_id: "u_1", team_id: "t_1", github_login: null, email: "owner@example.com", avatar_url: "", role: "owner" });
     if (p === "/api/usage") return json(route, { month: "2026-01", tokens_in: 0, tokens_out: 0, total_runs: 0, total_tokens: 0, max_tokens: 0 });
     if (p === "/api/banners") return json(route, { banners: [] });
+    if (p === "/api/integrations") return json(route, { can_edit: true, items: [], migrated: 0 });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }] });
     // Every page API fails the way the gateway does (bare status, no body):
     // the page still renders its frame, and the frame is what is checked.

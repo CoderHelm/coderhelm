@@ -149,6 +149,10 @@ export interface Requirement {
   action?: CompatAction;
   /** For data_sources: the monitoring, docs or pipeline connection it means. */
   connection?: "" | "newrelic" | "confluence" | "metrics" | "airflow";
+  /** For plugins: the MCP server it means. */
+  server?: string;
+  /** Where it is connected (an Integrations card or Data sources), worked out by the check. */
+  link?: string;
 }
 
 export interface CompatStep {
@@ -166,6 +170,7 @@ export interface CompatNeed {
   connect: Requirement["connect"];
   action?: CompatAction;
   connection?: Requirement["connection"];
+  link?: string;
   status: "missing" | "blocked";
   steps: number;
 }

@@ -445,7 +445,7 @@ function RouteCard({
       {!connected && (
         <p className="mt-3 text-sm text-amber-300">
           The topic&apos;s AWS account ({account ?? "unknown"}) is not connected, so its alerts are ignored.{" "}
-          <Link href="/settings/aws" className={linkButton}>Connect it</Link>
+          <Link href="/settings/integrations/aws/" className={linkButton}>Connect it</Link>
         </p>
       )}
 
@@ -573,7 +573,7 @@ function SetupSteps({ endpoint }: { endpoint: string }) {
     <SideCard title="How to connect a topic" id="setup-heading">
       <ol className="flex list-decimal flex-col gap-2 pl-5">
         <li>
-          Connect the topic&apos;s AWS account under <Link href="/settings/aws" className={linkButton}>AWS</Link>.
+          Connect the topic&apos;s AWS account under <Link href="/settings/integrations/aws/" className={linkButton}>AWS</Link>.
         </li>
         <li>Add a route: the topic ARN, and rules for the alerts that should open a pull request.</li>
         <li>

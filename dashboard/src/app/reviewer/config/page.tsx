@@ -616,7 +616,7 @@ function ReviewerConfigPage() {
                       <p className="text-xs text-zinc-600">
                         {loadingLogGroups
                           ? "Loading log groups…"
-                          : <>No AWS account connected. <Link href="/settings/aws" className={linkButton}>Connect one</Link> to pick log groups. The health check on CI works without it.</>}
+                          : <>No AWS account connected. <Link href="/settings/integrations/aws/" className={linkButton}>Connect one</Link> to pick log groups. The health check on CI works without it.</>}
                       </p>
                     ) : (
                       <>

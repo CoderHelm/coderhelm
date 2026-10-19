@@ -463,7 +463,7 @@ test("an item's page: each step, what it relies on, what to connect, and the two
   // What to connect, each with its fix and where.
   const needs = section.getByTestId("compat-needs");
   await expect(needs.getByText("Monitoring", { exact: true })).toBeVisible();
-  await expect(needs.getByRole("link", { name: "Connect in MCP servers" })).toHaveAttribute("href", /^\/settings\/plugins\/?$/);
+  await expect(needs.getByRole("link", { name: "Connect in Integrations" })).toHaveAttribute("href", /^\/settings\/integrations\/?#other-tools$/);
   await expect(needs.getByText("Coderhelm only reads outside systems here.")).toBeVisible();
 
   // The steps in order, with their status; gaps open by default.
@@ -475,7 +475,7 @@ test("an item's page: each step, what it relies on, what to connect, and the two
   await expect(steps.nth(3).getByText("Needs a tool")).toBeVisible();
   await expect(steps.nth(4).getByText("Write blocked")).toBeVisible();
   await expect(steps.nth(3).getByText("list_change_events")).toBeVisible();
-  await expect(steps.nth(3).getByRole("link", { name: "Connect Monitoring in MCP servers" })).toHaveAttribute("href", /^\/settings\/plugins\/?$/);
+  await expect(steps.nth(3).getByRole("link", { name: "Connect Monitoring in Integrations" })).toHaveAttribute("href", /^\/settings\/integrations\/?#other-tools$/);
   await expect(steps.nth(4).getByText("writes outside")).toBeVisible();
   await steps.nth(1).getByRole("button", { name: "Show what it relies on (1)" }).click();
   await expect(steps.nth(1).getByText("CloudWatch logs")).toBeVisible();

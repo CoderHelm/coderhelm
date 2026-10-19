@@ -38,10 +38,25 @@ interface Backend {
   roleMissing?: string[];
 }
 
-function connection(over: Record<string, unknown> = {}) {
+function abilities(missing: string[] = []) {
+  const metrics = !missing.includes("metrics");
+  const airflow = !missing.includes("airflow");
+  return {
+    account: ACCOUNT, region: "us-east-1", role: "CoderHelmLogReader", status: "active", checked_at: ago(3 * MIN), check_error: "",
+    logs: { available: true, on: true },
+    metrics: { available: metrics, on: metrics, switched_off: false },
+    airflow: { available: airflow, on: airflow, switched_off: false, found: airflow ? ["prod-airflow"] : [], skipped: [], environments: airflow ? ["prod-airflow"] : [] },
+    missing,
+    update_url: missing.length ? "https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?stackName=CoderHelmLogReaderOps" : null,
+    stack_name: "CoderHelmLogReaderOps",
+  };
+}
+
+function connection(over: Record<string, unknown> = {}, missing: string[] = []) {
   return {
     connection_id: ACCOUNT, role_arn: ROLE_ARN, external_id: EXTERNAL_ID, region: "us-east-1", status: "active",
-    log_groups: ["/ecs/api"], last_analyzed_at: ago(40 * MIN), created_at: ago(9 * 86_400_000), updated_at: ago(2 * 86_400_000), ...over,
+    log_groups: ["/ecs/api"], last_analyzed_at: ago(40 * MIN), created_at: ago(9 * 86_400_000), updated_at: ago(2 * 86_400_000),
+    abilities: abilities(missing), ...over,
   };
 }
 
@@ -198,17 +213,6 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       db.jiraCheck = { ...db.jiraCheck, secret_configured: true, webhook_url: "https://api.example.com/webhooks/jira/tok" };
       return json(r, { token: "tok", webhook_secret: "whsec_new_value" });
     }
-    if (p === "/api/connectors/aws-check") {
-      const missing = db.roleMissing ?? [];
-      return json(r, {
-        check: { account: ACCOUNT, role: "CoderHelmLogReader", region: "us-east-1", works: true, caller: "", error: "", can_read_logs: true,
-          can_read_metrics: !missing.includes("metrics"), can_read_airflow: !missing.includes("airflow"), airflow_environments: [] },
-        missing,
-        update_url: missing.length ? "https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?stackName=CoderHelmLogReaderOps" : null,
-        stack_name: "CoderHelmLogReaderOps",
-        template_url: "https://coderhelm-public.s3.amazonaws.com/cfn/coderhelm-log-reader-ops.yaml",
-      });
-    }
     return json(r, { error: `not mocked: ${method} ${p}` }, 404);
   });
   return db;
@@ -246,7 +250,7 @@ const callsTo = (db: Backend, method: string, re: RegExp) => db.calls.filter((c)
 test.describe("AWS", () => {
   test("connected: status, scopes, test result, findings, log groups and disconnect", async ({ page }) => {
     const db = await mockApi(page);
-    await page.goto("/settings/aws");
+    await page.goto("/settings/integrations/aws/");
     await expect(page.getByRole("heading", { level: 1, name: "AWS" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText("Settings");
 
@@ -283,7 +287,7 @@ test.describe("AWS", () => {
 
   test("a failed test says so next to the account", async ({ page }) => {
     await mockApi(page, { assumeFails: true });
-    await page.goto("/settings/aws");
+    await page.goto("/settings/integrations/aws/");
     const card = page.getByRole("article", { name: `AWS account ${ACCOUNT}` });
     await card.getByRole("button", { name: "Test connection" }).click();
     await expect(card.getByText("The test failed")).toBeVisible();
@@ -292,7 +296,7 @@ test.describe("AWS", () => {
 
   test("not connected: the guided steps check the ARN and region, and a refused role explains why", async ({ page }) => {
     const db = await mockApi(page, { connections: [], assumeFails: true });
-    await page.goto("/settings/aws");
+    await page.goto("/settings/integrations/aws/");
     const steps = page.getByRole("list", { name: "Connection steps" });
     await expect(steps.locator('[aria-current="step"]')).toContainText("Create the read-only role");
     await expect(page.getByText(EXTERNAL_ID)).toBeVisible();
@@ -316,7 +320,7 @@ test.describe("AWS", () => {
 
   test("members see accounts and findings but no admin controls", async ({ page }) => {
     const db = await mockApi(page, { role: "member" });
-    await page.goto("/settings/aws");
+    await page.goto("/settings/integrations/aws/");
     await expect(page.getByText("Only an admin or the owner can connect, test or remove an account.")).toBeVisible();
     const card = page.getByRole("article", { name: `AWS account ${ACCOUNT}` });
     await expect(card).toBeVisible();
@@ -332,7 +336,7 @@ test.describe("AWS", () => {
   test("a failed load offers a retry", async ({ page }) => {
     const db = await mockApi(page);
     db.fail.add("/api/aws-connections");
-    await page.goto("/settings/aws");
+    await page.goto("/settings/integrations/aws/");
     await expect(page.getByText("Could not load your AWS accounts")).toBeVisible();
     db.fail.clear();
     await page.getByRole("button", { name: "Try again" }).click();
@@ -344,18 +348,23 @@ test.describe("AWS", () => {
 
 test.describe("AWS role access", () => {
   test("a role that can't read metrics or Airflow shows the one-click stack link", async ({ page }) => {
-    await mockApi(page, { roleMissing: ["metrics", "airflow"] });
-    await page.goto("/settings/aws");
-    const box = page.getByTestId("aws-role-access");
-    await expect(box.getByText("Update your CoderHelm role stack to enable CloudWatch metrics and Airflow")).toBeVisible();
-    const link = box.getByRole("link", { name: "Add metrics and Airflow access in AWS" });
+    await mockApi(page, { connections: [connection({}, ["metrics", "airflow"])] });
+    await page.goto("/settings/integrations/aws/");
+    const box = page.getByTestId(`aws-panel-${ACCOUNT}`);
+    await expect(box.getByText("Add CloudWatch metrics and Airflow to your CoderHelm role")).toBeVisible();
+    const link = box.getByRole("link", { name: "Add access in AWS" });
     await expect(link).toHaveAttribute("href", /stacks\/quickcreate\?stackName=CoderHelmLogReaderOps/);
+    await expect(box.getByRole("switch", { name: "Let agents read Metrics" })).toBeDisabled();
   });
 
-  test("a role that can read everything says so", async ({ page }) => {
+  test("a role that can read everything shows each ability on", async ({ page }) => {
     await mockApi(page);
-    await page.goto("/settings/aws");
-    await expect(page.getByTestId("aws-role-access")).toHaveText("The role can read logs, CloudWatch metrics and Airflow.");
+    await page.goto("/settings/integrations/aws/");
+    const box = page.getByTestId(`aws-panel-${ACCOUNT}`);
+    await expect(box.getByRole("switch", { name: "Let agents read Metrics" })).toHaveAttribute("aria-checked", "true");
+    await expect(box.getByRole("switch", { name: "Let agents read Airflow" })).toHaveAttribute("aria-checked", "true");
+    await expect(box.getByRole("checkbox", { name: "prod-airflow" })).toBeChecked();
+    await expect(box.getByRole("link", { name: "Add access in AWS" })).toHaveCount(0);
   });
 });
 
@@ -486,7 +495,7 @@ test.describe("Alert routes", () => {
 test.describe("Jira", () => {
   test("connected: status, connection check, projects with repositories, events", async ({ page }) => {
     const db = await mockApi(page);
-    await page.goto("/settings/jira");
+    await page.goto("/settings/integrations/jira/");
     await expect(page.getByRole("heading", { level: 1, name: "Jira" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "your-team.atlassian.net" })).toBeVisible();
     await expect(page.getByText("Connected", { exact: true })).toBeVisible();
@@ -512,7 +521,7 @@ test.describe("Jira", () => {
 
   test("disconnecting the app clears every trigger address", async ({ page }) => {
     const db = await mockApi(page);
-    await page.goto("/settings/jira");
+    await page.goto("/settings/integrations/jira/");
     await page.getByRole("button", { name: "Disconnect the app" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Disconnect" }).click();
     await expect(page.getByRole("heading", { name: "Jira is not connected" })).toBeVisible();
@@ -525,7 +534,7 @@ test.describe("Jira", () => {
       jiraCheck: { ready: false, secret_configured: false, configured_repos: { total: 3, enabled: 2 }, enabled_repos: [], jira_events_seen: false, installation_id: 7, team_id: "t_1", forge_secret: "forge-secret-value" },
       jiraEvents: [],
     });
-    await page.goto("/settings/jira");
+    await page.goto("/settings/integrations/jira/");
     await expect(page.getByRole("heading", { name: "Jira is not connected" })).toBeVisible();
     await expect(page.getByRole("list", { name: "Jira app steps" }).locator('[aria-current="step"]')).toContainText("Install the Jira app");
     await expect(page.getByText("t_1", { exact: true })).toBeVisible();
@@ -543,7 +552,7 @@ test.describe("Jira", () => {
 
   test("the owner can remove the integration", async ({ page }) => {
     const db = await mockApi(page, { role: "owner" });
-    await page.goto("/settings/jira");
+    await page.goto("/settings/integrations/jira/");
     await page.getByRole("button", { name: "Remove integration" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Remove integration" }).click();
     await expect(page.getByRole("heading", { name: "Jira is not connected" })).toBeVisible();
@@ -552,14 +561,14 @@ test.describe("Jira", () => {
 
   test("members are told who can open the page", async ({ page }) => {
     await mockApi(page, { role: "member" });
-    await page.goto("/settings/jira");
+    await page.goto("/settings/integrations/jira/");
     await expect(page.getByText("This page needs a different role")).toBeVisible();
   });
 
   test("a failed load offers a retry", async ({ page }) => {
     const db = await mockApi(page);
     db.fail.add("/api/integrations/jira/check");
-    await page.goto("/settings/jira");
+    await page.goto("/settings/integrations/jira/");
     await expect(page.getByText("Could not load the Jira settings")).toBeVisible();
     db.fail.clear();
     await page.getByRole("button", { name: "Try again" }).click();

@@ -397,7 +397,7 @@ function PlanDetail() {
             </button>
           ))}
         </div>
-        {!jiraReady && plan.status === "draft" && <span className="text-xs text-zinc-500">Connect Jira in <Link href="/settings/jira" className="underline hover:text-zinc-300">settings</Link> to send tasks there</span>}
+        {!jiraReady && plan.status === "draft" && <span className="text-xs text-zinc-500">Connect Jira in <Link href="/settings/integrations/jira/" className="underline hover:text-zinc-300">settings</Link> to send tasks there</span>}
         {plan.status !== "draft" && <span className="text-xs text-zinc-500">Locked once the plan starts</span>}
       </div>
 

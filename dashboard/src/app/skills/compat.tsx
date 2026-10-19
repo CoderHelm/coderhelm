@@ -109,34 +109,39 @@ export function CompatBadge({ item }: { item: Pick<Skill, "compat"> }) {
   );
 }
 
-/** Where to connect what a step needs. GitHub is never offered: every team
- * has it connected already. */
+/** Where to connect what a step needs, when the check didn't say. GitHub
+ * is never offered: every team has it connected already. */
 const CONNECT: Record<Requirement["connect"], { href: string; label: string } | null> = {
-  plugins: { href: "/settings/plugins", label: "MCP servers" },
+  plugins: { href: "/settings/integrations#other-tools", label: "Integrations" },
   data_sources: { href: "/data-sources", label: "Data sources" },
   github: null,
   none: null,
 };
 
-/** The link a gap offers, if any: connecting it, or adding the credentials
- * of a server that's switched on. Never one for something already
- * connected. */
-const CONNECTION_LABEL: Record<string, string> = {
-  newrelic: "New Relic",
-  confluence: "Confluence",
-  metrics: "CloudWatch metrics",
-  airflow: "Airflow",
+/** Monitoring, docs and pipeline connections, by id. Metrics and Airflow
+ * are abilities of the AWS account card. */
+const CONNECTION: Record<string, { label: string; card: string; verb: string }> = {
+  newrelic: { label: "New Relic", card: "newrelic", verb: "Set up" },
+  confluence: { label: "Confluence", card: "confluence", verb: "Set up" },
+  metrics: { label: "CloudWatch metrics", card: "aws", verb: "Turn on" },
+  airflow: { label: "Airflow", card: "aws", verb: "Turn on" },
 };
 
-function linkFor(g: Pick<Requirement, "connect" | "action" | "connection">): { href: string; text: string } | null {
+/** The link a gap offers, if any: connecting it, or adding the credentials
+ * of a server that's switched on. Never one for something already
+ * connected. The check's own `link` (to the right Integrations card) wins. */
+export function linkFor(
+  g: Pick<Requirement, "connect" | "action" | "connection" | "link"> & { server?: string },
+): { href: string; text: string } | null {
   const where = CONNECT[g.connect];
   if (!where || g.action === "none") return null;
-  // A monitoring, docs or pipeline connection opens its own card.
-  if (g.connection && CONNECTION_LABEL[g.connection]) {
-    return { href: `/data-sources?connect=${g.connection}#connections`, text: `Set up ${CONNECTION_LABEL[g.connection]} in Data sources` };
+  const c = g.connection ? CONNECTION[g.connection] : undefined;
+  if (c) {
+    return { href: g.link || `/settings/integrations#integration-${c.card}`, text: `${c.verb} ${c.label} in Integrations` };
   }
-  if (g.action === "credentials") return { href: where.href, text: `Add credentials in ${where.label}` };
-  return { href: where.href, text: `Connect in ${where.label}` };
+  const href = g.link || (g.connect === "plugins" && g.server ? `/settings/integrations#integration-${g.server}` : where.href);
+  if (g.action === "credentials") return { href, text: `Add credentials in ${where.label}` };
+  return { href, text: `Connect in ${where.label}` };
 }
 
 // ─── The Skills page overview ────────────────────────────────

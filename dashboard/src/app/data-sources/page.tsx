@@ -22,7 +22,6 @@ import { Skeleton } from "@/components/skeleton";
 import { Page, PageHeader, Section } from "@/components/page";
 import { LogGroupPicker } from "@/components/log-group-picker";
 import { ActivityFeed } from "@/components/data-source-activity";
-import { ConnectionsSection } from "@/components/connections";
 import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 
 export default function DataSourcesPageGuarded() {
@@ -176,7 +175,13 @@ function DataSourcesPage() {
         </div>
       </Section>
 
-      <ConnectionsSection />
+      <p className="mt-6 text-sm text-zinc-400" data-testid="integrations-pointer">
+        New Relic, Confluence, CloudWatch metrics, Airflow and MCP servers are set up in{" "}
+        <Link href="/settings/integrations" className={linkButton}>
+          Settings → Integrations
+        </Link>
+        .
+      </p>
 
       <p className="mt-6">
         <button

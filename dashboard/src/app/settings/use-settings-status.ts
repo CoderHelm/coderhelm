@@ -41,12 +41,6 @@ const LOADERS: Record<SettingsStatusKey, (me: Me) => Promise<ItemStatus | null>>
     if (repos.length === 0) return { text: "No repositories yet", tone: "warning" };
     return { text: `${on} of ${plural(repos.length, "repository", "repositories")} on`, tone: on > 0 ? "success" : "neutral" };
   },
-  github: async () => {
-    const s = await api.getInstallationStatus();
-    return s.status === "connected"
-      ? { text: s.github_org ? `Connected to ${s.github_org}` : "Connected", tone: "success" }
-      : { text: "Not connected", tone: "warning" };
-  },
   team: async () => {
     const { users } = await api.listUsers();
     return { text: plural(users.length, "person", "people"), tone: "neutral" };
@@ -60,15 +54,14 @@ const LOADERS: Record<SettingsStatusKey, (me: Me) => Promise<ItemStatus | null>>
     const { sources } = await api.listDataSources();
     return sources.length === 0 ? { text: "None connected", tone: "neutral" } : { text: `${sources.length} connected`, tone: "success" };
   },
-  plugins: async () => {
-    const { plugins } = await api.listEnabledPlugins();
-    const on = plugins.filter((p) => p.enabled).length;
-    return on === 0 ? { text: "None connected", tone: "neutral" } : { text: `${on} connected`, tone: "success" };
-  },
-  jira: async () => {
-    const j = await api.getJiraCheck();
-    if (j.ready) return { text: "Connected", tone: "success" };
-    return j.secret_configured ? { text: "Waiting for the first Jira event", tone: "warning" } : { text: "Not connected", tone: "neutral" };
+  integrations: async () => {
+    const { items } = await api.getIntegrations();
+    const connected = items.filter((i) => i.status === "connected").length;
+    const needs = items.filter((i) => i.status === "needs_credentials").length;
+    const broken = items.filter((i) => i.status === "error").length;
+    if (broken > 0) return { text: `${plural(broken, "integration")} not working`, tone: "error" };
+    if (needs > 0) return { text: `${needs} need${needs === 1 ? "s" : ""} credentials · ${connected} connected`, tone: "warning" };
+    return { text: `${connected} connected`, tone: connected > 0 ? "success" : "neutral" };
   },
   models: async () => {
     const m = await api.getModelProvider();
