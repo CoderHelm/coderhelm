@@ -51,7 +51,10 @@ export interface Skill {
   translated_at?: string;
 }
 
-export type CompatStatus = "ready" | "translated" | "needs_tools";
+export type CompatStatus = "ready" | "translated" | "needs_tools" | "partial";
+/** What a gap offers: a link to connect it, to add credentials, or nothing
+ * (the integration is already there, or it can't run in Coderhelm). */
+export type CompatAction = "connect" | "credentials" | "none";
 export type RequirementStatus = "available" | "translated" | "missing" | "blocked";
 
 /** The short form of an item's last check, as lists get it. */
@@ -80,6 +83,7 @@ export interface Requirement {
   needs: string;
   fix: string;
   connect: "plugins" | "data_sources" | "github" | "none";
+  action?: CompatAction;
 }
 
 export interface CompatStep {
@@ -95,6 +99,7 @@ export interface CompatNeed {
   name: string;
   fix: string;
   connect: Requirement["connect"];
+  action?: CompatAction;
   status: "missing" | "blocked";
   steps: number;
 }
@@ -104,6 +109,8 @@ export interface Compat extends CompatShort {
   steps?: CompatStep[];
   counts?: { steps: number; as_written: number; translated: number; missing: number; blocked: number };
   needs_detail?: CompatNeed[];
+  /** What was fixed up in the model's answer, in plain words. */
+  notes?: string[];
   model?: string;
   input_tokens?: number;
   output_tokens?: number;
