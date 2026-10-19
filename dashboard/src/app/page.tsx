@@ -8,6 +8,7 @@ import { usePagedList, LoadMoreButton } from "@/components/load-more";
 import { Callout } from "@/components/callout";
 import { RunStatusBadge } from "@/components/run-status";
 import { focusRing, secondaryButton } from "@/components/ui";
+import { Page, PageHeader } from "@/components/page";
 
 interface RunGroup {
   ticket_id: string;
@@ -89,13 +90,9 @@ export default function RunsPage() {
   };
 
   return (
-    <div>
-         <div className="mb-8">
-           <h1 className="text-2xl font-bold text-zinc-100">Runs</h1>
-           <p className="text-sm text-zinc-500 mt-1">
-             All agent runs across your repositories.
-           </p>
-         </div>
+    <Page>
+      <PageHeader title="Runs" lead="All agent runs across your repositories." />
+      <div className="mt-6">
       {loading ? (
         <TableSkeleton rows={5} cols={5} />
       ) : error ? (
@@ -106,7 +103,7 @@ export default function RunsPage() {
           </button>
         </Callout>
       ) : runs.length === 0 ? (
-        <div className="text-zinc-500 border border-zinc-800 rounded-lg p-8 text-center">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-500">
           <p className="text-lg text-zinc-300 mb-2">No runs yet</p>
           <p className="text-sm">
             Assign a GitHub issue to the Coderhelm bot, add the <code className="text-zinc-300">coderhelm</code> label to it, or
@@ -153,7 +150,8 @@ export default function RunsPage() {
         </div>
       )}
       <LoadMoreButton hasMore={!!next} loading={loadingMore} onClick={loadMore} failed={moreFailed} />
-    </div>
+      </div>
+    </Page>
   );
 }
 

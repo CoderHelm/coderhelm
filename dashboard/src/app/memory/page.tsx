@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { ChatIcon, CodeIcon, MemoryIcon, PinIcon, PlannerIcon, ReviewerIcon } from "@/components/icons";
+import { Page, PageHeader } from "@/components/page";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 
 // What each memory can be about, in the order they're shown. Mirrors the
@@ -192,20 +193,16 @@ export default function MemoryPage() {
   const agent = profiles?.find((p) => p.id === openAgent) ?? null;
 
   return (
-    <div className="max-w-5xl">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-zinc-100">Memory</h1>
-          <p className="mt-1 max-w-2xl text-sm text-zinc-400">
-            What Coderhelm knows about each repository, where it learned it, and what each agent actually uses.
-          </p>
-        </div>
-        {isAdmin && repo && (
+    <Page>
+      <PageHeader
+        title="Memory"
+        lead="What Coderhelm knows about each repository, where it learned it, and what each agent actually uses."
+        actions={isAdmin && repo ? (
           <button type="button" onClick={() => setTeaching(true)} className={primaryButton}>
             Teach it something
           </button>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       {reposError ? (
         <div className="mt-6">
@@ -403,7 +400,7 @@ export default function MemoryPage() {
           onSaved={() => { setTeaching(false); toast("Remembered"); refresh(); }}
         />
       )}
-    </div>
+    </Page>
   );
 }
 

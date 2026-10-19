@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { hasRole, whoCan, type Role } from "@/lib/roles";
 import { Callout } from "./callout";
 import { linkButton } from "./ui";
+import { Page } from "./page";
 
 type MinRole = Exclude<Role, "viewer">;
 
@@ -36,7 +37,8 @@ export function RoleGuard({ minRole, children }: { minRole: MinRole; children: R
   if (access === "allowed") return <>{children}</>;
 
   return (
-    <div className="max-w-xl">
+    <Page>
+      <div className="max-w-xl">
       <Callout
         variant={access === "error" ? "error" : "info"}
         title={access === "error" ? "Could not check your access" : "This page needs a different role"}
@@ -52,6 +54,7 @@ export function RoleGuard({ minRole, children }: { minRole: MinRole; children: R
           </Link>
         </p>
       </Callout>
-    </div>
+      </div>
+    </Page>
   );
 }

@@ -6,6 +6,7 @@ import { useToast } from "@/components/toast";
 import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { focusRing, secondaryButton } from "@/components/ui";
+import { Page, PageHeader } from "@/components/page";
 
 type ToggleKey = "email_token_warning" | "email_weekly_summary";
 
@@ -44,9 +45,10 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="max-w-xl">
-      <h1 className="text-2xl font-bold">Notifications</h1>
-      <p className="text-sm text-zinc-400 mt-1 mb-6">Choose which emails Coderhelm sends you. These settings are yours alone.</p>
+    <Page>
+      <div className="mb-6">
+        <PageHeader title="Notifications" lead="Choose which emails Coderhelm sends you. These settings are yours alone." />
+      </div>
 
       {failed && (
         <Callout variant="error" title="Could not load your email settings">
@@ -90,6 +92,6 @@ export default function NotificationsPage() {
           })}
         </ul>
       )}
-    </div>
+    </Page>
   );
 }

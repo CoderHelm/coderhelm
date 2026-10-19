@@ -14,6 +14,7 @@ import { Callout } from "@/components/callout";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { Page, PageHeader } from "@/components/page";
 import {
   ArtifactLinks, AttemptSquares, BackLink, EmptyBox, LoadError, Loading, SectionHeading, StatCard, StatePill, firstError,
 } from "@/components/tests/common";
@@ -23,7 +24,7 @@ import { useLoad } from "@/components/tests/use-load";
 export default function TestDetailGuarded() {
   return (
     <RoleGuard minRole="member">
-      <Suspense fallback={<Loading what="this test" />}>
+      <Suspense fallback={<Page><Loading what="this test" /></Page>}>
         <TestDetail />
       </Suspense>
     </RoleGuard>
@@ -44,9 +45,9 @@ function TestDetail() {
     api.me().then((u) => setIsAdmin(ADMIN_ROLES.has(u.role))).catch(() => setIsAdmin(false));
   }, []);
 
-  if (!id) return <EmptyBox>No test was named. Go back to <Link href="/tests" className={linkButton}>Tests</Link>.</EmptyBox>;
-  if (error) return <LoadError what="this test" message={error} onRetry={reload} />;
-  if (loading && !data) return <Loading what="this test" />;
+  if (!id) return <Page><EmptyBox>No test was named. Go back to <Link href="/tests" className={linkButton}>Tests</Link>.</EmptyBox></Page>;
+  if (error) return <Page><LoadError what="this test" message={error} onRetry={reload} /></Page>;
+  if (loading && !data) return <Page><Loading what="this test" /></Page>;
   if (!data) return null;
   const { test, history, events } = data;
 
@@ -116,25 +117,29 @@ function TestDetail() {
   const fixRunning = test.fix_status && ["reproducing", "fixing", "burn_in"].includes(test.fix_status);
 
   return (
-    <div className="max-w-5xl">
-      <BackLink href="/tests">Tests</BackLink>
-      <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1 basis-80">
-          <h1 className="break-words text-2xl font-bold text-zinc-100">{testName(test)}</h1>
-          <p className="mt-1 break-all font-mono text-sm text-zinc-500">{test.file}</p>
-          <p className="mt-1 text-sm text-zinc-500">
-            {test.repo} · {test.framework}
-            {test.owner && <> · Owner {test.owner}</>}
-            {test.last_seen && <> · Last run {timeAgo(test.last_seen)}</>}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <StatePill state={test.state} />
-          {test.flags.filter((f) => f !== test.state).map((f) => (
-            <StatusPill key={f}>{STATE_LABEL[f as keyof typeof STATE_LABEL] ?? f}</StatusPill>
-          ))}
-        </div>
-      </div>
+    <Page>
+      <PageHeader
+        eyebrow={<BackLink href="/tests">Tests</BackLink>}
+        title={testName(test)}
+        lead={
+          <>
+            <p className="break-all font-mono text-zinc-500">{test.file}</p>
+            <p className="mt-1 text-zinc-500">
+              {test.repo} · {test.framework}
+              {test.owner && <> · Owner {test.owner}</>}
+              {test.last_seen && <> · Last run {timeAgo(test.last_seen)}</>}
+            </p>
+          </>
+        }
+        actions={
+          <>
+            <StatePill state={test.state} />
+            {test.flags.filter((f) => f !== test.state).map((f) => (
+              <StatusPill key={f}>{STATE_LABEL[f as keyof typeof STATE_LABEL] ?? f}</StatusPill>
+            ))}
+          </>
+        }
+      />
       <p className="mt-3 max-w-prose text-sm text-zinc-300">{STATE_HELP[test.state]}</p>
 
       <section aria-label="Numbers" className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -232,7 +237,7 @@ function TestDetail() {
           </ol>
         )}
       </section>
-    </div>
+    </Page>
   );
 }
 

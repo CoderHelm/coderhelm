@@ -11,6 +11,7 @@ import { StatusPill } from "@/components/status-pill";
 import { Callout } from "@/components/callout";
 import { Segmented } from "@/components/segmented";
 import { focusRing, linkButton } from "@/components/ui";
+import { Page, PageHeader } from "@/components/page";
 import {
   ArtifactLinks, AttemptSquares, BackLink, EmptyBox, LoadError, Loading, SectionHeading, StatCard, firstError, totalDuration,
 } from "@/components/tests/common";
@@ -19,7 +20,7 @@ import { useLoad } from "@/components/tests/use-load";
 export default function RunDetailGuarded() {
   return (
     <RoleGuard minRole="member">
-      <Suspense fallback={<Loading what="this run" />}>
+      <Suspense fallback={<Page><Loading what="this run" /></Page>}>
         <RunDetail />
       </Suspense>
     </RoleGuard>
@@ -41,19 +42,19 @@ function RunDetail() {
     return filter === "problems" ? list.filter((e) => e.outcome === "failed" || e.outcome === "flaky") : list;
   }, [data, filter]);
 
-  if (!key) return <EmptyBox>No run was named. Go back to <Link href="/tests?view=runs" className={linkButton}>Runs</Link>.</EmptyBox>;
-  if (error) return <LoadError what="this run" message={error} onRetry={reload} />;
-  if (loading && !data) return <Loading what="this run" />;
+  if (!key) return <Page><EmptyBox>No run was named. Go back to <Link href="/tests?view=runs" className={linkButton}>Runs</Link>.</EmptyBox></Page>;
+  if (error) return <Page><LoadError what="this run" message={error} onRetry={reload} /></Page>;
+  if (loading && !data) return <Page><Loading what="this run" /></Page>;
   if (!data) return null;
   const { run } = data;
 
   return (
-    <div className="max-w-5xl">
-      <BackLink href="/tests?view=runs">Runs</BackLink>
-      <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1 basis-80">
-          <h1 className="break-words text-2xl font-bold text-zinc-100">{run.workflow}</h1>
-          <p className="mt-1 break-words text-sm text-zinc-500">
+    <Page>
+      <PageHeader
+        eyebrow={<BackLink href="/tests?view=runs">Runs</BackLink>}
+        title={run.workflow}
+        lead={
+          <p className="break-words">
             {run.repo} · <span className="font-mono">{run.branch}</span>
             {run.pr ? (
               <> · <a href={githubPrUrl(run.repo, run.pr)} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-zinc-300">PR #{run.pr}</a></>
@@ -62,14 +63,16 @@ function RunDetail() {
             {run.run_attempt > 1 && <> · re-run {run.run_attempt}</>}
             {" "}· <time dateTime={run.started_at} title={new Date(run.started_at).toLocaleString()}>{timeAgo(run.started_at)}</time>
           </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <StatusPill tone={run.bad_run ? "warning" : run.status === "passed" ? "success" : "error"}>
-            {run.bad_run ? "Bad run" : run.status === "passed" ? "Passed" : "Failed"}
-          </StatusPill>
-          {run.url && <a href={run.url} target="_blank" rel="noreferrer" className={linkButton}>Open on GitHub</a>}
-        </div>
-      </div>
+        }
+        actions={
+          <>
+            <StatusPill tone={run.bad_run ? "warning" : run.status === "passed" ? "success" : "error"}>
+              {run.bad_run ? "Bad run" : run.status === "passed" ? "Passed" : "Failed"}
+            </StatusPill>
+            {run.url && <a href={run.url} target="_blank" rel="noreferrer" className={linkButton}>Open on GitHub</a>}
+          </>
+        }
+      />
 
       {run.bad_run && (
         <div className="mt-4">
@@ -111,7 +114,7 @@ function RunDetail() {
           </ul>
         )}
       </section>
-    </div>
+    </Page>
   );
 }
 

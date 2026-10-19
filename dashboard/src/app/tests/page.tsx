@@ -9,6 +9,7 @@ import { readRepo, writeRepo } from "@/lib/tests";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
 import { focusRing, primaryButton } from "@/components/ui";
+import { Page, PageHeader } from "@/components/page";
 import { LoadError, Loading, Select } from "@/components/tests/common";
 import { FailureGroupsView, NeedsAttention, QuarantineView, RunsView, SlowestView } from "@/components/tests/views";
 import { TrendsView } from "@/components/tests/trends";
@@ -18,7 +19,7 @@ import { SettingsView, SetupSteps } from "@/components/tests/settings";
 export default function TestsPageGuarded() {
   return (
     <RoleGuard minRole="member">
-      <Suspense fallback={<Loading what="your tests" />}>
+      <Suspense fallback={<Page><Loading what="your tests" /></Page>}>
         <TestsPage />
       </Suspense>
     </RoleGuard>
@@ -101,25 +102,24 @@ function TestsPage() {
   const showEmpty = loaded && !error && (off || noData) && view !== "settings";
 
   return (
-    <div className="max-w-5xl">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-zinc-100 text-balance">Tests</h1>
-          <p className="mt-2 max-w-prose text-sm text-zinc-400">
-            Every E2E run from your CI: which tests are flaky, which are broken, what they cost your team, and which tests are worth adding.
-          </p>
-        </div>
-        {summary && summary.repos.length > 1 && (
-          <div className="w-full sm:w-64">
-            <Select
-              label="Repository"
-              value={repo}
-              onChange={pickRepo}
-              options={[{ value: "", label: "All repositories" }, ...summary.repos.map((r) => ({ value: r, label: r }))]}
-            />
-          </div>
-        )}
-      </div>
+    <Page>
+      <PageHeader
+        title="Tests"
+        titleClassName="text-balance"
+        lead="Every E2E run from your CI: which tests are flaky, which are broken, what they cost your team, and which tests are worth adding."
+        actions={
+          summary && summary.repos.length > 1 ? (
+            <div className="w-full sm:w-64">
+              <Select
+                label="Repository"
+                value={repo}
+                onChange={pickRepo}
+                options={[{ value: "", label: "All repositories" }, ...summary.repos.map((r) => ({ value: r, label: r }))]}
+              />
+            </div>
+          ) : undefined
+        }
+      />
 
       <nav aria-label="Tests views" className="mt-6 border-b border-zinc-800">
         <ul className="-mb-px flex flex-wrap gap-x-1">
@@ -169,7 +169,7 @@ function TestsPage() {
           <Loading what="settings" />
         )}
       </div>
-    </div>
+    </Page>
   );
 }
 

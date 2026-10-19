@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Page, PageHeader } from "@/components/page";
 import { useRouter } from "next/navigation";
 import { api, type Template } from "@/lib/api";
 import { useToast } from "@/components/toast";
@@ -47,15 +48,14 @@ export default function TemplatesPage() {
   };
 
   return (
-    <div>
-      <div className="mb-6">
-        <Link href="/plans" className={`text-zinc-500 hover:text-zinc-300 text-sm rounded ${focusRing}`}>← Plans</Link>
-        <h1 className="text-2xl font-bold text-zinc-100 mt-1">Plan templates</h1>
-        <p className="text-sm text-zinc-500 mt-1">
-          Saved plans you can start again with one click.
-        </p>
-      </div>
+    <Page>
+      <PageHeader
+        eyebrow={<Link href="/plans" className={`text-zinc-500 hover:text-zinc-300 text-sm rounded ${focusRing}`}>← Plans</Link>}
+        title="Plan templates"
+        lead="Saved plans you can start again with one click."
+      />
 
+      <div className="mt-6">
       {loading ? (
         <TableSkeleton rows={3} cols={3} />
       ) : error ? (
@@ -65,7 +65,7 @@ export default function TemplatesPage() {
           </button>
         </Callout>
       ) : shown.length === 0 ? (
-        <div className="border border-zinc-800 rounded-lg p-8 sm:p-12 text-center text-zinc-500">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 sm:p-12 text-center text-zinc-500">
           <p className="text-lg mb-2 text-zinc-300">No templates yet</p>
           <p className="text-sm mb-4">
             Open a plan and choose &ldquo;Save as template&rdquo; to reuse it later.
@@ -80,7 +80,7 @@ export default function TemplatesPage() {
             {shown.map((t) => (
               <li
                 key={t.template_id}
-                className="flex flex-col rounded-lg border border-zinc-800 bg-zinc-900 p-5 hover:border-zinc-700 transition-colors min-w-0"
+                className="flex flex-col rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 hover:border-zinc-700 transition-colors min-w-0"
               >
                 <div className="mb-3 min-w-0">
                   <h2 className="text-sm font-semibold text-zinc-100 break-words">{t.title}</h2>
@@ -135,6 +135,7 @@ export default function TemplatesPage() {
           <LoadMoreButton hasMore={!!next} loading={loadingMore} onClick={loadMore} />
         </>
       )}
-    </div>
+      </div>
+    </Page>
   );
 }

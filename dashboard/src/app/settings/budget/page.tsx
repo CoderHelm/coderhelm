@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/skeleton";
 import { inputClass, primaryButton, secondaryButton } from "@/components/ui";
 import { cacheHitRate, FEATURE_LABELS, formatTokens, USAGE_CHANGED, usageBreakdown, usageParts, usageTone, usageTotal } from "@/lib/usage";
 import { hasRole } from "@/lib/roles";
+import { Page, PageHeader } from "@/components/page";
 
 // Who may change the limit. The gateway checks the same role on save.
 const EDIT_ROLE = "admin" as const;
@@ -63,11 +64,10 @@ function TokenLimitPage() {
   };
 
   return (
-    <div className="max-w-xl">
-      <h1 className="text-2xl font-bold">Token limit</h1>
-      <p className="text-sm text-zinc-400 mt-1 mb-6">
-        A monthly cap on the tokens your team uses. When the team reaches it, new runs pause until the next month starts.
-      </p>
+    <Page>
+      <div className="mb-6">
+        <PageHeader title="Token limit" lead="A monthly cap on the tokens your team uses. When the team reaches it, new runs pause until the next month starts." />
+      </div>
 
       {load.state === "loading" && (
         <div className="space-y-4" aria-busy="true" aria-label="Loading token limit">
@@ -146,7 +146,7 @@ function TokenLimitPage() {
           </section>
         </div>
       )}
-    </div>
+    </Page>
   );
 }
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api, type PluginDef, type EnabledPlugin } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
+import { Page, PageHeader } from "@/components/page";
 
 const CATEGORY_COLORS: Record<string, string> = {
   Design: "bg-purple-500/10 text-purple-400 border-purple-500/20",
@@ -178,13 +179,15 @@ function PluginsPage() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl">
-        <h1 className="text-2xl font-bold mb-6">MCP servers</h1>
+      <Page>
+        <div className="mb-6">
+          <PageHeader title="MCP servers" />
+        </div>
         <div className="flex items-center gap-2 text-zinc-500 text-sm">
           <div className="w-4 h-4 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
           Loading servers...
         </div>
-      </div>
+      </Page>
     );
   }
 
@@ -192,12 +195,9 @@ function PluginsPage() {
   const tiers = [1, 2, 3];
 
   return (
-    <div className="max-w-4xl">
+    <Page>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">MCP servers</h1>
-        <p className="text-sm text-zinc-500 mt-1">
-          Connect MCP servers to give Coderhelm access to third-party tools during runs.
-        </p>
+        <PageHeader title="MCP servers" lead="Connect MCP servers to give Coderhelm access to third-party tools during runs." />
       </div>
 
       {/* Security notice */}
@@ -524,6 +524,6 @@ function PluginsPage() {
           </div>
         );
       })}
-    </div>
+    </Page>
   );
 }

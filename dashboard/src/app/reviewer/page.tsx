@@ -10,6 +10,7 @@ import { ReReviewButton } from "@/components/re-review-button";
 import { usePagedList, LoadMoreButton } from "@/components/load-more";
 import { Callout } from "@/components/callout";
 import { focusRing, linkButton, secondaryButton } from "@/components/ui";
+import { Page, PageHeader, cardClass } from "@/components/page";
 import { RiskText, VerdictPill, triggerLabel } from "./labels";
 
 export default function ReviewerPageGuarded() {
@@ -95,24 +96,24 @@ function ReviewerPage() {
   const groups = groupByPr(reviews);
 
   return (
-    <div>
-      <div className="mb-8">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-zinc-100">Reviewer</h1>
-            <p className="text-sm text-zinc-500 mt-1">
-              Reviews the agent posted on your PRs. Add the review label (default{" "}
-              <code className="text-zinc-400">ch-review</code>) to a PR to trigger one, or reply{" "}
-              <code className="text-zinc-400">@coderhelm re-review</code>.
-            </p>
-          </div>
+    <Page>
+      <PageHeader
+        title="Reviewer"
+        lead={
+          <>
+            Reviews the agent posted on your PRs. Add the review label (default{" "}
+            <code className="text-zinc-300">ch-review</code>) to a PR to trigger one, or reply{" "}
+            <code className="text-zinc-300">@coderhelm re-review</code>.
+          </>
+        }
+        actions={
           <Link href="/reviewer/config" className={`shrink-0 ${secondaryButton}`}>
             Configure
           </Link>
-        </div>
-      </div>
+        }
+      />
 
-      <div className="mb-6 p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+      <div className={`mt-6 mb-6 ${cardClass}`}>
         <h2 className="text-sm font-semibold text-zinc-200">Review a PR now</h2>
         <p className="text-xs text-zinc-500 mt-1 mb-3">
           Reviews the PR&apos;s latest commit — no label or GitHub comment needed.
@@ -155,7 +156,7 @@ function ReviewerPage() {
           </button>
         </Callout>
       ) : reviews.length === 0 ? (
-        <div className="text-zinc-500 border border-zinc-800 rounded-lg p-8 text-center">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-500">
           <p className="text-lg mb-2">{repoFilter ? `No reviews for ${repoFilter} yet` : "No reviews yet"}</p>
           <p className="text-sm">
             Turn the reviewer on for a repo in{" "}
@@ -189,7 +190,7 @@ function ReviewerPage() {
         </div>
       )}
       <LoadMoreButton hasMore={!!next} loading={loadingMore} failed={moreFailed} onClick={loadMore} />
-    </div>
+    </Page>
   );
 }
 

@@ -12,6 +12,7 @@ import { focusRing, inputClass, secondaryButton } from "@/components/ui";
 import { SETTINGS_GROUPS, type SettingsItem } from "@/components/settings-items";
 import { hasRole, ROLE_LABEL, whoCan, type Role } from "@/lib/roles";
 import { useSettingsStatus, type ItemStatus, type Me } from "./use-settings-status";
+import { Page, PageHeader } from "@/components/page";
 
 export default function SettingsPage() {
   const [me, setMe] = useState<Me | null>(null);
@@ -28,19 +29,23 @@ export default function SettingsPage() {
   const roleLabel = me ? ROLE_LABEL[me.role as Role] ?? me.role : null;
 
   return (
-    <div className="max-w-3xl">
-      <header className="mb-8">
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-sm text-zinc-400 mt-1">
-          How Coderhelm works for your team, and the settings that are just yours.
-        </p>
-        {roleLabel && (
-          <p className="text-xs text-zinc-500 mt-3">
-            Your role: <span className="text-zinc-300 font-medium">{roleLabel}</span>. Pages marked View only show the
-            current setup; ask someone with a higher role to change them.
-          </p>
-        )}
-      </header>
+    <Page>
+      <div className="mb-8">
+        <PageHeader
+          title="Settings"
+          lead={
+            <>
+              <p>How Coderhelm works for your team, and the settings that are just yours.</p>
+              {roleLabel && (
+                <p className="text-xs text-zinc-500 mt-3">
+                  Your role: <span className="text-zinc-300 font-medium">{roleLabel}</span>. Pages marked View only show the
+                  current setup; ask someone with a higher role to change them.
+                </p>
+              )}
+            </>
+          }
+        />
+      </div>
 
       {loadError && (
         <Callout variant="error" title="Could not load your settings">
@@ -77,7 +82,7 @@ export default function SettingsPage() {
       </div>
 
       {me && hasRole(me.role, "owner") && <DangerZone />}
-    </div>
+    </Page>
   );
 }
 

@@ -11,6 +11,7 @@ import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { ChevronRightIcon } from "@/components/icons";
 import { focusRing, secondaryButton } from "@/components/ui";
+import { Page, PageHeader } from "@/components/page";
 
 type Tone = "success" | "warning" | "error" | "neutral";
 
@@ -86,18 +87,17 @@ function HealthPage() {
   const overall = health ? OVERALL[health.status] ?? OVERALL.degraded : null;
 
   return (
-    <div className="max-w-3xl">
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-8">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold">System health</h1>
-          <p className="text-sm text-zinc-500 mt-1">
-            Checks again every {unhealthy ? "5" : "30"} seconds.
-          </p>
-        </div>
-        <button type="button" onClick={refresh} disabled={checking} className={secondaryButton}>
-          {checking ? "Checking..." : "Check now"}
-        </button>
-      </div>
+    <Page>
+      <PageHeader
+        title="System health"
+        lead={<>Checks again every {unhealthy ? "5" : "30"} seconds.</>}
+        actions={
+          <button type="button" onClick={refresh} disabled={checking} className={secondaryButton}>
+            {checking ? "Checking..." : "Check now"}
+          </button>
+        }
+      />
+      <div className="mt-6">
 
       {error && (
         <div className="mb-6">
@@ -133,7 +133,8 @@ function HealthPage() {
           </div>
         </>
       )}
-    </div>
+      </div>
+    </Page>
   );
 }
 

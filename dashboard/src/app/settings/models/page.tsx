@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api, ModelProviderConfig } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
+import { Page, PageHeader } from "@/components/page";
 
 const MODEL_OPTIONS = [
   { value: "claude-fable-5-1", label: "Claude Fable 5.1 — most capable" },
@@ -90,21 +91,22 @@ function ModelProviderPage() {
 
   if (loading) {
     return (
-      <div className="max-w-xl">
-        <h1 className="text-2xl font-bold mb-6">AI models</h1>
+      <Page>
+        <div className="mb-6">
+          <PageHeader title="AI models" />
+        </div>
         <div className="h-64 bg-zinc-900/50 border border-zinc-800 rounded-lg animate-pulse" />
-      </div>
+      </Page>
     );
   }
 
   const hasApiKey = !!config?.api_key_masked;
 
   return (
-    <div className="max-w-xl">
-      <h1 className="text-2xl font-bold mb-2">AI models</h1>
-      <p className="text-sm text-zinc-500 mb-6">
-        Add your Anthropic API key to power CoderHelm runs.
-      </p>
+    <Page>
+      <div className="mb-6">
+        <PageHeader title="AI models" lead="Add your Anthropic API key to power CoderHelm runs." />
+      </div>
 
       {!hasApiKey && !apiKey && (
         <div className="mb-5 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
@@ -114,7 +116,7 @@ function ModelProviderPage() {
         </div>
       )}
 
-      <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-lg space-y-5">
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 space-y-5">
         <div>
           <label className="block text-sm font-medium text-zinc-300 mb-1.5">API Key</label>
           <div className="relative">
@@ -195,6 +197,6 @@ function ModelProviderPage() {
           <li>• Changes take effect on the next run. In-progress runs are unaffected.</li>
         </ul>
       </div>
-    </div>
+    </Page>
   );
 }

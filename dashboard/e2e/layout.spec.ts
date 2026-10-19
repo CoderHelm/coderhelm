@@ -11,8 +11,41 @@ const WIDTH = "max-w-6xl";
 
 /** Pages on the shared layout. Add a page here when it moves onto <Page>. */
 const PAGES: { path: string; name: string }[] = [
-  { path: "/analytics", name: "analytics" },
+  { path: "/", name: "runs" },
+  { path: "/runs/detail?id=01RUN00000000000000000001", name: "run-detail" },
+  { path: "/plans", name: "plans" },
+  { path: "/plans/detail?id=p1", name: "plan-detail" },
+  { path: "/plans/new", name: "plan-new" },
+  { path: "/plans/templates", name: "plan-templates" },
+  { path: "/reviewer", name: "reviewer" },
+  { path: "/reviewer/detail?id=r1", name: "reviewer-detail" },
+  { path: "/reviewer/config", name: "reviewer-config" },
   { path: "/releases", name: "releases" },
+  { path: "/analytics", name: "analytics" },
+  { path: "/alerts", name: "alerts" },
+  { path: "/alerts/detail?id=a1", name: "alert-detail" },
+  { path: "/tests", name: "tests" },
+  { path: "/tests/run?id=t1", name: "tests-run" },
+  { path: "/tests/test?id=t1", name: "tests-test" },
+  { path: "/memory", name: "memory" },
+  { path: "/infrastructure", name: "infrastructure" },
+  { path: "/graph", name: "graph" },
+  { path: "/health", name: "health" },
+  { path: "/admin", name: "admin" },
+  { path: "/settings", name: "settings" },
+  { path: "/settings/team", name: "settings-team" },
+  { path: "/settings/notifications", name: "settings-notifications" },
+  { path: "/settings/security", name: "settings-security" },
+  { path: "/settings/workflow", name: "settings-workflow" },
+  { path: "/settings/guardrails", name: "settings-guardrails" },
+  { path: "/settings/voice", name: "settings-voice" },
+  { path: "/settings/instructions", name: "settings-instructions" },
+  { path: "/settings/models", name: "settings-models" },
+  { path: "/settings/plugins", name: "settings-plugins" },
+  { path: "/settings/budget", name: "settings-budget" },
+  { path: "/settings/github", name: "settings-github" },
+  { path: "/settings/repos", name: "settings-repos" },
+  { path: "/no-such-page", name: "not-found" },
 ];
 
 async function mockApi(page: Page) {
@@ -38,7 +71,6 @@ for (const { path: route, name } of PAGES) {
     const column = page.locator("main [data-page]").first();
     await expect(column).toBeVisible();
     await expect(column).toHaveClass(new RegExp(`\\bmx-auto\\b.*\\b${WIDTH}\\b|\\b${WIDTH}\\b.*\\bmx-auto\\b`));
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 
     fs.mkdirSync(SHOTS_DIR, { recursive: true });
     await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });

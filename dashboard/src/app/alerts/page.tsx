@@ -8,6 +8,7 @@ import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
 import { Callout } from "@/components/callout";
 import { linkButton, secondaryButton } from "@/components/ui";
+import { Page, PageHeader } from "@/components/page";
 import { OutcomeBadge, formatWhen } from "./outcome";
 
 export default function AlertsHistoryGuarded() {
@@ -57,17 +58,20 @@ function AlertsHistory() {
   }, [load]);
 
   return (
-    <div className="max-w-5xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-zinc-100">Alerts</h1>
-        <p className="text-sm text-zinc-500 mt-1">
-          Every alert Coderhelm received on your alert routes and what it did with it. Open one to share its link.{" "}
-          <Link href="/settings/alerts" className={linkButton}>
-            Alert routes
-          </Link>
-        </p>
-      </div>
+    <Page>
+      <PageHeader
+        title="Alerts"
+        lead={
+          <>
+            Every alert Coderhelm received on your alert routes and what it did with it. Open one to share its link.{" "}
+            <Link href="/settings/alerts" className={linkButton}>
+              Alert routes
+            </Link>
+          </>
+        }
+      />
 
+      <div className="mt-6">
       {loading ? (
         <TableSkeleton rows={5} cols={4} />
       ) : error ? (
@@ -80,7 +84,7 @@ function AlertsHistory() {
           </p>
         </Callout>
       ) : alerts.length === 0 ? (
-        <div className="text-zinc-500 border border-zinc-800 rounded-lg p-8 text-center">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-500">
           <p className="text-lg mb-2">No alerts yet</p>
           <p className="text-sm">Alerts appear here once a topic mapped in Alert routes publishes one.</p>
         </div>
@@ -121,6 +125,7 @@ function AlertsHistory() {
           {loadingMore ? "Loading…" : "Load more"}
         </button>
       )}
-    </div>
+      </div>
+    </Page>
   );
 }

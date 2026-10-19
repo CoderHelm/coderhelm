@@ -12,11 +12,12 @@ import { ChatMarkdown } from "@/components/chat-markdown";
 import { Callout } from "@/components/callout";
 import { CopyButton } from "@/components/copy-button";
 import { focusRing, inputClass, linkButton } from "@/components/ui";
+import { Page, PageHeader } from "@/components/page";
 import { PlanStatusPill, TaskStatusPill, TASK_ORDER, taskInfo } from "../status";
 
 export default function PlanDetailPage() {
   return (
-    <Suspense fallback={<div className="max-w-3xl"><Skeleton className="h-6 w-full max-w-64 mb-2" /><Skeleton className="h-4 w-full max-w-96 mb-6" /><TableSkeleton rows={4} cols={3} /></div>}>
+    <Suspense fallback={<Page><Skeleton className="h-6 w-full max-w-64 mb-2" /><Skeleton className="h-4 w-full max-w-96 mb-6" /><TableSkeleton rows={4} cols={3} /></Page>}>
       <PlanDetail />
     </Suspense>
   );
@@ -270,26 +271,26 @@ function PlanDetail() {
   const draftCount = plan?.tasks.filter((t) => t.status === "draft").length ?? 0;
   if (!planId) {
     return (
-      <div className="max-w-3xl">
+      <Page>
         <Link href="/plans" className={`text-zinc-500 hover:text-zinc-300 text-sm rounded ${focusRing}`}>← Plans</Link>
         <p className="text-zinc-500 mt-4">No plan selected. Pick one from the plans list.</p>
-      </div>
+      </Page>
     );
   }
 
   if (loading && !plan) {
     return (
-      <div className="max-w-3xl">
+      <Page>
         <Skeleton className="h-6 w-full max-w-64 mb-2" />
         <Skeleton className="h-4 w-full max-w-96 mb-6" />
         <TableSkeleton rows={4} cols={3} />
-      </div>
+      </Page>
     );
   }
 
   if (!plan) {
     return (
-      <div className="max-w-3xl space-y-4">
+      <Page className="space-y-4">
         <Link href="/plans" className={`text-zinc-500 hover:text-zinc-300 text-sm rounded ${focusRing}`}>← Plans</Link>
         {loadError === "missing" ? (
           <Callout variant="warning" title="Plan not found">
@@ -302,17 +303,18 @@ function PlanDetail() {
             </button>
           </Callout>
         )}
-      </div>
+      </Page>
     );
   }
 
   return (
-    <div className="max-w-3xl">
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
-        <div className="min-w-0">
-          <Link href="/plans" className={`text-zinc-500 hover:text-zinc-300 text-sm rounded ${focusRing}`}>← Plans</Link>
-          <h1 className="text-2xl font-bold text-zinc-100 mt-1 break-words">{plan.title || "Untitled plan"}</h1>
-          {plan.description && <p className="text-zinc-400 text-sm mt-1">{plan.description}</p>}
+    <Page>
+      <PageHeader
+        eyebrow={<Link href="/plans" className={`text-zinc-500 hover:text-zinc-300 text-sm rounded ${focusRing}`}>← Plans</Link>}
+        title={plan.title || "Untitled plan"}
+        lead={
+          <>
+          {plan.description && <p>{plan.description}</p>}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-2">
             {plan.repo && <span className="text-xs text-zinc-500 font-mono break-all">{plan.repo}</span>}
             <PlanStatusPill status={plan.status} />
@@ -331,8 +333,10 @@ function PlanDetail() {
               </>
             )}
           </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+          </>
+        }
+        actions={
+          <>
           <button
             type="button"
             onClick={openTemplateModal}
@@ -357,11 +361,12 @@ function PlanDetail() {
               {executing ? "Starting…" : "Approve all and start"}
             </button>
           )}
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Plan-level destination picker */}
-      <div className="mb-6 flex flex-wrap items-center gap-3 p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+      <div className="mt-6 mb-6 flex flex-wrap items-center gap-3 p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
         <span className="text-xs text-zinc-500 uppercase tracking-wider font-medium whitespace-nowrap">Destination</span>
         <div className="flex flex-wrap gap-2" role="group" aria-label="Destination">
           {(["github", "jira"] as const).map((d) => (
@@ -874,6 +879,6 @@ function PlanDetail() {
           </form>
         </div>
       )}
-    </div>
+    </Page>
   );
 }

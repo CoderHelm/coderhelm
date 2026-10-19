@@ -20,6 +20,7 @@ import { StatusPill } from "@/components/status-pill";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { focusRing, inputClass, primaryButton, secondaryButton } from "@/components/ui";
+import { Page, PageHeader } from "@/components/page";
 
 // ── Force layout (small, dependency-free) ───────────────────────────────────
 
@@ -332,21 +333,18 @@ export default function GraphPage() {
   const updated = status?.updated_at ? new Date(status.updated_at) : null;
 
   return (
-    <div className="max-w-6xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Code graph</h1>
-        <p className="text-sm text-zinc-500 mt-1 max-w-prose">
-          A map of each repo: where things are defined, who calls them and what imports what. The reviewer and the
-          coding agent both use it. It updates on every push to the default branch.
-        </p>
-      </div>
+    <Page className="space-y-6">
+      <PageHeader
+        title="Code graph"
+        lead="A map of each repo: where things are defined, who calls them and what imports what. The reviewer and the coding agent both use it. It updates on every push to the default branch."
+      />
 
       {reposError ? (
         <ErrorBox title="Couldn't load your repos" message={reposError} onRetry={() => void loadRepos(false)} />
       ) : repos === null ? (
         <Skeleton className="h-10 w-72" />
       ) : repos.length === 0 ? (
-        <div className="text-sm text-zinc-400 border border-zinc-800 rounded-lg p-4" data-testid="graph-empty">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-sm text-zinc-400" data-testid="graph-empty">
           No repos have a code graph yet. A repo appears here once the reviewer is set up for it.{" "}
           <Link href="/reviewer/config" className={`text-zinc-200 underline underline-offset-2 rounded ${focusRing}`}>
             Set up the reviewer
@@ -543,6 +541,6 @@ export default function GraphPage() {
           </div>
         </>
       )}
-    </div>
+    </Page>
   );
 }

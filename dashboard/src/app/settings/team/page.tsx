@@ -26,6 +26,7 @@ import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { CheckIcon, GitHubIcon, MailIcon } from "@/components/icons";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { Page, PageHeader } from "@/components/page";
 
 const ROLE_STYLE: Record<string, string> = {
   owner: "border-amber-500/30 bg-amber-500/10 text-amber-300",
@@ -167,20 +168,19 @@ export default function TeamPage() {
   const loading = members === null && !error;
 
   return (
-    <div className="max-w-4xl">
-      <Link href="/settings" className={`${linkButton} text-sm`}>
-        Back to settings
-      </Link>
-      <div className="mt-4">
-        <h1 className="text-2xl font-bold text-zinc-100">Team</h1>
-        <p className="mt-2 max-w-prose text-sm text-zinc-400">
-          {teamName ? <span className="text-zinc-200">{teamName}</span> : "This workspace"}
-          {members ? ` · ${active.length} ${active.length === 1 ? "person" : "people"}` : ""}
-          {". "}
-          Who has access, what their role lets them do, and pending invites.
-        </p>
-        {isOwner && <RenameTeam current={teamName} onRenamed={setTeamName} />}
-      </div>
+    <Page>
+      <PageHeader
+        title="Team"
+        lead={
+          <>
+            {teamName ? <span className="text-zinc-200">{teamName}</span> : "This workspace"}
+            {members ? ` · ${active.length} ${active.length === 1 ? "person" : "people"}` : ""}
+            {". "}
+            Who has access, what their role lets them do, and pending invites.
+          </>
+        }
+      />
+      {isOwner && <RenameTeam current={teamName} onRenamed={setTeamName} />}
 
       {error && (
         <div className="mt-6">
@@ -389,7 +389,7 @@ export default function TeamPage() {
           onConfirm={(person, github) => link(person, github)}
         />
       )}
-    </div>
+    </Page>
   );
 }
 

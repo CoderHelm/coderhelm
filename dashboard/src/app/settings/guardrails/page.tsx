@@ -6,6 +6,7 @@ import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
 import { Skeleton } from "@/components/skeleton";
 import { RepoCombobox } from "@/components/repo-combobox";
+import { Page, PageHeader } from "@/components/page";
 import {
   ShieldCheckIcon, LockIcon, ShieldAlertIcon,
   KeyIcon, RepeatIcon, ClipboardIcon, ScanIcon,
@@ -188,12 +189,13 @@ function GuardrailsPage() {
   };
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-2">Guardrails</h1>
-      <p className="text-zinc-400 text-sm mb-6">
-        Must-rules that Coderhelm enforces on every run. Global rules apply to all repos.
-        Per-repo rules add repo-specific constraints on top.
-      </p>
+    <Page>
+      <div className="mb-6">
+        <PageHeader
+          title="Guardrails"
+          lead="Must-rules that Coderhelm enforces on every run. Global rules apply to all repos. Per-repo rules add repo-specific constraints on top."
+        />
+      </div>
 
       <div className="border border-zinc-800 rounded-lg p-4 mb-4 bg-zinc-900/30">
         <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3">Built-in rules (always enforced)</h3>
@@ -282,6 +284,6 @@ function GuardrailsPage() {
           )}
         </>
       )}
-    </div>
+    </Page>
   );
 }

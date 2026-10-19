@@ -11,6 +11,7 @@ import { Segmented } from "@/components/segmented";
 import { RepoCombobox } from "@/components/repo-combobox";
 import { AlertCircleIcon, InfoIcon, WarningIcon } from "@/components/icons";
 import { focusRing, secondaryButton } from "@/components/ui";
+import { Page, PageHeader } from "@/components/page";
 
 const SEVERITY_STYLES: Record<string, string> = {
   error: "border-red-500/20 bg-red-500/5 text-red-400",
@@ -325,13 +326,11 @@ export default function InfrastructurePage() {
   const noRepos = scope === "repo" && repos !== null && repos.length === 0;
 
   return (
-    <div>
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold">Infrastructure</h1>
-          <p className="text-zinc-500 text-sm mt-1">Security, cost and reliability review of the infrastructure code in your repos.</p>
-        </div>
-        {canScan && !noRepos && (
+    <Page>
+      <PageHeader
+        title="Infrastructure"
+        lead="Security, cost and reliability review of the infrastructure code in your repos."
+        actions={canScan && !noRepos ? (
           <button
             type="button"
             onClick={handleRefresh}
@@ -340,10 +339,10 @@ export default function InfrastructurePage() {
           >
             {refreshing ? "Starting..." : refreshLabel}
           </button>
-        )}
-      </div>
+        ) : undefined}
+      />
 
-      <div className="mb-5">
+      <div className="mt-6 mb-5">
         <Segmented label="What to review" options={SCOPES} value={scope} onChange={setScope} />
       </div>
       {scope === "repo" && repos && repos.length > 0 && (
@@ -353,7 +352,7 @@ export default function InfrastructurePage() {
       )}
 
       {noRepos ? (
-        <div className="p-6 text-center text-sm text-zinc-400 border border-zinc-800 rounded-xl">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center text-sm text-zinc-400">
           No repos are turned on yet.{" "}
           <Link href="/settings/repos" className={`text-zinc-200 underline underline-offset-2 rounded ${focusRing}`}>Turn on a repo</Link>{" "}
           to review its infrastructure on its own.
@@ -370,6 +369,6 @@ export default function InfrastructurePage() {
       ) : analysis ? (
         <AnalysisView analysis={analysis} refreshing={refreshing} onRefresh={handleRefresh} pollStart={pollStart} stale={pollStale} canScan={canScan} />
       ) : null}
-    </div>
+    </Page>
   );
 }
