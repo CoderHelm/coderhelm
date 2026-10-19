@@ -11,6 +11,7 @@ import { useToast } from "@/components/toast";
 import { usePagedList, LoadMoreButton } from "@/components/load-more";
 import { Callout } from "@/components/callout";
 import { focusRing, linkButton, secondaryButton } from "@/components/ui";
+import { Page, PageHeader, cardClass } from "@/components/page";
 
 // The characters the backend accepts in a tag (anything else is a bare 400).
 const TAG_PATTERN = /^[A-Za-z0-9._+/-]{1,200}$/;
@@ -81,17 +82,19 @@ function ReleasesPage() {
   };
 
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-zinc-100">Releases</h1>
-        <p className="text-sm text-zinc-500 mt-1">
-          Release notes Coderhelm wrote for each release tag: the GitHub Release, the Confluence changelog entry, and the
-          email to your team. Turn them on for a repo in{" "}
-          <Link href="/reviewer/config" className={linkButton}>Reviewer settings</Link>, under Release notes.
-        </p>
-      </div>
+    <Page>
+      <PageHeader
+        title="Releases"
+        lead={
+          <>
+            Release notes Coderhelm wrote for each release tag: the GitHub Release, the Confluence changelog entry, and the
+            email to your team. Turn them on for a repo in{" "}
+            <Link href="/reviewer/config" className={linkButton}>Reviewer settings</Link>, under Release notes.
+          </>
+        }
+      />
 
-      <div className="mb-6 p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+      <div className={`mt-6 mb-6 ${cardClass}`}>
         <h2 className="text-sm font-semibold text-zinc-200">Write notes for a tag</h2>
         <p className="text-xs text-zinc-500 mt-1 mb-3">For a tag Coderhelm didn&apos;t cut, or an older release. Publishes to whatever the repo has set up.</p>
         <div className="flex flex-wrap items-start gap-2">
@@ -145,7 +148,7 @@ function ReleasesPage() {
           </button>
         </Callout>
       ) : releases.length === 0 ? (
-        <div className="text-zinc-500 border border-zinc-800 rounded-lg p-8 text-center">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-500">
           <p className="text-lg mb-2">{repoFilter ? `No release notes for ${repoFilter} yet` : "No release notes yet"}</p>
           <p className="text-sm">They appear here after the next release tag on a repo with release notes on.</p>
         </div>
@@ -214,7 +217,7 @@ function ReleasesPage() {
         </div>
       )}
       <LoadMoreButton hasMore={!!next} loading={loadingMore} failed={moreFailed} onClick={loadMore} />
-    </div>
+    </Page>
   );
 }
 

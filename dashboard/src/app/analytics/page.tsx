@@ -8,6 +8,7 @@ import { CardSkeleton, ChartSkeleton } from "@/components/skeleton";
 import { Segmented } from "@/components/segmented";
 import { Callout } from "@/components/callout";
 import { focusRing } from "@/components/ui";
+import { Page, PageHeader, Section } from "@/components/page";
 
 // Categorical slots for the dark chart surface, checked for color-vision
 // separation and contrast (blue, orange). Text never takes a series color.
@@ -72,16 +73,6 @@ function Tile({ label, value, change, basis, testId }: { label: string; value: s
       {change && <p className="mt-1 text-xs text-zinc-400">{change}</p>}
       {basis && <p className="mt-1 text-xs text-zinc-500">{basis}</p>}
     </div>
-  );
-}
-
-function Section({ title, lead, children, id }: { title: string; lead?: string; children: ReactNode; id?: string }) {
-  return (
-    <section className="mt-10 min-w-0" aria-labelledby={id}>
-      <h2 id={id} className="text-xs font-semibold uppercase tracking-wider text-zinc-500">{title}</h2>
-      {lead && <p className="mt-1 max-w-prose text-sm text-zinc-400">{lead}</p>}
-      <div className="mt-3">{children}</div>
-    </section>
   );
 }
 
@@ -188,15 +179,11 @@ export default function AnalyticsPage() {
   }, [load]);
 
   return (
-    <div className="mx-auto max-w-6xl">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold">Analytics</h1>
-          <p className="mt-1 max-w-prose text-sm text-zinc-400">
-            What Coderhelm delivered, the tokens it used, and where it struggles. Every number comes from your runs, reviews and lookups; open any row to see the work behind it.
-          </p>
-        </div>
-      </div>
+    <Page>
+      <PageHeader
+        title="Analytics"
+        lead="What Coderhelm delivered, the tokens it used, and where it struggles. Every number comes from your runs, reviews and lookups; open any row to see the work behind it."
+      />
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <Segmented label="Period" options={PERIODS} value={`${days}` as `${AnalyticsDays}`} onChange={(v) => setDays(Number(v) as AnalyticsDays)} />
@@ -233,7 +220,7 @@ export default function AnalyticsPage() {
       ) : data ? (
         <Body data={data} loading={loading} />
       ) : null}
-    </div>
+    </Page>
   );
 }
 
@@ -306,7 +293,7 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
 
       <TimeSaved merged={s.prs_merged} days={d} />
 
-      <Section title="Where it struggles" id="struggles" lead="Failed runs grouped by what went wrong. Open the latest run of a group to see its steps.">
+      <Section title="Where it struggles" id="struggles" description="Failed runs grouped by what went wrong. Open the latest run of a group to see its steps.">
         <Table
           label="Failures by reason"
           head={["Reason", "Runs", "Latest"]}
@@ -324,7 +311,7 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
         )}
       </Section>
 
-      <Section title="Reviews" id="reviews" lead="Pull request reviews Coderhelm posted, and what became of the findings it raised before.">
+      <Section title="Reviews" id="reviews" description="Pull request reviews Coderhelm posted, and what became of the findings it raised before.">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Tile label="Reviews posted" value={count(data.reviews.posted)} change={delta(s.reviews, p.reviews, "count", d)} basis={`On ${plural(data.reviews.prs_reviewed, "PR")}`} />
           <Tile label="Approved / changes asked / comments" value={`${count(data.reviews.approve)} / ${count(data.reviews.request_changes)} / ${count(data.reviews.comment)}`} />
@@ -362,7 +349,7 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
       </div>
 
       <div className="grid gap-x-6 lg:grid-cols-2">
-        <Section title="Where the work goes" id="steps" lead={`Tokens and time by step, over the last ${Math.min(d, data.steps_window_days)} days (step details are kept for ${data.steps_window_days}).`}>
+        <Section title="Where the work goes" id="steps" description={`Tokens and time by step, over the last ${Math.min(d, data.steps_window_days)} days (step details are kept for ${data.steps_window_days}).`}>
           <Table
             label="By step"
             head={["Step", "Times", "Tokens", "Avg time"]}
@@ -370,7 +357,7 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
             empty="No step details in this period."
           />
         </Section>
-        <Section title="Data source lookups" id="lookups" lead={data.lookups.total ? `${plural(data.lookups.total, "lookup")}: ${count(data.lookups.refused)} refused by the read-only rules, ${count(data.lookups.failed)} failed.` : undefined}>
+        <Section title="Data source lookups" id="lookups" description={data.lookups.total ? `${plural(data.lookups.total, "lookup")}: ${count(data.lookups.refused)} refused by the read-only rules, ${count(data.lookups.failed)} failed.` : undefined}>
           <Table
             label="Lookups by source"
             head={["Source", "Lookups", "Refused", "Failed"]}
