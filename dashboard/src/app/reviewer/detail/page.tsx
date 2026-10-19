@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/skeleton";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Page, PageHeader, cardClass } from "@/components/page";
 import { VerdictPill, riskLabel, triggerLabel } from "../labels";
+import { AppliedStandards } from "@/components/applied-standards";
 
 export default function ReviewDetailGuarded() {
   return (
@@ -174,6 +175,8 @@ function ReviewDetailPage() {
         }
         actions={<ReReviewButton repo={review.repo} pr={review.pr_number} className="min-h-9" />}
       />
+
+      <AppliedStandards names={review.applied_standards} className="mt-4" />
 
       <div className={`mt-6 ${cardClass} overflow-x-auto`}>
         <Markdown>{review.body || "_The review has no text._"}</Markdown>

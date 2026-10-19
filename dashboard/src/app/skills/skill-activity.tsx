@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Callout } from "@/components/callout";
-import { BookIcon, ChatIcon, ClipboardIcon } from "@/components/icons";
+import { BookIcon, ChatIcon, ClipboardIcon, PinIcon } from "@/components/icons";
 import { usePagedList } from "@/components/load-more";
 import { Skeleton } from "@/components/skeleton";
 import { StatusPill } from "@/components/status-pill";
@@ -27,7 +27,7 @@ import { agentHref, type Skill } from "@/lib/skills";
 export interface ActivityFilters {
   item: string;
   by: string;
-  action: "" | "read" | "ask";
+  action: "" | "read" | "ask" | "apply";
   outcome: string;
   range: Range;
   q: string;
@@ -43,7 +43,7 @@ function splitItem(key: string): { repo?: string; path?: string } {
 }
 
 function ActionIcon({ action }: { action: SkillAccessEvent["action"] }) {
-  const icon = action === "ask" ? <ChatIcon /> : action === "read_file" ? <ClipboardIcon /> : <BookIcon />;
+  const icon = action === "ask" ? <ChatIcon /> : action === "read_file" ? <ClipboardIcon /> : action === "apply" ? <PinIcon /> : <BookIcon />;
   return (
     <span aria-hidden="true" className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-zinc-800 text-zinc-400">
       {icon}
@@ -283,6 +283,7 @@ export function SkillActivity({
             <option value="planner">Planner</option>
             <option value="coder">Coder</option>
             <option value="reviewer">Reviewer</option>
+            <option value="writer">Writer (PR descriptions, release notes)</option>
             <option value="people">People trying an agent</option>
           </select>
         </label>
@@ -292,6 +293,7 @@ export function SkillActivity({
             <option value="">Reads and asks</option>
             <option value="read">Reads</option>
             <option value="ask">Asks</option>
+            <option value="apply">Always applied</option>
           </select>
         </label>
         <label className="text-xs text-zinc-400">

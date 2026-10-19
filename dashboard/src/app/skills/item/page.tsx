@@ -15,6 +15,7 @@ import { KIND_LABEL, ago, fileUrl, skillsApi, type SkillRepo, type SkillWithBody
 import { ItemActivity } from "../skill-activity";
 import { CompatSection } from "../compat";
 import { useRecheck } from "../use-recheck";
+import { AlwaysApplySection } from "../always-apply";
 
 export default function ItemPageGuarded() {
   return (
@@ -151,6 +152,8 @@ function ItemPage() {
       <div className="mt-8">
         <CompatSection item={item} canManage={canManage} busy={busy} onRecheck={recheck} onUseTranslated={chooseTranslated} />
       </div>
+
+      <AlwaysApplySection item={item} canManage={canManage} onSaved={(a) => setItem({ ...item, always_apply: a })} />
 
       {item.files.length > 0 && (
         <p className="mt-3 text-xs text-zinc-500 [overflow-wrap:anywhere]">Files with it, which agents can read: {item.files.join(", ")}</p>

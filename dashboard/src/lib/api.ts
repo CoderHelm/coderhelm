@@ -1081,6 +1081,8 @@ export interface Review {
   thumbs_down: number;
   rating_comments: ReviewRatingComment[];
   created_at: string;
+  /** Team standards the review was given in full ("Always apply"). */
+  applied_standards?: string[];
 }
 
 export interface TeamUser {
@@ -1124,6 +1126,8 @@ export interface RunDetail extends Run {
   error?: string;
   updated_at?: string;
   pass_history?: { pass: string; started_at: string }[];
+  /** Team standards the run's passes were given in full ("Always apply"). */
+  applied_standards?: string[];
   progress_notes?: { message: string; timestamp: string }[];
 }
 

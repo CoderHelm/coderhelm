@@ -14,6 +14,7 @@ import Link from "next/link";
 import { KIND_LABEL, agentHref, ago, handle, pageHref, skillsApi, thinDescription, type Skill, type SkillKind, type SkillRepo, type SkillStats } from "@/lib/skills";
 import { Page, PageHeader } from "@/components/page";
 import { CompatBadge, CompatOverview, matchesCompatFilter } from "./compat";
+import { AlwaysApplyBadge, SuggestionHint } from "./always-apply";
 import { UsageStats } from "./usage-stats";
 import { NO_FILTERS, SkillActivity, type ActivityFilters } from "./skill-activity";
 import { RANGES, type Range } from "@/lib/activity";
@@ -57,7 +58,7 @@ function filtersFrom(params: URLSearchParams): ActivityFilters {
   return {
     item: repo && path ? `${repo}#${path}` : "",
     by: params.get("by") ?? "",
-    action: action === "read" || action === "ask" ? action : "",
+    action: action === "read" || action === "ask" || action === "apply" ? action : "",
     outcome: params.get("outcome") ?? "",
     range: range && RANGES.some((r) => r.value === range) ? range : "all",
     q: params.get("q") ?? "",
@@ -411,6 +412,7 @@ function SkillsPage() {
                             {handle(s, items)}
                           </Link>
                           <CompatBadge item={s} />
+                          <AlwaysApplyBadge item={s} />
                           {s.kind === "agent" && (
                             <>
                               <StatusPill tone="success">Agent · can be asked</StatusPill>
@@ -421,6 +423,7 @@ function SkillsPage() {
                           )}
                         </div>
                         {s.description && <p className="mt-1 text-sm text-zinc-400">{s.description}</p>}
+                        <SuggestionHint item={s} />
                         {s.kind === "agent" && thinDescription(s.description) && (
                           <p className="mt-1 text-xs text-amber-300">
                             {s.description ? "Short description" : "No description"}: Coderhelm&apos;s agents decide when to ask it from this line.
@@ -464,7 +467,7 @@ function SkillsPage() {
         {items.length > 0 && (
           <p className="mt-8 text-xs text-zinc-500">
             {on} of {items.length} switched on. Coderhelm lists the ones that are on to its agents, and each agent reads at most 20 in one
-            run.
+            run. Ones set to always apply are given in full to matching work instead.
           </p>
         )}
         </div>

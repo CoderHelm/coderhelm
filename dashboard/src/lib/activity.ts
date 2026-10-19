@@ -7,7 +7,8 @@ import type { SkillKind } from "./skills";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
 
-export type AccessAction = "read" | "read_file" | "ask";
+/** "apply": given in full by its "Always apply" setting. */
+export type AccessAction = "read" | "read_file" | "ask" | "apply";
 
 export interface SkillAccessEvent {
   id: string;
@@ -37,7 +38,7 @@ export interface SkillAccessEvent {
 export interface ActivitySummary {
   days: number;
   since: string;
-  skills: { reads: number; asks: number; read_problems: number; ask_problems: number };
+  skills: { reads: number; asks: number; read_problems: number; ask_problems: number; applies?: number };
   /** Null for someone who isn't an admin. */
   lookups: { total: number; ok: number; refused: number; failed: number } | null;
 }
@@ -47,7 +48,7 @@ export interface SkillActivityFilter {
   path?: string;
   /** An agent, or "people". */
   by?: string;
-  action?: "read" | "ask" | "";
+  action?: "read" | "ask" | "apply" | "";
   /** An outcome, or "problems". */
   outcome?: string;
   q?: string;
@@ -89,7 +90,7 @@ export const activityApi = {
 
 // ─── Words ─────────────────────────────────────────────────
 
-const AGENTS: Record<string, string> = { planner: "Planner", coder: "Coder", reviewer: "Reviewer" };
+const AGENTS: Record<string, string> = { planner: "Planner", coder: "Coder", reviewer: "Reviewer", writer: "Writer" };
 
 /** Who did it, in words: "Planner", or a person's email. */
 export function readerLabel(by: string): string {
@@ -106,7 +107,9 @@ export function outcomeOf(e: Pick<SkillAccessEvent, "action" | "outcome">): { to
   const ask = e.action === "ask";
   switch (e.outcome) {
     case "ok":
-      return { tone: "success", label: "Read", means: "The agent got the text and used it as guidance." };
+      return e.action === "apply"
+        ? { tone: "success", label: "Applied", means: "Its whole text was in the agent's instructions, set to always apply." }
+        : { tone: "success", label: "Read", means: "The agent got the text and used it as guidance." };
     case "answered":
       return { tone: "success", label: "Answered", means: "The agent answered within its limits." };
     case "pending":
@@ -142,6 +145,7 @@ export function outcomeOf(e: Pick<SkillAccessEvent, "action" | "outcome">): { to
 export function actionPhrase(e: Pick<SkillAccessEvent, "action" | "by">): string {
   if (e.action === "ask") return e.by.endsWith(" (try)") ? "tried" : "asked";
   if (e.action === "read_file") return "read a file of";
+  if (e.action === "apply") return "was given";
   return "read";
 }
 

@@ -15,6 +15,8 @@ interface Item {
   asks: number; last_asked_at: string; switched_by: string; switched_at: string;
   compat?: { status: string; summary: string; needs: string[]; at: string; error: string; current: boolean } | null;
   use_translated?: boolean; translated_by?: string; translated_at?: string;
+  always_apply?: { on: boolean; repos: string[]; passes: string[]; paths: string[]; by: string; at: string };
+  suggestion?: { repos: string[]; passes: string[]; paths: string[]; reason: string; at: string } | null;
 }
 interface Ask {
   id: string; repo: string; path: string; run_id: string; sha: string; by: string; origin: string; question: string; context_chars: number; outcome: string; answer: string;
@@ -192,7 +194,22 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       Object.assign(it, { switched_by: "admin@example.com", switched_at: new Date().toISOString() });
       return json(route, { ok: true, enabled: it.enabled });
     }
-    if (p === "/api/runs/run_77") return json(route, { run_id: "run_77", status: "completed", ticket_id: "ABC-88", title: "Add partial refunds", repo: "acme/api", created_at: ago(2900), pass_history: [], progress_notes: [] });
+    if (p === "/api/skills/always" && method === "PUT") {
+      const it = db.items.find((i) => i.repo === body?.repo && i.path === body?.path);
+      if (!it) return json(route, { error: "No such skill." }, 404);
+      if (it.kind === "agent") return json(route, { error: "Agents are asked, not read, so they can't be always applied." }, 400);
+      // The gateway tidies a folder glob the way the worker reads it.
+      const paths = ((body?.paths as string[]) ?? []).map((g) => (g.endsWith("/") ? `${g}**` : g));
+      it.always_apply = { on: Boolean(body?.on), repos: (body?.repos as string[]) ?? [], passes: (body?.passes as string[]) ?? [], paths, by: "admin@example.com", at: new Date().toISOString() };
+      return json(route, { ok: true, always_apply: it.always_apply });
+    }
+    if (p === "/api/repos" && method === "GET") return json(route, { repos: [
+      { name: "acme/web", enabled: true, ticket_source: "github" },
+      { name: "acme/api", enabled: true, ticket_source: "github" },
+      { name: "acme/archived", enabled: false, ticket_source: "github" },
+    ] });
+    if (p === "/api/reviewer/review") return json(route, { sk: "REVIEW#acme/web#000412#t", repo: "acme/web", pr_number: 412, head_sha: SHA, verdict: "APPROVE", risk: "low", body: "Looks good.", posted_as: "COMMENT", trigger: "push", action_summary: "", thumbs_up: 0, thumbs_down: 0, rating_comments: [], created_at: ago(30), applied_standards: ["api-conventions", "copy-tone"] });
+    if (p === "/api/runs/run_77") return json(route, { run_id: "run_77", status: "completed", ticket_id: "ABC-88", title: "Add partial refunds", repo: "acme/api", created_at: ago(2900), pass_history: [], progress_notes: [], applied_standards: ["api-conventions"] });
     if (/^\/api\/runs\/run_77\/agent-log$/.test(p)) return json(route, { passes: [], live_events: [] });
     if (/^\/api\/runs\/run_77\/traces$/.test(p)) return json(route, { traces: [] });
     if (p === "/api/skills/asks" && method === "GET") {
@@ -527,4 +544,81 @@ test("an item not checked yet, a changed one, and an agent's page", async ({ pag
   await expect(section.getByText(/When Coderhelm asks this agent a question it gets no tools/)).toBeVisible();
   await page.goto("/skills/item?repo=acme%2Fplaybook&path=skills%2Fgone%2FSKILL.md");
   await expect(page.getByText("Skill not found")).toBeVisible();
+});
+
+test.describe("always apply", () => {
+  test("an admin sets an item to always apply by repository, pass and path, and the list shows it", async ({ page }) => {
+    const db = await mockApi(page);
+    await page.goto(DEBUG_URL);
+    const section = page.getByTestId("always-section");
+    await expect(page.getByRole("heading", { name: "Always apply" })).toBeVisible();
+    await expect(section.getByText("Read on demand")).toBeVisible();
+    // The compatibility section is still there, above it.
+    await expect(page.getByTestId("compat-section")).toBeVisible();
+
+    await section.getByRole("switch", { name: "Always apply debug" }).click();
+    // Only switched on repositories are offered; none picked means all.
+    await expect(section.getByRole("checkbox", { name: "web" })).toBeVisible();
+    await expect(section.getByRole("checkbox", { name: "archived" })).toHaveCount(0);
+    await expect(section.getByRole("checkbox", { name: "Coder" })).toBeChecked();
+    await expect(section.getByRole("checkbox", { name: "Reviewer" })).toBeChecked();
+    await expect(section.getByRole("checkbox", { name: "Planner" })).not.toBeChecked();
+    await section.getByRole("checkbox", { name: "web" }).check();
+    await section.getByRole("checkbox", { name: "PR descriptions" }).check();
+    await section.getByLabel("Paths").fill("apps/web/\n**/*.tsx");
+    await shot(page, "skills-always-form");
+    await section.getByRole("button", { name: "Save" }).click();
+
+    await expect(section.getByTestId("always-badge")).toHaveText("Always applied · web · Coder, Reviewer, PR descriptions · apps/web/**, **/*.tsx");
+    const put = db.calls.find((c) => c.path === "/api/skills/always");
+    expect(put?.body).toEqual({ repo: "acme/playbook", path: "skills/debug/SKILL.md", on: true, repos: ["acme/web"], passes: ["coder", "reviewer", "pr"], paths: ["apps/web/", "**/*.tsx"] });
+
+    await page.goto("/skills");
+    const row = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "skill:debug" }) });
+    await expect(row.getByTestId("always-badge")).toHaveText(/Always applied · web · Coder, Reviewer, PR descriptions/);
+    await shot(page, "skills-always-list");
+
+    // Switching it off saves at once.
+    await page.goto(DEBUG_URL);
+    await page.getByRole("switch", { name: "Always apply debug" }).click();
+    await expect(page.getByTestId("always-section").getByText("Read on demand")).toBeVisible();
+    expect(db.calls.filter((c) => c.path === "/api/skills/always").pop()?.body).toMatchObject({ on: false });
+  });
+
+  test("a suggestion is shown, never applied, and can fill the scope", async ({ page }) => {
+    const items = structuredClone(ITEMS);
+    items[1].suggestion = { repos: ["acme/web"], passes: ["coder", "reviewer"], paths: [], reason: "Names the web app's framework.", at: ago(10) };
+    const db = await mockApi(page, { items });
+    await page.goto("/skills");
+    const row = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "skill:api-conventions" }) });
+    await expect(row.getByTestId("always-suggestion-hint")).toHaveText("Suggested: always apply to web for Coder and Reviewer");
+    await expect(row.getByTestId("always-badge")).toHaveCount(0);
+
+    await page.goto("/skills/item?repo=acme%2Fplaybook&path=skills%2Fapi-conventions%2FSKILL.md");
+    const section = page.getByTestId("always-section");
+    await expect(section.getByText("Names the web app's framework.")).toBeVisible();
+    expect(db.calls.some((c) => c.path === "/api/skills/always")).toBe(false);
+    await section.getByRole("button", { name: "Use this scope" }).click();
+    await expect(section.getByRole("checkbox", { name: "web" })).toBeChecked();
+    await section.getByRole("button", { name: "Save" }).click();
+    await expect(section.getByTestId("always-badge")).toHaveText("Always applied · web · Coder, Reviewer");
+  });
+
+  test("members see the setting but can't change it", async ({ page }) => {
+    const items = structuredClone(ITEMS);
+    items[0].always_apply = { on: true, repos: [], passes: ["coder", "reviewer"], paths: [], by: "admin@example.com", at: ago(60) };
+    await mockApi(page, { role: "member", items });
+    await page.goto(DEBUG_URL);
+    const section = page.getByTestId("always-section");
+    await expect(section.getByTestId("always-badge")).toHaveText("Always applied · all repositories · Coder, Reviewer");
+    await expect(section.getByRole("switch")).toHaveCount(0);
+  });
+
+  test("a run's and a review's pages name the team standards they were given", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/runs/detail?id=run_77");
+    await expect(page.getByTestId("applied-standards")).toContainText("Applied team standards: api-conventions");
+    await page.goto("/reviewer/detail?sk=REVIEW%23acme%2Fweb%23000412%23t");
+    await expect(page.getByTestId("applied-standards")).toContainText("Applied team standards: api-conventions, copy-tone");
+  });
 });
