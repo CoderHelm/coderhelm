@@ -76,7 +76,7 @@ function ToolsPage() {
   const pending = asks.filter((a) => a.status === "pending");
 
   return (
-    <div className="max-w-4xl">
+    <div className="mx-auto w-full min-w-0 max-w-6xl">
       <Link href="/data-sources" className={`${linkButton} text-sm`}>Back to data sources</Link>
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">

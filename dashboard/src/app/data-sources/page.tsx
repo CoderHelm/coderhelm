@@ -17,7 +17,9 @@ import { Field, SecretInput } from "@/components/field";
 import { HiddenFieldsEditor } from "@/components/hidden-fields-editor";
 import { StatusPill } from "@/components/status-pill";
 import { StepDot } from "@/components/stepper";
-import { CodeIcon, DatabaseIcon, LogsIcon, WrenchIcon } from "@/components/icons";
+import { CodeIcon, DatabaseIcon, LogsIcon, ShieldCheckIcon, WrenchIcon } from "@/components/icons";
+import { Skeleton } from "@/components/skeleton";
+import { Page, PageHeader, Section } from "@/components/page";
 import { LogGroupPicker } from "@/components/log-group-picker";
 import { ActivityFeed } from "@/components/data-source-activity";
 import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
@@ -29,9 +31,44 @@ export default function DataSourcesPageGuarded() {
 const CONNECT = "/data-sources/connect";
 const CONNECT_AWS = "/data-sources/connect/aws";
 
+interface SourceStats {
+  /** The newest lookup in the last 7 days, if any. */
+  last?: string;
+  lookups: number;
+  failures: number;
+  /** More happened than one page shows; the counts are at least these. */
+  more: boolean;
+}
+
+const WEEK_MS = 7 * 86_400_000;
+
+/** Lookups and failures per source over the last 7 days, from the activity log. */
+async function weekStats(): Promise<Record<string, SourceStats>> {
+  const since = new Date(Date.now() - WEEK_MS).toISOString();
+  const [all, problems] = await Promise.all([
+    api.listDataSourceActivity(200, undefined, { since }),
+    api.listDataSourceActivity(200, undefined, { since, outcome: "problems" }),
+  ]);
+  const out: Record<string, SourceStats> = {};
+  const get = (id: string) => (out[id] ??= { lookups: 0, failures: 0, more: false });
+  for (const ev of all.events) {
+    const s = get(ev.source_id);
+    s.lookups += 1;
+    if (!s.last || ev.at > s.last) s.last = ev.at;
+    if (all.next) s.more = true;
+  }
+  for (const ev of problems.events) {
+    const s = get(ev.source_id);
+    s.failures += 1;
+    if (problems.next) s.more = true;
+  }
+  return out;
+}
+
 function DataSourcesPage() {
   const [sources, setSources] = useState<DataSource[] | null>(null);
   const [events, setEvents] = useState<DataSourceActivityEvent[]>([]);
+  const [stats, setStats] = useState<Record<string, SourceStats> | null>(null);
   const [loadError, setLoadError] = useState("");
   const [storeOpen, setStoreOpen] = useState(false);
 
@@ -51,6 +88,8 @@ function DataSourcesPage() {
     } catch {
       // The feed shows the error; progress just stays where it was.
     }
+    // The per-source numbers are extra: cards work without them.
+    weekStats().then(setStats, () => setStats(null));
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -63,20 +102,32 @@ function DataSourcesPage() {
   };
 
   const list = sources ?? [];
-  const anyOn = list.some((s) => s.enabled);
+  const anyOn = list.some((s) => s.enabled && s.status === "ready");
+  const pending = list.some((s) => !s.setup_complete);
 
   return (
-    <div className="max-w-4xl">
-      <h1 className="text-2xl font-bold text-zinc-100 text-balance">
-        Let Coderhelm check facts against your real systems
-      </h1>
-      <p className="mt-2 max-w-prose text-sm text-zinc-400">
-        Connect a source and Coderhelm can look things up while it plans, writes code and reviews, like whether a field really exists or a
-        setting is live. It can only read. It can never change your data.
-      </p>
-      {anyOn && (
-        <p className="mt-4"><StatusPill tone="success">Fact-checking is on</StatusPill></p>
-      )}
+    <Page>
+      <PageHeader
+        title="Data sources"
+        lead="Let Coderhelm check facts against your real systems. Connect a source and it can look things up while it plans, writes code and reviews, like whether a field really exists or a setting is live."
+        actions={
+          <>
+            <Link href="/data-sources/activity" className={secondaryButton}>Every lookup</Link>
+            {anyOn && <StatusPill tone="success">Fact-checking is on</StatusPill>}
+          </>
+        }
+      />
+
+      <div className="mt-6 flex gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm">
+        <span aria-hidden="true" className="mt-0.5 shrink-0 text-emerald-400"><ShieldCheckIcon /></span>
+        <div className="min-w-0">
+          <p className="font-semibold text-zinc-100">Read only, always</p>
+          <p className="mt-0.5 text-zinc-400">
+            Coderhelm can only read. Before a source is turned on it checks that writes are impossible, every lookup that would change data
+            is refused, the fields you name stay hidden, and every lookup is logged.
+          </p>
+        </div>
+      </div>
 
       {loadError && (
         <div className="mt-6">
@@ -87,54 +138,44 @@ function DataSourcesPage() {
         </div>
       )}
 
-      <div className="mt-7 grid gap-3.5 sm:grid-cols-2">
-        <ConnectCard
-          href={`${CONNECT}?step=address`}
-          icon={<CodeIcon />}
-          title="An API"
-          time="About 2 minutes"
-        >
-          The web address your apps already talk to. Coderhelm asks it questions.
-        </ConnectCard>
-        <ConnectCard
-          href={`${CONNECT_AWS}?for=logs`}
-          icon={<LogsIcon />}
-          title="Logs in your AWS account"
-          time="About 3 minutes"
-        >
-          Coderhelm searches your logs for the errors behind a bug report. Only the log groups you choose.
-        </ConnectCard>
-        <ConnectCard
-          href={`${CONNECT_AWS}?for=database`}
-          icon={<DatabaseIcon />}
-          title="A database in your AWS account"
-          time="About 5 minutes"
-        >
-          Read-only access to a PostgreSQL database or a Redshift warehouse, so Coderhelm can check the records a ticket names.
-        </ConnectCard>
-        <ConnectCard href="/data-sources/tools" icon={<WrenchIcon />} title="Your own tools" time="About 5 minutes">
-          Named lookups your engineers already trust, like &quot;find order by number&quot;. Written once, approved by another admin.
-        </ConnectCard>
-      </div>
-
       {sources === null && !loadError && (
-        <p role="status" className="mt-7 text-sm text-zinc-500">Loading your data sources…</p>
+        <div className="mt-8 flex flex-col gap-3" aria-busy="true">
+          <p role="status" className="sr-only">Loading your data sources…</p>
+          <Skeleton className="h-36 w-full" />
+          <Skeleton className="h-36 w-full" />
+        </div>
       )}
 
       {list.length > 0 && (
-        <section aria-labelledby="connected-heading" className="mt-8">
-          <h2 id="connected-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">Connected</h2>
+        <Section id="connected" title={`Connected (${list.length})`}>
           <div className="flex flex-col gap-3">
             {list.map((s) => (
-              <SourceCard key={s.id} source={s} onChange={replaceSource} onRemoved={removeSource} />
+              <SourceCard key={s.id} source={s} stats={stats} onChange={replaceSource} onRemoved={removeSource} />
             ))}
           </div>
-        </section>
+        </Section>
       )}
 
-      {sources !== null && <ProgressList sources={list} events={events} />}
+      {sources !== null && (list.length === 0 || pending) && <ProgressList sources={list} events={events} />}
 
-      <p className="mt-5">
+      <Section id="add" title={list.length ? "Add another source" : "Add a source"} description="Each one takes a few minutes and ends with a check that Coderhelm can only read.">
+        <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+          <ConnectCard href={`${CONNECT}?step=address`} icon={<CodeIcon />} title="An API" time="About 2 minutes">
+            The web address your apps already talk to. Coderhelm asks it questions.
+          </ConnectCard>
+          <ConnectCard href={`${CONNECT_AWS}?for=logs`} icon={<LogsIcon />} title="Logs in your AWS account" time="About 3 minutes">
+            Coderhelm searches your logs for the errors behind a bug report. Only the log groups you choose.
+          </ConnectCard>
+          <ConnectCard href={`${CONNECT_AWS}?for=database`} icon={<DatabaseIcon />} title="A database in your AWS account" time="About 5 minutes">
+            Read only access to a PostgreSQL database or a Redshift warehouse, so Coderhelm can check the records a ticket names.
+          </ConnectCard>
+          <ConnectCard href="/data-sources/tools" icon={<WrenchIcon />} title="Your own tools" time="About 5 minutes">
+            Named lookups your engineers already trust, like &quot;find order by number&quot;. Written once, approved by another admin.
+          </ConnectCard>
+        </div>
+      </Section>
+
+      <p className="mt-6">
         <button
           type="button"
           aria-expanded={storeOpen}
@@ -146,32 +187,36 @@ function DataSourcesPage() {
         </button>
       </p>
       {storeOpen && (
-        <div id="what-we-store" className="mt-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm text-zinc-300">
-          <h2 className="font-semibold text-zinc-100">What we store</h2>
-          <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>For an API: its address, and the key, encrypted. The key is never shown again, not even to you.</li>
-            <li>For logs and databases: the name of the read-only role in your AWS account, and which log groups or database it may read. No passwords: the database password stays in your account.</li>
-            <li>A log of every lookup: when it ran, who asked, what was asked and whether it worked.</li>
-          </ul>
-          <p className="mt-2">The activity log keeps the text of each lookup (not what came back) for 180 days.</p>
-          <p className="mt-2">We do not store your data. What a lookup returns is used for that review and not kept.</p>
-          <h2 className="mt-4 font-semibold text-zinc-100">How to turn it off</h2>
-          <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>Pause a source with its switch. Nothing is looked up while it is paused.</li>
-            <li>Remove the source. For an API we delete the saved key.</li>
-            <li>Revoke the key at your API, or delete the CoderhelmReadOnly role in your AWS account. Either cuts access immediately, without coming here.</li>
-          </ul>
+        <div id="what-we-store" className="mt-3 grid gap-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm text-zinc-300 md:grid-cols-2">
+          <div>
+            <h2 className="font-semibold text-zinc-100">What we store</h2>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>For an API: its address, and the key, encrypted. The key is never shown again, not even to you.</li>
+              <li>For logs and databases: the name of the read-only role in your AWS account, and which log groups or database it may read. No passwords: the database password stays in your account.</li>
+              <li>A log of every lookup: when it ran, who asked, what was asked and whether it worked.</li>
+            </ul>
+            <p className="mt-2">The activity log keeps the text of each lookup (not what came back) for 180 days.</p>
+            <p className="mt-2">We do not store your data. What a lookup returns is used for that review and not kept.</p>
+          </div>
+          <div>
+            <h2 className="font-semibold text-zinc-100">How to turn it off</h2>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>Pause a source with its switch. Nothing is looked up while it is paused.</li>
+              <li>Remove the source. For an API we delete the saved key.</li>
+              <li>Revoke the key at your API, or delete the CoderhelmReadOnly role in your AWS account. Either cuts access immediately, without coming here.</li>
+            </ul>
+          </div>
         </div>
       )}
 
       <ActivityFeed sources={list} fullPageLink />
-    </div>
+    </Page>
   );
 }
 
 function SourceIcon({ children }: { children: ReactNode }) {
   return (
-    <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-800 text-zinc-100">
+    <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-zinc-100">
       {children}
     </span>
   );
@@ -203,6 +248,28 @@ function ConnectCard({
   );
 }
 
+const KIND_ICON: Record<DataSource["kind"], ReactNode> = {
+  api: <CodeIcon />,
+  logs: <LogsIcon />,
+  database: <DatabaseIcon />,
+};
+
+/** "password, secret, token and 8 more". */
+function hiddenSummary(names: string[]): string {
+  if (names.length === 0) return "Nothing hidden";
+  const head = names.slice(0, 3).join(", ");
+  return names.length > 3 ? `${head} and ${names.length - 3} more` : head;
+}
+
+function SourceFact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-zinc-500">{label}</dt>
+      <dd className="mt-0.5 break-words text-sm text-zinc-200">{children}</dd>
+    </div>
+  );
+}
+
 
 // ── One connected source ──────────────────────────────────────────
 
@@ -210,10 +277,13 @@ type Panel = "test" | "key" | "hidden" | "groups" | null;
 
 function SourceCard({
   source,
+  stats,
   onChange,
   onRemoved,
 }: {
   source: DataSource;
+  /** Null while loading or when the activity log can't be read. */
+  stats: Record<string, SourceStats> | null;
   onChange: (s: DataSource) => void;
   onRemoved: (id: string) => void;
 }) {
@@ -382,11 +452,13 @@ function SourceCard({
   const hiddenDirty = hidden.join("\n") !== source.hidden_fields.join("\n");
   const groupsDirty = groups.join("\n") !== (source.aws?.log_groups ?? []).join("\n");
   const count = countLabel(source);
+  const week = stats?.[source.id];
   const keyId = `key-${source.id}`;
 
   return (
     <article aria-label={source.name} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
       <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
+        <SourceIcon>{KIND_ICON[source.kind]}</SourceIcon>
         <div className="min-w-0 flex-1 basis-56">
           <h3 className="flex flex-wrap items-center gap-2 font-semibold text-zinc-100">
             <span className="break-words min-w-0">{source.name}</span>
@@ -396,11 +468,6 @@ function SourceCard({
               : <StatusPill tone="error">Needs attention</StatusPill>}
           </h3>
           <p className="mt-1 break-all font-mono text-xs text-zinc-400">{whereLabel(source)}</p>
-          <p className="mt-2 text-xs text-zinc-500">
-            {isApi ? (source.key_hint ? `Key ending ${source.key_hint}` : "Key saved") : count || "Read-only role"}
-            <span aria-hidden="true"> · </span>
-            Last checked {timeAgo(source.last_checked_at)}
-          </p>
         </div>
         {unfinished ? (
           <div className="flex flex-wrap items-center gap-3">
@@ -434,6 +501,32 @@ function SourceCard({
         )}
       </div>
 
+      <dl className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+        <SourceFact label={isApi ? "Key" : "Shares"}>
+          {isApi ? (source.key_hint ? `Key ending ${source.key_hint}` : "Key saved") : count || "Read-only role"}
+        </SourceFact>
+        <SourceFact label="Last lookup">
+          {stats === null ? "Unknown" : week?.last ? timeAgo(week.last) : "None in the last 7 days"}
+        </SourceFact>
+        <SourceFact label="Failed or refused, last 7 days">
+          {stats === null ? (
+            "Unknown"
+          ) : (week?.failures ?? 0) > 0 ? (
+            <Link href={`/data-sources/activity?source=${encodeURIComponent(source.id)}&outcome=problems&range=7d`} className={`${linkButton} text-amber-300`}>
+              {week!.failures}{week!.more ? "+" : ""} {week!.failures === 1 ? "lookup" : "lookups"}
+            </Link>
+          ) : (
+            "None"
+          )}
+        </SourceFact>
+        <SourceFact label="Last checked">{timeAgo(source.last_checked_at)}</SourceFact>
+        <SourceFact label={`Hidden ${noun.many}`}>
+          <span title={source.hidden_fields.join(", ")}>{hiddenSummary(source.hidden_fields)}</span>
+        </SourceFact>
+        <SourceFact label="Used for">{source.repos.length === 0 ? "Every repository" : source.repos.length === 1 ? source.repos[0] : `${source.repos.length} repositories`}</SourceFact>
+        {isApi && <SourceFact label="Writes">{source.has_mutations ? "The API allows them; Coderhelm refuses every one" : "The API offers none"}</SourceFact>}
+      </dl>
+
       {source.status === "error" && (
         <div className="mt-4">
           <Callout variant="error" title="This source needs attention" live={false}>
@@ -443,7 +536,7 @@ function SourceCard({
         </div>
       )}
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap gap-2 border-t border-zinc-800 pt-4">
         <button type="button" onClick={test} disabled={busy === "test"} className={secondaryButton}>
           {busy === "test" ? "Testing…" : "Test again"}
         </button>
@@ -610,7 +703,7 @@ function ProgressList({ sources, events }: { sources: DataSource[]; events: Data
   ];
 
   return (
-    <section aria-labelledby="progress-heading" className="mt-8">
+    <section aria-labelledby="progress-heading" className="mt-10">
       <h2 id="progress-heading" className="sr-only">Setup progress</h2>
       <ol className="rounded-lg border border-zinc-800 bg-zinc-900/50 divide-y divide-zinc-800">
         {rows.map((row, i) => (

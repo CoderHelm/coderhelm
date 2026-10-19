@@ -1,740 +1,803 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api, type JiraEvent, type JiraCheck, type JiraConfig, type JiraProject } from "@/lib/api";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { api, type JiraCheck, type JiraConfig, type JiraEvent, type JiraProject, type Repo } from "@/lib/api";
+import { hasRole } from "@/lib/roles";
+import { timeAgo } from "@/lib/data-sources";
+import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
+import { Callout } from "@/components/callout";
+import { StatusPill } from "@/components/status-pill";
+import { Stepper } from "@/components/stepper";
+import { Segmented } from "@/components/segmented";
+import { CopyButton } from "@/components/copy-button";
+import { Disclosure } from "@/components/disclosure";
 import { Skeleton } from "@/components/skeleton";
-import { RoleGuard } from "@/components/role-guard";
+import { AtlassianIcon, ExternalLinkIcon } from "@/components/icons";
+import { Page, PageHeader, Section } from "@/components/page";
+import { Switch } from "@/components/teams-webhook";
+import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 
-type Tab = "app" | "webhook" | "events" | "settings";
+export default function JiraPageGuarded() {
+  return (
+    <RoleGuard minRole="admin">
+      <JiraPage />
+    </RoleGuard>
+  );
+}
 
-export default function JiraPageGuarded() { return <RoleGuard minRole="admin"><JiraPage /></RoleGuard>; }
+const TRIGGER_LABEL = "coderhelm";
+
+/** The Coderhelm Jira app's install page. */
+const INSTALL_URL =
+  "https://developer.atlassian.com/console/install/de730821-2955-4d78-836e-55b6e7c23c88?signature=AYABePrR09vSK2DTVLCCzK%2Bt04oAAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4IOp8r3eKNYw8z2v%2FEq3%2FfvrZguoGsXpNSaDveR%2FF%2Fo0BXAmH88tVaInK7U6E2MFkZAAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDJMQ6B1ogvNrk2X41AIBEIA7UEnUW%2FGBqNgbzivPOfH9txPwU4gjvklvkmwbZWb%2FmZoMMd5lsRvkJ7OzWCYtJAbfrF2hZZcREGnfeoMAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHijmwVTMt6Oj3F%2B0%2B0cVrojrS8yZ9ktpdfDxqPMSIkvHAEGa2reJg8L%2FrWqEbgFRPADAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMThkIkAaI7FAPWkeTAgEQgDtGtXT7SzNrjUqpB8Pm474FMrk2aPj2FtBDtjW9vNYK3NZ0oNloPH9XPGbn1uS7YTPJZPTB561JZvBdcgAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeLKa7Dfn9BgbXaQmJGrkKztjV4vrreTkqr7wGwhqIYs5AaBDJ8FvKCFfzHTyolwIyC8AAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAyQ9HvoMmjskgnJCTUCARCAO%2FkpeTKd8IIamduK2tZFv2a8kDZoP7FTtAuky6S0LNmrEoIuYnHoMEyydCQLXHgjex%2FsD71J9OlNG%2Bx9AgAAAAAMAAAQAAAAAAAAAAAAAAAAAMx%2BPlN5fhsnaG9wdl169OP%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADLtyR6xQ9Nnc2%2F0GV7Dz3xCvKwGrAD%2BuvAz%2FU5KYYo7ZAgS%2FpCTSkiLEvuK6Ij5gvJQHM4oYSv%2FXgh40M6Ouxvc4a8%3D&product=jira";
+
+type Load = { state: "loading" } | { state: "error" } | { state: "ready" };
 
 function JiraPage() {
-  const [check, setCheck] = useState<JiraCheck | null>(null);
-  const [config, setConfig] = useState<JiraConfig | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [generatingSecret, setGeneratingSecret] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [copied, setCopied] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("app");
-  const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
-  const [role, setRole] = useState<string>("member");
   const { toast } = useToast();
   const { confirm } = useConfirm();
+  const [load, setLoad] = useState<Load>({ state: "loading" });
+  const [check, setCheck] = useState<JiraCheck | null>(null);
+  const [config, setConfig] = useState<JiraConfig | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
+  const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
-  const isAdmin = role === "admin" || role === "owner";
-
-  useEffect(() => {
-    Promise.all([api.getJiraCheck(), api.getJiraConfig(), api.me()])
-      .then(([c, cfg, me]) => { setCheck(c); setConfig(cfg); setRole(me.role ?? "member"); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  const refresh = useCallback(async () => {
+    try {
+      const [c, cfg] = await Promise.all([api.getJiraCheck(), api.getJiraConfig()]);
+      setCheck(c);
+      setConfig(cfg);
+      setLoad({ state: "ready" });
+    } catch {
+      setLoad((prev) => (prev.state === "ready" ? prev : { state: "error" }));
+    }
   }, []);
 
-  const copy = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(label);
-    setTimeout(() => setCopied(null), 2000);
-  };
+  useEffect(() => {
+    api.me().then((me) => setIsOwner(hasRole(me.role, "owner"))).catch(() => setIsOwner(false));
+    refresh();
+  }, [refresh]);
 
-  const generateSecret = async () => {
-    setGeneratingSecret(true);
-    try {
-      const result = await api.generateJiraSecret();
-      const c = await api.getJiraCheck();
-      setCheck(c);
-      setRevealedSecret(result.webhook_secret);
-      toast("Webhook credentials generated — copy the secret now, it won't be shown again");
-    } catch {
-      toast("Failed to generate webhook URL", "error");
-    }
-    setGeneratingSecret(false);
-  };
+  const appLinked = !!(config?.list_projects_url && config?.create_ticket_url);
+  const webhookOn = !!check?.webhook_url;
+  const connected = appLinked || webhookOn;
+  const enabledRepos = check?.configured_repos.enabled ?? 0;
 
-  const deleteSecret = async () => {
-    if (!(await confirm({ title: "Remove Webhook URL", message: "Remove the webhook URL? Jira webhooks will stop working until you generate a new one.", confirmLabel: "Remove", destructive: true }))) return;
-    try {
-      await api.deleteJiraSecret();
-      setCheck((c) => c ? { ...c, secret_configured: false, webhook_url: undefined } : c);
-      setRevealedSecret(null);
-      toast("Webhook URL removed");
-    } catch {
-      toast("Failed to remove webhook URL", "error");
-    }
-  };
-
-  const deleteIntegration = async () => {
-    if (!(await confirm({ title: "Delete Jira Integration", message: "This will remove all Jira configuration, webhook credentials, project settings, and event history. You can set it up again anytime.", confirmLabel: "Delete", destructive: true }))) return;
+  const removeIntegration = async () => {
+    const ok = await confirm({
+      title: "Remove the Jira integration?",
+      message: "This deletes the Jira settings, webhook credentials, project choices and event history. Tickets stop starting runs. You can set it up again any time.",
+      confirmLabel: "Remove integration",
+      destructive: true,
+    });
+    if (!ok) return;
     setDeleting(true);
     try {
       await api.deleteJiraIntegration();
-      setCheck(null);
-      setConfig(null);
       setRevealedSecret(null);
-      toast("Jira integration deleted");
+      toast("Jira integration removed");
+      await refresh();
     } catch {
-      toast("Failed to delete integration", "error");
+      toast("Could not remove the integration. Nothing was changed.", "error");
     } finally {
       setDeleting(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="max-w-2xl">
-        <h1 className="text-2xl font-bold mb-6">Jira</h1>
-        <div className="space-y-4">
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-40 w-full" />
-          <Skeleton className="h-32 w-full" />
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-2">Jira</h1>
-      <p className="text-zinc-400 text-sm mb-6">
-        Connect Jira so assigning or transitioning issues triggers Coderhelm automatically.
-      </p>
+    <Page>
+      <PageHeader
+        title="Jira"
+        lead={
+          <>
+            Add the <code className="text-zinc-200">{TRIGGER_LABEL}</code> label to a Jira ticket and assign it: Coderhelm picks the repository,
+            opens a pull request and keeps the ticket in step.
+          </>
+        }
+      />
 
-      {/* Status */}
-      <div className={`p-4 rounded-lg border mb-6 ${
-        check?.ready
-          ? "bg-emerald-500/5 border-emerald-500/20"
-          : "bg-yellow-500/5 border-yellow-500/20"
-      }`}>
-        <div className="flex items-center gap-2 mb-1">
-          <span className={check?.ready ? "text-emerald-400" : "text-yellow-400"}>
-            {check?.ready ? "✓" : "○"}
-          </span>
-          <span className={`text-sm font-medium ${check?.ready ? "text-emerald-400" : "text-yellow-400"}`}>
-            {check?.ready ? "Connected" : "Not connected yet"}
-          </span>
+      {load.state === "loading" && (
+        <div className="mt-8 grid gap-4 lg:grid-cols-3" aria-busy="true">
+          <Skeleton className="h-44 lg:col-span-2" />
+          <Skeleton className="h-44" />
         </div>
-        <div className="text-xs text-zinc-500 mt-1 space-y-0.5">
-          <p>{(check?.configured_repos.enabled ?? 0) > 0 ? "✓" : "○"} {check?.configured_repos.enabled ?? 0} enabled repo(s)</p>
-          <p>{check?.jira_events_seen ? "✓" : "○"} Jira events received{check?.last_jira_event_at && (
-            <span className="text-zinc-600 ml-1">· last {new Date(check.last_jira_event_at).toLocaleString()}{check.jira_event_count ? ` · ${check.jira_event_count} total` : ""}</span>
-          )}</p>
-        </div>
-      </div>
-
-      {/* Tabs — only show admin tabs to admins */}
-      <div className="flex gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-lg mb-6 w-fit">
-        {(["app", "webhook", "events", "settings"] as const)
-          .filter((t) => isAdmin || t === "app" || t === "events")
-          .map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer ${tab === t ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}>
-            {t === "app" ? "Jira App" : t === "webhook" ? "Webhook" : t === "events" ? "Events" : "Settings"}
-          </button>
-        ))}
-      </div>
-
-      {tab === "app" ? (
-        <JiraAppTab check={check} config={config} setConfig={setConfig} toast={toast} />
-      ) : tab === "webhook" ? (
-        <WebhookTab
-          check={check}
-          setCheck={setCheck}
-          generatingSecret={generatingSecret}
-          generateSecret={generateSecret}
-          deleteSecret={deleteSecret}
-          copy={copy}
-          copied={copied}
-          revealedSecret={revealedSecret}
-        />
-      ) : tab === "events" ? (
-        <EventsTab />
-      ) : (
-        <SettingsTab config={config} setConfig={setConfig} toast={toast} />
       )}
 
-      {/* Delete integration */}
-      {(check || config) && (
-        <div className="mt-10 pt-6 border-t border-zinc-800">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-zinc-300">Delete integration</p>
-              <p className="text-xs text-zinc-500 mt-0.5">Remove all Jira configuration, credentials, and event history.</p>
+      {load.state === "error" && (
+        <div className="mt-8">
+          <Callout variant="error" title="Could not load the Jira settings">
+            <p>Nothing was changed.</p>
+            <p>
+              <button type="button" onClick={() => { setLoad({ state: "loading" }); refresh(); }} className={linkButton}>
+                Try again
+              </button>
+            </p>
+          </Callout>
+        </div>
+      )}
+
+      {load.state === "ready" && check && config && (
+        <>
+          <div className="mt-8 grid items-start gap-6 lg:grid-cols-3">
+            <div className="min-w-0 lg:col-span-2">
+              <StatusCard check={check} config={config} appLinked={appLinked} webhookOn={webhookOn} onChanged={refresh} setConfig={setConfig} />
             </div>
-            <button
-              onClick={deleteIntegration}
-              disabled={deleting}
-              className="px-3 py-1.5 text-xs text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
-            >
-              {deleting ? "Deleting…" : "Delete"}
-            </button>
+            <HowItWorks />
           </div>
-        </div>
+
+          {!connected && (
+            <Section id="setup" title="Set up" description="Pick one way to connect. The Jira app is quicker and can also post back to tickets.">
+              <SetupGuide check={check} onChanged={refresh} revealedSecret={revealedSecret} setRevealedSecret={setRevealedSecret} />
+            </Section>
+          )}
+
+          {connected && enabledRepos === 0 && (
+            <div className="mt-6">
+              <Callout variant="warning" title="No repository is turned on">
+                <p>
+                  Tickets can&apos;t start runs until at least one repository is on.{" "}
+                  <Link href="/settings/repos" className={linkButton}>Turn one on</Link>
+                </p>
+              </Callout>
+            </div>
+          )}
+
+          {appLinked && <ProjectsSection config={config} setConfig={setConfig} />}
+
+          {connected && (
+            <Section id="webhook" title="Jira webhook" description="Optional when the Jira app is linked. A native Jira webhook sends ticket updates to Coderhelm.">
+              <WebhookPanel check={check} onChanged={refresh} revealedSecret={revealedSecret} setRevealedSecret={setRevealedSecret} />
+            </Section>
+          )}
+
+          <Section id="events" title="Recent Jira events" description="The last 20 ticket updates Coderhelm received and what it did with each.">
+            <EventsList />
+          </Section>
+
+          <Section id="related" title="Related settings">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <RelatedLink href="/reviewer/config" title="Release notes and Confluence">
+                Where release notes are published, including the Confluence page they go under.
+              </RelatedLink>
+              <RelatedLink href="/settings/repos" title="Repositories">
+                Which repositories Coderhelm may work in, and their roles for routing tickets.
+              </RelatedLink>
+            </div>
+          </Section>
+
+          {(check.secret_configured || appLinked || config.projects.length > 0) && (
+            <Section id="remove" title="Remove the integration">
+              <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-red-500/20 p-4">
+                <p className="max-w-prose text-sm text-zinc-400">
+                  Deletes every Jira setting, the webhook credentials and the event history.
+                  {!isOwner && " Only the team owner can do this."}
+                </p>
+                {isOwner && (
+                  <button
+                    type="button"
+                    onClick={removeIntegration}
+                    disabled={deleting}
+                    className={`inline-flex min-h-9 items-center justify-center rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20 disabled:opacity-50 ${focusRing}`}
+                  >
+                    {deleting ? "Removing…" : "Remove integration"}
+                  </button>
+                )}
+              </div>
+            </Section>
+          )}
+        </>
       )}
-    </div>
+    </Page>
   );
 }
 
-function JiraAppTab({ check, config, setConfig, toast }: {
-  check: JiraCheck | null;
-  config: JiraConfig | null;
-  setConfig: React.Dispatch<React.SetStateAction<JiraConfig | null>>;
-  toast: (msg: string, type?: "error" | "success") => void;
-}) {
-  const [copied, setCopied] = useState<string | null>(null);
-  const [unlinking, setUnlinking] = useState(false);
-  const { confirm } = useConfirm();
-  const copy = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(label);
-    setTimeout(() => setCopied(null), 2000);
-  };
-  const installUrl = "https://developer.atlassian.com/console/install/de730821-2955-4d78-836e-55b6e7c23c88?signature=AYABePrR09vSK2DTVLCCzK%2Bt04oAAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4IOp8r3eKNYw8z2v%2FEq3%2FfvrZguoGsXpNSaDveR%2FF%2Fo0BXAmH88tVaInK7U6E2MFkZAAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDJMQ6B1ogvNrk2X41AIBEIA7UEnUW%2FGBqNgbzivPOfH9txPwU4gjvklvkmwbZWb%2FmZoMMd5lsRvkJ7OzWCYtJAbfrF2hZZcREGnfeoMAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHijmwVTMt6Oj3F%2B0%2B0cVrojrS8yZ9ktpdfDxqPMSIkvHAEGa2reJg8L%2FrWqEbgFRPADAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMThkIkAaI7FAPWkeTAgEQgDtGtXT7SzNrjUqpB8Pm474FMrk2aPj2FtBDtjW9vNYK3NZ0oNloPH9XPGbn1uS7YTPJZPTB561JZvBdcgAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeLKa7Dfn9BgbXaQmJGrkKztjV4vrreTkqr7wGwhqIYs5AaBDJ8FvKCFfzHTyolwIyC8AAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAyQ9HvoMmjskgnJCTUCARCAO%2FkpeTKd8IIamduK2tZFv2a8kDZoP7FTtAuky6S0LNmrEoIuYnHoMEyydCQLXHgjex%2FsD71J9OlNG%2Bx9AgAAAAAMAAAQAAAAAAAAAAAAAAAAAMx%2BPlN5fhsnaG9wdl169OP%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADLtyR6xQ9Nnc2%2F0GV7Dz3xCvKwGrAD%2BuvAz%2FU5KYYo7ZAgS%2FpCTSkiLEvuK6Ij5gvJQHM4oYSv%2FXgh40M6Ouxvc4a8%3D&product=jira";
+function RelatedLink({ href, title, children }: { href: string; title: string; children: ReactNode }) {
+  return (
+    <Link href={href} className={`block rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 hover:border-zinc-600 ${focusRing}`}>
+      <span className="block font-semibold text-zinc-100">{title}</span>
+      <span className="mt-1 block text-sm text-zinc-400">{children}</span>
+    </Link>
+  );
+}
 
-  const forgeLinked = !!(config?.list_projects_url && config?.create_ticket_url);
+// ── Status ───────────────────────────────────────────────────────────
+
+function StatusRow({ ok, children }: { ok: boolean; children: ReactNode }) {
+  return (
+    <li className="flex items-start gap-2.5 text-sm">
+      <span aria-hidden="true" className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${ok ? "bg-emerald-400" : "bg-zinc-600"}`} />
+      <span className={ok ? "text-zinc-200" : "text-zinc-400"}>
+        <span className="sr-only">{ok ? "Done: " : "Not yet: "}</span>
+        {children}
+      </span>
+    </li>
+  );
+}
+
+function StatusCard({
+  check,
+  config,
+  appLinked,
+  webhookOn,
+  onChanged,
+  setConfig,
+}: {
+  check: JiraCheck;
+  config: JiraConfig;
+  appLinked: boolean;
+  webhookOn: boolean;
+  onChanged: () => void;
+  setConfig: (c: JiraConfig) => void;
+}) {
+  const { toast } = useToast();
+  const { confirm } = useConfirm();
+  const [testing, setTesting] = useState(false);
+  const [test, setTest] = useState<{ ok: boolean; text: string } | null>(null);
+  const [unlinking, setUnlinking] = useState(false);
+  const site = config.site_url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const connected = appLinked || webhookOn;
+  const enabled = check.configured_repos.enabled;
+
+  const runTest = async () => {
+    setTesting(true);
+    setTest(null);
+    try {
+      const { projects } = await api.fetchJiraProjects();
+      setTest({ ok: true, text: `Coderhelm reached ${site || "your Jira site"} and can see ${projects.length} project${projects.length === 1 ? "" : "s"}.` });
+    } catch (e) {
+      setTest({ ok: false, text: e instanceof Error && e.message ? e.message : "Coderhelm could not reach the Jira app." });
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const unlink = async () => {
-    if (!(await confirm({ title: "Disconnect Jira", message: "Disconnect the Jira app? You can reconnect it anytime.", confirmLabel: "Disconnect", destructive: true }))) return;
+    const ok = await confirm({
+      title: "Disconnect the Jira app?",
+      message: "Tickets stop starting runs through the app, and Coderhelm stops posting to tickets. Your project choices are kept. Save the app's settings in Jira again to reconnect.",
+      confirmLabel: "Disconnect",
+      destructive: true,
+    });
+    if (!ok) return;
     setUnlinking(true);
     try {
-      await api.updateJiraConfig({ list_projects_url: "", create_ticket_url: "" });
-      setConfig((c) => c ? { ...c, list_projects_url: "", create_ticket_url: "" } : c);
+      await api.updateJiraConfig({ list_projects_url: "", create_ticket_url: "", add_comment_url: "" });
+      setConfig({ ...config, list_projects_url: "", create_ticket_url: "", add_comment_url: "" });
       toast("Jira app disconnected");
+      onChanged();
     } catch {
-      toast("Failed to disconnect", "error");
+      toast("Could not disconnect. The app is still linked.", "error");
     } finally {
       setUnlinking(false);
     }
   };
 
-  if (forgeLinked) {
-    return (
-      <div className="space-y-6">
-        <div className="p-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-emerald-400">Jira app linked</p>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  {config?.site_url ? (
-                    <a href={config.site_url} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-200 transition-colors">{config.site_url.replace(/^https?:\/\//, "")}</a>
-                  ) : (
-                    "Trigger URLs registered — assigning labeled tickets will start runs."
-                  )}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={unlink}
-              disabled={unlinking}
-              className="px-3 py-1.5 text-xs text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
-            >
-              {unlinking ? "Disconnecting…" : "Disconnect"}
-            </button>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="text-sm font-medium text-zinc-100">How to use</h3>
-          <div className="space-y-3">
-            <div className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[10px] font-medium text-zinc-400">1</span>
-              <p className="text-sm text-zinc-400 pt-0.5">Add a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">coderhelm</code> label to any Jira issue, then assign it.</p>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[10px] font-medium text-zinc-400">2</span>
-              <p className="text-sm text-zinc-400 pt-0.5">Coderhelm picks the right repo, creates a branch, and opens a PR.</p>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[10px] font-medium text-zinc-400">3</span>
-              <p className="text-sm text-zinc-400 pt-0.5">Track progress on the <strong className="text-zinc-200">Runs</strong> page.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <p className="text-zinc-400 text-sm">
-        Install the Coderhelm Jira app on your Jira site. When you assign a ticket with a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">coderhelm</code> label, Coderhelm determines the right repo from the ticket context and starts working.
-      </p>
-
-      <div className="space-y-6">
-        <Step number={1} title="Install the Jira app">
-          <p className="text-zinc-400 text-sm mb-3">
-            Click the button below to install Coderhelm on your Jira site. You need to be a Jira admin.
+    <section aria-labelledby="status-heading" className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
+      <div className="flex flex-wrap items-start gap-3">
+        <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-sky-400">
+          <AtlassianIcon />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 id="status-heading" className="font-semibold text-zinc-100">
+            {connected ? (site ? site : "Jira") : "Jira is not connected"}
+          </h2>
+          <p className="text-sm text-zinc-400">
+            {appLinked ? "Through the Coderhelm Jira app" : webhookOn ? "Through a Jira webhook" : "Follow the setup below to connect."}
           </p>
-          <a
-            href={installUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white transition-colors cursor-pointer"
-          >
-            Install on Jira
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-          </a>
-        </Step>
+        </div>
+        {connected && check.ready ? (
+          <StatusPill tone="success">Connected</StatusPill>
+        ) : connected ? (
+          <StatusPill tone="warning">Needs a repository</StatusPill>
+        ) : (
+          <StatusPill>Not connected</StatusPill>
+        )}
+      </div>
 
-        <Step number={2} title="Configure the app in Jira">
-          <p className="text-zinc-400 text-sm mb-3">
-            After installing, go to <strong className="text-zinc-200">Jira → Apps → Manage your apps → Coderhelm</strong> and enter your Team ID and Secret.
-          </p>
-          {check?.team_id ? (
-            <div className="space-y-3 p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
-              <div>
-                <label className="text-xs text-zinc-500 mb-1 block">Team ID</label>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono">
-                    {check.team_id}
-                  </code>
-                  <button onClick={() => copy(check.team_id, "team-id")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer">
-                    {copied === "team-id" ? "Copied!" : "Copy"}
-                  </button>
-                </div>
-              </div>
-              {check.forge_secret && (
-                <div>
-                  <label className="text-xs text-zinc-500 mb-1 block">Secret</label>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono truncate">
-                      {check.forge_secret}
-                    </code>
-                    <button onClick={() => copy(check.forge_secret!, "forge-secret")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer">
-                      {copied === "forge-secret" ? "Copied!" : "Copy"}
-                    </button>
-                  </div>
-                </div>
-              )}
-              <p className="text-xs text-zinc-600">Paste both into the Coderhelm app settings in Jira, then click <strong className="text-zinc-400">Save</strong>. The trigger URLs are registered automatically.</p>
-            </div>
-          ) : (
-            <p className="text-zinc-500 text-sm italic">Loading your configuration…</p>
+      <ul className="mt-4 flex flex-col gap-2">
+        <StatusRow ok={appLinked}>{appLinked ? "Jira app linked" : "Jira app not linked"}</StatusRow>
+        <StatusRow ok={webhookOn}>{webhookOn ? "Webhook credentials made" : "No webhook"}</StatusRow>
+        <StatusRow ok={enabled > 0}>
+          {enabled} of {check.configured_repos.total} repositor{check.configured_repos.total === 1 ? "y" : "ies"} turned on
+        </StatusRow>
+        <StatusRow ok={check.jira_events_seen || (check.jira_event_count ?? 0) > 0}>
+          {check.last_jira_event_at
+            ? `Last ticket run ${timeAgo(check.last_jira_event_at)}`
+            : "No ticket has started a run yet"}
+          {check.jira_event_count ? `, ${check.jira_event_count.toLocaleString()} events received` : ""}
+        </StatusRow>
+      </ul>
+
+      {test && (
+        <div className="mt-4">
+          <Callout variant={test.ok ? "success" : "error"} title={test.ok ? "The connection works" : "The check failed"}>
+            <p className="break-words">{test.text}</p>
+          </Callout>
+        </div>
+      )}
+
+      {appLinked && (
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-zinc-800 pt-4">
+          <button type="button" onClick={runTest} disabled={testing} className={secondaryButton}>
+            {testing ? "Checking…" : "Check the connection"}
+          </button>
+          {config.site_url && (
+            <a href={config.site_url} target="_blank" rel="noopener noreferrer" className={`${secondaryButton} gap-2`}>
+              Open Jira
+              <span aria-hidden="true" className="scale-90"><ExternalLinkIcon /></span>
+              <span className="sr-only">(opens in a new tab)</span>
+            </a>
           )}
-        </Step>
+          <button
+            type="button"
+            onClick={unlink}
+            disabled={unlinking}
+            className={`inline-flex min-h-9 items-center justify-center rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20 disabled:opacity-50 sm:ml-auto ${focusRing}`}
+          >
+            {unlinking ? "Disconnecting…" : "Disconnect the app"}
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
 
-        <Step number={3} title="Label and assign">
-          <p className="text-zinc-400 text-sm">
-            Add a <code className="text-zinc-300 bg-zinc-800 px-1 rounded">coderhelm</code> label to any Jira issue, then assign it. Coderhelm picks the right repo automatically based on the ticket.
-          </p>
-        </Step>
+function HowItWorks() {
+  return (
+    <aside aria-labelledby="how-heading" className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm">
+      <h2 id="how-heading" className="font-semibold text-zinc-100">What starts a run</h2>
+      <ol className="mt-3 flex list-decimal flex-col gap-2 pl-5 text-zinc-400">
+        <li>
+          A ticket in a turned on project gets the <code className="text-zinc-200">{TRIGGER_LABEL}</code> label. The label is fixed.
+        </li>
+        <li>Someone assigns the ticket.</li>
+        <li>Coderhelm picks the repository (or uses the one set for the project), works on a branch and opens a pull request.</li>
+        <li>Progress shows on the Runs page and, with the Jira app, as comments on the ticket.</li>
+      </ol>
+    </aside>
+  );
+}
 
-        <Step number={4} title="Check the Runs page">
-          <p className="text-zinc-400 text-sm">
-            A new run should appear within a minute. Coderhelm creates a branch, implements the change, and opens a PR.
-          </p>
-        </Step>
+// ── Setup ────────────────────────────────────────────────────────────
+
+const APP_STEPS = [
+  { id: "install", label: "Install the Jira app" },
+  { id: "configure", label: "Paste your Team ID and secret" },
+  { id: "try", label: "Label and assign a ticket" },
+];
+
+function SetupGuide({
+  check,
+  onChanged,
+  revealedSecret,
+  setRevealedSecret,
+}: {
+  check: JiraCheck;
+  onChanged: () => void;
+  revealedSecret: string | null;
+  setRevealedSecret: (s: string | null) => void;
+}) {
+  const [how, setHow] = useState<"app" | "webhook">("app");
+  const [installed, setInstalled] = useState(false);
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="max-w-full"><Segmented
+        label="How to connect"
+        options={[
+          { value: "app", label: "Jira app (recommended)" },
+          { value: "webhook", label: "Jira webhook" },
+        ]}
+        value={how}
+        onChange={setHow}
+      /></div>
+      {how === "app" ? (
+        <div className="grid gap-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 md:grid-cols-[220px_minmax(0,1fr)]">
+          <Stepper steps={APP_STEPS} current={installed ? "configure" : "install"} label="Jira app steps" />
+          <div className="flex min-w-0 flex-col gap-6 text-sm text-zinc-400">
+            <div className="flex flex-col gap-2">
+              <h3 className="font-semibold text-zinc-100">1. Install the Jira app</h3>
+              <p>You need to be a Jira admin. The install page opens in a new tab.</p>
+              <div>
+                <a href={INSTALL_URL} target="_blank" rel="noopener noreferrer" onClick={() => setInstalled(true)} className={`${primaryButton} gap-2`}>
+                  Install on Jira
+                  <span aria-hidden="true" className="scale-90"><ExternalLinkIcon /></span>
+                  <span className="sr-only">(opens in a new tab)</span>
+                </a>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <h3 className="font-semibold text-zinc-100">2. Paste your Team ID and secret</h3>
+              <p>
+                In Jira, open <span className="text-zinc-200">Apps, Manage your apps, Coderhelm</span>, paste both values and press Save. Coderhelm
+                registers itself; this page then shows the app as linked.
+              </p>
+              <CopyRow label="Team ID" value={check.team_id} />
+              {check.forge_secret && <CopyRow label="Secret" value={check.forge_secret} secret />}
+              <p>
+                <button type="button" onClick={onChanged} className={linkButton}>I saved it in Jira, check again</button>
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <h3 className="font-semibold text-zinc-100">3. Label and assign a ticket</h3>
+              <p>
+                Add the <code className="text-zinc-200">{TRIGGER_LABEL}</code> label to a ticket and assign it. A run appears on the Runs page within a
+                minute.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
+          <WebhookPanel check={check} onChanged={onChanged} revealedSecret={revealedSecret} setRevealedSecret={setRevealedSecret} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CopyRow({ label, value, secret }: { label: string; value: string; secret?: boolean }) {
+  const [shown, setShown] = useState(!secret);
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+      <p className="text-xs text-zinc-500">{label}</p>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <code className="min-w-0 flex-1 break-all font-mono text-sm text-zinc-200">{shown ? value : "•".repeat(24)}</code>
+        {secret && (
+          <button type="button" onClick={() => setShown((s) => !s)} aria-pressed={shown} className={`${secondaryButton} !px-3 !py-1 text-xs`}>
+            {shown ? "Hide" : "Show"}
+          </button>
+        )}
+        <CopyButton text={value} />
       </div>
     </div>
   );
 }
 
-function SettingsTab({ config, setConfig, toast }: {
-  config: JiraConfig | null;
-  setConfig: React.Dispatch<React.SetStateAction<JiraConfig | null>>;
-  toast: (msg: string, type?: "error" | "success") => void;
+function WebhookPanel({
+  check,
+  onChanged,
+  revealedSecret,
+  setRevealedSecret,
+}: {
+  check: JiraCheck;
+  onChanged: () => void;
+  revealedSecret: string | null;
+  setRevealedSecret: (s: string | null) => void;
 }) {
-  const [saving, setSaving] = useState(false);
-  const [fetching, setFetching] = useState(false);
-  const listProjectsUrl = config?.list_projects_url ?? "";
-  const createTicketUrl = config?.create_ticket_url ?? "";
-  const triggerLabel = "coderhelm";
-  const [defaultProject, setDefaultProject] = useState(config?.default_project ?? "");
-  const [projects, setProjects] = useState<JiraProject[]>(config?.projects ?? []);
-  const [enabledRepos, setEnabledRepos] = useState<string[]>([]);
+  const { toast } = useToast();
+  const { confirm } = useConfirm();
+  const [busy, setBusy] = useState<"" | "make" | "remove">("");
 
-  // Load enabled repos for project → repo mapping
+  const make = async () => {
+    if (check.webhook_url) {
+      const ok = await confirm({
+        title: "Make new webhook credentials?",
+        message: "The current address and secret stop working at once. Update the webhook in Jira with the new ones.",
+        confirmLabel: "Make new ones",
+        destructive: true,
+      });
+      if (!ok) return;
+    }
+    setBusy("make");
+    try {
+      const r = await api.generateJiraSecret();
+      setRevealedSecret(r.webhook_secret);
+      toast("Webhook credentials made. Copy the secret now; it is shown only once.");
+      onChanged();
+    } catch {
+      toast("Could not make webhook credentials", "error");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const remove = async () => {
+    const ok = await confirm({
+      title: "Remove the webhook?",
+      message: "Jira webhooks stop working until you make new credentials.",
+      confirmLabel: "Remove webhook",
+      destructive: true,
+    });
+    if (!ok) return;
+    setBusy("remove");
+    try {
+      await api.deleteJiraSecret();
+      setRevealedSecret(null);
+      toast("Webhook removed");
+      onChanged();
+    } catch {
+      toast("Could not remove the webhook", "error");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4 text-sm text-zinc-400">
+      {check.webhook_url ? (
+        <>
+          <CopyRow label="Webhook address" value={check.webhook_url} />
+          {revealedSecret ? (
+            <>
+              <CopyRow label="Webhook secret" value={revealedSecret} />
+              <Callout variant="warning" title="Copy the secret now">
+                <p>It is not shown again after you leave this page. Make new credentials if you lose it.</p>
+              </Callout>
+            </>
+          ) : (
+            <p>The secret was shown once when it was made. Make new credentials to get a new one.</p>
+          )}
+          <Disclosure summary="How to add it in Jira">
+            <ol className="flex list-decimal flex-col gap-1.5 pl-5">
+              <li>Open <span className="text-zinc-200">your-site.atlassian.net/plugins/servlet/webhooks</span> and create a webhook.</li>
+              <li>Paste the webhook address, and the secret in the secret field.</li>
+              <li>Under events, choose Issue, updated. Save.</li>
+              <li>Jira signs each request with the secret, so Coderhelm can tell it came from your site.</li>
+            </ol>
+          </Disclosure>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={make} disabled={!!busy} className={secondaryButton}>
+              {busy === "make" ? "Making…" : "Make new credentials"}
+            </button>
+            <button
+              type="button"
+              onClick={remove}
+              disabled={!!busy}
+              className={`inline-flex min-h-9 items-center justify-center rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20 disabled:opacity-50 ${focusRing}`}
+            >
+              {busy === "remove" ? "Removing…" : "Remove webhook"}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p>Make a webhook address and signing secret for your team, then add them as a webhook in Jira.</p>
+          <div>
+            <button type="button" onClick={make} disabled={!!busy} className={primaryButton}>
+              {busy === "make" ? "Making…" : "Make webhook credentials"}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Projects ─────────────────────────────────────────────────────────
+
+function ProjectsSection({ config, setConfig }: { config: JiraConfig; setConfig: (c: JiraConfig) => void }) {
+  const { toast } = useToast();
+  const [projects, setProjects] = useState<JiraProject[]>(config.projects);
+  const [repos, setRepos] = useState<Repo[]>([]);
+  const [fetching, setFetching] = useState(false);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [defaultProject, setDefaultProject] = useState(config.default_project);
+  const [savingDefault, setSavingDefault] = useState(false);
+  const [q, setQ] = useState("");
+
   useEffect(() => {
-    api.listRepos().then(({ repos }) => {
-      setEnabledRepos(repos.filter((r) => r.enabled).map((r) => r.name));
-    }).catch(() => {});
+    api.listRepos().then((r) => setRepos(r.repos.filter((x) => x.enabled))).catch(() => {});
   }, []);
 
-  // Sync projects when config updates (e.g. after re-fetch)
-  useEffect(() => {
-    if (config?.projects && config.projects.length > 0) {
-      setProjects(config.projects);
-    }
-  }, [config?.projects]);
-
-  // Sync default project when config updates (e.g. after load or account switch)
-  useEffect(() => {
-    if (config?.default_project !== undefined) {
-      setDefaultProject(config.default_project);
-    }
-  }, [config?.default_project]);
-
-  const saveConfig = async () => {
-    setSaving(true);
+  const persist = async (next: JiraProject[], key: string, failMsg: string) => {
+    const before = projects;
+    setProjects(next);
+    setSavingKey(key);
     try {
-      await api.updateJiraConfig({
-        list_projects_url: listProjectsUrl,
-        create_ticket_url: createTicketUrl,
-        trigger_label: triggerLabel,
-        default_project: defaultProject,
-      });
-      setConfig((c) => c ? { ...c, list_projects_url: listProjectsUrl, create_ticket_url: createTicketUrl, trigger_label: triggerLabel, default_project: defaultProject } : c);
-      toast("Settings saved");
+      await api.updateJiraProjects(next);
+      setConfig({ ...config, projects: next });
     } catch {
-      toast("Failed to save settings", "error");
+      setProjects(before);
+      toast(failMsg, "error");
     } finally {
-      setSaving(false);
+      setSavingKey(null);
     }
   };
 
   const fetchProjects = async () => {
-    if (!listProjectsUrl) {
-      toast("List Projects URL not configured — save settings in the Jira app first", "error");
-      return;
-    }
     setFetching(true);
     try {
       const { projects: fetched } = await api.fetchJiraProjects();
-      // Merge with existing enabled state and repo mappings
-      const existing = new Map(projects.map((p) => [p.key, { enabled: p.enabled, repo: p.repo }]));
-      const merged = fetched.map((p) => ({
-        ...p,
-        enabled: existing.get(p.key)?.enabled ?? false,
-        repo: existing.get(p.key)?.repo ?? "",
-      }));
-      setProjects(merged);
-      toast(`Found ${merged.length} project${merged.length !== 1 ? "s" : ""}`);
+      const existing = new Map(projects.map((p) => [p.key, p]));
+      const merged = fetched.map((p) => ({ ...p, enabled: existing.get(p.key)?.enabled ?? false, repo: existing.get(p.key)?.repo ?? "" }));
+      await persist(merged, "__all", "Could not save the project list");
+      toast(`Found ${merged.length} project${merged.length === 1 ? "" : "s"}`);
     } catch {
-      toast("Failed to fetch projects — check the URL", "error");
+      toast("Could not reach Jira to list the projects", "error");
     } finally {
       setFetching(false);
     }
   };
 
-  const toggleProject = (key: string) => {
-    setProjects((prev) => {
-      const updated = prev.map((p) => p.key === key ? { ...p, enabled: !p.enabled } : p);
-      api.updateJiraProjects(updated).then(() => {
-        setConfig((c) => c ? { ...c, projects: updated } : c);
-      }).catch(() => toast("Failed to save projects", "error"));
-      return updated;
-    });
-  };
-
-  const setProjectRepo = (key: string, repo: string) => {
-    setProjects((prev) => {
-      const updated = prev.map((p) => p.key === key ? { ...p, repo } : p);
-      api.updateJiraProjects(updated).then(() => {
-        setConfig((c) => c ? { ...c, projects: updated } : c);
-      }).catch(() => toast("Failed to save repo mapping", "error"));
-      return updated;
-    });
-  };
-
   const enabledProjects = projects.filter((p) => p.enabled);
+  const shown = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return projects.filter((p) => !needle || p.key.toLowerCase().includes(needle) || p.name.toLowerCase().includes(needle));
+  }, [projects, q]);
+
+  const saveDefault = async () => {
+    setSavingDefault(true);
+    try {
+      await api.updateJiraConfig({ default_project: defaultProject });
+      setConfig({ ...config, default_project: defaultProject });
+      toast("Default project saved");
+    } catch {
+      toast("Could not save the default project", "error");
+    } finally {
+      setSavingDefault(false);
+    }
+  };
 
   return (
-    <div className="space-y-8 mb-8">
-      {/* Forge trigger URLs */}
-      <section>
-        <h3 className="text-sm font-semibold text-zinc-100 mb-1">Forge Trigger URLs</h3>
-        <p className="text-xs text-zinc-500 mb-3">
-          Registered automatically when you save settings in the Jira Forge app.
-        </p>
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs text-zinc-500 mb-1 block">List Projects URL</label>
-            <input
-              value={listProjectsUrl}
-              readOnly
-              placeholder="Not configured yet — save settings in the Jira Forge app"
-              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-100 placeholder-zinc-600 opacity-60 cursor-default"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-zinc-500 mb-1 block">Create Ticket URL</label>
-            <input
-              value={createTicketUrl}
-              readOnly
-              placeholder="Not configured yet — save settings in the Jira Forge app"
-              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-100 placeholder-zinc-600 opacity-60 cursor-default"
-            />
-          </div>
-          {config?.site_url && (
-            <div>
-              <label className="text-xs text-zinc-500 mb-1 block">Jira Site</label>
-              <a href={config.site_url} target="_blank" rel="noopener noreferrer"
-                className="inline-block px-3 py-2 text-sm text-zinc-300 hover:text-zinc-100 transition-colors">
-                {config.site_url.replace(/^https?:\/\//, "")}
-              </a>
-            </div>
+    <Section
+      id="projects"
+      title={`Projects that start work (${enabledProjects.length} on)`}
+      description="Only tickets in projects that are on start runs. Set a repository to skip Coderhelm's own choice for that project."
+      actions={
+        <button type="button" onClick={fetchProjects} disabled={fetching} className={secondaryButton}>
+          {fetching ? "Listing…" : projects.length ? "Refresh from Jira" : "List projects from Jira"}
+        </button>
+      }
+    >
+      {projects.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-zinc-700 p-6 text-center text-sm text-zinc-400">
+          No projects listed yet. Press List projects from Jira.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {projects.length > 8 && (
+            <>
+              <label htmlFor="project-search" className="sr-only">Search projects</label>
+              <input id="project-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${projects.length} projects`} className={`${inputClass} sm:max-w-sm`} />
+            </>
           )}
-        </div>
-      </section>
-
-      {/* Trigger label */}
-      <section>
-        <h3 className="text-sm font-semibold text-zinc-100 mb-1">Trigger Label</h3>
-        <p className="text-xs text-zinc-500 mb-3">
-          Only Jira tickets with this label will trigger Coderhelm. The label is always <code className="text-zinc-300 bg-zinc-800 px-1 rounded">coderhelm</code>.
-        </p>
-        <div className="flex items-center gap-2">
-          <code className="px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-100 font-mono">coderhelm</code>
-          <span className="text-xs text-zinc-600">Cannot be changed</span>
-        </div>
-      </section>
-
-      {/* Projects */}
-      <section>
-        <div className="flex items-center justify-between mb-1">
-          <h3 className="text-sm font-semibold text-zinc-100">Jira Projects</h3>
-          <button
-            onClick={fetchProjects}
-            disabled={fetching || !listProjectsUrl}
-            className="px-3 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded text-zinc-300 hover:bg-zinc-700 disabled:opacity-50 transition-colors cursor-pointer"
-          >
-            {fetching ? "Fetching..." : "Fetch from Jira"}
-          </button>
-        </div>
-        <p className="text-xs text-zinc-500 mb-3">
-          Enable the projects Coderhelm should process. Only tickets from enabled projects will trigger runs.
-        </p>
-        {projects.length > 0 ? (
-          <div className="space-y-1.5">
-            {projects.map((p) => (
-              <div
-                key={p.key}
-                className="flex items-center gap-3 px-3 py-2 bg-zinc-900/50 border border-zinc-800 rounded-lg"
-              >
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
+          <ul className="overflow-hidden rounded-lg border border-zinc-800 divide-y divide-zinc-800">
+            {shown.map((p) => (
+              <li key={p.key} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <Switch
                     checked={p.enabled}
-                    onChange={() => toggleProject(p.key)}
-                    className="accent-emerald-500"
+                    disabled={savingKey !== null}
+                    onChange={(enabled) =>
+                      persist(projects.map((x) => (x.key === p.key ? { ...x, enabled } : x)), p.key, `Could not change ${p.key}. It is still ${p.enabled ? "on" : "off"}.`)
+                    }
+                    label={`Tickets in ${p.key} start runs`}
                   />
-                  <span className="text-sm text-zinc-200 font-mono">{p.key}</span>
-                  <span className="text-sm text-zinc-400">{p.name}</span>
-                </label>
-                {p.enabled && enabledRepos.length > 1 && (
-                  <select
-                    value={p.repo ?? ""}
-                    onChange={(e) => setProjectRepo(p.key, e.target.value)}
-                    className="ml-auto px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 focus:outline-none focus:border-zinc-500"
-                  >
-                    <option value="">Auto-detect repo</option>
-                    {enabledRepos.map((r) => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                  </select>
+                  <span className="min-w-0">
+                    <span className="block text-sm text-zinc-100">
+                      <span className="font-mono">{p.key}</span> <span className="text-zinc-400">{p.name}</span>
+                    </span>
+                    {p.lead && <span className="block text-xs text-zinc-500">Lead: {p.lead}</span>}
+                  </span>
+                </div>
+                {p.enabled && repos.length > 0 && (
+                  <label className="flex min-w-0 items-center gap-2 text-sm text-zinc-400 sm:w-72">
+                    <span className="shrink-0">Repository</span>
+                    <select
+                      value={p.repo ?? ""}
+                      disabled={savingKey !== null}
+                      onChange={(e) =>
+                        persist(projects.map((x) => (x.key === p.key ? { ...x, repo: e.target.value } : x)), p.key, `Could not save the repository for ${p.key}`)
+                      }
+                      className={`${inputClass} min-w-0 py-1.5`}
+                    >
+                      <option value="">Coderhelm picks</option>
+                      {repos.map((r) => (
+                        <option key={r.name} value={r.name}>{r.name}</option>
+                      ))}
+                    </select>
+                  </label>
                 )}
-                {p.lead && <span className="text-xs text-zinc-600 ml-auto">{p.lead}</span>}
-              </div>
+              </li>
             ))}
-          </div>
-        ) : (
-          <p className="text-xs text-zinc-600 italic">No projects loaded. Click &ldquo;Fetch from Jira&rdquo; to import.</p>
-        )}
-      </section>
-
-      {/* Default project */}
-      {enabledProjects.length > 0 && (
-        <section>
-          <h3 className="text-sm font-semibold text-zinc-100 mb-1">Default Project</h3>
-          <p className="text-xs text-zinc-500 mb-3">
-            When creating Jira tickets from plans, this project is used unless overridden per task.
-          </p>
-          <select
-            value={defaultProject}
-            onChange={(e) => setDefaultProject(e.target.value)}
-            className="w-64 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-100 focus:outline-none focus:border-zinc-600"
-          >
-            <option value="">None</option>
-            {enabledProjects.map((p) => (
-              <option key={p.key} value={p.key}>{p.key} — {p.name}</option>
-            ))}
-          </select>
-        </section>
+          </ul>
+          {shown.length === 0 && <p className="text-sm text-zinc-500">No project matches &ldquo;{q}&rdquo;.</p>}
+        </div>
       )}
 
-      {/* Save */}
-      <button
-        onClick={saveConfig}
-        disabled={saving}
-        className="px-5 py-2.5 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-40 cursor-pointer"
-      >
-        {saving ? "Saving..." : "Save settings"}
-      </button>
-    </div>
-  );
-}
-
-interface WebhookTabProps {
-  check: JiraCheck | null;
-  setCheck: React.Dispatch<React.SetStateAction<JiraCheck | null>>;
-  generatingSecret: boolean;
-  generateSecret: () => void;
-  deleteSecret: () => void;
-  copy: (text: string, label: string) => void;
-  copied: string | null;
-  revealedSecret: string | null;
-}
-
-function WebhookTab({ check, generatingSecret, generateSecret, deleteSecret, copy, copied, revealedSecret }: WebhookTabProps) {
-  return (
-    <div className="space-y-6 mb-8">
-      <p className="text-zinc-400 text-sm">
-        Use a native Jira webhook to send events to Coderhelm when issues are updated.
-      </p>
-
-      <Step number={1} title="Generate webhook credentials">
-        <p className="text-zinc-400 text-sm mb-3">
-          Generate a unique webhook URL and signing secret for your account.
-        </p>
-        {check?.webhook_url ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-emerald-400">✓ Webhook configured</span>
-              <button onClick={generateSecret} disabled={generatingSecret} className="text-xs text-zinc-500 hover:text-zinc-300 underline cursor-pointer">
-                {generatingSecret ? "Regenerating..." : "Regenerate"}
-              </button>
-              <button onClick={deleteSecret} className="text-xs text-zinc-600 hover:text-red-400 underline cursor-pointer">
-                Remove
-              </button>
-            </div>
-            <div>
-              <label className="text-xs text-zinc-500 mb-1 block">Webhook URL</label>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono truncate">
-                  {check.webhook_url}
-                </code>
-                <button onClick={() => copy(check.webhook_url!, "url")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer">
-                  {copied === "url" ? "Copied!" : "Copy"}
-                </button>
-              </div>
-            </div>
-            {revealedSecret ? (
-              <div>
-                <label className="text-xs text-zinc-500 mb-1 block">Webhook Secret</label>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-200 font-mono truncate">
-                    {revealedSecret}
-                  </code>
-                  <button onClick={() => copy(revealedSecret, "secret")} className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer">
-                    {copied === "secret" ? "Copied!" : "Copy"}
-                  </button>
-                </div>
-                <p className="text-yellow-500/80 text-xs mt-1">⚠ Copy this secret now — it will not be shown again after you leave this page.</p>
-              </div>
-            ) : check.secret_configured ? (
-              <div>
-                <label className="text-xs text-zinc-500 mb-1 block">Webhook Secret</label>
-                <p className="px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-500 font-mono">
-                  ••••••••••••••••••••
-                </p>
-                <p className="text-zinc-600 text-xs mt-1">Secret was shown only at generation time. Regenerate to get a new one.</p>
-              </div>
-            ) : null}
-            <p className="text-zinc-500 text-xs">Keep both values private. Regenerating will invalidate the previous credentials.</p>
+      {enabledProjects.length > 0 && (
+        <form
+          className="mt-6 flex flex-wrap items-end gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            saveDefault();
+          }}
+        >
+          <div>
+            <label htmlFor="default-project" className="mb-1.5 block text-sm font-semibold text-zinc-100">
+              Default project for tickets made from plans
+            </label>
+            <select id="default-project" value={defaultProject} onChange={(e) => setDefaultProject(e.target.value)} className={`${inputClass} w-72 max-w-full`}>
+              <option value="">None</option>
+              {enabledProjects.map((p) => (
+                <option key={p.key} value={p.key}>{p.key}: {p.name}</option>
+              ))}
+            </select>
           </div>
-        ) : (
-          <button onClick={generateSecret} disabled={generatingSecret} className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 transition-colors cursor-pointer">
-            {generatingSecret ? "Generating..." : "Generate webhook credentials"}
+          <button type="submit" disabled={savingDefault || defaultProject === config.default_project} className={primaryButton}>
+            {savingDefault ? "Saving…" : "Save"}
           </button>
-        )}
-      </Step>
-
-      <Step number={2} title="Add the webhook in Jira">
-        <p className="text-zinc-400 text-sm">
-          Go to <strong className="text-zinc-200">https://&lt;your-site&gt;.atlassian.net/plugins/servlet/webhooks</strong> and create a new webhook.
-        </p>
-        <p className="text-zinc-500 text-xs mt-2">
-          Paste the <strong className="text-zinc-300">Webhook URL</strong> from step 1. Enter the <strong className="text-zinc-300">Webhook Secret</strong> in the secret field. Under events, enable <strong className="text-zinc-300">Issue → updated</strong>.
-        </p>
-        <p className="text-zinc-500 text-xs mt-1">
-          The secret is used to sign each request with an HMAC-SHA256 signature (<code className="text-zinc-400 bg-zinc-800 px-1 rounded text-xs">X-Hub-Signature</code> header) so Coderhelm can verify it came from Jira.
-        </p>
-      </Step>
-
-      <Step number={3} title="Test">
-        <p className="text-zinc-400 text-sm">
-          Update a Jira issue with your trigger label and check the Events tab.
-        </p>
-      </Step>
-
-    </div>
+        </form>
+      )}
+    </Section>
   );
 }
 
-function EventsTab() {
-  const [events, setEvents] = useState<JiraEvent[]>([]);
+// ── Events ───────────────────────────────────────────────────────────
+
+const EVENT_STATUS: Record<string, { tone: "success" | "neutral" | "error"; label: string }> = {
+  processed: { tone: "success", label: "Handled" },
+  filtered: { tone: "neutral", label: "Skipped" },
+  error: { tone: "error", label: "Failed" },
+  signature_rejected: { tone: "error", label: "Signature refused" },
+};
+
+function EventsList() {
+  const [events, setEvents] = useState<JiraEvent[] | null>(null);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
-    api.listJiraEvents()
-      .then((res) => { setEvents(res.events); setTotal(res.total ?? res.events.length); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  const load = useCallback(() => {
+    setError(false);
+    api
+      .listJiraEvents()
+      .then((r) => {
+        setEvents(r.events);
+        setTotal(r.total ?? r.events.length);
+      })
+      .catch(() => {
+        setError(true);
+        setEvents((prev) => prev ?? []);
+      });
   }, []);
+  useEffect(() => { load(); }, [load]);
 
-  const statusColor: Record<string, string> = {
-    processed: "text-emerald-400",
-    filtered: "text-zinc-500",
-    error: "text-red-400",
-    signature_rejected: "text-red-400",
-  };
-
-  if (loading) {
-    return <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>;
+  if (events === null) {
+    return (
+      <div className="flex flex-col gap-2" aria-busy="true">
+        {[0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+      </div>
+    );
   }
-
+  if (error) {
+    return (
+      <Callout variant="error" title="Could not load the Jira events">
+        <p><button type="button" onClick={load} className={linkButton}>Try again</button></p>
+      </Callout>
+    );
+  }
   if (events.length === 0) {
-    return <p className="text-zinc-500 text-sm">No Jira events received yet.</p>;
+    return (
+      <div className="rounded-lg border border-dashed border-zinc-700 p-6 text-center text-sm text-zinc-400">
+        No Jira events yet. Label and assign a ticket to send the first one.
+      </div>
+    );
   }
-
   return (
-    <div className="mb-8">
-      <p className="text-zinc-400 text-sm mb-4">Last {events.length} webhook events · {total} total</p>
-      <div className="border border-zinc-800 rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-zinc-800 bg-zinc-900/50">
-              <th className="text-left px-4 py-2 text-zinc-500 font-medium">Ticket</th>
-              <th className="text-left px-4 py-2 text-zinc-500 font-medium">Title</th>
-              <th className="text-left px-4 py-2 text-zinc-500 font-medium">Status</th>
-              <th className="text-left px-4 py-2 text-zinc-500 font-medium">Repo</th>
-              <th className="text-left px-4 py-2 text-zinc-500 font-medium">Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            {events.map((e) => (
-              <tr key={e.event_id} className="border-b border-zinc-800/50 hover:bg-zinc-900/50">
-                <td className="px-4 py-2 text-zinc-300 font-mono text-xs">{e.ticket_key || "—"}</td>
-                <td className="px-4 py-2 text-zinc-100 text-sm">{e.title || "—"}</td>
-                <td className={`px-4 py-2 text-xs ${statusColor[e.status] ?? "text-zinc-400"}`}>{e.status}</td>
-                <td className="px-4 py-2 text-zinc-400 font-mono text-xs">{e.repo || "—"}</td>
-                <td className="px-4 py-2 text-zinc-500 text-xs">{new Date(e.created_at).toLocaleString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div className="flex flex-col gap-2">
+      <p className="text-sm text-zinc-500">Showing {events.length} of {total}</p>
+      <ul className="overflow-hidden rounded-lg border border-zinc-800 divide-y divide-zinc-800">
+        {events.map((e) => {
+          const st = EVENT_STATUS[e.status] ?? { tone: "neutral" as const, label: e.status.replace(/[_-]+/g, " ") };
+          return (
+            <li key={e.event_id} className="flex flex-col gap-1.5 px-4 py-3 sm:flex-row sm:items-center sm:gap-4">
+              <span className="shrink-0 font-mono text-xs text-zinc-300 sm:w-24">{e.ticket_key || "No ticket"}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block break-words text-sm text-zinc-100">{e.title || "Untitled ticket"}</span>
+                <span className="block text-xs text-zinc-500">
+                  {e.repo ? <span className="font-mono">{e.repo}</span> : "No repository"} · <time dateTime={e.created_at}>{timeAgo(e.created_at)}</time>
+                </span>
+              </span>
+              <span className="shrink-0"><StatusPill tone={st.tone}>{st.label}</StatusPill></span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
-
-function Step({ number, title, children }: { number: number; title: string; children: React.ReactNode }) {
-  return (
-    <div className="flex gap-4">
-      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-medium text-zinc-300">
-        {number}
-      </div>
-      <div className="flex-1 pt-0.5">
-        <h3 className="text-sm font-medium text-zinc-100 mb-1">{title}</h3>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-

@@ -73,7 +73,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     id: "alerts",
     label: "Alerts",
     items: [
-      { href: "/settings/alerts", title: "Alert routes", description: "Turn monitoring alerts into pull requests or Teams cards.", icon: <BellIcon />, view: "admin", edit: "admin", status: "alerts" },
+      { href: "/settings/alerts", title: "Alert routes", description: "Turn monitoring alerts into pull requests or Teams cards.", icon: <BellIcon />, view: "member", edit: "admin", status: "alerts" },
     ],
   },
   {
@@ -81,7 +81,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     label: "Data sources",
     items: [
       { href: "/data-sources", title: "Data sources", description: "Live systems the reviewer may read to check facts. Read only.", icon: <DatabaseIcon />, view: "admin", edit: "admin", status: "dataSources" },
-      { href: "/settings/aws", title: "AWS", description: "AWS accounts whose CloudWatch logs Coderhelm reads for findings.", icon: <AwsIcon />, view: "admin", edit: "admin" },
+      { href: "/settings/aws", title: "AWS", description: "AWS accounts whose CloudWatch logs Coderhelm reads for findings.", icon: <AwsIcon />, view: "member", edit: "admin" },
       { href: "/skills", title: "Skills", description: "Written know how from a repository that Coderhelm can follow.", icon: <BookIcon />, view: "member", edit: "member" },
     ],
   },

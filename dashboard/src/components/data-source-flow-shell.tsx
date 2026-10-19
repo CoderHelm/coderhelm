@@ -21,7 +21,7 @@ export function FlowShell({
   steps: { id: string; label: string }[];
 }) {
   return (
-    <div className="max-w-4xl">
+    <div className="mx-auto w-full min-w-0 max-w-6xl">
       <Link href={back.href} className={`inline-flex min-h-6 items-center text-sm text-zinc-400 hover:text-zinc-100 rounded ${focusRing}`}>
         <span aria-hidden="true">←&nbsp;</span>{back.label}
       </Link>

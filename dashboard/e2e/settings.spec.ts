@@ -22,9 +22,9 @@ const ITEMS: { title: string; href: string; view: Role; edit: Role; heading: str
   { title: "Team voice", href: "/settings/voice", view: "admin", edit: "admin", heading: "Team voice" },
   { title: "Custom instructions", href: "/settings/instructions", view: "admin", edit: "admin", heading: "Custom instructions" },
   { title: "AI models", href: "/settings/models", view: "admin", edit: "admin", heading: "AI models" },
-  { title: "Alert routes", href: "/settings/alerts", view: "admin", edit: "admin", heading: "Alert routes" },
-  { title: "Data sources", href: "/data-sources", view: "admin", edit: "admin", heading: /check facts against your real systems/ },
-  { title: "AWS", href: "/settings/aws", view: "admin", edit: "admin", heading: "AWS" },
+  { title: "Alert routes", href: "/settings/alerts", view: "member", edit: "admin", heading: "Alert routes" },
+  { title: "Data sources", href: "/data-sources", view: "admin", edit: "admin", heading: "Data sources" },
+  { title: "AWS", href: "/settings/aws", view: "member", edit: "admin", heading: "AWS" },
   { title: "Skills", href: "/skills", view: "member", edit: "member", heading: "Skills" },
   { title: "Jira", href: "/settings/jira", view: "admin", edit: "admin", heading: "Jira" },
   { title: "MCP servers", href: "/settings/plugins", view: "admin", edit: "admin", heading: "MCP servers" },
@@ -74,7 +74,9 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/repos") return json(route, { repos: [{ name: "your-team/web", enabled: true, ticket_source: "github", onboard_status: "ready" }, { name: "your-team/api", enabled: false, ticket_source: "github" }] });
     if (p === "/api/github/installation-status") return json(route, { status: "connected", github_org: "your-team", installation_id: 7 });
     if (p === "/api/users") return admin ? json(route, { users: [{ user_id: "u_1", email: "person@example.com", role: db.role, status: "active" }] }) : forbidden(route);
-    if (p === "/api/alert-routes") return admin ? json(route, { endpoint_path: "/webhooks/alerts/sns", routes: [] }) : forbidden(route);
+    // Members may read routes and alerts; only admins change them.
+    if (p === "/api/alert-routes") return atLeast(db.role, "member") ? json(route, { endpoint_path: "/webhooks/alerts/sns", routes: [] }) : forbidden(route);
+    if (p === "/api/alerts") return atLeast(db.role, "member") ? json(route, { alerts: [], next: null }) : forbidden(route);
     if (p === "/api/alert-budget") return admin ? json(route, { daily_tokens: 2_000_000, used_24h_tokens: 0, open_runs: 0, open_run_reserve_tokens: 0, max_runs_per_rule_per_day: 3 }) : forbidden(route);
     if (p === "/api/alert-notify") return admin ? json(route, { teams_webhook_url: "", enabled: false }) : forbidden(route);
     if (p === "/api/data-sources") return json(route, { sources: [] });

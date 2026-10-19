@@ -167,7 +167,7 @@ function ConnectDataSourcePage() {
     );
   } else {
     return (
-      <div className="max-w-4xl">
+      <div className="mx-auto w-full min-w-0 max-w-6xl">
         <h1 id="step-heading" tabIndex={-1} className="text-2xl font-bold text-zinc-100 focus:outline-none">Fact-checking is on</h1>
         <p className="mt-2 max-w-prose text-sm text-zinc-400">
           Coderhelm uses it from now on, while it plans, writes code and reviews. When it looks something up, the plan or
