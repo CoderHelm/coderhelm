@@ -120,12 +120,37 @@ function handler(event) {
   }
   var uri = request.uri;
   if (uri.startsWith('/errors/')) return request;
+  // Agents that ask for Markdown get the page's Markdown twin (built next to
+  // every page as /<page>.md, and /index.md for the home page).
+  var accept = request.headers.accept && request.headers.accept.value;
+  if (accept && accept.indexOf('text/markdown') !== -1 && (uri.endsWith('/') || uri.indexOf('.') === -1)) {
+    var path = uri.replace(/\/+$/, '');
+    request.uri = path === '' ? '/index.md' : path + '.md';
+    return request;
+  }
   if (uri.endsWith('/')) {
     request.uri = uri + 'index.html';
   } else if (uri.indexOf('.') === -1) {
     request.uri = uri + '/index.html';
   }
   return request;
+}
+      `),
+      runtime: cloudfront.FunctionRuntime.JS_2_0,
+    });
+
+    // Pages are served as HTML or Markdown depending on Accept, so tell every
+    // cache between us and the reader that the response varies by it.
+    const varyAccept = new cloudfront.Function(this, "VaryAccept", {
+      functionName: `${prefix}-site-vary-accept`,
+      code: cloudfront.FunctionCode.fromInline(`
+function handler(event) {
+  var response = event.response;
+  var uri = event.request.uri;
+  if (uri.endsWith('.html') || uri.endsWith('.md')) {
+    response.headers['vary'] = { value: 'Accept' };
+  }
+  return response;
 }
       `),
       runtime: cloudfront.FunctionRuntime.JS_2_0,
@@ -145,6 +170,10 @@ function handler(event) {
           {
             function: urlRewrite,
             eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+          },
+          {
+            function: varyAccept,
+            eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE,
           },
         ],
       },
@@ -224,7 +253,7 @@ function handler(event) {
       destinationBucket: siteBucket,
       distribution,
       distributionPaths: ["/*"],
-      exclude: ["errors/*", "_next/*"],
+      exclude: ["errors/*", "_next/*", "*.md", "llms.txt", "llms-full.txt"],
       cacheControl: [
         s3deploy.CacheControl.setPublic(),
         s3deploy.CacheControl.maxAge(cdk.Duration.hours(1)),
@@ -242,6 +271,33 @@ function handler(event) {
         s3deploy.CacheControl.setPublic(),
         s3deploy.CacheControl.maxAge(cdk.Duration.days(365)),
         s3deploy.CacheControl.immutable(),
+      ],
+    });
+
+    // Markdown twins and llms.txt files for agents, with an explicit UTF-8
+    // charset (S3 would otherwise serve text/markdown with no charset).
+    new s3deploy.BucketDeployment(this, "DeployMarkdown", {
+      sources: [s3deploy.Source.asset("../out")],
+      destinationBucket: siteBucket,
+      include: ["*.md"],
+      exclude: ["*"],
+      contentType: "text/markdown; charset=utf-8",
+      cacheControl: [
+        s3deploy.CacheControl.setPublic(),
+        s3deploy.CacheControl.maxAge(cdk.Duration.hours(1)),
+        s3deploy.CacheControl.sMaxAge(cdk.Duration.days(1)),
+      ],
+    });
+    new s3deploy.BucketDeployment(this, "DeployLlmsTxt", {
+      sources: [s3deploy.Source.asset("../out")],
+      destinationBucket: siteBucket,
+      include: ["llms.txt", "llms-full.txt"],
+      exclude: ["*"],
+      contentType: "text/plain; charset=utf-8",
+      cacheControl: [
+        s3deploy.CacheControl.setPublic(),
+        s3deploy.CacheControl.maxAge(cdk.Duration.hours(1)),
+        s3deploy.CacheControl.sMaxAge(cdk.Duration.days(1)),
       ],
     });
 

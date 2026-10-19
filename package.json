@@ -9,9 +9,6 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@iconify-json/logos": "^1.2.11",
-    "clsx": "2.1.1",
-    "mermaid": "^11.13.0",
     "next": "^16.2.1",
     "react": "19.1.0",
     "react-dom": "19.1.0"

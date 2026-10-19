@@ -1,88 +1,24 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import { SITE } from "@/content/site";
 import "./globals.css";
 
+const sans = Geist({ subsets: ["latin"], variable: "--font-geist-sans", display: "swap" });
+const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono", display: "swap", preload: false });
 
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  display: "swap",
-});
-
+// Site-wide defaults. Every page sets its own title, description, canonical,
+// Markdown alternate and Open Graph data through pageMetadata().
 export const metadata: Metadata = {
-  metadataBase: new URL("https://coderhelm.com"),
-  title: {
-    default: "Coderhelm — Autonomous AI Coding Agent | Ship Code, Not Tickets",
-    template: "%s | Coderhelm",
-  },
-  description:
-    "Coderhelm is an autonomous AI coding agent. Assign a GitHub issue or Jira ticket and get a production-ready PR with self-healing CI and multi-pass code generation.",
-  keywords: [
-    "AI coding agent",
-    "autonomous coding",
-    "GitHub automation",
-    "Jira automation",
-    "AI code review",
-    "AI pull request",
-    "developer tools",
-    "AI software engineer",
-    "self-healing CI",
-    "AI bug investigation",
-    "read only database access for AI",
-    "AI plans",
-    "MCP servers",
-    "code generation",
-    "autonomous PR",
-    "GitHub issue to PR",
-    "Jira ticket to PR",
-    "AI code generation",
-    "AWS log analyzer",
-    "code guardrails",
-    "AI developer assistant",
-    "multi-pass pipeline",
-    "Coderhelm",
-  ],
-  authors: [{ name: "Coderhelm" }],
-  creator: "Coderhelm",
-  publisher: "Coderhelm",
+  metadataBase: new URL(SITE.url),
+  title: { default: SITE.name, template: `%s | ${SITE.name}` },
+  applicationName: SITE.name,
+  authors: [{ name: SITE.name, url: SITE.url }],
+  creator: SITE.name,
+  publisher: SITE.name,
   robots: {
     index: true,
     follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-video-preview": -1,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-    },
-  },
-  openGraph: {
-    title: "Coderhelm — Ship code, not tickets",
-    description:
-      "Autonomous AI coding agent. Assign a GitHub issue or Jira ticket — get a production-ready PR with self-healing CI, AI plans, and MCP tool integrations.",
-    url: "https://coderhelm.com",
-    siteName: "Coderhelm",
-    type: "website",
-    locale: "en_US",
-    images: [
-      {
-        url: "https://coderhelm.com/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "Coderhelm — Ship code, not tickets",
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Coderhelm — Ship code, not tickets",
-    description:
-      "Autonomous AI coding agent. Assign a GitHub issue or Jira ticket — get a production-ready PR with self-healing CI, AI plans, and MCP tool integrations.",
-    creator: "@coderhelm",
-    images: ["https://coderhelm.com/og-image.png"],
-  },
-  alternates: {
-    canonical: "https://coderhelm.com",
+    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 },
   },
   icons: {
     icon: [
@@ -94,131 +30,27 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export const viewport: Viewport = {
+  themeColor: "#0a0a0a",
+  colorScheme: "dark",
+};
+
+const GA_ID = "G-T14Q1LDRC0";
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
       <head>
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-T14Q1LDRC0" />
-        <script dangerouslySetInnerHTML={{ __html: `
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'G-T14Q1LDRC0');
-        `}} />
-      </head>
-      <body className={`${inter.className} bg-surface text-text-primary antialiased`}>
+        <link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt" />
+        {/* Google tag, once per page. */}
+        <script async src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} />
         <script
-          type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@graph": [
-                {
-                  "@type": "Organization",
-                  name: "Coderhelm",
-                  url: "https://coderhelm.com",
-                  logo: "https://coderhelm.com/icon-512.png",
-                  sameAs: [],
-                  description:
-                    "Coderhelm builds autonomous AI coding agents that turn GitHub issues and Jira tickets into production-ready pull requests.",
-                },
-                {
-                  "@type": "SoftwareApplication",
-                  name: "Coderhelm",
-                  applicationCategory: "DeveloperApplication",
-                  operatingSystem: "Web",
-                  url: "https://coderhelm.com",
-                  description:
-                    "Autonomous AI coding agent. Assign a GitHub issue or Jira ticket — get a production-ready PR with self-healing CI, AI plans, MCP tool integrations, and AWS log analysis.",
-                  featureList: [
-                    "GitHub issue to pull request automation",
-                    "Jira ticket to pull request automation",
-                    "Multi-pass code generation pipeline",
-                    "Self-healing CI — automatic test fix iterations",
-                    "AI Plans — describe features in plain English",
-                    "28+ MCP server integrations (Figma, Sentry, Linear, Notion, Slack, Datadog)",
-                    "AWS CloudWatch log analyzer",
-                    "Read only lookups in your API, logs, PostgreSQL databases and Redshift warehouse while planning, coding and reviewing",
-                    "Bug ticket investigation using your real records and logs",
-                    "Ongoing maintenance: answers review comments, fixes its own CI, keeps PRs current, watches deploys, turns alerts into fixes",
-                    "E2E test intelligence: flaky vs broken detection, quarantine, proven fix PRs, run history and suggested tests",
-                    "Read only lookups in Redshift data warehouses across several databases",
-                    "Analytics: merge rate, time to merge, cost per merged PR, review outcomes",
-                    "Custom code guardrails and team voice",
-                    "Openspec architecture documents",
-                    "Works with any stack — React, Python, Go, Rust, and more",
-                  ],
-                  offers: [
-                    {
-                      "@type": "Offer",
-                      name: "Free",
-                      price: "0",
-                      priceCurrency: "USD",
-                      description:
-                        "Free and open source — bring your own Anthropic API key",
-                    },
-                  ],
-                },
-                {
-                  "@type": "FAQPage",
-                  mainEntity: [
-                    {
-                      "@type": "Question",
-                      name: "What is Coderhelm?",
-                      acceptedAnswer: {
-                        "@type": "Answer",
-                        text: "Coderhelm is an autonomous AI coding agent. You assign a GitHub issue or Jira ticket, and Coderhelm reads your codebase, plans changes, implements them, runs CI, and opens a production-ready pull request.",
-                      },
-                    },
-                    {
-                      "@type": "Question",
-                      name: "How does Coderhelm work?",
-                      acceptedAnswer: {
-                        "@type": "Answer",
-                        text: "Three steps: 1) Connect your GitHub or Jira account, 2) Create an issue and assign it to Coderhelm or add the coderhelm label, 3) Review the PR that Coderhelm opens. It uses a multi-pass pipeline with context analysis, code generation, safety review, and self-healing CI.",
-                      },
-                    },
-                    {
-                      "@type": "Question",
-                      name: "What languages and frameworks does Coderhelm support?",
-                      acceptedAnswer: {
-                        "@type": "Answer",
-                        text: "Coderhelm works with any stack including React, Next.js, Python, Go, Rust, TypeScript, Java, and more. It reads your codebase to understand your patterns and conventions.",
-                      },
-                    },
-                    {
-                      "@type": "Question",
-                      name: "Is Coderhelm free?",
-                      acceptedAnswer: {
-                        "@type": "Answer",
-                        text: "Yes, Coderhelm has a free tier with 500K tokens per month, supporting both public and private repos. The Pro plan at $199/month includes 5M tokens, AI plans, and priority queue.",
-                      },
-                    },
-                    {
-                      "@type": "Question",
-                      name: "Is my code secure with Coderhelm?",
-                      acceptedAnswer: {
-                        "@type": "Answer",
-                        text: "Yes. Coderhelm uses isolated execution environments, does not store your code, enforces team isolation, verifies webhooks, and is rate-limited and audited. Enterprise-grade security is built in.",
-                      },
-                    },
-                  ],
-                },
-                {
-                  "@type": "WebSite",
-                  name: "Coderhelm",
-                  url: "https://coderhelm.com",
-                },
-              ],
-            }),
+            __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}');`,
           }}
         />
-        {children}
-      </body>
+      </head>
+      <body className="bg-surface font-sans text-text-primary antialiased">{children}</body>
     </html>
   );
 }
