@@ -9,6 +9,7 @@ import type {
   TextPart,
   ThinkingPart,
   ToolCallPart,
+  UsedRef,
 } from "@/lib/stream-types";
 import { streamChat } from "@/lib/stream-client";
 
@@ -71,6 +72,35 @@ function saveSession(messages: StreamMessage[]) {
   }
 }
 
+const CHAT_ID_KEY = "coderhelm:plan-chat-id";
+
+function newChatId(): string {
+  const id = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `c${Date.now()}${Math.random().toString(36).slice(2, 10)}`;
+  try {
+    sessionStorage.setItem(CHAT_ID_KEY, id);
+  } catch {}
+  return id;
+}
+
+function loadChatId(): string {
+  try {
+    return sessionStorage.getItem(CHAT_ID_KEY) || newChatId();
+  } catch {
+    return newChatId();
+  }
+}
+
+/** Every skill, agent and data source a message's tool calls used, once each. */
+export function messageUsed(msg: StreamMessage): UsedRef[] {
+  const out: UsedRef[] = [];
+  for (const part of msg.parts) {
+    if (part.type === "tool_call" && part.used && !out.some((u) => u.kind === part.used!.kind && u.label === part.used!.label)) {
+      out.push(part.used);
+    }
+  }
+  return out;
+}
+
 function clearSessionStorage() {
   try {
     sessionStorage.removeItem(STORAGE_KEY);
@@ -104,6 +134,8 @@ interface UseStreamingChatReturn {
   retry: () => void;
   clear: () => void;
   editAndResend: (messageId: string, newText: string) => void;
+  /** The chat's id, kept on the plan saved from it. */
+  chatId: () => string;
 }
 
 export function useStreamingChat(): UseStreamingChatReturn {
@@ -112,6 +144,9 @@ export function useStreamingChat(): UseStreamingChatReturn {
   const [status, setStatus] = useState<StreamStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // The chat's id: its skill reads, agent asks and lookups are logged under
+  // it, and the plan saved from it keeps it.
+  const chatIdRef = useRef<string>(typeof window !== "undefined" ? loadChatId() : "");
 
   // 200ms-throttled update for streaming message (avoids 60fps markdown reparse)
   const pendingParts = useRef<MessagePart[]>([]);
@@ -200,6 +235,7 @@ export function useStreamingChat(): UseStreamingChatReturn {
             input: "",
             status: event.status as "success" | "error",
             summary: event.summary,
+            used: event.used ?? undefined,
           });
           scheduleFlush();
           break;
@@ -281,6 +317,7 @@ export function useStreamingChat(): UseStreamingChatReturn {
 
       try {
         await streamChat(chatMessages, {
+          chatId: chatIdRef.current,
           signal: controller.signal,
           onEvent: handleEvent,
           onError: (err) => {
@@ -338,6 +375,7 @@ export function useStreamingChat(): UseStreamingChatReturn {
   const clear = useCallback(() => {
     abortRef.current?.abort();
     clearSessionStorage();
+    chatIdRef.current = newChatId();
     setMessages([GREETING]);
     setStatus("idle");
     setError(null);
@@ -389,6 +427,7 @@ export function useStreamingChat(): UseStreamingChatReturn {
       abortRef.current = controller;
 
       streamChat(chatMessages, {
+        chatId: chatIdRef.current,
         signal: controller.signal,
         onEvent: handleEvent,
         onError: (err) => {
@@ -409,7 +448,8 @@ export function useStreamingChat(): UseStreamingChatReturn {
     [messages, status, handleEvent],
   );
 
-  return { messages, status, error, send, stop, retry, clear, editAndResend };
+  const chatId = useCallback(() => chatIdRef.current, []);
+  return { messages, status, error, send, stop, retry, clear, editAndResend, chatId };
 }
 
 // ---------------------------------------------------------------------------
@@ -456,6 +496,7 @@ function mergeParts(existing: MessagePart[], incoming: MessagePart[]): MessagePa
           input: existing.input + part.input,
           status: part.status,
           summary: part.summary || existing.summary,
+          used: part.used || existing.used,
         };
       } else {
         result.push({ ...part });

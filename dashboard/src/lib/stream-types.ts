@@ -12,10 +12,18 @@ export type StreamEvent =
   | { type: "text_delta"; text: string }
   | { type: "tool_start"; id: string; name: string; server?: string }
   | { type: "tool_input_delta"; id: string; partial_json: string }
-  | { type: "tool_result"; id: string; status: "success" | "error"; summary: string }
+  | { type: "tool_result"; id: string; status: "success" | "error"; summary: string; used?: UsedRef | null }
   | { type: "usage"; input_tokens: number; output_tokens: number; turns: number }
   | { type: "done" }
   | { type: "error"; message: string };
+
+/** What a tool call used, for the chat's chips: a team skill read, a team
+ * agent asked, or a data source looked up, with a link to it. */
+export interface UsedRef {
+  kind: "skill" | "agent" | "source";
+  label: string;
+  href: string;
+}
 
 // -- Multi-part message model -----------------------------------------------
 
@@ -38,6 +46,7 @@ export interface ToolCallPart {
   input: string;
   status: "running" | "success" | "error";
   summary?: string;
+  used?: UsedRef;
 }
 
 export interface UsagePart {

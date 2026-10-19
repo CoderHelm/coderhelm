@@ -170,7 +170,12 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/skills/item" && method === "GET") {
       const it = db.items.find((i) => i.repo === url.searchParams.get("repo") && i.path === url.searchParams.get("path"));
       if (!it) return json(route, { error: "No such skill." }, 404);
-      if (it.kind === "agent") return json(route, { ...it, body: AGENT_BODY, prompt: "You are one of this team's own agents, asked a question by Coderhelm's reviewer.\n\n## Your brief\nYou review specs before work starts.", translated: "" });
+      if (it.kind === "agent") {
+        const agent_tools = it.name === "spec-checker"
+          ? { declared: ["Read", "Grep", "Bash", "WebFetch", "Write"], granted: ["read_file", "read_file_lines", "search_code"], missing: ["Bash", "WebFetch"], blocked: ["Write"] }
+          : { declared: [], granted: [], missing: [], blocked: [] };
+        return json(route, { ...it, body: AGENT_BODY, agent_tools, prompt: "You are one of this team's own agents, asked a question by Coderhelm's reviewer.\n\n## Your brief\nYou review specs before work starts.", translated: "" });
+      }
       const full = it.name === "debug" && it.compat ? { ...it.compat, ...DEBUG_COMPAT, needs: it.compat.needs, needs_detail: DEBUG_COMPAT.needs } : it.compat;
       return json(route, { ...it, body: BODY, compat: full, translated: it.compat && it.name === "debug" ? DEBUG_TRANSLATED : "" });
     }
@@ -212,6 +217,17 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/runs/run_77") return json(route, { run_id: "run_77", status: "completed", ticket_id: "ABC-88", title: "Add partial refunds", repo: "acme/api", created_at: ago(2900), pass_history: [], progress_notes: [], applied_standards: ["api-conventions"] });
     if (/^\/api\/runs\/run_77\/agent-log$/.test(p)) return json(route, { passes: [], live_events: [] });
     if (/^\/api\/runs\/run_77\/traces$/.test(p)) return json(route, { traces: [] });
+    if (p === "/api/skills/used" && method === "GET") {
+      const run = url.searchParams.get("run_id");
+      return json(route, run === "run_77"
+        ? {
+            skills: [{ name: "debug", kind: "skill", repo: "acme/playbook", path: "skills/debug/SKILL.md", count: 2 }],
+            agents: [{ name: "spec-checker", kind: "agent", repo: "acme/playbook", path: "agents/spec-checker.md", count: 1, tools: ["read_file"] }],
+            sources: [{ id: "s1", name: "Orders DB", lookups: 3 }],
+            standards: [{ name: "api-conventions", kind: "skill", repo: "acme/playbook", path: "skills/api-conventions/SKILL.md", count: 1 }],
+          }
+        : { skills: [], agents: [], sources: [], standards: [] });
+    }
     if (p === "/api/skills/asks" && method === "GET") {
       const runId = url.searchParams.get("run_id");
       if (runId) return json(route, { asks: db.asks.filter((a) => a.run_id === runId) });
@@ -357,8 +373,13 @@ test("an agent's page: when it's asked, how it runs, recent asks and its instruc
   await expect(page.getByText("Coderhelm asks this agent when")).toBeVisible();
   await expect(page.getByText("A Coderhelm setting. It doesn't change the file.")).toBeVisible();
   await expect(page.getByRole("link", { name: "Open on GitHub" })).toHaveAttribute("href", `https://github.com/acme/playbook/blob/${SHA}/agents/spec-checker.md`);
-  await expect(page.getByText("None when Coderhelm asks it.")).toBeVisible();
-  await expect(page.getByText("Read, Grep, Bash, WebFetch", { exact: true })).toBeVisible();
+  // It reads with what its own file lists, mapped to Coderhelm's read-only tools.
+  const tools = page.getByTestId("agent-tools");
+  await expect(tools).toContainText("Read-only, the ones its file lists.");
+  await expect(tools.getByRole("list", { name: "Tools it gets" }).getByRole("listitem")).toHaveText(["read_file", "read_file_lines", "search_code"]);
+  await expect(tools).toContainText("Not available here: Bash, WebFetch");
+  await expect(tools).toContainText("Write blocked: Write");
+  await expect(page.getByText(/Up to 12 tool calls and 3 minutes/)).toBeVisible();
   await expect(page.getByText("Your team's heavy model")).toBeVisible();
   await expect(page.getByRole("link", { name: "acme/web#412" })).toHaveAttribute("href", "https://github.com/acme/web/issues/412");
   await expect(page.getByRole("link", { name: "View run" })).toHaveAttribute("href", /\/runs\/detail\/?\?id=run_77/);
@@ -416,7 +437,8 @@ test("a run's page lists the team agents it asked, linked to each agent", async 
   await expect(page.getByRole("heading", { name: "Team agents asked (1)" })).toBeVisible();
   await expect(page.getByText("Check this ticket for contradictions before I plan it.")).toBeVisible();
   await expect(page.getByText("Took too long")).toBeVisible();
-  await expect(page.getByRole("link", { name: "spec-checker" })).toHaveAttribute("href", /\/skills\/agent\/?\?repo=acme%2Fplaybook&path=agents%2Fspec-checker\.md/);
+  const asked = page.getByRole("listitem").filter({ hasText: "Check this ticket for contradictions" });
+  await expect(asked.getByRole("link", { name: "spec-checker" })).toHaveAttribute("href", /\/skills\/agent\/?\?repo=acme%2Fplaybook&path=agents%2Fspec-checker\.md/);
 });
 
 const DEBUG_URL = "/skills/item?repo=acme%2Fplaybook&path=skills%2Fdebug%2FSKILL.md";
@@ -541,7 +563,7 @@ test("an item not checked yet, a changed one, and an agent's page", async ({ pag
   await page.goto(AGENT_URL);
   const section = page.getByTestId("compat-section");
   await expect(section.getByText("Not checked yet", { exact: true })).toBeVisible();
-  await expect(section.getByText(/When Coderhelm asks this agent a question it gets no tools/)).toBeVisible();
+  await expect(section.getByText(/For an agent, that is the read-only tools its own file lists/)).toBeVisible();
   await page.goto("/skills/item?repo=acme%2Fplaybook&path=skills%2Fgone%2FSKILL.md");
   await expect(page.getByText("Skill not found")).toBeVisible();
 });
@@ -617,8 +639,13 @@ test.describe("always apply", () => {
   test("a run's and a review's pages name the team standards they were given", async ({ page }) => {
     await mockApi(page);
     await page.goto("/runs/detail?id=run_77");
-    await expect(page.getByTestId("applied-standards")).toContainText("Applied team standards: api-conventions");
+    const used = page.getByTestId("work-used");
+    await expect(used).toContainText("Skill: debug ×2");
+    await expect(used).toContainText("Agent asked: spec-checker (read with read_file)");
+    await expect(used).toContainText("Data source: Orders DB ×3");
+    await expect(used).toContainText("Standards applied: api-conventions");
+    await shot(page, "run-used");
     await page.goto("/reviewer/detail?sk=REVIEW%23acme%2Fweb%23000412%23t");
-    await expect(page.getByTestId("applied-standards")).toContainText("Applied team standards: api-conventions, copy-tone");
+    await expect(page.getByTestId("work-used")).toContainText("Standards applied: api-conventions, copy-tone");
   });
 });

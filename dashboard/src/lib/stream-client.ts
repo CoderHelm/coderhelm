@@ -15,6 +15,8 @@ const CONNECT_TIMEOUT_MS = 15_000;
 const STREAM_IDLE_TIMEOUT_MS = 120_000;
 
 export interface StreamOptions {
+  /** The chat's id: what it reads, asks and looks up is logged under it. */
+  chatId?: string;
   signal?: AbortSignal;
   onEvent: (event: StreamEvent) => void;
   onError?: (error: Error) => void;
@@ -133,7 +135,7 @@ export async function streamChat(
   messages: { role: string; content: string }[],
   options: StreamOptions,
 ): Promise<void> {
-  const { signal, onEvent, onError } = options;
+  const { signal, onEvent, onError, chatId } = options;
 
   assertOnline();
 
@@ -146,7 +148,7 @@ export async function streamChat(
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ messages, chat_id: chatId }),
       signal,
     }),
     CONNECT_TIMEOUT_MS,

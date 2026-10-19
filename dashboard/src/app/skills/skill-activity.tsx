@@ -92,9 +92,9 @@ function ActivityRow({ e, showItem }: { e: SkillAccessEvent; showItem: boolean }
         </div>
         {e.why && (
           <p className="mt-1 line-clamp-3 text-sm text-zinc-400 [overflow-wrap:anywhere]">
-            <span className="sr-only">{e.action === "ask" ? "Question: " : "Why: "}</span>
+            <span className="sr-only">{e.action === "ask" ? "Question: " : e.action === "agent_tool" ? "Input: " : "Why: "}</span>
             <span aria-hidden="true" className="text-zinc-600">
-              {e.action === "ask" ? "Asked: " : "Why: "}
+              {e.action === "ask" ? "Asked: " : e.action === "agent_tool" ? "Input: " : "Why: "}
             </span>
             {e.why}
           </p>

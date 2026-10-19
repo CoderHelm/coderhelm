@@ -260,7 +260,7 @@ function SkillsPage() {
             Keep your team&apos;s skills, agent briefs and commands in a repository, and Coderhelm&apos;s planner, coder and reviewer read
             the ones that fit the work, and can ask your agents a question. Coderhelm reads the default branch, so only merged changes
             count, and reads it again on every push. Nothing in them is ever run, and they can&apos;t give Coderhelm any access it
-            doesn&apos;t already have: an agent that&apos;s asked gets no tools, only its brief and what it&apos;s sent.
+            doesn&apos;t already have: an agent that&apos;s asked gets only the read-only tools its own file lists, its brief and what it&apos;s sent.
           </>
         }
       />
