@@ -50,3 +50,31 @@ html {
   background-size: 100% 100%, 56px 56px, 56px 56px;
   mask-image: linear-gradient(to bottom, black 40%, transparent);
 }
+
+/* The story rail marks the step crossing the middle of the screen. Browsers
+   without scroll driven animations simply show plain links. It is a color
+   change, not motion, so it stays on with reduced motion. */
+@supports (animation-timeline: view()) {
+  .story-step {
+    view-timeline-inset: 45% 45%;
+  }
+  .story-link {
+    animation: story-on linear both;
+    animation-fill-mode: none;
+  }
+  @keyframes story-on {
+    from,
+    to {
+      color: var(--color-text-primary);
+      border-left-color: var(--color-accent-text);
+    }
+  }
+}
+
+/* The accent words in the home headline. */
+.hero-accent {
+  background: linear-gradient(100deg, #fafafa 0%, #9cc2ff 55%, var(--color-accent) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}

@@ -31,6 +31,22 @@ function block(b: Block): string {
     }
     case "frame":
       return `*Product view: ${b.caption}*`;
+    case "story": {
+      let n = 0;
+      return b.chapters
+        .map((c) =>
+          [
+            `### ${c.title}`,
+            ...c.steps.map(
+              (s) =>
+                `${++n}. **${s.title}.** ${s.heading} ${absolutize(s.text)} [${s.linkLabel}](${SITE.url}${s.href})\n\n   *Product view: ${s.caption}*`,
+            ),
+          ].join("\n\n"),
+        )
+        .join("\n\n");
+    }
+    case "bento":
+      return b.items.map((c) => `- **[${c.title}](${SITE.url}${c.href}):** ${absolutize(c.text)}`).join("\n");
   }
 }
 

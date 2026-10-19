@@ -4,6 +4,8 @@ import { SITE, pageBySlug } from "@/content/site";
 import { pageJsonLd, jsonLdString } from "@/lib/seo";
 import { Inline } from "./Md";
 import { Frame } from "./Frames";
+import { Story } from "./Story";
+import { Bento } from "./Bento";
 import Nav from "./Nav";
 import Footer from "./Footer";
 
@@ -95,6 +97,10 @@ function BlockView({ block }: { block: Block }) {
       );
     case "frame":
       return <Frame id={block.id} caption={block.caption} />;
+    case "story":
+      return <Story chapters={block.chapters} />;
+    case "bento":
+      return <Bento items={block.items} />;
   }
 }
 

@@ -187,3 +187,62 @@ Paths: P = coderhelm-platform (main at b54a493), D = coderhelm/dashboard/src/app
   - These need a legal edit by the owner.
 - **README.md at the repo root** still describes an MCP plugin system with Notion and Slack examples.
 - **No real product screenshots are used.** The product views are HTML recreations based on the dashboard, with made up example data.
+
+## 9. Showing many capabilities without a wall (follow-up, 2026-10-19)
+
+The owner's verdict on the first redesign: the headline was weaker than the old "Ship code, not tickets.", and the home page was still a wall of features. Two card grids of six (after the PR, security), a features list and a seven-row table each asked the visitor to read many equal items with no order between them. This section covers how other sites show breadth, what the evidence says, and the structure we chose.
+
+### 9.1 How others show breadth (home pages fetched 2026-10-19)
+
+The fetch tool sees page text, so layout is inferred from markup where noted. Resend and Supabase returned their agent Markdown, not the rendered page. devin.ai returned 404.
+
+| Site | Mechanism | How much at once | Where detail goes |
+|---|---|---|---|
+| Linear | One product story in workflow order: Intake, Plan, AI, Build/review/ship. One large real UI view per stage | One stage per screen | A page per stage |
+| Vercel | Three sections grouped by job (build agents, ship apps, host platforms), each with 4 feature labels and one proof point | About 12 capabilities, no card grid | Product pages |
+| Stripe | A 6 tile bento, then sections by audience (startups, platforms, developers), an interactive picker for developers | Segment by segment | Product pages |
+| Raycast | 4 category tabs over 17 extension cards, then a 12 screenshot "What else" gallery at the end | One category | The store |
+| Notion | Three feature blocks grouped by job (capture, find, automate), each with real screenshots | 3 blocks | /product/features |
+| Arc | 4 alternating blocks, one screenshot each; smaller features folded into those blocks | 1 per screen | None |
+| Superhuman | Hero video carousel (3), 3 feature blocks, then 5 tabs over 15 icon cards (the wall pattern, behind tabs) | 15 cards | Product pages |
+| Cursor | Nearly every capability is one real UI demo (agent sidebar, Slack, model picker, repo list); no card grid | 1 per screen | Docs, changelog |
+| Clerk | One section per product with grouped bullet lists (11, 4, 3, 4) and "Explore X →" | One group | A page per product |
+| Supabase | 6 products and a "What do you want to do?" table that maps jobs to docs (agent Markdown) | One table | Docs |
+| Retool | Almost no features on home: value props, a customer grid, app gallery link | Few | Gallery, product pages |
+| Zapier | 3 groups (control, delegation, visibility) holding 13 bullets (weak fetch) | 3 groups | Product pages |
+| Datadog | A 9 tile product index, each tile to its own product page | 9 tiles | A page per product |
+| GitHub Copilot | 3 stacked rows (desktop app, editor, cloud agent), each a real screenshot and a link; tabs only for pricing and FAQ | 1 per row | Feature pages, docs |
+| CodeRabbit | 4 numbered steps (01 Review to 04 Secure) with real UI, then feature blocks, then a compact "more ways" list | 1 step per screen | A page per job |
+| Graphite | Video beside a 7 item list, feature rows, a 5 label tab list | Mixed | Product pages |
+
+What repeats across the strongest pages (Linear, Cursor, Copilot, CodeRabbit, Notion): one story told in 3 to 6 large sections, each a single real UI view with one heading and one link, then the long tail in one compact list or gallery. Grouping by job is how Vercel, Notion, Clerk and Zapier show 12 to 22 capabilities without a card wall. Tabs appear mostly for categories (Raycast) or reference content (Copilot pricing and FAQ). Carousels are used for logos, testimonials and news, never for the core story.
+
+### 9.2 Evidence
+
+- **Progressive disclosure.** Show the few most important things first and defer the rest; more than two levels of disclosure usually hurts. https://www.nngroup.com/articles/progressive-disclosure/ For us that means two levels: the home page, then one page per job.
+- **Information carrying images beat decoration.** Eye tracking shows people study images that show the real thing and skip decorative ones. https://www.nngroup.com/articles/photos-as-web-content/
+- **A list of functions is the weakest approach.** Evil Martians' review of 100+ developer tool landing pages calls a plain feature list "the most straightforward, and weakest" approach and finds problem oriented stories more engaging; tools with a lot of UI lead with it. This counts patterns, it does not measure conversion. https://evilmartians.com/chronicles/we-studied-100-devtool-landing-pages-here-is-what-actually-works-in-2025
+- **Tabs hide what is not default.** Content in non default tabs should be supplementary, not critical; labels should be one or two words; on phones accordions often work better, and five or more tabs push content out of view. https://www.nngroup.com/articles/tabs-used-right/ and https://bux.osu.edu/blog/accordions-vs-tabs
+- **Carousels lose later frames.** Use five or fewer, show position, never auto advance on mobile, and repeat important content elsewhere. https://www.nngroup.com/articles/designing-effective-carousels/
+- **Scrolljacking disorients.** Most participants were disoriented, worst when text had to be read and on mobile. https://www.nngroup.com/articles/scrolljacking-101/
+- **Chunking, not hiding.** More than seven items is fine when they are grouped in a meaningful way, because people recognize rather than recall. https://www.nngroup.com/articles/chunking/
+- **Front load headings.** People read the first words of headings and lines most. https://www.nngroup.com/articles/f-shaped-pattern-reading-web-content/
+- **Accessible tabs need JavaScript** (roles, arrow keys, one tab in the tab order). https://www.w3.org/WAI/ARIA/apg/patterns/tabs/ Auto moving content over five seconds needs a pause control (WCAG 2.2.2), and interaction motion should respect reduced motion (WCAG 2.3.3).
+- **Interactive demo conversion numbers** come only from demo vendors (for example Navattic's "6x"). Treated as marketing, not evidence.
+- **Jobs to be done grouping** has no primary conversion study we could find; the support is indirect (chunking, problem oriented stories) plus what leading sites do.
+
+### 9.3 The structure we chose, and why
+
+1. **Hero: "Ship code, not tickets."** The old line, restored, with a tightened version of the old subline. Under it, a strip of the eight steps of the story. It previews the whole product in one glance and every step is a link that jumps to it.
+2. **One story, three jobs, eight steps.** "One ticket, followed all the way to production." The steps are grouped by the job they do for a team: *Turn tickets into pull requests* (assign, open the PR), *Keep pull requests healthy after they open* (fix CI, answer review comments, review every PR, merge and check the deploy) and *Catch problems in production* (alerts, flaky tests). Each step is one heading that starts with what happens, one or two sentences, one product view of that moment and one link to the page that holds the detail.
+   - Stacked in normal document flow, not tabs or a carousel: every step is critical (tabs guidance), the steps are sequential and distinct (staged disclosure), and stacking works at 375 px with no JavaScript.
+   - A sticky rail on wide screens lists the three jobs and eight steps as plain anchor links, so a visitor can jump anywhere, as the owner asked. Where the browser supports scroll driven animations, the rail marks the step crossing the middle of the screen; elsewhere it is plain links. It is a color change, not motion, so it is safe with reduced motion.
+   - The same ticket (WEB-412, "Send start date at checkout") runs through the first six views, so the steps read as one story rather than eight features.
+3. **A compact bento for what surrounds the work**: read only data lookups, plans, skills and memory, and security, four cells with a small product detail each and a link out. Then one line naming the integrations.
+4. **FAQ and one CTA.** The six card security grid, the six card "after the PR" grid and the integrations table left the home page; their content lives on /security/, /maintenance/ and the other job pages, and in llms.txt.
+
+What we did not do: no tabs or carousel for the story (hidden critical content, poor on phones, needs JavaScript for correct keyboard support), no scroll jacking, no autoplay, no new claims (every step restates a claim in section 6), no logos, numbers or testimonials.
+
+### 9.4 Claims used by the new home page
+
+Every statement in the story and the bento maps to a row in section 6: triggers, AGENTS.md, plan with files, `coderhelm/` branch, sandbox with no credentials, three self review rounds, security check, conflicts, CI fixes capped at 8 pushes and stopping on repeats, one rerun of an end to end failure the change did not cause, answering review comments, reviewer label, line suggestions, risk, re-review on push, auto merge off by default on the exact reviewed commit with a person's approval and green checks, deploy check reporting only new failures and never rolling back, SNS alarm routing with rules and paired recoveries, flaky versus broken, opt in quarantine, twenty green runs for fix PRs, read only lookups with recorded activity, plans that become issues and runs, skills, MCP servers, memory, KMS secrets, signed webhooks and roles.

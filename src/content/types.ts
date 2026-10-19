@@ -12,7 +12,27 @@ export type FrameId =
   | "alert"
   | "tests"
   | "lookup"
-  | "skills";
+  | "skills"
+  | "ticket"
+  | "cifix"
+  | "reply"
+  | "merge";
+
+// Small pictures for the bento cells on the home page.
+export type MiniId = "lookup" | "skills" | "plans" | "security";
+
+export type StoryStep = {
+  id: string; // anchor, unique on the page
+  title: string; // short label in the step selector
+  heading: string; // one sentence shown with the picture
+  text: string;
+  frame: FrameId;
+  caption: string;
+  href: string;
+  linkLabel: string;
+};
+
+export type Chapter = { title: string; steps: StoryStep[] };
 
 export type Block =
   | { type: "p"; text: string }
@@ -21,6 +41,9 @@ export type Block =
   | { type: "cards"; items: { title: string; text: string; href?: string }[] }
   | { type: "faq"; items: { q: string; a: string }[] }
   | { type: "table"; head: string[]; rows: string[][] }
+  // One ticket followed through its life, grouped by the job each step does.
+  | { type: "story"; chapters: Chapter[] }
+  | { type: "bento"; items: { title: string; text: string; href: string; mini: MiniId; wide?: boolean }[] }
   // A picture of the product. The caption is what the Markdown twin keeps.
   | { type: "frame"; id: FrameId; caption: string };
 
