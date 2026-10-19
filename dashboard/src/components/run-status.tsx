@@ -9,6 +9,8 @@ const LOOKS: Record<string, Look> = {
   running: { label: "Running", dot: "bg-blue-400", text: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20", live: true },
   awaiting_ci: { label: "Waiting on CI", dot: "bg-cyan-400", text: "text-cyan-400", bg: "bg-cyan-500/10 border-cyan-500/20", live: true },
   needs_input: { label: "Needs your answer", dot: "bg-amber-400", text: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },
+  // The code works as designed; the fix is a change in another system's data or settings.
+  needs_outside_change: { label: "Needs a change outside the code", dot: "bg-orange-400", text: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/20" },
   completed: { label: "Done", dot: "bg-emerald-400", text: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
   merged: { label: "Merged", dot: "bg-violet-400", text: "text-violet-400", bg: "bg-violet-500/10 border-violet-500/20" },
   failed: { label: "Failed", dot: "bg-red-400", text: "text-red-400", bg: "bg-red-500/10 border-red-500/20" },

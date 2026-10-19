@@ -172,6 +172,72 @@ test("a finished run shows its pull request, steps, documents and tasks without 
   expect(errors).toEqual([]);
 });
 
+// The report a run posts when the code works as designed and the fix is a
+// setting in the source system (the worker's outside-the-code fixture).
+const OUTSIDE_REPORT = [
+  "**Needs a change outside the code**",
+  "",
+  "**Cause:** The class's term is set to not be available on the web in the booking system, so the sync job marks the class inactive, as it is designed to.",
+  "",
+  "**What I checked**",
+  "- programs where external id = 12345: one row, term id 678, active = false",
+  "- terms where id = 678: available_on_web = false",
+  "",
+  "**What the code is meant to do:** The sync job marks a program inactive when its term is not available on the web.",
+  "",
+  "**What the data shows:** Term 678 has available_on_web = false in the booking system, so program 12345 is correctly inactive.",
+  "",
+  "**The change to make**",
+  "- **Where:** the booking system (the term's settings page in the booking system's admin)",
+  "- **What to change:** Set term 678 (the term of program 12345) to available on web.",
+  "- **How to confirm:** After the next sync runs, program 12345 is active and the Saturday class shows on the site.",
+  "",
+  "No code was changed and no pull request was opened: the code works as designed, and changing it would override the data in the source system. Once the change above is made, nothing else is needed here.",
+].join("\n");
+
+test("a run whose fix is outside the code shows what to change there and opens no pull request", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page, {
+    run: baseRun({
+      status: "needs_outside_change",
+      title: "Saturday class missing from the site",
+      current_pass: "done",
+      branch: null,
+      pr_url: null,
+      pr_number: null,
+      files_modified: [],
+      fix_location: "outside_code",
+      outside_change_report: OUTSIDE_REPORT,
+      pass_history: [{ pass: "triage", started_at: iso(6) }, { pass: "plan", started_at: iso(5) }],
+    }),
+  });
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  await expect(page.getByText("Needs a change outside the code", { exact: true }).first()).toBeVisible();
+  const report = page.getByRole("region", { name: "The fix is a change outside the code" });
+  await expect(report).toBeVisible();
+  await expect(report).toContainText("Set term 678 (the term of program 12345) to available on web.");
+  await expect(report).toContainText("After the next sync runs");
+  await expect(report).toContainText("terms where id = 678: available_on_web = false");
+  // The box has its own heading; the report's first line is not repeated as text.
+  await expect(report.getByText("Needs a change outside the code")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Pull request #/ })).toHaveCount(0);
+  await expect(page.getByText("Reported the change to make outside the code")).toBeVisible();
+  // Triage and plan are done; nothing after them ran, on purpose.
+  await expect(page.getByRole("list", { name: "Steps" }).locator("svg")).toHaveCount(2);
+  await expect(page.getByRole("button", { name: "Start over from scratch" })).toBeVisible();
+  await shot(page, "runs-detail-outside-code");
+  expect(errors).toEqual([]);
+});
+
+test("a run that learned the fix was elsewhere shows the lesson it saved", async ({ page }) => {
+  await mockApi(page, {
+    run: baseRun({ lesson: "Classes missing from the site are often because their semester is not available on web in the booking system; check that setting first." }),
+  });
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  await expect(page.getByText("Lesson saved for this repository:")).toBeVisible();
+  await expect(page.getByText(/semester is not available on web in the booking system/)).toBeVisible();
+});
+
 test("the spec documents open on a document that exists, never an empty tab", async ({ page }) => {
   await mockApi(page);
   await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
