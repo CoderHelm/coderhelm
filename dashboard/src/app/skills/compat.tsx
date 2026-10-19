@@ -455,7 +455,7 @@ function Chip({ children, tone = "zinc" }: { children: ReactNode; tone?: "zinc" 
   return <span className={`inline-flex max-w-full items-center rounded-md border px-1.5 py-0.5 font-mono text-xs [overflow-wrap:anywhere] ${cls}`}>{children}</span>;
 }
 
-const KIND_WORD: Record<Requirement["kind"], string> = { tool: "tool", command: "command", data: "data", path: "file path", other: "other" };
+const KIND_WORD: Record<Requirement["kind"], string> = { tool: "tool", command: "command", data: "data", path: "file path", person: "talk to a person", other: "other" };
 
 function RequirementRow({ r }: { r: Requirement }) {
   const s = STEP_STATUS[r.status] ?? STEP_STATUS.missing;

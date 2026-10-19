@@ -138,7 +138,7 @@ export interface CompatShort {
 export interface Requirement {
   /** What the item asks for, in its words. */
   asks: string;
-  kind: "tool" | "command" | "data" | "path" | "other";
+  kind: "tool" | "command" | "data" | "path" | "person" | "other";
   status: RequirementStatus;
   /** Coderhelm tools that do it. */
   uses: string[];
