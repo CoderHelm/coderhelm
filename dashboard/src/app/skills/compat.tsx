@@ -121,9 +121,20 @@ const CONNECT: Record<Requirement["connect"], { href: string; label: string } | 
 /** The link a gap offers, if any: connecting it, or adding the credentials
  * of a server that's switched on. Never one for something already
  * connected. */
-function linkFor(g: Pick<Requirement, "connect" | "action">): { href: string; text: string } | null {
+const CONNECTION_LABEL: Record<string, string> = {
+  newrelic: "New Relic",
+  confluence: "Confluence",
+  metrics: "CloudWatch metrics",
+  airflow: "Airflow",
+};
+
+function linkFor(g: Pick<Requirement, "connect" | "action" | "connection">): { href: string; text: string } | null {
   const where = CONNECT[g.connect];
   if (!where || g.action === "none") return null;
+  // A monitoring, docs or pipeline connection opens its own card.
+  if (g.connection && CONNECTION_LABEL[g.connection]) {
+    return { href: `/data-sources?connect=${g.connection}#connections`, text: `Set up ${CONNECTION_LABEL[g.connection]} in Data sources` };
+  }
   if (g.action === "credentials") return { href: where.href, text: `Add credentials in ${where.label}` };
   return { href: where.href, text: `Connect in ${where.label}` };
 }
