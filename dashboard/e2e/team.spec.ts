@@ -87,6 +87,7 @@ async function mockApi(page: Page, selfRole = "admin", init: Partial<Backend> = 
     if (p === "/api/me") return json(route, { user_id: self?.user_id ?? "u-admin", team_id: "t_1", github_login: null, email: self?.email ?? "", avatar_url: "", role: selfRole });
     if (p === "/api/usage") return json(route, { month: "2026-01", total_tokens: 0, tokens_in: 0, tokens_out: 0, total_runs: 0, max_tokens: 0 });
     if (p === "/api/banners") return json(route, { banners: [] });
+    if (p === "/api/integrations") return json(route, { can_edit: false, items: [], migrated: 0 });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "acme-labs", status: "active", current: true }] });
     if (p === "/api/users/permissions") {
       return json(route, {

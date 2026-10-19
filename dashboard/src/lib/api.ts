@@ -792,6 +792,14 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ instructions }),
     }),
+  /** The team's own public domains agents may check pages on; each covers its subdomains. */
+  getWebDomains: () => request<{ web_domains?: string[] }>(`/api/reviewer/org-config`).then((r) => r.web_domains ?? []),
+  /** Replaces the list (admin). Entries that aren't domains are refused with a 400 naming them. */
+  setWebDomains: (domains: string[]) =>
+    request<{ web_domains: string[] }>(`/api/reviewer/org-config`, {
+      method: "PUT",
+      body: JSON.stringify({ web_domains: domains }),
+    }).then((r) => r.web_domains ?? []),
   listReviews: (repo?: string, cursor?: string, limit = 50) => {
     const params = new URLSearchParams({ limit: String(limit) });
     if (repo) params.set("repo", repo);
@@ -2126,6 +2134,14 @@ export interface Integration {
   /** A page with more settings, or empty. */
   manage_href: string;
   detail: Record<string, unknown>;
+}
+
+/** Sent on `window` with the number of integrations that need attention, so the menu badge stays current. */
+export const INTEGRATIONS_ATTENTION_EVENT = "coderhelm:integrations-attention";
+
+/** Integrations that are switched on but not working: missing credentials or a failed check. */
+export function needsAttention(items: Integration[]): number {
+  return items.filter((i) => i.status === "needs_credentials" || i.status === "error").length;
 }
 
 export interface IntegrationsResponse {
