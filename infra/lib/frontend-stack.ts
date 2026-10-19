@@ -124,7 +124,8 @@ function handler(event) {
   // every page as /<page>.md, and /index.md for the home page).
   var accept = request.headers.accept && request.headers.accept.value;
   if (accept && accept.indexOf('text/markdown') !== -1 && (uri.endsWith('/') || uri.indexOf('.') === -1)) {
-    var path = uri.replace(/\/+$/, '');
+    var path = uri;
+    while (path.length > 0 && path.charAt(path.length - 1) === '/') { path = path.slice(0, -1); }
     request.uri = path === '' ? '/index.md' : path + '.md';
     return request;
   }
