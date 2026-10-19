@@ -9,10 +9,10 @@ import { StatusPill } from "@/components/status-pill";
 import { Skeleton } from "@/components/skeleton";
 import { inputClass, primaryButton, secondaryButton } from "@/components/ui";
 import { formatTokens, USAGE_CHANGED, usageTone } from "@/lib/usage";
-import { hasRole, whoCan } from "@/lib/roles";
+import { hasRole } from "@/lib/roles";
 
 // Who may change the limit. The gateway checks the same role on save.
-const EDIT_ROLE = "owner" as const;
+const EDIT_ROLE = "admin" as const;
 
 export default function TokenLimitPageGuarded() {
   return (
@@ -139,7 +139,7 @@ function TokenLimitPage() {
                   {load.usage.max_tokens > 0 ? `${formatTokens(load.usage.max_tokens)} tokens a month` : "No limit"}
                 </p>
                 <Callout variant="info" live={false}>
-                  <p>Only {whoCan(EDIT_ROLE)} can change the limit.</p>
+                  <p>Only admins and the owner can change the limit.</p>
                 </Callout>
               </div>
             )}
