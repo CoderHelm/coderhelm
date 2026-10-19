@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, type RunDetail, type Openspec, type UsageInfo, type PluginDef, type PassTrace, type AgentLogPass, errorStatus } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
+import { usageBreakdown, usageTotal } from "@/lib/usage";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Callout } from "@/components/callout";
@@ -103,6 +104,16 @@ function PassProgress({ currentPass, status, passHistory }: { currentPass?: stri
       })}
     </ol>
   );
+}
+
+/** A run's four token parts (missing ones count as 0). */
+function usageOf(r: RunDetail) {
+  return {
+    tokens_in: r.tokens_in ?? 0,
+    tokens_out: r.tokens_out ?? 0,
+    cache_read_tokens: r.cache_read_tokens ?? 0,
+    cache_write_tokens: r.cache_write_tokens ?? 0,
+  };
 }
 
 function formatTokens(n?: number): string {
@@ -260,7 +271,7 @@ function AgentLogTurnView({ turn }: { turn: AgentLogPass["conversation"][number]
         )}
         {turn.usage && (
           <span className="text-zinc-600 ml-auto">
-            {((turn.usage.input_tokens + turn.usage.output_tokens) / 1000).toFixed(1)}k tokens
+            {((turn.usage.input_tokens + (turn.usage.cache_read ?? 0) + (turn.usage.cache_write ?? 0) + turn.usage.output_tokens) / 1000).toFixed(1)}k tokens
           </span>
         )}
       </button>
@@ -601,19 +612,23 @@ function RunDetailInner() {
       )}
 
       {/* Stats cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+      {/* Tokens: the total of all four parts, then each part. */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6" title={usageBreakdown(usageOf(run))}>
         <StatCard label="Duration" value={formatDuration(run.duration_s)} />
-        <StatCard label="Tokens in" value={formatTokens(run.tokens_in)} />
-        <StatCard label="Tokens out" value={formatTokens(run.tokens_out)} />
-        <StatCard label="Cache read" value={formatTokens(run.cache_read_tokens)} />
-        <StatCard label="Cache write" value={formatTokens(run.cache_write_tokens)} />
+        <StatCard label="Total tokens" value={formatTokens(usageTotal(usageOf(run)))} />
+        <StatCard label="New input" value={formatTokens(run.tokens_in)} />
+        <StatCard label="Read from cache" value={formatTokens(run.cache_read_tokens)} />
+        <StatCard label="Written to cache" value={formatTokens(run.cache_write_tokens)} />
+        <StatCard label="Output" value={formatTokens(run.tokens_out)} />
       </div>
 
       {/* Pass pipeline (collapsed by default) */}
       {traces.length > 0 && (() => {
         const maxDuration = Math.max(...traces.map((t) => t.duration_ms), 1);
         const totalDuration = traces.reduce((s, t) => s + t.duration_ms, 0);
-        const totalTokens = traces.reduce((s, t) => s + (t.input_tokens || 0) + (t.output_tokens || 0), 0);
+        const traceTokens = (t: (typeof traces)[number]) =>
+          (t.input_tokens || 0) + (t.cache_read_tokens || 0) + (t.cache_write_tokens || 0) + (t.output_tokens || 0);
+        const totalTokens = traces.reduce((s, t) => s + traceTokens(t), 0);
         const passColors: Record<string, string> = {
           triage: "from-violet-500/80 to-violet-600/40",
           plan: "from-blue-500/80 to-blue-600/40",
@@ -685,7 +700,7 @@ function RunDetailInner() {
                   const baseName = trace.pass.split(":")[0];
                   const stepLabel = passLabel(trace.pass);
                   const pct = (trace.duration_ms / maxDuration) * 100;
-                  const passTokens = (trace.input_tokens || 0) + (trace.output_tokens || 0);
+                  const passTokens = traceTokens(trace);
                   const tokenPct = totalTokens > 0 ? (passTokens / totalTokens) * 100 : 0;
                   const cached = trace.cache_read_tokens || 0;
                   const duration = trace.duration_ms >= 60000
@@ -715,11 +730,15 @@ function RunDetailInner() {
                       <div className="flex items-center gap-3 text-[11px]">
                         {passTokens > 0 ? (
                           <>
-                            <span className="text-zinc-500">{formatTokens(trace.input_tokens)} in</span>
-                            <span className="text-zinc-500">{formatTokens(trace.output_tokens)} out</span>
+                            <span className="text-zinc-400">{formatTokens(passTokens)} tokens</span>
+                            <span className="text-zinc-500">{formatTokens(trace.input_tokens)} new input</span>
                             {cached > 0 && (
-                              <span className="text-zinc-600">{formatTokens(cached)} cached</span>
+                              <span className="text-zinc-600">{formatTokens(cached)} read from cache</span>
                             )}
+                            {(trace.cache_write_tokens || 0) > 0 && (
+                              <span className="text-zinc-600">{formatTokens(trace.cache_write_tokens || 0)} written to cache</span>
+                            )}
+                            <span className="text-zinc-500">{formatTokens(trace.output_tokens)} output</span>
                             <span className="ml-auto text-zinc-600 tabular-nums">{tokenPct.toFixed(0)}% of tokens</span>
                           </>
                         ) : (

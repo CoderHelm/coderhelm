@@ -102,7 +102,7 @@ function SettingsRow({ item, readOnly, status }: { item: SettingsItem; readOnly:
         <span className="block text-sm text-zinc-400 mt-0.5">{item.description}</span>
         {status && (
           <span className="mt-2 flex">
-            <StatusPill tone={status.tone}>{status.text}</StatusPill>
+            <span title={status.title}><StatusPill tone={status.tone}>{status.text}</StatusPill></span>
           </span>
         )}
       </span>

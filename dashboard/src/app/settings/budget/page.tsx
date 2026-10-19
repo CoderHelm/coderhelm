@@ -8,7 +8,7 @@ import { Callout } from "@/components/callout";
 import { StatusPill } from "@/components/status-pill";
 import { Skeleton } from "@/components/skeleton";
 import { inputClass, primaryButton, secondaryButton } from "@/components/ui";
-import { formatTokens, USAGE_CHANGED, usageTone } from "@/lib/usage";
+import { cacheHitRate, FEATURE_LABELS, formatTokens, USAGE_CHANGED, usageBreakdown, usageParts, usageTone, usageTotal } from "@/lib/usage";
 import { hasRole } from "@/lib/roles";
 
 // Who may change the limit. The gateway checks the same role on save.
@@ -152,7 +152,11 @@ function TokenLimitPage() {
 
 function UsageCard({ usage }: { usage: UsageInfo }) {
   const limit = usage.max_tokens;
-  const used = usage.total_tokens;
+  // All four parts: new input, read from cache, written to cache, output.
+  const used = usageTotal(usage);
+  const parts = usageParts(usage);
+  const hitRate = Math.round(cacheHitRate(usage) * 100);
+  const features = (usage.features ?? []).filter((f) => f.total_tokens > 0);
   const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
   const tone = usageTone(used, limit);
   const bar = tone === "error" ? "bg-red-500" : tone === "warning" ? "bg-amber-500" : "bg-emerald-500";
@@ -186,6 +190,44 @@ function UsageCard({ usage }: { usage: UsageInfo }) {
         {usage.total_runs.toLocaleString()} {usage.total_runs === 1 ? "run" : "runs"} this month
         {limit > 0 ? ` · ${pct}% of the limit` : ""}
       </p>
+
+      <dl aria-label="Tokens by kind" className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-zinc-800 pt-4 sm:grid-cols-4">
+        {parts.map((p) => (
+          <div key={p.label} data-testid="usage-part">
+            <dt className="text-xs text-zinc-500">{p.label}</dt>
+            <dd className="mt-0.5 text-sm font-medium tabular-nums text-zinc-100" data-value={p.value}>
+              {formatTokens(p.value)}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 text-xs text-zinc-500" data-testid="cache-hit-rate">
+        Cache hit rate {hitRate}%: the share of input read from the cache instead of sent new or written to it.
+      </p>
+
+      {features.length > 0 && (
+        <div className="mt-4 border-t border-zinc-800 pt-4">
+          <h3 className="text-xs font-medium text-zinc-400">Where the tokens went</h3>
+          <ul className="mt-2 space-y-1.5" aria-label="Tokens by feature">
+            {features.map((f) => (
+              <li key={f.feature} className="flex items-center justify-between gap-3 text-sm" title={usageBreakdown(f)}>
+                <span className="text-zinc-300">{FEATURE_LABELS[f.feature] ?? f.feature}</span>
+                <span className="tabular-nums text-zinc-400">
+                  {formatTokens(f.total_tokens)}
+                  <span className="text-zinc-600"> · {used > 0 ? Math.round((f.total_tokens / used) * 100) : 0}%</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {limit > 0 && usage.limit_counts_cache === false && (
+        <p className="mt-4 text-xs text-zinc-500" data-testid="limit-rule">
+          Runs pause when new input and output reach the limit ({formatTokens(usage.counted_tokens ?? usage.tokens_in + usage.tokens_out)} so far).
+          Tokens read from or written to the cache are shown above but not counted toward it yet.
+        </p>
+      )}
     </section>
   );
 }
