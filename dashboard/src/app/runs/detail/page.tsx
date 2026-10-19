@@ -14,6 +14,7 @@ import { focusRing, primaryButton, secondaryButton } from "@/components/ui";
 import { Page } from "@/components/page";
 import { RunStatusBadge, runIsLive } from "@/components/run-status";
 import { TeamAgentAsks } from "./team-asks";
+import { AppliedStandards } from "@/components/applied-standards";
 
 const PASSES = ["triage", "plan", "implement", "test", "security", "pr", "review"];
 
@@ -911,6 +912,8 @@ function RunDetailInner() {
           </div>
         )}
       </div>
+
+      <AppliedStandards names={run.applied_standards} className="mb-6" />
 
       <TeamAgentAsks runId={runId} status={run.status} />
 

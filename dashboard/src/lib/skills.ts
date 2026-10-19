@@ -49,6 +49,69 @@ export interface Skill {
   use_translated?: boolean;
   translated_by?: string;
   translated_at?: string;
+  /** Given in full to matching work instead of only listed. Missing on an
+   * older gateway. */
+  always_apply?: AlwaysApply;
+  /** Where it looks meant to always apply, worked out at sync. Null when
+   * nothing is suggested. Never applied by itself. */
+  suggestion?: AlwaysApplySuggestion | null;
+}
+
+/** The passes an item can always apply to, in order, with their names. */
+export const PASSES = [
+  { id: "planner", label: "Planner" },
+  { id: "coder", label: "Coder" },
+  { id: "reviewer", label: "Reviewer" },
+  { id: "pr", label: "PR descriptions" },
+  { id: "review_comments", label: "Review comments" },
+  { id: "replies", label: "Replies" },
+  { id: "release_notes", label: "Release notes" },
+] as const;
+
+export type Pass = (typeof PASSES)[number]["id"];
+
+/** Passes a newly switched on item gets unless the admin picks others. */
+export const DEFAULT_PASSES: Pass[] = ["coder", "reviewer"];
+
+export interface AlwaysApply {
+  on: boolean;
+  /** owner/name; empty means every repository. */
+  repos: string[];
+  passes: Pass[];
+  /** Globs such as apps/web/**; empty means any change. */
+  paths: string[];
+  by: string;
+  at: string;
+}
+
+export interface AlwaysApplySuggestion {
+  repos: string[];
+  passes: Pass[];
+  paths: string[];
+  reason: string;
+  at: string;
+}
+
+/** A pass in words, lower case after the first, e.g. "coder". */
+export const passLabel = (p: string) => PASSES.find((x) => x.id === p)?.label ?? p;
+
+/** "speedboat" for "acme/speedboat". */
+export const repoShort = (r: string) => r.split("/").pop() ?? r;
+
+/** The badge text: "Always applied · speedboat · Coder, Reviewer". */
+export function alwaysLabel(a: Pick<AlwaysApply, "repos" | "passes" | "paths">): string {
+  const repos = a.repos.length === 0 ? "all repositories" : a.repos.map(repoShort).join(", ");
+  const passes = a.passes.map(passLabel).join(", ");
+  const paths = a.paths.length > 0 ? ` · ${a.paths.join(", ")}` : "";
+  return `Always applied · ${repos} · ${passes}${paths}`;
+}
+
+/** The suggestion as a sentence: "Suggested: always apply to speedboat for Coder and Reviewer". */
+export function suggestionLabel(s: AlwaysApplySuggestion): string {
+  const names = s.passes.map(passLabel);
+  const passes = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0] ?? "";
+  const paths = s.paths.length > 0 ? ` when the change touches ${s.paths.join(", ")}` : "";
+  return `Suggested: always apply to ${s.repos.map(repoShort).join(", ")} for ${passes}${paths}`;
 }
 
 export type CompatStatus = "ready" | "translated" | "needs_tools";
@@ -210,6 +273,8 @@ export const skillsApi = {
   runAsks: (runId: string) => call<{ asks: AgentAsk[] }>(`/api/skills/asks?run_id=${encodeURIComponent(runId)}`),
   recheck: (repo: string, path?: string) =>
     call<{ ok: true; checking: true }>("/api/skills/recheck", { method: "POST", body: JSON.stringify({ repo, path: path ?? "" }) }),
+  setAlwaysApply: (repo: string, path: string, a: Pick<AlwaysApply, "on" | "repos" | "passes" | "paths">) =>
+    call<{ ok: true; always_apply: AlwaysApply }>("/api/skills/always", { method: "PUT", body: JSON.stringify({ repo, path, ...a }) }),
   setUseTranslated: (repo: string, path: string, enabled: boolean) =>
     call<{ ok: true; use_translated: boolean }>("/api/skills/translated", { method: "PUT", body: JSON.stringify({ repo, path, enabled }) }),
   tryAgent: (repo: string, path: string, question: string, context: string) =>

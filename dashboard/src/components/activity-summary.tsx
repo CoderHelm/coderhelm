@@ -73,6 +73,7 @@ export function ActivitySummaryStrip({ days = 7 }: { days?: number }) {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <SummaryTile href={`${skillLog}&action=read&range=7d`} label="Skill reads" value={summary.skills.reads} note="skills, briefs, commands" />
           <SummaryTile href={`${skillLog}&action=ask&range=7d`} label="Agent asks" value={summary.skills.asks} note="questions to team agents" />
+          <SummaryTile href={`${skillLog}&action=apply&range=7d`} label="Always applied" value={summary.skills.applies ?? 0} note="team standards given in full" />
           <SummaryTile
             href={`${skillLog}&outcome=problems&range=7d`}
             label="Reads and asks that went wrong"
