@@ -12,6 +12,50 @@ import { Select } from "./common";
 export const REPORTER_SNIPPET = `// playwright.config.ts
 reporter: [["html"], ["json", { outputFile: "test-results/results.json" }]],`;
 
+export const QUARANTINE_SNIPPET = `# in the job that runs your Playwright tests
+permissions:
+  id-token: write # lets the job ask GitHub for a signed token Coderhelm checks
+  contents: read
+steps:
+  # ...your checkout and install steps...
+  - name: Get quarantined tests from Coderhelm
+    id: quarantine
+    run: |
+      TOKEN=$(curl -sf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \\
+        "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=coderhelm" | jq -r .value) || TOKEN=""
+      GREP=$(curl -sf -H "Authorization: Bearer $TOKEN" \\
+        https://api.coderhelm.com/webhooks/ci/tests/quarantine | jq -r '.playwright_grep_invert // ""') || GREP=""
+      echo "grep=$GREP" >> "$GITHUB_OUTPUT"
+  - name: Run E2E tests
+    env:
+      QUARANTINED: \${{ steps.quarantine.outputs.grep }}
+    run: |
+      if [ -n "$QUARANTINED" ]; then
+        npx playwright test --grep-invert "$QUARANTINED"
+      else
+        npx playwright test
+      fi
+  # ...your upload-artifact step...`;
+
+/** The CI step that keeps quarantined tests from failing a build. Nothing in a repo changes until a team adds it. */
+export function QuarantineCiStep() {
+  return (
+    <div className="space-y-2 text-sm text-zinc-300">
+      <p className="max-w-prose text-zinc-400">
+        Coderhelm already treats a run where only quarantined tests failed as passing: it won&apos;t try to fix it or hold back
+        auto-merge. GitHub&apos;s check still turns red, because your workflow decides that. To skip quarantined tests in the build,
+        add this step before your test step. If Coderhelm can&apos;t be reached, every test runs as before.
+      </p>
+      <Snippet text={QUARANTINE_SNIPPET} />
+      <p className="max-w-prose text-zinc-400">
+        Skipped tests aren&apos;t recorded from that run. To keep recording them, run{" "}
+        <code className="text-zinc-200">npx playwright test --grep &quot;$QUARANTINED&quot;</code> in a separate job with{" "}
+        <code className="text-zinc-200">continue-on-error: true</code> that uploads its results the same way.
+      </p>
+    </div>
+  );
+}
+
 export const UPLOAD_SNIPPET = `# in the workflow that runs your E2E tests, after the test step
 - uses: actions/upload-artifact@v4
   if: \${{ !cancelled() }}
@@ -114,6 +158,8 @@ export function SettingsView({
   }, []);
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(settings);
+  const days = draft.ticket_after_days;
+  const daysValid = Number.isInteger(days) && days >= 1 && days <= 30;
   const set = <K extends keyof TestSettings>(k: K, v: TestSettings[K]) => setDraft((d) => ({ ...d, [k]: v }));
   const toggleRepo = (name: string) =>
     setDraft((d) => ({ ...d, repos: d.repos.includes(name) ? d.repos.filter((r) => r !== name) : [...d.repos, name] }));
@@ -178,7 +224,26 @@ export function SettingsView({
               </div>
             }
           >
-            After 14 days in quarantine without a fix, the test&apos;s owner gets a ticket with its history and likely cause.
+            When a test stays quarantined without a fix, its owner gets a ticket with its history and likely cause.
+          </Row>
+          <Row
+            title="Days before a ticket"
+            control={
+              <input
+                id="ticket-after-days"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={30}
+                aria-label="Days before a ticket"
+                value={Number.isFinite(draft.ticket_after_days) ? draft.ticket_after_days : ""}
+                disabled={!draft.enabled || draft.tickets === "off"}
+                onChange={(e) => set("ticket_after_days", e.target.value === "" ? Number.NaN : Number(e.target.value))}
+                className={`w-20 rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm text-zinc-100 disabled:opacity-50 ${focusRing}`}
+              />
+            }
+          >
+            File a ticket after a test has been quarantined this many days. Between 1 and 30.
           </Row>
         </div>
       </section>
@@ -217,13 +282,16 @@ export function SettingsView({
         )}
       </section>
 
+      {!daysValid && (
+        <p role="alert" className="text-sm text-red-300">Pick between 1 and 30 days before a ticket.</p>
+      )}
       {error && (
         <Callout variant="error" title="We couldn't save your settings">
           <p>{error} Nothing was changed.</p>
         </Callout>
       )}
       <div className="flex flex-wrap gap-3">
-        <button type="button" onClick={save} disabled={!dirty || saving} className={primaryButton}>
+        <button type="button" onClick={save} disabled={!dirty || saving || !daysValid} className={primaryButton}>
           {saving ? "Saving…" : "Save settings"}
         </button>
         {dirty && (
@@ -236,6 +304,13 @@ export function SettingsView({
       <section aria-labelledby="setup-heading">
         <h2 id="setup-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">Make results complete</h2>
         <SetupSteps />
+      </section>
+
+      <section aria-labelledby="quarantine-ci-heading">
+        <h2 id="quarantine-ci-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+          Make quarantined tests stop failing your build
+        </h2>
+        <QuarantineCiStep />
       </section>
     </div>
   );

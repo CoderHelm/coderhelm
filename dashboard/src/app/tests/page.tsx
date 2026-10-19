@@ -160,7 +160,7 @@ function TestsPage() {
         ) : view === "slowest" ? (
           <SlowestView repo={repo} />
         ) : view === "quarantine" ? (
-          <QuarantineView repo={repo} canEdit={isAdmin} />
+          <QuarantineView repo={repo} canEdit={isAdmin} ticketDays={settings?.ticket_after_days} />
         ) : view === "coverage" ? (
           <CoverageView repo={repo} canEdit={isAdmin} />
         ) : settings ? (

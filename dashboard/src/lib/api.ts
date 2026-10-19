@@ -1897,6 +1897,8 @@ export interface TestSettings {
   burn_in: boolean;
   /** Empty means every repo. */
   repos: string[];
+  /** Days a test stays quarantined before its owner gets a ticket (1–30). */
+  ticket_after_days: number;
 }
 
 export interface TestSummary {

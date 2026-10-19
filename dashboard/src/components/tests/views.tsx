@@ -10,6 +10,7 @@ import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { focusRing, linkButton, secondaryButton } from "@/components/ui";
 import { EmptyBox, LoadError, Loading, SectionHeading, StatCard } from "./common";
+import { QuarantineCiStep } from "./settings";
 import { TestList, impactFacts, quarantineFacts, slowFacts } from "./test-list";
 import { useLoad } from "./use-load";
 
@@ -251,7 +252,7 @@ export function SlowestView({ repo }: { repo: string }) {
 
 // ── Quarantine ────────────────────────────────────────────────────
 
-export function QuarantineView({ repo, canEdit }: { repo: string; canEdit: boolean }) {
+export function QuarantineView({ repo, canEdit, ticketDays = 2 }: { repo: string; canEdit: boolean; ticketDays?: number }) {
   const { toast } = useToast();
   const { confirm } = useConfirm();
   const { data, setData, error, loading, reload } = useLoad(
@@ -280,14 +281,21 @@ export function QuarantineView({ repo, canEdit }: { repo: string; canEdit: boole
   };
 
   const tests = data?.tests ?? [];
-  const old = tests.filter((t) => t.quarantined_since && Date.now() - new Date(t.quarantined_since).getTime() > 14 * 86_400_000);
+  const old = tests.filter((t) => t.quarantined_since && Date.now() - new Date(t.quarantined_since).getTime() > ticketDays * 86_400_000);
 
   return (
     <section aria-labelledby="quarantine-heading">
       <SectionHeading id="quarantine-heading">Quarantine</SectionHeading>
       <p className="mb-3 max-w-prose text-sm text-zinc-400">
-        Quarantined tests still run and are still recorded, but can&apos;t fail a build. After 14 days without a fix, the owner gets a ticket.
+        Quarantined tests still run and are still recorded. When only quarantined tests fail, Coderhelm treats the run as passing. When
+        tickets are on, the owner gets one after {plural(ticketDays, "day")} without a fix.
       </p>
+      <details className="mb-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+        <summary className="cursor-pointer text-sm font-medium text-zinc-100">Make quarantined tests stop failing your build</summary>
+        <div className="mt-3">
+          <QuarantineCiStep />
+        </div>
+      </details>
       {error ? (
         <LoadError what="the quarantine list" message={error} onRetry={reload} />
       ) : loading && !data ? (
@@ -297,7 +305,7 @@ export function QuarantineView({ repo, canEdit }: { repo: string; canEdit: boole
       ) : (
         <>
           {old.length > 0 && (
-            <p className="mb-3 text-sm text-amber-200">{plural(old.length, "test has", "tests have")} been quarantined for over 14 days.</p>
+            <p className="mb-3 text-sm text-amber-200">{plural(old.length, "test has", "tests have")} been quarantined for over {plural(ticketDays, "day")}.</p>
           )}
           <TestList
             label="Quarantined tests"
