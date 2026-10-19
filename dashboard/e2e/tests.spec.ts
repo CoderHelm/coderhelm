@@ -62,7 +62,7 @@ const ATTEMPT_PASS = { retry: 1, status: "passed", duration_ms: 13_000 };
 interface Call { method: string; path: string; body: Record<string, unknown> | null }
 interface Backend {
   role: string;
-  settings: { enabled: boolean; auto_quarantine: boolean; fix_prs: boolean; tickets: string; burn_in: boolean; repos: string[] };
+  settings: { enabled: boolean; auto_quarantine: boolean; fix_prs: boolean; tickets: string; burn_in: boolean; repos: string[]; ticket_after_days: number };
   tests: TestRow[];
   runs: Record<string, unknown>[];
   empty: boolean;
@@ -86,7 +86,7 @@ function summary(db: Backend) {
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = {
     role: "admin",
-    settings: { enabled: true, auto_quarantine: true, fix_prs: true, tickets: "github", burn_in: false, repos: [] },
+    settings: { enabled: true, auto_quarantine: true, fix_prs: true, tickets: "github", burn_in: false, repos: [], ticket_after_days: 2 },
     tests: [FLAKY, BROKEN, QUARANTINED, HEALTHY].map((t) => ({ ...t })),
     runs: Array.from({ length: 45 }, (_, i) => makeRun(i + 1)),
     empty: false,
@@ -232,7 +232,7 @@ async function shot(page: Page, name: string) {
 const callsTo = (db: Backend, method: string, re: RegExp) => db.calls.filter((c) => c.method === method && re.test(c.path));
 
 test("tests: off by default, an admin turns it on and sees the reporter change", async ({ page }) => {
-  const db = await mockApi(page, { empty: true, settings: { enabled: false, auto_quarantine: false, fix_prs: false, tickets: "off", burn_in: false, repos: [] } });
+  const db = await mockApi(page, { empty: true, settings: { enabled: false, auto_quarantine: false, fix_prs: false, tickets: "off", burn_in: false, repos: [], ticket_after_days: 2 } });
   await page.goto("/tests");
   await expect(page.getByRole("heading", { name: "Turn on E2E tracking" })).toBeVisible();
   await expect(page.getByText('["json", { outputFile: "test-results/results.json" }]')).toBeVisible();
@@ -244,7 +244,7 @@ test("tests: off by default, an admin turns it on and sees the reporter change",
 });
 
 test("tests: a member sees the empty state but can't turn it on, and has no settings tab", async ({ page }) => {
-  await mockApi(page, { role: "member", empty: true, settings: { enabled: false, auto_quarantine: false, fix_prs: false, tickets: "off", burn_in: false, repos: [] } });
+  await mockApi(page, { role: "member", empty: true, settings: { enabled: false, auto_quarantine: false, fix_prs: false, tickets: "off", burn_in: false, repos: [], ticket_after_days: 2 } });
   await page.goto("/tests");
   await expect(page.getByText("Ask an admin on your team to turn it on.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Turn on E2E tracking" })).toHaveCount(0);
@@ -388,7 +388,11 @@ test("tests: the quarantine ledger and releasing a test", async ({ page }) => {
   await page.goto("/tests?view=quarantine");
   const list = page.getByRole("list", { name: "Quarantined tests" });
   await expect(list.getByRole("listitem")).toHaveCount(1);
-  await expect(page.getByText("1 test has been quarantined for over 14 days.")).toBeVisible();
+  await expect(page.getByText("1 test has been quarantined for over 2 days.")).toBeVisible();
+  await expect(page.getByText(/When only quarantined tests fail, Coderhelm treats the run as passing/)).toBeVisible();
+  await page.getByText("Make quarantined tests stop failing your build").click();
+  await expect(page.getByText(/--grep-invert "\$QUARANTINED"/)).toBeVisible();
+  await expect(page.getByText(/audience=coderhelm/)).toBeVisible();
   await expect(list.getByRole("link", { name: "Ticket" })).toHaveAttribute("href", /issues\/42/);
   await expect(list).toContainText("Proving the fix (20 runs)");
   await shot(page, "quarantine");
@@ -431,13 +435,20 @@ test("tests: settings save every choice", async ({ page }) => {
   await page.getByRole("switch", { name: "Check new tests before merge" }).click();
   await page.getByRole("switch", { name: "Quarantine flaky tests" }).click();
   await page.getByLabel("Tickets for long quarantines").selectOption("jira");
+  const days = page.getByRole("spinbutton", { name: "Days before a ticket" });
+  await expect(days).toHaveValue("2");
+  await expect(page.getByText("File a ticket after a test has been quarantined this many days.", { exact: false })).toBeVisible();
+  await days.fill("31");
+  await expect(page.getByText("Pick between 1 and 30 days before a ticket.")).toBeVisible();
+  await days.fill("5");
   await page.getByRole("checkbox", { name: WEB }).check();
   await expect(page.getByText("Only the ticked repositories are tracked.")).toBeVisible();
   await page.getByRole("button", { name: "Save settings" }).click();
   await expect(page.getByRole("button", { name: "Save settings" })).toBeDisabled();
   expect(callsTo(db, "PUT", /\/api\/tests\/settings/)[0].body).toEqual({
-    enabled: true, auto_quarantine: false, fix_prs: true, tickets: "jira", burn_in: true, repos: [WEB],
+    enabled: true, auto_quarantine: false, fix_prs: true, tickets: "jira", burn_in: true, repos: [WEB], ticket_after_days: 5,
   });
+  await expect(page.getByRole("heading", { name: "Make quarantined tests stop failing your build" })).toBeVisible();
 });
 
 test("tests: a failed load says so and retries", async ({ page }) => {
