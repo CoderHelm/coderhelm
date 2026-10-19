@@ -141,6 +141,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/me") return json(route, { user_id: "u_1", team_id: "t_1", github_login: null, email: "admin@example.com", avatar_url: "", role: db.role });
     if (p === "/api/usage") return json(route, { month: "2026-01", total_tokens: 0, tokens_in: 0, tokens_out: 0, total_runs: 0, max_tokens: 0 });
     if (p === "/api/banners") return json(route, { banners: [] });
+    if (p === "/api/integrations") return json(route, { can_edit: false, items: [], migrated: 0 });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }] });
     if (p === "/api/skills") {
       return json(route, { repos: [{ repo: "acme/playbook", added_by: "admin@example.com", added_at: ago(9000), sha: "4f2c9a1e7b3d", synced_at: ago(4), error: "", items: 3, skipped: [] }], items: ITEMS, can_manage: db.role === "admin" });
@@ -304,15 +305,16 @@ test("an item's own activity: an opened skill and an agent's page show only thei
   const db = await mockApi(page);
   await page.goto("/skills");
   await expect(page.getByRole("tab", { name: "Library" })).toHaveAttribute("aria-selected", "true");
-  await page.getByRole("button", { name: "skill:debug" }).click();
+  await page.getByRole("link", { name: "skill:debug" }).click();
   const recent = page.locator("#skill-activity");
-  await expect(recent.getByRole("heading", { name: "Recent activity" })).toBeVisible();
+  // The skill opens on its own page, whose log is the full one for that skill.
+  await expect(page).toHaveURL(/\/skills\/item\/?\?repo=acme%2Fplaybook&path=skills%2Fdebug%2FSKILL\.md$/);
+  await expect(recent.getByRole("heading", { name: "Every read" })).toBeVisible();
   await expect(recent.getByTestId("skill-activity-row")).toHaveCount(3);
   await expect(recent.getByTestId("skill-activity-row").first()).toContainText("Coder read it");
   await expect(recent.getByLabel("Item")).toHaveCount(0);
   const call = lastCall(db, "/api/skills/activity");
   expect(call?.params.get("path")).toBe("skills/debug/SKILL.md");
-  expect(call?.params.get("limit")).toBe("10");
 
   await page.goto(`/skills/agent?repo=acme%2Fplaybook&path=${encodeURIComponent("agents/spec-checker.md")}`);
   const all = page.locator("#skill-activity");

@@ -10,10 +10,12 @@ import {
   type IntegrationSection,
   type IntegrationStatus,
   type PluginDef,
+  INTEGRATIONS_ATTENTION_EVENT,
+  needsAttention,
 } from "@/lib/api";
 import { errorMessage, timeAgo } from "@/lib/data-sources";
 import { RoleGuard } from "@/components/role-guard";
-import { Page, PageHeader, Section, cardClass } from "@/components/page";
+import { Page, PageHeader, Section } from "@/components/page";
 import { Callout } from "@/components/callout";
 import { StatusPill } from "@/components/status-pill";
 import { Skeleton } from "@/components/skeleton";
@@ -23,7 +25,8 @@ import { Switch, TeamsHowTo, TeamsWebhookField, validTeamsUrl } from "@/componen
 import { Disclosure } from "@/components/disclosure";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
-import { inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { ChevronRightIcon } from "@/components/icons";
 
 // Settings → Integrations: every outside system Coderhelm connects to, in one
 // place. Grouped by what it's for (like Vercel's and Sentry's integration
@@ -101,6 +104,11 @@ function IntegrationsPage() {
     const c = { connected: 0, needs_credentials: 0, error: 0, not_connected: 0 };
     for (const i of data?.items ?? []) c[i.status]++;
     return c;
+  }, [data]);
+
+  // Keep the menu badge in step with what this page shows.
+  useEffect(() => {
+    if (data) window.dispatchEvent(new CustomEvent(INTEGRATIONS_ATTENTION_EVENT, { detail: needsAttention(data.items) }));
   }, [data]);
 
   const replace = (next: Integration) =>
@@ -184,6 +192,15 @@ function IntegrationsPage() {
           );
         })}
       {data && (
+        <Section
+          id="websites"
+          title="Your websites"
+          description="Coderhelm can check that links and redirects on these sites work (status and page title only). Each domain covers its subdomains."
+        >
+          <WebsitesCard canEdit={data.canEdit} />
+        </Section>
+      )}
+      {data && (
         <Section id="data-sources" title="Data sources">
           <p className="text-sm text-zinc-400">
             APIs, databases and log searches agents can query, with hidden fields and an activity log, are on{" "}
@@ -204,6 +221,39 @@ const ACTION_LABEL = {
   check_again: "Check again",
   manage: "Manage",
 } as const;
+
+/**
+ * What opening a card lets you do, in one line, so it is plain that the card
+ * leads somewhere. Written per integration from what its settings offer.
+ */
+function canDoLine(item: Integration, canEdit: boolean): string {
+  const kind = kindOf(item);
+  const on = item.status !== "not_connected";
+  if (!canEdit) {
+    if (kind === "github") return "See the repositories Coderhelm works in";
+    if (kind === "aws_account" || kind === "aws_connect") return "See the accounts, log groups and findings";
+    return "";
+  }
+  switch (kind) {
+    case "github":
+      return on ? "Pick repositories, link another installation or check the app" : "Install the GitHub app and pick repositories";
+    case "jira":
+      return on ? "Choose projects, see recent ticket events, test or remove the connection" : "Connect with the Jira app or a webhook";
+    case "aws_connect":
+      return "Connect an account through a read-only role, made in one click";
+    case "aws_account":
+      return "Turn Metrics and Airflow on or off, pick Airflow environments, check access again";
+    case "connector":
+      if (item.id === "newrelic") return on ? "Change the key, region or accounts, test the connection or remove it" : "Add a user key and pick the region and accounts";
+      return on ? "Change the site, spaces or token, allow writing to listed pages, or remove it" : "Add your site, an account email and an API token";
+    case "teams":
+      return on ? "Change the channel webhook or turn alert posts on or off" : "Add a channel webhook so alerts and pull requests are posted";
+    case "plugin":
+      if (!on) return "Add credentials to switch it on for agents";
+      if (item.status === "needs_credentials") return "Add credentials, edit agent instructions or turn it off";
+      return "Replace credentials, test it, edit agent instructions or turn it off";
+  }
+}
 
 function IntegrationCard({
   item,
@@ -231,9 +281,15 @@ function IntegrationCard({
   const kind = kindOf(item);
   const aws = kind === "aws_account" ? (item.detail as unknown as AwsAccountAbilities) : null;
   const headingId = `${anchor}-name`;
+  const canDoId = `${anchor}-can-do`;
 
-  // The page link (GitHub, Jira, AWS without an account) or the inline panel.
+  // GitHub, Jira and the first AWS connection have their own page; the rest open in place.
   const pageHref = kind === "github" || kind === "jira" || kind === "aws_connect" ? item.manage_href : "";
+  // Members can open the pages they're allowed to read; everything else is admin only.
+  const memberHref = kind === "github" || kind === "aws_connect" || kind === "aws_account" ? item.manage_href : "";
+  const href = canEdit ? pageHref : memberHref;
+  const opens = Boolean(href) || canEdit;
+  const canDo = canDoLine(item, canEdit);
 
   const checkAgain = async () => {
     setBusy(true);
@@ -257,84 +313,98 @@ function IntegrationCard({
     }
   };
 
-  const primary = async () => {
-    if (item.action === "check_again" && kind !== "teams") return checkAgain();
-    if (kind === "plugin" && item.action === "connect") {
-      setBusy(true);
-      try {
-        await api.enablePlugin(item.id);
-        await onReload();
-        setOpen(true);
-      } catch (e) {
-        toast(errorMessage(e, "Couldn't switch it on."), "error");
-      } finally {
-        setBusy(false);
-      }
-      return;
-    }
-    setOpen((v) => !v);
-  };
-
   const last = item.last_check ? `Checked ${timeAgo(item.last_check)}` : kind === "aws_account" || kind === "plugin" || kind === "connector" ? (item.status === "not_connected" ? "" : "Not checked yet") : "";
+
+  // The name is the card's control; its ::after stretches over the summary so
+  // the whole top of the card opens it (a link for pages, a toggle in place).
+  const stretch =
+    "rounded-sm text-left outline-none after:absolute after:inset-0 after:rounded-t-lg after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-zinc-300";
+  const nameControl = !opens ? (
+    item.name
+  ) : href ? (
+    <Link href={href} className={stretch} aria-describedby={canDo ? canDoId : undefined}>
+      {item.name}
+    </Link>
+  ) : (
+    <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls={`${anchor}-panel`} className={stretch} aria-describedby={canDo ? canDoId : undefined}>
+      {item.name}
+    </button>
+  );
+
+  // The one action shown on the card face: fixing something, or adding it.
+  const showAction = canEdit && item.status !== "connected" && !open;
 
   return (
     <article
       id={anchor}
       tabIndex={-1}
       aria-labelledby={headingId}
-      className={`${cardClass} p-5 outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 ${item.status === "needs_credentials" ? "border-amber-500/40" : item.status === "error" ? "border-red-500/40" : ""}`}
+      className={`group min-w-0 rounded-lg border bg-zinc-900/50 outline-none transition-colors motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-zinc-400 ${
+        item.status === "needs_credentials" ? "border-amber-500/40" : item.status === "error" ? "border-red-500/40" : "border-zinc-800"
+      } ${opens ? (item.status === "needs_credentials" || item.status === "error" ? "hover:bg-zinc-900" : "hover:border-zinc-600 hover:bg-zinc-900") : ""}`}
       data-testid={`integration-${item.id}`}
       data-status={item.status}
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <h3 id={headingId} className="min-w-0 break-words font-semibold text-zinc-100">
-          {item.name}
-        </h3>
-        <StatusPill tone={st.tone}>{st.label}</StatusPill>
-      </div>
-      <p className="mt-1 text-sm text-zinc-400">{item.does}</p>
-      {item.reason && (
-        <p className={`mt-2 text-sm ${item.status === "error" ? "text-red-300" : item.status === "needs_credentials" ? "font-medium text-amber-300" : "text-zinc-400"}`}>
-          {item.reason}
+      <div className={`relative p-4 ${opens ? "cursor-pointer" : ""}`}>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h3 id={headingId} className="min-w-0 break-words font-semibold text-zinc-100">
+            {nameControl}
+          </h3>
+          <StatusPill tone={st.tone}>{st.label}</StatusPill>
+        </div>
+        <p className="mt-1 text-sm text-zinc-400" data-testid="integration-does">
+          {item.does}
         </p>
-      )}
-      {aws && <AwsAbilitySummary a={aws} />}
-      {last && <p className="mt-2 text-xs text-zinc-500">{last}</p>}
+        {item.reason && (
+          <p className={`mt-2 text-sm ${item.status === "error" ? "text-red-300" : item.status === "needs_credentials" ? "font-medium text-amber-300" : "text-zinc-400"}`}>
+            {item.reason}
+          </p>
+        )}
+        {aws && <AwsAbilitySummary a={aws} />}
+        {last && <p className="mt-2 text-xs text-zinc-500">{last}</p>}
+        {canDo ? (
+          <p id={canDoId} data-testid="integration-can-do" className="mt-3 text-sm font-medium text-zinc-300 group-hover:text-zinc-100">
+            {canDo.slice(0, canDo.lastIndexOf(" ") + 1)}
+            {/* The last word and the chevron wrap together, so the chevron never sits alone on a line. */}
+            <span className="whitespace-nowrap">
+              {canDo.slice(canDo.lastIndexOf(" ") + 1)}
+              <span aria-hidden="true" className={`ml-1 inline-block align-[-3px] text-zinc-500 transition-transform motion-reduce:transition-none group-hover:text-zinc-200 ${open ? "rotate-90" : "group-hover:translate-x-0.5"}`}>
+                <ChevronRightIcon />
+              </span>
+            </span>
+          </p>
+        ) : (
+          !canEdit && item.status !== "connected" && <p className="mt-3 text-sm text-zinc-500">Ask an admin to set this up.</p>
+        )}
+      </div>
 
-      {canEdit ? (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          {pageHref ? (
-            <Link href={pageHref} className={item.status === "connected" ? secondaryButton : primaryButton}>
-              {ACTION_LABEL[item.action]}
-            </Link>
-          ) : (
-            <button
-              type="button"
-              onClick={primary}
-              disabled={busy}
-              aria-expanded={item.action === "check_again" || (kind === "plugin" && item.action === "connect") ? undefined : open}
-              className={item.status === "connected" ? secondaryButton : primaryButton}
-            >
-              {busy ? "Working…" : ACTION_LABEL[item.action]}
-            </button>
-          )}
-          {item.action === "check_again" && kind !== "teams" && (
-            <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className={linkButton}>
-              {open ? "Close" : "Settings"}
-            </button>
-          )}
-          {kind === "aws_account" && (
+      {(showAction || (canEdit && kind === "aws_account")) && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 pb-4">
+          {showAction &&
+            (pageHref ? (
+              <Link href={pageHref} className={primaryButton}>
+                {ACTION_LABEL[item.action]}
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => (item.action === "check_again" && kind !== "teams" ? checkAgain() : setOpen(true))}
+                disabled={busy}
+                className={primaryButton}
+              >
+                {busy ? "Working…" : ACTION_LABEL[item.action]}
+              </button>
+            ))}
+          {canEdit && kind === "aws_account" && (
             <Link href={item.manage_href} className={linkButton}>
-              Log groups and findings
+              Log groups, findings and more accounts
             </Link>
           )}
         </div>
-      ) : (
-        item.status !== "connected" && <p className="mt-4 text-sm text-zinc-500">Ask an admin to set this up.</p>
       )}
 
       {open && canEdit && (
-        <>
+        <div id={`${anchor}-panel`} className="border-t border-zinc-800 px-4 pb-4 pt-1">
           {kind === "aws_account" && aws && (
             <AwsAbilitiesPanel
               a={aws}
@@ -352,7 +422,12 @@ function IntegrationCard({
           )}
           {kind === "plugin" && <PluginPanel item={item} onChanged={onReload} onClose={() => setOpen(false)} />}
           {kind === "teams" && <TeamsPanel onSaved={onReload} />}
-        </>
+          <p className="mt-4">
+            <button type="button" onClick={() => setOpen(false)} className={linkButton}>
+              Close
+            </button>
+          </p>
+        </div>
       )}
     </article>
   );
@@ -426,6 +501,8 @@ function PluginPanel({ item, onChanged, onClose }: { item: Integration; onChange
     setSaving(true);
     setError("");
     try {
+      // Connecting a server that is off: switch it on only once there are credentials to save.
+      if (!d.enabled) await api.enablePlugin(p.id);
       const r = await api.updatePluginCredentials(p.id, creds);
       if (r.error) {
         setError(r.error);
@@ -467,7 +544,7 @@ function PluginPanel({ item, onChanged, onClose }: { item: Integration; onChange
   };
 
   return (
-    <div className="mt-4 flex flex-col gap-4 border-t border-zinc-800 pt-4">
+    <div className="mt-4 flex flex-col gap-4">
       <form
         className="flex flex-col gap-4"
         onSubmit={(e) => {
@@ -518,6 +595,7 @@ function PluginPanel({ item, onChanged, onClose }: { item: Integration; onChange
           </button>
         </div>
       </form>
+      {d.enabled && (
       <Disclosure summary="Instructions agents follow with this server">
         <Field id={`${p.id}-prompt`} label="Instructions">
           {(props) => <textarea {...props} rows={4} maxLength={4000} className={`${inputClass} font-mono`} value={prompt} onChange={(e) => setPrompt(e.target.value)} />}
@@ -528,11 +606,14 @@ function PluginPanel({ item, onChanged, onClose }: { item: Integration; onChange
           </button>
         </p>
       </Disclosure>
-      <p>
-        <button type="button" onClick={turnOff} className={linkButton}>
-          Turn off {p.name}
-        </button>
-      </p>
+      )}
+      {d.enabled && (
+        <p>
+          <button type="button" onClick={turnOff} className={linkButton}>
+            Turn off {p.name}
+          </button>
+        </p>
+      )}
     </div>
   );
 }
@@ -571,7 +652,7 @@ function TeamsPanel({ onSaved }: { onSaved: () => Promise<void> }) {
   };
   return (
     <form
-      className="mt-4 flex flex-col gap-4 border-t border-zinc-800 pt-4"
+      className="mt-4 flex flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault();
         save();
@@ -593,5 +674,129 @@ function TeamsPanel({ onSaved }: { onSaved: () => Promise<void> }) {
         </button>
       </div>
     </form>
+  );
+}
+
+/** The team's own public domains the reviewer may open pages on to check links. */
+function WebsitesCard({ canEdit }: { canEdit: boolean }) {
+  const [domains, setDomains] = useState<string[] | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const { toast } = useToast();
+
+  const load = useCallback(async () => {
+    setLoadError("");
+    try {
+      setDomains(await api.getWebDomains());
+    } catch (e) {
+      setLoadError(errorMessage(e, "Couldn't load your websites."));
+    }
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const save = async (next: string[], done: string) => {
+    setSaving(true);
+    setError("");
+    try {
+      setDomains(await api.setWebDomains(next));
+      toast(done);
+      return true;
+    } catch (e) {
+      setError(errorMessage(e, "Couldn't save the websites."));
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const add = async () => {
+    const entries = draft
+      .split(/[\s,]+/)
+      .map((d) => d.trim())
+      .filter(Boolean);
+    if (!domains || entries.length === 0) return;
+    if (await save([...domains, ...entries], entries.length === 1 ? `${entries[0]} added` : "Websites added")) setDraft("");
+  };
+
+  return (
+    <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4" data-testid="websites-card">
+      {loadError ? (
+        <p role="alert" className="text-sm text-red-400">
+          {loadError}{" "}
+          <button type="button" onClick={load} className={linkButton}>
+            Try again
+          </button>
+        </p>
+      ) : !domains ? (
+        <Skeleton className="h-8 w-full" />
+      ) : (
+        <>
+          {domains.length === 0 ? (
+            <p className="text-sm text-zinc-400">No websites yet, so Coderhelm doesn&apos;t open any pages.</p>
+          ) : (
+            <ul aria-label="Your websites" className="flex flex-wrap gap-2">
+              {domains.map((d) => (
+                <li key={d} className="inline-flex min-w-0 items-center gap-1 rounded-full border border-zinc-700 bg-zinc-950 py-1 pl-3 pr-1 text-sm text-zinc-200">
+                  <span data-testid="website-name" className="min-w-0 break-all font-mono text-xs">{d}</span>
+                  {canEdit ? (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => save(domains.filter((x) => x !== d), `${d} removed`)}
+                      aria-label={`Remove ${d}`}
+                      className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50 ${focusRing}`}
+                    >
+                      <span aria-hidden="true">×</span>
+                    </button>
+                  ) : (
+                    <span className="pr-2" />
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {canEdit ? (
+            <form
+              className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end"
+              onSubmit={(e) => {
+                e.preventDefault();
+                add();
+              }}
+            >
+              <div className="min-w-0 flex-1">
+                <Field id="websites-add" label="Add a domain" helper="A bare domain like example.com. Separate several with commas.">
+                  {(props) => (
+                    <input
+                      {...props}
+                      className={inputClass}
+                      placeholder="example.com"
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      autoComplete="off"
+                      spellCheck={false}
+                      inputMode="url"
+                    />
+                  )}
+                </Field>
+              </div>
+              <button type="submit" disabled={saving || !draft.trim()} className={`${secondaryButton} sm:mb-6`}>
+                {saving ? "Saving…" : "Add"}
+              </button>
+            </form>
+          ) : (
+            <p className="mt-3 text-sm text-zinc-500">Only admins can change this list.</p>
+          )}
+          {error && (
+            <p role="alert" className="mt-2 text-sm text-red-400">
+              {error}
+            </p>
+          )}
+        </>
+      )}
+    </div>
   );
 }

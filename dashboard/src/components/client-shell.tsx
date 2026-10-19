@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { api, type UsageInfo, type Banner, type TeamInfo } from "@/lib/api";
+import { api, type UsageInfo, type Banner, type TeamInfo, INTEGRATIONS_ATTENTION_EVENT, needsAttention } from "@/lib/api";
 import { pushToDataLayer } from "@/lib/gtm";
 import { formatTokens, USAGE_CHANGED, usageBreakdown, usageTotal } from "@/lib/usage";
 import { ToastProvider } from "./toast";
@@ -40,6 +40,10 @@ interface NavItem {
   adminOnly?: boolean;
   memberOnly?: boolean;
   superAdminOnly?: boolean;
+  /** Shown indented under the item before it. */
+  sub?: boolean;
+  /** Shows how many integrations need attention. */
+  attentionBadge?: boolean;
 }
 
 interface NavGroup {
@@ -60,6 +64,15 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    // What Coderhelm is connected to, near the top so it's easy to find.
+    label: "Connections",
+    items: [
+      { href: "/settings/integrations", label: "Integrations", icon: <PluginIcon />, memberOnly: true, attentionBadge: true },
+      { href: "/settings/integrations/aws", label: "AWS", icon: <AwsIcon />, memberOnly: true, sub: true },
+      { href: "/data-sources", label: "Data sources", icon: <DatabaseIcon />, adminOnly: true },
+    ],
+  },
+  {
     label: "Insights",
     items: [
       { href: "/analytics", label: "Analytics", icon: <TrendingUpIcon />, memberOnly: true },
@@ -75,14 +88,7 @@ const navGroups: NavGroup[] = [
       { href: "/settings/repos", label: "Repos", icon: <GitBranchIcon />, memberOnly: true },
       { href: "/settings", label: "Settings", icon: <GearIcon /> },
       { href: "/settings/notifications", label: "Notifications", icon: <BellIcon /> },
-    ],
-  },
-  {
-    label: "Integrations",
-    items: [
-      { href: "/settings/integrations", label: "Integrations", icon: <PluginIcon />, memberOnly: true },
       { href: "/settings/alerts", label: "Alert routes", icon: <BellIcon />, adminOnly: true },
-      { href: "/data-sources", label: "Data sources", icon: <DatabaseIcon />, adminOnly: true },
       { href: "/skills", label: "Skills", icon: <BookIcon />, memberOnly: true },
       { href: "/settings/models", label: "AI Models", icon: <CpuIcon />, adminOnly: true },
     ],
@@ -568,8 +574,30 @@ function Sidebar({
     if (href === "/") return pathname === "/";
     if (href === "/settings") return pathname === "/settings";
     if (href === "/plans") return pathname === "/plans" || pathname.startsWith("/plans/detail") || pathname.startsWith("/plans/new");
+    // A sub item (Integrations › AWS) is the only one lit on its own pages.
+    if (href === "/settings/integrations" && pathname.startsWith("/settings/integrations/aws")) return false;
     return pathname.startsWith(href);
   };
+
+  // How many integrations need attention: loaded once, then kept current by the Integrations page.
+  const [attention, setAttention] = useState(0);
+  const canSeeIntegrations = !!user && user.role !== "viewer" && user.status !== "pending";
+  useEffect(() => {
+    const onCount = (e: Event) => setAttention(Number((e as CustomEvent<number>).detail) || 0);
+    window.addEventListener(INTEGRATIONS_ATTENTION_EVENT, onCount);
+    return () => window.removeEventListener(INTEGRATIONS_ATTENTION_EVENT, onCount);
+  }, []);
+  useEffect(() => {
+    if (!canSeeIntegrations) return;
+    let live = true;
+    api
+      .getIntegrations()
+      .then((r) => live && setAttention(needsAttention(r.items)))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [canSeeIntegrations]);
 
   const currentTeam = teams.find((t) => t.current);
 
@@ -630,7 +658,7 @@ function Sidebar({
                     href={item.href}
                     prefetch={false}
                     aria-current={isActive(item.href) ? "page" : undefined}
-                    className={`flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors ${focusRing} ${
+                    className={`flex items-center justify-between py-1.5 rounded-md text-sm transition-colors ${item.sub ? "pl-8 pr-2" : "px-2"} ${focusRing} ${
                       isActive(item.href)
                         ? "text-zinc-100 bg-zinc-800"
                         : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
@@ -640,6 +668,16 @@ function Sidebar({
                       <span className="w-4 flex items-center justify-center" aria-hidden="true">{item.icon}</span>
                       {item.label}
                     </span>
+                    {item.attentionBadge && attention > 0 && (
+                      <span
+                        data-testid="nav-integrations-attention"
+                        title={`${attention} need attention`}
+                        className="min-w-5 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 text-center text-xs font-medium text-amber-300"
+                      >
+                        {attention}
+                        <span className="sr-only"> need attention</span>
+                      </span>
+                    )}
                   </Link>
                 );
               })}
