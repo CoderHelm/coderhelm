@@ -1,38 +1,15 @@
 import type { MetadataRoute } from "next";
+import { SITE, pages } from "@/content/site";
 
 export const dynamic = "force-static";
 
+// Pages only. Each page links its Markdown twin with rel="alternate", and
+// /llms.txt lists the twins for agents.
 export default function sitemap(): MetadataRoute.Sitemap {
-  return [
-    {
-      url: "https://coderhelm.com",
-      lastModified: new Date(),
-      changeFrequency: "weekly",
-      priority: 1,
-    },
-    {
-      url: "https://coderhelm.com/terms",
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.3,
-    },
-    {
-      url: "https://coderhelm.com/privacy",
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.3,
-    },
-    {
-      url: "https://coderhelm.com/acceptable-use",
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.3,
-    },
-    {
-      url: "https://coderhelm.com/contact",
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.4,
-    },
-  ];
+  return pages.map((p) => ({
+    url: `${SITE.url}${p.path}`,
+    lastModified: SITE.updated,
+    changeFrequency: p.kind === "legal" ? "yearly" : "monthly",
+    priority: p.slug === "" ? 1 : p.kind === "legal" ? 0.3 : 0.8,
+  }));
 }

@@ -1,92 +1,58 @@
 import Link from "next/link";
+import { SITE, pages } from "@/content/site";
+import { Logo } from "./Logo";
 
 export default function Footer() {
+  const product = pages.filter((p) => p.slug !== "" && p.kind !== "legal");
+  const legal = pages.filter((p) => p.kind === "legal" && p.slug !== "contact");
   return (
-    <footer className="border-t border-surface-border bg-surface">
-      <div className="mx-auto max-w-6xl px-6 py-12">
-        <div className="grid gap-8 md:grid-cols-4">
-          <div>
-            <div className="flex items-center gap-2 text-lg font-bold">
-              <span className="gradient-text">{"///"}</span>
-              <span>Coderhelm</span>
-            </div>
-            <p className="mt-3 text-sm text-text-secondary">
-              Ship code, not tickets.
-            </p>
-          </div>
-
-          <div>
-            <p className="mb-3 text-sm font-semibold text-text-primary">Product</p>
-            <ul className="space-y-2 text-sm text-text-secondary">
-              <li>
-                <a href="#features" className="hover:text-text-primary transition-colors">
-                  Features
-                </a>
-              </li>
-              <li>
-                <a href="#open-source" className="hover:text-text-primary transition-colors">
-                  Open Source
-                </a>
-              </li>
-              <li>
-                <a href="https://github.com/CoderHelm" target="_blank" rel="noopener noreferrer" className="hover:text-text-primary transition-colors">
-                  GitHub
-                </a>
-              </li>
-              <li>
-                <a href="#how-it-works" className="hover:text-text-primary transition-colors">
-                  How it works
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <p className="mb-3 text-sm font-semibold text-text-primary">Legal</p>
-            <ul className="space-y-2 text-sm text-text-secondary">
-              <li>
-                <Link href="/privacy" className="hover:text-text-primary transition-colors">
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link href="/terms" className="hover:text-text-primary transition-colors">
-                  Terms of Service
-                </Link>
-              </li>
-              <li>
-                <Link href="/acceptable-use" className="hover:text-text-primary transition-colors">
-                  Acceptable Use
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <p className="mb-3 text-sm font-semibold text-text-primary">Connect</p>
-            <ul className="space-y-2 text-sm text-text-secondary">
-              <li>
-                <Link href="/contact" className="hover:text-text-primary transition-colors">
-                  Contact
-                </Link>
-              </li>
-              <li>
-                <a href="https://app.coderhelm.com" className="hover:text-text-primary transition-colors">
-                  Dashboard
-                </a>
-              </li>
-              <li>
-                <a href="mailto:support@coderhelm.com" className="hover:text-text-primary transition-colors">
-                  support@coderhelm.com
-                </a>
-              </li>
-            </ul>
-          </div>
+    <footer className="border-t border-line">
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+        <div>
+          <Link href="/" className="flex items-center gap-2 font-semibold">
+            <Logo />
+            {SITE.name}
+          </Link>
+          <p className="mt-3 max-w-xs text-sm leading-relaxed text-text-secondary">{SITE.tagline}</p>
         </div>
-
-        <div className="mt-12 border-t border-surface-border pt-6 text-center text-xs text-text-muted">
-          &copy; {new Date().getFullYear()} Coderhelm. All rights reserved.
+        <div>
+          <h2 className="text-sm font-semibold text-text-primary">Product</h2>
+          <ul className="mt-3 space-y-2 text-sm">
+            {product.map((p) => (
+              <li key={p.slug}>
+                <Link href={p.path} className="text-text-secondary hover:text-text-primary">
+                  {p.navLabel}
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
+        <div>
+          <h2 className="text-sm font-semibold text-text-primary">For agents</h2>
+          <ul className="mt-3 space-y-2 text-sm">
+            <li><a href="/llms.txt" className="text-text-secondary hover:text-text-primary">llms.txt</a></li>
+            <li><a href="/llms-full.txt" className="text-text-secondary hover:text-text-primary">llms-full.txt</a></li>
+            <li><a href="/index.md" className="text-text-secondary hover:text-text-primary">This site in Markdown</a></li>
+            <li><a href="/sitemap.xml" className="text-text-secondary hover:text-text-primary">Sitemap</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2 className="text-sm font-semibold text-text-primary">Company</h2>
+          <ul className="mt-3 space-y-2 text-sm">
+            <li><Link href="/contact/" className="text-text-secondary hover:text-text-primary">Contact</Link></li>
+            {legal.map((p) => (
+              <li key={p.slug}>
+                <Link href={p.path} className="text-text-secondary hover:text-text-primary">
+                  {p.navLabel}
+                </Link>
+              </li>
+            ))}
+            <li><a href={`mailto:${SITE.email}`} className="text-text-secondary hover:text-text-primary">{SITE.email}</a></li>
+          </ul>
+        </div>
+      </div>
+      <div className="mx-auto max-w-6xl border-t border-line px-4 py-6 text-xs text-text-muted sm:px-6">
+        © {SITE.year} {SITE.name}. Updated {SITE.updatedLabel}.
       </div>
     </footer>
   );

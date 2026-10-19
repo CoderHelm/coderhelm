@@ -1,0 +1,718 @@
+import type { Page } from "./types";
+import terms from "./legal/terms";
+import privacy from "./legal/privacy";
+import acceptableUse from "./legal/acceptable-use";
+import contact from "./legal/contact";
+
+// Every product statement on this site describes behavior that is live in the
+// platform today. The PR that introduced this file lists the code reference
+// behind each one. Keep it that way: if a feature is not shipped, it is not here.
+
+export const SITE = {
+  name: "CoderHelm",
+  alternateNames: ["Coderhelm", "Coder Helm"],
+  url: "https://coderhelm.com",
+  appUrl: "https://app.coderhelm.com",
+  email: "support@coderhelm.com",
+  tagline: "The AI engineer that stays on the code after the pull request.",
+  // The one sentence that defines the product, used word for word in the home
+  // page, the meta description, JSON-LD and llms.txt.
+  entity:
+    "CoderHelm is an AI coding agent for GitHub and Jira. Assign it an issue or a ticket and it opens a pull request in your repository, then it stays on the code: it answers review comments, fixes its own failing CI, reviews your team's pull requests and turns production alerts into fixes that a person approves.",
+  llmsDetails: [
+    "Status: closed beta. Sign in at https://app.coderhelm.com; new accounts are admitted from a waitlist.",
+    "Models: Claude, through the team's own Anthropic API key. Admins can set a monthly token limit.",
+    "Works with: GitHub (GitHub App), Jira (Forge app), Microsoft Teams, AWS (CloudWatch alarms through SNS, CloudWatch Logs, PostgreSQL, Redshift), GraphQL APIs, Playwright, JUnit and Cucumber reports, and 17 MCP servers.",
+    "Starts a run when: a GitHub issue is assigned to CoderHelm, gets the `coderhelm` label, or gets a `/coderhelm` or `@coderhelm` comment; a Jira ticket is assigned to CoderHelm or gets the `coderhelm` label.",
+    "Reviews any pull request that gets the review label (`ch-review` by default) once a repository turns the reviewer on.",
+    "Not: a code editor or IDE plugin. It works through issues, tickets and pull requests.",
+  ],
+  featureList: [
+    "GitHub issue to pull request",
+    "Jira ticket to pull request",
+    "AI code review on any GitHub pull request",
+    "Fixes failing CI on its own pull requests",
+    "Answers review comments and pushes fixes",
+    "CloudWatch alarm to pull request through SNS",
+    "Flaky test detection and quarantine",
+    "Read only lookups in GraphQL APIs, CloudWatch Logs, PostgreSQL and Redshift",
+    "Team skills and agent briefs read from a repository",
+    "AI plans that turn a description into ordered issues",
+  ],
+  sameAs: ["https://github.com/CoderHelm"],
+  ctaNote: "CoderHelm is in closed beta. Sign in to request access; you bring your own Anthropic API key.",
+  updated: "2026-10-19",
+  updatedLabel: "October 19, 2026",
+  year: 2026,
+} as const;
+
+const home: Page = {
+  slug: "",
+  path: "/",
+  navLabel: "Home",
+  title: "CoderHelm: the AI engineer that stays on the code after the pull request",
+  description:
+    "Assign a GitHub issue or Jira ticket and CoderHelm opens a pull request. Then it stays on the code: it answers review comments, fixes its own CI, reviews every PR and turns alerts into fixes.",
+  eyebrow: "Closed beta",
+  h1: "Assign the ticket. It stays on the code.",
+  lede:
+    "CoderHelm turns GitHub issues and Jira tickets into pull requests in your repository. After the pull request it keeps working: it answers review comments, fixes the CI it broke, reviews your team's pull requests and turns production alerts into fixes your team approves.",
+  heroFrame: {
+    id: "maintain",
+    caption:
+      "One pull request, start to finish: the ticket, the draft, a failing check CoderHelm fixed, a review comment it answered, the merge, and the deploy check after it.",
+  },
+  sections: [
+    {
+      id: "how-it-works",
+      eyebrow: "How it works",
+      heading: "Three steps, and the last one keeps going.",
+      blocks: [
+        {
+          type: "steps",
+          items: [
+            {
+              title: "Connect GitHub and Jira",
+              text: "Install the GitHub App on the repositories you choose, and the Jira app if your team plans in Jira. Add your Anthropic API key.",
+            },
+            {
+              title: "Assign the ticket",
+              text: "Assign an issue or ticket to CoderHelm, or add the `coderhelm` label. It plans the change, writes it on its own branch, runs your build and tests, reviews its own work and opens a pull request.",
+            },
+            {
+              title: "Review, merge, and it stays",
+              text: "Ask for changes and it pushes them. If a check fails, it fixes the cause. After the merge it is still there for the review comments, the alerts and the tests.",
+            },
+          ],
+        },
+        { type: "p", text: "Read more about [tickets to pull requests](/pull-requests/)." },
+      ],
+    },
+    {
+      id: "after-the-pr",
+      eyebrow: "Maintenance, not handoff",
+      heading: "Most AI tools stop at the pull request. CoderHelm stays.",
+      blocks: [
+        {
+          type: "p",
+          text: "Code is only half done when the pull request opens. CoderHelm keeps working on the code it wrote and the code your team writes, inside the tools you already use.",
+        },
+        {
+          type: "cards",
+          items: [
+            { title: "Answers review comments", text: "Ask a question or request a change on its pull request. It replies, pushes the fix and says what changed.", href: "/maintenance/" },
+            { title: "Fixes the CI it broke", text: "When a check fails on its pull request, it reads the logs, fixes the cause and pushes again. It stops when the same failure repeats.", href: "/maintenance/" },
+            { title: "Reviews every pull request", text: "Add a label to any pull request and it reviews it with the context of the whole repository, then reviews again on every push.", href: "/reviewer/" },
+            { title: "Turns alerts into fixes", text: "CloudWatch alarms routed to CoderHelm become analyzed pull requests in the right repository. When the alarm recovers, it pairs the two.", href: "/alerts/" },
+            { title: "Keeps tests healthy", text: "Tells flaky tests from broken ones, keeps flaky ones from failing builds, and opens fix pull requests that must pass twenty runs in a row.", href: "/tests/" },
+            { title: "Works your way", text: "Reads your AGENTS.md, your team's skills and agent briefs, and the MCP servers you connect.", href: "/skills/" },
+          ],
+        },
+      ],
+    },
+    {
+      id: "reviewer",
+      eyebrow: "Code review",
+      heading: "A reviewer on every pull request, not only its own.",
+      blocks: [
+        { type: "frame", id: "review", caption: "A CoderHelm review: a risk level with the reason, a comment on the exact line with a suggested fix, and earlier comments it resolved after they were fixed." },
+        {
+          type: "list",
+          items: [
+            "Reads the callers, contracts and tests around a change, not just the diff",
+            "Comments on the exact lines, with suggestions you can apply from GitHub",
+            "Rates risk as low, medium or high, and says why",
+            "Reviews again on every push and resolves its own comments once they are fixed",
+            "Answers in the thread: `@coderhelm why is this unsafe?` or `@coderhelm re-review`",
+          ],
+        },
+        { type: "p", text: "See everything the [reviewer](/reviewer/) does." },
+      ],
+    },
+    {
+      id: "facts",
+      eyebrow: "Checks the facts",
+      heading: "It looks at your real systems before it guesses.",
+      blocks: [
+        {
+          type: "p",
+          text: "Connect your GraphQL API, CloudWatch Logs, PostgreSQL databases or Redshift warehouse. While CoderHelm plans, writes and reviews, it checks what the running system really holds, and a bug ticket comes with the record and the error behind it. Every lookup is read only, enforced in code, and recorded.",
+        },
+        { type: "frame", id: "lookup", caption: "A bug ticket investigated with two read only lookups, one in the database and one in the logs, before any code is planned." },
+        { type: "p", text: "How the [read only data sources](/data-sources/) work." },
+      ],
+    },
+    {
+      id: "integrations",
+      eyebrow: "Integrations",
+      heading: "Works where your team already works.",
+      blocks: [
+        {
+          type: "table",
+          head: ["Tool", "What CoderHelm does with it"],
+          rows: [
+            ["GitHub", "A GitHub App: issues start runs, pull requests are opened, reviewed and updated, checks are read and fixed."],
+            ["Jira", "A Forge app: assign a ticket or add the `coderhelm` label to start a run."],
+            ["Microsoft Teams", "Posts alerts and their recoveries, log findings, reviews and releases to your channels."],
+            ["AWS", "CloudWatch alarms and EventBridge events through SNS; read only CloudWatch Logs, PostgreSQL and Redshift through a role you create."],
+            ["Test reports", "Playwright, JUnit and Cucumber results from your CI."],
+            ["MCP servers", "Figma, Sentry, Linear, Notion, Vercel, Stripe, PostHog, GitLab, Neon, Turso, Snyk, LaunchDarkly, MongoDB Atlas, Grafana, Redis, Upstash and Sanity."],
+            ["Anthropic", "Claude models, through your own API key."],
+          ],
+        },
+      ],
+    },
+    {
+      id: "security",
+      eyebrow: "Security",
+      heading: "Guarded in code, not in a prompt.",
+      blocks: [
+        {
+          type: "cards",
+          items: [
+            { title: "Works on its own branch", text: "Every change is written on a `coderhelm/` branch and arrives as a pull request. A pull request CoderHelm wrote never merges without a person's approval." },
+            { title: "Your build runs in a sandbox", text: "Your build, lint and tests run in a separate container that holds no credentials." },
+            { title: "Read only, checked at every step", text: "Data lookups run one read at a time, in a read only transaction that is always rolled back, as a user that cannot write." },
+            { title: "Secrets encrypted with AWS KMS", text: "Stored tokens and connection details are encrypted with AWS KMS, and data source secrets are bound to your team." },
+            { title: "Signed webhooks", text: "GitHub webhooks and SNS messages are verified before anything runs." },
+            { title: "Roles for your team", text: "Owner, admin, billing, member and viewer roles decide who can change what." },
+          ],
+        },
+        { type: "p", text: "The full [security model](/security/), including what is stored and for how long." },
+      ],
+    },
+    {
+      id: "faq",
+      eyebrow: "FAQ",
+      heading: "Questions teams ask first.",
+      blocks: [
+        {
+          type: "faq",
+          items: [
+            { q: "What is CoderHelm?", a: SITE.entity },
+            { q: "How do I start a run?", a: "On GitHub, assign the issue to CoderHelm, add the `coderhelm` label, or comment `/coderhelm` or `@coderhelm`. On Jira, assign the ticket to CoderHelm or add the `coderhelm` label (your admin can change the label)." },
+            { q: "Does CoderHelm push to my main branch?", a: "No. It writes every change on its own `coderhelm/` branch and opens a pull request. Merging is your call; the optional auto merge for reviewed pull requests waits for a person's approval and green checks." },
+            { q: "What happens after the pull request is merged?", a: "CoderHelm stays on the code. It answers questions and review comments, reviews new pull requests that get the review label, turns routed alerts into fixes, keeps flaky tests from blocking builds and, with auto merge on, checks the deploy after the merge and reports only new failures." },
+            { q: "Which languages does it support?", a: "It works on the repository as text and runs your own build and tests, so it is not tied to one language or framework." },
+            { q: "Which AI models does it use?", a: "Claude models from Anthropic, through your team's own Anthropic API key. Admins can choose the models and set a monthly token limit." },
+            { q: "How much does it cost?", a: "CoderHelm is in closed beta. Each team brings its own Anthropic API key, so model usage is billed to your Anthropic account, and admins can cap it with a monthly token limit." },
+            { q: "Can it change data in my database?", a: "No. Lookups are read only, enforced in code at several independent points: the query is checked, the transaction is read only and rolled back, and the database user cannot write." },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+const pullRequests: Page = {
+  slug: "pull-requests",
+  path: "/pull-requests/",
+  navLabel: "Tickets to PRs",
+  title: "GitHub issue and Jira ticket to pull request",
+  description:
+    "Assign a GitHub issue or Jira ticket to CoderHelm and it plans the change, writes it on its own branch, runs your build and tests, reviews its own work and opens a pull request.",
+  eyebrow: "Tickets to pull requests",
+  h1: "From a GitHub issue or Jira ticket to a pull request.",
+  lede:
+    "Assign the ticket to CoderHelm or add a label. It reads the repository, plans the change, writes it, runs your build and tests, reviews its own work and opens a pull request your team can review like any other.",
+  heroFrame: { id: "run", caption: "A run in the CoderHelm dashboard: each stage from triage to the opened pull request, with the files it changed." },
+  sections: [
+    {
+      id: "triggers",
+      heading: "Start a run from the tools you already use",
+      blocks: [
+        {
+          type: "table",
+          head: ["Where", "How to start a run"],
+          rows: [
+            ["GitHub issue", "Assign it to CoderHelm, add the `coderhelm` label, or comment `/coderhelm` or `@coderhelm`."],
+            ["Jira ticket", "Assign it to CoderHelm or add the `coderhelm` label. Your admin can change the label."],
+            ["CoderHelm dashboard", "Describe the work in a plan and approve it; each task becomes an issue and a run."],
+            ["Monitoring alert", "Route a CloudWatch alarm to CoderHelm and a matching rule starts a run. See [alerts](/alerts/)."],
+          ],
+        },
+      ],
+    },
+    {
+      id: "stages",
+      heading: "What happens during a run",
+      blocks: [
+        {
+          type: "steps",
+          items: [
+            { title: "Triage and plan", text: "It reads the ticket, the repository's conventions and your AGENTS.md, then writes a plan with the files it will touch." },
+            { title: "Implement and test", text: "It writes the change on a `coderhelm/` branch and runs your real build, lint and tests in a sandbox that holds no credentials." },
+            { title: "Review and open", text: "It reviews its own work (up to three fix rounds), runs a security check, resolves conflicts with the base branch and opens the pull request." },
+          ],
+        },
+        { type: "p", text: "Pull requests open as drafts while the work is in progress, and are marked ready for review when CoderHelm is done." },
+      ],
+    },
+    {
+      id: "plans",
+      heading: "Plans: describe the work, get ordered tickets",
+      blocks: [
+        {
+          type: "p",
+          text: "In the dashboard, describe what you want to build. CoderHelm streams a plan as it reasons, searching your code and the MCP servers you connected for the details. Approve it and each task becomes a GitHub issue and a run, in order.",
+        },
+      ],
+    },
+    {
+      id: "pr-faq",
+      heading: "FAQ",
+      blocks: [
+        {
+          type: "faq",
+          items: [
+            { q: "Can CoderHelm read screenshots attached to a ticket?", a: "Yes, images attached to the ticket are read along with its text." },
+            { q: "Will the pull request follow our conventions?", a: "It reads AGENTS.md, CLAUDE.md, copilot instructions and .cursorrules from the repository, plus the guardrails, custom instructions and team voice your admins set." },
+            { q: "What if CI fails on the pull request?", a: "It reads the failing check's logs, fixes the cause and pushes again. It stops when the same failure happens twice, so it never loops on a problem it cannot fix. See [maintenance](/maintenance/)." },
+          ],
+        },
+      ],
+    },
+  ],
+  related: ["maintenance", "reviewer", "skills"],
+};
+
+const reviewer: Page = {
+  slug: "reviewer",
+  path: "/reviewer/",
+  navLabel: "Code review",
+  title: "AI code review for GitHub pull requests",
+  description:
+    "Add a label to any GitHub pull request and CoderHelm reviews it with the context of the whole repository, comments on exact lines with suggested fixes, rates risk and reviews again on every push.",
+  eyebrow: "Code review",
+  h1: "AI code review on every GitHub pull request.",
+  lede:
+    "Turn the reviewer on for a repository and add the review label (`ch-review` by default) to any pull request. CoderHelm reviews it like an engineer who knows the codebase, and keeps reviewing as you push.",
+  heroFrame: { id: "review", caption: "A CoderHelm review on GitHub: a risk level with the reason, a line comment with a suggested fix, and earlier comments resolved after they were fixed." },
+  sections: [
+    {
+      id: "what",
+      heading: "What a review includes",
+      blocks: [
+        {
+          type: "list",
+          items: [
+            "Context beyond the diff: a code graph of definitions and callers shows what a change reaches",
+            "Comments on the exact lines, with GitHub suggestions you can apply",
+            "A risk level of low, medium or high; migrations, auth, secrets and payments always rate high",
+            "A new review on every push, and its own comments resolved once they are fixed",
+            "Answers in the thread: `@coderhelm` with a question, `@coderhelm re-review`, or the Re-request review button",
+            "Draft pull requests are skipped until they are marked ready",
+          ],
+        },
+      ],
+    },
+    {
+      id: "options",
+      heading: "Options a repository can turn on",
+      blocks: [
+        {
+          type: "cards",
+          items: [
+            { title: "Auto merge, only when safe", text: "Off by default. Merges only the exact commit it reviewed, after a person approves and every check is green." },
+            { title: "Runs the right CI", text: "Adds the labels your CI listens for, such as which end to end suites to run or a staging deploy, based on what the pull request changes. It uses the labels your repository already describes." },
+            { title: "Holds the line on tests", text: "Sends back pull requests that change behavior without new or updated tests, and says what to test and where." },
+            { title: "Release tags", text: "Tags a release after merges, grouping merges that land close together (within 15 minutes by default)." },
+            { title: "Deploy check", text: "With auto merge on, it waits for the deploy checks after the merge and reports only failures that are new. It never rolls back a shared branch." },
+            { title: "Learns from your team", text: "Rate a review and add a note. Later reviews on that repository follow the feedback, on top of AGENTS.md and your review instructions." },
+          ],
+        },
+      ],
+    },
+    {
+      id: "review-faq",
+      heading: "FAQ",
+      blocks: [
+        {
+          type: "faq",
+          items: [
+            { q: "Does it review pull requests written by people?", a: "Yes. Any pull request with the review label is reviewed, whoever wrote it." },
+            { q: "Can it merge on its own?", a: "Only if you turn on auto merge for the repository, and even then only the exact commit it reviewed, after a person approves and every check passes." },
+            { q: "Where do I see past reviews?", a: "The Reviewer page in the dashboard lists every review with its ratings, and lets you review a pull request on demand." },
+          ],
+        },
+      ],
+    },
+  ],
+  related: ["maintenance", "tests", "pull-requests"],
+};
+
+const maintenance: Page = {
+  slug: "maintenance",
+  path: "/maintenance/",
+  navLabel: "Maintenance",
+  title: "AI that fixes failing CI and answers review comments",
+  description:
+    "CoderHelm stays on the code after the pull request: it answers review comments, fixes failing CI on its pull requests, resolves merge conflicts, checks deploys after merge and writes release notes.",
+  eyebrow: "After the pull request",
+  h1: "It doesn't hand off. It stays on the code.",
+  lede:
+    "Opening a pull request is where most AI tools stop. CoderHelm keeps working on it until it is merged, and keeps watching the code after that.",
+  heroFrame: { id: "maintain", caption: "The timeline of one CoderHelm pull request: a check it fixed, a review comment it answered, the merge and the deploy check after it." },
+  sections: [
+    {
+      id: "before-merge",
+      heading: "Until the pull request is merged",
+      blocks: [
+        {
+          type: "cards",
+          items: [
+            { title: "Answers review comments", text: "Request changes or ask a question on its pull request. It replies, pushes the fix and says what changed." },
+            { title: "Fixes failing CI", text: "When a check fails on its pull request, it reads the logs, fixes the cause and pushes again. It stops when the same failure repeats, and caps automatic pushes at eight. When only [quarantined tests](/tests/) failed, it treats the run as passing instead." },
+            { title: "Keeps the branch current", text: "Resolves merge conflicts with the base branch before it works on feedback, so a pull request does not go stale while it waits." },
+            { title: "Tells your failures from its own", text: "When an end to end test fails for a reason the pull request did not cause, it runs it once more and says so, with the evidence." },
+          ],
+        },
+      ],
+    },
+    {
+      id: "after-merge",
+      heading: "After the merge",
+      blocks: [
+        {
+          type: "cards",
+          items: [
+            { title: "Checks the deploy", text: "With auto merge on, it waits until the deploy checks finish and reports only failures that are new compared with before the merge. It never rolls back a shared branch." },
+            { title: "Turns alerts into fixes", text: "Production alarms routed to CoderHelm become analyzed pull requests in the right repository.", href: "/alerts/" },
+            { title: "Keeps tests healthy", text: "Flaky tests stop blocking builds, broken ones are never hidden, and fix pull requests come with proof.", href: "/tests/" },
+            { title: "Writes release notes", text: "Tags releases after merges and writes notes your team can read, published to the GitHub release, Confluence or email." },
+          ],
+        },
+      ],
+    },
+    {
+      id: "maint-faq",
+      heading: "FAQ",
+      blocks: [
+        {
+          type: "faq",
+          items: [
+            { q: "Does CoderHelm fix CI on pull requests it did not write?", a: "It fixes failures on its own pull requests. On your team's pull requests the reviewer explains failures, and for end to end tests it says whether a failure is known flaky, a bad run or likely caused by the change." },
+            { q: "Can it loop forever on a failing check?", a: "No. It stops when the same failure happens twice and caps automatic pushes, then reports what it found." },
+          ],
+        },
+      ],
+    },
+  ],
+  related: ["alerts", "tests", "reviewer"],
+};
+
+const alerts: Page = {
+  slug: "alerts",
+  path: "/alerts/",
+  navLabel: "Alerts",
+  title: "CloudWatch alarm to pull request",
+  description:
+    "Route CloudWatch alarms and EventBridge events to CoderHelm through SNS. Matching alerts become analyzed pull requests in the right repository, and recoveries are paired with the alert that raised them.",
+  eyebrow: "Alerts to fixes",
+  h1: "From a CloudWatch alarm to a pull request.",
+  lede:
+    "Subscribe CoderHelm to the SNS topic that carries your alerts and add rules. An alert a rule takes becomes a run in that rule's repository: CoderHelm analyzes it, makes the change and opens a pull request your team reviews.",
+  heroFrame: { id: "alert", caption: "An alarm routed to a repository, the pull request CoderHelm opened for it, and the recovery paired with the original alert." },
+  sections: [
+    {
+      id: "how",
+      heading: "How alert routing works",
+      blocks: [
+        {
+          type: "steps",
+          items: [
+            { title: "Send alerts to SNS", text: "CloudWatch alarm notifications, AWS Chatbot messages, EventBridge events or plain messages, on a topic in an AWS account your team connected." },
+            { title: "Add rules", text: "Each rule names the alarms or alert text it takes, the repository to fix them in and how to act." },
+            { title: "Review the fix", text: "The pull request goes through normal review. A pull request CoderHelm wrote never merges without a person's approval." },
+          ],
+        },
+      ],
+    },
+    {
+      id: "pairing",
+      heading: "Alerts and recoveries, paired",
+      blocks: [
+        {
+          type: "p",
+          text: "When an alarm returns to OK, CoderHelm matches the recovery to the alert that raised it and posts a linked resolved card in Microsoft Teams, so the channel shows what is still open. Alerts no rule takes are posted to Teams only.",
+        },
+      ],
+    },
+    {
+      id: "limits",
+      heading: "Built to stay calm",
+      blocks: [
+        {
+          type: "list",
+          items: [
+            "Every message must carry a valid SNS signature, from a topic in an AWS account your team connected",
+            "Alert text is treated as data, never as instructions",
+            "Repeats of the same alert are collapsed into one",
+            "Each rule has a daily run cap, and alert runs stop for the day at your team's alert token budget",
+          ],
+        },
+      ],
+    },
+    {
+      id: "logs",
+      heading: "Log findings, every six hours",
+      blocks: [
+        {
+          type: "p",
+          text: "Connect AWS with a CloudFormation stack that creates a read only role, and CoderHelm scans the CloudWatch log groups you choose every six hours. Each finding has a severity, a summary and a suggested action, and becomes a plan with one click.",
+        },
+      ],
+    },
+  ],
+  related: ["maintenance", "data-sources", "security"],
+};
+
+const tests: Page = {
+  slug: "tests",
+  path: "/tests/",
+  navLabel: "Flaky tests",
+  title: "Flaky test detection and quarantine",
+  description:
+    "CoderHelm reads the end to end results your CI produces, tells flaky tests from broken ones, keeps flaky tests from failing builds and opens fix pull requests that must pass twenty runs in a row.",
+  eyebrow: "Test health",
+  h1: "Flaky tests stop blocking you. Broken ones never hide.",
+  lede:
+    "CoderHelm reads every end to end run your CI already produces, tells a flaky test from a broken one, and acts on it.",
+  heroFrame: { id: "tests", caption: "The Tests page: each test's history run by run, flaky and broken tests told apart, and the quarantine list." },
+  sections: [
+    {
+      id: "detect",
+      heading: "Flaky, broken or a bad run",
+      blocks: [
+        {
+          type: "cards",
+          items: [
+            { title: "Told apart", text: "A test that passed and failed on the same commit is flaky. One that fails almost every time is broken. A run where many tests fail together is a bad run, not many flaky tests." },
+            { title: "\"Is this failure mine?\"", text: "Each failing test on a pull request gets one line in the review: known flaky with its history, a bad run, or likely caused by the files this pull request changed." },
+            { title: "Quarantine, never for broken tests", text: "When your team turns it on, flaky tests keep running and being recorded but stop failing the build. A broken test is never quarantined. Owners get a ticket after two days by default; each team picks between 1 and 30." },
+            { title: "Quarantined failures don't block", text: "When the only failing tests in a run are quarantined ones, CoderHelm treats the run as passing: it does not start a CI fix, armed auto merge goes ahead, and a note on the pull request names the tests." },
+            { title: "Fix pull requests with proof", text: "CoderHelm reproduces the flake, fixes it, and marks the pull request ready only after twenty green runs in a row." },
+            { title: "Tests you are missing", text: "Uncovered changes and bug fixes without tests become suggested tests, each proposed only after it passes ten repeat runs." },
+            { title: "Every run on one page", text: "Runs, each test's history, failures grouped by cause, the slowest tests and the quarantine list." },
+            { title: "Fits your CI", text: "Quarantined tests still run in your CI. The Tests page shows the workflow step that keeps them from failing the build itself." },
+          ],
+        },
+      ],
+    },
+    {
+      id: "formats",
+      heading: "Reports it reads",
+      blocks: [
+        {
+          type: "p",
+          text: "Playwright (JSON or HTML), JUnit XML and Cucumber JSON. Results that never reach GitHub, such as a device farm, can be uploaded with a GitHub Actions token, so there is no secret to store.",
+        },
+      ],
+    },
+  ],
+  related: ["maintenance", "reviewer", "pull-requests"],
+};
+
+const dataSources: Page = {
+  slug: "data-sources",
+  path: "/data-sources/",
+  navLabel: "Data sources",
+  title: "Read only data sources for an AI coding agent",
+  description:
+    "CoderHelm checks your GraphQL API, CloudWatch Logs, PostgreSQL and Redshift while it plans, writes and reviews, with every lookup read only, enforced in code and recorded.",
+  eyebrow: "Checks the facts",
+  h1: "It looks before it guesses. Read only.",
+  lede:
+    "Connect your API, logs and databases. While CoderHelm plans, writes code and reviews, it checks what the running system really has: whether a field exists, what a setting is, what the service logged.",
+  heroFrame: { id: "lookup", caption: "A bug ticket investigated with a database lookup and a log search, both read only and recorded, before any code is planned." },
+  sections: [
+    {
+      id: "sources",
+      heading: "What it can look up",
+      blocks: [
+        {
+          type: "list",
+          items: [
+            "Your GraphQL API, your CloudWatch Logs, your PostgreSQL databases and your Redshift warehouse",
+            "Bug tickets come with evidence: the record, the error and the code that raised it",
+            "Reviews confirm a field or table really exists before flagging it",
+            "Setup takes minutes: paste one script into AWS CloudShell",
+            "Your own tools: named lookups your engineers write once, run only after a second admin approves each exact version",
+          ],
+        },
+      ],
+    },
+    {
+      id: "locks",
+      heading: "Read only, enforced in code at every step",
+      blocks: [
+        { type: "p", text: "Not a promise in a prompt. Each lock below stops a write on its own." },
+        {
+          type: "cards",
+          items: [
+            { title: "One read at a time", text: "Each lookup is checked before it is sent: one SELECT, one GraphQL query or one log search. Anything that could change data is refused." },
+            { title: "Rolled back, every time", text: "Database lookups run in a read only transaction that is always rolled back." },
+            { title: "A user that can only read", text: "CoderHelm signs in as a database user that cannot change any table, checked when you connect and again before use." },
+            { title: "A role tied to your team", text: "Access goes through a role in your AWS account that only works with your team's external ID. Delete the role and access ends." },
+            { title: "Hidden stays hidden", text: "Fields you hide are refused wherever they appear. Secrets, email addresses and card numbers are scrubbed from results, and only the log groups you choose can be searched." },
+            { title: "Every lookup on the record", text: "Each lookup is logged with who asked, what they asked and for which pull request. Follow it live, and switch any source off." },
+          ],
+        },
+      ],
+    },
+  ],
+  related: ["security", "alerts", "skills"],
+};
+
+const skills: Page = {
+  slug: "skills",
+  path: "/skills/",
+  navLabel: "Skills",
+  title: "Team skills, agent briefs and MCP servers",
+  description:
+    "CoderHelm works your way: it reads your AGENTS.md, the skills and agent briefs your team keeps in a repository, the MCP servers you connect and what it learned on past runs.",
+  eyebrow: "Your way of working",
+  h1: "It runs on your skills, your rules and your tools.",
+  lede:
+    "Keep your team's skills and agent briefs in a repository and CoderHelm reads the ones that fit the work. Connect the MCP servers you use and it pulls context from them while it plans and builds.",
+  heroFrame: { id: "skills", caption: "A connected skills repository: each skill and agent brief, its switch, and how often the agents read it." },
+  sections: [
+    {
+      id: "skills-repo",
+      heading: "Skills kept in a repository",
+      blocks: [
+        {
+          type: "list",
+          items: [
+            "Skills from `skills/<name>/SKILL.md` or `.claude/skills/<name>/SKILL.md`, with the text files next to them",
+            "Agent briefs from `agents/<name>.md` and command steps from `commands/<name>.md`",
+            "Read from the default branch only, so only merged, reviewed text is used, and synced after every merge",
+            "Text only: nothing from a skills repository is ever run, and every guard stays in place",
+            "Each item has a switch, and you can see how often each agent read it",
+          ],
+        },
+      ],
+    },
+    {
+      id: "rules",
+      heading: "Your rules",
+      blocks: [
+        {
+          type: "p",
+          text: "CoderHelm reads AGENTS.md, CLAUDE.md, copilot instructions and .cursorrules from each repository. Admins add guardrails, custom instructions and a team voice for pull request descriptions.",
+        },
+      ],
+    },
+    {
+      id: "mcp",
+      heading: "MCP servers",
+      blocks: [
+        {
+          type: "p",
+          text: "Connect any of 17 MCP servers and CoderHelm can use them while it plans and implements: Figma, Sentry, Linear, Notion, Vercel, Stripe, PostHog, GitLab, Neon, Turso, Snyk, LaunchDarkly, MongoDB Atlas, Grafana, Redis, Upstash and Sanity. Credentials are stored encrypted with AWS KMS.",
+        },
+      ],
+    },
+    {
+      id: "memory",
+      heading: "Memory you can see",
+      blocks: [
+        {
+          type: "p",
+          text: "CoderHelm remembers what it learns on each repository, kept per team and per repository. Each agent has a profile showing what it knows and where it learned it, and you can pin, edit, forget or teach it something new.",
+        },
+      ],
+    },
+  ],
+  related: ["pull-requests", "data-sources", "reviewer"],
+};
+
+const security: Page = {
+  slug: "security",
+  path: "/security/",
+  navLabel: "Security",
+  title: "Security and data handling",
+  description:
+    "How CoderHelm handles your code and data: changes on its own branch, builds in a sandbox with no credentials, read only data access, KMS encrypted secrets, signed webhooks and team roles.",
+  eyebrow: "Security",
+  h1: "Guarded in code, not in a prompt.",
+  lede:
+    "Every guard on this page is enforced by the platform itself, so it holds whatever the model writes.",
+  sections: [
+    {
+      id: "code",
+      heading: "Your code",
+      blocks: [
+        {
+          type: "list",
+          items: [
+            "CoderHelm reads your repository through the GitHub App, only on the repositories you install it on",
+            "It does not git clone your repository; source is fetched when a run needs it",
+            "Your build, lint and tests run in a separate container that holds no credentials; the copy of the source it uses is deleted after the build (one day at most)",
+            "The code graph keeps symbol names and references, not your source files",
+            "Every change goes on a `coderhelm/` branch and arrives as a pull request; a pull request CoderHelm wrote never merges without a person's approval",
+          ],
+        },
+      ],
+    },
+    {
+      id: "access",
+      heading: "Access and secrets",
+      blocks: [
+        {
+          type: "cards",
+          items: [
+            { title: "Encrypted with AWS KMS", text: "Stored tokens, keys and connection details are encrypted with AWS KMS. Data source secrets carry your team in the encryption context, so they cannot be read for another team." },
+            { title: "Signed webhooks", text: "GitHub webhooks are checked with HMAC and SNS messages by signature before anything runs." },
+            { title: "Team scoped", text: "Every request is scoped to your team, and roles (owner, admin, billing, member, viewer) decide who can change what." },
+            { title: "Read only data sources", text: "Database, API and log lookups are read only, enforced at several independent points.", href: "/data-sources/" },
+          ],
+        },
+      ],
+    },
+    {
+      id: "data",
+      heading: "What is stored",
+      blocks: [
+        {
+          type: "p",
+          text: "Model calls go to Anthropic through your team's own API key. The [privacy policy](/privacy/) lists every sub processor, what it receives and how long each kind of data is kept.",
+        },
+        { type: "p", text: "Report a vulnerability to security@coderhelm.com." },
+      ],
+    },
+  ],
+  related: ["data-sources", "alerts", "pull-requests"],
+};
+
+function legal(slug: string, navLabel: string, title: string, description: string, body: string): Page {
+  return { slug, path: `/${slug}/`, navLabel, title, description, h1: title, lede: "", sections: [], kind: "legal", body };
+}
+
+export const pages: Page[] = [
+  home,
+  pullRequests,
+  reviewer,
+  maintenance,
+  alerts,
+  tests,
+  dataSources,
+  skills,
+  security,
+  legal("contact", "Contact", "Contact", "How to reach CoderHelm for support, legal, privacy, security and abuse reports.", contact),
+  legal("privacy", "Privacy", "Privacy Policy", "How CoderHelm collects, uses and protects your data, and the sub processors it uses.", privacy),
+  legal("terms", "Terms", "Terms of Service", "The terms that govern your use of CoderHelm.", terms),
+  legal("acceptable-use", "Acceptable use", "Acceptable Use Policy", "What you may and may not do with CoderHelm.", acceptableUse),
+];
+
+export function pageBySlug(slug: string): Page | undefined {
+  return pages.find((p) => p.slug === slug);
+}
+
+export function mdPath(page: Page): string {
+  return page.slug === "" ? "/index.md" : `/${page.slug}.md`;
+}
+
+export function navPages(): Page[] {
+  return ["pull-requests", "reviewer", "maintenance", "alerts", "tests", "security"].map((s) => pageBySlug(s)!);
+}
