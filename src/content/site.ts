@@ -362,7 +362,7 @@ const maintenance: Page = {
           type: "cards",
           items: [
             { title: "Answers review comments", text: "Request changes or ask a question on its pull request. It replies, pushes the fix and says what changed." },
-            { title: "Fixes failing CI", text: "When a check fails on its pull request, it reads the logs, fixes the cause and pushes again. It stops when the same failure repeats, and caps automatic pushes at eight." },
+            { title: "Fixes failing CI", text: "When a check fails on its pull request, it reads the logs, fixes the cause and pushes again. It stops when the same failure repeats, and caps automatic pushes at eight. When only [quarantined tests](/tests/) failed, it treats the run as passing instead." },
             { title: "Keeps the branch current", text: "Resolves merge conflicts with the base branch before it works on feedback, so a pull request does not go stale while it waits." },
             { title: "Tells your failures from its own", text: "When an end to end test fails for a reason the pull request did not cause, it runs it once more and says so, with the evidence." },
           ],
@@ -489,10 +489,12 @@ const tests: Page = {
           items: [
             { title: "Told apart", text: "A test that passed and failed on the same commit is flaky. One that fails almost every time is broken. A run where many tests fail together is a bad run, not many flaky tests." },
             { title: "\"Is this failure mine?\"", text: "Each failing test on a pull request gets one line in the review: known flaky with its history, a bad run, or likely caused by the files this pull request changed." },
-            { title: "Quarantine, never for broken tests", text: "When your team turns it on, flaky tests keep running and being recorded but stop failing the build. A broken test is never quarantined. Owners get a ticket after two weeks." },
+            { title: "Quarantine, never for broken tests", text: "When your team turns it on, flaky tests keep running and being recorded but stop failing the build. A broken test is never quarantined. Owners get a ticket after two days by default; each team picks between 1 and 30." },
+            { title: "Quarantined failures don't block", text: "When the only failing tests in a run are quarantined ones, CoderHelm treats the run as passing: it does not start a CI fix, armed auto merge goes ahead, and a note on the pull request names the tests." },
             { title: "Fix pull requests with proof", text: "CoderHelm reproduces the flake, fixes it, and marks the pull request ready only after twenty green runs in a row." },
             { title: "Tests you are missing", text: "Uncovered changes and bug fixes without tests become suggested tests, each proposed only after it passes ten repeat runs." },
             { title: "Every run on one page", text: "Runs, each test's history, failures grouped by cause, the slowest tests and the quarantine list." },
+            { title: "Fits your CI", text: "Quarantined tests still run in your CI. The Tests page shows the workflow step that keeps them from failing the build itself." },
           ],
         },
       ],

@@ -79,7 +79,7 @@ What this PR does:
   - Reachable three ways: the `.md` URL, the `rel="alternate"` link, or `Accept: text/markdown`. A CloudFront viewer request function rewrites to the twin, and a viewer response function adds `Vary: Accept`.
   - The infra deploys `.md` as `text/markdown; charset=utf-8` and llms files as `text/plain; charset=utf-8`.
 - **Crawler policy: allow all, on the record.** `robots.ts` names OAI-SearchBot, ChatGPT-User, GPTBot, Claude-SearchBot, Claude-User, ClaudeBot, PerplexityBot, Perplexity-User, Google-Extended, Applebot-Extended, Amazonbot, meta-externalagent and CCBot, each with a comment. This is a public marketing site and visibility in assistants is the goal. Training crawlers are allowed too, as a policy choice that is easy to reverse per bot.
-- **Citation-friendly facts**: tables for triggers and integrations, exact numbers where they are product facts (3 fix rounds, 8 pushes, 20 green runs, 10 repeat runs, 14 days, 6 hours, 15 minutes, 17 MCP servers), and a visible "Updated" date in the footer and in every twin.
+- **Citation-friendly facts**: tables for triggers and integrations, exact numbers where they are product facts (3 fix rounds, 8 pushes, 20 green runs, 10 repeat runs, 2 days, 6 hours, 15 minutes, 17 MCP servers), and a visible "Updated" date in the footer and in every twin.
 
 ## 5. Page map
 
@@ -136,7 +136,8 @@ Paths: P = coderhelm-platform (main at b54a493), D = coderhelm/dashboard/src/app
 | Playwright JSON/HTML, JUnit XML, Cucumber JSON | P services/common/src/e2e/parse.rs:1-9 |
 | Flaky vs broken vs bad run | P services/common/src/e2e/detect.rs:1-15 |
 | PR line per failing test | P e2e.rs:7-9 |
-| Quarantine is opt-in, never for broken tests; owner ticket after 14 days | P detect.rs:14, :367-379; e2e.rs:58 |
+| Quarantine is opt-in, never for broken tests; owner ticket after 2 days by default, team setting 1 to 30 | P detect.rs:14, :367-379; common/src/e2e/model.rs:420-435 (`ticket_after_days`, `DEFAULT_TICKET_AFTER_DAYS = 2`, `TICKET_AFTER_DAYS_RANGE = 1..=30`), platform #172 (66e19fc) |
+| Only quarantined tests failing counts as passing: no CI fix, armed auto merge proceeds, PR note names the tests | P services/worker/src/passes/quarantine.rs:1-15; resume.rs:234-264, :1046; await_merge.rs:75-78, :358-372; e2e.rs:1002-1021 (the note) |
 | Fix PRs need 20 green runs | P e2e.rs:53-54 |
 | Suggested tests pass 10 repeat runs | P e2e.rs:56 |
 | Slowest tests, failures grouped by cause | P services/gateway/src/routes/tests.rs:456; common/src/e2e/store.rs:464 |
