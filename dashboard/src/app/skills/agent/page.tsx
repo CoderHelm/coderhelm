@@ -177,13 +177,12 @@ function AgentPage() {
             </a>
           </p>
         </div>
-        <div className="flex flex-col items-start gap-1 sm:items-end sm:text-right">
-          {canManage ? (
-            <ToolSwitch on={agent.enabled} label={`Let Coderhelm ask ${agent.name}`} busy={switching} onToggle={toggle} />
-          ) : (
-            <StatusPill tone={agent.enabled ? "success" : "neutral"}>{agent.enabled ? "On" : "Off"}</StatusPill>
-          )}
-          <p className="max-w-56 text-xs text-zinc-500">
+      </div>
+
+      <div className="mt-6 flex items-start justify-between gap-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-zinc-200">Let Coderhelm ask this agent</p>
+          <p className="mt-1 text-xs text-zinc-500">
             A Coderhelm setting. It doesn&apos;t change the file.
             {agent.switched_by && (
               <>
@@ -192,6 +191,13 @@ function AgentPage() {
               </>
             )}
           </p>
+        </div>
+        <div className="shrink-0">
+          {canManage ? (
+            <ToolSwitch on={agent.enabled} label={`Let Coderhelm ask ${agent.name}`} busy={switching} onToggle={toggle} />
+          ) : (
+            <StatusPill tone={agent.enabled ? "success" : "neutral"}>{agent.enabled ? "On" : "Off"}</StatusPill>
+          )}
         </div>
       </div>
 
