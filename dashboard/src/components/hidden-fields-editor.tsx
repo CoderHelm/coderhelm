@@ -5,8 +5,30 @@ import { XIcon } from "./icons";
 import { focusRing, inputClass, secondaryButton } from "./ui";
 
 /**
- * Editor for the list of field names hidden from the reviewer. Names are
- * matched wherever they appear, so the list is a flat set of words.
+ * Why a hidden entry can't be saved, or "" when it is fine. Mirrors the
+ * server's check: a word (two letters or digits at least), an `=exact`
+ * name, or one table's column as `table.column` / `schema.table.column`.
+ */
+export function hiddenEntryProblem(entry: string): string {
+  const e = entry.trim();
+  if (!e) return "Type a name.";
+  const bare = e.startsWith("=") ? e.slice(1) : e;
+  if (bare.includes(".")) {
+    const parts = bare.split(".").map((p) => p.trim().replace(/^"|"$/g, ""));
+    const ok =
+      parts.length >= 2 &&
+      parts.length <= 3 &&
+      parts.every((p) => p.length > 0 && /^[\p{L}\p{N}_$\- ]+$/u.test(p)) &&
+      parts[parts.length - 1].replace(/[^\p{L}\p{N}]/gu, "").length >= 2;
+    return ok ? "" : `"${e}" isn't a column name. Use table.column or schema.table.column.`;
+  }
+  if (bare.replace(/[^\p{L}\p{N}]/gu, "").length < 2) return `"${e}" is too short: it needs at least two letters or digits.`;
+  return "";
+}
+
+/**
+ * Editor for the list of names hidden from Coderhelm: words matched wherever
+ * they appear, exact names, and single tables' columns.
  */
 export function HiddenFieldsEditor({
   value,
@@ -31,6 +53,11 @@ export function HiddenFieldsEditor({
     if (!name) return;
     if (value.some((v) => v.toLowerCase() === name.toLowerCase())) {
       setError(`"${name}" is already hidden.`);
+      return;
+    }
+    const problem = hiddenEntryProblem(name);
+    if (problem) {
+      setError(problem);
       return;
     }
     onChange([...value, name]);
@@ -94,7 +121,12 @@ export function HiddenFieldsEditor({
           </button>
         </div>
         <p className="mt-2 text-xs text-zinc-500">
-          A name hides every field that contains it (<code>salary</code> also hides <code>base_salary</code>). Start with = to hide only an exact name: <code>=ip</code> hides <code>ip</code> but not <code>membership</code>.
+          A name hides every {noun} that contains it (<code>salary</code> also hides <code>base_salary</code>). Start with = to hide only an exact name: <code>=ip</code> hides <code>ip</code> but not <code>membership</code>.
+          {noun === "column" ? (
+            <> To hide a column in one table only, name the table: <code>person.name</code> or <code>public.person.name</code> hides <code>name</code> in that table and leaves other tables&apos; <code>name</code> alone.</>
+          ) : (
+            <> <code>Type.field</code> hides that field name everywhere in an API.</>
+          )}
         </p>
         {error && <p id={errorId} role="alert" className="mt-2 text-sm text-red-400">{error}</p>}
       </div>

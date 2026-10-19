@@ -15,6 +15,7 @@ import { Callout } from "@/components/callout";
 import { CheckList, type CheckItem } from "@/components/check-list";
 import { Field, SecretInput } from "@/components/field";
 import { HiddenFieldsEditor } from "@/components/hidden-fields-editor";
+import { HiddenSuggestions } from "@/components/hidden-suggestions";
 import { StatusPill } from "@/components/status-pill";
 import { StepDot } from "@/components/stepper";
 import { CodeIcon, DatabaseIcon, LogsIcon, ShieldCheckIcon, WrenchIcon } from "@/components/icons";
@@ -625,6 +626,15 @@ function SourceCard({
             {noun.many[0].toUpperCase() + noun.many.slice(1)} with these names are hidden from Coderhelm wherever they appear.
           </p>
           <HiddenFieldsEditor value={hidden} onChange={setHidden} idPrefix={`hub-${source.id}`} noun={noun.one as "field" | "column"} />
+          {source.kind === "database" && (
+            <HiddenSuggestions
+              source={source}
+              onChange={(next) => {
+                onChange(next);
+                setHidden(next.hidden_fields);
+              }}
+            />
+          )}
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={saveHidden} disabled={!hiddenDirty || busy === "hidden"} className={primaryButton}>
               {busy === "hidden" ? "Saving…" : "Save"}

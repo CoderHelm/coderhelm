@@ -33,6 +33,8 @@ interface Backend {
   /** Monitoring, docs and pipeline connections. */
   connectors: Record<string, unknown>[];
   awsAccounts: { account: string; region: string; role: string }[];
+  /** Suggested hidden columns, by source id. */
+  suggestions: Record<string, { entry: string; reason: string }[]>;
 }
 
 const NO_CONNECTORS = [
@@ -135,7 +137,7 @@ function makeSource(over: Partial<Source> = {}): Source {
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = {
     sources: [], events: [], calls: [], rejectKey: false, existing: [], dbWritable: false,
-    connectors: NO_CONNECTORS.map((c) => ({ ...c })), awsAccounts: [], ...init,
+    connectors: NO_CONNECTORS.map((c) => ({ ...c })), awsAccounts: [], suggestions: {}, ...init,
   };
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -222,6 +224,17 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       const source = awsSource("database");
       db.sources.push(source);
       return json(route, { source, checks: DB_PASSED });
+    }
+    const hs = p.match(/^\/api\/data-sources\/([^/]+)\/hidden-suggestions$/);
+    if (hs) {
+      const src = db.sources.find((s) => s.id === hs[1])!;
+      const list = db.suggestions[hs[1]] ?? [];
+      if (method === "GET") return json(route, { suggestions: list, dismissed: [], checked_at: "2026-01-31T10:00:00Z" });
+      const accept = (body?.accept as string[] | undefined) ?? [];
+      const dismiss = (body?.dismiss as string[] | undefined) ?? [];
+      src.hidden_fields = [...src.hidden_fields, ...accept];
+      db.suggestions[hs[1]] = list.filter((x) => !accept.includes(x.entry) && !dismiss.includes(x.entry));
+      return json(route, { source: src, suggestions: db.suggestions[hs[1]], dismissed: dismiss });
     }
     const m = p.match(/^\/api\/data-sources\/([^/]+)(?:\/(key|test|samples|try))?$/);
     const source = m && db.sources.find((s) => s.id === m[1]);
@@ -1070,4 +1083,67 @@ test("monitoring, docs and MCP connections live on Integrations, not here", asyn
   await expect(page.getByRole("heading", { name: "Monitoring, docs and pipelines" })).toHaveCount(0);
   const pointer = page.getByTestId("integrations-pointer");
   await expect(pointer.getByRole("link", { name: "Settings → Integrations" })).toHaveAttribute("href", /^\/settings\/integrations\/?$/);
+});
+
+test("hub: a database's suggested hidden columns can be hidden or dismissed, never hidden by themselves", async ({ page }) => {
+  const db = await mockApi(page, {
+    sources: [awsSource("database", { enabled: true, setup_complete: true, hidden_fields: ["email"] })],
+    suggestions: { ds_db: [
+      { entry: "public.member.name", reason: "A member is a person." },
+      { entry: "public.member.phone_number", reason: "A member's phone." },
+    ] },
+  });
+  await page.goto("/data-sources");
+  const card = page.getByRole("article", { name: "orders-db database" });
+  await card.getByRole("button", { name: "What Coderhelm can't see" }).click();
+  const box = card.getByRole("region", { name: "Suggested hidden fields" });
+  await expect(box.getByText("public.member.name")).toBeVisible();
+  expect(callsTo(db, "POST", /hidden-suggestions$/)).toHaveLength(0);
+  await shot(page, "hub-hidden-suggestions");
+
+  await box.getByRole("button", { name: "Hide public.member.name" }).click();
+  await expect(box.getByText("public.member.name")).toHaveCount(0);
+  expect(callsTo(db, "POST", /\/api\/data-sources\/ds_db\/hidden-suggestions$/)[0].body).toEqual({ accept: ["public.member.name"] });
+  await expect(card.getByRole("list", { name: "Hidden column names" }).getByText("public.member.name")).toBeVisible();
+
+  await box.getByRole("button", { name: "Dismiss public.member.phone_number" }).click();
+  await expect(box.getByText("No suggestions right now.")).toBeVisible();
+  expect(callsTo(db, "POST", /hidden-suggestions$/)[1].body).toEqual({ dismiss: ["public.member.phone_number"] });
+});
+
+test("hub: a column can be hidden in one table only, and a malformed entry is refused", async ({ page }) => {
+  const db = await mockApi(page, { sources: [awsSource("database", { enabled: true, setup_complete: true, hidden_fields: ["email"] })] });
+  await page.goto("/data-sources");
+  const card = page.getByRole("article", { name: "orders-db database" });
+  await card.getByRole("button", { name: "What Coderhelm can't see" }).click();
+  const input = card.getByLabel("Hide another column name");
+  await input.fill("a.b.c.d");
+  await input.press("Enter");
+  await expect(card.getByRole("alert")).toContainText("Use table.column or schema.table.column.");
+  await input.fill("person.name");
+  await input.press("Enter");
+  await card.getByRole("button", { name: "Save" }).click();
+  expect(callsTo(db, "PUT", /\/api\/data-sources\/ds_db$/)[0].body).toEqual({ hidden_fields: ["email", "person.name"] });
+});
+
+test("activity: a lookup that named a table the source doesn't have shows the real names", async ({ page }) => {
+  await mockApi(page, {
+    sources: [awsSource("database", { enabled: true, setup_complete: true })],
+    events: [
+      lookup(1, {
+        actor: "planner", summary: "select c.id from shipments c", query: "select c.id from shipments c",
+        outcome: "unknown_name", ok: false, ms: 0,
+        detail: "No table named shipments. Closest: public.order_shipment.",
+      }),
+      lookup(2),
+    ],
+  });
+  await page.goto("/data-sources");
+  const activity = page.locator("#activity");
+  await expect(activity.getByText("Unknown name", { exact: true })).toBeVisible();
+  await expect(activity.getByText("No table named shipments. Closest: public.order_shipment.")).toBeVisible();
+  await activity.getByLabel("Result").selectOption("unknown_name");
+  await expect(activity.getByTestId("activity-row")).toHaveCount(1);
+  await activity.getByLabel("Result").selectOption("problems");
+  await expect(activity.getByTestId("activity-row")).toHaveCount(1);
 });
