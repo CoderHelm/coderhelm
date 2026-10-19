@@ -26,6 +26,9 @@ import {
   type SkillWithBody,
 } from "@/lib/skills";
 import { ItemActivity } from "../skill-activity";
+import { CompatSection } from "../compat";
+import { useRecheck } from "../use-recheck";
+import { Page } from "@/components/page";
 
 export default function AgentPageGuarded() {
   return (
@@ -57,6 +60,12 @@ function AgentPage() {
   const [asksError, setAsksError] = useState("");
   const [switching, setSwitching] = useState(false);
   const [draft, setDraft] = useState<{ question: string; key: number } | null>(null);
+  const reload = useCallback(async () => {
+    const item = await skillsApi.item(repoName, path);
+    setAgent(item);
+    return item;
+  }, [repoName, path]);
+  const { busy, recheck, chooseTranslated } = useRecheck(agent, setAgent, reload);
 
   const loadAsks = useCallback(async () => {
     try {
@@ -111,21 +120,23 @@ function AgentPage() {
 
   if (missing) {
     return (
-      <div className="max-w-3xl rounded-lg border border-zinc-800 p-8 text-center text-zinc-500">
-        <p className="mb-2 text-lg">Agent not found</p>
-        <p className="text-sm">
-          It may have been removed from its repository, or the repository was disconnected.{" "}
-          <Link href="/skills" className="underline">
-            All skills
-          </Link>
-        </p>
-      </div>
+      <Page>
+        <div className="rounded-lg border border-zinc-800 p-8 text-center text-zinc-500">
+          <p className="mb-2 text-lg">Agent not found</p>
+          <p className="text-sm">
+            It may have been removed from its repository, or the repository was disconnected.{" "}
+            <Link href="/skills" className="underline">
+              All skills
+            </Link>
+          </p>
+        </div>
+      </Page>
     );
   }
 
   if (!agent) {
     return (
-      <div className="max-w-6xl space-y-4" role="status" aria-label="Loading the agent">
+      <div className="mx-auto w-full min-w-0 max-w-6xl space-y-4" role="status" aria-label="Loading the agent">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-40 w-full" />
@@ -139,7 +150,7 @@ function AgentPage() {
   const answered = runAsks.filter((a) => a.outcome === "answered").length;
 
   return (
-    <div className="max-w-6xl">
+    <Page>
       <Link href="/skills" className={`text-sm text-zinc-400 hover:text-zinc-200 rounded ${focusRing}`}>
         ← Skills
       </Link>
@@ -237,7 +248,7 @@ function AgentPage() {
         <div className="min-w-0 space-y-8">
           <section aria-labelledby="how-heading">
             <h2 id="how-heading" className={sectionHeading}>
-              How Coderhelm runs it
+              When Coderhelm asks it
             </h2>
             <dl className={`${card} divide-y divide-zinc-800`}>
               <Fact term="Who asks it">The planner, coder and reviewer, at most 3 asks in one run.</Fact>
@@ -270,6 +281,16 @@ function AgentPage() {
               </Fact>
             </dl>
           </section>
+
+          <CompatSection
+            item={agent}
+            canManage={canManage}
+            busy={busy}
+            onRecheck={recheck}
+            onUseTranslated={chooseTranslated}
+            agentNote
+            showText={!!agent.translated?.trim()}
+          />
 
           <RecentAsks asks={asks} error={asksError} agent={agent} canAskAgain={canManage && agent.enabled} onAskAgain={askAgain} />
 
@@ -307,7 +328,7 @@ function AgentPage() {
           )}
         </aside>
       </div>
-    </div>
+    </Page>
   );
 }
 

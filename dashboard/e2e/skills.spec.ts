@@ -13,12 +13,14 @@ interface Item {
   repo: string; path: string; kind: "skill" | "agent" | "command"; name: string; description: string; sha: string; hash: string;
   enabled: boolean; files: string[]; missing_tools: string[]; uses: number; last_used_at: string; last_used_by: string; updated_at: string;
   asks: number; last_asked_at: string; switched_by: string; switched_at: string;
+  compat?: { status: string; summary: string; needs: string[]; at: string; error: string; current: boolean } | null;
+  use_translated?: boolean; translated_by?: string; translated_at?: string;
 }
 interface Ask {
   id: string; repo: string; path: string; run_id: string; sha: string; by: string; origin: string; question: string; context_chars: number; outcome: string; answer: string;
   model: string; input_tokens: number; output_tokens: number; ms: number; at: string;
 }
-interface Backend { repos: Repo[]; items: Item[]; asks: Ask[]; stats: unknown; role: string; calls: { method: string; path: string; body: Record<string, unknown> | null }[] }
+interface Backend { repos: Repo[]; items: Item[]; asks: Ask[]; stats: unknown; role: string; checks: number; calls: { method: string; path: string; body: Record<string, unknown> | null }[] }
 
 const SHA = "4f2c9a1e7b3d5c8a9e0f1b2c3d4e5f6a7b8c9d0e";
 const REPOS: Repo[] = [
@@ -30,15 +32,42 @@ const item = (p: Partial<Item> & Pick<Item, "path" | "kind" | "name" | "descript
   repo: "acme/playbook", sha: SHA, hash: "h", enabled: true, files: [], missing_tools: [], uses: 0, last_used_at: "", last_used_by: "", updated_at: ago(60),
   asks: 0, last_asked_at: "", switched_by: "", switched_at: "", ...p,
 });
+const checked = (status: string, summary: string, needs: string[] = [], current = true) => ({ status, summary, needs, at: ago(30), error: "", current });
+const DEBUG_SUMMARY = "1 of 5 steps run as written · 2 translated · 1 needs Monitoring · 1 write blocked";
 const ITEMS: Item[] = [
-  item({ path: "skills/debug/SKILL.md", kind: "skill", name: "debug", description: "Find the cause before the fix: reproduce, read the logs around the failure, then follow the data back.", files: ["skills/debug/reference.md", "skills/debug/checklist.md"], uses: 14, last_used_at: ago(42), last_used_by: "planner" }),
-  item({ path: "skills/api-conventions/SKILL.md", kind: "skill", name: "api-conventions", description: "How the team names things, structures modules and writes tests.", uses: 31, last_used_at: ago(8), last_used_by: "reviewer" }),
-  item({ path: "skills/copy-tone/SKILL.md", kind: "skill", name: "copy-tone", description: "Plain words in user-facing copy and pull request text.", enabled: false }),
+  item({ path: "skills/debug/SKILL.md", kind: "skill", name: "debug", description: "Find the cause before the fix: reproduce, read the logs around the failure, then follow the data back.", files: ["skills/debug/reference.md", "skills/debug/checklist.md"], uses: 14, last_used_at: ago(42), last_used_by: "planner", compat: checked("needs_tools", DEBUG_SUMMARY, ["Monitoring", "Wiki writes"]) }),
+  item({ path: "skills/api-conventions/SKILL.md", kind: "skill", name: "api-conventions", description: "How the team names things, structures modules and writes tests.", uses: 31, last_used_at: ago(8), last_used_by: "reviewer", compat: checked("ready", "3 of 3 steps run as written") }),
+  item({ path: "skills/copy-tone/SKILL.md", kind: "skill", name: "copy-tone", description: "Plain words in user-facing copy and pull request text.", enabled: false, compat: checked("translated", "1 of 2 steps run as written · 1 translated"), use_translated: true }),
   item({ path: "agents/spec-checker.md", kind: "agent", name: "spec-checker", description: "Checks a spec or ticket for gaps, contradictions and untestable requirements before work starts.", uses: 3, last_used_at: ago(120), last_used_by: "reviewer (asked)", asks: 2, last_asked_at: ago(35), missing_tools: ["Read", "Grep", "Bash", "WebFetch"] }),
   item({ path: "agents/tech-debt-manager.md", kind: "agent", name: "tech-debt-manager", description: "Shortcuts." }),
   item({ path: "commands/release-notes.md", kind: "command", name: "release-notes", description: "Write release notes from the merged pull requests since the last tag.", uses: 2, last_used_at: ago(2000), last_used_by: "coder", missing_tools: ["Bash", "mcp__tracker__list_issues"] }),
-  item({ repo: "acme/old-guides", sha: "9a8b7c6d5e4f", path: ".claude/commands/deploy.md", kind: "command", name: "deploy", description: "The old deploy checklist.", enabled: false }),
+  item({ repo: "acme/old-guides", sha: "9a8b7c6d5e4f", path: ".claude/commands/deploy.md", kind: "command", name: "deploy", description: "The old deploy checklist.", enabled: false, compat: checked("needs_tools", "0 of 2 steps run as written · 2 need Monitoring", ["Monitoring"]) }),
 ];
+
+// The full check of the debug skill, as its page gets it.
+const req = (asks: string, status: string, uses: string[], extra: Record<string, string> = {}) => ({ asks, kind: "tool", status, uses, write: "none", needs: "", fix: "", connect: "none", ...extra });
+const DEBUG_COMPAT = {
+  steps: [
+    { title: "Reproduce it", does: "Write down the exact record, page and time.", dropped: false, status: "available", requirements: [] },
+    { title: "Read the logs", does: "Search the service logs around that time.", dropped: false, status: "translated", requirements: [req("CloudWatch logs", "translated", ["logs_search"], { kind: "data" })] },
+    { title: "Check the data", does: "Query the record in the database.", dropped: false, status: "translated", requirements: [req("psql", "translated", ["db_query"], { kind: "command" })] },
+    { title: "Check deploy markers", does: "Look for a deploy right before the failure.", dropped: false, status: "missing", requirements: [req("list_change_events", "missing", [], { needs: "Monitoring", fix: "Connect your monitoring tool's MCP server.", connect: "plugins" }), req("git log", "missing", [], { kind: "command", needs: "Commit history", fix: "Coderhelm has no commit history tool." })] },
+    { title: "Write the lesson", does: "Append what was learned to the team wiki page.", dropped: false, status: "blocked", requirements: [req("updatePage", "blocked", [], { write: "outside", needs: "Wiki writes", fix: "Coderhelm only reads outside systems here." })] },
+  ],
+  counts: { steps: 5, as_written: 1, translated: 2, missing: 1, blocked: 1 },
+  needs: [
+    { name: "Monitoring", fix: "Connect your monitoring tool's MCP server.", connect: "plugins", status: "missing", steps: 1 },
+    { name: "Wiki writes", fix: "Coderhelm only reads outside systems here.", connect: "none", status: "blocked", steps: 1 },
+  ],
+  model: "light-model", input_tokens: 9100, output_tokens: 3200, cost_usd: 0.034, ms: 41000,
+};
+const DEBUG_TRANSLATED = `# Debug
+
+1. Reproduce it. Write down the exact record, page and time.
+2. Search the service logs with \`logs_search\` around that time for errors that name the record.
+3. If the data is wrong, query it with \`db_query\` and follow it back to the code that wrote it.
+4. If the data is right, the bug is in the code that reads or shows it.
+GAP: Deploy markers — look for a recent deploy — not connected in Coderhelm (connect your monitoring tool)`;
 const BODY = `---
 name: debug
 description: Find the cause before the fix.
@@ -105,7 +134,7 @@ const STATS = {
 };
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
-  const db: Backend = { repos: structuredClone(REPOS), items: structuredClone(ITEMS), asks: structuredClone(ASKS), stats: structuredClone(STATS), role: "admin", calls: [], ...init };
+  const db: Backend = { repos: structuredClone(REPOS), items: structuredClone(ITEMS), asks: structuredClone(ASKS), stats: structuredClone(STATS), role: "admin", checks: 0, calls: [], ...init };
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
   await page.route((url) => url.hostname === "localhost" && /^\/(api|auth)\//.test(url.pathname), async (route) => {
@@ -137,7 +166,22 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/skills/item" && method === "GET") {
       const it = db.items.find((i) => i.repo === url.searchParams.get("repo") && i.path === url.searchParams.get("path"));
       if (!it) return json(route, { error: "No such skill." }, 404);
-      return json(route, it.kind === "agent" ? { ...it, body: AGENT_BODY, prompt: "You are one of this team's own agents, asked a question by Coderhelm's reviewer.\n\n## Your brief\nYou review specs before work starts." } : { ...it, body: BODY });
+      if (it.kind === "agent") return json(route, { ...it, body: AGENT_BODY, prompt: "You are one of this team's own agents, asked a question by Coderhelm's reviewer.\n\n## Your brief\nYou review specs before work starts.", translated: "" });
+      const full = it.name === "debug" && it.compat ? { ...it.compat, ...DEBUG_COMPAT, needs: it.compat.needs, needs_detail: DEBUG_COMPAT.needs } : it.compat;
+      return json(route, { ...it, body: BODY, compat: full, translated: it.compat && it.name === "debug" ? DEBUG_TRANSLATED : "" });
+    }
+    if (p === "/api/skills/recheck" && method === "POST") {
+      db.checks++;
+      const it = db.items.find((i) => i.repo === body?.repo && i.path === body?.path);
+      // The worker lands the new check a moment later.
+      if (it?.compat) setTimeout(() => Object.assign(it.compat!, { at: new Date().toISOString() }), 300);
+      return json(route, { ok: true, checking: true });
+    }
+    if (p === "/api/skills/translated" && method === "PUT") {
+      const it = db.items.find((i) => i.repo === body?.repo && i.path === body?.path);
+      if (!it) return json(route, { error: "No such skill." }, 404);
+      Object.assign(it, { use_translated: Boolean(body?.enabled), translated_by: "admin@example.com", translated_at: new Date().toISOString() });
+      return json(route, { ok: true, use_translated: it.use_translated });
     }
     if (p === "/api/skills/item" && method === "PUT") {
       const it = db.items.find((i) => i.repo === body?.repo && i.path === body?.path);
@@ -208,9 +252,7 @@ test("repositories in each state, items by kind, agents marked as askable, one o
   await expect(page.getByText("Agent · can be asked")).toHaveCount(2);
   await expect(page.getByRole("switch", { name: "Let Coderhelm read copy-tone" })).toHaveAttribute("aria-checked", "false");
 
-  await page.getByRole("button", { name: "skill:debug" }).click();
-  await expect(page.getByText("Reproduce it. Write down the exact record")).toBeVisible();
-  await expect(page.getByText("Files with it: skills/debug/reference.md, skills/debug/checklist.md")).toBeVisible();
+  await expect(page.getByRole("link", { name: "skill:debug" })).toHaveAttribute("href", /\/skills\/item\/?\?repo=acme%2Fplaybook&path=skills%2Fdebug%2FSKILL\.md/);
   await shot(page, "skills-list");
 
   await page.getByRole("switch", { name: "Let Coderhelm read copy-tone" }).click();
@@ -356,4 +398,112 @@ test("a run's page lists the team agents it asked, linked to each agent", async 
   await expect(page.getByText("Check this ticket for contradictions before I plan it.")).toBeVisible();
   await expect(page.getByText("Took too long")).toBeVisible();
   await expect(page.getByRole("link", { name: "spec-checker" })).toHaveAttribute("href", /\/skills\/agent\/?\?repo=acme%2Fplaybook&path=agents%2Fspec-checker\.md/);
+});
+
+const DEBUG_URL = "/skills/item?repo=acme%2Fplaybook&path=skills%2Fdebug%2FSKILL.md";
+
+test("the overview counts items by how Coderhelm runs them and filters by what they need", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/skills");
+  const overview = page.getByTestId("compat-overview");
+  await expect(overview.getByRole("heading", { name: "How Coderhelm runs your skills" })).toBeVisible();
+  await expect(overview.getByText("4 of 7 checked against what your team has connected · 3 waiting for a check")).toBeVisible();
+  await expect(overview.getByRole("button", { name: "1 Ready" })).toBeVisible();
+  await expect(overview.getByRole("button", { name: "1 Translated" })).toBeVisible();
+  await expect(overview.getByRole("button", { name: "2 Need tools" })).toBeVisible();
+  await expect(overview.getByRole("button", { name: "Monitoring needed by 2 items" })).toBeVisible();
+  await expect(overview.getByRole("button", { name: "Wiki writes needed by 1 item" })).toBeVisible();
+
+  // Each item says where it stands, and its summary line links to its page.
+  const debug = page.getByRole("listitem").filter({ hasText: "skill:debug" });
+  await expect(debug.getByText("Needs tools", { exact: true })).toBeVisible();
+  await expect(debug.getByRole("link", { name: DEBUG_SUMMARY })).toBeVisible();
+  await expect(page.getByRole("listitem").filter({ hasText: "skill:copy-tone" }).getByText("agents read the translated version")).toBeVisible();
+  await expect(page.getByRole("listitem").filter({ hasText: "agent:tech-debt-manager" }).getByText("Not checked yet")).toBeVisible();
+  await shot(page, "skills-compat-overview");
+
+  await overview.getByRole("button", { name: "Monitoring needed by 2 items" }).click();
+  await expect(page.getByText("Showing 2 of 7 items.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "skill:debug" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "command:deploy" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "skill:api-conventions" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Show all" }).click();
+  await expect(page.getByRole("link", { name: "skill:api-conventions" })).toBeVisible();
+  await overview.getByRole("button", { name: "1 Ready" }).click();
+  await expect(page.getByText("Showing 1 of 7 items.")).toBeVisible();
+});
+
+test("an item's page: each step, what it relies on, what to connect, and the two texts", async ({ page }) => {
+  const db = await mockApi(page);
+  await page.goto(DEBUG_URL);
+  await expect(page.getByRole("heading", { name: "debug", level: 1, exact: true })).toBeVisible();
+  const section = page.getByTestId("compat-section");
+  await expect(section.getByTestId("compat-summary")).toHaveText(DEBUG_SUMMARY);
+  await expect(section.getByText(/Checked 30 min ago with light-model · cost \$0\.034\./)).toBeVisible();
+
+  // What to connect, each with its fix and where.
+  const needs = section.getByTestId("compat-needs");
+  await expect(needs.getByText("Monitoring", { exact: true })).toBeVisible();
+  await expect(needs.getByRole("link", { name: "Connect in MCP servers" })).toHaveAttribute("href", /^\/settings\/plugins\/?$/);
+  await expect(needs.getByText("Coderhelm only reads outside systems here.")).toBeVisible();
+
+  // The steps in order, with their status; gaps open by default.
+  const steps = section.getByTestId("compat-step");
+  await expect(steps).toHaveCount(5);
+  await expect(steps.nth(0)).toHaveAttribute("data-status", "available");
+  await expect(steps.nth(0).getByText("Runs as written")).toBeVisible();
+  await expect(steps.nth(1).getByText("Translated", { exact: true })).toBeVisible();
+  await expect(steps.nth(3).getByText("Needs a tool")).toBeVisible();
+  await expect(steps.nth(4).getByText("Write blocked")).toBeVisible();
+  await expect(steps.nth(3).getByText("list_change_events")).toBeVisible();
+  await expect(steps.nth(3).getByRole("link", { name: "Connect Monitoring in MCP servers" })).toHaveAttribute("href", /^\/settings\/plugins\/?$/);
+  await expect(steps.nth(4).getByText("writes outside")).toBeVisible();
+  await steps.nth(1).getByRole("button", { name: "Show what it relies on (1)" }).click();
+  await expect(steps.nth(1).getByText("CloudWatch logs")).toBeVisible();
+  await expect(steps.nth(1).getByText("logs_search")).toBeVisible();
+  await shot(page, "skill-item-compat");
+
+  // The translated text, and what it changed.
+  await page.getByRole("button", { name: "Translated", exact: true }).click();
+  await expect(page.getByTestId("compat-text").getByText("GAP: Deploy markers")).toBeVisible();
+  await page.getByRole("button", { name: "Changes", exact: true }).click();
+  await expect(page.getByLabel("Changes from the original")).toContainText("Search the service logs with `logs_search`");
+  await expect(page.getByText(/\d+ lines changed\./)).toBeVisible();
+  await shot(page, "skill-item-changes");
+
+  // The admin gives agents the translated version.
+  const choice = page.getByRole("switch", { name: "Give agents the translated version of debug" });
+  await expect(choice).toHaveAttribute("aria-checked", "false");
+  await choice.click();
+  await expect(choice).toHaveAttribute("aria-checked", "true");
+  expect(db.calls.find((c) => c.method === "PUT" && c.path === "/api/skills/translated")?.body).toEqual({ repo: "acme/playbook", path: "skills/debug/SKILL.md", enabled: true });
+
+  // Re-check asks the worker, and the page picks up the new check.
+  await section.getByRole("button", { name: "Re-check" }).click();
+  await expect.poll(() => db.checks).toBe(1);
+  expect(db.calls.find((c) => c.path === "/api/skills/recheck")?.body).toEqual({ repo: "acme/playbook", path: "skills/debug/SKILL.md" });
+  await expect(page.getByText("debug checked")).toBeVisible({ timeout: 15_000 });
+});
+
+test("members see how an item runs but can't re-check it or choose its version", async ({ page }) => {
+  await mockApi(page, { role: "member" });
+  await page.goto(DEBUG_URL);
+  await expect(page.getByTestId("compat-summary")).toHaveText(DEBUG_SUMMARY);
+  await expect(page.getByRole("button", { name: "Re-check" })).toHaveCount(0);
+  await expect(page.getByRole("switch")).toHaveCount(0);
+  await expect(page.getByTestId("compat-version").getByText("Off", { exact: true })).toBeVisible();
+});
+
+test("an item not checked yet, a changed one, and an agent's page", async ({ page }) => {
+  const db = await mockApi(page);
+  db.items[1].compat = { ...db.items[1].compat!, current: false };
+  await page.goto("/skills/item?repo=acme%2Fplaybook&path=skills%2Fapi-conventions%2FSKILL.md");
+  await expect(page.getByText("Checking again", { exact: true })).toBeVisible();
+  await expect(page.getByText(/The text changed since the check/)).toBeVisible();
+  await page.goto(AGENT_URL);
+  const section = page.getByTestId("compat-section");
+  await expect(section.getByText("Not checked yet", { exact: true })).toBeVisible();
+  await expect(section.getByText(/When Coderhelm asks this agent a question it gets no tools/)).toBeVisible();
+  await page.goto("/skills/item?repo=acme%2Fplaybook&path=skills%2Fgone%2FSKILL.md");
+  await expect(page.getByText("Skill not found")).toBeVisible();
 });

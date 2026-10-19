@@ -11,9 +11,11 @@ import { useToast } from "@/components/toast";
 import { ToolSwitch } from "@/components/tools";
 import { inputClass, linkButton, primaryButton, secondaryButton, focusRing } from "@/components/ui";
 import Link from "next/link";
-import { KIND_LABEL, agentHref, ago, handle, skillsApi, thinDescription, type Skill, type SkillKind, type SkillRepo, type SkillStats, type SkillWithBody } from "@/lib/skills";
+import { KIND_LABEL, agentHref, ago, handle, pageHref, skillsApi, thinDescription, type Skill, type SkillKind, type SkillRepo, type SkillStats } from "@/lib/skills";
+import { Page, PageHeader } from "@/components/page";
+import { CompatBadge, CompatOverview, matchesCompatFilter } from "./compat";
 import { UsageStats } from "./usage-stats";
-import { ItemActivity, NO_FILTERS, SkillActivity, type ActivityFilters } from "./skill-activity";
+import { NO_FILTERS, SkillActivity, type ActivityFilters } from "./skill-activity";
 import { RANGES, type Range } from "@/lib/activity";
 
 /** The tools an item asks for in its front matter that it won't get. */
@@ -155,8 +157,8 @@ function SkillsPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [newRepo, setNewRepo] = useState("");
-  const [open, setOpen] = useState<SkillWithBody | null>(null);
   const [stats, setStats] = useState<SkillStats | null>(null);
+  const [compatFilter, setCompatFilter] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -223,7 +225,6 @@ function SkillsPage() {
     run(`disconnect:${repo}`, async () => {
       await skillsApi.disconnect(repo);
       toast(`Disconnected ${repo}`);
-      setOpen(null);
       await load();
     });
   };
@@ -235,26 +236,33 @@ function SkillsPage() {
       toast(r.enabled ? `${s.name} is on` : `${s.name} is off`);
     });
 
-  const view = (s: Skill) => {
-    if (open && open.repo === s.repo && open.path === s.path) {
-      setOpen(null);
-      return;
-    }
-    run(`view:${s.repo}#${s.path}`, async () => setOpen(await skillsApi.item(s.repo, s.path)));
-  };
+  const recheck = (repo: string) =>
+    run(`recheck:${repo}`, async () => {
+      await skillsApi.recheck(repo);
+      toast(`Checking every item in ${repo} again. Each takes about a minute; this page updates as they land.`);
+      setTimeout(load, 20_000);
+    });
 
-  const grouped = useMemo(() => KINDS.map((k) => ({ kind: k, list: items.filter((i) => i.kind === k) })).filter((g) => g.list.length > 0), [items]);
+  const grouped = useMemo(
+    () =>
+      KINDS.map((k) => ({ kind: k, list: items.filter((i) => i.kind === k && matchesCompatFilter(i, compatFilter)) })).filter((g) => g.list.length > 0),
+    [items, compatFilter],
+  );
   const on = items.filter((i) => i.enabled).length;
 
   return (
-    <div className="max-w-4xl">
-      <h1 className="text-2xl font-bold text-zinc-100 text-balance">Skills</h1>
-      <p className="mt-2 max-w-prose text-sm text-zinc-400">
-        Keep your team&apos;s skills, agent briefs and commands in a repository, and Coderhelm&apos;s planner, coder and reviewer read
-        the ones that fit the work, and can ask your agents a question. Coderhelm reads the default branch, so only merged
-        changes count, and reads it again on every push. Nothing in them is ever run, and they can&apos;t give Coderhelm any
-        access it doesn&apos;t already have: an agent that&apos;s asked gets no tools, only its brief and what it&apos;s sent.
-      </p>
+    <Page>
+      <PageHeader
+        title="Skills"
+        lead={
+          <>
+            Keep your team&apos;s skills, agent briefs and commands in a repository, and Coderhelm&apos;s planner, coder and reviewer read
+            the ones that fit the work, and can ask your agents a question. Coderhelm reads the default branch, so only merged changes
+            count, and reads it again on every push. Nothing in them is ever run, and they can&apos;t give Coderhelm any access it
+            doesn&apos;t already have: an agent that&apos;s asked gets no tools, only its brief and what it&apos;s sent.
+          </>
+        }
+      />
 
       {error && (
         <div className="mt-6">
@@ -278,6 +286,7 @@ function SkillsPage() {
         </div>
       ) : (
         <div role="tabpanel" id="panel-library" aria-labelledby="tab-library">
+        <CompatOverview items={items} filter={compatFilter} onFilter={setCompatFilter} />
         {stats && items.length > 0 && <UsageStats stats={stats} />}
 
         <section aria-labelledby="repos-heading" className="mt-8">
@@ -326,10 +335,21 @@ function SkillsPage() {
                       )}
                     </div>
                     {canManage && (
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <button type="button" className={secondaryButton} disabled={busy === `sync:${r.repo}`} onClick={() => sync(r.repo)}>
                           {busy === `sync:${r.repo}` ? "Starting…" : "Sync now"}
                         </button>
+                        {r.items > 0 && (
+                          <button
+                            type="button"
+                            className={secondaryButton}
+                            disabled={busy === `recheck:${r.repo}`}
+                            onClick={() => recheck(r.repo)}
+                            title="Check every item again against what your team has connected"
+                          >
+                            {busy === `recheck:${r.repo}` ? "Starting…" : "Re-check all"}
+                          </button>
+                        )}
                         <button type="button" className={secondaryButton} disabled={busy === `disconnect:${r.repo}`} onClick={() => disconnect(r.repo)}>
                           Disconnect
                         </button>
@@ -363,6 +383,14 @@ function SkillsPage() {
           )}
         </section>
 
+        {compatFilter && (
+          <p className="mt-6 text-sm text-zinc-400" role="status">
+            Showing {grouped.reduce((n, g) => n + g.list.length, 0)} of {items.length} items.{" "}
+            <button type="button" className={linkButton} onClick={() => setCompatFilter("")}>
+              Show all
+            </button>
+          </p>
+        )}
         {grouped.map((g) => (
           <section key={g.kind} aria-labelledby={`${g.kind}-heading`} className="mt-8">
             <h2 id={`${g.kind}-heading`} className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
@@ -371,29 +399,18 @@ function SkillsPage() {
             <ul className="space-y-3">
               {g.list.map((s) => {
                 const key = `${s.repo}#${s.path}`;
-                const isOpen = open?.repo === s.repo && open.path === s.path;
                 return (
                   <li key={key} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0 flex-1 basis-64">
                         <div className="flex flex-wrap items-center gap-2">
-                          {s.kind === "agent" ? (
-                            <Link
-                              href={agentHref(s)}
-                              className={`font-mono font-semibold text-zinc-100 hover:underline rounded [overflow-wrap:anywhere] ${focusRing}`}
-                            >
-                              {handle(s, items)}
-                            </Link>
-                          ) : (
-                            <button
-                              type="button"
-                              className={`font-mono font-semibold text-zinc-100 hover:underline rounded text-left [overflow-wrap:anywhere] ${focusRing}`}
-                              aria-expanded={isOpen}
-                              onClick={() => view(s)}
-                            >
-                              {handle(s, items)}
-                            </button>
-                          )}
+                          <Link
+                            href={pageHref(s)}
+                            className={`font-mono font-semibold text-zinc-100 hover:underline rounded [overflow-wrap:anywhere] ${focusRing}`}
+                          >
+                            {handle(s, items)}
+                          </Link>
+                          <CompatBadge item={s} />
                           {s.kind === "agent" && (
                             <>
                               <StatusPill tone="success">Agent · can be asked</StatusPill>
@@ -409,7 +426,15 @@ function SkillsPage() {
                             {s.description ? "Short description" : "No description"}: Coderhelm&apos;s agents decide when to ask it from this line.
                           </p>
                         )}
-                        {(s.missing_tools?.length ?? 0) > 0 && <MissingTools item={s} />}
+                        {s.compat?.summary && s.compat.current && (
+                          <p className="mt-1 text-xs text-zinc-400">
+                            <Link href={pageHref(s)} className={`hover:text-zinc-200 hover:underline rounded ${focusRing}`}>
+                              {s.compat.summary}
+                            </Link>
+                            {s.use_translated && <span className="text-sky-300"> · agents read the translated version</span>}
+                          </p>
+                        )}
+                        {!s.compat && (s.missing_tools?.length ?? 0) > 0 && <MissingTools item={s} />}
                         <p className="mt-1 text-xs text-zinc-500 [overflow-wrap:anywhere]">
                           {s.repo} · {s.path}
                           {s.files.length > 0 && <> · {s.files.length} file{s.files.length === 1 ? "" : "s"} with it</>}
@@ -429,18 +454,6 @@ function SkillsPage() {
                         <StatusPill tone={s.enabled ? "success" : "neutral"}>{s.enabled ? "On" : "Off"}</StatusPill>
                       )}
                     </div>
-                    {isOpen && open && (
-                      <div className="mt-4">
-                        <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-950 px-4 py-3 font-mono text-xs text-zinc-300">{open.body}</pre>
-                        {open.files.length > 0 && (
-                          <p className="mt-2 text-xs text-zinc-500 [overflow-wrap:anywhere]">Files with it: {open.files.join(", ")}</p>
-                        )}
-                        <ItemActivity item={open} />
-                        <button type="button" className={`${linkButton} mt-2 text-sm`} onClick={() => setOpen(null)}>
-                          Close
-                        </button>
-                      </div>
-                    )}
                   </li>
                 );
               })}
@@ -456,6 +469,6 @@ function SkillsPage() {
         )}
         </div>
       )}
-    </div>
+    </Page>
   );
 }
