@@ -22,6 +22,7 @@ import { Skeleton } from "@/components/skeleton";
 import { Page, PageHeader, Section } from "@/components/page";
 import { LogGroupPicker } from "@/components/log-group-picker";
 import { ActivityFeed } from "@/components/data-source-activity";
+import { ConnectionsSection } from "@/components/connections";
 import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 
 export default function DataSourcesPageGuarded() {
@@ -174,6 +175,8 @@ function DataSourcesPage() {
           </ConnectCard>
         </div>
       </Section>
+
+      <ConnectionsSection />
 
       <p className="mt-6">
         <button

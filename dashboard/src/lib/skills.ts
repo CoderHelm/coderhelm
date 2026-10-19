@@ -147,6 +147,8 @@ export interface Requirement {
   fix: string;
   connect: "plugins" | "data_sources" | "github" | "none";
   action?: CompatAction;
+  /** For data_sources: the monitoring, docs or pipeline connection it means. */
+  connection?: "" | "newrelic" | "confluence" | "metrics" | "airflow";
 }
 
 export interface CompatStep {
@@ -163,6 +165,7 @@ export interface CompatNeed {
   fix: string;
   connect: Requirement["connect"];
   action?: CompatAction;
+  connection?: Requirement["connection"];
   status: "missing" | "blocked";
   steps: number;
 }

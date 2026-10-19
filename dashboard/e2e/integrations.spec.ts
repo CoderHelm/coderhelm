@@ -34,6 +34,8 @@ interface Backend {
   jiraEvents: Record<string, unknown>[];
   assumeFails: boolean;
   calls: { method: string; path: string; body: Record<string, unknown> | null }[];
+  /** What the CoderHelm role can't read yet (metrics, airflow). */
+  roleMissing?: string[];
 }
 
 function connection(over: Record<string, unknown> = {}) {
@@ -196,6 +198,17 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       db.jiraCheck = { ...db.jiraCheck, secret_configured: true, webhook_url: "https://api.example.com/webhooks/jira/tok" };
       return json(r, { token: "tok", webhook_secret: "whsec_new_value" });
     }
+    if (p === "/api/connectors/aws-check") {
+      const missing = db.roleMissing ?? [];
+      return json(r, {
+        check: { account: ACCOUNT, role: "CoderHelmLogReader", region: "us-east-1", works: true, caller: "", error: "", can_read_logs: true,
+          can_read_metrics: !missing.includes("metrics"), can_read_airflow: !missing.includes("airflow"), airflow_environments: [] },
+        missing,
+        update_url: missing.length ? "https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?stackName=CoderHelmLogReaderOps" : null,
+        stack_name: "CoderHelmLogReaderOps",
+        template_url: "https://coderhelm-public.s3.amazonaws.com/cfn/coderhelm-log-reader-ops.yaml",
+      });
+    }
     return json(r, { error: `not mocked: ${method} ${p}` }, 404);
   });
   return db;
@@ -328,6 +341,23 @@ test.describe("AWS", () => {
 });
 
 // ── Alert routes ─────────────────────────────────────────────────────
+
+test.describe("AWS role access", () => {
+  test("a role that can't read metrics or Airflow shows the one-click stack link", async ({ page }) => {
+    await mockApi(page, { roleMissing: ["metrics", "airflow"] });
+    await page.goto("/settings/aws");
+    const box = page.getByTestId("aws-role-access");
+    await expect(box.getByText("Update your CoderHelm role stack to enable CloudWatch metrics and Airflow")).toBeVisible();
+    const link = box.getByRole("link", { name: "Add metrics and Airflow access in AWS" });
+    await expect(link).toHaveAttribute("href", /stacks\/quickcreate\?stackName=CoderHelmLogReaderOps/);
+  });
+
+  test("a role that can read everything says so", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/settings/aws");
+    await expect(page.getByTestId("aws-role-access")).toHaveText("The role can read logs, CloudWatch metrics and Airflow.");
+  });
+});
 
 test.describe("Alert routes", () => {
   test("route cards, recent alerts with outcomes and recoveries paired to their alerts", async ({ page }) => {

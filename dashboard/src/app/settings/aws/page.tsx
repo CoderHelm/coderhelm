@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/skeleton";
 import { Disclosure } from "@/components/disclosure";
 import { AwsIcon, ExternalLinkIcon } from "@/components/icons";
 import { Page, PageHeader, Section } from "@/components/page";
+import { AwsRoleAccess } from "@/components/connections";
 import { TeamsWebhookField, validTeamsUrl } from "@/components/teams-webhook";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 
@@ -139,7 +140,10 @@ function AwsPage() {
               </div>
             )}
             {connections.map((c) => (
-              <ConnectionCard key={c.connection_id} connection={c} canEdit={canEdit} onChanged={refresh} />
+              <div key={c.connection_id} className="flex min-w-0 flex-col gap-3">
+                <ConnectionCard connection={c} canEdit={canEdit} onChanged={refresh} />
+                {canEdit && <AwsRoleAccess account={c.connection_id} />}
+              </div>
             ))}
           </div>
           <ScopeCard />

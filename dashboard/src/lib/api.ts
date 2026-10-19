@@ -867,6 +867,15 @@ export const api = {
     ),
   deleteDataSource: (id: string) =>
     request<{ ok: true }>(`/api/data-sources/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  listConnectors: () => request<{ connectors: Connector[]; aws_accounts: ConnectorAwsAccount[] }>("/api/connectors"),
+  saveConnector: (kind: ConnectorKind, body: Record<string, unknown>) =>
+    request<{ connector: Connector }>(`/api/connectors/${kind}`, { method: "PUT", body: JSON.stringify(body) }),
+  testConnector: (kind: ConnectorKind) =>
+    request<{ connector: Connector }>(`/api/connectors/${kind}/test`, { method: "POST" }),
+  removeConnector: (kind: ConnectorKind) =>
+    request<{ ok: true }>(`/api/connectors/${kind}`, { method: "DELETE" }),
+  checkAwsRole: (account?: string) =>
+    request<AwsRoleCheck>(`/api/connectors/aws-check${account ? `?account=${encodeURIComponent(account)}` : ""}`),
   getDataSourceSamples: (id: string) =>
     request<{ samples: DataSourceSample[] }>(`/api/data-sources/${encodeURIComponent(id)}/samples`),
   tryDataSource: (id: string, query: string, opts: { log_groups?: string[]; since?: string; database?: string } = {}) =>
@@ -2035,4 +2044,55 @@ export interface TestRecommendation {
   evidence: { kind: "bug_ticket" | "changed_code" | "route" | "traffic"; text: string; url?: string | null }[];
   status: "open" | "accepted" | "generating" | "pr_opened" | "dismissed";
   pr_url?: string | null;
+}
+
+export type ConnectorKind = "newrelic" | "confluence" | "metrics" | "airflow";
+
+/** A monitoring, docs or pipeline connection. Keys are never returned. */
+export interface Connector {
+  kind: ConnectorKind;
+  label: string;
+  connected: boolean;
+  enabled?: boolean;
+  status?: string;
+  status_message?: string;
+  key_hint?: string;
+  region?: string;
+  account_ids?: string[];
+  site?: string;
+  email?: string;
+  spaces?: string[];
+  write_enabled?: boolean;
+  write_pages?: string[];
+  environments?: string[];
+  repos?: string[];
+  aws?: { account: string; region: string; role: string } | null;
+  updated_at?: string;
+  updated_by?: string;
+}
+
+export interface ConnectorAwsAccount {
+  account: string;
+  region: string;
+  role: string;
+}
+
+/** What the team's log reader role can read right now. */
+export interface AwsRoleCheck {
+  check: {
+    account: string;
+    role: string;
+    region: string;
+    works: boolean;
+    caller: string;
+    error: string;
+    can_read_logs: boolean | null;
+    can_read_metrics: boolean | null;
+    can_read_airflow: boolean | null;
+    airflow_environments: string[];
+  };
+  missing: string[];
+  update_url: string | null;
+  stack_name: string;
+  template_url: string;
 }
