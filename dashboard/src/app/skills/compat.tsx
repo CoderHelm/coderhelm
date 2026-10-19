@@ -78,12 +78,13 @@ export const STEP_STATUS: Record<RequirementStatus, { label: string; means: stri
   },
 };
 
-type Badge = "ready" | "translated" | "needs_tools" | "unchecked" | "failed" | "stale";
+type Badge = "ready" | "translated" | "needs_tools" | "partial" | "unchecked" | "failed" | "stale";
 
 const BADGE: Record<Badge, { label: string; cls: string; title: string }> = {
   ready: { label: "Ready", cls: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300", title: "Every step runs as written." },
   translated: { label: "Translated", cls: "border-sky-500/30 bg-sky-500/10 text-sky-300", title: "Some steps use Coderhelm's own tools instead." },
   needs_tools: { label: "Needs tools", cls: "border-amber-500/30 bg-amber-500/10 text-amber-300", title: "Some steps need a tool the team hasn't connected." },
+  partial: { label: "Partly checked", cls: "border-zinc-600 text-zinc-300", title: "The check couldn't list its steps yet; it's read as written." },
   unchecked: { label: "Not checked yet", cls: "border-zinc-700 text-zinc-400", title: "Coderhelm checks each item after it syncs." },
   failed: { label: "Check failed", cls: "border-red-500/30 bg-red-500/10 text-red-300", title: "The last check didn't finish." },
   stale: { label: "Checking again", cls: "border-zinc-700 text-zinc-400", title: "The text changed since the last check." },
@@ -95,7 +96,7 @@ export function badgeOf(s: Pick<Skill, "compat">): Badge {
   if (!c) return "unchecked";
   if (!c.current) return "stale";
   if (c.error && !c.status) return "failed";
-  if (c.status === "ready" || c.status === "translated" || c.status === "needs_tools") return c.status;
+  if (c.status === "ready" || c.status === "translated" || c.status === "needs_tools" || c.status === "partial") return c.status;
   return c.error ? "failed" : "unchecked";
 }
 
@@ -108,13 +109,24 @@ export function CompatBadge({ item }: { item: Pick<Skill, "compat"> }) {
   );
 }
 
-/** Where to connect what a step needs. */
+/** Where to connect what a step needs. GitHub is never offered: every team
+ * has it connected already. */
 const CONNECT: Record<Requirement["connect"], { href: string; label: string } | null> = {
   plugins: { href: "/settings/plugins", label: "MCP servers" },
   data_sources: { href: "/data-sources", label: "Data sources" },
-  github: { href: "/settings/github", label: "GitHub" },
+  github: null,
   none: null,
 };
+
+/** The link a gap offers, if any: connecting it, or adding the credentials
+ * of a server that's switched on. Never one for something already
+ * connected. */
+function linkFor(g: Pick<Requirement, "connect" | "action">): { href: string; text: string } | null {
+  const where = CONNECT[g.connect];
+  if (!where || g.action === "none") return null;
+  if (g.action === "credentials") return { href: where.href, text: `Add credentials in ${where.label}` };
+  return { href: where.href, text: `Connect in ${where.label}` };
+}
 
 // ─── The Skills page overview ────────────────────────────────
 
@@ -129,7 +141,7 @@ export function CompatOverview({
   onFilter: (f: string) => void;
 }) {
   const counts = useMemo(() => {
-    const c: Record<Badge, number> = { ready: 0, translated: 0, needs_tools: 0, unchecked: 0, failed: 0, stale: 0 };
+    const c: Record<Badge, number> = { ready: 0, translated: 0, needs_tools: 0, partial: 0, unchecked: 0, failed: 0, stale: 0 };
     for (const i of items) c[badgeOf(i)]++;
     return c;
   }, [items]);
@@ -148,7 +160,7 @@ export function CompatOverview({
   }, [items]);
   if (items.length === 0) return null;
   const checked = counts.ready + counts.translated + counts.needs_tools;
-  const waiting = counts.unchecked + counts.stale + counts.failed;
+  const waiting = counts.unchecked + counts.stale + counts.failed + counts.partial;
   const tiles: { key: Badge; label: string; n: number; tone: string }[] = [
     { key: "ready", label: "Ready", n: counts.ready, tone: "bg-emerald-400" },
     { key: "translated", label: "Translated", n: counts.translated, tone: "bg-sky-400" },
@@ -295,6 +307,14 @@ export function CompatSection({
           </div>
         </div>
 
+        {(c?.notes?.length ?? 0) > 0 && badge !== "stale" && (
+          <ul className="border-b border-zinc-800 px-5 py-3 text-xs text-zinc-400" data-testid="compat-notes">
+            {c!.notes!.map((n) => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
+        )}
+
         {(c?.needs_detail?.length ?? 0) > 0 && badge !== "stale" && <NeedsList needs={c!.needs_detail!} />}
 
         {steps.length > 0 ? (
@@ -303,7 +323,7 @@ export function CompatSection({
               <StepRow key={`${i}-${s.title}`} step={s} index={i} last={i === steps.length - 1} />
             ))}
           </ol>
-        ) : c && badge !== "failed" ? (
+        ) : c && badge !== "failed" && badge !== "partial" ? (
           <p className="p-5 text-sm text-zinc-400">No steps were found in this item.</p>
         ) : null}
       </div>
@@ -324,7 +344,7 @@ function NeedsList({ needs }: { needs: CompatNeed[] }) {
       <h3 className="text-xs font-medium text-zinc-500">To run every step</h3>
       <ul className="mt-2 divide-y divide-zinc-800 rounded-lg border border-zinc-800">
         {needs.map((n) => {
-          const where = CONNECT[n.connect];
+          const link = linkFor(n);
           const s = STEP_STATUS[n.status === "blocked" ? "blocked" : "missing"];
           return (
             <li key={`${n.status}-${n.name}`} className="flex flex-wrap items-start gap-3 px-4 py-3">
@@ -341,9 +361,9 @@ function NeedsList({ needs }: { needs: CompatNeed[] }) {
                 </p>
                 {n.fix && <p className="mt-0.5 text-sm text-zinc-400">{n.fix}</p>}
               </div>
-              {where && (
-                <Link href={where.href} className={`${secondaryButton} min-h-8 px-3 py-1 text-xs`}>
-                  Connect in {where.label}
+              {link && (
+                <Link href={link.href} className={`${secondaryButton} min-h-8 px-3 py-1 text-xs`}>
+                  {link.text}
                 </Link>
               )}
             </li>
@@ -428,7 +448,7 @@ const KIND_WORD: Record<Requirement["kind"], string> = { tool: "tool", command: 
 
 function RequirementRow({ r }: { r: Requirement }) {
   const s = STEP_STATUS[r.status] ?? STEP_STATUS.missing;
-  const where = CONNECT[r.connect];
+  const link = linkFor(r);
   return (
     <li className="grid gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)] sm:items-start" data-testid="compat-requirement" data-status={r.status}>
       <div className="min-w-0">
@@ -453,11 +473,13 @@ function RequirementRow({ r }: { r: Requirement }) {
           </div>
         ) : (
           <div>
-            <p className={`text-xs font-medium ${s.text}`}>{r.status === "blocked" ? "Can't write there" : "Not connected in Coderhelm"}</p>
+            <p className={`text-xs font-medium ${s.text}`}>
+              {r.status === "blocked" ? "Can't write there" : link ? "Not connected in Coderhelm" : "Not available in Coderhelm"}
+            </p>
             {r.fix && <p className="mt-0.5 text-xs text-zinc-400">{r.fix}</p>}
-            {where && (
-              <Link href={where.href} className={`${linkButton} mt-0.5 text-xs`}>
-                Connect {r.needs || "it"} in {where.label}
+            {link && (
+              <Link href={link.href} className={`${linkButton} mt-0.5 text-xs`}>
+                {link.text.replace(/^(Connect|Add credentials)/, (m) => (m === "Connect" ? `Connect ${r.needs || "it"}` : `Add ${r.needs || "its"} credentials`))}
               </Link>
             )}
           </div>

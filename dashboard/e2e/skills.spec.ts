@@ -51,14 +51,16 @@ const DEBUG_COMPAT = {
     { title: "Reproduce it", does: "Write down the exact record, page and time.", dropped: false, status: "available", requirements: [] },
     { title: "Read the logs", does: "Search the service logs around that time.", dropped: false, status: "translated", requirements: [req("CloudWatch logs", "translated", ["logs_search"], { kind: "data" })] },
     { title: "Check the data", does: "Query the record in the database.", dropped: false, status: "translated", requirements: [req("psql", "translated", ["db_query"], { kind: "command" })] },
-    { title: "Check deploy markers", does: "Look for a deploy right before the failure.", dropped: false, status: "missing", requirements: [req("list_change_events", "missing", [], { needs: "Monitoring", fix: "Connect your monitoring tool's MCP server.", connect: "plugins" }), req("git log", "missing", [], { kind: "command", needs: "Commit history", fix: "Coderhelm has no commit history tool." })] },
+    { title: "Check deploy markers", does: "Look for a deploy right before the failure.", dropped: false, status: "missing", requirements: [req("list_change_events", "missing", [], { needs: "Monitoring", fix: "Connect your monitoring tool's MCP server.", connect: "plugins" }), req("git log", "missing", [], { kind: "command", needs: "Commit history", fix: "Coderhelm's GitHub connection doesn't do this yet.", connect: "github", action: "none" })] },
     { title: "Write the lesson", does: "Append what was learned to the team wiki page.", dropped: false, status: "blocked", requirements: [req("updatePage", "blocked", [], { write: "outside", needs: "Wiki writes", fix: "Coderhelm only reads outside systems here." })] },
   ],
   counts: { steps: 5, as_written: 1, translated: 2, missing: 1, blocked: 1 },
   needs: [
     { name: "Monitoring", fix: "Connect your monitoring tool's MCP server.", connect: "plugins", status: "missing", steps: 1 },
     { name: "Wiki writes", fix: "Coderhelm only reads outside systems here.", connect: "none", status: "blocked", steps: 1 },
+    { name: "Commit history", fix: "Coderhelm's GitHub connection doesn't do this yet.", connect: "github", action: "none", status: "missing", steps: 1 },
   ],
+  notes: ["1 step had no title; it was made from what it does."],
   model: "light-model", input_tokens: 9100, output_tokens: 3200, cost_usd: 0.034, ms: 41000,
 };
 const DEBUG_TRANSLATED = `# Debug
@@ -483,6 +485,25 @@ test("an item's page: each step, what it relies on, what to connect, and the two
   await expect.poll(() => db.checks).toBe(1);
   expect(db.calls.find((c) => c.path === "/api/skills/recheck")?.body).toEqual({ repo: "acme/playbook", path: "skills/debug/SKILL.md" });
   await expect(page.getByText("debug checked")).toBeVisible({ timeout: 15_000 });
+});
+
+test("a gap on GitHub, which is always connected, offers no connect link; a partial check says why", async ({ page }) => {
+  const db = await mockApi(page);
+  await page.goto(DEBUG_URL);
+  const needs = page.getByTestId("compat-needs");
+  const history = needs.getByRole("listitem").filter({ hasText: "Commit history" });
+  await expect(history.getByText("Coderhelm's GitHub connection doesn't do this yet.")).toBeVisible();
+  await expect(history.getByRole("link")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Connect in GitHub/ })).toHaveCount(0);
+  const step = page.getByTestId("compat-step").nth(3);
+  await expect(step.getByText("Not available in Coderhelm")).toBeVisible();
+  await expect(page.getByTestId("compat-notes")).toContainText("1 step had no title; it was made from what it does.");
+
+  db.items[1].compat = { status: "partial", summary: "Coderhelm couldn't list this item's steps yet", needs: [], at: ago(2), error: "", current: true };
+  await page.goto("/skills/item?repo=acme%2Fplaybook&path=skills%2Fapi-conventions%2FSKILL.md");
+  await expect(page.getByText("Partly checked", { exact: true })).toBeVisible();
+  await expect(page.getByText("Check failed")).toHaveCount(0);
+  await expect(page.getByText("No steps were found in this item.")).toHaveCount(0);
 });
 
 test("members see how an item runs but can't re-check it or choose its version", async ({ page }) => {
