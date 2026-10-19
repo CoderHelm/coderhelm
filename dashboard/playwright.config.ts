@@ -22,6 +22,6 @@ export default defineConfig({
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
-    env: { NEXT_PUBLIC_API_URL: BASE_URL },
+    env: { NEXT_PUBLIC_API_URL: BASE_URL, NEXT_PUBLIC_STREAM_URL: BASE_URL },
   },
 });

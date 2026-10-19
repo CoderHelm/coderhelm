@@ -7,8 +7,10 @@ import type { SkillKind } from "./skills";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
 
-/** "apply": given in full by its "Always apply" setting. */
-export type AccessAction = "read" | "read_file" | "ask" | "apply";
+/** "apply": given in full by its "Always apply" setting. "agent_tool": one
+ * read-only tool call a team agent made while answering an ask (`file` is the
+ * tool, `why` its input). */
+export type AccessAction = "read" | "read_file" | "ask" | "apply" | "agent_tool";
 
 export interface SkillAccessEvent {
   id: string;
@@ -105,6 +107,18 @@ type Tone = "neutral" | "success" | "warning" | "error";
 /** An outcome as a pill and a plain sentence on what it means. */
 export function outcomeOf(e: Pick<SkillAccessEvent, "action" | "outcome">): { tone: Tone; label: string; means: string } {
   const ask = e.action === "ask";
+  if (e.action === "agent_tool") {
+    switch (e.outcome) {
+      case "ok":
+        return { tone: "success", label: "Read", means: "The agent read this with one of the tools its own file lists." };
+      case "refused":
+        return { tone: "warning", label: "Refused", means: "Not one of the tools its file lists, so it didn't run." };
+      case "limit":
+        return { tone: "warning", label: "Over the limit", means: "The ask had already made its 12 tool calls, so this one didn't run." };
+      default:
+        return { tone: "error", label: "Failed", means: "The read failed, so the agent answered without it." };
+    }
+  }
   switch (e.outcome) {
     case "ok":
       return e.action === "apply"
@@ -129,7 +143,7 @@ export function outcomeOf(e: Pick<SkillAccessEvent, "action" | "outcome">): { to
           : "The pass had already made its 20 reads, so this one was refused.",
       };
     case "timed_out":
-      return { tone: "error", label: "Took too long", means: "No answer within 2 minutes, so the asking agent went on without it." };
+      return { tone: "error", label: "Took too long", means: "No answer within 3 minutes, so the asking agent went on without it." };
     default:
       return {
         tone: "error",
@@ -146,6 +160,7 @@ export function actionPhrase(e: Pick<SkillAccessEvent, "action" | "by">): string
   if (e.action === "ask") return e.by.endsWith(" (try)") ? "tried" : "asked";
   if (e.action === "read_file") return "read a file of";
   if (e.action === "apply") return "was given";
+  if (e.action === "agent_tool") return "asked, and a tool ran for";
   return "read";
 }
 

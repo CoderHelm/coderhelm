@@ -193,9 +193,48 @@ export interface SkillWithBody extends Skill {
   body: string;
   /** For an agent: the exact instructions it answers under. */
   prompt?: string;
+  /** For an agent: the read-only tools its own file gives it, and what it lists that it doesn't get. */
+  agent_tools?: AgentToolset;
   compat?: Compat | null;
   /** The version rewritten for Coderhelm's tools. Empty before a check. */
   translated?: string;
+}
+
+/** The tools a team agent runs with, worked out from its own file. */
+export interface AgentToolset {
+  declared: string[];
+  /** Coderhelm's read-only tools it gets. */
+  granted: string[];
+  /** Listed, with no read-only equivalent in Coderhelm. */
+  missing: string[];
+  /** Listed tools that write: never given to an agent. */
+  blocked: string[];
+}
+
+/** Plain words for the read-only tools an agent can be given. */
+export function toolWords(name: string): string {
+  const words: Record<string, string> = {
+    read_file: "read files",
+    read_file_lines: "read lines of a file",
+    search_code: "search the code",
+    read_tree: "list every file",
+    list_directory: "list a folder",
+    github_history: "read the history (commits, blame, pull requests)",
+    graph_definition: "find where a symbol is defined",
+    graph_callers: "find what uses a symbol",
+    graph_impact: "find what a change reaches",
+    check_package: "look a package up on its registry",
+    live_describe: "see what a data source has",
+    live_lookup: "query an API data source",
+    db_query: "query a database data source",
+    logs_search: "search logs",
+  };
+  if (words[name]) return words[name];
+  if (name.startsWith("newrelic_")) return "read New Relic";
+  if (name.startsWith("confluence_")) return "read Confluence";
+  if (name.startsWith("metrics_")) return "read CloudWatch metrics";
+  if (name.startsWith("airflow_")) return "read Airflow";
+  return name;
 }
 
 /** One question put to a team agent, and its answer. */
@@ -270,7 +309,34 @@ export interface SkillStats {
   unused: SkillUse[];
 }
 
+/** One item a piece of work read, asked or was given, from the access log. */
+export interface UsedItem {
+  name: string;
+  kind: SkillKind;
+  repo: string;
+  path: string;
+  count: number;
+  /** For an agent: the tools it called answering. */
+  tools?: string[];
+}
+
+/** What a run, review or plan chat used. */
+export interface WorkUsed {
+  skills: UsedItem[];
+  agents: UsedItem[];
+  sources: { id: string; name: string; lookups: number }[];
+  standards: UsedItem[];
+}
+
+/** Which work to ask about: a run, or work by where it came from. */
+export type UsedQuery = { since: string } & ({ run_id: string } | { origin: string; repo?: string; pr?: number });
+
 export const skillsApi = {
+  used: (q: UsedQuery) => {
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(q)) if (v !== undefined && v !== "") p.set(k, String(v));
+    return call<WorkUsed>(`/api/skills/used?${p.toString()}`);
+  },
   list: () => call<{ repos: SkillRepo[]; items: Skill[]; can_manage: boolean }>("/api/skills"),
   stats: () => call<SkillStats>("/api/skills/stats"),
   connect: (repo: string) =>

@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { WorkUsedLine } from "@/components/work-used";
 import { api, type Plan, type Task, type Repo, type Openspec, errorStatus } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -363,6 +364,19 @@ function PlanDetail() {
           )}
           </>
         }
+      />
+
+      <WorkUsedLine
+        query={
+          plan.chat_id && plan.created_at
+            ? {
+                origin: `plan chat ${plan.chat_id}`,
+                // The chat came before the plan was saved.
+                since: new Date(new Date(plan.created_at).getTime() - 24 * 3600_000).toISOString(),
+              }
+            : null
+        }
+        className="mb-6"
       />
 
       {/* Plan-level destination picker */}

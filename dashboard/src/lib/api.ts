@@ -408,6 +408,8 @@ export const api = {
     destination?: "github" | "jira";
     tasks?: Partial<Task>[];
     mcp_servers?: string[];
+    /** The plan chat it was made in. */
+    chat_id?: string;
   }) =>
     request<{ plan_id: string }>("/api/plans", {
       method: "POST",
@@ -1290,6 +1292,8 @@ export interface Plan {
   tokens_in?: number;
   tokens_out?: number;
   mcp_servers?: string[];
+  /** The plan chat it was made in, for what that chat used. */
+  chat_id?: string;
   created_at: string;
   updated_at: string;
   executed_at?: string;

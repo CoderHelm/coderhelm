@@ -294,7 +294,7 @@ export function CompatSection({
           </h2>
           <p className="mt-1 max-w-prose text-sm text-zinc-400">
             Coderhelm read every step and checked each tool and command it relies on against what your team has connected.
-            {agentNote && " When Coderhelm asks this agent a question it gets no tools; this is for when its agents read it."}
+            {agentNote && " For an agent, that is the read-only tools its own file lists: those are all it gets when asked."}
           </p>
         </div>
         {canManage && (

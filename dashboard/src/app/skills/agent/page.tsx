@@ -21,7 +21,9 @@ import {
   skillsApi,
   splitFrontMatter,
   thinDescription,
+  toolWords,
   type AgentAsk,
+  type AgentToolset,
   type SkillRepo,
   type SkillWithBody,
 } from "@/lib/skills";
@@ -259,18 +261,7 @@ function AgentPage() {
             <dl className={`${card} divide-y divide-zinc-800`}>
               <Fact term="Who asks it">The planner, coder and reviewer, at most 3 asks in one run.</Fact>
               <Fact term="Tools">
-                <span className="text-zinc-200">None when Coderhelm asks it.</span> It answers from the question and the context it&apos;s sent, and
-                can&apos;t read files, run commands or reach the network.{" "}
-                {settings.toolsSet ? (
-                  settings.tools.length > 0 ? (
-                    <span className="text-zinc-500">
-                      Its file asks for <span className="font-mono text-zinc-400">{settings.tools.join(", ")}</span>; those apply where the file is
-                      used elsewhere, not here.
-                    </span>
-                  ) : null
-                ) : (
-                  <span className="text-zinc-500">Its file doesn&apos;t set tools, which in most tools means all of them; here it still gets none.</span>
-                )}
+                <AgentTools tools={agent.agent_tools} toolsSet={settings.toolsSet} />
               </Fact>
               <Fact term="Model">
                 Your team&apos;s {modelFor(settings.model)} model
@@ -283,7 +274,10 @@ function AgentPage() {
                 .
               </Fact>
               <Fact term="Limits">
-                One turn, up to 4k tokens and 2 minutes. Secrets are removed from the answer, and the asking agent treats it as advice, never as permission.
+                {(agent.agent_tools?.granted.length ?? 0) > 0
+                  ? "Up to 12 tool calls and 3 minutes, then an answer of up to 4k tokens. Every call is kept in the activity log with the run that asked and this agent's name. "
+                  : "One turn, up to 4k tokens and 3 minutes. "}
+                Secrets are removed from what it reads and from its answer, and the asking agent treats the answer as advice, never as permission.
               </Fact>
             </dl>
           </section>
@@ -338,6 +332,53 @@ function AgentPage() {
   );
 }
 
+/** What the agent reads with when it's asked, from its own file: the tools
+ * it gets, and what its file lists that it doesn't. */
+function AgentTools({ tools, toolsSet }: { tools?: AgentToolset; toolsSet: boolean }) {
+  const granted = tools?.granted ?? [];
+  const missing = tools?.missing ?? [];
+  const blocked = tools?.blocked ?? [];
+  return (
+    <div className="space-y-2" data-testid="agent-tools">
+      {granted.length > 0 ? (
+        <>
+          <p>
+            <span className="text-zinc-200">Read-only, the ones its file lists.</span> When asked during work it can{" "}
+            {[...new Set(granted.map(toolWords))].join(", ")}, in the repository and data the asking agent is working on.
+          </p>
+          <ul className="flex flex-wrap gap-1.5" aria-label="Tools it gets">
+            {granted.map((t) => (
+              <li key={t} className="rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+                {t}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p>
+          <span className="text-zinc-200">None.</span> It answers from the question and the context it&apos;s sent.{" "}
+          {!toolsSet && (
+            <span className="text-zinc-500">Its file doesn&apos;t list tools, and an agent only gets the read-only tools its file lists.</span>
+          )}
+        </p>
+      )}
+      {missing.length > 0 && (
+        <p className="text-zinc-400">
+          <span className="text-zinc-500">Not available here:</span> <span className="font-mono text-zinc-300">{missing.join(", ")}</span>. Coderhelm
+          has no read-only equivalent, so it answers without them.
+        </p>
+      )}
+      {blocked.length > 0 && (
+        <p className="text-zinc-400">
+          <span className="text-zinc-500">Write blocked:</span> <span className="font-mono text-zinc-300">{blocked.join(", ")}</span>. Team agents never
+          write; the planner, coder or reviewer that asked makes any change.
+        </p>
+      )}
+      <p className="text-zinc-500">It never writes, runs commands, uses an MCP server or browses the web.</p>
+    </div>
+  );
+}
+
 function Fact({ term, children }: { term: string; children: React.ReactNode }) {
   return (
     <div className="grid gap-1 p-4 sm:grid-cols-[7rem_minmax(0,1fr)] sm:gap-4">
@@ -351,7 +392,7 @@ const OUTCOME: Record<AgentAsk["outcome"], { tone: "success" | "warning" | "erro
   answered: { tone: "success", label: "Answered", means: "The agent answered within its limits." },
   pending: { tone: "warning", label: "Thinking…", means: "Waiting for the agent's answer." },
   failed: { tone: "error", label: "No answer", means: "The model call failed, so the asking agent went on without it." },
-  timed_out: { tone: "error", label: "Took too long", means: "No answer within 2 minutes, so the asking agent went on without it." },
+  timed_out: { tone: "error", label: "Took too long", means: "No answer within 3 minutes, so the asking agent went on without it." },
 };
 
 type Filter = "all" | "runs" | "tries" | "problems";
@@ -618,7 +659,12 @@ function TryIt({
           </span>
         )}
       </div>
-      <p className="mt-2 text-xs text-zinc-500">Ask it what Coderhelm&apos;s agents would. It runs exactly as it does for them: no tools, your team&apos;s model.</p>
+      <p className="mt-2 text-xs text-zinc-500">
+        Ask it what Coderhelm&apos;s agents would, with your team&apos;s model.{" "}
+        {(agent.agent_tools?.granted.length ?? 0) > 0
+          ? "A try has no work to read, so it answers without its tools; asked during work, it reads that work's repository."
+          : "It has no tools, here or during work."}
+      </p>
       <form onSubmit={submit} className="mt-4">
         <label className="block text-sm text-zinc-300">
           Question
@@ -660,7 +706,7 @@ function TryIt({
       </form>
       {waiting && (
         <p role="status" className="mt-4 text-sm text-zinc-400">
-          Waiting for {agent.name}. Most answers take under a minute; it stops at 2.
+          Waiting for {agent.name}. Most answers take under a minute; it stops at 3.
         </p>
       )}
       {result && (

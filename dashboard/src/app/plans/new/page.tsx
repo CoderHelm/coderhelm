@@ -6,7 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { api, type Repo, type Template } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { ChatMarkdown } from "@/components/chat-markdown";
-import { useStreamingChat, messageText, messageServers } from "@/hooks/use-streaming-chat";
+import { useStreamingChat, messageText, messageServers, messageUsed } from "@/hooks/use-streaming-chat";
+import { UsedChips } from "@/components/work-used";
 import { prefetchStreamToken } from "@/lib/stream-client";
 import type { StreamMessage, ToolCallPart, ThinkingPart, TextPart } from "@/lib/stream-types";
 import { ThinkingBlock } from "@/components/thinking-block";
@@ -239,6 +240,7 @@ const MessageBubble = memo(function MessageBubble({ msg }: { msg: StreamMessage 
   const isUser = msg.role === "user";
   const textContent = messageText(msg);
   const servers = messageServers(msg);
+  const used = msg.role === "assistant" ? messageUsed(msg) : [];
   const thinkingParts = msg.parts.filter((p): p is ThinkingPart => p.type === "thinking");
   const toolParts = msg.parts.filter((p): p is ToolCallPart => p.type === "tool_call");
   const textParts = msg.parts.filter((p): p is TextPart => p.type === "text");
@@ -276,6 +278,9 @@ const MessageBubble = memo(function MessageBubble({ msg }: { msg: StreamMessage 
             ))}
           </div>
         )}
+
+        {/* Team skills read, agents asked and data sources looked up */}
+        <UsedChips used={used} />
 
         {/* Thinking block */}
         {thinkingParts.map((part, i) => (
@@ -349,7 +354,7 @@ export default function NewPlanPage() {
 }
 
 function NewPlan() {
-  const { messages, status, error, send, stop, retry, clear, editAndResend } = useStreamingChat();
+  const { messages, status, error, send, stop, retry, clear, editAndResend, chatId } = useStreamingChat();
   const [input, setInput] = useState("");
   const [draft, setDraft] = useState<DraftPlan | null>(null);
   const [saving, setSaving] = useState(false);
@@ -447,7 +452,7 @@ function NewPlan() {
       const mcp_servers = usedServers.size > 0 ? Array.from(usedServers) : undefined;
       // A Jira default with no working Jira connection would make tickets that never send.
       const dest = destination === "jira" && !jiraReady ? "github" : destination;
-      const { plan_id } = await api.createPlan({ ...draft, destination: dest, mcp_servers });
+      const { plan_id } = await api.createPlan({ ...draft, destination: dest, mcp_servers, chat_id: chatId() });
       clear();
       setDraft(null);
       toast("Plan saved");

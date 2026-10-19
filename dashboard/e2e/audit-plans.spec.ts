@@ -42,6 +42,8 @@ interface Backend {
   planStatus: number;
   slowPlan: boolean;
   tasks: ReturnType<typeof task>[];
+  chatBody: Record<string, unknown> | null;
+  usedQueries: string[];
 }
 
 function freshTasks() {
@@ -56,7 +58,7 @@ function freshTasks() {
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = {
     calls: [], plansEmpty: false, plansFail: false, templatesEmpty: false, planStatus: 200, slowPlan: false,
-    tasks: freshTasks(), ...init,
+    tasks: freshTasks(), chatBody: null, usedQueries: [], ...init,
   };
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -75,6 +77,32 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/integrations/jira/check") return json(route, { ready: false, secret_configured: false, configured_repos: { total: 0, enabled: 0 }, enabled_repos: [], jira_events_seen: false, installation_id: 1 });
     if (p === "/api/settings/workflow") return json(route, { commit_openspec: false, default_destination: "jira", allow_plan_log_analyzer: false });
     if (p === "/api/plans/chat/token") return json(route, { token: "t" });
+    if (p === "/api/plans/chat/stream" && m === "POST") {
+      db.chatBody = JSON.parse(req.postData() || "{}");
+      const ev = (type: string, data: unknown) => `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
+      const call = (id: string, name: string, used: unknown) =>
+        ev("tool_start", { id, name }) + ev("tool_result", { id, name, status: "success", summary: "Done", used });
+      return route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body:
+          call("tu1", "read_skill", { kind: "skill", label: "api-conventions", href: "/skills/item?repo=your-team%2Fplaybook&path=skills%2Fapi-conventions%2FSKILL.md" }) +
+          call("tu2", "ask_team_agent", { kind: "agent", label: "spec-checker", href: "/skills/agent/?repo=your-team%2Fplaybook&path=agents%2Fspec-checker.md" }) +
+          call("tu3", "logs_search", { kind: "source", label: "Service logs", href: "/data-sources/activity" }) +
+          call("tu4", "read_skill", { kind: "skill", label: "api-conventions", href: "/skills/item?repo=your-team%2Fplaybook&path=skills%2Fapi-conventions%2FSKILL.md" }) +
+          ev("text_delta", { text: "The schedule page needs an endpoint first, the way your API conventions lay out." }) +
+          ev("done", {}),
+      });
+    }
+    if (p === "/api/skills/used" && m === "GET") {
+      db.usedQueries.push(url.search);
+      return json(route, {
+        skills: [{ name: "api-conventions", kind: "skill", repo: "your-team/playbook", path: "skills/api-conventions/SKILL.md", count: 2 }],
+        agents: [{ name: "spec-checker", kind: "agent", repo: "your-team/playbook", path: "agents/spec-checker.md", count: 1, tools: ["read_file", "search_code"] }],
+        sources: [{ id: "s1", name: "Service logs", lookups: 3 }],
+        standards: [{ name: "code-standards", kind: "skill", repo: "your-team/playbook", path: "skills/code-standards/SKILL.md", count: 1 }],
+      });
+    }
 
     if (p === "/api/plans" && m === "GET") {
       if (db.plansFail) return json(route, { error: "boom" }, 500);
@@ -95,7 +123,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (one && m === "GET") {
       if (db.planStatus !== 200) return route.fulfill({ status: db.planStatus, body: "" });
       if (db.slowPlan) await new Promise((r) => setTimeout(r, 1500));
-      return json(route, { ...plan(one[1], "Add a class schedule page", "draft"), task_count: db.tasks.length, tasks: db.tasks });
+      return json(route, { ...plan(one[1], "Add a class schedule page", "draft", { chat_id: "chat-1" }), task_count: db.tasks.length, tasks: db.tasks });
     }
     const approve = p.match(/^\/api\/plans\/\w+\/tasks\/(\w+)\/approve$/);
     if (approve) {
@@ -292,5 +320,38 @@ test("new plan offers templates on a fresh chat and a template opens its plan", 
   await page.getByRole("button", { name: /New API endpoint/ }).click();
   await expect(page).toHaveURL(/\/plans\/detail\/?\?id=PLANA/);
   await expect(page.getByRole("heading", { name: "Add a class schedule page" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("a plan chat answer shows the skills, agents and data sources it used, each linked", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page);
+  await page.goto("/plans/new/");
+  await page.getByRole("textbox", { name: "Message" }).fill("Plan a class schedule page");
+  await page.keyboard.press("Enter");
+  const chips = page.getByRole("list", { name: "What this answer used" });
+  await expect(chips).toBeVisible();
+  await expect(chips.getByRole("link")).toHaveCount(3);
+  await expect(chips.getByRole("link", { name: "Read skill: api-conventions" })).toHaveAttribute("href", /\/skills\/item\/?\?repo=your-team%2Fplaybook/);
+  await expect(chips.getByRole("link", { name: "Asked agent: spec-checker" })).toHaveAttribute("href", /\/skills\/agent\/?\?repo=/);
+  await expect(chips.getByRole("link", { name: "Looked up: Service logs" })).toHaveAttribute("href", /^\/data-sources\/activity\/?$/);
+  // The chat sends its id, so what it read is logged together.
+  expect(String(db.chatBody?.chat_id ?? "")).toMatch(/^[\w-]{8,64}$/);
+  await shot(page, "plans-chat-used");
+  expect(errors).toEqual([]);
+});
+
+test("a plan's page says what the chat it was made in used", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page);
+  await page.goto("/plans/detail?id=PLANA");
+  const used = page.getByTestId("work-used");
+  await expect(used).toContainText("Skill: api-conventions ×2");
+  await expect(used).toContainText("Agent asked: spec-checker (read with read_file, search_code)");
+  await expect(used).toContainText("Data source: Service logs ×3");
+  await expect(used).toContainText("Standards applied: code-standards");
+  await expect(used.getByRole("link", { name: "spec-checker" })).toHaveAttribute("href", /\/skills\/agent\/?\?repo=your-team%2Fplaybook/);
+  expect(db.usedQueries[0]).toContain("origin=plan+chat+chat-1");
+  await shot(page, "plans-detail-used");
   expect(errors).toEqual([]);
 });
