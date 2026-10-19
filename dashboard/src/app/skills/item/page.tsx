@@ -113,17 +113,20 @@ function ItemPage() {
         eyebrow={<span className="capitalize">{kindWord}</span>}
         title={<span className="font-mono [overflow-wrap:anywhere]">{item.name}</span>}
         lead={item.description || undefined}
-        actions={
-          <div className="flex flex-col items-start gap-1 sm:items-end">
-            {canManage ? (
-              <ToolSwitch on={item.enabled} label={`Let Coderhelm read ${item.name}`} busy={switching} onToggle={toggle} />
-            ) : (
-              <StatusPill tone={item.enabled ? "success" : "neutral"}>{item.enabled ? "On" : "Off"}</StatusPill>
-            )}
-            <p className="max-w-56 text-xs text-zinc-500 sm:text-right">A Coderhelm setting. It doesn&apos;t change the file.</p>
-          </div>
-        }
       />
+      <div className="mt-6 flex items-start justify-between gap-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-zinc-200">Let Coderhelm read this {kindWord}</p>
+          <p className="mt-1 text-xs text-zinc-500">A Coderhelm setting. It doesn&apos;t change the file.</p>
+        </div>
+        <div className="shrink-0">
+          {canManage ? (
+            <ToolSwitch on={item.enabled} label={`Let Coderhelm read ${item.name}`} busy={switching} onToggle={toggle} />
+          ) : (
+            <StatusPill tone={item.enabled ? "success" : "neutral"}>{item.enabled ? "On" : "Off"}</StatusPill>
+          )}
+        </div>
+      </div>
       <p className="mt-2 text-xs text-zinc-500 [overflow-wrap:anywhere]">
         From <span className="font-mono text-zinc-400">{item.repo}</span> · {item.path}
         {item.sha && (
