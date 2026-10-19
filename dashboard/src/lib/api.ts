@@ -867,15 +867,20 @@ export const api = {
     ),
   deleteDataSource: (id: string) =>
     request<{ ok: true }>(`/api/data-sources/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  listConnectors: () => request<{ connectors: Connector[]; aws_accounts: ConnectorAwsAccount[] }>("/api/connectors"),
+  getIntegrations: () => request<IntegrationsResponse>("/api/integrations"),
+  checkAwsAbilities: (account: string) =>
+    request<AwsAbilityReply>(`/api/aws-connections/${encodeURIComponent(account)}/abilities/check`, { method: "POST" }),
+  setAwsAbilities: (account: string, body: { metrics?: boolean; airflow?: boolean; airflow_environments?: string[] }) =>
+    request<AwsAbilityReply>(`/api/aws-connections/${encodeURIComponent(account)}/abilities`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
   saveConnector: (kind: ConnectorKind, body: Record<string, unknown>) =>
     request<{ connector: Connector }>(`/api/connectors/${kind}`, { method: "PUT", body: JSON.stringify(body) }),
   testConnector: (kind: ConnectorKind) =>
     request<{ connector: Connector }>(`/api/connectors/${kind}/test`, { method: "POST" }),
   removeConnector: (kind: ConnectorKind) =>
     request<{ ok: true }>(`/api/connectors/${kind}`, { method: "DELETE" }),
-  checkAwsRole: (account?: string) =>
-    request<AwsRoleCheck>(`/api/connectors/aws-check${account ? `?account=${encodeURIComponent(account)}` : ""}`),
   getDataSourceSamples: (id: string) =>
     request<{ samples: DataSourceSample[] }>(`/api/data-sources/${encodeURIComponent(id)}/samples`),
   tryDataSource: (id: string, query: string, opts: { log_groups?: string[]; since?: string; database?: string } = {}) =>
@@ -1536,6 +1541,8 @@ export interface AwsConnection {
   log_groups: string[];
   created_at?: string;
   updated_at?: string;
+  /** What the role can do (logs, metrics, Airflow); null for an unreadable record. */
+  abilities?: AwsAccountAbilities | null;
 }
 
 export interface LogGroup {
@@ -2071,28 +2078,62 @@ export interface Connector {
   updated_by?: string;
 }
 
-export interface ConnectorAwsAccount {
+export type IntegrationStatus = "connected" | "needs_credentials" | "not_connected" | "error";
+export type IntegrationAction = "connect" | "add_credentials" | "check_again" | "manage";
+export type IntegrationSection = "code" | "cloud" | "monitoring" | "docs" | "chat" | "other";
+
+/** One card on Settings → Integrations. */
+export interface Integration {
+  /** `github`, `jira`, `aws` or `aws-<account>`, `newrelic`, `confluence`, `teams`, or an MCP server id. */
+  id: string;
+  section: IntegrationSection;
+  name: string;
+  /** What Coderhelm does with it, in a sentence. */
+  does: string;
+  status: IntegrationStatus;
+  /** Why it isn't working, or a note. */
+  reason: string;
+  action: IntegrationAction;
+  /** RFC 3339, or empty when never checked. */
+  last_check: string;
+  /** A page with more settings, or empty. */
+  manage_href: string;
+  detail: Record<string, unknown>;
+}
+
+export interface IntegrationsResponse {
+  can_edit: boolean;
+  items: Integration[];
+  /** Old metrics or Airflow connections folded into AWS accounts on this load. */
+  migrated: number;
+}
+
+/** One ability of a connected AWS account. `available` is null until checked. */
+export interface AwsAbility {
+  available: boolean | null;
+  on: boolean;
+  switched_off?: boolean;
+}
+
+export interface AwsAccountAbilities {
   account: string;
   region: string;
   role: string;
+  status: string;
+  checked_at: string;
+  check_error: string;
+  logs: AwsAbility;
+  metrics: AwsAbility;
+  airflow: AwsAbility & { found: string[]; skipped: string[]; environments: string[] };
+  /** Abilities the role lacks that the add-on stack gives. */
+  missing?: string[];
+  update_url?: string | null;
+  stack_name?: string;
 }
 
-/** What the team's log reader role can read right now. */
-export interface AwsRoleCheck {
-  check: {
-    account: string;
-    role: string;
-    region: string;
-    works: boolean;
-    caller: string;
-    error: string;
-    can_read_logs: boolean | null;
-    can_read_metrics: boolean | null;
-    can_read_airflow: boolean | null;
-    airflow_environments: string[];
-  };
-  missing: string[];
-  update_url: string | null;
-  stack_name: string;
-  template_url: string;
+export interface AwsAbilityReply {
+  account: AwsAccountAbilities;
+  status: IntegrationStatus;
+  reason: string;
+  last_check: string;
 }

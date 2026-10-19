@@ -1063,42 +1063,11 @@ test("hub: each card shows its last lookup, failures this week with a link to th
   await expect(page).toHaveURL(/\/data-sources\/activity\/?\?source=ds_1&outcome=problems&range=7d$/);
 });
 
-test("monitoring connections: New Relic with a key, Confluence writes need the switch and page ids, AWS ones need an account", async ({ page }) => {
-  const db = await mockApi(page);
-  await page.goto("/data-sources");
-  await expect(page.getByRole("heading", { name: "Monitoring, docs and pipelines" })).toBeVisible();
-
-  const nr = page.getByTestId("connection-newrelic");
-  await expect(nr.getByText("Not connected")).toBeVisible();
-  await nr.getByRole("button", { name: "Connect" }).click();
-  await nr.getByLabel("User key").fill("NRAK-EXAMPLEKEY1234");
-  await nr.getByLabel("Account ids").fill("1234567, 7654321");
-  await nr.getByRole("button", { name: "Save and test" }).click();
-  await expect(nr.getByText("On", { exact: true })).toBeVisible();
-  const nrPut = db.calls.find((c) => c.method === "PUT" && c.path === "/api/connectors/newrelic");
-  expect(nrPut?.body).toMatchObject({ key: "NRAK-EXAMPLEKEY1234", region: "us", account_ids: ["1234567", "7654321"], enabled: true });
-
-  const cf = page.getByTestId("connection-confluence");
-  await cf.getByRole("button", { name: "Connect" }).click();
-  await expect(cf.getByLabel("Writable page ids")).toHaveCount(0);
-  await cf.getByLabel("Confluence address").fill("https://your-team.atlassian.net");
-  await cf.getByLabel("Account email").fill("bot@example.com");
-  await cf.getByLabel("API token").fill("atlassian-token-example");
-  await cf.getByLabel(/Allow agents to add text/).check();
-  await cf.getByLabel("Writable page ids").fill("123456789");
-  await cf.getByRole("button", { name: "Save and test" }).click();
-  await expect(cf.getByText("Writes on: may add text to pages 123456789.")).toBeVisible();
-  const cfPut = db.calls.find((c) => c.method === "PUT" && c.path === "/api/connectors/confluence");
-  expect(cfPut?.body).toMatchObject({ site: "https://your-team.atlassian.net", email: "bot@example.com", write_enabled: true, write_pages: ["123456789"] });
-
-  const m = page.getByTestId("connection-metrics");
-  await m.getByRole("button", { name: "Connect" }).click();
-  await expect(m.getByRole("link", { name: /Settings → AWS/ })).toBeVisible();
-});
-
-test("a skill check's link opens the connection it names", async ({ page }) => {
+test("monitoring, docs and MCP connections live on Integrations, not here", async ({ page }) => {
   await mockApi(page);
-  await page.goto("/data-sources?connect=confluence#connections");
-  await expect(page.getByTestId("connection-confluence").getByLabel("Confluence address")).toBeVisible();
-  await expect(page.getByTestId("connection-newrelic").getByLabel("User key")).toHaveCount(0);
+  await page.goto("/data-sources");
+  await expect(page.getByTestId("connection-newrelic")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Monitoring, docs and pipelines" })).toHaveCount(0);
+  const pointer = page.getByTestId("integrations-pointer");
+  await expect(pointer.getByRole("link", { name: "Settings → Integrations" })).toHaveAttribute("href", /^\/settings\/integrations\/?$/);
 });

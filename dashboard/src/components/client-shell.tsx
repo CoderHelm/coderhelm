@@ -80,13 +80,10 @@ const navGroups: NavGroup[] = [
   {
     label: "Integrations",
     items: [
-      { href: "/settings/github", label: "GitHub", icon: <GitHubIcon />, memberOnly: true },
-      { href: "/settings/aws", label: "AWS", icon: <AwsIcon />, adminOnly: true },
+      { href: "/settings/integrations", label: "Integrations", icon: <PluginIcon />, memberOnly: true },
       { href: "/settings/alerts", label: "Alert routes", icon: <BellIcon />, adminOnly: true },
       { href: "/data-sources", label: "Data sources", icon: <DatabaseIcon />, adminOnly: true },
       { href: "/skills", label: "Skills", icon: <BookIcon />, memberOnly: true },
-      { href: "/settings/jira", label: "Jira", icon: <AtlassianIcon />, adminOnly: true },
-      { href: "/settings/plugins", label: "MCP Servers", icon: <PluginIcon />, adminOnly: true },
       { href: "/settings/models", label: "AI Models", icon: <CpuIcon />, adminOnly: true },
     ],
   },

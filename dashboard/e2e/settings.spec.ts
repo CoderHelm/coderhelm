@@ -16,7 +16,6 @@ const ITEMS: { title: string; href: string; view: Role; edit: Role; heading: str
   { title: "Security", href: "/settings/security", view: "viewer", edit: "viewer", heading: "Security" },
   { title: "Team", href: "/settings/team", view: "viewer", edit: "admin", heading: "Team" },
   { title: "Repositories", href: "/settings/repos", view: "member", edit: "admin", heading: "Repositories" },
-  { title: "GitHub", href: "/settings/github", view: "member", edit: "admin", heading: "GitHub" },
   { title: "Workflow", href: "/settings/workflow", view: "admin", edit: "admin", heading: "Workflow" },
   { title: "Guardrails", href: "/settings/guardrails", view: "admin", edit: "admin", heading: "Guardrails" },
   { title: "Team voice", href: "/settings/voice", view: "admin", edit: "admin", heading: "Team voice" },
@@ -24,10 +23,8 @@ const ITEMS: { title: string; href: string; view: Role; edit: Role; heading: str
   { title: "AI models", href: "/settings/models", view: "admin", edit: "admin", heading: "AI models" },
   { title: "Alert routes", href: "/settings/alerts", view: "member", edit: "admin", heading: "Alert routes" },
   { title: "Data sources", href: "/data-sources", view: "admin", edit: "admin", heading: "Data sources" },
-  { title: "AWS", href: "/settings/aws", view: "member", edit: "admin", heading: "AWS" },
   { title: "Skills", href: "/skills", view: "member", edit: "member", heading: "Skills" },
-  { title: "Jira", href: "/settings/jira", view: "admin", edit: "admin", heading: "Jira" },
-  { title: "MCP servers", href: "/settings/plugins", view: "admin", edit: "admin", heading: "MCP servers" },
+  { title: "Integrations", href: "/settings/integrations", view: "member", edit: "admin", heading: "Integrations" },
   { title: "Token limit", href: "/settings/budget", view: "member", edit: "admin", heading: "Token limit" },
 ];
 
@@ -83,6 +80,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/data-sources/activity") return json(route, { events: [] });
     if (p === "/api/tools") return json(route, { tools: [], pending_asks: 0 });
     if (p === "/api/tools/asks") return json(route, { asks: [] });
+    if (p === "/api/integrations") return atLeast(db.role, "member") ? json(route, { can_edit: admin, migrated: 0, items: [{ id: "github", section: "code", name: "GitHub", does: "", status: "connected", reason: "", action: "manage", last_check: "", manage_href: "", detail: {} }, { id: "sentry", section: "monitoring", name: "Sentry", does: "", status: "needs_credentials", reason: "", action: "add_credentials", last_check: "", manage_href: "", detail: { plugin: { id: "sentry", name: "Sentry", description: "", category: "Monitoring", tier: 1, icon: "sentry", credential_fields: [], docs_url: "", repo_url: "", default_prompt: "", recommended_permissions: "" } } }] }) : forbidden(route);
     if (p === "/api/plugins/catalog") return json(route, { plugins: [] });
     if (p === "/api/plugins") return json(route, { plugins: [] });
     if (p === "/api/integrations/jira/check") {
@@ -159,7 +157,7 @@ test("hub shows current values at a glance", async ({ page }) => {
   await page.goto("/settings/");
   await expect(hubLink(page, "Token limit")).toContainText("1.2M of 5M used this month");
   await expect(hubLink(page, "Repositories")).toContainText("1 of 2 repositories on");
-  await expect(hubLink(page, "GitHub")).toContainText("Connected to your-team");
+  await expect(hubLink(page, "Integrations")).toContainText("1 needs credentials · 1 connected");
   await expect(hubLink(page, "Team")).toContainText("1 person");
   await expect(hubLink(page, "Alert routes")).toContainText("No routes yet");
   await expect(hubLink(page, "Security")).toContainText("Two step sign in off");

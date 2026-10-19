@@ -1,35 +1,18 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { api, type AwsRoleCheck, type Connector, type ConnectorAwsAccount, type ConnectorKind } from "@/lib/api";
-import { errorMessage } from "@/lib/data-sources";
+import { useState, type ReactNode } from "react";
+import { api, type AwsAccountAbilities, type AwsAbilityReply, type Connector } from "@/lib/api";
+import { errorMessage, timeAgo } from "@/lib/data-sources";
 import { Callout } from "./callout";
 import { Field, SecretInput } from "./field";
-import { StatusPill } from "./status-pill";
-import { Section } from "./page";
-import { useConfirm } from "./confirm-dialog";
+import { Switch } from "./teams-webhook";
 import { useToast } from "./toast";
-import { inputClass, linkButton, primaryButton, secondaryButton } from "./ui";
+import { inputClass, primaryButton, secondaryButton } from "./ui";
 
-/** What each connection gives agents, for its card. */
-const ABOUT: Record<ConnectorKind, { what: string; needs: string }> = {
-  newrelic: {
-    what: "NRQL queries, entity search, deployment markers and change events, and response time, error rate and throughput before and after a deploy.",
-    needs: "A New Relic user key (starts with NRAK-). Coderhelm only sends read queries.",
-  },
-  confluence: {
-    what: "Search and read Confluence pages. Optionally, add text to the end of pages you list, such as a lessons page.",
-    needs: "Your Confluence address, the email of an Atlassian account and an API token from id.atlassian.com.",
-  },
-  metrics: {
-    what: "CloudWatch metrics for ECS, RDS, Lambda, CloudFront, load balancers, SQS and DynamoDB, through your connected AWS role.",
-    needs: "A connected AWS account whose CoderHelm role can read metrics (Settings → AWS shows a one-click update if it can't).",
-  },
-  airflow: {
-    what: "Airflow on MWAA: DAGs, DAG runs, task instances, task logs and import errors. Read as Airflow's Viewer role.",
-    needs: "A connected AWS account whose CoderHelm role can read Airflow, and the names of your MWAA environments.",
-  },
+/** What a key-based connection needs, shown above its form. */
+const NEEDS: Record<"newrelic" | "confluence", string> = {
+  newrelic: "A New Relic user key (starts with NRAK-). Coderhelm only sends read queries.",
+  confluence: "Your Confluence address, the email of an Atlassian account and an API token from id.atlassian.com.",
 };
 
 const list = (s: string) =>
@@ -38,211 +21,24 @@ const list = (s: string) =>
     .map((x) => x.trim())
     .filter(Boolean);
 
-function statusPill(c: Connector) {
-  if (!c.connected) return <StatusPill>Not connected</StatusPill>;
-  if (c.status !== "ready") return <StatusPill tone="error">Needs attention</StatusPill>;
-  if (!c.enabled) return <StatusPill tone="warning">Paused</StatusPill>;
-  return <StatusPill tone="success">On</StatusPill>;
-}
-
-/** The monitoring, docs and pipeline connections on the Data sources page. */
-export function ConnectionsSection() {
-  const [items, setItems] = useState<Connector[] | null>(null);
-  const [accounts, setAccounts] = useState<ConnectorAwsAccount[]>([]);
-  const [error, setError] = useState("");
-
-  const load = useCallback(async () => {
-    setError("");
-    try {
-      const r = await api.listConnectors();
-      setItems(r.connectors);
-      setAccounts(r.aws_accounts);
-    } catch (e) {
-      setError(errorMessage(e, "The request failed."));
-      setItems((prev) => prev ?? []);
-    }
-  }, []);
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  // `?connect=<kind>` (from a skill check's link) opens that card.
-  const [wanted, setWanted] = useState("");
-  useEffect(() => {
-    const k = new URLSearchParams(window.location.search).get("connect") ?? "";
-    setWanted(k);
-  }, []);
-  useEffect(() => {
-    if (!wanted || !items) return;
-    document.getElementById(`connection-${wanted}`)?.scrollIntoView({ block: "center" });
-  }, [wanted, items]);
-
-  const replace = (next: Connector) => setItems((prev) => (prev ? prev.map((c) => (c.kind === next.kind ? next : c)) : prev));
-
-  return (
-    <Section
-      id="connections"
-      title="Monitoring, docs and pipelines"
-      description="Let agents read the systems your skills rely on. Each one is off until you turn it on, reads only, and every call shows in the activity log."
-    >
-      {error && (
-        <Callout variant="error" title="We couldn't load these connections">
-          <p>{error}</p>
-          <p>
-            <button type="button" onClick={load} className={linkButton}>
-              Try again
-            </button>
-          </p>
-        </Callout>
-      )}
-      {items === null ? (
-        <p role="status" className="text-sm text-zinc-500">
-          Loading…
-        </p>
-      ) : (
-        <div className="grid gap-3 lg:grid-cols-2" data-testid="connections">
-          {items.map((c) => (
-            <ConnectionCard key={c.kind} item={c} accounts={accounts} onChange={replace} onRemoved={load} startOpen={wanted === c.kind} />
-          ))}
-        </div>
-      )}
-    </Section>
-  );
-}
-
-function ConnectionCard({
-  item,
-  accounts,
-  onChange,
-  onRemoved,
-  startOpen = false,
-}: {
-  item: Connector;
-  accounts: ConnectorAwsAccount[];
-  onChange: (c: Connector) => void;
-  onRemoved: () => void;
-  startOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(startOpen);
-  useEffect(() => {
-    if (startOpen) setOpen(true);
-  }, [startOpen]);
-  const [busy, setBusy] = useState(false);
-  const { toast } = useToast();
-  const { confirm } = useConfirm();
-  const about = ABOUT[item.kind];
-
-  const test = async () => {
-    setBusy(true);
-    try {
-      const r = await api.testConnector(item.kind);
-      onChange(r.connector);
-      toast(r.connector.status === "ready" ? `${item.label} works` : `${item.label} needs attention`, r.connector.status === "ready" ? "success" : "error");
-    } catch (e) {
-      toast(errorMessage(e, "The test failed."), "error");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const remove = async () => {
-    const ok = await confirm({
-      title: `Remove ${item.label}?`,
-      message: "Agents stop using it right away and the saved key is deleted.",
-      confirmLabel: "Remove",
-      destructive: true,
-    });
-    if (!ok) return;
-    setBusy(true);
-    try {
-      await api.removeConnector(item.kind);
-      onRemoved();
-    } catch (e) {
-      toast(errorMessage(e, "Couldn't remove it."), "error");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div id={`connection-${item.kind}`} className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5" data-testid={`connection-${item.kind}`}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <h3 className="font-semibold text-zinc-100">{item.label}</h3>
-        {statusPill(item)}
-      </div>
-      <p className="mt-1 text-sm text-zinc-400">{about.what}</p>
-      {item.connected && item.status_message && (
-        <p className={`mt-2 text-sm ${item.status === "ready" ? "text-zinc-400" : "text-red-300"}`}>{item.status_message}</p>
-      )}
-      {item.kind === "confluence" && item.write_enabled && (item.write_pages?.length ?? 0) > 0 && (
-        <p className="mt-2 text-sm text-amber-300">Writes on: may add text to pages {item.write_pages?.join(", ")}.</p>
-      )}
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className={item.connected ? secondaryButton : primaryButton}>
-          {item.connected ? "Edit" : "Connect"}
-        </button>
-        {item.connected && (
-          <>
-            <button type="button" onClick={test} disabled={busy} className={secondaryButton}>
-              Test again
-            </button>
-            <button type="button" onClick={remove} disabled={busy} className={linkButton}>
-              Remove
-            </button>
-          </>
-        )}
-      </div>
-      {open && (
-        <ConnectionForm
-          item={item}
-          accounts={accounts}
-          onSaved={(c) => {
-            onChange(c);
-            if (c.status === "ready") setOpen(false);
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-function ConnectionForm({
-  item,
-  accounts,
-  onSaved,
-}: {
-  item: Connector;
-  accounts: ConnectorAwsAccount[];
-  onSaved: (c: Connector) => void;
-}) {
-  const k = item.kind;
+/**
+ * New Relic or Confluence: the key (sealed for the team, never shown again)
+ * and what agents may read. Saving tests it.
+ */
+export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c: Connector) => void }) {
+  const k = item.kind as "newrelic" | "confluence";
   const [key, setKey] = useState("");
-  const [region, setRegion] = useState(item.region || (k === "newrelic" ? "us" : accounts[0]?.region || ""));
+  const [region, setRegion] = useState(item.region || "us");
   const [accountIds, setAccountIds] = useState((item.account_ids ?? []).join(", "));
   const [site, setSite] = useState(item.site ?? "");
   const [email, setEmail] = useState(item.email ?? "");
   const [spaces, setSpaces] = useState((item.spaces ?? []).join(", "));
   const [writeEnabled, setWriteEnabled] = useState(item.write_enabled ?? false);
   const [writePages, setWritePages] = useState((item.write_pages ?? []).join(", "));
-  const [account, setAccount] = useState(item.aws?.account ?? accounts[0]?.account ?? "");
-  const [environments, setEnvironments] = useState((item.environments ?? []).join(", "));
   const [enabled, setEnabled] = useState(item.connected ? Boolean(item.enabled) : true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const id = (f: string) => `${k}-${f}`;
-  const aws = k === "metrics" || k === "airflow";
-
-  if (aws && accounts.length === 0) {
-    return (
-      <div className="mt-4">
-        <Callout variant="info" live={false}>
-          <p>
-            Connect your AWS account first. <Link href="/settings/aws" className={linkButton}>Go to Settings → AWS</Link>
-          </p>
-        </Callout>
-      </div>
-    );
-  }
 
   const save = async () => {
     setSaving(true);
@@ -252,8 +48,6 @@ function ConnectionForm({
     if (k === "newrelic") Object.assign(body, { region, account_ids: list(accountIds) });
     if (k === "confluence")
       Object.assign(body, { site, email, spaces: list(spaces), write_enabled: writeEnabled, write_pages: writeEnabled ? list(writePages) : [] });
-    if (aws) Object.assign(body, { account, region });
-    if (k === "airflow") body.environments = list(environments);
     try {
       const r = await api.saveConnector(k, body);
       setKey("");
@@ -280,16 +74,14 @@ function ConnectionForm({
         save();
       }}
     >
-      <p className="text-sm text-zinc-400">{ABOUT[k].needs}</p>
-      {(k === "newrelic" || k === "confluence") && (
-        <Field
-          id={id("key")}
-          label={k === "newrelic" ? "User key" : "API token"}
-          helper={item.key_hint ? `A key ending in ${item.key_hint} is saved. Leave this empty to keep it.` : "Encrypted for your team and never shown again."}
-        >
-          {(p) => <SecretInput {...p} className={inputClass} value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" />}
-        </Field>
-      )}
+      <p className="text-sm text-zinc-400">{NEEDS[k]}</p>
+      <Field
+        id={id("key")}
+        label={k === "newrelic" ? "User key" : "API token"}
+        helper={item.key_hint ? `A key ending in ${item.key_hint} is saved. Leave this empty to keep it.` : "Encrypted for your team and never shown again."}
+      >
+        {(p) => <SecretInput {...p} className={inputClass} value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" />}
+      </Field>
       {k === "newrelic" && (
         <>
           <Field id={id("region")} label="Region">
@@ -318,32 +110,6 @@ function ConnectionForm({
           {writeEnabled && text("pages", "Writable page ids", writePages, setWritePages, "The number in the page's address, after /pages/.", "123456789")}
         </>
       )}
-      {aws && (
-        <>
-          <Field id={id("account")} label="AWS account">
-            {(p) => (
-              <select
-                {...p}
-                className={inputClass}
-                value={account}
-                onChange={(e) => {
-                  setAccount(e.target.value);
-                  const a = accounts.find((x) => x.account === e.target.value);
-                  if (a && !region) setRegion(a.region);
-                }}
-              >
-                {accounts.map((a) => (
-                  <option key={a.account} value={a.account}>
-                    {a.account} ({a.role})
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
-          {text("region", "Region", region, setRegion, "Where the metrics or Airflow live.", "us-east-1")}
-        </>
-      )}
-      {k === "airflow" && text("envs", "MWAA environments", environments, setEnvironments, "Names of the environments agents may read.", "prod-airflow")}
       <label className="flex items-center gap-2 text-sm text-zinc-200">
         <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
         Let agents use it once the test passes
@@ -362,53 +128,175 @@ function ConnectionForm({
   );
 }
 
-/**
- * On Settings → AWS: whether the CoderHelm role can read metrics and
- * Airflow, with the one-click stack that adds them when it can't.
- */
-export function AwsRoleAccess({ account }: { account: string }) {
-  const [res, setRes] = useState<AwsRoleCheck | null>(null);
-  const [error, setError] = useState("");
-  const run = useCallback(async () => {
-    setError("");
-    setRes(null);
-    try {
-      setRes(await api.checkAwsRole(account));
-    } catch (e) {
-      setError(errorMessage(e, "The check failed."));
-    }
-  }, [account]);
-  useEffect(() => {
-    run();
-  }, [run]);
-
-  if (error) return <p className="text-sm text-zinc-500">Couldn&apos;t check what the role can read: {error}</p>;
-  if (!res) return <p role="status" className="text-sm text-zinc-500">Checking what the role can read…</p>;
-  if (!res.check.works) return null;
-  if (!res.update_url) {
+/** "Logs · Metrics · Airflow (prod-bi-airflow)" with each one's state, for a card. */
+export function AwsAbilitySummary({ a }: { a: AwsAccountAbilities }) {
+  const row = (name: string, on: boolean, available: boolean | null, extra?: string) => {
+    const state = on ? "On" : available === false ? "No access yet" : available === null ? "Not checked yet" : "Off";
+    const tone = on ? "text-emerald-400" : available === false ? "text-amber-300" : "text-zinc-500";
     return (
-      <p className="text-sm text-zinc-400" data-testid="aws-role-access">
-        The role can read logs, CloudWatch metrics and Airflow.
-      </p>
+      <li key={name} className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+        <span className="font-medium text-zinc-200">{name}</span>
+        <span className={tone}>{state}</span>
+        {extra && <span className="min-w-0 break-words text-zinc-400">{extra}</span>}
+      </li>
     );
-  }
-  const names = res.missing.map((m) => (m === "metrics" ? "CloudWatch metrics" : "Airflow")).join(" and ");
+  };
   return (
-    <div data-testid="aws-role-access">
-      <Callout variant="warning" title={`Update your CoderHelm role stack to enable ${names}`} live={false}>
-        <p>
-          The role can&apos;t read {names} yet, so agents can&apos;t check them. One click adds read-only access as a small stack in your account
-          ({res.stack_name}); it doesn&apos;t change your existing stack, and deleting it takes the access away.
+    <ul className="mt-3 space-y-1 text-sm" aria-label="What Coderhelm can do in this account" data-testid={`aws-abilities-${a.account}`}>
+      {row("Logs", a.logs.on, a.logs.available)}
+      {row("Metrics", a.metrics.on, a.metrics.available, a.metrics.on ? `CloudWatch, ${a.region}` : undefined)}
+      {row("Airflow", a.airflow.on, a.airflow.available, a.airflow.on ? a.airflow.environments.join(", ") : undefined)}
+    </ul>
+  );
+}
+
+/**
+ * An AWS account's abilities: switches for metrics and Airflow, the Airflow
+ * environments the check found (all on unless deselected), "Check again",
+ * and the one-click stack when the role lacks a permission.
+ */
+export function AwsAbilitiesPanel({
+  a,
+  canEdit,
+  onChange,
+}: {
+  a: AwsAccountAbilities;
+  canEdit: boolean;
+  onChange: (r: AwsAbilityReply) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const { toast } = useToast();
+
+  const run = async (f: () => Promise<AwsAbilityReply>, done: string) => {
+    setBusy(true);
+    setError("");
+    try {
+      const r = await f();
+      onChange(r);
+      toast(done);
+    } catch (e) {
+      setError(errorMessage(e, "That didn't work."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const check = () => run(() => api.checkAwsAbilities(a.account), "Checked what the role can do");
+  const set = (body: Parameters<typeof api.setAwsAbilities>[1]) => run(() => api.setAwsAbilities(a.account, body), "Saved");
+  const missing = (a.missing ?? []).map((m) => (m === "metrics" ? "CloudWatch metrics" : "Airflow"));
+
+  return (
+    <div className="mt-4 flex flex-col gap-4 border-t border-zinc-800 pt-4" data-testid={`aws-panel-${a.account}`}>
+      <p className="text-sm text-zinc-400">
+        Coderhelm checks what the CoderHelmLogReader role can do (one read of metrics, one list of Airflow environments) and turns each
+        ability on when the role allows it. {a.checked_at ? `Last checked ${timeAgo(a.checked_at)}.` : "Not checked yet."}
+      </p>
+      {a.check_error && (
+        <Callout variant="error" title="Coderhelm couldn't take on the role" live={false}>
+          <p>{a.check_error}</p>
+        </Callout>
+      )}
+      <div className="flex flex-col gap-3">
+        <AbilityRow
+          name="Metrics"
+          what="CloudWatch metrics for ECS, RDS, Lambda, CloudFront, load balancers, SQS and DynamoDB."
+          on={a.metrics.on}
+          available={a.metrics.available}
+          disabled={!canEdit || busy}
+          onToggle={(on) => set({ metrics: on })}
+        />
+        <AbilityRow
+          name="Airflow"
+          what="DAGs, DAG runs, task instances, task logs and import errors on MWAA, read as Airflow's Viewer role."
+          on={a.airflow.on || (a.airflow.available === true && !a.airflow.switched_off && a.airflow.found.length > 0)}
+          available={a.airflow.available}
+          disabled={!canEdit || busy}
+          onToggle={(on) => set({ airflow: on })}
+        />
+        {a.airflow.available && a.airflow.found.length > 0 && !a.airflow.switched_off && (
+          <fieldset className="ml-0 sm:ml-14">
+            <legend className="text-sm font-semibold text-zinc-100">Airflow environments</legend>
+            <p className="mt-1 text-sm text-zinc-400">Found in {a.region}. Agents read the production one unless the work names another.</p>
+            <ul className="mt-2 space-y-1">
+              {a.airflow.found.map((env) => {
+                const checked = !a.airflow.skipped.includes(env);
+                return (
+                  <li key={env}>
+                    <label className="flex items-center gap-2 text-sm text-zinc-200">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={!canEdit || busy}
+                        onChange={(e) => {
+                          const keep = a.airflow.found.filter((x) => (x === env ? e.target.checked : !a.airflow.skipped.includes(x)));
+                          set({ airflow_environments: keep });
+                        }}
+                      />
+                      <span className="break-all font-mono">{env}</span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </fieldset>
+        )}
+      </div>
+      {missing.length > 0 && a.update_url && (
+        <Callout variant="warning" title={`Add ${missing.join(" and ")} to your CoderHelm role`} live={false}>
+          <p>
+            The role can&apos;t read {missing.join(" or ")} yet. One click adds read-only access as a small stack in your account
+            ({a.stack_name ?? "CoderHelmLogReaderOps"}); it doesn&apos;t change your existing stack, and deleting it takes the access away. Then
+            check again.
+          </p>
+          {canEdit && (
+            <p className="mt-2">
+              <a href={a.update_url} target="_blank" rel="noreferrer" className={primaryButton}>
+                Add access in AWS
+              </a>
+            </p>
+          )}
+        </Callout>
+      )}
+      {error && (
+        <p role="alert" className="text-sm text-red-400">
+          {error}
         </p>
-        <p className="mt-2 flex flex-wrap gap-3">
-          <a href={res.update_url} target="_blank" rel="noreferrer" className={primaryButton}>
-            Add metrics and Airflow access in AWS
-          </a>
-          <button type="button" onClick={run} className={secondaryButton}>
-            Check again
+      )}
+      {canEdit && (
+        <div>
+          <button type="button" onClick={check} disabled={busy} className={secondaryButton}>
+            {busy ? "Checking…" : "Check again"}
           </button>
-        </p>
-      </Callout>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AbilityRow({
+  name,
+  what,
+  on,
+  available,
+  disabled,
+  onToggle,
+}: {
+  name: string;
+  what: string;
+  on: boolean;
+  available: boolean | null;
+  disabled: boolean;
+  onToggle: (on: boolean) => void;
+}) {
+  const note = available === false ? "The role can't read this yet." : available === null ? "Not checked yet." : null;
+  return (
+    <div className="flex min-w-0 items-start gap-3">
+      <Switch checked={on} onChange={onToggle} disabled={disabled || available !== true} label={`Let agents read ${name}`} />
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-zinc-100">{name}</p>
+        <p className="text-sm text-zinc-400">{what}</p>
+        {note && <p className="text-sm text-amber-300">{note}</p>}
+      </div>
     </div>
   );
 }

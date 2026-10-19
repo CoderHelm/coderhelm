@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
 import type { Role } from "@/lib/roles";
 import {
-  AtlassianIcon, AwsIcon, BellIcon, BookIcon, CpuIcon, DatabaseIcon, GitBranchIcon, GitHubIcon,
+  BellIcon, BookIcon, CpuIcon, DatabaseIcon, GitBranchIcon,
   LockIcon, PenIcon, PlanIcon, PluginIcon, ShieldCheckIcon, TargetIcon, UsersIcon, WrenchIcon,
 } from "./icons";
 
 /** Keys for the small "current value" line some items show on the hub. */
 export type SettingsStatusKey =
-  | "usage" | "repos" | "github" | "team" | "alerts" | "dataSources" | "plugins" | "jira" | "models" | "security";
+  | "usage" | "repos" | "team" | "alerts" | "dataSources" | "integrations" | "models" | "security";
 
 export interface SettingsItem {
   href: string;
@@ -52,10 +52,9 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   },
   {
     id: "code",
-    label: "Repositories and GitHub",
+    label: "Repositories",
     items: [
       { href: "/settings/repos", title: "Repositories", description: "Turn Coderhelm on or off for each repository.", icon: <GitBranchIcon />, view: "member", edit: "admin", status: "repos" },
-      { href: "/settings/github", title: "GitHub", description: "The GitHub App that gives Coderhelm access to your code.", icon: <GitHubIcon />, view: "member", edit: "admin", status: "github" },
     ],
   },
   {
@@ -81,7 +80,6 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     label: "Data sources",
     items: [
       { href: "/data-sources", title: "Data sources", description: "Live systems the reviewer may read to check facts. Read only.", icon: <DatabaseIcon />, view: "admin", edit: "admin", status: "dataSources" },
-      { href: "/settings/aws", title: "AWS", description: "AWS accounts whose CloudWatch logs Coderhelm reads for findings.", icon: <AwsIcon />, view: "member", edit: "admin" },
       { href: "/skills", title: "Skills", description: "Written know how from a repository that Coderhelm can follow.", icon: <BookIcon />, view: "member", edit: "member" },
     ],
   },
@@ -89,8 +87,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     id: "integrations",
     label: "Integrations",
     items: [
-      { href: "/settings/jira", title: "Jira", description: "Start work from Jira tickets and keep their status in step.", icon: <AtlassianIcon />, view: "admin", edit: "admin", status: "jira" },
-      { href: "/settings/plugins", title: "MCP servers", description: "Connect tools such as Figma, Sentry and Linear.", icon: <PluginIcon />, view: "admin", edit: "admin", status: "plugins" },
+      { href: "/settings/integrations", title: "Integrations", description: "GitHub, Jira, AWS, New Relic, Sentry, Confluence, Teams and other tools: what each can do and whether it works.", icon: <PluginIcon />, view: "member", edit: "admin", status: "integrations" },
     ],
   },
   {

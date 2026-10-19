@@ -121,7 +121,7 @@ function WorkflowPage() {
               <p className="text-xs text-zinc-500 mt-0.5">{t.description}</p>
               {t.key === "allow_plan_log_analyzer" && !awsConnected && (
                 <p className="text-xs text-yellow-500 mt-1">
-                  <a href="/settings/aws" className="underline hover:text-yellow-300">Connect an AWS account</a> to enable this.
+                  <a href="/settings/integrations/aws/" className="underline hover:text-yellow-300">Connect an AWS account</a> to enable this.
                 </p>
               )}
             </div>
