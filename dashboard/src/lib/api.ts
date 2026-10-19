@@ -1492,6 +1492,8 @@ export interface AlertEvent {
   title?: string | null;
   outcome: string;
   ticket_id?: string | null;
+  /** For a recovery: the ticket of the alert it resolves (newer events only). */
+  recovers_ticket?: string | null;
 }
 
 export interface AlertEventDetail {
@@ -1511,7 +1513,7 @@ export const API_BASE_URL = API_BASE;
 export interface AwsConnection {
   connection_id: string;
   role_arn: string;
-  external_id: string;
+  external_id?: string | null;
   region: string;
   status: string;
   /** The last failed analysis or test, if the latest one failed. */

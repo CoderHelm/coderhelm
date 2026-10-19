@@ -160,7 +160,11 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       const limit = Number(url.searchParams.get("limit") || 50);
       const before = url.searchParams.get("before");
       const from = before ? db.events.findIndex((e) => e.cursor === before) + 1 : 0;
-      return json(route, { events: db.events.slice(from, from + limit) });
+      // The two filters the hub uses for its per-source numbers.
+      const since = url.searchParams.get("since");
+      const outcome = url.searchParams.get("outcome");
+      const matching = db.events.filter((e) => (!since || String(e.at) >= since) && (outcome !== "problems" || !e.ok));
+      return json(route, { events: matching.slice(from, from + limit) });
     }
     if (p === "/api/data-sources/api/probe") {
       if (String(body?.url).includes("yourcompany.com")) return json(route, { ok: true, kind: "graphql", needs_key: true });
@@ -323,7 +327,8 @@ test("hub: empty state", async ({ page }) => {
   await mockApi(page);
   await page.goto("/data-sources");
 
-  await expect(page.getByRole("heading", { level: 1, name: "Let Coderhelm check facts against your real systems" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Data sources" })).toBeVisible();
+  await expect(page.getByText("Read only, always")).toBeVisible();
   await expect(page.getByRole("link", { name: /An API/ })).toBeVisible();
   await expect(page.getByText("Coming next")).toHaveCount(0);
   await expect(page.getByRole("link", { name: /Your own tools/ })).toHaveAttribute("href", /^\/data-sources\/tools\/?$/);
@@ -1002,4 +1007,35 @@ test("try a warehouse: pick a database, samples set it, and it is sent", async (
   await expect(page.getByText(/run as a warehouse user with no password that can only read/)).toBeVisible();
   await expect(page.getByText(/Read databases you didn't share \(it may read 2 databases\)/)).toBeVisible();
   await expect(page.getByText(/rolled back/)).toHaveCount(0);
+});
+
+test("hub: each card shows its last lookup, failures this week with a link to them, and what stays hidden", async ({ page }) => {
+  const now = Date.now();
+  const at = (minutesAgo: number) => new Date(now - minutesAgo * 60_000).toISOString();
+  await mockApi(page, {
+    sources: [makeSource({ enabled: true, setup_complete: true }), awsSource("logs", { enabled: true, setup_complete: true })],
+    events: [
+      { at: at(5), source_id: "ds_1", source_name: "api.yourcompany.com", actor: "reviewer", repo: "your-team/backend", pr: 4, summary: "Looked up an order", detail: "", ok: true, outcome: "ok", ms: 120 },
+      { at: at(90), source_id: "ds_1", source_name: "api.yourcompany.com", actor: "reviewer", repo: "your-team/backend", pr: 4, summary: "Tried a write", detail: REFUSAL, ok: false, outcome: "refused", ms: 2 },
+      { at: at(120), source_id: "ds_1", source_name: "api.yourcompany.com", actor: "planner", summary: "Looked up a setting", detail: "Your API did not answer in time.", ok: false, outcome: "failed", ms: 10000 },
+      // Older than a week: not counted.
+      { at: at(60 * 24 * 9), source_id: "ds_logs", source_name: "Logs", actor: "reviewer", summary: "Old search", detail: "Timed out", ok: false, outcome: "failed", ms: 10 },
+    ],
+  });
+  await page.goto("/data-sources");
+
+  const api = page.getByRole("article", { name: "api.yourcompany.com" });
+  await expect(api.getByText("5 minutes ago")).toBeVisible();
+  const failures = api.getByRole("link", { name: "2 lookups" });
+  await expect(failures).toHaveAttribute("href", /\/data-sources\/activity\/?\?source=ds_1&outcome=problems&range=7d$/);
+  await expect(api.getByText(/^password, secret, token and \d+ more$/)).toBeVisible();
+  await expect(api.getByText("Every repository")).toBeVisible();
+
+  const logs = page.getByRole("article", { name: `Logs in AWS account ${ACCOUNT}` });
+  await expect(logs.getByText("None in the last 7 days")).toBeVisible();
+  await expect(logs.getByText("None", { exact: true })).toBeVisible();
+  await shot(page, "hub-stats");
+
+  await failures.click();
+  await expect(page).toHaveURL(/\/data-sources\/activity\/?\?source=ds_1&outcome=problems&range=7d$/);
 });
