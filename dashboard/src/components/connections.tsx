@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { api, type AwsAccountAbilities, type AwsAbilityReply, type Connector } from "@/lib/api";
+import { api, type AwsAccountAbilities, type AwsAbilityReply, type Connector, type KeyConnectorKind } from "@/lib/api";
 import { errorMessage, timeAgo } from "@/lib/data-sources";
 import { Callout } from "./callout";
 import { Field, SecretInput } from "./field";
@@ -10,9 +10,11 @@ import { useToast } from "./toast";
 import { inputClass, primaryButton, secondaryButton } from "./ui";
 
 /** What a key-based connection needs, shown above its form. */
-const NEEDS: Record<"newrelic" | "confluence", string> = {
+const NEEDS: Record<KeyConnectorKind, string> = {
   newrelic: "A New Relic user key (starts with NRAK-). Coderhelm only sends read queries.",
   confluence: "Your Confluence address, the email of an Atlassian account and an API token from id.atlassian.com.",
+  opensearch:
+    "Your cluster's https address and a user with read-only access to the indexes agents may search. Coderhelm only lists, searches and counts; scripts are refused.",
 };
 
 const list = (s: string) =>
@@ -22,11 +24,11 @@ const list = (s: string) =>
     .filter(Boolean);
 
 /**
- * New Relic or Confluence: the key (sealed for the team, never shown again)
- * and what agents may read. Saving tests it.
+ * New Relic, Confluence or OpenSearch: the key or password (sealed for the
+ * team, never shown again) and what agents may read. Saving tests it.
  */
 export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c: Connector) => void }) {
-  const k = item.kind as "newrelic" | "confluence";
+  const k = item.kind as KeyConnectorKind;
   const [key, setKey] = useState("");
   const [region, setRegion] = useState(item.region || "us");
   const [accountIds, setAccountIds] = useState((item.account_ids ?? []).join(", "));
@@ -35,6 +37,8 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
   const [spaces, setSpaces] = useState((item.spaces ?? []).join(", "));
   const [writeEnabled, setWriteEnabled] = useState(item.write_enabled ?? false);
   const [writePages, setWritePages] = useState((item.write_pages ?? []).join(", "));
+  const [indexes, setIndexes] = useState((item.indexes ?? []).join(", "));
+  const [hiddenFields, setHiddenFields] = useState((item.hidden_fields ?? []).join(", "));
   const [enabled, setEnabled] = useState(item.connected ? Boolean(item.enabled) : true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -48,6 +52,7 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
     if (k === "newrelic") Object.assign(body, { region, account_ids: list(accountIds) });
     if (k === "confluence")
       Object.assign(body, { site, email, spaces: list(spaces), write_enabled: writeEnabled, write_pages: writeEnabled ? list(writePages) : [] });
+    if (k === "opensearch") Object.assign(body, { site, email, indexes: list(indexes), hidden_fields: list(hiddenFields) });
     try {
       const r = await api.saveConnector(k, body);
       setKey("");
@@ -77,7 +82,7 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
       <p className="text-sm text-zinc-400">{NEEDS[k]}</p>
       <Field
         id={id("key")}
-        label={k === "newrelic" ? "User key" : "API token"}
+        label={k === "newrelic" ? "User key" : k === "opensearch" ? "Password" : "API token"}
         helper={item.key_hint ? `A key ending in ${item.key_hint} is saved. Leave this empty to keep it.` : "Encrypted for your team and never shown again."}
       >
         {(p) => <SecretInput {...p} className={inputClass} value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" />}
@@ -110,6 +115,21 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
           {writeEnabled && text("pages", "Writable page ids", writePages, setWritePages, "The number in the page's address, after /pages/.", "123456789")}
         </>
       )}
+      {k === "opensearch" && (
+        <>
+          {text("site", "Cluster address", site, setSite, undefined, "https://search.example.com")}
+          {text("email", "User", email, setEmail, "A user with read-only access. Coderhelm sees what it can see.")}
+          {text("indexes", "Indexes", indexes, setIndexes, "Index names or patterns agents may search, like orders or logs-*. Leave empty for every index the user can see.", "orders, logs-*")}
+          {text(
+            "hidden",
+            "Hidden fields",
+            hiddenFields,
+            setHiddenFields,
+            "Field names whose values are never shown, on top of emails, phones, addresses and keys.",
+            "notes, dob",
+          )}
+        </>
+      )}
       <label className="flex items-center gap-2 text-sm text-zinc-200">
         <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
         Let agents use it once the test passes
@@ -128,7 +148,7 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
   );
 }
 
-/** "Logs · Metrics · Airflow (prod-bi-airflow)" with each one's state, for a card. */
+/** "Logs · Metrics · Airflow (prod-data-airflow)" with each one's state, for a card. */
 export function AwsAbilitySummary({ a }: { a: AwsAccountAbilities }) {
   const row = (name: string, on: boolean, available: boolean | null, extra?: string) => {
     const state = on ? "On" : available === false ? "No access yet" : available === null ? "Not checked yet" : "Off";

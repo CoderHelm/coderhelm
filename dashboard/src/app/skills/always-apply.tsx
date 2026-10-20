@@ -19,7 +19,7 @@ import {
   type Skill,
 } from "@/lib/skills";
 
-/** "Always applied · speedboat · Coder, Reviewer", or nothing when off. */
+/** "Always applied · web-app · Coder, Reviewer", or nothing when off. */
 export function AlwaysApplyBadge({ item }: { item: Pick<Skill, "always_apply" | "kind"> }) {
   const a = item.always_apply;
   if (!a?.on || item.kind === "agent") return null;
