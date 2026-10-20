@@ -488,7 +488,7 @@ function RunDetailInner() {
   const doneCount = taskItems.filter((t) => isTaskDone(t, filesModified, run.status, maxPassIdx)).length;
 
   // What each action is allowed for, matching the gateway's own checks.
-  const canRetry = ["failed", "needs_input", "cancelled"].includes(run.status) && run.current_pass !== "feedback";
+  const canRetry = ["failed", "needs_input", "needs_outside_change", "cancelled"].includes(run.status) && run.current_pass !== "feedback";
   const canReview = !!run.pr_url && !["running", "queued", "merged"].includes(run.status);
   // Starting over closes the pull request: never offered once it is merged.
   const canReset = ["completed", "failed", "needs_input", "needs_outside_change", "cancelled", "success"].includes(run.status);
