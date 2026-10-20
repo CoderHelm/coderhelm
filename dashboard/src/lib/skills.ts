@@ -95,10 +95,10 @@ export interface AlwaysApplySuggestion {
 /** A pass in words, lower case after the first, e.g. "coder". */
 export const passLabel = (p: string) => PASSES.find((x) => x.id === p)?.label ?? p;
 
-/** "speedboat" for "acme/speedboat". */
+/** "web-app" for "acme/web-app". */
 export const repoShort = (r: string) => r.split("/").pop() ?? r;
 
-/** The badge text: "Always applied · speedboat · Coder, Reviewer". */
+/** The badge text: "Always applied · web-app · Coder, Reviewer". */
 export function alwaysLabel(a: Pick<AlwaysApply, "repos" | "passes" | "paths">): string {
   const repos = a.repos.length === 0 ? "all repositories" : a.repos.map(repoShort).join(", ");
   const passes = a.passes.map(passLabel).join(", ");
@@ -106,7 +106,7 @@ export function alwaysLabel(a: Pick<AlwaysApply, "repos" | "passes" | "paths">):
   return `Always applied · ${repos} · ${passes}${paths}`;
 }
 
-/** The suggestion as a sentence: "Suggested: always apply to speedboat for Coder and Reviewer". */
+/** The suggestion as a sentence: "Suggested: always apply to web-app for Coder and Reviewer". */
 export function suggestionLabel(s: AlwaysApplySuggestion): string {
   const names = s.passes.map(passLabel);
   const passes = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0] ?? "";

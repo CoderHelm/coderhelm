@@ -7,6 +7,7 @@ import {
   type AwsAccountAbilities,
   type Connector,
   type Integration,
+  type KeyConnectorKind,
   type IntegrationSection,
   type IntegrationStatus,
   type PluginDef,
@@ -67,6 +68,7 @@ const SHORT: Record<string, string> = {
   aws: "Logs, metrics and Airflow through a read-only role",
   newrelic: "Queries, deploy markers and error rates",
   confluence: "Reads pages for context",
+  opensearch: "Searches the indexes your app reads",
   teams: "Posts alerts and pull request links to a channel",
   sentry: "Error events, issues and incidents",
   figma: "Design tokens, components and assets",
@@ -298,7 +300,7 @@ function IntegrationRow({
         const r = await api.checkAwsAbilities(aws.account);
         onChange({ ...item, status: r.status, reason: r.reason, last_check: r.last_check, detail: r.account as unknown as Record<string, unknown> });
       } else if (kind === "connector") {
-        const r = await api.testConnector(item.id as "newrelic" | "confluence");
+        const r = await api.testConnector(item.id as KeyConnectorKind);
         toast(r.connector.status === "ready" ? `${item.name} works` : `${item.name} needs attention`, r.connector.status === "ready" ? "success" : "error");
         await onReload();
       } else if (kind === "plugin") {
@@ -449,7 +451,7 @@ function kindOf(item: Integration): Kind {
   if (item.id === "jira") return "jira";
   if (item.id === "aws") return "aws_connect";
   if (item.id.startsWith("aws-")) return "aws_account";
-  if (item.id === "newrelic" || item.id === "confluence") return "connector";
+  if (item.id === "newrelic" || item.id === "confluence" || item.id === "opensearch") return "connector";
   if (item.id === "teams") return "teams";
   return "plugin";
 }
@@ -467,7 +469,7 @@ function ConnectorPanel({ item, onSaved }: { item: Integration; onSaved: () => P
     });
     if (!ok) return;
     try {
-      await api.removeConnector(item.id as "newrelic" | "confluence");
+      await api.removeConnector(item.id as KeyConnectorKind);
       await onSaved();
     } catch (e) {
       toast(errorMessage(e, "Couldn't remove it."), "error");
@@ -479,7 +481,7 @@ function ConnectorPanel({ item, onSaved }: { item: Integration; onSaved: () => P
         <p className="mt-3 text-sm text-amber-300">Writes on: may add text to pages {c.write_pages?.join(", ")}.</p>
       )}
       <ConnectorForm
-        item={{ ...c, kind: item.id as "newrelic" | "confluence", label: item.name, connected: Boolean(c.connected) }}
+        item={{ ...c, kind: item.id as KeyConnectorKind, label: item.name, connected: Boolean(c.connected) }}
         onSaved={() => {
           onSaved();
         }}

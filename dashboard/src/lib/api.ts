@@ -2094,7 +2094,9 @@ export interface TestRecommendation {
   pr_url?: string | null;
 }
 
-export type ConnectorKind = "newrelic" | "confluence" | "metrics" | "airflow";
+export type ConnectorKind = "newrelic" | "confluence" | "opensearch" | "metrics" | "airflow";
+/** A connection set up with a key in Settings → Integrations. */
+export type KeyConnectorKind = "newrelic" | "confluence" | "opensearch";
 
 /** A monitoring, docs or pipeline connection. Keys are never returned. */
 export interface Connector {
@@ -2113,6 +2115,8 @@ export interface Connector {
   write_enabled?: boolean;
   write_pages?: string[];
   environments?: string[];
+  indexes?: string[];
+  hidden_fields?: string[];
   repos?: string[];
   aws?: { account: string; region: string; role: string } | null;
   updated_at?: string;
