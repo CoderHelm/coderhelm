@@ -15,6 +15,7 @@ const NEEDS: Record<KeyConnectorKind, string> = {
   confluence: "Your Confluence address, the email of an Atlassian account and an API token from id.atlassian.com.",
   opensearch:
     "Your cluster's https address and a user with read-only access to the indexes agents may search. Coderhelm only lists, searches and counts; scripts are refused.",
+  rest: "The API's base address, the header its key goes in and the key. Coderhelm only sends GET requests, and only under the paths you list.",
 };
 
 const list = (s: string) =>
@@ -39,6 +40,8 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
   const [writePages, setWritePages] = useState((item.write_pages ?? []).join(", "));
   const [indexes, setIndexes] = useState((item.indexes ?? []).join(", "));
   const [hiddenFields, setHiddenFields] = useState((item.hidden_fields ?? []).join(", "));
+  const [headerName, setHeaderName] = useState(item.header_name || "X-Api-Key");
+  const [paths, setPaths] = useState((item.paths ?? []).join(", "));
   const [enabled, setEnabled] = useState(item.connected ? Boolean(item.enabled) : true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -53,6 +56,7 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
     if (k === "confluence")
       Object.assign(body, { site, email, spaces: list(spaces), write_enabled: writeEnabled, write_pages: writeEnabled ? list(writePages) : [] });
     if (k === "opensearch") Object.assign(body, { site, email, indexes: list(indexes), hidden_fields: list(hiddenFields) });
+    if (k === "rest") Object.assign(body, { site, header_name: headerName, paths: list(paths), hidden_fields: list(hiddenFields) });
     try {
       const r = await api.saveConnector(k, body);
       setKey("");
@@ -82,7 +86,7 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
       <p className="text-sm text-zinc-400">{NEEDS[k]}</p>
       <Field
         id={id("key")}
-        label={k === "newrelic" ? "User key" : k === "opensearch" ? "Password" : "API token"}
+        label={k === "newrelic" ? "User key" : k === "opensearch" ? "Password" : k === "rest" ? "API key" : "API token"}
         helper={item.key_hint ? `A key ending in ${item.key_hint} is saved. Leave this empty to keep it.` : "Encrypted for your team and never shown again."}
       >
         {(p) => <SecretInput {...p} className={inputClass} value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" />}
@@ -128,6 +132,21 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
             "Field names whose values are never shown, on top of emails, phones, addresses and keys.",
             "notes, dob",
           )}
+        </>
+      )}
+      {k === "rest" && (
+        <>
+          {text("site", "API address", site, setSite, undefined, "https://api.example.com")}
+          {text("header", "Key header", headerName, setHeaderName, "The header the API expects the key in, like X-Api-Key or Authorization.")}
+          {text(
+            "paths",
+            "Paths agents may read",
+            paths,
+            setPaths,
+            "One or more path prefixes, like /v1/orders. Agents can GET these and anything under them, nothing else.",
+            "/v1/orders, /v1/customers",
+          )}
+          {text("hidden", "Hidden fields", hiddenFields, setHiddenFields, "Field names whose values are never shown, on top of emails, phones, addresses and keys.", "notes, dob")}
         </>
       )}
       <label className="flex items-center gap-2 text-sm text-zinc-200">

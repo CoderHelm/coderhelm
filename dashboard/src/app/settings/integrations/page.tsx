@@ -69,6 +69,7 @@ const SHORT: Record<string, string> = {
   newrelic: "Queries, deploy markers and error rates",
   confluence: "Reads pages for context",
   opensearch: "Searches the indexes your app reads",
+  rest: "Reads records from an API you use",
   teams: "Posts alerts and pull request links to a channel",
   sentry: "Error events, issues and incidents",
   figma: "Design tokens, components and assets",
@@ -451,7 +452,7 @@ function kindOf(item: Integration): Kind {
   if (item.id === "jira") return "jira";
   if (item.id === "aws") return "aws_connect";
   if (item.id.startsWith("aws-")) return "aws_account";
-  if (item.id === "newrelic" || item.id === "confluence" || item.id === "opensearch") return "connector";
+  if (["newrelic", "confluence", "opensearch", "rest"].includes(item.id)) return "connector";
   if (item.id === "teams") return "teams";
   return "plugin";
 }
