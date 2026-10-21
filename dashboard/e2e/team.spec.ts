@@ -160,7 +160,7 @@ test("admin sees one row per person, GitHub logins, statuses and the permissions
   await expect(members(page).getByRole("listitem")).toHaveCount(7);
   await expect(row(page, "Olivia Owner").getByRole("link", { name: /olivia-o on GitHub/ })).toHaveAttribute("href", "https://github.com/olivia-o");
   await expect(row(page, "samrivera").getByText("GitHub sign-in only")).toBeVisible();
-  await expect(row(page, "Sam Rivera").getByText("Signed in 5 days ago")).toBeVisible();
+  await expect(row(page, "Sam Rivera").getByText("Active 5 days ago")).toBeVisible();
   await expect(row(page, "Alex Admin").getByText("You", { exact: true })).toBeVisible();
   // Admins can't touch owners or other admins, nor their own row.
   await expect(row(page, "Olivia Owner").getByRole("combobox")).toHaveCount(0);
