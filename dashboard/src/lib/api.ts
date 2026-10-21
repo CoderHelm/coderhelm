@@ -133,6 +133,8 @@ export const api = {
   logout: () => request<void>("/auth/logout", { method: "POST" }),
 
   // Allowlist
+  /** Every team with its runs, cost and members. Platform admin only (403 otherwise). */
+  adminTeams: () => request<{ teams: AdminTeam[]; month: string }>("/api/admin/teams"),
   listAllowlist: () => request<{ emails: string[] }>("/api/allowlist"),
   addToAllowlist: (email: string) =>
     request<{ status: string; email: string }>("/api/allowlist", {
@@ -2231,4 +2233,19 @@ export interface AwsAbilityReply {
   status: IntegrationStatus;
   reason: string;
   last_check: string;
+}
+
+/** One team in the platform admin's overview. */
+export interface AdminTeam {
+  team_id: string;
+  name: string;
+  status: string;
+  created_at: string;
+  members: number;
+  runs_total: number;
+  completed_total: number;
+  runs_month: number;
+  reviews_month: number;
+  cost_month_usd: number;
+  tokens_month: number;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { ApiError, api, type AdminTeam } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Callout } from "@/components/callout";
@@ -9,7 +9,8 @@ import { Skeleton } from "@/components/skeleton";
 import { focusRing, inputClass, primaryButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
 
-const ADMIN_EMAIL = "admin@coderhelm.com";
+const fmtInt = (n: number) => n.toLocaleString();
+const fmtUsd = (n: number) => `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function AdminPage() {
   const [authorized, setAuthorized] = useState(false);
@@ -20,6 +21,9 @@ export default function AdminPage() {
   const [allowEmail, setAllowEmail] = useState("");
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [teams, setTeams] = useState<AdminTeam[]>([]);
+  const [month, setMonth] = useState("");
+  const [loadError, setLoadError] = useState("");
   const { toast } = useToast();
   const { confirm } = useConfirm();
 
@@ -33,16 +37,21 @@ export default function AdminPage() {
       .finally(() => setListLoading(false));
   }, []);
 
+  // The server decides who is a platform admin: anyone else gets a 403.
   useEffect(() => {
     api
-      .me()
-      .then((me) => {
-        if (me.email === ADMIN_EMAIL) {
-          setAuthorized(true);
-          loadList();
-        }
+      .adminTeams()
+      .then((r) => {
+        setTeams(r.teams);
+        setMonth(r.month);
+        setAuthorized(true);
+        loadList();
       })
-      .catch(() => {})
+      .catch((e: unknown) => {
+        // 401/403: not a platform admin. Anything else is a real failure to show.
+        if (e instanceof ApiError && (e.status === 401 || e.status === 403)) return;
+        setLoadError(e instanceof Error ? e.message : "The request failed.");
+      })
       .finally(() => setLoading(false));
   }, [loadList]);
 
@@ -53,6 +62,16 @@ export default function AdminPage() {
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-40 w-full" />
         </div>
+      </Page>
+    );
+  }
+
+  if (!authorized && loadError) {
+    return (
+      <Page>
+        <Callout variant="error" title="Couldn't load the admin page">
+          <p>{loadError}</p>
+        </Callout>
       </Page>
     );
   }
@@ -110,6 +129,42 @@ export default function AdminPage() {
   return (
     <Page>
       <PageHeader title="Platform admin" lead="Internal tools for managing the Coderhelm platform." />
+      <section aria-labelledby="teams-heading" className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+        <h2 id="teams-heading" className="text-base font-semibold text-zinc-100 mb-1">Teams ({teams.length})</h2>
+        <p className="text-sm text-zinc-500 mb-4">Runs all time and in {month || "this month"}, with this month&apos;s model cost. Busiest this month first.</p>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] text-sm" data-testid="admin-teams">
+            <thead>
+              <tr className="border-b border-zinc-800 text-left text-xs text-zinc-500">
+                <th scope="col" className="py-2 pr-3 font-medium">Team</th>
+                <th scope="col" className="py-2 pr-3 font-medium text-right">Runs this month</th>
+                <th scope="col" className="py-2 pr-3 font-medium text-right">Runs all time</th>
+                <th scope="col" className="py-2 pr-3 font-medium text-right">Reviews this month</th>
+                <th scope="col" className="py-2 pr-3 font-medium text-right">Cost this month</th>
+                <th scope="col" className="py-2 pr-3 font-medium text-right">Members</th>
+                <th scope="col" className="py-2 font-medium">Joined</th>
+              </tr>
+            </thead>
+            <tbody>
+              {teams.map((t) => (
+                <tr key={t.team_id} className="border-b border-zinc-800/60 last:border-0">
+                  <td className="py-2 pr-3">
+                    <span className="block text-zinc-100">{t.name || "(no name)"}</span>
+                    <span className="block font-mono text-[11px] text-zinc-500">{t.team_id}</span>
+                    {t.status !== "active" && <span className="text-xs text-amber-300">{t.status}</span>}
+                  </td>
+                  <td className="py-2 pr-3 text-right tabular-nums text-zinc-100">{fmtInt(t.runs_month)}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums">{fmtInt(t.runs_total)}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums">{fmtInt(t.reviews_month)}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums">{fmtUsd(t.cost_month_usd)}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums">{fmtInt(t.members)}</td>
+                  <td className="py-2 text-zinc-400">{t.created_at ? new Date(t.created_at).toLocaleDateString() : ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
       <section aria-labelledby="allowlist-heading" className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
         <h2 id="allowlist-heading" className="text-base font-semibold text-zinc-100 mb-1">Signup allowlist</h2>
         <p className="text-sm text-zinc-500 mb-4">
