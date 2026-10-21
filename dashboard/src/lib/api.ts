@@ -2147,6 +2147,10 @@ export interface Connector {
   name?: string;
   label: string;
   connected: boolean;
+  /** An empty card for adding one more of a kind that's named per connection. */
+  needs_name?: boolean;
+  /** What agents should know when using it. */
+  instructions?: string;
   enabled?: boolean;
   status?: string;
   status_message?: string;
