@@ -372,6 +372,15 @@ async function shot(page: Page, name: string) {
   await page.setViewportSize({ width: 1280, height: 800 });
 }
 
+/** A connected source's row, opened to its details and actions. */
+async function openSource(page: Page, name: string) {
+  const row = page.getByRole("article", { name });
+  const toggle = row.locator("button[aria-controls$='-details']");
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  return row;
+}
+
 const callsTo = (db: Backend, method: string, re: RegExp) => db.calls.filter((c) => c.method === method && re.test(c.path));
 
 test("a REST API reads as a data source: its key, its paths, and a guide for agents that saves", async ({ page }) => {
@@ -385,8 +394,8 @@ test("a REST API reads as a data source: its key, its paths, and a guide for age
     ],
   });
   await page.goto("/data-sources");
-  const card = page.getByRole("article", { name: "bookings" });
-  await expect(card.getByText("REST API", { exact: true })).toBeVisible();
+  const card = await openSource(page, "bookings");
+  await expect(card.getByText("REST", { exact: true })).toBeVisible();
   await expect(card.getByText("Key ending AB12")).toBeVisible();
   await expect(card.getByText("/v1/org/7/programs")).toBeVisible();
   await expect(card.getByRole("button", { name: "Replace key" })).toBeVisible();
@@ -539,6 +548,7 @@ test("connect an API: happy path through Turn on fact-checking", async ({ page }
   // Hub now lists it
   const card = page.getByRole("article", { name: "api.yourcompany.com" });
   await expect(card.getByText("Ready", { exact: true })).toBeVisible();
+  await openSource(page, "api.yourcompany.com");
   await expect(card.getByText("Key ending 9x2k")).toBeVisible();
   await expect(card.getByRole("switch")).toHaveAttribute("aria-checked", "true");
   await expect(page.getByText("Looked up one order")).toBeVisible();
@@ -634,7 +644,7 @@ test("an unfinished setup can be resumed from the hub", async ({ page }) => {
 test("replace key: a good key replaces the old one", async ({ page }) => {
   const db = await mockApi(page, { sources: [makeSource({ enabled: true, setup_complete: true })] });
   await page.goto("/data-sources");
-  const card = page.getByRole("article", { name: "api.yourcompany.com" });
+  const card = await openSource(page, "api.yourcompany.com");
   await expect(card.getByText("Key ending 9x2k")).toBeVisible();
 
   await card.getByRole("button", { name: "Replace key" }).click();
@@ -650,7 +660,7 @@ test("replace key: a good key replaces the old one", async ({ page }) => {
 test("replace key: a rejected key keeps the old one and says so", async ({ page }) => {
   await mockApi(page, { rejectKey: true, sources: [makeSource({ enabled: true, setup_complete: true })] });
   await page.goto("/data-sources");
-  const card = page.getByRole("article", { name: "api.yourcompany.com" });
+  const card = await openSource(page, "api.yourcompany.com");
 
   await card.getByRole("button", { name: "Replace key" }).click();
   await card.getByRole("textbox", { name: "New key" }).fill("wrong-key");
@@ -668,7 +678,7 @@ test("replace key: a rejected key keeps the old one and says so", async ({ page 
 test("hub: editing what Coderhelm can't see sends the new list", async ({ page }) => {
   const db = await mockApi(page, { sources: [makeSource({ enabled: true, setup_complete: true, hidden_fields: ["password", "token"] })] });
   await page.goto("/data-sources");
-  const card = page.getByRole("article", { name: "api.yourcompany.com" });
+  const card = await openSource(page, "api.yourcompany.com");
 
   await card.getByRole("button", { name: "What Coderhelm can't see" }).click();
   await expect(card.getByRole("button", { name: "Save" })).toBeDisabled();
@@ -685,7 +695,7 @@ test("hub: editing what Coderhelm can't see sends the new list", async ({ page }
 test("remove: confirm, delete, and the card is gone", async ({ page }) => {
   const db = await mockApi(page, { sources: [makeSource({ enabled: true, setup_complete: true })] });
   await page.goto("/data-sources");
-  const card = page.getByRole("article", { name: "api.yourcompany.com" });
+  const card = await openSource(page, "api.yourcompany.com");
 
   await card.getByRole("button", { name: "Remove" }).click();
   await expect(page.getByRole("heading", { name: "Remove api.yourcompany.com?" })).toBeVisible();
@@ -717,6 +727,8 @@ test("a source in error status says Coderhelm is not using it, and activity expl
   await expect(card.getByText("Needs attention", { exact: true })).toBeVisible();
   await expect(card.getByText("Coderhelm is not using this source until the problem is fixed.")).toBeVisible();
   await expect(card.getByText("Your API stopped accepting the key.")).toBeVisible();
+  // The problem shows on the closed row; the key is in the details.
+  await openSource(page, "api.yourcompany.com");
   await expect(card.getByText("Key saved")).toBeVisible();
   await expect(card.getByText(/Key ending/)).toHaveCount(0);
 
@@ -795,19 +807,19 @@ test("hub: lists APIs, logs and databases, each with its own details", async ({ 
   });
   await page.goto("/data-sources");
 
-  const api = page.getByRole("article", { name: "api.yourcompany.com" });
-  await expect(api.getByText("API", { exact: true })).toBeVisible();
+  const api = await openSource(page, "api.yourcompany.com");
+  await expect(api.getByText("GraphQL", { exact: true })).toBeVisible();
   await expect(api.getByText("Key ending 9x2k")).toBeVisible();
   await expect(api.getByRole("button", { name: "Replace key" })).toBeVisible();
 
-  const logs = page.getByRole("article", { name: `Logs in AWS account ${ACCOUNT}` });
-  await expect(logs.getByText("Logs", { exact: true })).toBeVisible();
+  const logs = await openSource(page, `Logs in AWS account ${ACCOUNT}`);
+  await expect(logs.getByText("CloudWatch Logs", { exact: true })).toBeVisible();
   await expect(logs.getByText(`AWS account ${ACCOUNT}, us-east-1`)).toBeVisible();
   await expect(logs.getByText("2 log groups")).toBeVisible();
   await expect(logs.getByRole("button", { name: "Replace key" })).toHaveCount(0);
 
-  const db = page.getByRole("article", { name: "orders-db database" });
-  await expect(db.getByText("Database", { exact: true })).toBeVisible();
+  const db = await openSource(page, "orders-db database");
+  await expect(db.getByText("PostgreSQL", { exact: true })).toBeVisible();
   await expect(db.getByText(`orders-db / orders · AWS account ${ACCOUNT}, us-east-1`)).toBeVisible();
   await expect(db.getByText("42 tables")).toBeVisible();
   await expect(db.getByRole("button", { name: "Replace key" })).toHaveCount(0);
@@ -820,7 +832,7 @@ test("hub: lists APIs, logs and databases, each with its own details", async ({ 
 test("hub: the log groups a logs source may search can be changed", async ({ page }) => {
   const db = await mockApi(page, { sources: [awsSource("logs", { enabled: true, setup_complete: true })] });
   await page.goto("/data-sources");
-  const card = page.getByRole("article", { name: `Logs in AWS account ${ACCOUNT}` });
+  const card = await openSource(page, `Logs in AWS account ${ACCOUNT}`);
 
   await card.getByRole("button", { name: "Log groups" }).click();
   await expect(card.getByLabel("/ecs/api")).toBeChecked();
@@ -1100,8 +1112,8 @@ test("connect a warehouse and a database from one pasted line", async ({ page })
 test("try a warehouse: pick a database, samples set it, and it is sent", async ({ page }) => {
   const db = await mockApi(page, { sources: [warehouseSource()] });
   await page.goto("/data-sources");
-  const card = page.getByRole("article", { name: "analytics-dw warehouse" });
-  await expect(card).toContainText("Redshift warehouse");
+  const card = await openSource(page, "analytics-dw warehouse");
+  await expect(card).toContainText("Redshift");
   await expect(card).toContainText("analytics-dw / dev, marts");
   await expect(card).toContainText("18 tables in 2 databases");
 
@@ -1137,14 +1149,17 @@ test("hub: each card shows its last lookup, failures this week with a link to th
   await page.goto("/data-sources");
 
   const api = page.getByRole("article", { name: "api.yourcompany.com" });
+  // The closed row carries the last lookup and the week's problems.
   await expect(api.getByText("5 minutes ago")).toBeVisible();
+  await expect(api.getByText("2 failed this week")).toBeVisible();
+  await expect(page.getByRole("article", { name: `Logs in AWS account ${ACCOUNT}` }).getByText("none this week")).toBeVisible();
+  await openSource(page, "api.yourcompany.com");
   const failures = api.getByRole("link", { name: "2 lookups" });
   await expect(failures).toHaveAttribute("href", /\/data-sources\/activity\/?\?source=ds_1&outcome=problems&range=7d$/);
   await expect(api.getByText(/^password, secret, token and \d+ more$/)).toBeVisible();
   await expect(api.getByText("Every repository")).toBeVisible();
 
-  const logs = page.getByRole("article", { name: `Logs in AWS account ${ACCOUNT}` });
-  await expect(logs.getByText("None in the last 7 days")).toBeVisible();
+  const logs = await openSource(page, `Logs in AWS account ${ACCOUNT}`);
   await expect(logs.getByText("None", { exact: true })).toBeVisible();
   await shot(page, "hub-stats");
 
@@ -1170,7 +1185,7 @@ test("hub: a database's suggested hidden columns can be hidden or dismissed, nev
     ] },
   });
   await page.goto("/data-sources");
-  const card = page.getByRole("article", { name: "orders-db database" });
+  const card = await openSource(page, "orders-db database");
   await card.getByRole("button", { name: "What Coderhelm can't see" }).click();
   const box = card.getByRole("region", { name: "Suggested hidden fields" });
   await expect(box.getByText("public.member.name")).toBeVisible();
@@ -1190,7 +1205,7 @@ test("hub: a database's suggested hidden columns can be hidden or dismissed, nev
 test("hub: a column can be hidden in one table only, and a malformed entry is refused", async ({ page }) => {
   const db = await mockApi(page, { sources: [awsSource("database", { enabled: true, setup_complete: true, hidden_fields: ["email"] })] });
   await page.goto("/data-sources");
-  const card = page.getByRole("article", { name: "orders-db database" });
+  const card = await openSource(page, "orders-db database");
   await card.getByRole("button", { name: "What Coderhelm can't see" }).click();
   const input = card.getByLabel("Hide another column name");
   await input.fill("a.b.c.d");
@@ -1222,4 +1237,133 @@ test("activity: a lookup that named a table the source doesn't have shows the re
   await expect(activity.getByTestId("activity-row")).toHaveCount(1);
   await activity.getByLabel("Result").selectOption("problems");
   await expect(activity.getByTestId("activity-row")).toHaveCount(1);
+});
+
+// ── Many sources: grouped rows ─────────────────────────────────────
+
+/** Eight sources of every kind, with a staging and production pair of an API and a database. */
+function manySources(): Source[] {
+  const on = { enabled: true, setup_complete: true };
+  const pg = (id: string, name: string, cluster: string) =>
+    awsSource("database", { ...on, id, name, aws: { ...awsSource("database").aws!, cluster, database: "app" } });
+  return [
+    makeSource({ ...on, id: "ds_gql_prod", name: "Storefront API production", url: "https://api.example.com/graphql" }),
+    makeSource({ ...on, id: "ds_gql_stg", name: "Storefront API staging", url: "https://api.staging.example.com/graphql", status: "error", status_message: "Your API stopped accepting the key." }),
+    makeSource({ ...on, id: "ds_rest", kind: "rest", name: "Payments REST API", url: "https://payments.example.com", has_mutations: false, kinds: null, paths: ["/v1/charges"], header_name: "X-Api-Key" }),
+    pg("ds_pg_prod", "App database production", "app-prod"),
+    pg("ds_pg_stg", "App database staging", "app-staging"),
+    warehouseSource({ ...on }),
+    makeSource({ ...on, id: "ds_search", kind: "search", name: "Catalog search", url: "https://search.example.com", has_mutations: false, kinds: null, user: "reader", indexes: ["products-*"], enabled: false }),
+    awsSource("logs", { id: "ds_logs", setup_complete: false }),
+  ];
+}
+
+test("hub: many sources are grouped by kind into rows, with health on each row", async ({ page }) => {
+  await mockApi(page, { sources: manySources() });
+  await page.goto("/data-sources");
+
+  const connected = page.locator("#connected");
+  await expect(page.getByRole("heading", { name: "Connected (8)" })).toBeVisible();
+  await expect(page.getByTestId("source-summary")).toHaveText("6 on · 1 paused · 2 need attention");
+  const groups = connected.getByRole("heading", { level: 3 });
+  await expect(groups).toHaveText(["APIs3", "Databases and warehouses3", "Search1", "Logs1"]);
+
+  // Within a group, sorted by name: staging and production of the same thing sit together.
+  const apis = connected.getByRole("region", { name: /^APIs/ });
+  await expect(apis.getByRole("article")).toHaveCount(3);
+  await expect(apis.getByRole("article").nth(1)).toHaveAccessibleName("Storefront API production");
+  await expect(apis.getByRole("article").nth(2)).toHaveAccessibleName("Storefront API staging");
+
+  // Rows start closed: no action buttons until one is opened.
+  await expect(connected.getByRole("button", { name: "Test again" })).toHaveCount(0);
+  const staging = page.getByRole("article", { name: "Storefront API staging" });
+  await expect(staging.getByText("Needs attention", { exact: true })).toBeVisible();
+  await expect(staging.getByText("Coderhelm is not using this source until the problem is fixed.")).toBeVisible();
+  await expect(page.getByRole("article", { name: "App database staging" }).getByText("PostgreSQL", { exact: true })).toBeVisible();
+  await expect(page.getByRole("article", { name: "analytics-dw warehouse" }).getByText("Redshift", { exact: true })).toBeVisible();
+  await expect(page.getByRole("article", { name: `Logs in AWS account ${ACCOUNT}` }).getByRole("link", { name: "Continue setup" })).toBeVisible();
+  await shot(page, "hub-grouped");
+
+  // Opening a row with the keyboard shows its details and every action.
+  const toggle = staging.locator("button[aria-controls$='-details']");
+  await toggle.focus();
+  await page.keyboard.press("Enter");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  for (const name of ["Test again", "Replace key", "Guide for agents", "What Coderhelm can't see", "Remove"]) {
+    await expect(staging.getByRole("button", { name })).toBeVisible();
+  }
+  await expect(staging.getByText("Key ending 9x2k")).toBeVisible();
+  await shot(page, "hub-grouped-open");
+  await toggle.focus();
+  await page.keyboard.press("Enter");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(staging.getByRole("button", { name: "Test again" })).toHaveCount(0);
+});
+
+test("hub: find a source by name or address, or only the ones that need attention", async ({ page }) => {
+  await mockApi(page, { sources: manySources() });
+  await page.goto("/data-sources");
+  const connected = page.locator("#connected");
+
+  await page.getByLabel("Find a source").fill("staging");
+  await expect(connected.getByRole("article")).toHaveCount(2);
+  await expect(connected.getByText("Showing 2 of 8")).toBeVisible();
+  await expect(connected.getByRole("heading", { name: /^Search/ })).toHaveCount(0);
+
+  await page.getByLabel("Find a source").fill("payments.example.com");
+  await expect(connected.getByRole("article")).toHaveCount(1);
+  await page.getByLabel("Find a source").fill("nothing like this");
+  await expect(connected.getByText("No source matches.")).toBeVisible();
+  await connected.getByRole("button", { name: "Show every source" }).click();
+  await expect(connected.getByRole("article")).toHaveCount(8);
+
+  const attention = connected.getByRole("button", { name: "Needs attention (2)" });
+  await attention.click();
+  await expect(attention).toHaveAttribute("aria-pressed", "true");
+  await expect(connected.getByRole("article")).toHaveCount(2);
+  await expect(page.getByRole("article", { name: "Storefront API staging" })).toBeVisible();
+  await expect(page.getByRole("article", { name: `Logs in AWS account ${ACCOUNT}` })).toBeVisible();
+  await shot(page, "hub-grouped-attention");
+});
+
+test("hub: one Add button opens every kind, and Escape closes it", async ({ page }) => {
+  await mockApi(page, { sources: manySources() });
+  await page.goto("/data-sources");
+
+  // With sources connected, the kinds wait behind one button instead of filling the page.
+  await expect(page.getByRole("link", { name: /A GraphQL API/ })).toHaveCount(0);
+  const add = page.getByRole("button", { name: "Add a data source" });
+  await expect(add).toHaveAttribute("aria-expanded", "false");
+  await add.click();
+  await expect(add).toHaveAttribute("aria-expanded", "true");
+  const picker = page.getByRole("region", { name: "What do you want to connect?" });
+  for (const [name, href] of [
+    [/A GraphQL API/, /^\/data-sources\/connect\/?\?step=address$/],
+    [/A REST API/, /^\/data-sources\/connect\/reader\/?\?kind=rest$/],
+    [/A database in your AWS account/, /^\/data-sources\/connect\/aws\/?\?for=database$/],
+    [/An OpenSearch cluster/, /^\/data-sources\/connect\/reader\/?\?kind=search$/],
+    [/Logs in your AWS account/, /^\/data-sources\/connect\/aws\/?\?for=logs$/],
+    [/Your own tools/, /^\/data-sources\/tools\/?$/],
+  ] as const) {
+    await expect(picker.getByRole("link", { name })).toHaveAttribute("href", href);
+  }
+  await shot(page, "hub-add-picker");
+
+  await picker.getByRole("link", { name: /A REST API/ }).focus();
+  await page.keyboard.press("Escape");
+  await expect(picker).toHaveCount(0);
+  await expect(add).toBeFocused();
+
+  await add.click();
+  await page.getByRole("region", { name: "What do you want to connect?" }).getByRole("link", { name: /An OpenSearch cluster/ }).click();
+  await expect(page.getByRole("heading", { name: "Connect an OpenSearch cluster" })).toBeVisible();
+});
+
+test("hub: a link with ?source= opens that source's row", async ({ page }) => {
+  await mockApi(page, { sources: manySources() });
+  await page.goto("/data-sources?source=ds_pg_stg");
+  const row = page.getByRole("article", { name: "App database staging" });
+  await expect(row.locator("button[aria-controls$='-details']")).toHaveAttribute("aria-expanded", "true");
+  await expect(row.getByText("42 tables")).toBeVisible();
+  await expect(page.getByRole("article", { name: "App database production" }).getByText("42 tables")).toHaveCount(0);
 });

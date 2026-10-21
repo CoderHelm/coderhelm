@@ -142,6 +142,43 @@ export function kindLabel(source: Pick<DataSource, "kind" | "aws">): string {
   return isWarehouse(source) ? "Redshift warehouse" : KIND_LABEL[source.kind];
 }
 
+/** The product a source talks to, for the short tag on its row: "GraphQL", "PostgreSQL", "Redshift"… */
+export function engineLabel(source: Pick<DataSource, "kind" | "aws">): string {
+  switch (source.kind) {
+    case "api": return "GraphQL";
+    case "rest": return "REST";
+    case "search": return "OpenSearch";
+    case "logs": return "CloudWatch Logs";
+    case "database": return isWarehouse(source) ? "Redshift" : "PostgreSQL";
+  }
+}
+
+export type SourceGroupId = "apis" | "databases" | "search" | "logs";
+
+/** How the hub groups connected sources, in display order. */
+export const SOURCE_GROUPS: { id: SourceGroupId; title: string; kinds: DataSourceKind[] }[] = [
+  { id: "apis", title: "APIs", kinds: ["api", "rest"] },
+  { id: "databases", title: "Databases and warehouses", kinds: ["database"] },
+  { id: "search", title: "Search", kinds: ["search"] },
+  { id: "logs", title: "Logs", kinds: ["logs"] },
+];
+
+/**
+ * Sources split into their groups, each sorted by name so pairs like
+ * "orders staging" and "orders prod" sit next to each other. Empty groups are left out.
+ */
+export function groupSources<T extends Pick<DataSource, "kind" | "name">>(sources: T[]): { id: SourceGroupId; title: string; list: T[] }[] {
+  const byName = (a: T, b: T) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+  return SOURCE_GROUPS
+    .map((g) => ({ id: g.id, title: g.title, list: sources.filter((s) => g.kinds.includes(s.kind)).sort(byName) }))
+    .filter((g) => g.list.length > 0);
+}
+
+/** A source that needs someone: its last check failed, or its setup was never finished. */
+export function needsAttention(source: Pick<DataSource, "status" | "setup_complete">): boolean {
+  return source.status === "error" || !source.setup_complete;
+}
+
 /** "14 kinds of data", "3 log groups", "42 tables". Empty when unknown. */
 export function countLabel(source: Pick<DataSource, "kind" | "kinds"> & Partial<Pick<DataSource, "aws">>): string {
   const n = source.kinds;
