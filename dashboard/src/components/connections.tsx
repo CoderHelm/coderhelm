@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { api, type AwsAccountAbilities, type AwsAbilityReply, type Connector, type KeyConnectorKind } from "@/lib/api";
+import { api, type AwsAccountAbilities, type AwsAbilityReply, type Connector, type ConnectorId, type KeyConnectorKind } from "@/lib/api";
 import { errorMessage, timeAgo } from "@/lib/data-sources";
 import { Callout } from "./callout";
 import { Field, SecretInput } from "./field";
@@ -43,6 +43,10 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
   const [headerName, setHeaderName] = useState(item.header_name || "X-Api-Key");
   const [paths, setPaths] = useState((item.paths ?? []).join(", "));
   const [enabled, setEnabled] = useState(item.connected ? Boolean(item.enabled) : true);
+  const [name, setName] = useState(item.name ?? "");
+  // A new REST API is named here; a saved one keeps its name (it's its key).
+  const naming = k === "rest" && !item.connected;
+  const nameInvalid = naming && name !== "" && !/^[a-z][a-z0-9_-]{0,39}$/.test(name);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const id = (f: string) => `${k}-${f}`;
@@ -57,8 +61,17 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
       Object.assign(body, { site, email, spaces: list(spaces), write_enabled: writeEnabled, write_pages: writeEnabled ? list(writePages) : [] });
     if (k === "opensearch") Object.assign(body, { site, email, indexes: list(indexes), hidden_fields: list(hiddenFields) });
     if (k === "rest") Object.assign(body, { site, header_name: headerName, paths: list(paths), hidden_fields: list(hiddenFields) });
+    if (naming) {
+      if (!name || nameInvalid) {
+        setError("Give the API a name: lowercase letters, digits, - and _, starting with a letter.");
+        setSaving(false);
+        return;
+      }
+      body.name = name;
+    }
+    const target = (item.connected && item.id ? item.id : k) as ConnectorId;
     try {
-      const r = await api.saveConnector(k, body);
+      const r = await api.saveConnector(target, body);
       setKey("");
       onSaved(r.connector);
       if (r.connector.status !== "ready") setError(r.connector.status_message || "The test didn't pass.");
@@ -136,6 +149,17 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
       )}
       {k === "rest" && (
         <>
+          {naming &&
+            text(
+              "name",
+              "Name",
+              name,
+              (v) => setName(v.trim().toLowerCase()),
+              nameInvalid
+                ? "Lowercase letters, digits, - and _, starting with a letter."
+                : "How agents pick this API, like billing or bookings. It can't be changed later.",
+              "bookings",
+            )}
           {text("site", "API address", site, setSite, undefined, "https://api.example.com")}
           {text("header", "Key header", headerName, setHeaderName, "The header the API expects the key in, like X-Api-Key or Authorization.")}
           {text(

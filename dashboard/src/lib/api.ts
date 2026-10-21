@@ -894,12 +894,12 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(body),
     }),
-  saveConnector: (kind: ConnectorKind, body: Record<string, unknown>) =>
-    request<{ connector: Connector }>(`/api/connectors/${kind}`, { method: "PUT", body: JSON.stringify(body) }),
-  testConnector: (kind: ConnectorKind) =>
-    request<{ connector: Connector }>(`/api/connectors/${kind}/test`, { method: "POST" }),
-  removeConnector: (kind: ConnectorKind) =>
-    request<{ ok: true }>(`/api/connectors/${kind}`, { method: "DELETE" }),
+  saveConnector: (id: ConnectorId, body: Record<string, unknown>) =>
+    request<{ connector: Connector }>(`/api/connectors/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(body) }),
+  testConnector: (id: ConnectorId) =>
+    request<{ connector: Connector }>(`/api/connectors/${encodeURIComponent(id)}/test`, { method: "POST" }),
+  removeConnector: (id: ConnectorId) =>
+    request<{ ok: true }>(`/api/connectors/${encodeURIComponent(id)}`, { method: "DELETE" }),
   getHiddenSuggestions: (id: string) =>
     request<HiddenSuggestions>(`/api/data-sources/${encodeURIComponent(id)}/hidden-suggestions`),
   /** Accepted entries join the hidden list; dismissed ones are never suggested again. */
@@ -2127,10 +2127,16 @@ export interface TestRecommendation {
 export type ConnectorKind = "newrelic" | "confluence" | "opensearch" | "rest" | "metrics" | "airflow";
 /** A connection set up with a key in Settings → Integrations. */
 export type KeyConnectorKind = "newrelic" | "confluence" | "opensearch" | "rest";
+/** A connection's id in routes: its kind, or `rest:<name>` for one of the team's REST APIs. */
+export type ConnectorId = KeyConnectorKind | `rest:${string}`;
 
 /** A monitoring, docs or pipeline connection. Keys are never returned. */
 export interface Connector {
   kind: ConnectorKind;
+  /** `rest:<name>` for a named REST API, else the kind. */
+  id?: string;
+  /** A REST API's name (how agents pick it). */
+  name?: string;
   label: string;
   connected: boolean;
   enabled?: boolean;

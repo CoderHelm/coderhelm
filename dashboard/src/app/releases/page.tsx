@@ -118,6 +118,8 @@ function ReleasesPage() {
     }
   };
 
+  const used = usedSteps(releases);
+
   return (
     <Page>
       <PageHeader
@@ -291,14 +293,22 @@ function ReleasesPage() {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => send(r.repo, r.tag, "")} disabled={!!busy} className={secondaryButton}>
-                        Finish missing steps
-                      </button>
+                      {missingSteps(r, used) && (
+                        <button type="button" onClick={() => send(r.repo, r.tag, "")} disabled={!!busy} className={secondaryButton}>
+                          {missingSteps(r, used)}
+                        </button>
+                      )}
                       <button type="button" onClick={() => send(r.repo, r.tag, "email")} disabled={!!busy} className={secondaryButton}>
-                        Send email again
+                        Send the email again
                       </button>
-                      <button type="button" onClick={() => send(r.repo, r.tag, "all")} disabled={!!busy} className={secondaryButton}>
-                        Rewrite and publish again
+                      <button
+                        type="button"
+                        onClick={() => send(r.repo, r.tag, "all")}
+                        disabled={!!busy}
+                        className={secondaryButton}
+                        title="Write the notes from scratch and update the GitHub Release, Confluence and the email"
+                      >
+                        Rewrite the notes
                       </button>
                       <button type="button" onClick={reload} className={linkButton}>Refresh</button>
                     </div>
@@ -312,6 +322,35 @@ function ReleasesPage() {
       <LoadMoreButton hasMore={!!next} loading={loadingMore} failed={moreFailed} onClick={loadMore} />
     </Page>
   );
+}
+
+/** Per repo, the steps any of its listed releases has done (so a step the repo never uses isn't offered). */
+type UsedSteps = Map<string, { confluence: boolean; email: boolean }>;
+
+function usedSteps(releases: Release[]): UsedSteps {
+  const m: UsedSteps = new Map();
+  for (const r of releases) {
+    const u = m.get(r.repo) ?? { confluence: false, email: false };
+    m.set(r.repo, { confluence: u.confluence || !!r.confluence_url, email: u.email || !!r.email_sent_at });
+  }
+  return m;
+}
+
+/**
+ * The button for what this release hasn't done yet, named by what it will
+ * do ("Create the GitHub Release and send the email"), or "" when nothing is
+ * missing.
+ */
+function missingSteps(r: Release, used: UsedSteps): string {
+  const u = used.get(r.repo);
+  const todo: string[] = [];
+  if (!r.entry_md && !r.github_release_md) todo.push("write the notes");
+  if (!r.github_release_url) todo.push("create the GitHub Release");
+  if (!r.confluence_url && u?.confluence) todo.push("post to Confluence");
+  if (!r.email_sent_at && u?.email) todo.push("send the email");
+  if (todo.length === 0) return "";
+  const words = todo.length === 1 ? todo[0] : `${todo.slice(0, -1).join(", ")} and ${todo[todo.length - 1]}`;
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 function Step({ done, label }: { done: boolean; label: string }) {
