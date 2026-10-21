@@ -116,6 +116,14 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/health") return json(route, HEALTH);
     if (p === "/api/dlq") return json(route, { messages: db.dlq, count: db.dlq.length });
     if (p === "/api/dlq/purge" || p === "/api/dlq/delete" || p === "/api/dlq/redrive") return route.fulfill({ status: 200, body: "" });
+    // The server decides who is a platform admin.
+    if (p === "/api/admin/teams") {
+      if (db.email !== "admin@coderhelm.com") return json(route, { error: "Forbidden" }, 403);
+      return json(route, { month: "2026-10", teams: [
+        { team_id: "TEAM#b", name: "beta-co", status: "active", created_at: "2026-09-01T00:00:00Z", members: 3, runs_total: 140, completed_total: 90, runs_month: 42, reviews_month: 120, cost_month_usd: 310.5, tokens_month: 9000000 },
+        { team_id: "TEAM#a", name: "acme", status: "active", created_at: "2026-07-01T00:00:00Z", members: 1, runs_total: 12, completed_total: 8, runs_month: 2, reviews_month: 0, cost_month_usd: 4, tokens_month: 100000 },
+      ] });
+    }
     if (p === "/api/allowlist") {
       if (m === "GET") return json(route, { emails: db.allowlist });
       const body = JSON.parse(req.postData() || "{}") as { email: string };
@@ -297,6 +305,10 @@ test("admin allowlist adds once in lower case and asks before removing", async (
   const db = await mockApi(page, { email: "admin@coderhelm.com", role: "owner" });
   await page.goto("/admin");
   await expect(page.getByRole("heading", { name: "Platform admin" })).toBeVisible();
+  const teams = page.getByTestId("admin-teams");
+  await expect(teams.getByRole("row")).toHaveCount(3);
+  await expect(teams.getByRole("row").nth(1)).toContainText("beta-co");
+  await expect(teams.getByRole("row").nth(1)).toContainText("$310.50");
   await expect(page.getByText("first@example.com")).toBeVisible();
   const input = page.getByLabel("Email or domain to allow");
   // Bug: the raw text was appended, so "First@Example.com" showed as a second entry.
