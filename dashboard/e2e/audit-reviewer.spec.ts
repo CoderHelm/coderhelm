@@ -36,6 +36,46 @@ const REVIEWS = [
   review({ sk: "REVIEW#your-team/backend#000055#2026-01-01T09:00:00Z", repo: "your-team/backend", pr_number: 55, verdict: "QUESTION", risk: "N/A", trigger: "rerequest", thumbs_up: 0, thumbs_down: 1, created_at: iso(300) }),
 ];
 
+// Where the reviewer is with each PR (GET /api/reviewer/live): two in flight,
+// two waiting on auto-merge, one merged.
+type LiveRow = { repo: string; pr_number: number; [field: string]: unknown };
+
+function livePrs(): LiveRow[] {
+  return [
+    {
+      repo: "your-team/web", pr_number: 120, pr_title: "Add retries to the payment client", status: "reviewing", group: "active",
+      updated_at: iso(1), review: { phase: "reviewing", kind: "review", trigger: "labeled", attempt: 0, reason: "" }, gate: null,
+    },
+    {
+      repo: "your-team/backend", pr_number: 77, pr_title: "Move nightly jobs to the new queue", status: "queued", group: "active",
+      updated_at: iso(0), review: { phase: "queued", kind: "review", trigger: "synchronize" }, gate: null,
+    },
+    {
+      repo: "your-team/web", pr_number: 101, pr_title: "Faster checkout with a clearer receipt page", status: "waiting_people", group: "waiting",
+      updated_at: iso(4), review: { phase: "done", kind: "review", trigger: "labeled" },
+      gate: {
+        state: "waiting_approval", detail: "", head_sha: "abcdef1234567",
+        checklist: [{ mark: "done", text: "CoderHelm approved" }, { mark: "waiting", text: "Waiting for a person's approval" }],
+      },
+    },
+    {
+      repo: "your-team/web", pr_number: 96, pr_title: "Upgrade the image pipeline", status: "ci_failing", group: "waiting",
+      updated_at: iso(40), review: null,
+      gate: {
+        state: "blocked_ci", detail: "",
+        checklist: [
+          { mark: "done", text: "CoderHelm approved" }, { mark: "done", text: "Approved by @a-person" },
+          { mark: "blocked", text: "CI failing: build, e2e (chromium)" },
+        ],
+      },
+    },
+    {
+      repo: "your-team/backend", pr_number: 55, pr_title: "Explain the cache expiry", status: "merged", group: "done",
+      updated_at: iso(200), review: { phase: "done" }, gate: { state: "merged", checklist: [] },
+    },
+  ];
+}
+
 const RELEASES = [
   {
     repo: "your-team/web", tag: "v2.3.0", prev_tag: "v2.2.9", pr_count: 4, headline: "Faster checkout and a clearer receipt page",
@@ -65,12 +105,19 @@ interface Backend {
   failOrg: boolean;
   failDetail: boolean;
   missingDetail: boolean;
+  /** What GET /api/reviewer/live answers. */
+  live: LiveRow[];
+  /** The backend has no live endpoint yet (404). */
+  noLive: boolean;
+  /** Extra reviews listed before the fixtures (a review that just finished). */
+  newReviews: ReturnType<typeof review>[];
 }
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = {
     calls: [], bodies: [], role: "admin", empty: false, failList: false, failMore: false,
-    failConfig: false, failOrg: false, failDetail: false, missingDetail: false, ...init,
+    failConfig: false, failOrg: false, failDetail: false, missingDetail: false, live: livePrs(), noLive: false,
+    newReviews: [], ...init,
   };
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -95,8 +142,15 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       if (db.failList) return json(route, { error: "boom" }, 500);
       if (db.empty) return json(route, { reviews: [], next: null });
       const repo = url.searchParams.get("repo");
-      const list = repo ? REVIEWS.filter((r) => r.repo === repo) : REVIEWS;
+      const all = [...db.newReviews, ...REVIEWS];
+      const list = repo ? all.filter((r) => r.repo === repo) : all;
       return json(route, { reviews: list, next: db.failMore ? "page2" : null });
+    }
+    if (p === "/api/reviewer/live") {
+      if (db.noLive) return route.fulfill({ status: 404, body: "" });
+      if (db.empty) return json(route, { prs: [] });
+      const repo = url.searchParams.get("repo");
+      return json(route, { prs: repo ? db.live.filter((r) => r.repo === repo) : db.live });
     }
     if (p === "/api/reviewer/review") {
       if (db.failDetail) return json(route, { error: "boom" }, 500);
@@ -124,6 +178,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       return json(route, { releases: RELEASES, next: db.failMore ? "page2" : null });
     }
     if (p === "/api/releases/send") return json(route, { status: "queued" });
+    if (p === "/api/releases/pending") return json(route, { waiting: [], blocked: [] });
     return json(route, { error: `Not mocked: ${req.method()} ${p}` }, 404);
   });
   return db;
@@ -159,27 +214,125 @@ async function shot(page: Page, name: string) {
 
 // ── Reviewer list ────────────────────────────────────────────────────
 
-test("the reviewer list groups reviews by PR and says what started each in words", async ({ page }) => {
+test("the reviewer list shows one row per PR: title first, verdict as a badge, what started it in words", async ({ page }) => {
   const errors = watchConsole(page);
   await mockApi(page);
   await page.goto("/reviewer");
   await expect(page.getByRole("heading", { level: 1, name: "Reviewer" })).toBeVisible();
-  const prLink = page.getByRole("link", { name: /your-team\/web #101/ });
+  const prLink = page.getByRole("link", { name: "Faster checkout with a clearer receipt page" });
   await expect(prLink).toHaveAttribute("href", /\/reviewer\/detail\/?\?sk=REVIEW%23your-team%2Fweb%23000101/);
-  await expect(page.getByText("Approved").first()).toBeVisible();
-  await expect(page.getByText("Low risk")).toBeVisible();
-  await expect(page.getByText("Label added")).toBeVisible();
+  const row = page.getByTestId("reviewer-pr").filter({ has: prLink });
+  await expect(row.getByText("your-team/web #101")).toBeVisible();
+  await expect(row.getByText("Approved")).toBeVisible();
+  await expect(row.getByText("Low risk")).toBeVisible();
+  await expect(row.getByText("Label added")).toBeVisible();
   await expect(page.getByText("labeled", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Asked again")).toBeVisible();
+  // The state in short words, not the review's boilerplate.
+  await expect(row.getByText("Auto-merge armed · waiting for 1 approval")).toBeVisible();
   // The earlier review of the same PR opens under it, with a named toggle.
-  const toggle = page.getByRole("button", { name: /Show earlier reviews of your-team\/web #101/ });
+  const toggle = row.getByRole("button", { name: /Show details and earlier reviews of your-team\/web #101/ });
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(toggle).toHaveText(/2 reviews/);
   await toggle.click();
-  await expect(page.getByRole("button", { name: /Hide earlier reviews/ })).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByRole("link", { name: "New commits" })).toBeVisible();
-  await expect(page.getByText("High risk")).toBeVisible();
+  await expect(row.getByRole("button", { name: /Hide details/ })).toHaveAttribute("aria-expanded", "true");
+  await expect(row.getByRole("link", { name: "New commits" })).toBeVisible();
+  await expect(row.getByText("High risk")).toBeVisible();
+  await expect(row.getByText("Waiting for a person's approval")).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Pull request number" })).toBeVisible();
   await shot(page, "audit-reviewer-list");
+  expect(errors).toEqual([]);
+});
+
+test("PRs being reviewed now sit at the top with their live status", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page);
+  await page.goto("/reviewer");
+  const inReview = page.getByRole("region", { name: /In review now/ });
+  const waiting = page.getByRole("region", { name: /Waiting/ });
+  const done = page.getByRole("region", { name: /Done/ });
+  // A first review still running has no review page yet: it links to the PR.
+  const running = inReview.getByTestId("reviewer-pr").filter({ hasText: "Add retries to the payment client" });
+  await expect(running).toHaveAttribute("data-status", "reviewing");
+  await expect(running.getByText("Reviewing", { exact: true })).toBeVisible();
+  await expect(running.getByText("Reading the diff and writing the review…")).toBeVisible();
+  await expect(running.getByRole("link", { name: "Add retries to the payment client" })).toHaveAttribute(
+    "href",
+    "https://github.com/your-team/web/pull/120",
+  );
+  const queued = inReview.getByTestId("reviewer-pr").filter({ hasText: "Move nightly jobs to the new queue" });
+  await expect(queued.getByText("Queued", { exact: true })).toBeVisible();
+  await expect(queued.getByText("Waits a minute in case more commits land")).toBeVisible();
+  // Waiting on people and on CI; the CI failure names the checks.
+  await expect(waiting.getByTestId("reviewer-pr")).toHaveCount(2);
+  const failing = waiting.getByTestId("reviewer-pr").filter({ hasText: "Upgrade the image pipeline" });
+  await expect(failing.getByText("CI failing", { exact: true })).toBeVisible();
+  await expect(failing.getByText("Auto-merge armed · CI failing: build, e2e (chromium)")).toBeVisible();
+  await expect(done.getByText("Merged", { exact: true })).toBeVisible();
+  // In-flight first in the page order too.
+  await expect(page.getByTestId("reviewer-pr").first()).toHaveAttribute("data-status", /reviewing|queued/);
+  await shot(page, "audit-reviewer-live");
+  // The tabs filter to one group.
+  await page.getByRole("button", { name: "In review 2" }).click();
+  await expect(page.getByTestId("reviewer-pr")).toHaveCount(2);
+  await expect(page.getByRole("link", { name: "Faster checkout with a clearer receipt page" })).toHaveCount(0);
+  await shot(page, "audit-reviewer-tab-in-review");
+  await page.getByRole("button", { name: "Waiting 2" }).click();
+  await expect(page.getByTestId("reviewer-pr")).toHaveCount(2);
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect(page.getByTestId("reviewer-pr")).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+
+test("the status refreshes on its own while a review runs, and the finished review appears", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page);
+  await page.goto("/reviewer");
+  const running = page.getByTestId("reviewer-pr").filter({ hasText: "Add retries to the payment client" });
+  await expect(running).toHaveAttribute("data-status", "reviewing");
+  const liveCalls = () => db.calls.filter((c) => c.startsWith("GET /api/reviewer/live")).length;
+  const before = liveCalls();
+  // The review finishes: the live record says reviewed and a review record exists.
+  db.live = db.live.map((p) => (p.pr_number === 120 ? { ...p, status: "reviewed", group: "done", review: { phase: "done", kind: "review" } } : p));
+  db.newReviews = [
+    review({ sk: "REVIEW#your-team/web#000120#2026-01-03T10:00:00Z", pr_number: 120, verdict: "REQUEST_CHANGES", risk: "MEDIUM", created_at: iso(0) }),
+  ];
+  await expect(running).toHaveAttribute("data-status", "reviewed", { timeout: 25_000 });
+  expect(liveCalls()).toBeGreaterThan(before);
+  await expect(running.getByText("Changes requested")).toBeVisible();
+  await expect(running.getByRole("link", { name: "Add retries to the payment client" })).toHaveAttribute(
+    "href",
+    /\/reviewer\/detail\/?\?sk=REVIEW%23your-team%2Fweb%23000120/,
+  );
+  expect(errors).toEqual([]);
+});
+
+test("queueing a review from a row refreshes the status at once", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page);
+  await page.goto("/reviewer");
+  const merged = page.getByTestId("reviewer-pr").filter({ hasText: "Explain the cache expiry" });
+  await expect(merged).toHaveAttribute("data-status", "merged");
+  db.live = db.live.map((p) => (p.pr_number === 55 ? { ...p, status: "queued", group: "active", review: { phase: "queued", trigger: "rerequest" } } : p));
+  await merged.getByRole("button", { name: "Review your-team/backend #55 again" }).click();
+  await expect(merged).toHaveAttribute("data-status", "queued");
+  await expect(page.getByRole("region", { name: /In review now/ }).getByText("Explain the cache expiry")).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("a backend without live status still lists the reviews and does not poll", async ({ page }) => {
+  const errors = watchConsole(page, true);
+  const db = await mockApi(page, { noLive: true });
+  await page.goto("/reviewer");
+  await expect(page.getByRole("link", { name: "Pull request #101" })).toBeVisible();
+  await expect(page.getByText("Approved").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /In review/ })).toHaveCount(0);
+  await expect(page.getByTestId("reviewer-pr")).toHaveCount(2);
+  await shot(page, "audit-reviewer-no-live");
+  const liveCalls = () => db.calls.filter((c) => c.startsWith("GET /api/reviewer/live")).length;
+  const asked = liveCalls();
+  await page.waitForTimeout(16_000);
+  expect(liveCalls()).toBe(asked);
   expect(errors).toEqual([]);
 });
 
@@ -192,7 +345,7 @@ test("a failed reviews load says so and retries, instead of claiming there are n
   await shot(page, "audit-reviewer-list-error");
   db.failList = false;
   await page.getByRole("button", { name: "Try again" }).click();
-  await expect(page.getByRole("link", { name: /your-team\/web #101/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Faster checkout with a clearer receipt page" })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -220,11 +373,15 @@ test("?repo= opens the reviewer list filtered to that repo", async ({ page }) =>
   const errors = watchConsole(page);
   const db = await mockApi(page);
   await page.goto("/reviewer?repo=your-team%2Fbackend");
-  await expect(page.getByRole("link", { name: /your-team\/backend #55/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: /your-team\/web #101/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Explain the cache expiry" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Faster checkout with a clearer receipt page" })).toHaveCount(0);
+  // The repo is the filter, so rows show only the PR number.
+  await expect(page.getByTestId("reviewer-pr").filter({ hasText: "Explain the cache expiry" }).getByText("#55", { exact: true })).toBeVisible();
   expect(db.calls.filter((c) => c.startsWith("GET /api/reviewer/reviews")).every((c) => c.includes("repo=your-team%2Fbackend"))).toBe(true);
+  expect(db.calls.filter((c) => c.startsWith("GET /api/reviewer/live")).every((c) => c.includes("repo=your-team%2Fbackend"))).toBe(true);
   expect(errors).toEqual([]);
 });
+
 
 // ── Review detail ────────────────────────────────────────────────────
 
@@ -370,8 +527,8 @@ test("releases list each tag and open its notes and actions", async ({ page }) =
   await expect(row).toHaveAttribute("aria-expanded", "false");
   await row.click();
   await expect(row).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByRole("button", { name: "Rewrite and publish again" })).toBeVisible();
-  await page.getByRole("button", { name: "Send email again" }).click();
+  await expect(page.getByRole("button", { name: "Rewrite the notes" })).toBeVisible();
+  await page.getByRole("button", { name: "Send the email again" }).click();
   await expect(page.getByText("Email queued for your-team/web v2.3.0")).toBeVisible();
   expect(db.bodies).toContainEqual({ repo: "your-team/web", tag: "v2.3.0", resend: "email" });
   await shot(page, "audit-releases");

@@ -818,6 +818,13 @@ export const api = {
   },
   getReview: (sk: string) =>
     request<Review>(`/api/reviewer/review?sk=${encodeURIComponent(sk)}`),
+  /** Where the reviewer is with each PR now (queued, reviewing, waiting for CI or people, merged…). */
+  listLivePrs: (repo?: string) => {
+    const params = new URLSearchParams();
+    if (repo) params.set("repo", repo);
+    const q = params.toString();
+    return request<{ prs?: LivePr[] }>(`/api/reviewer/live${q ? `?${q}` : ""}`).then((r) => r.prs ?? []);
+  },
   rateReview: (sk: string, rating: "up" | "down" | "none", comment?: string) =>
     request<void>(`/api/reviewer/review/rate`, {
       method: "POST",
@@ -1169,6 +1176,45 @@ export interface Review {
   created_at: string;
   /** Team standards the review was given in full ("Always apply"). */
   applied_standards?: string[];
+}
+
+/** One line of the auto-merge checklist ("CI green", "Waiting for a person's approval"). */
+export interface MergeChecklistLine {
+  mark: "done" | "waiting" | "blocked";
+  text: string;
+}
+
+/**
+ * One PR the reviewer handles, with the one status it shows. Every field past
+ * the key may be missing (older backends, records written before a field existed).
+ */
+export interface LivePr {
+  repo: string;
+  pr_number: number;
+  pr_title?: string;
+  /** reviewing · queued · retrying · waiting_ci · ci_failing · waiting_people · merge_blocked · paused · failed · stalled · merged · closed · new_commits · reviewed */
+  status?: string;
+  /** active (being reviewed or queued) · waiting · done */
+  group?: "active" | "waiting" | "done" | string;
+  updated_at?: string;
+  review?: {
+    phase?: string;
+    kind?: "review" | "question" | string;
+    trigger?: string;
+    head_sha?: string;
+    attempt?: number;
+    reason?: string;
+    queued_at?: string;
+    started_at?: string;
+    finished_at?: string;
+  } | null;
+  gate?: {
+    state?: string;
+    detail?: string;
+    head_sha?: string;
+    armed_at?: string;
+    checklist?: MergeChecklistLine[];
+  } | null;
 }
 
 export interface TeamUser {
