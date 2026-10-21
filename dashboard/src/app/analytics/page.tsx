@@ -148,6 +148,11 @@ function stepLabel(s: string) {
 function sourceLabel(s: string) {
   return ({ github: "GitHub issues", jira: "Jira", alert: "Alerts", other: "Other" } as Record<string, string>)[s] ?? s;
 }
+/** People first, then CoderHelm's own work, then runs that recorded nobody; most runs first inside each. */
+function peopleRows(people: Analytics["people"]) {
+  const order = (r: Analytics["people"][number]) => (r.kind === "coderhelm" ? 1 : r.kind === "not_recorded" || !r.person ? 2 : 0);
+  return [...people].sort((a, b) => order(a) - order(b) || b.runs - a.runs).map((r) => [r.person || "Not recorded (older runs)", r.runs, r.merged]);
+}
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
@@ -338,11 +343,11 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
             empty="No runs in this period."
           />
         </Section>
-        <Section title="Who asks for work" id="people">
+        <Section title="Who asks for work" id="people" description="One row per person, however Jira, GitHub or the dashboard named them.">
           <Table
             label="By person"
             head={["Person", "Runs", "Merged"]}
-            rows={data.people.map((r) => [r.person || "Not recorded (older runs)", r.runs, r.merged])}
+            rows={peopleRows(data.people)}
             empty="No runs in this period."
           />
         </Section>

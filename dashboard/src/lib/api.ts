@@ -1951,7 +1951,8 @@ export interface Analytics {
   daily: { day: string; runs: number; prs_opened: number; merged: number; failed: number; cost_usd: number; tokens?: number; reviews: number }[];
   sources: { source: string; runs: number; prs: number; merged: number; merge_rate: number | null }[];
   repos: { repo: string; runs: number; prs: number; merged: number; failed: number; cost_usd: number; tokens?: number; merge_rate: number | null; reviews: number }[];
-  people: { person: string; runs: number; merged: number }[];
+  /** One row per person (however Jira, GitHub or the dashboard named them), CoderHelm's own work, and runs that recorded nobody. */
+  people: { person: string; kind?: "person" | "coderhelm" | "not_recorded"; runs: number; merged: number }[];
   failures: { reason: string; count: number; last_run_id: string; last_at: string }[];
   ci: { runs_with_red_ci: number; fixed_by_coderhelm: number; fix_rate: number | null; fix_attempts: number; fix_commits: number };
   reviews: {
