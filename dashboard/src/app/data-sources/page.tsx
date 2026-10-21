@@ -18,7 +18,7 @@ import { HiddenFieldsEditor } from "@/components/hidden-fields-editor";
 import { HiddenSuggestions } from "@/components/hidden-suggestions";
 import { StatusPill } from "@/components/status-pill";
 import { StepDot } from "@/components/stepper";
-import { CodeIcon, DatabaseIcon, LogsIcon, ShieldCheckIcon, WrenchIcon } from "@/components/icons";
+import { CloudIcon, CodeIcon, DatabaseIcon, LogsIcon, ScanIcon, ShieldCheckIcon, WrenchIcon } from "@/components/icons";
 import { Skeleton } from "@/components/skeleton";
 import { Page, PageHeader, Section } from "@/components/page";
 import { LogGroupPicker } from "@/components/log-group-picker";
@@ -160,9 +160,15 @@ function DataSourcesPage() {
       {sources !== null && (list.length === 0 || pending) && <ProgressList sources={list} events={events} />}
 
       <Section id="add" title={list.length ? "Add another source" : "Add a source"} description="Each one takes a few minutes and ends with a check that Coderhelm can only read.">
-        <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
-          <ConnectCard href={`${CONNECT}?step=address`} icon={<CodeIcon />} title="An API" time="About 2 minutes">
+        <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+          <ConnectCard href={`${CONNECT}?step=address`} icon={<CodeIcon />} title="A GraphQL API" time="About 2 minutes">
             The web address your apps already talk to. Coderhelm asks it questions.
+          </ConnectCard>
+          <ConnectCard href="/data-sources/connect/reader?kind=rest" icon={<CloudIcon />} title="A REST API" time="About 2 minutes">
+            A booking, payments or vendor API, read with GET requests under the paths you allow, so Coderhelm can compare its records with yours.
+          </ConnectCard>
+          <ConnectCard href="/data-sources/connect/reader?kind=search" icon={<ScanIcon />} title="An OpenSearch cluster" time="About 2 minutes">
+            The search indexes your app reads, searched read only. Only the indexes you list.
           </ConnectCard>
           <ConnectCard href={`${CONNECT_AWS}?for=logs`} icon={<LogsIcon />} title="Logs in your AWS account" time="About 3 minutes">
             Coderhelm searches your logs for the errors behind a bug report. Only the log groups you choose.
@@ -261,7 +267,16 @@ const KIND_ICON: Record<DataSource["kind"], ReactNode> = {
   api: <CodeIcon />,
   logs: <LogsIcon />,
   database: <DatabaseIcon />,
+  rest: <CloudIcon />,
+  search: <ScanIcon />,
 };
+
+/** Split a typed list ("a, b" or one per line) into its entries. */
+const entries = (s: string) =>
+  s
+    .split(/[,\n]+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
 
 /** "password, secret, token and 8 more". */
 function hiddenSummary(names: string[]): string {
@@ -282,7 +297,7 @@ function SourceFact({ label, children }: { label: string; children: ReactNode })
 
 // ── One connected source ──────────────────────────────────────────
 
-type Panel = "test" | "key" | "hidden" | "groups" | null;
+type Panel = "test" | "key" | "hidden" | "groups" | "settings" | "guide" | null;
 
 function SourceCard({
   source,
@@ -299,7 +314,7 @@ function SourceCard({
   const { toast } = useToast();
   const { confirm } = useConfirm();
   const [panel, setPanel] = useState<Panel>(null);
-  const [busy, setBusy] = useState<"" | "toggle" | "test" | "key" | "hidden" | "groups" | "remove">("");
+  const [busy, setBusy] = useState<"" | "toggle" | "test" | "key" | "hidden" | "groups" | "remove" | "settings" | "guide">("");
   const [error, setError] = useState<{ title: string; body: string } | null>(null);
   const [checks, setChecks] = useState<CheckItem[] | null>(null);
   const [testOk, setTestOk] = useState<boolean | null>(null);
@@ -313,6 +328,16 @@ function SourceCard({
   const expected = checksFor(source.kind, isWarehouse(source));
   const noun = hiddenNoun(source.kind);
   const isApi = source.kind === "api";
+  const isReader = source.kind === "rest" || source.kind === "search";
+  // Read with a key the team pasted (rather than a role in its AWS account).
+  const keyed = isApi || isReader;
+  const [guide, setGuide] = useState(source.instructions ?? "");
+  const [url, setUrl] = useState(source.url);
+  const [headerName, setHeaderName] = useState(source.header_name ?? "");
+  const [paths, setPaths] = useState((source.paths ?? []).join(", "));
+  const [user, setUser] = useState(source.user ?? "");
+  const [indexes, setIndexes] = useState((source.indexes ?? []).join(", "));
+  const [settingsError, setSettingsError] = useState("");
 
   const unfinished = !source.setup_complete;
   const hint = useMemo(() => (unfinished ? readSetupHint(source.id) : null), [unfinished, source.id]);
@@ -433,10 +458,48 @@ function SourceCard({
     }
   };
 
+  const saveGuide = async () => {
+    setBusy("guide");
+    setError(null);
+    try {
+      const res = await api.updateDataSource(source.id, { instructions: guide });
+      onChange(res.source);
+      toast("Guide saved");
+      setPanel(null);
+    } catch (e) {
+      setError({
+        title: "We couldn't save the guide",
+        body: `${errorMessage(e, "The request failed.")} The earlier guide is still in use. Press Save again.`,
+      });
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const saveSettings = async () => {
+    setBusy("settings");
+    setSettingsError("");
+    try {
+      const res = await api.updateDataSource(
+        source.id,
+        source.kind === "rest"
+          ? { url, header_name: headerName, paths: entries(paths) }
+          : { url, user, indexes: entries(indexes) },
+      );
+      onChange(res.source);
+      toast("Saved. The new settings passed their check.");
+      setPanel(null);
+    } catch (e) {
+      setSettingsError(`${errorMessage(e, "The request failed.")} Nothing was changed.`);
+    } finally {
+      setBusy("");
+    }
+  };
+
   const remove = async () => {
     const ok = await confirm({
       title: `Remove ${source.name}?`,
-      message: isApi
+      message: keyed
         ? "Coderhelm stops using it right away and we delete the saved key. This can't be undone."
         : "Coderhelm stops using it right away. The read-only role stays in your AWS account until you delete it there.",
       confirmLabel: "Remove",
@@ -511,9 +574,13 @@ function SourceCard({
       </div>
 
       <dl className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SourceFact label={isApi ? "Key" : "Shares"}>
-          {isApi ? (source.key_hint ? `Key ending ${source.key_hint}` : "Key saved") : count || "Read-only role"}
+        <SourceFact label={keyed ? "Key" : "Shares"}>
+          {keyed ? (source.key_hint ? `Key ending ${source.key_hint}` : "Key saved") : count || "Read-only role"}
         </SourceFact>
+        {source.kind === "rest" && <SourceFact label="Paths agents may read">{(source.paths ?? []).join(", ")}</SourceFact>}
+        {source.kind === "search" && (
+          <SourceFact label="Indexes">{source.indexes?.length ? source.indexes.join(", ") : "Every index the user sees"}</SourceFact>
+        )}
         <SourceFact label="Last lookup">
           {stats === null ? "Unknown" : week?.last ? timeAgo(week.last) : "None in the last 7 days"}
         </SourceFact>
@@ -549,11 +616,37 @@ function SourceCard({
         <button type="button" onClick={test} disabled={busy === "test"} className={secondaryButton}>
           {busy === "test" ? "Testing…" : "Test again"}
         </button>
-        {isApi && (
+        {keyed && (
           <button type="button" aria-expanded={panel === "key"} onClick={() => open("key")} className={secondaryButton}>
             Replace key
           </button>
         )}
+        {isReader && (
+          <button
+            type="button"
+            aria-expanded={panel === "settings"}
+            onClick={() => {
+              setUrl(source.url);
+              setHeaderName(source.header_name ?? "");
+              setPaths((source.paths ?? []).join(", "));
+              setUser(source.user ?? "");
+              setIndexes((source.indexes ?? []).join(", "));
+              setSettingsError("");
+              open("settings");
+            }}
+            className={secondaryButton}
+          >
+            {source.kind === "rest" ? "Address and paths" : "Address and indexes"}
+          </button>
+        )}
+        <button
+          type="button"
+          aria-expanded={panel === "guide"}
+          onClick={() => { setGuide(source.instructions ?? ""); open("guide"); }}
+          className={secondaryButton}
+        >
+          Guide for agents
+        </button>
         {source.kind === "logs" && (
           <button type="button" aria-expanded={panel === "groups"} onClick={openGroups} className={secondaryButton}>
             Log groups
@@ -614,6 +707,74 @@ function SourceCard({
           <div className="flex flex-wrap gap-2">
             <button type="submit" disabled={!newKey.trim() || busy === "key"} className={primaryButton}>
               {busy === "key" ? "Checking…" : "Check and replace"}
+            </button>
+            <button type="button" onClick={() => setPanel(null)} className={secondaryButton}>Close</button>
+          </div>
+        </form>
+      )}
+
+      {panel === "guide" && (
+        <form
+          className="mt-4 flex flex-col gap-3 border-t border-zinc-800 pt-4"
+          onSubmit={(e) => { e.preventDefault(); if (busy !== "guide") saveGuide(); }}
+        >
+          <Field
+            id={`guide-${source.id}`}
+            label="Guide for agents"
+            helper="What agents should know when they use this source: what the system is, what its fields mean, where else its data lives. Given to them with it."
+          >
+            {(props) => (
+              <textarea
+                {...props}
+                rows={6}
+                maxLength={4000}
+                value={guide}
+                onChange={(e) => setGuide(e.target.value)}
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600"
+                placeholder="quantity on a product is sessions per week on weekly packs, but the session count on season packs."
+              />
+            )}
+          </Field>
+          <div className="flex flex-wrap gap-2">
+            <button type="submit" disabled={guide === (source.instructions ?? "") || busy === "guide"} className={primaryButton}>
+              {busy === "guide" ? "Saving…" : "Save"}
+            </button>
+            <button type="button" onClick={() => setPanel(null)} className={secondaryButton}>Close</button>
+          </div>
+        </form>
+      )}
+
+      {panel === "settings" && isReader && (
+        <form
+          className="mt-4 flex flex-col gap-3 border-t border-zinc-800 pt-4"
+          onSubmit={(e) => { e.preventDefault(); if (busy !== "settings") saveSettings(); }}
+        >
+          <Field id={`url-${source.id}`} label={source.kind === "rest" ? "API address" : "Cluster address"}>
+            {(props) => <input {...props} value={url} onChange={(e) => setUrl(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" />}
+          </Field>
+          {source.kind === "rest" ? (
+            <>
+              <Field id={`header-${source.id}`} label="Key header" helper="The header the API expects the key in, like X-Api-Key or Authorization.">
+                {(props) => <input {...props} value={headerName} onChange={(e) => setHeaderName(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" />}
+              </Field>
+              <Field id={`paths-${source.id}`} label="Paths agents may read" helper="Path prefixes, like /v1/orders. Agents can GET these and anything under them, nothing else.">
+                {(props) => <input {...props} value={paths} onChange={(e) => setPaths(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-sm text-zinc-100" />}
+              </Field>
+            </>
+          ) : (
+            <>
+              <Field id={`user-${source.id}`} label="User" helper="A user with read-only access. Coderhelm sees what it can see.">
+                {(props) => <input {...props} value={user} onChange={(e) => setUser(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" />}
+              </Field>
+              <Field id={`indexes-${source.id}`} label="Indexes" helper="Index names or patterns agents may read, like orders or logs-*. Leave empty for every index the user sees.">
+                {(props) => <input {...props} value={indexes} onChange={(e) => setIndexes(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-sm text-zinc-100" />}
+              </Field>
+            </>
+          )}
+          {settingsError && <p role="alert" className="text-sm text-red-400">{settingsError}</p>}
+          <div className="flex flex-wrap gap-2">
+            <button type="submit" disabled={busy === "settings"} className={primaryButton}>
+              {busy === "settings" ? "Checking…" : "Check and save"}
             </button>
             <button type="button" onClick={() => setPanel(null)} className={secondaryButton}>Close</button>
           </div>

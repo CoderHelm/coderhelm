@@ -15,10 +15,11 @@ interface Aws {
   engine?: "postgres" | "redshift"; databases?: string[];
 }
 interface Source {
-  id: string; kind: "api" | "logs" | "database"; aws?: Aws | null; name: string; url: string; status: "ready" | "error"; status_message?: string;
+  id: string; kind: "api" | "logs" | "database" | "rest" | "search"; aws?: Aws | null; name: string; url: string; status: "ready" | "error"; status_message?: string;
   enabled: boolean; setup_complete: boolean; key_hint: string; has_mutations: boolean; kinds: number | null;
   schema_available: boolean; hidden_fields: string[]; repos: string[]; last_checked_at: string;
   created_at: string; created_by: string;
+  header_name?: string; paths?: string[]; user?: string; indexes?: string[]; instructions?: string;
 }
 interface Call { method: string; path: string; body: Record<string, unknown> | null }
 interface Backend {
@@ -192,6 +193,19 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       if (db.rejectKey) return json(route, { ok: false, checks: REJECTED_CHECKS, kinds: null, has_mutations: false, schema_available: false });
       return json(route, { ok: true, checks: PASSED_CHECKS, kinds: 14, has_mutations: true, schema_available: true });
     }
+    if ((p === "/api/data-sources/rest" || p === "/api/data-sources/search") && method === "POST") {
+      const now = new Date().toISOString();
+      const created: Source = {
+        ...makeSource(),
+        id: "ds_reader", kind: p.endsWith("rest") ? "rest" : "search", name: String(body?.name), url: String(body?.url),
+        key_hint: String(body?.key).slice(-4), enabled: body?.enabled === true, setup_complete: true, has_mutations: false,
+        kinds: null, schema_available: false, header_name: body?.header_name as string, paths: body?.paths as string[],
+        user: body?.user as string, indexes: body?.indexes as string[], instructions: body?.instructions as string,
+        last_checked_at: now, created_at: now,
+      };
+      db.sources.push(created);
+      return json(route, { source: created, checks: [{ id: "read", label: "Read with the key", ok: true, detail: "GET /v1/programs answered" }] });
+    }
     if (p === "/api/data-sources/api" && method === "POST") {
       if (db.rejectKey) return json(route, { error: "The key was not accepted.", ok: false, checks: REJECTED_CHECKS }, 400);
       const source = makeSource({ url: String(body?.url) });
@@ -360,13 +374,74 @@ async function shot(page: Page, name: string) {
 
 const callsTo = (db: Backend, method: string, re: RegExp) => db.calls.filter((c) => c.method === method && re.test(c.path));
 
+test("a REST API reads as a data source: its key, its paths, and a guide for agents that saves", async ({ page }) => {
+  const db = await mockApi(page, {
+    sources: [
+      makeSource({
+        id: "ds_rest", kind: "rest", name: "bookings", url: "https://api.example.com", key_hint: "AB12", enabled: true,
+        setup_complete: true, has_mutations: false, kinds: null, schema_available: false, header_name: "X-Api-Key",
+        paths: ["/v1/org/7/programs"], instructions: "",
+      }),
+    ],
+  });
+  await page.goto("/data-sources");
+  const card = page.getByRole("article", { name: "bookings" });
+  await expect(card.getByText("REST API", { exact: true })).toBeVisible();
+  await expect(card.getByText("Key ending AB12")).toBeVisible();
+  await expect(card.getByText("/v1/org/7/programs")).toBeVisible();
+  await expect(card.getByRole("button", { name: "Replace key" })).toBeVisible();
+  await card.getByRole("button", { name: "Guide for agents" }).click();
+  await card.getByLabel("Guide for agents").fill("quantity is sessions per week on weekly packs.");
+  await card.getByRole("button", { name: "Save" }).click();
+  await expect.poll(() => callsTo(db, "PUT", /\/api\/data-sources\/ds_rest$/).length).toBe(1);
+  expect(callsTo(db, "PUT", /\/api\/data-sources\/ds_rest$/)[0].body).toEqual({ instructions: "quantity is sessions per week on weekly packs." });
+  await card.getByRole("button", { name: "Address and paths" }).click();
+  await expect(card.getByLabel("Paths agents may read")).toHaveValue("/v1/org/7/programs");
+  await shot(page, "data-sources-rest");
+});
+
+test("connect a REST API or a cluster from the hub, with a guide, switched on", async ({ page }) => {
+  const db = await mockApi(page);
+  await page.goto("/data-sources");
+  await page.getByRole("link", { name: /A REST API/ }).click();
+  await expect(page.getByRole("heading", { name: "Connect a REST API" })).toBeVisible();
+  await page.getByLabel("Name").fill("bookings");
+  await page.getByLabel("API address").fill("https://api.example.com");
+  await page.getByLabel("Paths agents may read").fill("/v1/org/7/programs, /v1/org/7/facilities");
+  await page.getByLabel("API key").fill("k-123456789");
+  await page.getByLabel("Guide for agents").fill("Programs hold sessions.");
+  await shot(page, "data-sources-connect-rest");
+  await page.getByRole("button", { name: "Check and connect" }).click();
+  await expect(page).toHaveURL(/\/data-sources\/?$/);
+  const post = callsTo(db, "POST", /\/api\/data-sources\/rest$/)[0].body!;
+  expect(post).toEqual({
+    name: "bookings", url: "https://api.example.com", key: "k-123456789", instructions: "Programs hold sessions.",
+    header_name: "X-Api-Key", paths: ["/v1/org/7/programs", "/v1/org/7/facilities"], enabled: true,
+  });
+  await expect(page.getByRole("article", { name: "bookings" })).toBeVisible();
+
+  await page.goto("/data-sources/connect/reader?kind=search");
+  await expect(page.getByRole("heading", { name: "Connect an OpenSearch cluster" })).toBeVisible();
+  await page.getByLabel("Name").fill("search");
+  await page.getByLabel("Cluster address").fill("https://search.example.com");
+  await page.getByLabel("User").fill("reader");
+  await page.getByLabel("Indexes").fill("orders-*");
+  await page.getByLabel("Password").fill("p-123456789");
+  await page.getByRole("checkbox").uncheck();
+  await page.getByRole("button", { name: "Check and connect" }).click();
+  await expect(page).toHaveURL(/\/data-sources\/?$/);
+  expect(callsTo(db, "POST", /\/api\/data-sources\/search$/)[0].body).toEqual({
+    name: "search", url: "https://search.example.com", key: "p-123456789", instructions: "", user: "reader", indexes: ["orders-*"],
+  });
+});
+
 test("hub: empty state", async ({ page }) => {
   await mockApi(page);
   await page.goto("/data-sources");
 
   await expect(page.getByRole("heading", { level: 1, name: "Data sources" })).toBeVisible();
   await expect(page.getByText("Read only, always")).toBeVisible();
-  await expect(page.getByRole("link", { name: /An API/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /A GraphQL API/ })).toBeVisible();
   await expect(page.getByText("Coming next")).toHaveCount(0);
   await expect(page.getByRole("link", { name: /Your own tools/ })).toHaveAttribute("href", /^\/data-sources\/tools\/?$/);
   await expect(page.getByRole("link", { name: /Logs in your AWS account/ })).toHaveAttribute("href", /^\/data-sources\/connect\/aws\/?\?for=logs$/);
@@ -387,7 +462,7 @@ test("hub: empty state", async ({ page }) => {
 test("connect an API: happy path through Turn on fact-checking", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/data-sources");
-  await page.getByRole("link", { name: /An API/ }).click();
+  await page.getByRole("link", { name: /A GraphQL API/ }).click();
 
   // Address
   await expect(page.getByRole("heading", { level: 1, name: "Where is your API?" })).toBeVisible();
