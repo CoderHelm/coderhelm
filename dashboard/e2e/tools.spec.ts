@@ -147,6 +147,8 @@ async function shot(page: Page, name: string) {
 test("the hub offers your own tools, and an empty list says how to start", async ({ page }) => {
   await mockApi(page);
   await page.goto("/data-sources");
+  // A source is connected, so the kinds to add sit behind one button.
+  await page.getByRole("button", { name: "Add a data source" }).click();
   await page.getByRole("link", { name: /Your own tools/ }).click();
   await expect(page.getByRole("heading", { name: "Your own tools" })).toBeVisible();
   await expect(page.getByText("No tools yet.")).toBeVisible();
