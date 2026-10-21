@@ -873,9 +873,25 @@ export const api = {
       "/api/data-sources/api",
       { method: "POST", body: JSON.stringify(data) },
     ),
+  /** A REST API or OpenSearch cluster: checked, then saved switched off. Does not throw on failed checks. */
+  createDataSourceReader: (
+    kind: "rest" | "search",
+    data: DataSourceReaderSettings & { name: string; key: string; instructions?: string; hidden_fields?: string[] },
+  ) =>
+    requestWithBody<{ source: DataSource; checks: DataSourceCheck[] }, { checks: DataSourceCheck[] }>(
+      `/api/data-sources/${kind}`,
+      { method: "POST", body: JSON.stringify(data) },
+    ),
   updateDataSource: (
     id: string,
-    data: { enabled?: boolean; hidden_fields?: string[]; repos?: string[]; name?: string; log_groups?: string[] },
+    data: DataSourceReaderSettings & {
+      enabled?: boolean;
+      hidden_fields?: string[];
+      repos?: string[];
+      name?: string;
+      log_groups?: string[];
+      instructions?: string;
+    },
   ) =>
     request<{ source: DataSource }>(`/api/data-sources/${encodeURIComponent(id)}`, {
       method: "PUT",
@@ -1726,7 +1742,7 @@ export interface MemoryStats {
 }
 
 // Data sources
-export type DataSourceKind = "api" | "logs" | "database";
+export type DataSourceKind = "api" | "logs" | "database" | "rest" | "search";
 
 /** Where in a team's AWS account a logs or database source reads. */
 export interface DataSourceAws {
@@ -1768,6 +1784,25 @@ export interface DataSource {
   last_checked_at: string;
   created_at: string;
   created_by: string;
+  /** REST: the header the key is sent in. */
+  header_name?: string;
+  /** REST: path prefixes agents may GET. */
+  paths?: string[];
+  /** Search: the cluster user. */
+  user?: string;
+  /** Search: indexes agents may read; empty for every index the user sees. */
+  indexes?: string[];
+  /** What agents should know when using it. */
+  instructions?: string;
+}
+
+/** What a REST API or OpenSearch cluster is set up with. */
+export interface DataSourceReaderSettings {
+  url?: string;
+  header_name?: string;
+  paths?: string[];
+  user?: string;
+  indexes?: string[];
 }
 
 export type DataSourceStepId = "reach" | "sign_in" | "read" | "read_only" | "role" | "logs";

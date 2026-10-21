@@ -44,7 +44,11 @@ export function isWarehouse(source: Pick<DataSource, "aws">): boolean {
   return source.aws?.engine === "redshift";
 }
 
+/** A REST API or OpenSearch cluster: one read with the key shows it works. */
+export const READER_CHECKS: CheckLabel[] = [{ id: "read", label: "Read with the key" }];
+
 export function checksFor(kind: DataSourceKind, warehouse = false): CheckLabel[] {
+  if (kind === "rest" || kind === "search") return READER_CHECKS;
   if (kind === "database") return warehouse ? WAREHOUSE_CHECKS : DATABASE_CHECKS;
   return kind === "logs" ? LOGS_CHECKS : CHECK_LABELS;
 }
@@ -64,6 +68,18 @@ const STEP_LABELS: Record<DataSourceKind, Record<string, string>> = {
     role: ROLE_CHECK.label,
     sign_in: ROLE_CHECK.label,
     read: "Run the search",
+    read_only: "Only reads are possible",
+  },
+  rest: {
+    reach: "Reach the API",
+    sign_in: "Sign in with the key",
+    read: "Read with the key",
+    read_only: "Only reads are possible",
+  },
+  search: {
+    reach: "Reach the cluster",
+    sign_in: "Sign in to the cluster",
+    read: "Read with the key",
     read_only: "Only reads are possible",
   },
 };
@@ -117,6 +133,8 @@ export const KIND_LABEL: Record<DataSourceKind, string> = {
   api: "API",
   logs: "Logs",
   database: "Database",
+  rest: "REST API",
+  search: "OpenSearch",
 };
 
 /** "API", "Logs", "Database" or "Redshift warehouse". */
@@ -139,7 +157,7 @@ export function countLabel(source: Pick<DataSource, "kind" | "kinds"> & Partial<
 
 /** Where a source reads from, in one line: the address, or the AWS account and what in it. */
 export function whereLabel(source: Pick<DataSource, "kind" | "url" | "aws">): string {
-  if (source.kind === "api" || !source.aws) return source.url;
+  if (source.kind === "api" || source.kind === "rest" || source.kind === "search" || !source.aws) return source.url;
   const acct = `AWS account ${source.aws.account}, ${source.aws.region}`;
   if (source.kind === "database" && source.aws.engine === "redshift") {
     const dbs = source.aws.databases ?? [];
