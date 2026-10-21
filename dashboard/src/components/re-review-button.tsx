@@ -11,11 +11,14 @@ export function ReReviewButton({
   pr,
   label = "Review again",
   className = "",
+  onQueued,
 }: {
   repo: string;
   pr: number;
   label?: string;
   className?: string;
+  /** Called once the review is queued (e.g. to refresh the page's status). */
+  onQueued?: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const { toast } = useToast();
@@ -25,7 +28,10 @@ export function ReReviewButton({
     setBusy(true);
     try {
       const res = await api.reReview(repo, pr);
-      if (res.status === "queued") toast(`Review queued for ${repo} #${pr}`);
+      if (res.status === "queued") {
+        toast(`Review queued for ${repo} #${pr}`);
+        onQueued?.();
+      }
       else toast(res.reason || "Review not queued", "error");
     } catch {
       toast("Could not queue the review", "error");
