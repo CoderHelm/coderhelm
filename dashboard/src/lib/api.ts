@@ -398,6 +398,15 @@ export const api = {
       body: JSON.stringify(settings),
     }),
 
+  // Git conventions: branch, commit and PR title templates
+  getGitConventions: () =>
+    request<GitConventions>("/api/settings/git-conventions"),
+  updateGitConventions: (templates: GitConventionTemplates) =>
+    requestWithBody<GitConventions, { field: keyof GitConventionTemplates }>("/api/settings/git-conventions", {
+      method: "PUT",
+      body: JSON.stringify(templates),
+    }),
+
   // Plans
   listPlans: (cursor?: string) =>
     request<{ plans: Plan[]; next_cursor?: string | null }>(
@@ -1343,6 +1352,18 @@ export interface NotificationPrefs {
   email_weekly_summary: boolean;
   email_run_complete?: boolean;
   email_run_failed?: boolean;
+}
+
+/** The team's templates; an empty one keeps CoderHelm's default. */
+export interface GitConventionTemplates {
+  branch: string;
+  commit: string;
+  pr_title: string;
+}
+
+export interface GitConventions extends GitConventionTemplates {
+  defaults: GitConventionTemplates;
+  tokens: string[];
 }
 
 export interface WorkflowSettings {

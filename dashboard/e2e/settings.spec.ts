@@ -90,6 +90,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/integrations/jira/events") return json(route, { events: [], total: 0 });
     if (p === "/api/settings/model-provider") return admin ? json(route, { provider: "anthropic", api_key_masked: null, primary_model: null, heavy_model: null }) : forbidden(route);
     if (p === "/api/settings/workflow") return json(route, { commit_openspec: false, default_destination: "github", allow_plan_log_analyzer: false });
+    if (p === "/api/settings/git-conventions") return json(route, { branch: "", commit: "", pr_title: "", defaults: { branch: "coderhelm/{ticket_lower}", commit: "{ticket}: {title}", pr_title: "{ticket}: {title}" }, tokens: ["ticket", "ticket_lower", "slug", "summary", "title"] });
     if (p === "/api/aws-connections") return json(route, { connections: [] });
     if (p === "/api/recommendations") return json(route, { recommendations: [] });
     if (p === "/api/recommendations/notify") return json(route, { notify_mode: "off", teams_webhook_url: "" });
