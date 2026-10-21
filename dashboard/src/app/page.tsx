@@ -1,14 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { api, type Run } from "@/lib/api";
 import { TableSkeleton } from "@/components/skeleton";
 import { usePagedList, LoadMoreButton } from "@/components/load-more";
 import { Callout } from "@/components/callout";
-import { RunStatusBadge } from "@/components/run-status";
-import { focusRing, secondaryButton } from "@/components/ui";
+import { RunStatusBadge, runStatusLabel } from "@/components/run-status";
+import { focusRing, inputClass, linkButton, secondaryButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
+
+// The status filter's choices. "Done" covers older runs that finished as "success".
+const STATUS_FILTERS: { value: string; label: string }[] = [
+  "running",
+  "awaiting_ci",
+  "needs_input",
+  "needs_outside_change",
+  "completed,success",
+  "merged",
+  "failed",
+  "cancelled",
+  "retried",
+  "archived",
+].map((value) => ({ value, label: runStatusLabel(value.split(",")[0]) }));
 
 interface RunGroup {
   ticket_id: string;
@@ -64,8 +79,50 @@ function groupRunsByTicket(runs: Run[]): RunGroup[] {
   return groups;
 }
 
-export default function RunsPage() {
+export default function RunsPageWithParams() {
+  return (
+    <Suspense fallback={<Page><PageHeader title="Runs" lead="All agent runs across your repositories." /><div className="mt-6"><TableSkeleton rows={5} cols={5} /></div></Page>}>
+      <RunsPage />
+    </Suspense>
+  );
+}
+
+function RunsPage() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  // The address holds the search, so a search can be shared or reloaded.
+  const q = params.get("q") ?? "";
+  const status = params.get("status") ?? "";
+  const [search, setSearch] = useState(q);
+  const written = useRef<string | null>(null);
+  const filtered = !!(q || status);
+
+  const setFilters = (next: { q: string; status: string }) => {
+    const u = new URLSearchParams();
+    if (next.q) u.set("q", next.q);
+    if (next.status) u.set("status", next.status);
+    const s = u.toString();
+    written.current = next.q;
+    router.replace(`${pathname}${s ? `?${s}` : ""}`, { scroll: false });
+  };
+
+  // Search after a pause in typing, not on every key.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (search.trim() !== q) setFilters({ q: search.trim(), status });
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
+
+  // A change to the address from outside (back, a link) replaces the words typed.
+  useEffect(() => {
+    if (written.current === q) return;
+    written.current = null;
+    setSearch(q);
+  }, [q]);
 
   const {
     items: runs,
@@ -76,7 +133,10 @@ export default function RunsPage() {
     moreFailed,
     loadMore,
     reload,
-  } = usePagedList<Run>((cursor) => api.listRuns(cursor).then((d) => ({ items: d.runs, next: d.next })), []);
+  } = usePagedList<Run>(
+    (cursor) => api.listRuns(cursor, { q, status }).then((d) => ({ items: d.runs, next: d.next })),
+    [q, status],
+  );
 
   const groups = groupRunsByTicket(runs);
 
@@ -92,7 +152,26 @@ export default function RunsPage() {
   return (
     <Page>
       <PageHeader title="Runs" lead="All agent runs across your repositories." />
-      <div className="mt-6">
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <input
+          type="search"
+          aria-label="Search runs"
+          placeholder="Search by ticket, title, repo or PR number"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className={`${inputClass} !w-auto min-w-0 flex-1 basis-64`}
+        />
+        <select
+          aria-label="Status"
+          value={status}
+          onChange={(e) => setFilters({ q: search.trim(), status: e.target.value })}
+          className={`${inputClass} !w-auto min-w-0 max-w-full`}
+        >
+          <option value="">Every status</option>
+          {STATUS_FILTERS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+        </select>
+      </div>
+      <div className="mt-4">
       {loading ? (
         <TableSkeleton rows={5} cols={5} />
       ) : error ? (
@@ -102,6 +181,26 @@ export default function RunsPage() {
             Try again
           </button>
         </Callout>
+      ) : runs.length === 0 && filtered ? (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-500">
+          <p className="text-lg text-zinc-300 mb-2">No runs match</p>
+          {/* Each request reads a bounded number of runs; older ones may still match. */}
+          <p className="text-sm">
+            {next ? "None of the most recent runs match. Load more to search older runs." : "Try a ticket number, part of a title, or a repo."}
+          </p>
+          <p className="text-sm mt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSearch("");
+                setFilters({ q: "", status: "" });
+              }}
+              className={linkButton}
+            >
+              Clear the search
+            </button>
+          </p>
+        </div>
       ) : runs.length === 0 ? (
         <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-500">
           <p className="text-lg text-zinc-300 mb-2">No runs yet</p>

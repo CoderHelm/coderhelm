@@ -63,6 +63,20 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
         return route.fulfill({ status, body: "" });
       }
       if (db.empty) return json(route, { runs: [], next: null });
+      const q = url.searchParams.get("q")?.toLowerCase();
+      const status = url.searchParams.get("status");
+      if (q || status) {
+        // A stand-in for the server's search: "older" matches nothing in the
+        // first read and one run in the next.
+        if (q === "older") {
+          if (!url.searchParams.get("cursor")) return json(route, { runs: [], next: "01RUN00000000000000000000" });
+          return json(route, { runs: [{ ...RUNS[2], run_id: "01RUN0000000000000000000Y", ticket_id: "OLD-2", title: "An older match" }], next: null });
+        }
+        const hit = RUNS.filter(
+          (r) => (!status || status.split(",").includes(r.status)) && (!q || `${r.ticket_id} ${r.title} ${r.repo}`.toLowerCase().includes(q)),
+        );
+        return json(route, { runs: hit, next: null });
+      }
       if (url.searchParams.get("cursor")) {
         if (db.more === 2) return route.fulfill({ status: 500, body: "" });
         return json(route, { runs: [{ ...RUNS[2], run_id: "01RUN0000000000000000000Z", ticket_id: "OLD-1", title: "An older run" }], next: null });
@@ -167,6 +181,41 @@ test("runs list: a failed Load more is reported and can be tried again", async (
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(page.getByRole("link", { name: "An older run" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Load more|Try again/ })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("runs list: search and status filter ask the server, stay in the address, and say when nothing matches", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page);
+  await page.goto("/");
+  const table = page.getByRole("table");
+  await expect(table.getByText("Needs your answer").filter({ visible: true })).toBeVisible();
+
+  const search = page.getByRole("searchbox", { name: "Search runs" });
+  await search.fill("api-7");
+  await expect(page).toHaveURL(/\?q=api-7$/);
+  await expect(table.getByRole("link", { name: /Retry the sync job/ })).toBeVisible();
+  await expect(table.getByText("Needs your answer")).toHaveCount(0);
+  // Typing waits for a pause: one search request, not one per key.
+  expect(db.calls.filter((c) => c.startsWith("GET /api/runs?q=")).length).toBe(1);
+
+  await page.getByRole("combobox", { name: "Status" }).selectOption({ label: "Failed" });
+  await expect(page).toHaveURL(/\?q=api-7&status=failed$/);
+  await expect(page.getByText("No runs match")).toBeVisible();
+  await expect(page.getByText("No runs yet")).toHaveCount(0);
+  await shot(page, "shell-runs-no-match");
+
+  await page.getByRole("button", { name: "Clear the search" }).click();
+  await expect(search).toHaveValue("");
+  await expect(page).toHaveURL(/\/$/);
+  await expect(table.getByText("Needs your answer").filter({ visible: true })).toBeVisible();
+
+  // A reload keeps the search; older runs are searched with Load more.
+  await page.goto("/?q=older");
+  await expect(search).toHaveValue("older");
+  await expect(page.getByText("None of the most recent runs match. Load more to search older runs.")).toBeVisible();
+  await page.getByRole("button", { name: "Load more" }).click();
+  await expect(page.getByRole("link", { name: "An older match" })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
