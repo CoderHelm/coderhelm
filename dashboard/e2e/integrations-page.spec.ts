@@ -227,6 +227,47 @@ test("opening a row explains it and holds its settings", async ({ page }) => {
   await shot(page, "integrations-open");
 });
 
+test("a saved key reads as saved, a connection keeps a guide for agents, and another one is named", async ({ page }) => {
+  const restDoes = "Reads a REST API you use.";
+  const db = await mockApi(page, {
+    items: [
+      ...items(),
+      card("rest:billing", "cloud", "REST API (billing)", "connected", "manage", {
+        does: restDoes,
+        detail: { kind: "rest", id: "rest:billing", name: "billing", label: "REST API (billing)", connected: true, enabled: true, status: "ready", key_hint: "AB12", site: "https://api.example.com", header_name: "X-Api-Key", paths: ["/v1/invoices"], instructions: "amount is in cents." },
+      }),
+      card("rest:", "cloud", "Another REST API", "not_connected", "connect", { does: restDoes, detail: { kind: "rest", connected: false, needs_name: true } }),
+    ],
+  });
+  await page.goto("/settings/integrations");
+  await row(page, "rest:billing").getByRole("button", { name: /^REST API \(billing\),/ }).click();
+  const saved = row(page, "rest:billing").getByTestId("integration-panel");
+  await expect(saved.getByLabel("Saved, ending in AB12")).toHaveText("••••••••AB12");
+  await expect(saved.getByText("Saved", { exact: true })).toBeVisible();
+  await expect(saved.getByLabel("API key")).toHaveCount(0);
+  await expect(saved.getByLabel("Guide for agents")).toHaveValue("amount is in cents.");
+  await expect(saved.getByLabel("Name")).toHaveCount(0);
+  await shot(page, "integrations-rest-saved");
+  await saved.getByRole("button", { name: "Replace key" }).click();
+  await expect(saved.getByLabel("API key")).toBeVisible();
+
+  await row(page, "rest:").getByRole("button", { name: /^Another REST API,/ }).click();
+  const add = row(page, "rest:").getByTestId("integration-panel");
+  await expect(add.getByLabel("Name")).toBeVisible();
+  await add.getByLabel("Name").fill("Bookings");
+  await expect(add.getByLabel("Name")).toHaveValue("bookings");
+  await add.getByLabel("API key").fill("k-123");
+  await add.getByLabel("API address").fill("https://api.example.org");
+  await add.getByLabel("Paths agents may read").fill("/v1/programs");
+  await add.getByLabel("Guide for agents").fill("Programs hold sessions.");
+  await add.getByRole("button", { name: "Save and test" }).click();
+  await expect.poll(() => db.calls.find((c) => c.method === "PUT")?.path).toBe("/api/connectors/rest");
+  const put = db.calls.find((c) => c.method === "PUT")!.body!;
+  expect(put.name).toBe("bookings");
+  expect(put.instructions).toBe("Programs hold sessions.");
+  await shot(page, "integrations-rest-add");
+});
+
 test("an AWS account shows its abilities; an admin switches one off and deselects an environment", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/settings/integrations");
@@ -338,7 +379,7 @@ test("the whole row opens it, from the mouse or the keyboard, and Close folds it
   // A click on the status column, not only the name, opens it.
   await nr.getByTestId("integration-status").click();
   await expect(ctl).toHaveAttribute("aria-expanded", "true");
-  await expect(nr.getByLabel("User key")).toBeVisible();
+  await expect(nr.getByLabel("Saved, ending in 1234")).toBeVisible();
   await nr.getByRole("button", { name: "Close" }).click();
   await expect(ctl).toHaveAttribute("aria-expanded", "false");
   await ctl.focus();
