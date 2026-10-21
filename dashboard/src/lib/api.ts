@@ -180,9 +180,15 @@ export const api = {
     }),
 
   // Runs
-  listRuns: (cursor?: string) =>
+  /**
+   * One page of runs, newest first. `q` searches ticket key or number, title,
+   * repo, PR number and status; `status` is comma-separated exact statuses.
+   * The server reads a bounded number of runs per call, so a filtered page
+   * can be short or empty while `next` is still set.
+   */
+  listRuns: (cursor?: string, filters: { q?: string; status?: string } = {}) =>
     request<{ runs: Run[]; next?: string | null }>(
-      `/api/runs${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+      `/api/runs${qs({ cursor, q: filters.q, status: filters.status })}`,
     ),
   listJiraEvents: () =>
     request<{ events: JiraEvent[]; total: number }>(
@@ -1166,6 +1172,7 @@ export interface Run {
   title: string;
   repo: string;
   pr_url?: string;
+  pr_number?: number;
   cost_usd?: number;
   tokens_in?: number;
   tokens_out?: number;
