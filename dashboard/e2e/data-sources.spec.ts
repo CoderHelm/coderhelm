@@ -1150,9 +1150,10 @@ test("hub: each card shows its last lookup, failures this week with a link to th
 
   const api = page.getByRole("article", { name: "api.yourcompany.com" });
   // The closed row carries the last lookup and the week's problems.
-  await expect(api.getByText("5 minutes ago")).toBeVisible();
+  await expect(api.getByText("5m ago")).toBeVisible();
   await expect(api.getByText("2 failed this week")).toBeVisible();
-  await expect(page.getByRole("article", { name: `Logs in AWS account ${ACCOUNT}` }).getByText("none this week")).toBeVisible();
+  // No lookup this week: the slot stays empty rather than saying so on every row.
+  await expect(page.getByRole("article", { name: `Logs in AWS account ${ACCOUNT}` }).getByText("Last lookup")).toHaveCount(0);
   await openSource(page, "api.yourcompany.com");
   const failures = api.getByRole("link", { name: "2 lookups" });
   await expect(failures).toHaveAttribute("href", /\/data-sources\/activity\/?\?source=ds_1&outcome=problems&range=7d$/);
@@ -1259,7 +1260,11 @@ function manySources(): Source[] {
 }
 
 test("hub: many sources are grouped by kind into rows, with health on each row", async ({ page }) => {
-  await mockApi(page, { sources: manySources() });
+  // Lookups on two sources only: the other rows leave the last-lookup slot empty.
+  await mockApi(page, { sources: manySources(), events: [
+    lookup(12, { source_id: "ds_pg_prod", source_name: "App database production" }),
+    lookup(180, { source_id: "ds_gql_prod", source_name: "Storefront API production" }),
+  ] });
   await page.goto("/data-sources");
 
   const connected = page.locator("#connected");
@@ -1281,7 +1286,17 @@ test("hub: many sources are grouped by kind into rows, with health on each row",
   await expect(staging.getByText("Coderhelm is not using this source until the problem is fixed.")).toBeVisible();
   await expect(page.getByRole("article", { name: "App database staging" }).getByText("PostgreSQL", { exact: true })).toBeVisible();
   await expect(page.getByRole("article", { name: "analytics-dw warehouse" }).getByText("Redshift", { exact: true })).toBeVisible();
-  await expect(page.getByRole("article", { name: `Logs in AWS account ${ACCOUNT}` }).getByRole("link", { name: "Continue setup" })).toBeVisible();
+  const logsRow = page.getByRole("article", { name: `Logs in AWS account ${ACCOUNT}` });
+  await expect(logsRow.getByRole("link", { name: "Continue setup" })).toBeVisible();
+  // A long name is cut short on a wide screen, with the whole name on hover.
+  await expect(logsRow.getByTitle(`Logs in AWS account ${ACCOUNT}`)).toBeVisible();
+  await expect(connected.getByText("Last lookup")).toHaveCount(2);
+  await expect(page.getByRole("article", { name: "App database production" }).getByText("12m ago")).toBeVisible();
+  await expect(page.getByRole("article", { name: "Storefront API production" }).getByText("3h ago")).toBeVisible();
+  // Sources are on, so the first-source checklist is gone; the unfinished one has its own row link.
+  await expect(page.locator('li[aria-current="step"]')).toHaveCount(0);
+  await expect(page.getByText("Pick a source above to start.")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Setup progress" })).toHaveCount(0);
   await shot(page, "hub-grouped");
 
   // Opening a row with the keyboard shows its details and every action.

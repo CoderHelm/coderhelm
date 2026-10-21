@@ -6,7 +6,7 @@ import { api, type AwsLogGroup, type DataSource, type DataSourceActivityEvent } 
 import {
   DEFAULT_HIDDEN_FIELDS, errorMessage, formatDuration, readSetupHint, clearSetupHint,
   runningChecks, actorLabel, checksFor, countLabel, hiddenNoun, isWarehouse, kindLabel, whereLabel,
-  timeAgo, toCheckItems, engineLabel, groupSources, needsAttention,
+  timeAgo, shortAgo, toCheckItems, engineLabel, groupSources, needsAttention,
 } from "@/lib/data-sources";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
@@ -116,6 +116,10 @@ function DataSourcesPage() {
   const list = sources ?? [];
   const anyOn = list.some((s) => s.enabled && s.status === "ready");
   const pending = list.some((s) => !s.setup_complete);
+  // The first-source checklist: until one source is turned on, or while the source being set up is the only one.
+  // After that, an unfinished source has its own "Continue setup" on its row.
+  const showProgress =
+    list.length === 0 || (pending && (list.length === 1 || !list.some((s) => s.setup_complete && s.enabled)));
   const attention = list.filter(needsAttention).length;
   const onCount = list.filter((s) => s.setup_complete && s.enabled).length;
   const pausedCount = list.filter((s) => s.setup_complete && !s.enabled).length;
@@ -316,7 +320,7 @@ function DataSourcesPage() {
         <Section id="add" title="Add a source"><KindPicker /></Section>
       )}
 
-      {sources !== null && (list.length === 0 || pending) && <ProgressList sources={list} events={events} />}
+      {sources !== null && showProgress && <ProgressList sources={list} events={events} />}
 
       <p className="mt-6 text-sm text-zinc-400" data-testid="integrations-pointer">
         New Relic, Confluence, CloudWatch metrics, Airflow and MCP servers are set up in{" "}
@@ -726,7 +730,12 @@ function SourceRow({
           <span className="hidden sm:flex"><SourceIcon small>{KIND_ICON[source.kind]}</SourceIcon></span>
           <span className="flex min-w-0 flex-1 basis-40 flex-col">
             <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 sm:flex-nowrap">
-              <span className={`min-w-0 font-medium text-zinc-100 ${open_ ? "break-words" : "[overflow-wrap:anywhere] sm:truncate"}`}>{source.name}</span>
+              <span
+                title={open_ ? undefined : source.name}
+                className={`min-w-0 font-medium text-zinc-100 ${open_ ? "break-words" : "[overflow-wrap:anywhere] sm:truncate"}`}
+              >
+                {source.name}
+              </span>
               <span className="shrink-0 rounded border border-zinc-700 px-1.5 py-px text-[11px] font-medium text-zinc-400">{engineLabel(source)}</span>
             </span>
             <span
@@ -750,9 +759,14 @@ function SourceRow({
                 {failures}{week!.more ? "+" : ""} failed this week
               </span>
             )}
-            <span className="whitespace-nowrap text-zinc-400">
-              <span className="text-zinc-500">Last lookup </span>
-              <span>{stats === null ? "unknown" : week?.last ? timeAgo(week.last) : "none this week"}</span>
+            {/* Only when there was one; the empty slot keeps the column aligned on wide screens. */}
+            <span className={`whitespace-nowrap text-zinc-400 sm:w-32 sm:text-right ${week?.last ? "" : "hidden sm:inline-block"}`}>
+              {week?.last && (
+                <>
+                  <span className="text-zinc-500">Last lookup </span>
+                  <span title={new Date(week.last).toLocaleString()}>{shortAgo(week.last)}</span>
+                </>
+              )}
             </span>
           </span>
         </button>
