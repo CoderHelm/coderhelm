@@ -6,6 +6,7 @@ import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
 import { Callout } from "@/components/callout";
 import { Page, PageHeader } from "@/components/page";
+import { GitConventionsSection } from "@/components/git-conventions";
 
 type WorkflowToggleKey = "commit_openspec" | "allow_plan_log_analyzer";
 
@@ -182,6 +183,8 @@ function WorkflowPage() {
           )}
         </div>
       </div>
+
+      <GitConventionsSection />
     </Page>
   );
 }
