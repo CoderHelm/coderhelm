@@ -40,8 +40,9 @@ function analytics(daysN: number, repo: string | null) {
       { repo: "your-team/backend", runs: 14, prs: 10, merged: 6, failed: 2, cost_usd: 36.3, merge_rate: 0.6, reviews: 15 },
     ],
     people: [
-      { person: "a-person", runs: 25, merged: 14 },
-      { person: "", runs: 17, merged: 7 },
+      { person: "", kind: "not_recorded", runs: 30, merged: 9 },
+      { person: "Ada Lovelace", kind: "person", runs: 25, merged: 14 },
+      { person: "CoderHelm (E2E tests)", kind: "coderhelm", runs: 4, merged: 2 },
     ],
     failures: [
       { reason: "Timed out after #s", count: 3, last_run_id: "01RUNFAILED00000000000000A", last_at: new Date().toISOString() },
@@ -134,7 +135,8 @@ test("the scorecard answers whether it is worth it, against the previous period"
   await expect(page.getByTestId("tile-ci")).toContainText("6 of 8 runs went green");
   await expect(page.getByTestId("tile-findings")).toContainText("24 fixed in code, 8 settled by a person");
   await expect(page.getByRole("table", { name: "Failures by reason" })).toContainText("Timed out after #s");
-  await expect(page.getByRole("table", { name: "By person" })).toContainText("Not recorded (older runs)");
+  // People first, CoderHelm's own work next, runs that recorded nobody last.
+  await expect(page.getByRole("table", { name: "By person" }).locator("tbody tr td:first-child")).toHaveText(["Ada Lovelace", "CoderHelm (E2E tests)", "Not recorded (older runs)"]);
   await expect(page.getByRole("table", { name: "Lookups by source" })).toContainText("orders-db database");
   await expect(page.getByRole("table", { name: "By step" })).toContainText("Writing code");
   // Drill-downs open the run behind a number.
