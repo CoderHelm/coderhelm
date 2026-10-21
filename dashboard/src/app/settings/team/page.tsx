@@ -526,7 +526,7 @@ function MemberRow({
       <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 sm:w-auto sm:flex-nowrap">
         <div className="flex min-w-0 flex-1 flex-col items-start gap-1 sm:w-40 sm:flex-none sm:items-end">
           {githubOnly ? <StatusPill>GitHub sign-in only</StatusPill> : <StatusPill tone="success">Active</StatusPill>}
-          <span className="text-xs text-zinc-500">{seen ? `Signed in ${seen}` : "No sign-in recorded"}</span>
+          <span className="text-xs text-zinc-500">{seen ? `Active ${seen}` : "Not active yet"}</span>
         </div>
         {manageable && !lastOwner ? (
           <div className="relative">
