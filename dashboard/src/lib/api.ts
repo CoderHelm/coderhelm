@@ -837,6 +837,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ repo, tag, resend }),
     }),
+  pendingReleases: (repo?: string) =>
+    request<{ waiting: WaitingRelease[]; blocked: BlockedRelease[] }>(
+      `/api/releases/pending${repo ? `?repo=${encodeURIComponent(repo)}` : ""}`,
+    ),
+  releaseNow: (repo: string) =>
+    request<{ status: string }>(`/api/releases/now`, {
+      method: "POST",
+      body: JSON.stringify({ repo }),
+    }),
 
   // Data sources
   listDataSources: () => request<{ sources: DataSource[] }>("/api/data-sources"),
@@ -988,6 +997,27 @@ export interface Release {
   confluence_url: string;
   email_sent_at: string;
   updated_at: string;
+  /** The latest failed run's error (cleared once a run finishes). */
+  last_error?: string;
+  failed_at?: string;
+}
+
+/** A release waiting out the repo's batch window. */
+export interface WaitingRelease {
+  repo: string;
+  /** Unix seconds. */
+  fires_at: number;
+  merges: number;
+  base_branch: string;
+}
+
+/** A release tag Coderhelm couldn't cut after its retries. */
+export interface BlockedRelease {
+  repo: string;
+  error: string;
+  failed_at: string;
+  attempts: number;
+  base_branch: string;
 }
 
 export interface GraphRepo {

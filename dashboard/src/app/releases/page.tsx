@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { api, type Release, type Repo } from "@/lib/api";
+import { api, type BlockedRelease, type Release, type Repo, type WaitingRelease } from "@/lib/api";
 import { RoleGuard } from "@/components/role-guard";
 import { RepoCombobox } from "@/components/repo-combobox";
 import { Markdown } from "@/components/markdown";
@@ -46,6 +46,43 @@ function ReleasesPage() {
   useEffect(() => {
     api.listRepos().then((d) => setRepos(d.repos)).catch(() => {});
   }, []);
+
+  const [waiting, setWaiting] = useState<WaitingRelease[]>([]);
+  const [blocked, setBlocked] = useState<BlockedRelease[]>([]);
+  const [now, setNow] = useState(() => Date.now());
+  const loadPending = useCallback(() => {
+    api
+      .pendingReleases(repoFilter || undefined)
+      .then((d) => {
+        setWaiting(d.waiting);
+        setBlocked(d.blocked);
+      })
+      .catch(() => {});
+  }, [repoFilter]);
+  useEffect(() => {
+    loadPending();
+    const poll = setInterval(loadPending, 30_000);
+    const tick = setInterval(() => setNow(Date.now()), 1_000);
+    return () => {
+      clearInterval(poll);
+      clearInterval(tick);
+    };
+  }, [loadPending]);
+
+  const releaseNow = async (repo: string, retry: boolean) => {
+    if (busy) return;
+    setBusy(`now:${repo}`);
+    try {
+      await api.releaseNow(repo);
+      toast(retry ? `Retrying the release for ${repo}` : `Releasing ${repo} now`);
+      setWaiting((w) => w.filter((x) => x.repo !== repo));
+      setTimeout(loadPending, 5_000);
+    } catch (e) {
+      toast(sendError(e), "error");
+    } finally {
+      setBusy("");
+    }
+  };
 
   const {
     items: releases,
@@ -93,6 +130,57 @@ function ReleasesPage() {
           </>
         }
       />
+
+      {(blocked.length > 0 || waiting.length > 0) && (
+        <div className="mt-6 space-y-3">
+          {blocked.map((b) => (
+            <Callout key={`blocked:${b.repo}`} variant="error" title={`Release blocked for ${b.repo}`}>
+              <p className="text-xs break-words">{b.error}</p>
+              <p className="mt-1 text-[11px] opacity-80">
+                Tried {b.attempts} {b.attempts === 1 ? "time" : "times"}
+                {b.failed_at && <>, last {new Date(b.failed_at).toLocaleString()}</>}. Fix the cause (for example a tag rule on
+                GitHub), then retry.
+              </p>
+              <button
+                type="button"
+                onClick={() => releaseNow(b.repo, true)}
+                disabled={!!busy}
+                className={`mt-2 ${secondaryButton}`}
+              >
+                {busy === `now:${b.repo}` ? "Retrying…" : "Retry release"}
+              </button>
+            </Callout>
+          ))}
+          {waiting.map((w) => {
+            const left = Math.max(0, w.fires_at * 1000 - now);
+            const mins = Math.floor(left / 60_000);
+            const secs = Math.floor((left % 60_000) / 1000);
+            return (
+              <div key={`waiting:${w.repo}`} className={`${cardClass} flex flex-wrap items-center gap-3`}>
+                <div className="min-w-0">
+                  <p className="text-sm text-zinc-200">
+                    <span className="font-mono text-xs break-all">{w.repo}</span> has {w.merges}{" "}
+                    {w.merges === 1 ? "merge" : "merges"} waiting to release
+                  </p>
+                  <p className="text-xs text-zinc-500" aria-live="polite">
+                    {left > 0
+                      ? `Releases from ${w.base_branch || "the default branch"} in ${mins}:${String(secs).padStart(2, "0")}`
+                      : "Releasing…"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => releaseNow(w.repo, false)}
+                  disabled={!!busy || left === 0}
+                  className={`ml-auto ${secondaryButton}`}
+                >
+                  {busy === `now:${w.repo}` ? "Releasing…" : "Release now"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className={`mt-6 mb-6 ${cardClass}`}>
         <h2 className="text-sm font-semibold text-zinc-200">Write notes for a tag</h2>
@@ -175,6 +263,11 @@ function ReleasesPage() {
                     <Step done={!!r.email_sent_at} label="Email" />
                   </span>
                 </button>
+                {r.last_error && (
+                  <p className="px-4 pb-2 -mt-1 text-xs text-red-400 break-words">
+                    Last run failed{r.failed_at ? ` ${new Date(r.failed_at).toLocaleString()}` : ""}: {r.last_error}
+                  </p>
+                )}
                 {isOpen && (
                   <div className="px-4 pb-4 space-y-4">
                     <div className="flex flex-wrap gap-2 text-xs">
