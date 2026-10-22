@@ -76,6 +76,19 @@ function Tile({ label, value, change, basis, testId }: { label: string; value: s
   );
 }
 
+/** People's ratings of reviews, as the share rated helpful. */
+function RatingsTile({ up, down }: { up: number; down: number }) {
+  const rated = up + down;
+  if (rated === 0) return <Tile label="Rated helpful" value="—" basis="No ratings yet" />;
+  return (
+    <Tile
+      label="Rated helpful"
+      value={pct(up / rated)}
+      basis={`${count(up)} of ${plural(rated, "rating")} on the Reviewer page`}
+    />
+  );
+}
+
 function ChartCard({ title, children, table }: { title: string; children: ReactNode; table: ReactNode }) {
   const [showTable, setShowTable] = useState(false);
   return (
@@ -321,7 +334,7 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
           <Tile label="Reviews posted" value={count(data.reviews.posted)} change={delta(s.reviews, p.reviews, "count", d)} basis={`On ${plural(data.reviews.prs_reviewed, "PR")}`} />
           <Tile label="Approved / changes asked / comments" value={`${count(data.reviews.approve)} / ${count(data.reviews.request_changes)} / ${count(data.reviews.comment)}`} />
           <Tile label="Findings raised" value={count(data.reviews.findings)} basis={data.reviews.questions ? `${plural(data.reviews.questions, "question")} answered too` : undefined} />
-          <Tile label="Ratings" value={`👍 ${count(data.reviews.thumbs_up)}  👎 ${count(data.reviews.thumbs_down)}`} basis="From the Reviewer page" />
+          <RatingsTile up={data.reviews.thumbs_up} down={data.reviews.thumbs_down} />
         </div>
       </Section>
 
