@@ -11,6 +11,7 @@ export function RepoCombobox({
   label = "Repository",
   placeholder = "Select repo...",
   id,
+  className = "mb-4",
 }: {
   repos: Repo[];
   selected: string;
@@ -20,6 +21,8 @@ export function RepoCombobox({
   /** What the button says while nothing is picked. */
   placeholder?: string;
   id?: string;
+  /** Spacing around the picker; most pages keep the default gap below it. */
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -44,7 +47,7 @@ export function RepoCombobox({
   const display = filtered.slice(0, 50);
 
   return (
-    <div ref={ref} className="relative mb-4">
+    <div ref={ref} className={`relative ${className}`.trim()}>
       <button
         type="button"
         id={id}
