@@ -957,6 +957,7 @@ function RunDetailInner() {
         query={run.created_at ? { run_id: run.run_id || runId, since: run.created_at } : null}
         refreshKey={run.status}
         standardNames={run.applied_standards}
+        title="What the run used"
         className="mb-6"
       />
 

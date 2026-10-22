@@ -670,14 +670,23 @@ test.describe("always apply", () => {
   test("a run's and a review's pages name the team standards they were given", async ({ page }) => {
     await mockApi(page);
     await page.goto("/runs/detail?id=run_77");
+    // The same block as a review's page: a quiet line that opens to chips.
     const used = page.getByTestId("work-used");
-    await expect(used).toContainText("Skill: debug ×2");
-    await expect(used).toContainText("Agent asked: spec-checker (read with read_file)");
-    await expect(used).toContainText("Data source: Orders DB ×3");
-    await expect(used).toContainText("Standards applied: api-conventions");
+    await expect(used.getByText("1 skill · 1 agent · 1 data source · 1 standard")).toBeVisible();
+    await used.getByText("What the run used").click();
+    await expect(used.getByRole("link", { name: /^debug/ })).toHaveAttribute("href", /\/skills\/item\/?\?repo=acme%2Fplaybook&path=skills%2Fdebug/);
+    await expect(used.getByRole("link", { name: /^debug/ })).toContainText("×2");
+    await expect(used.getByRole("link", { name: /spec-checker/ })).toContainText("read with read_file");
+    await expect(used.getByRole("link", { name: /spec-checker/ })).toHaveAttribute("href", /\/skills\/agent\/?\?repo=acme%2Fplaybook/);
+    await expect(used.getByRole("link", { name: /Orders DB/ })).toHaveAttribute("href", /\/data-sources\/activity\/?$/);
+    await expect(used.getByRole("link", { name: /api-conventions/ })).toBeVisible();
     await shot(page, "run-used");
     await page.goto("/reviewer/detail?sk=REVIEW%23acme%2Fweb%23000412%23t");
-    await expect(page.getByTestId("work-used")).toContainText("Standards applied: api-conventions, copy-tone");
+    const reviewUsed = page.getByTestId("work-used");
+    await expect(reviewUsed.getByText("2 standards")).toBeVisible();
+    await reviewUsed.getByText("What the reviewer used").click();
+    await expect(reviewUsed.getByText("api-conventions")).toBeVisible();
+    await expect(reviewUsed.getByText("copy-tone")).toBeVisible();
   });
 });
 
