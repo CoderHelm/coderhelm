@@ -457,11 +457,14 @@ test("an agent with no asks yet, and an unknown agent", async ({ page }) => {
 test("a run's page lists the team agents it asked, linked to each agent", async ({ page }) => {
   await mockApi(page);
   await page.goto("/runs/detail?id=run_77");
-  await expect(page.getByRole("heading", { name: "Team agents asked (1)" })).toBeVisible();
-  await expect(page.getByText("Check this ticket for contradictions before I plan it.")).toBeVisible();
-  await expect(page.getByText("Took too long")).toBeVisible();
-  const asked = page.getByRole("listitem").filter({ hasText: "Check this ticket for contradictions" });
+  const section = page.getByTestId("team-asks");
+  await expect(section.getByRole("heading", { name: "Team agents asked (1)" })).toBeVisible();
+  await expect(page.getByTestId("asks-summary")).toHaveText("1 question asked · 1 without an answer");
+  const asked = section.getByTestId("ask-row");
+  await expect(asked).toContainText("Timed out");
   await expect(asked.getByRole("link", { name: "spec-checker" })).toHaveAttribute("href", /\/skills\/agent\/?\?repo=acme%2Fplaybook&path=agents%2Fspec-checker\.md/);
+  await asked.getByRole("button", { name: "Show spec-checker's answer" }).click();
+  await expect(section.getByText("Check this ticket for contradictions before I plan it.")).toBeVisible();
 });
 
 const DEBUG_URL = "/skills/item?repo=acme%2Fplaybook&path=skills%2Fdebug%2FSKILL.md";

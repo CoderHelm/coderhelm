@@ -1340,6 +1340,9 @@ export interface PassTrace {
   cache_write_tokens?: number;
   error?: string;
   timestamp: string;
+  cost_usd?: number;
+  /** What the step did, for steps that keep it (a team agents' review: its step, each review, whether the draft was revised). */
+  detail?: unknown;
 }
 
 export interface Openspec {

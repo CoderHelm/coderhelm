@@ -961,7 +961,7 @@ function RunDetailInner() {
         className="mb-6"
       />
 
-      <TeamAgentAsks runId={runId} status={run.status} />
+      <TeamAgentAsks runId={runId} status={run.status} traces={traces} />
 
       {/* Activity trail */}
       {(run.pass_history?.length || run.created_at) && (
