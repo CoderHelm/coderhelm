@@ -129,7 +129,8 @@ function actionsFor(role: string): (Entry & { minLevel: number })[] {
     // The href is filled in when the palette opens, with the page it opened on.
     { id: "act:get-help", group: "actions", label: "Get help…", sub: "Open a support ticket about this page", href: "/support?new=1", minLevel: 0, keywords: ["support", "ticket", "help", "contact", "broken", "bug"] },
     { id: "act:tickets", group: "actions", label: "Your support tickets", sub: "Support", href: "/support", minLevel: 0, keywords: ["support", "ticket", "help", "replies"] },
-    { id: "act:report", group: "actions", label: "Report an issue", sub: "Opens GitHub", href: "https://github.com/CoderHelm/coderhelm/issues", external: true, minLevel: 0, keywords: ["bug", "feedback", "support"] },
+    { id: "act:report", group: "actions", label: "Report an issue", sub: "Open a ticket about something that went wrong", href: "/support?new=1&type=issue", minLevel: 0, keywords: ["bug", "feedback", "support", "broken"] },
+    { id: "act:contact", group: "actions", label: "Contact us", sub: "Ask Coderhelm support a question", href: "/support?new=1&type=contact", minLevel: 0, keywords: ["contact", "email", "question", "feedback"] },
   ];
   return all.filter((a) => level(role) >= a.minLevel);
 }
