@@ -13,10 +13,11 @@ interface Item {
   repo: string; path: string; kind: "skill" | "agent" | "command"; name: string; description: string; sha: string; hash: string;
   enabled: boolean; files: string[]; missing_tools: string[]; uses: number; last_used_at: string; last_used_by: string; updated_at: string;
   asks: number; last_asked_at: string; switched_by: string; switched_at: string;
-  compat?: { status: string; summary: string; needs: string[]; at: string; error: string; current: boolean } | null;
+  compat?: { status: string; summary: string; needs: string[]; need_items?: { name: string; action: string; local?: boolean; instead?: string }[]; at: string; error: string; current: boolean } | null;
   use_translated?: boolean; translated_by?: string; translated_at?: string;
   always_apply?: { on: boolean; repos: string[]; passes: string[]; paths: string[]; by: string; at: string };
   suggestion?: { repos: string[]; passes: string[]; paths: string[]; reason: string; at: string } | null;
+  reviews?: { auto: string[]; set: boolean; steps: string[]; effective: string[]; by: string; at: string };
 }
 interface Ask {
   id: string; repo: string; path: string; run_id: string; sha: string; by: string; origin: string; question: string; context_chars: number; outcome: string; answer: string;
@@ -34,16 +35,27 @@ const item = (p: Partial<Item> & Pick<Item, "path" | "kind" | "name" | "descript
   repo: "acme/playbook", sha: SHA, hash: "h", enabled: true, files: [], missing_tools: [], uses: 0, last_used_at: "", last_used_by: "", updated_at: ago(60),
   asks: 0, last_asked_at: "", switched_by: "", switched_at: "", ...p,
 });
-const checked = (status: string, summary: string, needs: string[] = [], current = true) => ({ status, summary, needs, at: ago(30), error: "", current });
+// Each need is something to connect, unless named in LOCAL: those assume a
+// person's own machine, with what Coderhelm does instead.
+const LOCAL: Record<string, string> = { "Local files": "Reads the repository and the team's connected sources instead" };
+const checked = (status: string, summary: string, needs: string[] = [], current = true) => ({
+  status,
+  summary,
+  needs,
+  at: ago(30),
+  error: "",
+  current,
+  need_items: needs.map((name) => (LOCAL[name] ? { name, action: "none", local: true, instead: LOCAL[name] } : { name, action: "connect" })),
+});
 const DEBUG_SUMMARY = "1 of 5 steps run as written · 2 translated · 1 needs Monitoring · 1 write blocked";
 const ITEMS: Item[] = [
   item({ path: "skills/debug/SKILL.md", kind: "skill", name: "debug", description: "Find the cause before the fix: reproduce, read the logs around the failure, then follow the data back.", files: ["skills/debug/reference.md", "skills/debug/checklist.md"], uses: 14, last_used_at: ago(42), last_used_by: "planner", compat: checked("needs_tools", DEBUG_SUMMARY, ["Monitoring", "Wiki writes"]) }),
   item({ path: "skills/api-conventions/SKILL.md", kind: "skill", name: "api-conventions", description: "How the team names things, structures modules and writes tests.", uses: 31, last_used_at: ago(8), last_used_by: "reviewer", compat: checked("ready", "3 of 3 steps run as written") }),
   item({ path: "skills/copy-tone/SKILL.md", kind: "skill", name: "copy-tone", description: "Plain words in user-facing copy and pull request text.", enabled: false, compat: checked("translated", "1 of 2 steps run as written · 1 translated"), use_translated: true }),
-  item({ path: "agents/spec-checker.md", kind: "agent", name: "spec-checker", description: "Checks a spec or ticket for gaps, contradictions and untestable requirements before work starts.", uses: 3, last_used_at: ago(120), last_used_by: "reviewer (asked)", asks: 2, last_asked_at: ago(35), missing_tools: ["Read", "Grep", "Bash", "WebFetch"] }),
+  item({ path: "agents/spec-checker.md", kind: "agent", name: "spec-checker", description: "Checks a spec or ticket for gaps, contradictions and untestable requirements before work starts.", uses: 3, last_used_at: ago(120), last_used_by: "reviewer (asked)", asks: 2, last_asked_at: ago(35), missing_tools: ["Read", "Grep", "Bash", "WebFetch"], reviews: { auto: ["plan"], set: false, steps: [], effective: ["plan"], by: "", at: "" } }),
   item({ path: "agents/tech-debt-manager.md", kind: "agent", name: "tech-debt-manager", description: "Shortcuts." }),
   item({ path: "commands/release-notes.md", kind: "command", name: "release-notes", description: "Write release notes from the merged pull requests since the last tag.", uses: 2, last_used_at: ago(2000), last_used_by: "coder", missing_tools: ["Bash", "mcp__tracker__list_issues"] }),
-  item({ repo: "acme/old-guides", sha: "9a8b7c6d5e4f", path: ".claude/commands/deploy.md", kind: "command", name: "deploy", description: "The old deploy checklist.", enabled: false, compat: checked("needs_tools", "0 of 2 steps run as written · 2 need Monitoring", ["Monitoring"]) }),
+  item({ repo: "acme/old-guides", sha: "9a8b7c6d5e4f", path: ".claude/commands/deploy.md", kind: "command", name: "deploy", description: "The old deploy checklist.", enabled: false, compat: checked("needs_tools", "0 of 2 steps run as written · 1 needs Monitoring", ["Monitoring", "Local files"]) }),
 ];
 
 // The full check of the debug skill, as its page gets it.
@@ -208,6 +220,16 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       const paths = ((body?.paths as string[]) ?? []).map((g) => (g.endsWith("/") ? `${g}**` : g));
       it.always_apply = { on: Boolean(body?.on), repos: (body?.repos as string[]) ?? [], passes: (body?.passes as string[]) ?? [], paths, by: "admin@example.com", at: new Date().toISOString() };
       return json(route, { ok: true, always_apply: it.always_apply });
+    }
+    if (p === "/api/skills/reviews" && method === "PUT") {
+      const it = db.items.find((i) => i.repo === body?.repo && i.path === body?.path);
+      if (!it) return json(route, { error: "No such skill." }, 404);
+      if (it.kind !== "agent") return json(route, { error: "Only team agents run as review steps; skills and commands are read." }, 400);
+      const set = Boolean(body?.set);
+      const steps = set ? ((body?.steps as string[]) ?? []) : [];
+      const auto = it.reviews?.auto ?? [];
+      it.reviews = { auto, set, steps, effective: set ? steps : auto, by: "admin@example.com", at: new Date().toISOString() };
+      return json(route, { ok: true, reviews: it.reviews });
     }
     if (p === "/api/repos" && method === "GET") return json(route, { repos: [
       { name: "acme/web", enabled: true, ticket_source: "github" },
@@ -455,6 +477,14 @@ test("the overview counts items by how Coderhelm runs them and filters by what t
   await expect(overview.getByRole("button", { name: "2 Need tools" })).toBeVisible();
   await expect(overview.getByRole("button", { name: "Monitoring needed by 2 items" })).toBeVisible();
   await expect(overview.getByRole("button", { name: "Wiki writes needed by 1 item" })).toBeVisible();
+  // A laptop file has nothing to connect: it's its own folded group, with
+  // what Coderhelm does instead, never "most needed".
+  await expect(overview.getByRole("button", { name: /Local files needed by/ })).toHaveCount(0);
+  const local = overview.getByTestId("compat-local");
+  await expect(local.getByText("Assumes a local machine (1)")).toBeVisible();
+  await expect(local.getByText("Reads the repository and the team's connected sources instead")).toBeHidden();
+  await local.getByText("Assumes a local machine (1)").click();
+  await expect(local.getByText("Reads the repository and the team's connected sources instead")).toBeVisible();
 
   // Each item says where it stands, and its summary line links to its page.
   const debug = page.getByRole("listitem").filter({ hasText: "skill:debug" });
@@ -649,4 +679,31 @@ test.describe("always apply", () => {
     await page.goto("/reviewer/detail?sk=REVIEW%23acme%2Fweb%23000412%23t");
     await expect(page.getByTestId("work-used")).toContainText("Standards applied: api-conventions, copy-tone");
   });
+});
+
+test("an agent's review steps: worked out by its check, set by an admin, and back", async ({ page }) => {
+  const db = await mockApi(page);
+  await page.goto("/skills");
+  await expect(page.getByRole("listitem").filter({ hasText: "agent:spec-checker" }).getByTestId("reviews-badge")).toHaveText("Reviews: Plan");
+  await page.goto("/skills/agent?repo=acme%2Fplaybook&path=agents%2Fspec-checker.md");
+  const section = page.getByTestId("reviews-section");
+  await expect(section.getByRole("heading", { name: "Reviews: plan / code / prose" })).toBeVisible();
+  await expect(section.getByText("Runs in: Plan")).toBeVisible();
+  await expect(section.getByText("Worked out by its check from its name and description.")).toBeVisible();
+  await section.getByRole("checkbox", { name: /^Code/ }).check();
+  await section.getByRole("button", { name: "Save" }).click();
+  await expect(section.getByText("Runs in: Plan, Code")).toBeVisible();
+  expect(db.calls.find((c) => c.path === "/api/skills/reviews")?.body).toEqual({ repo: "acme/playbook", path: "agents/spec-checker.md", set: true, steps: ["plan", "code"] });
+  await expect(section.getByText(/The check says: Plan\./)).toBeVisible();
+  await section.getByRole("button", { name: "Use what the check says (Plan)" }).click();
+  await expect(section.getByText("Runs in: Plan", { exact: true })).toBeVisible();
+  expect(db.calls.filter((c) => c.path === "/api/skills/reviews").pop()?.body).toMatchObject({ set: false });
+});
+
+test("members see an agent's review steps but can't change them", async ({ page }) => {
+  await mockApi(page, { role: "member" });
+  await page.goto("/skills/agent?repo=acme%2Fplaybook&path=agents%2Fspec-checker.md");
+  const section = page.getByTestId("reviews-section");
+  await expect(section.getByText("Runs in: Plan")).toBeVisible();
+  await expect(section.getByRole("checkbox")).toHaveCount(0);
 });

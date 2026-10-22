@@ -55,6 +55,36 @@ export interface Skill {
   /** Where it looks meant to always apply, worked out at sync. Null when
    * nothing is suggested. Never applied by itself. */
   suggestion?: AlwaysApplySuggestion | null;
+  /** For a team agent: the review steps it runs in. Missing on an older
+   * gateway. */
+  reviews?: ReviewSteps;
+}
+
+/** The review steps a team agent can run in, in order, with their names. */
+export const REVIEW_STEPS = [
+  { id: "plan", label: "Plan", means: "Reads the draft plan before it's kept; with gaps, the planner revises once." },
+  { id: "code", label: "Code", means: "Reads the pull request's diff; the reviewer checks each note before raising it." },
+  { id: "prose", label: "Prose", means: "Reads the pull request description draft; with gaps, it's revised once." },
+] as const;
+
+export type ReviewStep = (typeof REVIEW_STEPS)[number]["id"];
+
+export interface ReviewSteps {
+  /** What the agent's check worked out from its name and description. */
+  auto: ReviewStep[];
+  /** An admin chose `steps` instead. */
+  set: boolean;
+  steps: ReviewStep[];
+  /** What it runs in now: the admin's choice, else the check's. */
+  effective: ReviewStep[];
+  by: string;
+  at: string;
+}
+
+/** "Plan, Code" for the steps, or "none". */
+export function reviewsLabel(steps: string[]): string {
+  const names = REVIEW_STEPS.filter((s) => steps.includes(s.id)).map((s) => s.label);
+  return names.length > 0 ? names.join(", ") : "none";
 }
 
 /** The passes an item can always apply to, in order, with their names. */
@@ -127,11 +157,24 @@ export interface CompatShort {
   summary: string;
   /** What it needs that the team hasn't connected, by name. */
   needs: string[];
+  /** The same, each with what to do about it. Missing on an older gateway;
+   * an item checked before actions were kept has an empty action. */
+  need_items?: NeedItem[];
   at: string;
   /** Why the last check failed, or empty. */
   error: string;
   /** Whether it was checked against its current text. */
   current: boolean;
+}
+
+/** One thing an item needs, with what to do: connect it, add its
+ * credentials, or nothing ("none"). `local` marks one that assumes a
+ * person's own machine; `instead` says what Coderhelm does. */
+export interface NeedItem {
+  name: string;
+  action: CompatAction | "";
+  local?: boolean;
+  instead?: string;
 }
 
 /** One thing a step relies on, and how Coderhelm covers it. */
@@ -153,6 +196,8 @@ export interface Requirement {
   server?: string;
   /** Where it is connected (an Integrations card or Data sources), worked out by the check. */
   link?: string;
+  /** For something only a person's own machine has: what Coderhelm does instead. */
+  instead?: string;
 }
 
 export interface CompatStep {
@@ -173,6 +218,8 @@ export interface CompatNeed {
   link?: string;
   status: "missing" | "blocked";
   steps: number;
+  local?: boolean;
+  instead?: string;
 }
 
 /** An item's full check, as its page gets it. */
@@ -356,6 +403,9 @@ export const skillsApi = {
     call<{ ok: true; checking: true }>("/api/skills/recheck", { method: "POST", body: JSON.stringify({ repo, path: path ?? "" }) }),
   setAlwaysApply: (repo: string, path: string, a: Pick<AlwaysApply, "on" | "repos" | "passes" | "paths">) =>
     call<{ ok: true; always_apply: AlwaysApply }>("/api/skills/always", { method: "PUT", body: JSON.stringify({ repo, path, ...a }) }),
+  /** `set` false goes back to what the agent's check says. */
+  setReviews: (repo: string, path: string, set: boolean, steps: ReviewStep[]) =>
+    call<{ ok: true; reviews: ReviewSteps }>("/api/skills/reviews", { method: "PUT", body: JSON.stringify({ repo, path, set, steps }) }),
   setUseTranslated: (repo: string, path: string, enabled: boolean) =>
     call<{ ok: true; use_translated: boolean }>("/api/skills/translated", { method: "PUT", body: JSON.stringify({ repo, path, enabled }) }),
   tryAgent: (repo: string, path: string, question: string, context: string) =>

@@ -30,6 +30,7 @@ import {
 import { ItemActivity } from "../skill-activity";
 import { CompatSection } from "../compat";
 import { useRecheck } from "../use-recheck";
+import { ReviewStepsSection } from "../review-steps";
 import { Page } from "@/components/page";
 
 export default function AgentPageGuarded() {
@@ -251,6 +252,8 @@ function AgentPage() {
           )}
         </p>
       </div>
+
+      <ReviewStepsSection item={agent} canManage={canManage} onSaved={(r) => setAgent({ ...agent, reviews: r })} />
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="min-w-0 space-y-8">

@@ -25,6 +25,7 @@ import { KIND_LABEL, agentHref, ago, handle, pageHref, skillsApi, thinDescriptio
 import { Page, PageHeader } from "@/components/page";
 import { CompatBadge, CompatOverview, matchesCompatFilter } from "./compat";
 import { AlwaysApplyBadge, SuggestionHint } from "./always-apply";
+import { ReviewStepsBadge } from "./review-steps";
 import { UsageStats } from "./usage-stats";
 import { NO_FILTERS, SkillActivity, type ActivityFilters } from "./skill-activity";
 import { RANGES, type Range } from "@/lib/activity";
@@ -503,6 +504,7 @@ function SkillsPage() {
                         <>
                           <CompatBadge item={s} />
                           <AlwaysApplyBadge item={s} />
+                          <ReviewStepsBadge item={s} />
                           {s.kind === "agent" && <StatusPill tone="success">Agent · can be asked</StatusPill>}
                         </>
                       }

@@ -11,13 +11,16 @@ import { Markdown } from "@/components/markdown";
 import { Segmented } from "@/components/segmented";
 import { ToolSwitch } from "@/components/tools";
 import { ChevronRightIcon, LockIcon } from "@/components/icons";
+import { Chip as ListChip } from "@/components/list";
 import { focusRing, linkButton, secondaryButton } from "@/components/ui";
 import { lineDiff } from "@/lib/line-diff";
 import {
   ago,
   splitFrontMatter,
   type Compat,
+  type CompatShort,
   type CompatNeed,
+  type NeedItem,
   type CompatStep,
   type Requirement,
   type RequirementStatus,
@@ -167,18 +170,30 @@ export function CompatOverview({
     for (const i of items) c[badgeOf(i)]++;
     return c;
   }, [items]);
-  const needs = useMemo(() => {
+  const { needs, local } = useMemo(() => {
     const by = new Map<string, { name: string; items: number }>();
+    const onMachine = new Map<string, { name: string; instead: string; items: number }>();
     for (const i of items) {
       if (badgeOf(i) !== "needs_tools") continue;
-      for (const n of new Set(i.compat?.needs ?? [])) {
-        const key = n.toLowerCase();
-        const e = by.get(key) ?? { name: n, items: 0 };
-        e.items++;
-        by.set(key, e);
+      const seen = new Set<string>();
+      for (const n of needItemsOf(i.compat)) {
+        const key = n.name.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (n.local) {
+          const e = onMachine.get(key) ?? { name: n.name, instead: n.instead ?? "", items: 0 };
+          e.items++;
+          onMachine.set(key, e);
+        } else if (canConnect(n)) {
+          const e = by.get(key) ?? { name: n.name, items: 0 };
+          e.items++;
+          by.set(key, e);
+        }
       }
     }
-    return [...by.values()].sort((a, b) => b.items - a.items || a.name.localeCompare(b.name));
+    const sort = <T extends { name: string; items: number }>(m: Map<string, T>) =>
+      [...m.values()].sort((a, b) => b.items - a.items || a.name.localeCompare(b.name));
+    return { needs: sort(by), local: sort(onMachine) };
   }, [items]);
   if (items.length === 0) return null;
   const checked = counts.ready + counts.translated + counts.needs_tools;
@@ -246,9 +261,42 @@ export function CompatOverview({
           </ul>
         </div>
       )}
+      {local.length > 0 && (
+        <details className="mt-4 border-t border-zinc-800 pt-4" data-testid="compat-local">
+          <summary className={`cursor-pointer text-xs font-medium text-zinc-500 hover:text-zinc-300 rounded ${focusRing}`}>
+            Assumes a local machine ({local.length})
+          </summary>
+          <p className="mt-2 text-xs text-zinc-500">Nothing to connect: these only exist on a person&apos;s own computer. What Coderhelm does instead:</p>
+          <ul className="mt-2 space-y-1.5">
+            {local.map((n) => (
+              <li key={n.name} className="text-sm text-zinc-300">
+                <span className="inline-flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{n.name}</span>
+                  <ListChip tone="muted">
+                    {n.items} item{n.items === 1 ? "" : "s"}
+                  </ListChip>
+                </span>
+                {n.instead && <span className="block text-xs text-zinc-400">{n.instead}</span>}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </section>
   );
 }
+
+/** What an item needs, each with what to do. An item checked before the
+ * actions were kept gives its names with no action. */
+export function needItemsOf(c?: CompatShort | null): NeedItem[] {
+  if (!c) return [];
+  if (c.need_items && c.need_items.length > 0) return c.need_items;
+  return (c.needs ?? []).map((name) => ({ name, action: "" as const }));
+}
+
+/** Whether a need is something to connect: a link to connect it, or to add
+ * a switched-on server's credentials. Nothing else is "most needed". */
+export const canConnect = (n: NeedItem) => n.action === "connect" || n.action === "credentials";
 
 /** Whether an item shows under an overview filter. */
 export function matchesCompatFilter(s: Skill, filter: string): boolean {
@@ -382,6 +430,7 @@ function NeedsList({ needs }: { needs: CompatNeed[] }) {
                   </span>
                 </p>
                 {n.fix && <p className="mt-0.5 text-sm text-zinc-400">{n.fix}</p>}
+                {n.local && n.instead && <p className="mt-0.5 text-xs text-zinc-500">Assumes a local machine. Instead: {n.instead}</p>}
               </div>
               {link && (
                 <Link href={link.href} className={`${secondaryButton} min-h-8 px-3 py-1 text-xs`}>
@@ -484,7 +533,9 @@ function RequirementRow({ r }: { r: Requirement }) {
       </span>
       <div className="min-w-0">
         <span className="sr-only">Coderhelm uses: </span>
-        {r.status === "available" || r.status === "translated" ? (
+        {(r.status === "available" || r.status === "translated") && r.uses.length === 0 && r.instead ? (
+          <p className={`text-xs ${s.text}`}>{r.instead}</p>
+        ) : r.status === "available" || r.status === "translated" ? (
           <div className="flex flex-wrap gap-1">
             {r.uses.map((u) => (
               <Chip key={u} tone={r.status === "translated" ? "sky" : "emerald"}>
@@ -496,9 +547,10 @@ function RequirementRow({ r }: { r: Requirement }) {
         ) : (
           <div>
             <p className={`text-xs font-medium ${s.text}`}>
-              {r.status === "blocked" ? "Can't write there" : link ? "Not connected in Coderhelm" : "Not available in Coderhelm"}
+              {r.status === "blocked" ? "Can't write there" : link ? "Not connected in Coderhelm" : r.instead ? "Assumes a local machine" : "Not available in Coderhelm"}
             </p>
             {r.fix && <p className="mt-0.5 text-xs text-zinc-400">{r.fix}</p>}
+            {r.instead && <p className="mt-0.5 text-xs text-zinc-400">Instead: {r.instead}</p>}
             {link && (
               <Link href={link.href} className={`${linkButton} mt-0.5 text-xs`}>
                 {link.text.replace(/^(Connect|Add credentials)/, (m) => (m === "Connect" ? `Connect ${r.needs || "it"}` : `Add ${r.needs || "its"} credentials`))}
