@@ -131,13 +131,19 @@ const CONNECTION: Record<string, { label: string; card: string; verb: string }> 
  * of a server that's switched on. Never one for something already
  * connected. The check's own `link` (to the right Integrations card) wins. */
 export function linkFor(
-  g: Pick<Requirement, "connect" | "action" | "connection" | "link"> & { server?: string },
+  g: Pick<Requirement, "connect" | "action" | "connection" | "link"> & { server?: string; status?: string; write?: Requirement["write"] },
 ): { href: string; text: string } | null {
   const where = CONNECT[g.connect];
   if (!where || g.action === "none") return null;
   const c = g.connection ? CONNECTION[g.connection] : undefined;
   if (c) {
-    return { href: g.link || `/settings/integrations#integration-${c.card}`, text: `${c.verb} ${c.label} in Integrations` };
+    // A Confluence write needs the write switch and page list, whether
+    // Confluence is connected with a token or through the Jira app.
+    const writes = g.connection === "confluence" && (g.status === "blocked" || g.write === "outside");
+    return {
+      href: g.link || `/settings/integrations#integration-${c.card}`,
+      text: writes ? `Set up ${c.label} writes in Integrations` : `${c.verb} ${c.label} in Integrations`,
+    };
   }
   const href = g.link || (g.connect === "plugins" && g.server ? `/settings/integrations#integration-${g.server}` : where.href);
   if (g.action === "credentials") return { href, text: `Add credentials in ${where.label}` };

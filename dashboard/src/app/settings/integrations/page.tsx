@@ -19,7 +19,7 @@ import { Page, PageHeader, Section } from "@/components/page";
 import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { Field, SecretInput } from "@/components/field";
-import { AwsAbilitiesPanel, AwsAbilitySummary, ConnectorForm } from "@/components/connections";
+import { AwsAbilitiesPanel, AwsAbilitySummary, ConnectorForm, JIRA_APP } from "@/components/connections";
 import { Switch, TeamsHowTo, TeamsWebhookField, validTeamsUrl } from "@/components/teams-webhook";
 import { Disclosure } from "@/components/disclosure";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -462,11 +462,16 @@ function ConnectorPanel({ item, onSaved }: { item: Integration; onSaved: () => P
   const { confirm } = useConfirm();
   const { toast } = useToast();
   const c = item.detail as unknown as Connector;
+  // Confluence through the Jira app: removing only resets its settings (the
+  // app keeps connecting it, reading only).
+  const viaApp = c.via === JIRA_APP;
   const remove = async () => {
     const ok = await confirm({
-      title: `Remove ${item.name}?`,
-      message: "Agents stop using it right away and the saved key is deleted.",
-      confirmLabel: "Remove",
+      title: viaApp ? `Reset ${item.name}?` : `Remove ${item.name}?`,
+      message: viaApp
+        ? "Writes turn off and the page list and spaces are cleared. Agents keep reading through the Jira app."
+        : "Agents stop using it right away and the saved key is deleted.",
+      confirmLabel: viaApp ? "Reset" : "Remove",
       destructive: true,
     });
     if (!ok) return;
@@ -488,10 +493,10 @@ function ConnectorPanel({ item, onSaved }: { item: Integration; onSaved: () => P
           onSaved();
         }}
       />
-      {c.connected && (
+      {c.connected && (!viaApp || Boolean(c.updated_at)) && (
         <p className="mt-3">
           <button type="button" onClick={remove} className={linkButton}>
-            Remove {item.name}
+            {viaApp ? `Reset ${item.name} settings` : `Remove ${item.name}`}
           </button>
         </p>
       )}

@@ -246,6 +246,44 @@ test("a saved key reads as saved, and a connection keeps a guide for agents", as
   expect(db.calls.find((c) => c.method === "PUT")!.body!.instructions).toBe("The api app is the backend; web is the site.");
 });
 
+test("Confluence through the Jira app is connected without a token, and writes stay a choice", async ({ page }) => {
+  const db = await mockApi(page);
+  db.items = db.items.map((i) =>
+    i.id === "confluence"
+      ? card("confluence", "docs", "Confluence", "connected", "manage", {
+          reason: "Connected through the Jira app.",
+          detail: {
+            kind: "confluence", label: "Confluence", connected: true, enabled: true, status: "ready",
+            site: "https://yourcompany.atlassian.net", via: "jira_app", spaces: [], write_enabled: false, write_pages: [], updated_at: "",
+          },
+        })
+      : i,
+  );
+  await page.goto("/settings/integrations");
+  await expect(row(page, "confluence").getByTestId("integration-status")).toContainText("Connected");
+  await control(page, "confluence", "Confluence").click();
+  const panel = row(page, "confluence").getByTestId("integration-panel");
+  await expect(panel.getByTestId("confluence-via-jira-app")).toContainText("Connected through the Jira app on https://yourcompany.atlassian.net");
+  // No address, email or token to fill in, and nothing to remove.
+  await expect(panel.getByLabel("API token")).toHaveCount(0);
+  await expect(panel.getByLabel("Confluence address")).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: /^(Remove|Reset) Confluence/ })).toHaveCount(0);
+  await panel.getByLabel(/Allow agents to add text/).check();
+  await panel.getByLabel("Writable page ids").fill("42, 43");
+  await panel.getByRole("button", { name: "Save and test" }).click();
+  await expect.poll(() => db.calls.find((c) => c.method === "PUT")?.path).toBe("/api/connectors/confluence");
+  const body = db.calls.find((c) => c.method === "PUT")!.body!;
+  expect(body.via).toBe("jira_app");
+  expect(body.write_enabled).toBe(true);
+  expect(body.write_pages).toEqual(["42", "43"]);
+  expect(body.key).toBeUndefined();
+  expect(body.site).toBeUndefined();
+  // A team can still use its own token.
+  await panel.getByRole("button", { name: "Use an API token instead" }).click();
+  await expect(panel.getByLabel("Confluence address")).toBeVisible();
+  await expect(panel.getByLabel("API token")).toBeVisible();
+});
+
 test("an AWS account shows its abilities; an admin switches one off and deselects an environment", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/settings/integrations");
