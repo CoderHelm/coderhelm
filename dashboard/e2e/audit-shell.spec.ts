@@ -52,6 +52,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     }
     if (p === "/api/usage") return json(route, { month: "2026-01", tokens_in: 0, tokens_out: 0, total_runs: 0, ...db.usage });
     if (p === "/api/banners") return json(route, { banners: db.banners });
+    if (p === "/api/support/badge") return json(route, { waiting: 0, queue_open: null });
     if (p === "/api/integrations") return json(route, { can_edit: false, items: [], migrated: 0 });
     if (p === "/api/repos") return json(route, { repos: [{ name: "your-team/web", enabled: true, ticket_source: "github" }, { name: "your-team/api", enabled: true, ticket_source: "github" }] });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }, { team_id: "t_2", org: "other-team", status: "active", current: false }] });

@@ -135,6 +135,30 @@ export const api = {
   // Allowlist
   /** Every team with its runs, cost and members. Platform admin only (403 otherwise). */
   adminTeams: () => request<{ teams: AdminTeam[]; month: string }>("/api/admin/teams"),
+
+  // Support tickets: the team's own, and the platform admin's queue (403 for anyone else)
+  supportTickets: () => request<{ tickets: SupportTicket[] }>("/api/support/tickets"),
+  supportTicket: (id: string) => request<SupportDetail>(`/api/support/tickets/${encodeURIComponent(id)}`),
+  openSupportTicket: (body: NewSupportTicket) =>
+    request<SupportDetail>("/api/support/tickets", { method: "POST", body: JSON.stringify(body) }),
+  replySupportTicket: (id: string, body: string) =>
+    request<SupportDetail>(`/api/support/tickets/${encodeURIComponent(id)}/reply`, {
+      method: "POST",
+      body: JSON.stringify({ body }),
+    }),
+  supportBadge: () => request<{ waiting: number; queue_open: number | null }>("/api/support/badge"),
+  adminSupportTickets: () => request<{ tickets: SupportTicket[] }>("/api/admin/support/tickets"),
+  adminSupportTicket: (id: string) => request<SupportDetail>(`/api/admin/support/tickets/${encodeURIComponent(id)}`),
+  adminReplySupportTicket: (id: string, body: string, status?: SupportStatus) =>
+    request<SupportDetail>(`/api/admin/support/tickets/${encodeURIComponent(id)}/reply`, {
+      method: "POST",
+      body: JSON.stringify({ body, status }),
+    }),
+  adminSetSupportTicket: (id: string, change: { status?: SupportStatus; priority?: SupportPriority }) =>
+    request<SupportDetail>(`/api/admin/support/tickets/${encodeURIComponent(id)}/status`, {
+      method: "POST",
+      body: JSON.stringify(change),
+    }),
   listAllowlist: () => request<{ emails: string[] }>("/api/allowlist"),
   addToAllowlist: (email: string) =>
     request<{ status: string; email: string }>("/api/allowlist", {
@@ -2368,4 +2392,59 @@ export interface AdminTeam {
   reviews_month: number;
   cost_month_usd: number;
   tokens_month: number;
+}
+
+/** Whose move it is: `open` is support's, `waiting` the customer's. */
+export type SupportStatus = "open" | "waiting" | "resolved";
+export type SupportPriority = "normal" | "high" | "urgent";
+export type SupportItemKind = "run" | "review" | "release" | "plan";
+
+export interface SupportItem {
+  kind: SupportItemKind;
+  id: string;
+  label: string;
+  repo: string;
+  /** A run's status when the ticket was filed. */
+  status: string;
+}
+
+export interface SupportTicket {
+  id: string;
+  team_id: string;
+  team_name: string;
+  subject: string;
+  status: SupportStatus;
+  priority: SupportPriority;
+  opened_by_id: string;
+  opened_by_email: string;
+  opened_by_name: string;
+  role: string;
+  context: { page: string; item: SupportItem | null; user_agent: string };
+  created_at: string;
+  updated_at: string;
+  last_actor: "customer" | "support";
+  message_count: number;
+}
+
+export interface SupportMessage {
+  id: string;
+  kind: "message" | "event";
+  author: "customer" | "support";
+  author_email: string;
+  author_name: string;
+  body: string;
+  created_at: string;
+}
+
+export interface SupportDetail {
+  ticket: SupportTicket;
+  messages: SupportMessage[];
+}
+
+export interface NewSupportTicket {
+  subject: string;
+  body: string;
+  priority?: SupportPriority;
+  page?: string;
+  item?: { kind: SupportItemKind; id: string; label?: string; repo?: string };
 }

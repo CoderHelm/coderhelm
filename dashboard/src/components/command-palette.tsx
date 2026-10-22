@@ -20,6 +20,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { api, ApiError, type SearchResults } from "@/lib/api";
 import { kindLabel, whereLabel } from "@/lib/data-sources";
 import { pageHref, skillsApi } from "@/lib/skills";
+import { helpHref, helpTargetFromUrl } from "@/lib/support";
 import { runStatusLabel } from "./run-status";
 import { timeAgo } from "./list/time";
 import { focusRing } from "./ui";
@@ -125,6 +126,9 @@ function actionsFor(role: string): (Entry & { minLevel: number })[] {
     { id: "act:invite", group: "actions", label: "Invite a teammate", sub: "Team", href: "/settings/team", minLevel: 3, keywords: ["member", "add person", "user"] },
     { id: "act:skills-repo", group: "actions", label: "Connect a skills repository", sub: "Skills", href: "/skills", minLevel: 1, keywords: ["skill", "agent", "command"] },
     { id: "act:reviewer-config", group: "actions", label: "Configure the reviewer", sub: "Reviewer settings", href: "/reviewer/config", minLevel: 1, keywords: ["label", "auto-merge", "release notes"] },
+    // The href is filled in when the palette opens, with the page it opened on.
+    { id: "act:get-help", group: "actions", label: "Get help…", sub: "Open a support ticket about this page", href: "/support?new=1", minLevel: 0, keywords: ["support", "ticket", "help", "contact", "broken", "bug"] },
+    { id: "act:tickets", group: "actions", label: "Your support tickets", sub: "Support", href: "/support", minLevel: 0, keywords: ["support", "ticket", "help", "replies"] },
     { id: "act:report", group: "actions", label: "Report an issue", sub: "Opens GitHub", href: "https://github.com/CoderHelm/coderhelm/issues", external: true, minLevel: 0, keywords: ["bug", "feedback", "support"] },
   ];
   return all.filter((a) => level(role) >= a.minLevel);
@@ -461,7 +465,17 @@ function Palette({
   const server = useServerSearch(q, effectiveScope);
 
   const lvl = level(role);
-  const actions = useMemo(() => actionsFor(role), [role]);
+  // "Get help…" carries the page the palette was opened on (and the run,
+  // review or plan it shows). The palette mounts on open, so this is read then.
+  const [helpFrom] = useState(() =>
+    typeof window === "undefined"
+      ? "/support?new=1"
+      : helpHref(window.location.pathname, helpTargetFromUrl(window.location.pathname, window.location.search)),
+  );
+  const actions = useMemo(
+    () => actionsFor(role).map((a) => (a.id === "act:get-help" ? { ...a, href: helpFrom } : a)),
+    [role, helpFrom],
+  );
   const pageEntries = useMemo<Entry[]>(
     () => pages.map((p) => ({ id: `page:${p.href}`, group: "pages", label: p.label, sub: p.section, href: p.href, keywords: p.section ? [p.section] : [] })),
     [pages],
