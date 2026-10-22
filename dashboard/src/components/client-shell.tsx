@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { api, type UsageInfo, type Banner, type TeamInfo } from "@/lib/api";
 import { pushToDataLayer } from "@/lib/gtm";
+import { BETA_SIGNUPS_CHANGED } from "@/lib/admin";
 import { formatTokens, USAGE_CHANGED, usageBreakdown, usageTotal } from "@/lib/usage";
 import { ToastProvider } from "./toast";
 import { ConfirmProvider } from "./confirm-dialog";
@@ -42,6 +43,8 @@ interface NavItem {
   adminOnly?: boolean;
   memberOnly?: boolean;
   superAdminOnly?: boolean;
+  /** A number shown beside the label, e.g. new beta sign-ups. */
+  countKey?: "betaSignups";
 }
 
 interface NavGroup {
@@ -101,17 +104,22 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/settings/security", label: "Security", icon: <ShieldCheckIcon /> },
       { href: "/settings/budget", label: "Token limit", icon: <TargetIcon />, memberOnly: true },
-      { href: "/admin", label: "Admin", icon: <ShieldIcon />, superAdminOnly: true },
+      { href: "/admin", label: "Admin", icon: <ShieldIcon />, superAdminOnly: true, countKey: "betaSignups" },
       { href: "/admin/tickets", label: "Support queue", icon: <LifeBuoyIcon />, superAdminOnly: true },
     ],
   },
 ];
 
+/** Who sees the platform admin page. The server checks again on every call. */
+function isPlatformAdmin(user: User | null): boolean {
+  return user?.email === "admin@coderhelm.com";
+}
+
 /** The menu items this person can open, by role. */
 function visibleItems(group: NavGroup, user: User | null): NavItem[] {
   const isAdminOrOwner = isAdmin(user);
   const isMemberOrAbove = isAdminOrOwner || user?.role === "billing" || user?.role === "member";
-  const isSuperAdmin = user?.email === "admin@coderhelm.com";
+  const isSuperAdmin = isPlatformAdmin(user);
   return group.items.filter((item) => {
     if (item.superAdminOnly) return isSuperAdmin;
     if (item.memberOnly) return isMemberOrAbove;
@@ -158,6 +166,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [usage, setUsage] = useState<UsageInfo | null>(null);
+  // New beta sign-ups, for the Admin menu item (platform admin only).
+  const [betaNew, setBetaNew] = useState(0);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [teams, setTeams] = useState<TeamInfo[]>([]);
   const [dismissedBanners, setDismissedBanners] = useState<Set<string>>(new Set());
@@ -268,6 +278,18 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       api.getUsage().then(setUsage).catch(() => {});
     }
   }, [pathname, user]);
+
+  // The platform admin sees how many beta sign-ups wait, kept current when
+  // the admin page invites someone.
+  const platformAdmin = isPlatformAdmin(user);
+  useEffect(() => {
+    if (!platformAdmin) return;
+    const refresh = () =>
+      api.adminBetaSignups().then((r) => setBetaNew(r.counts.new)).catch(() => {});
+    refresh();
+    window.addEventListener(BETA_SIGNUPS_CHANGED, refresh);
+    return () => window.removeEventListener(BETA_SIGNUPS_CHANGED, refresh);
+  }, [platformAdmin]);
 
   // ...and right after someone changes the limit.
   useEffect(() => {
@@ -381,7 +403,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           onClick={(e) => { if ((e.target as HTMLElement).closest("a")) setMenuOpen(false); }}
           className={`${menuOpen ? "fixed inset-y-0 left-0 z-50 flex shadow-2xl" : "hidden"} md:contents`}
         >
-          <Sidebar usage={usage} user={user} teams={teams} />
+          <Sidebar usage={usage} user={user} teams={teams} betaNew={betaNew} />
           <button
             type="button"
             onClick={() => setMenuOpen(false)}
@@ -586,10 +608,13 @@ function Sidebar({
   usage,
   user,
   teams,
+  betaNew,
 }: {
   usage: UsageInfo | null;
   user: User | null;
   teams: TeamInfo[];
+  /** New beta sign-ups, shown on the Admin item. */
+  betaNew: number;
 }) {
   const pathname = usePathname();
   const [switching, setSwitching] = useState(false);
@@ -687,7 +712,11 @@ function Sidebar({
                       <span className="w-4 flex items-center justify-center" aria-hidden="true">{item.icon}</span>
                       {item.label}
                     </span>
-                    <CountBadge n={badgeFor(item.href)} label="need a reply" />
+                    {item.countKey === "betaSignups" ? (
+                      <CountBadge n={betaNew} label={`new beta ${betaNew === 1 ? "sign-up" : "sign-ups"}`} />
+                    ) : (
+                      <CountBadge n={badgeFor(item.href)} label="need a reply" />
+                    )}
                   </Link>
                 );
               })}
@@ -821,6 +850,8 @@ type AuthView = "login" | "signup" | "waitlist" | "verify" | "forgot" | "reset" 
 function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const [view, setView] = useState<AuthView>("login");
   const [email, setEmail] = useState("");
+  const [company, setCompany] = useState("");
+  const [reason, setReason] = useState("");
   const [password, setPassword] = useState("");
   const [agreedTos, setAgreedTos] = useState(false);
   const [code, setCode] = useState("");
@@ -848,7 +879,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const handleWaitlist = async () => {
     setError(""); setLoading(true);
     try {
-      const result = await api.joinWaitlist(email);
+      const result = await api.joinWaitlist(email, { company: company.trim() || undefined, reason: reason.trim() || undefined });
       setMessage(result.message || "You're on the list!");
       setView("login");
     } catch {
@@ -1080,6 +1111,12 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
                 <input type="email" autoComplete="email" aria-label="Email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }}
                   onKeyDown={(e) => e.key === "Enter" && handleWaitlist()}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
+                <input type="text" autoComplete="organization" aria-label="Company (optional)" placeholder="Company (optional)" value={company} maxLength={120}
+                  onChange={(e) => setCompany(e.target.value)}
+                  className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
+                <textarea aria-label="What would you use Coderhelm for? (optional)" placeholder="What would you use Coderhelm for? (optional)" value={reason} maxLength={500} rows={3}
+                  onChange={(e) => setReason(e.target.value)}
+                  className="w-full resize-y rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
                 <button onClick={handleWaitlist} disabled={loading || !email}
                   className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed">
                   {loading ? "Joining..." : "Join waitlist"}

@@ -100,10 +100,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
-  joinWaitlist: (email: string) =>
+  joinWaitlist: (email: string, extra: { company?: string; reason?: string } = {}) =>
     request<{ status: string; message: string }>("/auth/waitlist", {
       method: "POST",
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, ...extra }),
     }),
   loginEmail: (email: string, password: string) =>
     request<{ status: string; session?: string; team_id?: string }>(
@@ -134,7 +134,15 @@ export const api = {
 
   // Allowlist
   /** Every team with its runs, cost and members. Platform admin only (403 otherwise). */
-  adminTeams: () => request<{ teams: AdminTeam[]; month: string }>("/api/admin/teams"),
+  adminTeams: () => request<AdminTeamsReply>("/api/admin/teams"),
+  /** Everyone on the beta waitlist and where they stand. Platform admin only. */
+  adminBetaSignups: () => request<BetaSignupsReply>("/api/admin/beta-signups"),
+  /** Marks a sign-up invited and adds the email to the sign-up allowlist. No email is sent. */
+  inviteBetaSignup: (email: string) =>
+    request<{ status: string; email: string; invited_at: string }>("/api/admin/beta-signups/invite", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
 
   // Support tickets: the team's own, and the platform admin's queue (403 for anyone else)
   supportTickets: () => request<{ tickets: SupportTicket[] }>("/api/support/tickets"),
@@ -2517,19 +2525,85 @@ export interface AwsAbilityReply {
   last_check: string;
 }
 
+/** Why a team sits under its organisation in the admin overview. */
+export type AdminTeamLink = "main" | "github" | "jira" | "member" | "domain";
+
 /** One team in the platform admin's overview. */
 export interface AdminTeam {
   team_id: string;
   name: string;
   status: string;
+  plan: string;
   created_at: string;
   members: number;
+  invites: number;
+  repos: number;
   runs_total: number;
-  completed_total: number;
   runs_month: number;
+  reviews_total: number;
   reviews_month: number;
   cost_month_usd: number;
   tokens_month: number;
+  /** Later of members' last sign-in and last use; empty when unknown. */
+  last_active_at: string;
+  github_org: string;
+  has_installation: boolean;
+  jira_site: string;
+  /** A team of one whose member also belongs to another team. */
+  personal: boolean;
+  /** Has runs or reviews, or (not personal) repos or a GitHub installation. */
+  active: boolean;
+  link: AdminTeamLink;
+}
+
+/** Teams that belong together: the same GitHub installation, Jira site, people or company domain. */
+export interface AdminOrg {
+  key: string;
+  label: string;
+  label_from: "github" | "jira" | "name" | "domain" | "none";
+  domain: string;
+  active: boolean;
+  team_count: number;
+  personal_count: number;
+  members: number;
+  repos: number;
+  runs_total: number;
+  runs_month: number;
+  reviews_total: number;
+  reviews_month: number;
+  cost_month_usd: number;
+  last_active_at: string;
+  created_at: string;
+  plan: string;
+  /** Main team first. */
+  teams: AdminTeam[];
+}
+
+export interface AdminTeamsReply {
+  month: string;
+  orgs: AdminOrg[];
+  teams: AdminTeam[];
+  counts: { teams: number; orgs: number; active_orgs: number; inactive_orgs: number };
+}
+
+export type BetaSignupStatus = "new" | "invited" | "joined";
+
+/** One person on the beta waitlist. */
+export interface BetaSignup {
+  email: string;
+  original_email: string;
+  company: string;
+  /** Company email domain; empty for public mail. */
+  domain: string;
+  reason: string;
+  created_at: string;
+  status: BetaSignupStatus;
+  invited_at: string;
+}
+
+export interface BetaSignupsReply {
+  signups: BetaSignup[];
+  counts: { new: number; invited: number; joined: number; total: number };
 }
 
 /** Whose move it is: `open` is support's, `waiting` the customer's. */
