@@ -473,8 +473,20 @@ test("reviewer settings load for a repo, with labelled fields and switches", asy
   await expect(page.getByRole("switch", { name: /Enable reviewer for this repo/ })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("textbox", { name: "Trigger label" })).toHaveValue("ch-review");
   await expect(page.getByRole("textbox", { name: "Review standards for every repo" })).toHaveValue("Never log secrets.");
-  await page.getByRole("button", { name: /Actions after approval/ }).click();
-  await expect(page.getByRole("combobox", { name: "Merge method" })).toBeVisible();
+  // The summary says what the reviewer does here in plain words.
+  const summary = page.getByTestId("reviewer-summary");
+  await expect(summary).toContainText("Reviews pull requests labelled “ch-review”.");
+  await expect(summary).toContainText("Leaves merging to people.");
+  // Options of a switched-off setting stay folded away until it is on.
+  await expect(page.getByRole("group", { name: "Merge method" })).toHaveCount(0);
+  await page.getByRole("switch", { name: /Auto-merge on approve/ }).click();
+  await expect(page.getByRole("group", { name: "Merge method" })).toBeVisible();
+  await page.getByRole("switch", { name: /Auto-merge on approve/ }).click();
+  // Every section is one jump away.
+  const nav = page.getByRole("navigation", { name: "Settings sections" });
+  for (const name of ["Reviews", "Tests", "CI labels", "Auto-merge", "Tags and health check", "Release notes", "Teams reminders", "Stop everything", "Every repository"]) {
+    await expect(nav.getByRole("link", { name: new RegExp(`^${name}`) })).toBeVisible();
+  }
   await shot(page, "audit-reviewer-config");
   expect(errors).toEqual([]);
 });
@@ -483,7 +495,7 @@ test("reviewer settings with no repo picked explain what to do", async ({ page }
   const errors = watchConsole(page);
   await mockApi(page);
   await page.goto("/reviewer/config");
-  await expect(page.getByText(/Pick a repository above/)).toBeVisible();
+  await expect(page.getByText(/Choose a repository to see what the reviewer does/)).toBeVisible();
   await shot(page, "audit-reviewer-config-empty");
   expect(errors).toEqual([]);
 });
@@ -527,6 +539,89 @@ test("a Teams webhook that is not https is caught before saving", async ({ page 
   await page.getByRole("button", { name: "Save settings" }).click();
   await expect(page.getByText("Reviewer settings saved")).toBeVisible();
   expect(db.calls.some((c) => c.startsWith("PUT /api/reviewer/config/your-team/web"))).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test("saving sends the same settings body as before, with every edit in it", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page);
+  await page.goto("/reviewer/config?repo=your-team%2Fweb");
+  const save = page.getByRole("button", { name: "Save settings" });
+  await expect(save).toBeDisabled();
+  await expect(page.getByTestId("save-bar")).toContainText("All changes saved");
+
+  await page.getByRole("textbox", { name: "Trigger label" }).fill("needs-review");
+  await page.getByRole("switch", { name: /Require tests/ }).click();
+  await page.getByRole("switch", { name: /Auto-merge on approve/ }).click();
+  await page.getByRole("group", { name: "Merge method" }).getByRole("button", { name: "Rebase" }).click();
+  await page.getByRole("textbox", { name: /Deploy labels/ }).fill("deploy-staging");
+  await page.getByRole("switch", { name: /Tag after merge/ }).click();
+  await page.getByRole("group", { name: "Tag style" }).getByRole("button", { name: "Date and time" }).click();
+  await page.getByRole("spinbutton", { name: /Batch window/ }).fill("30");
+  await page.getByRole("switch", { name: /Write release notes/ }).click();
+  await page.getByText("Publish to Confluence").click();
+  await page.getByRole("textbox", { name: "Parent page id" }).fill("12a34");
+  await page.getByRole("switch", { name: /Remind reviewers in Microsoft Teams/ }).click();
+  await page.getByRole("textbox", { name: "Teams incoming webhook URL" }).fill("https://example.com/hook");
+  await page.getByRole("spinbutton", { name: /Wait before reminding again/ }).fill("6");
+
+  // Unsaved edits are counted and marked where they are.
+  await expect(page.getByTestId("save-bar")).toContainText("13 unsaved changes on your-team/web");
+  await expect(page.getByText("Unsaved", { exact: true }).first()).toBeVisible();
+  await expect(page.getByTestId("reviewer-summary")).toContainText("Merges approved pull requests (rebase) once a person has also approved.");
+  await shot(page, "audit-reviewer-config-editing");
+
+  await save.click();
+  await expect(page.getByText("Reviewer settings saved")).toBeVisible();
+  const puts = db.calls.filter((c) => c.startsWith("PUT /api/reviewer/config/"));
+  expect(puts).toEqual(["PUT /api/reviewer/config/your-team/web"]);
+  expect(db.bodies.at(-1)).toEqual({
+    ...CONFIG,
+    label: "needs-review",
+    require_tests: true,
+    auto_merge: true,
+    merge_method: "rebase",
+    deploy_label: "deploy-staging",
+    auto_tag: true,
+    tag_mode: "date",
+    tag_batch_minutes: 30,
+    release_notes: true,
+    release_notes_confluence_parent_id: "1234",
+    reminders_enabled: true,
+    teams_webhook_url: "https://example.com/hook",
+    reminder_cooldown_hours: 6,
+  });
+  expect(errors).toEqual([]);
+});
+
+test("unsaved edits can be discarded, and switching repos with them asks first", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page);
+  await page.goto("/reviewer/config?repo=your-team%2Fweb");
+  // Settings away from their defaults are marked (this fixture has the reviewer on and a focus).
+  await expect(page.getByTestId("not-default-count")).toContainText("2 settings differ from the defaults");
+  await page.getByRole("switch", { name: /Check the change by running tests/ }).click();
+  await expect(page.getByTestId("save-bar")).toContainText("1 unsaved change on your-team/web");
+  await page.getByRole("button", { name: "Discard" }).click();
+  await expect(page.getByRole("switch", { name: /Check the change by running tests/ })).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByTestId("save-bar")).toContainText("All changes saved");
+
+  await page.getByRole("switch", { name: /Stop everything/ }).click();
+  await expect(page.getByTestId("reviewer-summary")).toContainText("Every reviewer action on this repo is stopped");
+  await page.getByRole("button", { name: /Repository: your-team\/web/ }).click();
+  await page.getByRole("button", { name: "your-team/backend" }).click();
+  await expect(page.getByText("Leave without saving?")).toBeVisible();
+  await page.getByRole("button", { name: "Keep editing" }).click();
+  await expect(page).toHaveURL(/repo=your-team%2Fweb/);
+  await expect(page.getByRole("switch", { name: /Stop everything/ })).toHaveAttribute("aria-checked", "true");
+
+  await page.getByRole("button", { name: /Repository: your-team\/web/ }).click();
+  await page.getByRole("button", { name: "your-team/backend" }).click();
+  await page.getByRole("button", { name: "Drop changes" }).click();
+  await expect(page).toHaveURL(/repo=your-team%2Fbackend/);
+  await expect(page.getByRole("heading", { name: "On your-team/backend" })).toBeVisible();
+  await expect(page.getByRole("switch", { name: /Stop everything/ })).toHaveAttribute("aria-checked", "false");
+  expect(db.calls.some((c) => c.startsWith("PUT /api/reviewer/config/"))).toBe(false);
   expect(errors).toEqual([]);
 });
 
