@@ -2282,6 +2282,8 @@ export interface Connector {
   spaces?: string[];
   write_enabled?: boolean;
   write_pages?: string[];
+  /** Confluence: `jira_app` when it goes through the team's Coderhelm Jira app (no token), else empty. */
+  via?: string;
   environments?: string[];
   indexes?: string[];
   hidden_fields?: string[];
