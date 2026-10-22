@@ -1201,7 +1201,7 @@ export interface LivePr {
   repo: string;
   pr_number: number;
   pr_title?: string;
-  /** reviewing · queued · retrying · waiting_ci · ci_failing · waiting_people · merge_blocked · paused · failed · stalled · merged · closed · new_commits · reviewed */
+  /** reviewing · queued · retrying · waiting_ci · ci_failing · waiting_people · merge_blocked · paused · failed · stalled · merged · closed · new_commits · skipped · reviewed */
   status?: string;
   /** active (being reviewed or queued) · waiting · done */
   group?: "active" | "waiting" | "done" | string;

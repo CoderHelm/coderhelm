@@ -29,6 +29,7 @@ const LOOKS: Record<string, StatusLook> = {
   merged: { label: "Merged", dot: "bg-violet-400", text: "text-violet-300" },
   closed: { label: "Closed", dot: "bg-zinc-500", text: "text-zinc-400" },
   new_commits: { label: "New commits", dot: "bg-zinc-400", text: "text-zinc-300" },
+  skipped: { label: "No review needed", dot: "bg-zinc-600", text: "text-zinc-400" },
   reviewed: { label: "Reviewed", dot: "bg-zinc-600", text: "text-zinc-400" },
 };
 
@@ -102,6 +103,8 @@ export function summaryLine(pr: LivePr | undefined): string {
       return "Closed without merging";
     case "new_commits":
       return "New commits since the last review";
+    case "skipped":
+      return review.reason || "The new commits change no code or data since the approval";
     default:
       return "";
   }
