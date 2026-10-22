@@ -3,14 +3,12 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type DataSource, type DataSourceActivityEvent, type DataSourceActivityFilter, type DataSourceKind } from "@/lib/api";
-import { actorLabel, errorMessage, formatDuration, timeAgo } from "@/lib/data-sources";
+import { actorLabel, errorMessage, formatDuration } from "@/lib/data-sources";
 import { RANGES, originHref, rangeSince, type Range } from "@/lib/activity";
-import { Callout } from "./callout";
 import { CopyButton } from "./copy-button";
 import { StatusPill } from "./status-pill";
-import { Skeleton } from "./skeleton";
-import { CodeIcon, DatabaseIcon, LogsIcon } from "./icons";
-import { focusRing, inputClass, linkButton, secondaryButton } from "./ui";
+import { focusRing, linkButton, secondaryButton } from "./ui";
+import { List, ListEmpty, ListError, ListRow, ListSkeleton, ListToolbar, LoadMore, Time, type Tone } from "./list";
 
 /** How often the feed asks for new lookups while it is following. */
 export const FOLLOW_INTERVAL_MS = 10_000;
@@ -93,20 +91,42 @@ export function groupRepeats(events: DataSourceActivityEvent[]): LookupGroup[] {
   return out;
 }
 
-function KindIcon({ kind }: { kind?: DataSourceKind }) {
-  const icon = kind === "logs" ? <LogsIcon /> : kind === "database" ? <DatabaseIcon /> : <CodeIcon />;
-  return (
-    <span aria-hidden="true" className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-zinc-800 text-zinc-400 scale-90">
-      {icon}
-    </span>
-  );
-}
-
 function OutcomePill({ outcome }: { outcome: DataSourceActivityEvent["outcome"] }) {
   if (outcome === "ok") return <StatusPill tone="success">OK</StatusPill>;
   if (outcome === "refused") return <StatusPill tone="warning">Refused</StatusPill>;
   if (outcome === "unknown_name") return <StatusPill tone="warning">Unknown name</StatusPill>;
   return <StatusPill tone="error">Failed</StatusPill>;
+}
+
+const OUTCOME_TONE: Record<DataSourceActivityEvent["outcome"], Tone> = {
+  ok: "success",
+  refused: "waiting",
+  unknown_name: "waiting",
+  failed: "danger",
+};
+
+/** A filter select with the list toolbar's look (source, who, when). */
+export function FilterSelect({
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <select
+      aria-label={label}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`min-h-9 min-w-0 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 py-1.5 pl-3 text-sm text-zinc-100 transition-colors hover:border-zinc-500 motion-reduce:transition-none ${focusRing}`}
+    >
+      {children}
+    </select>
+  );
 }
 
 const subtleLink = `text-zinc-400 underline underline-offset-2 hover:text-zinc-200 rounded ${focusRing}`;
@@ -140,7 +160,6 @@ export function ActivityFeed({
   const [olderState, setOlderState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [older, setOlder] = useState<string | null>(null);
   const [filters, setFilters] = useState<FeedFilters>(initialFilters);
-  const [search, setSearch] = useState(initialFilters.q);
   const loaded = useRef(false);
   const generation = useRef(0);
 
@@ -149,10 +168,8 @@ export function ActivityFeed({
   useEffect(() => {
     const f = JSON.parse(initialKey) as FeedFilters;
     setFilters(f);
-    setSearch(f.q);
   }, [initialKey]);
 
-  const kinds = useMemo(() => new Map(sources.map((s) => [s.id, s.kind])), [sources]);
   const { source, who, outcome, range, q } = filters;
 
   const serverFilter = useCallback(
@@ -171,16 +188,6 @@ export function ActivityFeed({
     setFilters(next);
     onFiltersChange?.(next);
   };
-
-  useEffect(() => {
-    if (search === filters.q) return;
-    const t = setTimeout(() => {
-      const next = { ...filters, q: search };
-      setFilters(next);
-      onFiltersChange?.(next);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [search, filters, onFiltersChange]);
 
   const refresh = useCallback(async () => {
     const gen = generation.current;
@@ -283,10 +290,7 @@ export function ActivityFeed({
   const groups = groupRepeats(shown);
   const filtering = source !== "all" || who !== "all" || outcome !== "all" || range !== "all" || !!q.trim();
   const canPageBack = olderState !== "done" && !!events?.length && !!older;
-  const clear = () => {
-    setSearch("");
-    setFilter({ ...ALL_LOOKUPS });
-  };
+  const clear = () => setFilter({ ...ALL_LOOKUPS });
 
   return (
     <section id="activity" aria-labelledby="activity-heading" className="mt-10 scroll-mt-8">
@@ -307,151 +311,110 @@ export function ActivityFeed({
         >
           {following ? "Pause" : "Resume"}
         </button>
-        <button
-          type="button"
-          onClick={() => setFilter({ outcome: outcome === "problems" ? "all" : "problems" })}
-          className={`rounded-full border px-2.5 py-0.5 text-xs ${
-            outcome === "problems" ? "border-amber-500/40 bg-amber-500/10 text-amber-200" : "border-zinc-700 text-zinc-400 hover:text-zinc-200"
-          } ${focusRing}`}
-          aria-pressed={outcome === "problems"}
-        >
-          Problems only
-        </button>
         {fullPageLink && (
           <Link href="/data-sources/activity" className={`${linkButton} ml-auto text-xs`}>Open the full activity log</Link>
         )}
       </div>
 
-      <div className="mb-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
-        <label className="col-span-2 text-xs text-zinc-400 lg:col-span-4">
-          <span className="mb-1 block">Search</span>
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Words in what was asked, why it failed, or a repository"
-            className={inputClass}
-          />
-        </label>
-        <label className="text-xs text-zinc-400">
-          <span className="mb-1 block">Source</span>
-          <select value={source} onChange={(e) => setFilter({ source: e.target.value })} className={inputClass}>
-            <option value="all">All sources</option>
-            {sourceOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-          </select>
-        </label>
-        <label className="text-xs text-zinc-400">
-          <span className="mb-1 block">Who</span>
-          <select value={who} onChange={(e) => setFilter({ who: e.target.value as Who })} className={inputClass}>
-            <option value="all">Everyone</option>
-            <option value="reviewer">Reviewer</option>
-            <option value="planner">Planner</option>
-            <option value="coder">Coding agent</option>
-            <option value="people">People</option>
-          </select>
-        </label>
-        <label className="text-xs text-zinc-400">
-          <span className="mb-1 block">Result</span>
-          <select value={outcome} onChange={(e) => setFilter({ outcome: e.target.value as Outcome })} className={inputClass}>
-            <option value="all">Any result</option>
-            <option value="problems">Failed or refused</option>
-            <option value="ok">Worked</option>
-            <option value="refused">Refused</option>
-            <option value="failed">Failed</option>
-            <option value="unknown_name">Unknown name (not sent)</option>
-          </select>
-        </label>
-        <label className="text-xs text-zinc-400">
-          <span className="mb-1 block">When</span>
-          <select value={range} onChange={(e) => setFilter({ range: e.target.value as Range })} className={inputClass}>
-            {RANGES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-          </select>
-        </label>
+      <ListToolbar
+        className="mb-3"
+        search={{
+          value: q,
+          onChange: (v) => setFilter({ q: v }),
+          placeholder: "Words in what was asked, why it failed, or a repository",
+          label: "Search",
+        }}
+        status={{
+          label: "Result",
+          value: outcome,
+          onChange: (v) => setFilter({ outcome: v as Outcome }),
+          options: [
+            { value: "all", label: "All" },
+            { value: "ok", label: "Worked", tone: "success" },
+            { value: "problems", label: "Problems", tone: "waiting" },
+            { value: "refused", label: "Refused", tone: "waiting" },
+            { value: "failed", label: "Failed", tone: "danger" },
+            { value: "unknown_name", label: "Unknown name", tone: "waiting" },
+          ],
+        }}
+        onClear={filtering ? clear : undefined}
+      />
+      <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2">
+        <FilterSelect label="Source" value={source} onChange={(v) => setFilter({ source: v })}>
+          <option value="all">All sources</option>
+          {sourceOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+        </FilterSelect>
+        <FilterSelect label="Who" value={who} onChange={(v) => setFilter({ who: v as Who })}>
+          <option value="all">Everyone</option>
+          <option value="reviewer">Reviewer</option>
+          <option value="planner">Planner</option>
+          <option value="coder">Coding agent</option>
+          <option value="people">People</option>
+        </FilterSelect>
+        <FilterSelect label="When" value={range} onChange={(v) => setFilter({ range: v as Range })}>
+          {RANGES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+        </FilterSelect>
       </div>
-      {filtering && (
-        <p className="mb-3">
-          <button type="button" onClick={clear} className={`${linkButton} text-xs`}>Clear filters</button>
-        </p>
-      )}
 
       {error && (
         <div className="mb-3">
-          <Callout variant="error" title="We couldn't load the activity log">
-            <p>{error} Your sources are not affected. {following ? "We'll try again in a few seconds." : "Resume to try again."}</p>
-          </Callout>
+          <ListError title="We couldn't load the activity log">
+            {error} Your sources are not affected. {following ? "We'll try again in a few seconds." : "Resume to try again."}
+          </ListError>
         </div>
       )}
 
       {events === null ? (
-        <ul role="status" aria-label="Loading lookups" className="rounded-lg border border-zinc-800 bg-zinc-900/50 divide-y divide-zinc-800">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <li key={i} className="flex items-start gap-3 px-4 py-4 sm:px-5">
-              <Skeleton className="h-7 w-7 shrink-0" />
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-3.5 w-3/4" />
-                <Skeleton className="h-3 w-1/2" />
-              </div>
-              <Skeleton className="h-5 w-12 rounded-full" />
-            </li>
-          ))}
-        </ul>
+        <ListSkeleton rows={4} label="Loading lookups" />
       ) : groups.length === 0 ? (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm text-zinc-400">
-          {filtering ? (
-            <>
-              <p>No lookups match these filters.</p>
-              <button type="button" onClick={clear} className={`${linkButton} mt-1 text-sm`}>Clear filters</button>
-            </>
-          ) : (
-            <p>No lookups yet. They appear here the moment Coderhelm or a teammate runs one.</p>
-          )}
-        </div>
+        filtering ? (
+          <ListEmpty title="No lookups match these filters." onClear={clear} />
+        ) : (
+          <ListEmpty title="No lookups yet. They appear here the moment Coderhelm or a teammate runs one." />
+        )
       ) : (
-        <ul className="rounded-lg border border-zinc-800 bg-zinc-900/50 divide-y divide-zinc-800">
+        <List label="Lookups">
           {groups.map((g) => {
             const ev = g.first;
             const key = g.key;
             const repeats = g.all.length;
-            const isOpen = open.has(key);
             const full = ev.query || ev.summary;
             const prUrl = ev.repo && ev.pr ? `https://github.com/${ev.repo}/pull/${ev.pr}` : "";
             const workUrl = ev.origin ? originHref(ev.origin) : "";
             const oldest = g.all[g.all.length - 1];
             return (
-              <li key={key} className={fresh.has(key) ? "animate-feed-in" : undefined} data-testid="activity-row">
-                <button
-                  type="button"
-                  onClick={() => toggle(key)}
-                  aria-expanded={isOpen}
-                  className={`flex w-full items-start gap-3 px-4 py-3.5 text-left hover:bg-zinc-800/40 sm:px-5 ${focusRing}`}
-                >
-                  <KindIcon kind={kinds.get(ev.source_id)} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block break-words text-sm text-zinc-100">{ev.summary}</span>
-                    {ev.outcome !== "ok" && ev.detail && (
-                      <span className={`mt-0.5 block break-words text-sm ${ev.outcome === "failed" ? "text-red-200" : "text-amber-200"}`}>{ev.detail}</span>
-                    )}
-                    <span className="mt-1 block break-words text-xs text-zinc-500">
-                      <span className="text-zinc-400">{actorLabel(ev)}</span>
-                      <span aria-hidden="true"> · </span>
-                      {ev.source_name}
-                      <span aria-hidden="true"> · </span>
-                      <time dateTime={ev.at} title={new Date(ev.at).toLocaleString()}>{timeAgo(ev.at)}</time>
-                      {ev.ms > 0 && (<><span aria-hidden="true"> · </span>{formatDuration(ev.ms)}</>)}
-                      {ev.outcome === "ok" && ev.detail && (<><span aria-hidden="true"> · </span>{ev.detail}</>)}
-                    </span>
-                  </span>
-                  <span className="flex shrink-0 flex-col items-end gap-1">
+              <ListRow
+                key={key}
+                testId="activity-row"
+                className={fresh.has(key) ? "animate-feed-in" : ""}
+                // A lookup that just arrived pulses once it lands.
+                status={{ tone: OUTCOME_TONE[ev.outcome] ?? "neutral", live: fresh.has(key) }}
+                title={ev.summary}
+                titleText={ev.summary}
+                summary={ev.outcome !== "ok" && ev.detail ? ev.detail : undefined}
+                summaryTone={ev.outcome === "failed" ? "danger" : "waiting"}
+                meta={[
+                  <span key="who" className="text-zinc-400">{actorLabel(ev)}</span>,
+                  ev.source_name,
+                  <Time key="at" iso={ev.at} />,
+                  ev.ms > 0 ? formatDuration(ev.ms) : null,
+                  ev.outcome === "ok" && ev.detail ? ev.detail : null,
+                ]}
+                chips={
+                  <>
                     <OutcomePill outcome={ev.outcome} />
                     {repeats > 1 && (
                       <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[11px] font-medium tabular-nums text-zinc-300">
                         {repeats} times in a row
                       </span>
                     )}
-                  </span>
-                </button>
-                {isOpen && (
-                  <div className="space-y-3 px-4 pb-4 sm:px-5 sm:pl-[3.75rem]">
+                  </>
+                }
+                open={open.has(key)}
+                onOpenChange={() => toggle(key)}
+                detailsFor={`details of the lookup: ${ev.summary}`}
+                details={
+                  <>
                     <div className="rounded-lg border border-zinc-800 bg-zinc-950">
                       <div className="flex items-center justify-between gap-2 border-b border-zinc-800 px-3 py-1.5">
                         <span className="text-xs text-zinc-500">What was asked</span>
@@ -493,21 +456,16 @@ export function ActivityFeed({
                         </a>
                       )}
                     </p>
-                  </div>
-                )}
-              </li>
+                  </>
+                }
+              />
             );
           })}
-        </ul>
+        </List>
       )}
 
-      {canPageBack && (
-        <div className="mt-3 flex items-center gap-3">
-          <button type="button" onClick={loadOlder} disabled={olderState === "loading"} className={secondaryButton}>
-            {olderState === "loading" ? "Loading…" : "Load older"}
-          </button>
-          {olderState === "error" && <span className="text-sm text-red-200">Couldn&apos;t load older lookups. Try again.</span>}
-        </div>
+      {events !== null && events.length > 0 && (
+        <LoadMore hasMore={canPageBack} loading={olderState === "loading"} failed={olderState === "error"} onClick={loadOlder} />
       )}
     </section>
   );

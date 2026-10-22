@@ -10,7 +10,8 @@ import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
 import { focusRing, primaryButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
-import { LoadError, Loading, Select } from "@/components/tests/common";
+import { LoadError, Loading } from "@/components/tests/common";
+import { RepoFilter, useListParams } from "@/components/list";
 import { FailureGroupsView, NeedsAttention, QuarantineView, RunsView, SlowestView } from "@/components/tests/views";
 import { TrendsView } from "@/components/tests/trends";
 import { CoverageView } from "@/components/tests/coverage";
@@ -49,7 +50,10 @@ function TestsPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [settings, setSettings] = useState<TestSettings | null>(null);
   const [summary, setSummary] = useState<TestSummary | null>(null);
-  const [repo, setRepo] = useState("");
+  // ?repo= leads; without one, the repo picked last time in this browser.
+  const [listParams, setListParams] = useListParams({ repo: "" });
+  const [stored, setStored] = useState("");
+  const repo = listParams.repo || stored;
   const [error, setError] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [turningOn, setTurningOn] = useState(false);
@@ -58,7 +62,7 @@ function TestsPage() {
   const view: View = visible.some((v) => v.value === asked) ? (asked as View) : "attention";
 
   useEffect(() => {
-    setRepo(readRepo());
+    setStored(readRepo());
     api.me().then((u) => setIsAdmin(ADMIN_ROLES.has(u.role))).catch(() => setIsAdmin(false));
   }, []);
 
@@ -75,8 +79,9 @@ function TestsPage() {
   useEffect(() => { load(); }, [load]);
 
   const pickRepo = (r: string) => {
-    setRepo(r);
+    setStored(r);
     writeRepo(r);
+    setListParams({ repo: r });
   };
 
   const turnOn = async () => {
@@ -108,16 +113,7 @@ function TestsPage() {
         titleClassName="text-balance"
         lead="Every E2E run from your CI: which tests are flaky, which are broken, what they cost your team, and which tests are worth adding."
         actions={
-          summary && summary.repos.length > 1 ? (
-            <div className="w-full sm:w-64">
-              <Select
-                label="Repository"
-                value={repo}
-                onChange={pickRepo}
-                options={[{ value: "", label: "All repositories" }, ...summary.repos.map((r) => ({ value: r, label: r }))]}
-              />
-            </div>
-          ) : undefined
+          summary && (summary.repos.length > 1 || repo) ? <RepoFilter value={repo} onChange={pickRepo} repos={summary.repos} /> : undefined
         }
       />
 

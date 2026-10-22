@@ -1,12 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { api, type Repo } from "@/lib/api";
-import { Skeleton } from "@/components/skeleton";
 import { RoleGuard } from "@/components/role-guard";
 import { Page, PageHeader } from "@/components/page";
+import { focusRing, secondaryButton } from "@/components/ui";
+import {
+  List,
+  ListEmpty,
+  ListError,
+  ListRow,
+  ListSkeleton,
+  ListToolbar,
+  LoadMore,
+  useListParams,
+  type StatusLook,
+} from "@/components/list";
 
-const PAGE_SIZE = 10;
+/** Rows shown at first, and added by each "Load more". */
+const PAGE_SIZE = 25;
 
 function parseOnboardError(raw: string | undefined): string {
   if (!raw) return "Analysis failed";
@@ -17,23 +29,49 @@ function parseOnboardError(raw: string | undefined): string {
   return "Analysis failed — click to retry";
 }
 
-export default function ReposPageGuarded() { return <RoleGuard minRole="member"><ReposPage /></RoleGuard>; }
+/** The row's dot: off, being read, ready, or failed. */
+function repoLook(repo: Repo): StatusLook {
+  if (!repo.enabled) return { label: "Off", tone: "muted" };
+  if (repo.onboard_status === "pending") return { label: "Analyzing", tone: "live", live: true };
+  if (repo.onboard_status === "failed") return { label: "Analysis failed", tone: "danger" };
+  return { label: "On", tone: "success" };
+}
+
+export default function ReposPageGuarded() {
+  return (
+    <RoleGuard minRole="member">
+      <Suspense fallback={<Page><PageHeader title="Repositories" /><div className="mt-6"><ListSkeleton /></div></Page>}>
+        <ReposPage />
+      </Suspense>
+    </RoleGuard>
+  );
+}
 
 function ReposPage() {
   const [repos, setRepos] = useState<Repo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(0);
+  const [error, setError] = useState(false);
+  const [shownCount, setShownCount] = useState(PAGE_SIZE);
   const [toggling, setToggling] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [savingRole, setSavingRole] = useState<string | null>(null);
+  const [params, setParams] = useListParams({ q: "", status: "all" });
+  const q = params.q.trim().toLowerCase();
+  const status = params.status === "on" || params.status === "off" ? params.status : "all";
+
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(false);
+    api
+      .listRepos()
+      .then((data) => setRepos(data.repos))
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
-    api.listRepos().then((data) => {
-      setRepos(data.repos);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
+    load();
+  }, [load]);
 
   // Poll while any repo is pending
   useEffect(() => {
@@ -43,6 +81,9 @@ function ReposPage() {
     }, 5000);
     return () => clearInterval(timer);
   }, [repos]);
+
+  // Back to the first rows when the filters change.
+  useEffect(() => setShownCount(PAGE_SIZE), [q, status]);
 
   const handleToggle = async (repo: Repo) => {
     setToggling(repo.name);
@@ -66,179 +107,170 @@ function ReposPage() {
     setSavingRole(null);
   };
 
-  const filtered = repos.filter((r) =>
-    r.name?.toLowerCase().includes(search.toLowerCase())
-  );
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const retry = (repo: Repo) => {
+    setToggling(repo.name);
+    api.toggleRepo(repo.name, true)
+      .then(() => setRepos((prev) => prev.map((r) => r.name === repo.name ? { ...r, onboard_status: "pending", onboard_error: undefined } : r)))
+      .catch(() => {})
+      .finally(() => setToggling(null));
+  };
 
-  // Reset to first page when search changes
-  useEffect(() => { setPage(0); }, [search]);
+  const sync = async () => {
+    setSyncing(true);
+    try {
+      await api.syncRepos();
+      const data = await api.listRepos();
+      setRepos(data.repos);
+    } catch { /* ignore */ }
+    setSyncing(false);
+  };
+
+  const searched = repos.filter((r) => !q || r.name?.toLowerCase().includes(q));
+  const onCount = searched.filter((r) => r.enabled).length;
+  const filtered = searched.filter((r) => status === "all" || (status === "on") === r.enabled);
+  const paged = filtered.slice(0, shownCount);
+  const anyFilter = !!(q || status !== "all");
+  const clear = () => setParams({ q: "", status: "all" });
 
   return (
     <Page>
-      <div className="mb-6">
-        <PageHeader
-          title="Repositories"
-          lead="Repos connected via the GitHub App. Enable the ones you want Coderhelm to work on, and set a role (web, backend, …) so Jira tickets route to the right repo."
-        />
-      </div>
+      <PageHeader
+        title="Repositories"
+        lead="Repos connected via the GitHub App. Enable the ones you want Coderhelm to work on, and set a role (web, backend, …) so Jira tickets route to the right repo."
+      />
 
-      {!loading && (
-        <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={async () => {
-              setSyncing(true);
-              try {
-                await api.syncRepos();
-                const data = await api.listRepos();
-                setRepos(data.repos);
-              } catch { /* ignore */ }
-              setSyncing(false);
-            }}
-            disabled={syncing}
-            className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 text-zinc-200 rounded-lg text-sm font-medium hover:bg-zinc-700 transition-colors disabled:opacity-50"
-          >
-            {syncing ? "Syncing..." : "Sync repos"}
-          </button>
-          <span className="text-xs text-zinc-600">Pull latest repos from GitHub</span>
-        </div>
+      {!loading && !error && repos.length > 0 && (
+        <ListToolbar
+          className="mt-6 mb-4"
+          search={{
+            value: params.q,
+            onChange: (v) => setParams({ q: v }, { replace: true }),
+            placeholder: "Search repos",
+          }}
+          status={{
+            label: "Show repos",
+            value: status,
+            onChange: (v) => setParams({ status: v }),
+            options: [
+              { value: "all", label: "All", count: searched.length },
+              { value: "on", label: "On", count: onCount, tone: "success" },
+              { value: "off", label: "Off", count: searched.length - onCount, tone: "muted" },
+            ],
+          }}
+          actions={
+            <button type="button" onClick={sync} disabled={syncing} className={secondaryButton} title="Pull latest repos from GitHub">
+              {syncing ? "Syncing..." : "Sync repos"}
+            </button>
+          }
+          onClear={anyFilter ? clear : undefined}
+          summary={`${filtered.length} repo${filtered.length !== 1 ? "s" : ""}${q ? ` matching "${params.q.trim()}"` : ""}`}
+        />
       )}
 
-      {loading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
-        </div>
-      ) : repos.length === 0 ? (
-        <div className="text-zinc-500 border border-zinc-800 rounded-lg p-8 text-center">
-          <p>No repos connected yet.</p>
-          <a
-            href="https://github.com/apps/coderhelm"
-            className="text-zinc-300 underline mt-2 inline-block text-sm"
-          >
-            Install the GitHub App
-          </a>
-        </div>
-      ) : (
-        <>
-          {/* Search */}
-          <input
-            type="text"
-            placeholder="Search repos..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full mb-4 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
+      <div className={!loading && !error && repos.length > 0 ? "" : "mt-6"}>
+        {loading ? (
+          <ListSkeleton rows={3} label="Loading repos" />
+        ) : error ? (
+          <ListError title="Couldn't load your repos" onRetry={load} />
+        ) : repos.length === 0 ? (
+          <ListEmpty
+            title="No repos connected yet."
+            action={
+              <>
+                <a href="https://github.com/apps/coderhelm" className={secondaryButton}>
+                  Install the GitHub App
+                </a>
+                <button type="button" onClick={sync} disabled={syncing} className={secondaryButton}>
+                  {syncing ? "Syncing..." : "Sync repos"}
+                </button>
+              </>
+            }
           />
-
-          {/* Count */}
-          <p className="text-xs text-zinc-500 mb-3">
-            {filtered.length} repo{filtered.length !== 1 ? "s" : ""}
-            {search && ` matching "${search}"`}
-          </p>
-
-          {/* Repo list */}
-          <div className="space-y-2">
-            {paged.map((repo) => (
-              <div
-                key={repo.name}
-                className="flex items-center justify-between px-4 py-3 bg-zinc-900/50 border border-zinc-800 rounded-lg"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  {/* Toggle switch */}
-                  <button
-                    onClick={() => handleToggle(repo)}
-                    disabled={toggling === repo.name}
-                    className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                      repo.enabled ? "bg-green-500" : "bg-zinc-700"
-                    } ${toggling === repo.name ? "opacity-50" : "cursor-pointer"}`}
-                  >
-                    <span
-                      className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                        repo.enabled ? "translate-x-4.5" : "translate-x-0.5"
-                      }`}
-                    />
-                  </button>
-                  <div className="min-w-0">
-                    <span className="text-sm font-mono text-zinc-200 truncate block">{repo.name}</span>
-                    {repo.enabled && repo.onboard_status === "pending" && (
-                      <span className="text-xs text-yellow-400/80 flex items-center gap-1 mt-0.5">
-                        <span className="inline-block w-3 h-3 border border-yellow-400/60 border-t-yellow-300 rounded-full animate-spin" />
+        ) : filtered.length === 0 ? (
+          <ListEmpty title="No repos match" onClear={clear} />
+        ) : (
+          <List label="Repositories">
+            {paged.map((repo) => {
+              const look = repoLook(repo);
+              return (
+                <ListRow
+                  key={repo.name}
+                  testId="repo-row"
+                  data={{ enabled: String(repo.enabled) }}
+                  leading={
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={repo.enabled}
+                      aria-label={`Let Coderhelm work on ${repo.name}`}
+                      onClick={() => handleToggle(repo)}
+                      disabled={toggling === repo.name}
+                      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                        repo.enabled ? "bg-green-500" : "bg-zinc-700"
+                      } ${toggling === repo.name ? "opacity-50" : "cursor-pointer"} ${focusRing}`}
+                    >
+                      <span
+                        className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                          repo.enabled ? "translate-x-4.5" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                  }
+                  title={repo.name}
+                  titleText={repo.name}
+                  quiet={!repo.enabled}
+                  summary={
+                    repo.enabled && repo.onboard_status === "pending" ? (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="inline-block h-3 w-3 animate-spin rounded-full border border-sky-400/60 border-t-sky-300 motion-reduce:animate-none" />
                         Analyzing...
                       </span>
-                    )}
-                    {repo.enabled && repo.onboard_status === "failed" && (
-                      <span className="text-xs text-red-400 mt-0.5 flex items-center gap-2">
+                    ) : repo.enabled && repo.onboard_status === "failed" ? (
+                      <span className="inline-flex flex-wrap items-center gap-2">
                         <span title={repo.onboard_error}>✕ {parseOnboardError(repo.onboard_error)}</span>
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setToggling(repo.name);
-                            api.toggleRepo(repo.name, true)
-                              .then(() => setRepos((prev) => prev.map((r) => r.name === repo.name ? { ...r, onboard_status: "pending", onboard_error: undefined } : r)))
-                              .catch(() => {})
-                              .finally(() => setToggling(null));
-                          }}
+                          type="button"
+                          onClick={() => retry(repo)}
                           disabled={toggling === repo.name}
-                          className="text-xs text-zinc-400 hover:text-zinc-200 underline underline-offset-2 cursor-pointer disabled:opacity-50"
+                          className={`rounded text-xs text-zinc-400 underline underline-offset-2 hover:text-zinc-200 disabled:opacity-50 ${focusRing}`}
                         >
                           Retry
                         </button>
                       </span>
-                    )}
-                    {repo.enabled && repo.onboard_status === "ready" && (
-                      <span className="text-xs text-green-400/70 mt-0.5 block">✓ Ready</span>
-                    )}
-                  </div>
-                </div>
-                {repo.enabled && (
-                  <div className="relative shrink-0 ml-3" title="Primary role for this repo — routes matching Jira tickets here">
-                    <select
-                      value={repo.role || ""}
-                      onChange={(e) => handleRoleChange(repo, e.target.value)}
-                      disabled={savingRole === repo.name}
-                      className="appearance-none pl-2.5 pr-7 py-1 text-xs font-medium rounded-md border bg-zinc-900 border-zinc-700 text-zinc-300 focus:outline-none focus:border-zinc-500 cursor-pointer disabled:opacity-50"
-                    >
-                      <option value="">No role</option>
-                      <option value="web">Web</option>
-                      <option value="backend">Backend</option>
-                      <option value="mobile">Mobile</option>
-                      <option value="cms">CMS</option>
-                      <option value="infra">Infra</option>
-                      <option value="data">Data</option>
-                    </select>
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500"><polyline points="6 9 12 15 18 9" /></svg>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-zinc-800">
-              <button
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                disabled={page === 0}
-                className="px-3 py-1.5 text-sm bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                Previous
-              </button>
-              <span className="text-xs text-zinc-500">
-                Page {page + 1} of {totalPages}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                disabled={page >= totalPages - 1}
-                className="px-3 py-1.5 text-sm bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                Next
-              </button>
-            </div>
-          )}
-        </>
-      )}
+                    ) : repo.enabled && repo.onboard_status === "ready" ? (
+                      "✓ Ready"
+                    ) : undefined
+                  }
+                  summaryTone={look.tone}
+                  chips={
+                    repo.enabled ? (
+                      <span className="relative" title="Primary role for this repo — routes matching Jira tickets here">
+                        <select
+                          aria-label={`Role of ${repo.name}`}
+                          value={repo.role || ""}
+                          onChange={(e) => handleRoleChange(repo, e.target.value)}
+                          disabled={savingRole === repo.name}
+                          className={`appearance-none rounded-md border border-zinc-700 bg-zinc-900 py-1 pl-2.5 pr-7 text-xs font-medium text-zinc-300 focus:border-zinc-500 focus:outline-none disabled:opacity-50 ${focusRing}`}
+                        >
+                          <option value="">No role</option>
+                          <option value="web">Web</option>
+                          <option value="backend">Backend</option>
+                          <option value="mobile">Mobile</option>
+                          <option value="cms">CMS</option>
+                          <option value="infra">Infra</option>
+                          <option value="data">Data</option>
+                        </select>
+                        <svg aria-hidden="true" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500"><polyline points="6 9 12 15 18 9" /></svg>
+                      </span>
+                    ) : undefined
+                  }
+                />
+              );
+            })}
+          </List>
+        )}
+        <LoadMore hasMore={!loading && filtered.length > shownCount} loading={false} onClick={() => setShownCount((n) => n + PAGE_SIZE)} />
+      </div>
     </Page>
   );
 }

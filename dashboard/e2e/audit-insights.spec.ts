@@ -329,6 +329,24 @@ test("admin allowlist adds once in lower case and asks before removing", async (
   expect(errors).toEqual([]);
 });
 
+test("admin teams: search, status and sort sit above the table and live in the address", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page, { email: "admin@coderhelm.com", role: "owner" });
+  await page.goto("/admin");
+  const teams = page.getByTestId("admin-teams");
+  await expect(teams.getByRole("row")).toHaveCount(3);
+  await page.getByRole("combobox", { name: "Sort" }).selectOption("name");
+  await expect(page).toHaveURL(/sort=name/);
+  await expect(teams.getByRole("row").nth(1)).toContainText("acme");
+  await page.getByRole("searchbox", { name: "Search teams" }).fill("beta");
+  await expect(teams.getByRole("row")).toHaveCount(2);
+  await expect(teams.getByRole("row").nth(1)).toContainText("beta-co");
+  await page.getByRole("searchbox", { name: "Search teams" }).fill("nobody-here");
+  await expect(page.getByText("No teams match")).toBeVisible();
+  await expect(page.getByRole("group", { name: "Show teams" }).getByRole("button", { name: /^All\s*0$/ })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test("admin allowlist load failure is shown, not presented as an empty list", async ({ page }) => {
   await mockApi(page, { email: "admin@coderhelm.com", role: "owner", fail: new Set(["/api/allowlist"]) });
   await page.goto("/admin");
@@ -346,7 +364,7 @@ test("code graph shows stats, search and the explorer", async ({ page }) => {
   await expect(page.getByLabel("Repository")).toHaveValue("your-team/web");
   await expect(page.getByText("3,400")).toBeVisible();
   await page.getByLabel("Function, class or type name").fill("request");
-  await page.getByRole("button", { name: "Search" }).click();
+  await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Definitions (1)" })).toBeVisible();
   await page.getByRole("button", { name: /src\/lib\/api\.ts/ }).first().click();
   await expect(page.getByRole("group", { name: "Files connected to src/lib/api.ts" })).toBeVisible();

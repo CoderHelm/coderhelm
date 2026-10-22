@@ -171,7 +171,7 @@ test("plans list shows plain status words and keeps New plan while a plan runs",
   await page.goto("/plans/");
   await expect(page.getByRole("heading", { name: "Plans", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Add a class schedule page" })).toBeVisible();
-  await expect(page.getByText("Running", { exact: true })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Plans" }).getByText("Running", { exact: true })).toBeVisible();
   // A plan is running: both ways forward are offered.
   await expect(page.getByRole("link", { name: "New plan" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Continue running plan" })).toHaveAttribute("href", /\/plans\/detail\/?\?id=PLANB/);
@@ -185,9 +185,33 @@ test("Load more sends the cursor encoded, so the next page arrives", async ({ pa
   await page.goto("/plans/");
   await page.getByRole("button", { name: "Load more" }).click();
   await expect(page.getByRole("link", { name: "Clean up old flags" })).toBeVisible();
-  await expect(page.getByText("Waiting on a merge")).toBeVisible();
+  await expect(page.getByRole("list", { name: "Plans" }).getByText("Waiting on a merge")).toBeVisible();
   expect(db.calls).toContain("GET /api/plans?cursor=PLAN%23PLANB");
   await expect(page.getByRole("button", { name: "Load more" })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("plans toolbar: status toggles with counts and a search, kept in the address", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page);
+  await page.goto("/plans/");
+  const list = page.getByRole("list", { name: "Plans" });
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+  const toggles = page.getByRole("group", { name: "Show plans" });
+  await expect(toggles.getByRole("button", { name: /^All\s*2$/ })).toHaveAttribute("aria-pressed", "true");
+  await toggles.getByRole("button", { name: /^Active/ }).click();
+  await expect(page).toHaveURL(/status=active/);
+  await expect(list.getByRole("listitem")).toHaveCount(1);
+  await expect(list.getByRole("link", { name: "Retry the sync job" })).toBeVisible();
+  await page.goBack();
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+  await page.getByRole("searchbox", { name: "Search plans" }).fill("class schedule");
+  await expect(page).toHaveURL(/q=class/);
+  await expect(list.getByRole("listitem")).toHaveCount(1);
+  await page.getByRole("searchbox", { name: "Search plans" }).fill("nothing like this");
+  await expect(page.getByText(/No plans match/)).toBeVisible();
+  await page.getByRole("button", { name: "Clear filters" }).first().click();
+  await expect(list.getByRole("listitem")).toHaveCount(2);
   expect(errors).toEqual([]);
 });
 
@@ -297,7 +321,23 @@ test("templates list shows the delete button without hovering", async ({ page })
   await shot(page, "plans-templates");
   await del.click();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "New API endpoint" })).toHaveCount(0);
+  await expect(page.getByRole("list", { name: "Templates" }).getByText("New API endpoint")).toHaveCount(0);
+  await expect(page.getByRole("list", { name: "Templates" }).getByText("New settings page")).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("templates search narrows the list and says when nothing matches", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page);
+  await page.goto("/plans/templates/");
+  const list = page.getByRole("list", { name: "Templates" });
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+  // Tags and categories are searched too.
+  await page.getByRole("searchbox", { name: "Search templates" }).fill("backend");
+  await expect(list.getByRole("listitem")).toHaveCount(1);
+  await expect(list.getByText("New API endpoint")).toBeVisible();
+  await page.getByRole("searchbox", { name: "Search templates" }).fill("zzz");
+  await expect(page.getByText(/No templates match/)).toBeVisible();
   expect(errors).toEqual([]);
 });
 

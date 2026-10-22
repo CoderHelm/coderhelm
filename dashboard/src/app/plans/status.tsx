@@ -1,14 +1,23 @@
+import { TONES, type StatusLook } from "@/components/list/status";
+
 // Plain-word status pills for plans and their tasks. The API sends status
 // words like "rejected" or "waiting"; people see what they mean.
 
 const PILL = "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap";
 
-const PLAN: Record<string, { label: string; style: string }> = {
-  draft: { label: "Draft", style: "bg-zinc-800 text-zinc-400 border-zinc-700" },
-  executing: { label: "Running", style: "bg-blue-500/10 text-blue-400 border-blue-500/20" },
-  waiting: { label: "Waiting on a merge", style: "bg-orange-500/10 text-orange-400 border-orange-500/20" },
-  done: { label: "Done", style: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
+// Plans use the shared list tones (components/list/status), so "Running" is
+// the same colour here as on Runs.
+const PLAN: Record<string, StatusLook> = {
+  draft: { label: "Draft", tone: "neutral" },
+  executing: { label: "Running", tone: "live", live: true },
+  waiting: { label: "Waiting on a merge", tone: "waiting" },
+  done: { label: "Done", tone: "success" },
 };
+
+/** How a plan's status looks in a list; unknown statuses read as plain words. */
+export function planStatusLook(status: string): StatusLook {
+  return PLAN[status] ?? { label: words(status), tone: "neutral" };
+}
 
 export const TASK: Record<string, { label: string; style: string; dot: string; border: string }> = {
   draft: { label: "Draft", style: "bg-zinc-800 text-zinc-400 border-zinc-700", dot: "bg-zinc-700", border: "border-l-zinc-700" },
@@ -35,8 +44,8 @@ export function taskInfo(status: string) {
 }
 
 export function PlanStatusPill({ status }: { status: string }) {
-  const s = PLAN[status] ?? { label: words(status), style: PLAN.draft.style };
-  return <span className={`${PILL} ${s.style}`}>{s.label}</span>;
+  const s = planStatusLook(status);
+  return <span className={`${PILL} ${TONES[s.tone].chip}`}>{s.label}</span>;
 }
 
 export function TaskStatusPill({ status }: { status: string }) {

@@ -53,6 +53,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/usage") return json(route, { month: "2026-01", tokens_in: 0, tokens_out: 0, total_runs: 0, ...db.usage });
     if (p === "/api/banners") return json(route, { banners: db.banners });
     if (p === "/api/integrations") return json(route, { can_edit: false, items: [], migrated: 0 });
+    if (p === "/api/repos") return json(route, { repos: [{ name: "your-team/web", enabled: true, ticket_source: "github" }, { name: "your-team/api", enabled: true, ticket_source: "github" }] });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }, { team_id: "t_2", org: "other-team", status: "active", current: false }] });
     // The gateway answers errors with a bare status and no body.
     if (db.allFail) return route.fulfill({ status: db.allFail, body: "" });
@@ -123,7 +124,7 @@ test("runs list: plain status words, readable times, grouped attempts with a nam
   await mockApi(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "Runs" })).toBeVisible();
-  const table = page.getByRole("table");
+  const table = page.getByRole("list", { name: "Runs" });
   await expect(table.getByText("Needs your answer").filter({ visible: true })).toBeVisible();
   await expect(table.getByText("Merged").filter({ visible: true })).toBeVisible();
   await expect(table.getByText("Waiting on CI").filter({ visible: true })).toBeVisible();
@@ -137,10 +138,10 @@ test("runs list: plain status words, readable times, grouped attempts with a nam
   // A run with no title still has a link to open it.
   await expect(table.getByRole("link", { name: "Untitled run" })).toHaveAttribute("href", /\/runs\/detail\/?\?id=01RUN00000000000000000000/);
 
-  const toggle = page.getByRole("button", { name: "Show 1 earlier attempt" });
+  const toggle = page.getByRole("button", { name: /^Show 1 earlier attempt of / });
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await toggle.click();
-  await expect(page.getByRole("button", { name: "Hide 1 earlier attempt" })).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("button", { name: /^Hide 1 earlier attempt of / })).toHaveAttribute("aria-expanded", "true");
   await expect(table.getByText("Failed").filter({ visible: true })).toBeVisible();
   await expect(page).toHaveTitle("Runs · Coderhelm");
   await shot(page, "shell-runs");
@@ -156,7 +157,7 @@ test("runs list: a failed load says so and Try again reloads", async ({ page }) 
   await shot(page, "shell-runs-error");
   db.runs = 200;
   await page.getByRole("button", { name: "Try again" }).click();
-  await expect(page.getByRole("table").getByText("Needs your answer").filter({ visible: true })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Runs" }).getByText("Needs your answer").filter({ visible: true })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -188,7 +189,7 @@ test("runs list: search and status filter ask the server, stay in the address, a
   const errors = watchConsole(page);
   const db = await mockApi(page);
   await page.goto("/");
-  const table = page.getByRole("table");
+  const table = page.getByRole("list", { name: "Runs" });
   await expect(table.getByText("Needs your answer").filter({ visible: true })).toBeVisible();
 
   const search = page.getByRole("searchbox", { name: "Search runs" });
@@ -199,14 +200,16 @@ test("runs list: search and status filter ask the server, stay in the address, a
   // Typing waits for a pause: one search request, not one per key.
   expect(db.calls.filter((c) => c.startsWith("GET /api/runs?q=")).length).toBe(1);
 
-  await page.getByRole("combobox", { name: "Status" }).selectOption({ label: "Failed" });
+  await page.getByRole("group", { name: "Show runs" }).getByRole("button", { name: "Failed" }).click();
   await expect(page).toHaveURL(/\?q=api-7&status=failed$/);
+  expect(db.calls.some((c) => c.includes("status=failed%2Ccancelled"))).toBe(true);
   await expect(page.getByText("No runs match")).toBeVisible();
   await expect(page.getByText("No runs yet")).toHaveCount(0);
   await shot(page, "shell-runs-no-match");
 
   await page.getByRole("button", { name: "Clear the search" }).click();
   await expect(search).toHaveValue("");
+  await page.getByTestId("list-toolbar").getByRole("button", { name: "Clear filters" }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(table.getByText("Needs your answer").filter({ visible: true })).toBeVisible();
 

@@ -1,4 +1,5 @@
 import type { LivePr, MergeChecklistLine, Review } from "@/lib/api";
+import type { StatusLook } from "@/components/list/status";
 
 // What the reviewer is doing with each PR, in short words. The backend sends one
 // status per PR (`/api/reviewer/live`); the reviews list adds the verdicts. A
@@ -7,34 +8,28 @@ import type { LivePr, MergeChecklistLine, Review } from "@/lib/api";
 
 export type Group = "active" | "waiting" | "done";
 
-export interface StatusLook {
-  label: string;
-  dot: string;
-  text: string;
-  /** Still moving: the dot pulses and the page keeps refreshing. */
-  live?: boolean;
-}
-
+// Colours are the shared list tones (components/list/status), so "waiting" is
+// the same amber here as on Runs.
 const LOOKS: Record<string, StatusLook> = {
-  reviewing: { label: "Reviewing", dot: "bg-sky-400", text: "text-sky-300", live: true },
-  queued: { label: "Queued", dot: "bg-sky-400/60", text: "text-sky-300", live: true },
-  retrying: { label: "Retrying", dot: "bg-amber-400", text: "text-amber-300", live: true },
-  waiting_ci: { label: "Waiting for CI", dot: "bg-cyan-400", text: "text-cyan-300", live: true },
-  waiting_people: { label: "Waiting for approval", dot: "bg-amber-400", text: "text-amber-300" },
-  ci_failing: { label: "CI failing", dot: "bg-red-400", text: "text-red-300" },
-  merge_blocked: { label: "Merge blocked", dot: "bg-red-400", text: "text-red-300" },
-  paused: { label: "Auto-merge paused", dot: "bg-zinc-400", text: "text-zinc-300" },
-  failed: { label: "Review failed", dot: "bg-red-400", text: "text-red-300" },
-  stalled: { label: "Review stalled", dot: "bg-red-400", text: "text-red-300" },
-  merged: { label: "Merged", dot: "bg-violet-400", text: "text-violet-300" },
-  closed: { label: "Closed", dot: "bg-zinc-500", text: "text-zinc-400" },
-  new_commits: { label: "New commits", dot: "bg-zinc-400", text: "text-zinc-300" },
-  skipped: { label: "No review needed", dot: "bg-zinc-600", text: "text-zinc-400" },
-  reviewed: { label: "Reviewed", dot: "bg-zinc-600", text: "text-zinc-400" },
+  reviewing: { label: "Reviewing", tone: "live", live: true },
+  queued: { label: "Queued", tone: "queued", live: true },
+  retrying: { label: "Retrying", tone: "waiting", live: true },
+  waiting_ci: { label: "Waiting for CI", tone: "waiting", live: true },
+  waiting_people: { label: "Waiting for approval", tone: "waiting" },
+  ci_failing: { label: "CI failing", tone: "danger" },
+  merge_blocked: { label: "Merge blocked", tone: "danger" },
+  paused: { label: "Auto-merge paused", tone: "neutral" },
+  failed: { label: "Review failed", tone: "danger" },
+  stalled: { label: "Review stalled", tone: "danger" },
+  merged: { label: "Merged", tone: "merged" },
+  closed: { label: "Closed", tone: "muted" },
+  new_commits: { label: "New commits", tone: "neutral" },
+  skipped: { label: "No review needed", tone: "muted" },
+  reviewed: { label: "Reviewed", tone: "muted" },
 };
 
 export function statusLook(status: string): StatusLook {
-  return LOOKS[status] ?? { label: sentence(status || "reviewed"), dot: "bg-zinc-600", text: "text-zinc-400" };
+  return LOOKS[status] ?? { label: sentence(status || "reviewed"), tone: "muted" };
 }
 
 function sentence(code: string): string {

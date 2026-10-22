@@ -1,35 +1,69 @@
 "use client";
 
+import { Suspense, useMemo } from "react";
 import Link from "next/link";
 import { api, type Plan } from "@/lib/api";
-import { TableSkeleton } from "@/components/skeleton";
-import { Callout } from "@/components/callout";
-import { usePagedList, LoadMoreButton } from "@/components/load-more";
-import { focusRing, primaryButton, secondaryButton, linkButton } from "@/components/ui";
+import { linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
-import { PlanStatusPill } from "./status";
+import {
+  GROUP_LABEL,
+  List,
+  ListEmpty,
+  ListError,
+  ListRow,
+  ListSkeleton,
+  ListToolbar,
+  LoadMore,
+  StatusText,
+  useListParams,
+  usePagedList,
+  useTeamRepos,
+} from "@/components/list";
+import { planStatusLook } from "./status";
 
-function timeAgo(iso: string): string {
-  const t = new Date(iso).getTime();
-  if (!iso || Number.isNaN(t)) return "—";
-  const seconds = Math.floor((Date.now() - t) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
+// The status toggles: each is one plan status.
+const TABS = [
+  { value: "all", label: GROUP_LABEL.all, status: "" },
+  { value: "active", label: GROUP_LABEL.active, status: "executing", tone: "live" },
+  { value: "waiting", label: GROUP_LABEL.waiting, status: "waiting", tone: "waiting" },
+  { value: "draft", label: "Draft", status: "draft", tone: "neutral" },
+  { value: "done", label: GROUP_LABEL.done, status: "done", tone: "success" },
+] as const;
+
+function planMatches(plan: Plan, q: string): boolean {
+  if (!q) return true;
+  const hay = [plan.title, plan.description, plan.repo].filter(Boolean).join(" ").toLowerCase();
+  return q
+    .toLowerCase()
+    .split(/\s+/)
+    .every((w) => hay.includes(w));
 }
 
-export default function PlansPage() {
-  const { items: plans, next, loading, loadingMore, error, loadMore, reload } = usePagedList<Plan>(
+export default function PlansPageWithParams() {
+  return (
+    <Suspense fallback={<Page><PageHeader title="Plans" /><div className="mt-6"><ListSkeleton /></div></Page>}>
+      <PlansPage />
+    </Suspense>
+  );
+}
+
+function PlansPage() {
+  const [params, setParams] = useListParams({ q: "", status: "all", repo: "" });
+  const q = params.q.trim();
+  const tab = TABS.find((t) => t.value === params.status) ?? TABS[0];
+  const repo = params.repo;
+  const teamRepos = useTeamRepos();
+  const { items: plans, next, loading, loadingMore, error, moreFailed, loadMore, reload } = usePagedList<Plan>(
     (cursor) => api.listPlans(cursor).then((d) => ({ items: d.plans, next: d.next_cursor })),
     [],
   );
 
   const executingPlan = plans.find((p) => p.status === "executing");
+  // Search and repo first, so the toggle counts say what each would show.
+  const matched = useMemo(() => plans.filter((p) => planMatches(p, q) && (!repo || p.repo === repo)), [plans, q, repo]);
+  const shown = tab.status ? matched.filter((p) => p.status === tab.status) : matched;
+  const filtered = !!(q || repo || tab.value !== "all");
+  const clear = () => setParams({ q: "", status: "all", repo: "" });
 
   return (
     <Page>
@@ -50,68 +84,77 @@ export default function PlansPage() {
         }
       />
 
-      <div className="mt-6">
-      {loading ? (
-        <TableSkeleton rows={4} cols={4} />
-      ) : error ? (
-        <Callout variant="error" title="Couldn't load your plans">
-          <button type="button" onClick={reload} className={linkButton}>
-            Try again
-          </button>
-        </Callout>
-      ) : plans.length === 0 ? (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 sm:p-12 text-center text-zinc-500">
-          <p className="text-lg mb-2 text-zinc-300">No plans yet</p>
-          <p className="text-sm mb-4">
-            A plan breaks a feature into ordered GitHub issues or Jira tickets that Coderhelm builds one by one.
-          </p>
-          <Link href="/plans/new" className={linkButton}>
-            Create your first plan
-          </Link>
-        </div>
-      ) : (
-        <div className="border border-zinc-800 rounded-lg overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-zinc-900 text-zinc-400 text-left">
-              <tr>
-                <th scope="col" className="px-4 py-3 font-medium">Title</th>
-                <th scope="col" className="px-4 py-3 font-medium hidden md:table-cell">Repo</th>
-                <th scope="col" className="px-4 py-3 font-medium hidden sm:table-cell">Tasks</th>
-                <th scope="col" className="px-4 py-3 font-medium">Status</th>
-                <th scope="col" className="px-4 py-3 font-medium hidden sm:table-cell">Created</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800">
-              {plans.map((plan) => (
-                <tr key={plan.plan_id} className="hover:bg-zinc-900/50">
-                  <td className="px-4 py-3 min-w-0">
-                    <Link
-                      href={`/plans/detail?id=${plan.plan_id}`}
-                      className={`text-zinc-100 hover:underline font-medium rounded break-words ${focusRing}`}
-                    >
-                      {plan.title || "Untitled plan"}
-                    </Link>
-                    {plan.description && (
-                      <p className="text-zinc-500 text-xs mt-0.5 line-clamp-2 max-w-md">{plan.description}</p>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 hidden md:table-cell">
-                    <span className="text-zinc-400 font-mono text-xs">{plan.repo || "—"}</span>
-                  </td>
-                  <td className="px-4 py-3 text-zinc-400 hidden sm:table-cell">{plan.task_count || "—"}</td>
-                  <td className="px-4 py-3">
-                    <PlanStatusPill status={plan.status} />
-                  </td>
-                  <td className="px-4 py-3 text-zinc-500 text-xs whitespace-nowrap hidden sm:table-cell">
-                    {timeAgo(plan.created_at)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {!loading && !error && plans.length > 0 && (
+        <ListToolbar
+          className="mt-6 mb-4"
+          search={{
+            value: params.q,
+            onChange: (v) => setParams({ q: v }, { replace: true }),
+            placeholder: "Search by title, description or repo",
+            label: "Search plans",
+          }}
+          status={{
+            label: "Show plans",
+            value: tab.value,
+            onChange: (v) => setParams({ status: v }),
+            options: TABS.map((t) => ({
+              value: t.value,
+              label: t.label,
+              count: t.status ? matched.filter((p) => p.status === t.status).length : matched.length,
+              tone: "tone" in t ? t.tone : undefined,
+            })),
+          }}
+          repo={{ value: repo, onChange: (v) => setParams({ repo: v }), repos: teamRepos }}
+          onClear={filtered ? clear : undefined}
+        />
       )}
-      <LoadMoreButton hasMore={!!next} loading={loadingMore} onClick={loadMore} />
+
+      <div className={plans.length > 0 && !loading && !error ? "" : "mt-6"}>
+        {loading ? (
+          <ListSkeleton rows={4} label="Loading plans" />
+        ) : error ? (
+          <ListError title="Couldn't load your plans" onRetry={reload} />
+        ) : plans.length === 0 ? (
+          <ListEmpty
+            title="No plans yet"
+            action={
+              <Link href="/plans/new" className={linkButton}>
+                Create your first plan
+              </Link>
+            }
+          >
+            A plan breaks a feature into ordered GitHub issues or Jira tickets that Coderhelm builds one by one.
+          </ListEmpty>
+        ) : shown.length === 0 ? (
+          <ListEmpty title={q ? `No plans match “${q}”` : "No plans here"} onClear={clear}>
+            {next ? "Only the plans loaded so far were searched. Load more to search older ones." : undefined}
+          </ListEmpty>
+        ) : (
+          <List label="Plans">
+            {shown.map((plan) => {
+              const look = planStatusLook(plan.status);
+              return (
+                <ListRow
+                  key={plan.plan_id}
+                  testId="plan-row"
+                  data={{ status: plan.status }}
+                  status={look}
+                  title={plan.title || "Untitled plan"}
+                  titleText={plan.title || undefined}
+                  href={`/plans/detail?id=${plan.plan_id}`}
+                  meta={[
+                    !repo ? plan.repo || null : null,
+                    plan.task_count ? `${plan.task_count} task${plan.task_count === 1 ? "" : "s"}` : null,
+                  ]}
+                  summary={plan.description || undefined}
+                  chips={<StatusText look={look} />}
+                  time={plan.created_at}
+                />
+              );
+            })}
+          </List>
+        )}
+        {!loading && !error && <LoadMore hasMore={!!next} loading={loadingMore} failed={moreFailed} onClick={loadMore} />}
       </div>
     </Page>
   );

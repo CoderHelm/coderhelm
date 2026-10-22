@@ -231,32 +231,32 @@ test("skills activity: filters go to the server, stay in the address, and clear"
   await expect(page).toHaveURL(/by=coder/);
 
   await page.getByLabel("Who").selectOption("");
-  await page.getByLabel("Result").selectOption("problems");
+  await page.getByRole("group", { name: "Result" }).getByRole("button", { name: "Went wrong" }).click();
   await expect(rows).toHaveCount(3);
   expect(lastCall(db, "/api/skills/activity")?.params.get("outcome")).toBe("problems");
 
-  await page.getByLabel("Result").selectOption("");
+  await page.getByRole("group", { name: "Result" }).getByRole("button", { name: "All", exact: true }).click();
   await page.getByLabel("Item").selectOption({ label: "agent:spec-checker" });
   await expect(rows).toHaveCount(2);
   expect(lastCall(db, "/api/skills/activity")?.params.get("path")).toBe("agents/spec-checker.md");
 
   await page.getByLabel("Item").selectOption("");
-  await page.getByLabel("Search").fill("partial refunds");
+  await page.getByRole("searchbox", { name: "Search" }).fill("partial refunds");
   await expect(rows).toHaveCount(2);
   expect(lastCall(db, "/api/skills/activity")?.params.get("q")).toBe("partial refunds");
   await expect(page).toHaveURL(/q=partial\+refunds/);
 
   // A reload keeps the view.
   await page.reload();
-  await expect(page.getByLabel("Search")).toHaveValue("partial refunds");
+  await expect(page.getByRole("searchbox", { name: "Search" })).toHaveValue("partial refunds");
   await expect(rows).toHaveCount(2);
 
-  await page.getByLabel("Search").fill("nothing like this");
+  await page.getByRole("searchbox", { name: "Search" }).fill("nothing like this");
   await expect(page.getByText("Nothing matches these filters.")).toBeVisible();
   await shot(page, "skills-activity-empty-filter");
   await page.getByRole("button", { name: "Clear filters" }).last().click();
   await expect(rows).toHaveCount(7);
-  await expect(page.getByLabel("Search")).toHaveValue("");
+  await expect(page.getByRole("searchbox", { name: "Search" })).toHaveValue("");
 
   await page.getByLabel("When").selectOption("24h");
   await expect(rows).toHaveCount(5);
@@ -267,7 +267,7 @@ test("skills activity: a summary count opens the log filtered to it", async ({ p
   await mockApi(page);
   await page.goto("/skills/?tab=activity");
   await page.getByTestId("activity-summary").getByRole("link", { name: /went wrong/ }).click();
-  await expect(page.getByLabel("Result")).toHaveValue("problems");
+  await expect(page.getByRole("group", { name: "Result" }).getByRole("button", { name: "Went wrong" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByLabel("When")).toHaveValue("7d");
   await expect(page.getByTestId("skill-activity-row")).toHaveCount(3);
 });
@@ -283,7 +283,7 @@ test("skills activity: older entries load as the list scrolls, and the end says 
   await expect(rows).toHaveCount(75);
   expect(db.calls.filter((c) => c.path === "/api/skills/activity" && c.params.get("before")).length).toBeGreaterThan(0);
   await expect(page.getByText("That's everything kept. Reads and asks are kept for 180 days.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Load older" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Load more" })).toHaveCount(0);
 });
 
 test("skills activity: nothing yet, and a failed load offers to try again", async ({ page }) => {
@@ -354,18 +354,18 @@ test("lookup log: summary, the same failure in a row shows once, and a row links
   await expect(repeated.getByRole("button", { name: "Copy" })).toBeVisible();
   await shot(page, "lookups-activity");
 
-  await activity.getByRole("button", { name: "Problems only" }).click();
+  await activity.getByRole("group", { name: "Result" }).getByRole("button", { name: "Problems" }).click();
   await expect(rows).toHaveCount(2);
   expect(lastCall(db, "/api/data-sources/activity")?.params.get("outcome")).toBe("problems");
   await expect(page).toHaveURL(/outcome=problems/);
-  await expect(activity.getByLabel("Result")).toHaveValue("problems");
+  await expect(activity.getByRole("group", { name: "Result" }).getByRole("button", { name: "Problems" })).toHaveAttribute("aria-pressed", "true");
 });
 
 test("lookup log: filters from the address are applied and sent, search goes to the server", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/data-sources/activity/?outcome=refused&range=7d");
   const activity = page.locator("#activity");
-  await expect(activity.getByLabel("Result")).toHaveValue("refused");
+  await expect(activity.getByRole("group", { name: "Result" }).getByRole("button", { name: "Refused" })).toHaveAttribute("aria-pressed", "true");
   await expect(activity.getByLabel("When")).toHaveValue("7d");
   await expect(activity.getByTestId("activity-row")).toHaveCount(1);
   const call = lastCall(db, "/api/data-sources/activity");
@@ -374,7 +374,7 @@ test("lookup log: filters from the address are applied and sent, search goes to 
 
   await activity.getByRole("button", { name: "Clear filters" }).first().click();
   await expect(activity.getByTestId("activity-row")).toHaveCount(4);
-  await activity.getByLabel("Search").fill("information_schema");
+  await activity.getByRole("searchbox", { name: "Search" }).fill("information_schema");
   await expect(activity.getByTestId("activity-row")).toHaveCount(1);
   expect(lastCall(db, "/api/data-sources/activity")?.params.get("q")).toBe("information_schema");
   await shot(page, "lookups-activity-search");

@@ -1,95 +1,125 @@
-/** What Coderhelm did with an alert, as a badge. */
+import { TONES, type StatusLook, type Tone } from "@/components/list/status";
+
+/** What Coderhelm did with an alert, in four groups for the list's toggles. */
+export type OutcomeGroup = "started" | "handled" | "ignored" | "problem";
+
+/** The outcome toggles on the alerts list, in order. */
+export const OUTCOME_GROUPS: { value: OutcomeGroup; label: string; tone: Tone }[] = [
+  { value: "started", label: "Run started", tone: "success" },
+  { value: "handled", label: "Handled", tone: "neutral" },
+  { value: "ignored", label: "Not acted on", tone: "muted" },
+  { value: "problem", label: "Problems", tone: "danger" },
+];
+
+/** Colours are the shared list tones (components/list/status). */
 export const OUTCOMES: Record<
   string,
-  { label: string; detail: string; cls: string }
+  { label: string; detail: string; tone: Tone; group: OutcomeGroup }
 > = {
   run_started: {
     label: "Run started",
     detail: "Coderhelm started a run on the mapped repo to act on this alert.",
-    cls: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
+    tone: "success",
+    group: "started",
   },
   duplicate: {
     label: "Repeat",
     detail:
       "The same alert already started a run in the last 6 hours, so this one was folded into it.",
-    cls: "bg-zinc-800 border-zinc-700 text-zinc-400",
+    tone: "muted",
+    group: "handled",
   },
   in_flight: {
     label: "Already handled",
     detail: "A run for this alert is in progress or already finished.",
-    cls: "bg-zinc-800 border-zinc-700 text-zinc-400",
+    tone: "muted",
+    group: "handled",
   },
   notified: {
     label: "Posted to Teams",
     detail:
       "The route only notifies: the alert was posted to Teams and no run started.",
-    cls: "bg-sky-500/10 border-sky-500/20 text-sky-400",
+    tone: "neutral",
+    group: "handled",
   },
   no_match: {
     label: "No match",
     detail: "The alert didn't contain any of the route's match terms.",
-    cls: "bg-zinc-800 border-zinc-700 text-zinc-400",
+    tone: "muted",
+    group: "ignored",
   },
   not_alarm: {
     label: "Recovery",
     detail:
       "The alert is a recovery or informational state change, so there was nothing to fix.",
-    cls: "bg-zinc-800 border-zinc-700 text-zinc-400",
+    tone: "muted",
+    group: "ignored",
   },
   recovered: {
     label: "Recovered",
     detail:
       "The alert's card was still open, so this recovery closed it. Routes that post recoveries post one green card linking the alert; later recoveries stay quiet until a new alert.",
-    cls: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
+    tone: "success",
+    group: "handled",
   },
   no_open_alert: {
     label: "Recovery, not posted",
     detail:
       "Nothing was open for this alert: its card was never posted or a recovery already closed it, so nothing went to Teams.",
-    cls: "bg-zinc-800 border-zinc-700 text-zinc-400",
+    tone: "muted",
+    group: "ignored",
   },
   route_paused: {
     label: "Route paused",
     detail: "The route for this topic is paused.",
-    cls: "bg-amber-500/10 border-amber-500/20 text-amber-400",
+    tone: "waiting",
+    group: "problem",
   },
   budget: {
     label: "Over token limit",
     detail: "The team's token limit was reached, so no run started.",
-    cls: "bg-amber-500/10 border-amber-500/20 text-amber-400",
+    tone: "waiting",
+    group: "problem",
   },
   alert_budget: {
     label: "Alert budget reached",
     detail:
       "Alert runs in the last 24 hours used the team's daily alert token budget, so no run started. Change it under Alert routes.",
-    cls: "bg-amber-500/10 border-amber-500/20 text-amber-400",
+    tone: "waiting",
+    group: "problem",
   },
   daily_cap: {
     label: "Daily cap",
     detail: "The route already started 20 runs in the last day.",
-    cls: "bg-amber-500/10 border-amber-500/20 text-amber-400",
+    tone: "waiting",
+    group: "problem",
   },
   misconfigured: {
     label: "Route misconfigured",
     detail: "The route's repo is invalid. Edit the route in Alert routes.",
-    cls: "bg-red-500/10 border-red-500/20 text-red-400",
+    tone: "danger",
+    group: "problem",
   },
   error: {
     label: "Error",
     detail:
       "Starting the run failed. SNS retries the delivery, and this record updates when it does.",
-    cls: "bg-red-500/10 border-red-500/20 text-red-400",
+    tone: "danger",
+    group: "problem",
   },
 };
 
+/** How an outcome looks; one this page doesn't know yet reads as words. */
+export function outcomeLook(outcome: string): StatusLook {
+  const o = OUTCOMES[outcome];
+  return o ? { label: o.label, tone: o.tone } : { label: humanize(outcome), tone: "muted" };
+}
+
 export function OutcomeBadge({ outcome }: { outcome: string }) {
-  const o = OUTCOMES[outcome] ?? {
-    label: humanize(outcome),
-    cls: "bg-zinc-800 border-zinc-700 text-zinc-400",
-  };
+  const o = outcomeLook(outcome);
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap ${o.cls}`}
+      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap ${TONES[o.tone].chip}`}
     >
       {o.label}
     </span>
