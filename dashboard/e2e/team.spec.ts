@@ -19,6 +19,9 @@ interface Member {
   invited_by: string | null;
   last_active_at: string | null;
   updated_at: string | null;
+  invited_at?: string | null;
+  invite_expires_at?: string | null;
+  invite_expired?: boolean;
   is_self: boolean;
 }
 
@@ -44,7 +47,23 @@ function team(selfRole: string): Member[] {
     member({ user_id: "4242", email: null, github_login: "samrivera", github_id: "4242", role: "member", sign_in: "github", last_active_at: ago(3600_000) }),
     member({ user_id: "5151", email: null, github_login: "octo-builder", github_id: "5151", role: "viewer", sign_in: "github" }),
     member({ user_id: "invite_01", email: "new.hire@example.com", role: "member", status: "invited", invited_by: "u-admin" }),
+    // An owner invited this person as an admin, long enough ago that it expired.
+    invite({ user_id: "invite_02", email: "person@example.com", role: "admin", invited_by: "u-owner" }, 62 * DAY),
   ];
+}
+
+const INVITE_DAYS = 30;
+function invite(p: Partial<Member> & { user_id: string }, sentAgo: number): Member {
+  const sent = Date.now() - sentAgo;
+  const expires = sent + INVITE_DAYS * DAY;
+  return member({
+    status: "invited",
+    updated_at: new Date(sent).toISOString(),
+    invited_at: new Date(sent).toISOString(),
+    invite_expires_at: new Date(expires).toISOString(),
+    invite_expired: expires <= Date.now(),
+    ...p,
+  });
 }
 
 const ROLES = [
@@ -59,7 +78,7 @@ const CAPABILITIES = [
   { key: "view_team", label: "See who is on the team", min_role: "viewer" },
   { key: "plans", label: "Create, edit, approve and run plans and templates", min_role: "member" },
   { key: "runs", label: "Retry, re-run, re-review or cancel runs", min_role: "member" },
-  { key: "people", label: "Invite people, resend or revoke invites, link GitHub accounts, and change or remove members and viewers", min_role: "admin" },
+  { key: "people", label: "Invite people, resend or revoke any pending invite, link GitHub accounts, and change or remove members and viewers", min_role: "admin" },
   { key: "repos", label: "Manage repositories: sync, turn on, roles, code graph and infrastructure scans", min_role: "admin" },
   { key: "manage_admins", label: "Make someone an admin or owner, and change or remove admins and owners", min_role: "owner" },
   { key: "budget", label: "Set the monthly budget", min_role: "owner" },
@@ -96,6 +115,7 @@ async function mockApi(page: Page, selfRole = "admin", init: Partial<Backend> = 
         your_role: selfRole,
         grantable_roles: ROLES.filter((r) => r.assignable && canManage(selfRole, r.key)).map((r) => r.key),
         manageable_roles: ROLES.filter((r) => canManage(selfRole, r.key)).map((r) => r.key),
+        can_manage_invites: LEVEL[selfRole] >= 3,
       });
     }
     if (p === "/api/users" && method === "GET") {
@@ -118,7 +138,25 @@ async function mockApi(page: Page, selfRole = "admin", init: Partial<Backend> = 
         target.role = String(body?.role);
         return json(route, { status: "updated", role: target.role });
       }
-      if (m[2] === "resend") return json(route, { status: "sent" });
+      // Same rules as the gateway: admins and owners handle every pending
+      // invite whatever its role; seated admins and owners are an owner's call.
+      if ((m[2] === "resend" || method === "DELETE") && LEVEL[selfRole] < 3) {
+        return json(route, { error: "Only admins and owners can do that." }, 403);
+      }
+      if (method === "DELETE" && target.status !== "invited" && !canManage(selfRole, target.role)) {
+        return json(route, { error: "Only an owner can remove an admin or owner." }, 403);
+      }
+      if (m[2] === "resend") {
+        if (target.status !== "invited") return json(route, { error: "They've already joined; there's no invite to resend." }, 400);
+        const renewed = invite({ user_id: target.user_id }, 0);
+        Object.assign(target, {
+          invited_at: renewed.invited_at,
+          invite_expires_at: renewed.invite_expires_at,
+          invite_expired: false,
+          updated_at: renewed.updated_at,
+        });
+        return json(route, { status: "sent", invited_at: renewed.invited_at, invite_expires_at: renewed.invite_expires_at });
+      }
       if (m[2] === "link-github") {
         const gh = db.members.find((x) => x.user_id === body?.github_user_id);
         if (!gh) return json(route, { error: "not found" }, 404);
@@ -174,7 +212,7 @@ test("admin sees one row per person, GitHub logins, statuses and the permissions
   // Permissions: cumulative, with the viewer's role highlighted.
   const admins = page.getByRole("group", { name: "Admin (your role)" });
   await expect(admins.getByText("Admins can also")).toBeVisible();
-  await expect(admins.getByText(/Invite people, resend or revoke invites/)).toBeVisible();
+  await expect(admins.getByText(/Invite people, resend or revoke any pending invite/)).toBeVisible();
   await expect(page.getByRole("group", { name: "Owner" }).getByText("Set the monthly budget")).toBeVisible();
   await shot(page, "team-admin");
 });
@@ -278,6 +316,44 @@ test("invite: validates the email, then shows the invite as pending; resend and 
   await page.getByRole("button", { name: "Revoke invite", exact: true }).click();
   await expect(invites.getByText("new.hire@example.com")).toHaveCount(0);
   expect(db.calls.some((c) => c.method === "DELETE" && c.path === "/api/users/invite_01")).toBe(true);
+});
+
+test("an admin can resend and revoke an owner's admin invite, and an expired one says so", async ({ page }) => {
+  const db = await mockApi(page, "admin");
+  await page.goto("/settings/team");
+  const invites = page.getByRole("list", { name: /Pending invites/ });
+  const item = invites.getByRole("listitem").filter({ hasText: "person@example.com" });
+  await expect(item.getByText(/Invited as an Admin/)).toBeVisible();
+  await expect(item.getByText("Expired", { exact: true })).toBeVisible();
+  await expect(item.getByText(/expired [A-Z][a-z]{2} \d{1,2}, \d{4}/)).toBeVisible();
+  await expect(item.getByText(/The link no longer works/)).toBeVisible();
+  await shot(page, "team-expired-invite");
+
+  // Resending renews it.
+  await item.getByRole("button", { name: "Resend" }).click();
+  await expect(page.getByText(/Invite sent again to person@example.com\. It works until/)).toBeVisible();
+  await expect(item.getByText("Invited", { exact: true })).toBeVisible();
+  await expect(item.getByText("Expired", { exact: true })).toHaveCount(0);
+  await expect(item.getByText(/works until/)).toBeVisible();
+  expect(db.calls.some((c) => c.method === "POST" && c.path === "/api/users/invite_02/resend")).toBe(true);
+
+  // And it can be revoked, though it offers the admin role.
+  await item.getByRole("button", { name: "Revoke invite for person@example.com" }).click();
+  await page.getByRole("button", { name: "Revoke invite", exact: true }).click();
+  await expect(page.getByText("Invite for person@example.com revoked")).toBeVisible();
+  await expect(invites.getByText("person@example.com")).toHaveCount(0);
+  expect(db.calls.some((c) => c.method === "DELETE" && c.path === "/api/users/invite_02")).toBe(true);
+});
+
+test("an expired invite can be revoked without resending it", async ({ page }) => {
+  const db = await mockApi(page, "owner");
+  await page.goto("/settings/team");
+  const invites = page.getByRole("list", { name: /Pending invites/ });
+  await invites.getByRole("button", { name: "Revoke invite for person@example.com" }).click();
+  await page.getByRole("button", { name: "Revoke invite", exact: true }).click();
+  await expect(invites.getByText("person@example.com")).toHaveCount(0);
+  expect(db.calls.some((c) => c.method === "DELETE" && c.path === "/api/users/invite_02")).toBe(true);
+  expect(db.calls.some((c) => c.path.endsWith("/resend"))).toBe(false);
 });
 
 test("remove a member from the actions menu", async ({ page }) => {

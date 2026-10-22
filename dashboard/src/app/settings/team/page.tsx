@@ -4,8 +4,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
 import {
+  canManageInvites,
   capabilitiesAddedBy,
   displayName,
+  isInviteExpired,
+  shortDate,
   isGithubOnly,
   isLinkTarget,
   isValidEmail,
@@ -73,6 +76,9 @@ export default function TeamPage() {
   const role = perms?.your_role ?? "viewer";
   const isOwner = role === "owner";
   const canManagePeople = (perms?.manageable_roles.length ?? 0) > 0;
+  // Invites are not seats: an admin may resend or revoke every pending invite,
+  // including one that offers the admin role.
+  const canInvites = canManageInvites(perms);
   const roleInfo = useCallback((key: string) => perms?.roles.find((r) => r.key === key), [perms]);
   const roleLabel = (key: string) => roleInfo(key)?.label ?? key;
 
@@ -142,8 +148,11 @@ export default function TeamPage() {
   const resend = async (m: Member) => {
     setBusy(m.user_id);
     try {
-      await teamApi.resend(m.user_id);
-      toast(`Invite sent again to ${m.email}`);
+      const r = await teamApi.resend(m.user_id);
+      const renewed = { invited_at: r.invited_at ?? new Date().toISOString(), invite_expires_at: r.invite_expires_at ?? null, invite_expired: false };
+      setMembers((prev) => prev?.map((x) => (x.user_id === m.user_id ? { ...x, ...renewed } : x)) ?? null);
+      const until = shortDate(r.invite_expires_at);
+      toast(`Invite sent again to ${m.email}${until ? `. It works until ${until}.` : ""}`);
     } catch (e) {
       toast(errorText(e), "error");
     } finally {
@@ -326,7 +335,7 @@ export default function TeamPage() {
         ) : null}
       </section>
 
-      {canManagePeople && members && (
+      {canInvites && members && (
         <section aria-labelledby="invites-heading" className="mt-8">
           <h2 id="invites-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
             Pending invites {invites.length > 0 && <span className="text-zinc-600">({invites.length})</span>}
@@ -338,7 +347,9 @@ export default function TeamPage() {
           ) : (
             <ul aria-labelledby="invites-heading" className="divide-y divide-zinc-800 rounded-lg border border-zinc-800 bg-zinc-900/40">
               {invites.map((m) => {
-                const allowed = canManage(m);
+                const expired = isInviteExpired(m);
+                const sent = relativeTime(m.invited_at ?? m.updated_at);
+                const until = shortDate(m.invite_expires_at);
                 return (
                   <li key={m.user_id} className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5">
                     <div className="flex min-w-0 flex-1 basis-56 items-center gap-3">
@@ -349,12 +360,14 @@ export default function TeamPage() {
                         <p className="truncate text-sm font-medium text-zinc-100">{m.email}</p>
                         <p className="text-xs text-zinc-500">
                           Invited as {articled(roleLabel(m.role))}
-                          {relativeTime(m.updated_at) ? ` · ${relativeTime(m.updated_at)}` : ""}
+                          {sent ? ` · sent ${sent}` : ""}
+                          {until ? (expired ? ` · expired ${until}` : ` · works until ${until}`) : ""}
                         </p>
+                        {expired && <p className="text-xs text-zinc-500">The link no longer works. Resend it, or revoke the invite.</p>}
                       </div>
                     </div>
-                    <StatusPill tone="warning">Invited</StatusPill>
-                    {allowed && (
+                    {expired ? <StatusPill tone="error">Expired</StatusPill> : <StatusPill tone="warning">Invited</StatusPill>}
+                    {canInvites && (
                       <div className="flex gap-2">
                         <button type="button" className={secondaryButton} disabled={busy === m.user_id} onClick={() => resend(m)}>
                           Resend

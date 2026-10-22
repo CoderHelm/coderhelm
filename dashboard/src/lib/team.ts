@@ -37,6 +37,10 @@ export interface Member {
   invited_by: string | null;
   last_active_at: string | null;
   updated_at: string | null;
+  /** Pending invites only: when it was last sent, when it stops working. */
+  invited_at?: string | null;
+  invite_expires_at?: string | null;
+  invite_expired?: boolean;
   is_self: boolean;
 }
 
@@ -61,6 +65,8 @@ export interface Permissions {
   your_role: string;
   grantable_roles: string[];
   manageable_roles: string[];
+  /** Resend or revoke any pending invite, whatever role it offers. */
+  can_manage_invites?: boolean;
 }
 
 export const teamApi = {
@@ -77,13 +83,44 @@ export const teamApi = {
       body: JSON.stringify({ role }),
     }),
   remove: (userId: string) => request<{ status: string }>(`/api/users/${encodeURIComponent(userId)}`, { method: "DELETE" }),
-  resend: (userId: string) => request<{ status: string }>(`/api/users/${encodeURIComponent(userId)}/resend`, { method: "POST" }),
+  resend: (userId: string) =>
+    request<{ status: string; invited_at?: string; invite_expires_at?: string }>(`/api/users/${encodeURIComponent(userId)}/resend`, {
+      method: "POST",
+    }),
   linkGithub: (userId: string, githubUserId: string) =>
     request<{ status: string; user_id: string; github_login: string; role: string }>(
       `/api/users/${encodeURIComponent(userId)}/link-github`,
       { method: "POST", body: JSON.stringify({ github_user_id: githubUserId }) },
     ),
 };
+
+/**
+ * May you resend and revoke pending invites? Admins and owners may, for every
+ * invite: an invite is not a seat, so the role it offers doesn't limit who can
+ * withdraw it. Falls back to your role when the server doesn't say.
+ */
+export function canManageInvites(p: Permissions | null): boolean {
+  if (!p) return false;
+  if (typeof p.can_manage_invites === "boolean") return p.can_manage_invites;
+  return (p.roles.find((r) => r.key === p.your_role)?.level ?? 0) >= 3;
+}
+
+/** Whether a pending invite has run out, from the server's flag or its expiry date. */
+export function isInviteExpired(m: Pick<Member, "status" | "invite_expired" | "invite_expires_at">, now: Date = new Date()): boolean {
+  if (m.status !== "invited") return false;
+  if (typeof m.invite_expired === "boolean") return m.invite_expired;
+  if (!m.invite_expires_at) return false;
+  const t = new Date(m.invite_expires_at).getTime();
+  return !Number.isNaN(t) && t <= now.getTime();
+}
+
+/** A calendar date, like "Jan 31, 2026". */
+export function shortDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const t = new Date(iso);
+  if (Number.isNaN(t.getTime())) return null;
+  return t.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
 
 /** The best single label for a person. */
 export function displayName(m: Pick<Member, "name" | "email" | "github_login" | "user_id">): string {
