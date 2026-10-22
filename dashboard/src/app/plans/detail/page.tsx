@@ -376,6 +376,7 @@ function PlanDetail() {
               }
             : null
         }
+        title="What the chat used"
         className="mb-6"
       />
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api, type Review } from "@/lib/api";
@@ -9,12 +9,15 @@ import { Markdown } from "@/components/markdown";
 import { useToast } from "@/components/toast";
 import { ReReviewButton } from "@/components/re-review-button";
 import { Callout } from "@/components/callout";
+import { HelpLink } from "@/components/support";
 import { Skeleton } from "@/components/skeleton";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
-import { Page, PageHeader, cardClass } from "@/components/page";
-import { HelpLink } from "@/components/support";
-import { VerdictPill, riskLabel, triggerLabel } from "../labels";
+import { Page, cardClass } from "@/components/page";
+import { ExternalLinkIcon, ThumbsDownIcon, ThumbsUpIcon } from "@/components/icons";
+import { TONES, Time } from "@/components/list";
+import { VerdictPill, RiskText } from "../labels";
 import { WorkUsedLine } from "@/components/work-used";
+import { bySeverity, fileUrl, reviewParts, type Finding } from "./findings";
 
 export default function ReviewDetailGuarded() {
   return (
@@ -46,18 +49,51 @@ const backLink = (
 
 type LoadState = "loading" | "ready" | "missing" | "error";
 
+// What started the review, as the end of "Triggered by …".
+const TRIGGERED_BY: Record<string, string> = {
+  labeled: "Triggered by the review label",
+  opened: "Triggered when the PR was opened",
+  reopened: "Triggered when the PR was reopened",
+  synchronize: "Triggered by new commits",
+  ready_for_review: "Triggered when the PR was marked ready",
+  reply: "Triggered by a reply to the reviewer",
+  rerequest: "Asked for again",
+  sweep: "Picked up by the reviewer's catch-up check",
+  reconcile: "Picked up by the reviewer's catch-up check",
+};
+
+function triggeredBy(trigger: string): string | null {
+  if (!trigger) return null;
+  return TRIGGERED_BY[trigger] ?? `Triggered by: ${trigger.replace(/_/g, " ")}`;
+}
+
+/**
+ * How the verdict reached GitHub, in words, when that differs from the
+ * verdict. GitHub doesn't let a PR's author approve or request changes, so on
+ * a PR CoderHelm opened the verdict goes up as a comment: a review whose
+ * verdict is an approval or a change request but was posted as a comment is
+ * one of those. Older reviews had a "comment" verdict of their own.
+ */
+function postedNote(verdict: string, postedAs: string): string | null {
+  if (verdict === "QUESTION") return "Answered in a comment on the PR.";
+  if (verdict === "COMMENT") return "Posted as a comment. Reviews from before verdicts were always an approval or a change request.";
+  if (postedAs === "COMMENT" && (verdict === "APPROVE" || verdict === "REQUEST_CHANGES")) {
+    return "Posted as a comment because CoderHelm opened this PR. GitHub doesn't let a PR's author approve or request changes.";
+  }
+  if (postedAs === "APPROVE") return "Posted on GitHub as an approval.";
+  if (postedAs === "REQUEST_CHANGES") return "Posted on GitHub as a change request.";
+  return null;
+}
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
 function ReviewDetailPage() {
-  const { toast } = useToast();
   const params = useSearchParams();
   const sk = params.get("sk") || "";
   const [review, setReview] = useState<Review | null>(null);
   const [state, setState] = useState<LoadState>(sk ? "loading" : "missing");
-  const [comment, setComment] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [rating, setRating] = useState<"up" | "down" | null>(null);
-  // One thumbs per visit: each press adds to the count, so a second press of
-  // the same review would count the same person twice.
-  const [rated, setRated] = useState<"up" | "down" | null>(null);
+  // Older reviews don't keep the PR's title; the live status may still have it.
+  const [liveTitle, setLiveTitle] = useState("");
 
   const load = useCallback(() => {
     if (!sk) {
@@ -79,34 +115,23 @@ function ReviewDetailPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const rate = async (value: "up" | "down") => {
-    if (!review || rating || rated) return;
-    setRating(value);
-    try {
-      await api.rateReview(review.sk, value);
-      setRated(value);
-      toast(value === "up" ? "Marked helpful" : "Marked not helpful");
-      load();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Could not save the rating", "error");
-    } finally {
-      setRating(null);
-    }
-  };
-
-  const submitComment = async () => {
-    if (!review || !comment.trim()) return;
-    setSubmitting(true);
-    try {
-      await api.rateReview(review.sk, "none", comment.trim());
-      toast("Note saved");
-      setComment("");
-      load();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Could not save the note", "error");
-    }
-    setSubmitting(false);
-  };
+  const repo = review?.repo ?? "";
+  const prNumber = review?.pr_number ?? 0;
+  const hasTitle = !!review?.pr_title;
+  useEffect(() => {
+    if (!repo || !prNumber || hasTitle) return;
+    let live = true;
+    api
+      .listLivePrs(repo)
+      .then((prs) => {
+        const t = prs.find((p) => p.pr_number === prNumber)?.pr_title;
+        if (live && t) setLiveTitle(t);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [repo, prNumber, hasTitle]);
 
   if (state === "loading") return <DetailSkeleton />;
   if (state === "missing" || (state === "ready" && !review)) {
@@ -138,145 +163,352 @@ function ReviewDetailPage() {
     );
   }
 
-  const prUrl = `https://github.com/${review.repo}/pull/${review.pr_number}`;
-  const risk = riskLabel(review.risk);
-  const meta = [
-    review.head_sha && `commit ${review.head_sha.slice(0, 7)}`,
-    review.trigger && `started by: ${triggerLabel(review.trigger).toLowerCase()}`,
-    review.posted_as && `posted as ${review.posted_as}`,
-    review.created_at && !isNaN(new Date(review.created_at).getTime()) && new Date(review.created_at).toLocaleString(),
-  ].filter(Boolean) as string[];
+  const created = review.created_at && !isNaN(new Date(review.created_at).getTime()) ? review.created_at : "";
 
   return (
     <Page>
-      <PageHeader
-        eyebrow={backLink}
-        titleClassName="break-all"
-        title={
-          <a
-            href={prUrl}
-            target="_blank"
-            rel="noreferrer"
-            className={`rounded text-zinc-100 hover:underline ${focusRing}`}
-          >
-            {review.repo} #{review.pr_number}
-            <span className="sr-only"> (opens GitHub in a new tab)</span>
-          </a>
-        }
-        lead={
-          <>
-            <span className="flex flex-wrap items-center gap-3">
-              <VerdictPill verdict={review.verdict} />
-              {risk && <span className="text-xs font-medium text-zinc-400">{risk}</span>}
-            </span>
-            {meta.length > 0 && (
-              <span className="mt-1 block text-xs text-zinc-500">{meta.join(" · ")}</span>
-            )}
-          </>
-        }
-        actions={<ReReviewButton repo={review.repo} pr={review.pr_number} className="min-h-9" />}
-      />
+      <Header review={review} title={review.pr_title || liveTitle} />
 
       <WorkUsedLine
         query={
-          review.created_at && !isNaN(new Date(review.created_at).getTime())
+          created
             ? {
                 origin: `${review.repo}#${review.pr_number}`,
                 repo: review.repo,
                 pr: review.pr_number,
                 // The review is kept when it's done; what it read came before.
-                since: new Date(new Date(review.created_at).getTime() - 2 * 3600_000).toISOString(),
+                since: new Date(new Date(created).getTime() - 2 * 3600_000).toISOString(),
               }
             : null
         }
         standardNames={review.applied_standards}
-        className="mt-4"
+        title="What the reviewer used"
+        className="mt-6"
       />
 
-      <div className={`mt-6 ${cardClass} overflow-x-auto`}>
-        <Markdown>{review.body || "_The review has no text._"}</Markdown>
-      </div>
+      <ReviewBody review={review} />
 
       {review.action_summary && (
-        <div className={`mt-4 ${cardClass} overflow-x-auto`}>
-          <h2 className="text-sm font-semibold text-zinc-200 mb-2">What happened after the review</h2>
+        <section className={`mt-6 ${cardClass} overflow-x-auto`} aria-labelledby="after-review">
+          <h2 id="after-review" className="mb-2 text-sm font-semibold text-zinc-200">What happened after the review</h2>
           <Markdown>{review.action_summary}</Markdown>
-        </div>
+        </section>
       )}
 
-      {/* Ratings */}
-      <section className={`mt-6 ${cardClass}`}>
-        <h2 className="text-sm font-semibold text-zinc-200 mb-3">Rate this review</h2>
-        <div className="flex flex-wrap items-center gap-3 mb-4">
-          <button
-            type="button"
-            onClick={() => rate("up")}
-            disabled={!!rating || !!rated}
-            aria-pressed={rated === "up"}
-            className={`${secondaryButton} hover:border-emerald-500/40`}
-          >
-            <span aria-hidden="true" className="mr-1">👍</span> Helpful
-            <span className="ml-1.5 text-zinc-500">{review.thumbs_up}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => rate("down")}
-            disabled={!!rating || !!rated}
-            aria-pressed={rated === "down"}
-            className={`${secondaryButton} hover:border-red-500/40`}
-          >
-            <span aria-hidden="true" className="mr-1">👎</span> Not helpful
-            <span className="ml-1.5 text-zinc-500">{review.thumbs_down}</span>
-          </button>
-          {rated && <span className="text-xs text-zinc-500">Thanks, your rating is saved.</span>}
-        </div>
-
-        <label htmlFor="review-note" className="block text-xs text-zinc-500 mb-1">
-          Leave a note so the reviewer learns
-        </label>
-        <textarea
-          id="review-note"
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          rows={3}
-          maxLength={4000}
-          className={inputClass}
-          placeholder="For example: this changes the sign in flow. Flag changes like that next time."
-        />
-        <button
-          type="button"
-          onClick={submitComment}
-          disabled={submitting || !comment.trim()}
-          className={`mt-2 ${primaryButton}`}
-        >
-          {submitting ? "Saving…" : "Add note"}
-        </button>
-
-        {review.rating_comments.length > 0 && (
-          <ul className="mt-5 space-y-3 border-t border-zinc-800 pt-4">
-            {review.rating_comments.map((c, i) => (
-              <li key={i} className="text-sm">
-                <div className="flex items-center gap-2 text-xs text-zinc-500 mb-0.5">
-                  <span className="text-zinc-300">{c.by}</span>
-                  {c.rating === "up" && <span className="text-emerald-400">marked helpful</span>}
-                  {c.rating === "down" && <span className="text-red-400">marked not helpful</span>}
-                  {c.at && <span>· {new Date(c.at).toLocaleDateString()}</span>}
-                </div>
-                <p className="text-zinc-400 whitespace-pre-line break-words">{c.text}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <Rating review={review} onSaved={load} />
 
       <p className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <Link href={`/reviewer?repo=${encodeURIComponent(review.repo)}`} className={linkButton}>
-          More reviews of {review.repo}
+          More reviews of {shortRepo(review.repo)}
         </Link>
         <HelpLink item={{ kind: "review", id: sk, label: `${review.repo} #${review.pr_number}`, repo: review.repo }}>
           Something wrong with this review?
         </HelpLink>
       </p>
     </Page>
+  );
+}
+
+const shortRepo = (repo: string) => repo.split("/").pop() || repo;
+
+const externalLink = `rounded hover:underline ${focusRing}`;
+
+function Header({ review, title }: { review: Review; title: string }) {
+  const prUrl = `https://github.com/${review.repo}/pull/${review.pr_number}`;
+  const sha = review.head_sha;
+  const posted = postedNote(review.verdict, review.posted_as);
+  const trigger = triggeredBy(review.trigger);
+  const repoRef = (
+    <span title={review.repo}>
+      {shortRepo(review.repo)} #{review.pr_number}
+    </span>
+  );
+  return (
+    <header className="min-w-0" data-testid="review-header">
+      <div className="mb-1 text-sm text-zinc-500">{backLink}</div>
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0 flex-1 basis-80">
+          <h1 className="min-w-0 text-2xl font-bold text-zinc-100">
+            <a href={prUrl} target="_blank" rel="noreferrer" className={`relative block truncate ${externalLink}`} title={title || review.repo}>
+              {title || repoRef}
+              <span className="sr-only"> (opens the PR on GitHub in a new tab)</span>
+            </a>
+          </h1>
+          {title && <p className="mt-0.5 text-sm text-zinc-500">{repoRef}</p>}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <a href={prUrl} target="_blank" rel="noreferrer" className={`${secondaryButton} gap-1.5`}>
+            Open PR on GitHub
+            <span aria-hidden="true" className="inline-flex"><ExternalLinkIcon /></span>
+            <span className="sr-only"> (opens in a new tab)</span>
+          </a>
+          <ReReviewButton repo={review.repo} pr={review.pr_number} className="min-h-9 !rounded-lg !px-4 !text-sm font-medium" />
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <VerdictPill verdict={review.verdict} />
+        <RiskText risk={review.risk} />
+      </div>
+      <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-500" aria-label="About this review">
+        {trigger && <li>{trigger}</li>}
+        {sha && (
+          <li>
+            Reviewed commit{" "}
+            <a href={`https://github.com/${review.repo}/commit/${sha}`} target="_blank" rel="noreferrer" className={`font-mono text-zinc-300 ${externalLink}`}>
+              {sha.slice(0, 7)}
+            </a>
+          </li>
+        )}
+        {review.created_at && (
+          <li>
+            <Time iso={review.created_at} />
+          </li>
+        )}
+      </ul>
+      {posted && <p className="mt-1.5 max-w-prose text-xs text-zinc-500" data-testid="posted-note">{posted}</p>}
+    </header>
+  );
+}
+
+const SEVERITY_TONE: Record<string, string> = {
+  blocking: TONES.danger.chip,
+  high: TONES.danger.chip,
+  medium: TONES.waiting.chip,
+  low: TONES.neutral.chip,
+  nit: TONES.muted.chip,
+};
+
+const KIND_WORD: Record<string, string> = {
+  defect: "Defect",
+  concern: "Unverified concern",
+  question: "Question",
+  note: "Note",
+};
+
+const chip = "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap";
+
+function FindingCard({ f, repo, sha }: { f: Finding; repo: string; sha: string }) {
+  const url = fileUrl(repo, sha, f.file, f.line);
+  const where = f.file ? `${f.file}${f.line > 0 ? `:${f.line}` : ""}` : "";
+  return (
+    <li className={`${cardClass} space-y-2`} data-testid="finding">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className={`${chip} ${SEVERITY_TONE[f.severity] ?? TONES.neutral.chip}`}>{f.severity.charAt(0).toUpperCase() + f.severity.slice(1)}</span>
+        {f.kind && <span className={`${chip} ${TONES.muted.chip}`}>{KIND_WORD[f.kind] ?? f.kind}</span>}
+      </div>
+      <h3 className="text-sm font-semibold text-zinc-100 [overflow-wrap:anywhere]">{f.title || "Untitled finding"}</h3>
+      {where &&
+        (url ? (
+          <a href={url} target="_blank" rel="noreferrer" className={`inline-block max-w-full font-mono text-xs text-zinc-400 underline decoration-zinc-700 underline-offset-2 hover:text-zinc-200 hover:decoration-zinc-400 [overflow-wrap:anywhere] ${focusRing} rounded`}>
+            {where}
+            <span className="sr-only"> (opens the file on GitHub)</span>
+          </a>
+        ) : (
+          <p className="font-mono text-xs text-zinc-400 [overflow-wrap:anywhere]">{where}</p>
+        ))}
+      {f.body && (
+        <div className="min-w-0 overflow-x-auto [&_p:last-child]:mb-0">
+          <Markdown>{f.body}</Markdown>
+        </div>
+      )}
+    </li>
+  );
+}
+
+function FindingGroup({ id, title, list, repo, sha }: { id: string; title: string; list: Finding[]; repo: string; sha: string }) {
+  if (list.length === 0) return null;
+  return (
+    <section className="mt-6" aria-labelledby={id}>
+      <h2 id={id} className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+        {title} <span className="text-zinc-600">· {list.length}</span>
+      </h2>
+      <ul className="mt-2 space-y-3">
+        {list.map((f, i) => (
+          <FindingCard key={`${f.file}:${f.line}:${i}`} f={f} repo={repo} sha={sha} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function ReviewBody({ review }: { review: Review }) {
+  const { summary, findings, rest } = reviewParts(review);
+  const known = findings.every((f) => f.holds !== null);
+  const toFix = known ? findings.filter((f) => f.holds).sort(bySeverity) : [];
+  const notes = known ? findings.filter((f) => !f.holds).sort(bySeverity) : [];
+  const counts = known
+    ? [toFix.length > 0 && `${toFix.length} to fix`, notes.length > 0 && plural(notes.length, "note", "notes")].filter(Boolean).join(" · ")
+    : plural(findings.length, "finding", "findings");
+  return (
+    <>
+      <section className={`mt-6 ${cardClass}`} aria-labelledby="review-summary">
+        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="review-summary" className="text-sm font-semibold text-zinc-200">Summary</h2>
+          {findings.length > 0 && <span className="text-xs text-zinc-500" data-testid="finding-counts">{counts}</span>}
+        </div>
+        <div className="min-w-0 overflow-x-auto [&_p:last-child]:mb-0">
+          <Markdown>{summary || (findings.length > 0 ? "_No summary._" : "_The review has no text._")}</Markdown>
+        </div>
+      </section>
+
+      {known ? (
+        <>
+          <FindingGroup id="findings-fix" title="To fix" list={toFix} repo={review.repo} sha={review.head_sha} />
+          <FindingGroup id="findings-notes" title="Notes" list={notes} repo={review.repo} sha={review.head_sha} />
+        </>
+      ) : (
+        <FindingGroup id="findings-all" title="Findings" list={[...findings].sort(bySeverity)} repo={review.repo} sha={review.head_sha} />
+      )}
+
+      {rest && (
+        <section className={`mt-6 ${cardClass} overflow-x-auto`} aria-label="More from the review">
+          <Markdown>{rest}</Markdown>
+        </section>
+      )}
+    </>
+  );
+}
+
+function Rating({ review, onSaved }: { review: Review; onSaved: () => void }) {
+  const { toast } = useToast();
+  const [rating, setRating] = useState<"up" | "down" | null>(null);
+  // One answer per visit: each press adds to the count, so a second press of
+  // the same review would count the same person twice.
+  const [rated, setRated] = useState<"up" | "down" | null>(null);
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (noteOpen) noteRef.current?.focus();
+  }, [noteOpen]);
+
+  const rate = async (value: "up" | "down") => {
+    if (rating || rated) return;
+    setRating(value);
+    try {
+      await api.rateReview(review.sk, value);
+      setRated(value);
+      setNoteOpen(true);
+      toast(value === "up" ? "Saved: the review was right" : "Saved: the review was wrong");
+      onSaved();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Could not save the rating", "error");
+    } finally {
+      setRating(null);
+    }
+  };
+
+  const submitComment = async () => {
+    if (!comment.trim()) return;
+    setSubmitting(true);
+    try {
+      await api.rateReview(review.sk, "none", comment.trim());
+      toast("Note saved");
+      setComment("");
+      setNoteOpen(false);
+      onSaved();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Could not save the note", "error");
+    }
+    setSubmitting(false);
+  };
+
+  const answer = (value: "up" | "down") => {
+    const Icon = value === "up" ? ThumbsUpIcon : ThumbsDownIcon;
+    const chosen = rated === value;
+    return (
+      <button
+        type="button"
+        onClick={() => rate(value)}
+        disabled={!!rating || !!rated}
+        aria-pressed={chosen}
+        className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-default motion-reduce:transition-none ${focusRing} ${
+          chosen
+            ? value === "up"
+              ? TONES.success.chip
+              : TONES.danger.chip
+            : "border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 disabled:opacity-50"
+        }`}
+      >
+        <span aria-hidden="true" className="inline-flex"><Icon /></span>
+        {value === "up" ? "Yes" : "No"}
+      </button>
+    );
+  };
+
+  const total = review.thumbs_up + review.thumbs_down;
+  return (
+    <section className={`mt-6 ${cardClass}`} aria-labelledby="rate-review">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <h2 id="rate-review" className="text-sm font-semibold text-zinc-200">Was this review right?</h2>
+        <div className="flex items-center gap-2" role="group" aria-labelledby="rate-review">
+          {answer("up")}
+          {answer("down")}
+        </div>
+        {rated ? (
+          <span className="text-xs text-zinc-500" role="status">Thanks, your answer is saved.</span>
+        ) : (
+          !noteOpen && (
+            <button type="button" onClick={() => setNoteOpen(true)} className={linkButton}>
+              Add a note
+            </button>
+          )
+        )}
+        {total > 0 && (
+          <span className="text-xs text-zinc-500 sm:ml-auto" data-testid="rating-counts">
+            {review.thumbs_up} said yes · {review.thumbs_down} said no
+          </span>
+        )}
+      </div>
+
+      {noteOpen && (
+        <div className="mt-4">
+          <label htmlFor="review-note" className="mb-1 block text-xs text-zinc-500">
+            {rated ? "Tell the reviewer why (optional)" : "Leave a note so the reviewer learns"}
+          </label>
+          <textarea
+            ref={noteRef}
+            id="review-note"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            rows={3}
+            maxLength={4000}
+            className={inputClass}
+            placeholder="For example: this changes the sign in flow. Flag changes like that next time."
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button type="button" onClick={submitComment} disabled={submitting || !comment.trim()} className={primaryButton}>
+              {submitting ? "Saving…" : "Save note"}
+            </button>
+            <button type="button" onClick={() => { setNoteOpen(false); setComment(""); }} className={secondaryButton}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      <p className="mt-3 text-xs text-zinc-500">
+        CoderHelm also learns from your replies on the PR on its own, so there is no need to repeat them here.
+      </p>
+
+      {review.rating_comments.length > 0 && (
+        <ul className="mt-4 space-y-3 border-t border-zinc-800 pt-4" aria-label="Notes on this review">
+          {review.rating_comments.map((c, i) => (
+            <li key={i} className="text-sm">
+              <div className="mb-0.5 flex flex-wrap items-center gap-x-2 text-xs text-zinc-500">
+                <span className="text-zinc-300">{c.by}</span>
+                {c.rating === "up" && <span className={TONES.success.text}>said it was right</span>}
+                {c.rating === "down" && <span className={TONES.danger.text}>said it was wrong</span>}
+                {c.at && <span>· {new Date(c.at).toLocaleDateString()}</span>}
+              </div>
+              <p className="whitespace-pre-line break-words text-zinc-400">{c.text}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

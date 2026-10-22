@@ -388,11 +388,13 @@ test("a plan's page says what the chat it was made in used", async ({ page }) =>
   const db = await mockApi(page);
   await page.goto("/plans/detail?id=PLANA");
   const used = page.getByTestId("work-used");
-  await expect(used).toContainText("Skill: api-conventions ×2");
-  await expect(used).toContainText("Agent asked: spec-checker (read with read_file, search_code)");
-  await expect(used).toContainText("Data source: Service logs ×3");
-  await expect(used).toContainText("Standards applied: code-standards");
-  await expect(used.getByRole("link", { name: "spec-checker" })).toHaveAttribute("href", /\/skills\/agent\/?\?repo=your-team%2Fplaybook/);
+  await expect(used.getByText("1 skill · 1 agent · 1 data source · 1 standard")).toBeVisible();
+  await used.getByText("What the chat used").click();
+  await expect(used.getByRole("link", { name: /^api-conventions/ })).toContainText("×2");
+  await expect(used.getByRole("link", { name: /spec-checker/ })).toContainText("read with read_file, search_code");
+  await expect(used.getByRole("link", { name: /Service logs/ })).toContainText("×3");
+  await expect(used.getByRole("link", { name: /code-standards/ })).toBeVisible();
+  await expect(used.getByRole("link", { name: /spec-checker/ })).toHaveAttribute("href", /\/skills\/agent\/?\?repo=your-team%2Fplaybook/);
   expect(db.usedQueries[0]).toContain("origin=plan+chat+chat-1");
   await shot(page, "plans-detail-used");
   expect(errors).toEqual([]);

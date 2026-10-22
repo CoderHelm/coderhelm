@@ -1228,6 +1228,24 @@ export interface Review {
   created_at: string;
   /** Team standards the review was given in full ("Always apply"). */
   applied_standards?: string[];
+  /** The PR's title when the review was written (empty on older reviews). */
+  pr_title?: string;
+  /** The findings, one object each (null on older reviews: read them from `body`). */
+  findings?: ReviewFinding[] | null;
+}
+
+/** One finding of a review, as the reviewer kept it. */
+export interface ReviewFinding {
+  /** blocking · high · medium · low · nit */
+  severity: string;
+  /** What it rests on: defect · concern · question. */
+  kind?: string;
+  /** It holds the merge (the verdict requests changes for it). */
+  blocks?: boolean;
+  file: string;
+  line: number;
+  title: string;
+  body: string;
 }
 
 /** One line of the auto-merge checklist ("CI green", "Waiting for a person's approval"). */

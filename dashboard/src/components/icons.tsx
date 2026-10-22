@@ -72,3 +72,6 @@ export const InfoIcon = () => <svg {...s}><circle cx="12" cy="12" r="10" /><line
 export const AlertCircleIcon = () => <svg {...s}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="13" /><circle cx="12" cy="16" r="0.5" fill="currentColor" /></svg>;
 export const EyeIcon = () => <svg {...s}><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" /><circle cx="12" cy="12" r="3" /></svg>;
 export const EyeOffIcon = () => <svg {...s}><path d="M17.94 17.94A10.9 10.9 0 0112 19C5 19 1 12 1 12a20.3 20.3 0 015.06-5.94" /><path d="M9.9 4.24A10.4 10.4 0 0112 4c7 0 11 8 11 8a20.3 20.3 0 01-2.16 3.19" /><path d="M14.12 14.12a3 3 0 01-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>;
+/** Thumbs up and down: a yes or no on something the app did. */
+export const ThumbsUpIcon = () => <svg {...s}><path d="M7 10v11" /><path d="M15 5.88L14 10h5.83a2 2 0 011.92 2.56l-2.33 8A2 2 0 0117.5 22H4a2 2 0 01-2-2v-8a2 2 0 012-2h2.76a2 2 0 001.79-1.11L12 2a3.13 3.13 0 013 3.88z" /></svg>;
+export const ThumbsDownIcon = () => <svg {...s}><path d="M17 14V3" /><path d="M9 18.12L10 14H4.17a2 2 0 01-1.92-2.56l2.33-8A2 2 0 016.5 2H20a2 2 0 012 2v8a2 2 0 01-2 2h-2.76a2 2 0 00-1.79 1.11L12 22a3.13 3.13 0 01-3-3.88z" /></svg>;

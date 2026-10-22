@@ -36,6 +36,56 @@ const REVIEWS = [
   review({ sk: "REVIEW#your-team/backend#000055#2026-01-01T09:00:00Z", repo: "your-team/backend", pr_number: 55, verdict: "QUESTION", risk: "N/A", trigger: "rerequest", thumbs_up: 0, thumbs_down: 1, created_at: iso(300) }),
 ];
 
+// Reviews only the detail page opens (the list fixtures stay as they are).
+// The first keeps its findings only in the text, as older reviews do; the
+// second has them as data, with the PR's title.
+const FINDINGS_BODY = [
+  "The retry change is close, but one call can now run twice.",
+  "",
+  "- [blocking] src/app/checkout/page.tsx:84 — Payment can be sent twice",
+  "  `submitOrder` runs again when the retry fires after a slow first answer.",
+  "  Guard it with the `orderId` the first call returned.",
+  "",
+  "- [medium] src/lib/retry.ts:12 — The backoff never grows",
+  "  `delay` is set once, outside the loop.",
+  "",
+  "- [nit] README.md:3 — Typo in the heading",
+  "  \"Chekout\" should read \"Checkout\".",
+].join("\n");
+
+const DETAIL_REVIEWS = [
+  review({
+    sk: "REVIEW#your-team/web#000130#2026-01-03T10:00:00Z",
+    pr_number: 130,
+    verdict: "REQUEST_CHANGES",
+    risk: "MEDIUM",
+    trigger: "synchronize",
+    posted_as: "COMMENT",
+    head_sha: "1c9bba5d00d1e2f3",
+    body: FINDINGS_BODY,
+    thumbs_up: 0,
+    rating_comments: [],
+  }),
+  review({
+    sk: "REVIEW#your-team/backend#000140#2026-01-03T11:00:00Z",
+    repo: "your-team/backend",
+    pr_number: 140,
+    verdict: "APPROVE",
+    risk: "LOW",
+    trigger: "opened",
+    posted_as: "APPROVE",
+    head_sha: "feedface0011",
+    pr_title: "Cache the price list for an hour so the catalog page loads faster on a slow connection",
+    body: "Approving. The cache is keyed by region.\n\n- [low] api/prices.rs:40 — Expiry is hard to read\n  ignored text",
+    findings: [
+      { severity: "low", kind: "concern", blocks: false, file: "api/prices.rs", line: 40, title: "Expiry is hard to read", body: "Name the `3600` as a constant." },
+      { severity: "medium", kind: "question", blocks: false, file: "api/regions.rs", line: 0, title: "Are regions ever renamed?", body: "If so the old keys linger." },
+    ],
+    thumbs_up: 0,
+    rating_comments: [],
+  }),
+];
+
 // Where the reviewer is with each PR (GET /api/reviewer/live): two in flight,
 // two waiting on auto-merge, one merged.
 type LiveRow = { repo: string; pr_number: number; [field: string]: unknown };
@@ -128,6 +178,8 @@ interface Backend {
   noLive: boolean;
   /** Extra reviews listed before the fixtures (a review that just finished). */
   newReviews: ReturnType<typeof review>[];
+  /** What GET /api/skills/used answers. */
+  used: { skills: unknown[]; agents: unknown[]; sources: unknown[]; standards: unknown[] };
   /** What GET /api/releases/pending answers. */
   pending: { waiting: unknown[]; blocked: unknown[] };
 }
@@ -136,7 +188,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
   const db: Backend = {
     calls: [], bodies: [], role: "admin", empty: false, failList: false, failMore: false,
     failConfig: false, failOrg: false, failDetail: false, missingDetail: false, live: livePrs(), noLive: false,
-    newReviews: [], pending: { waiting: [], blocked: [] }, ...init,
+    newReviews: [], pending: { waiting: [], blocked: [] }, used: { skills: [], agents: [], sources: [], standards: [] }, ...init,
   };
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -152,7 +204,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/banners") return json(route, { banners: [] });
     if (p === "/api/support/badge") return json(route, { waiting: 0, queue_open: null });
     if (p === "/api/integrations") return json(route, { can_edit: false, items: [], migrated: 0 });
-    if (p === "/api/skills/used") return json(route, { skills: [], agents: [], sources: [], standards: [] });
+    if (p === "/api/skills/used") return json(route, db.used);
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }] });
     if (p === "/api/repos") return json(route, { repos: [{ name: "your-team/web", enabled: true, ticket_source: "github" }, { name: "your-team/backend", enabled: true, ticket_source: "github" }] });
     if (p === "/api/aws-connections") return json(route, { connections: [] });
@@ -176,7 +228,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       if (db.failDetail) return json(route, { error: "boom" }, 500);
       if (db.missingDetail) return route.fulfill({ status: 404, body: "" });
       const sk = url.searchParams.get("sk");
-      const r = REVIEWS.find((x) => x.sk === sk);
+      const r = [...REVIEWS, ...DETAIL_REVIEWS].find((x) => x.sk === sk);
       return r ? json(route, r) : route.fulfill({ status: 404, body: "" });
     }
     if (p === "/api/reviewer/review/rate") return route.fulfill({ status: 200, body: "" });
@@ -414,23 +466,124 @@ test("?repo= opens the reviewer list filtered to that repo", async ({ page }) =>
 
 // ── Review detail ────────────────────────────────────────────────────
 
-test("a review page shows the verdict, risk and trigger in words and rates once", async ({ page }) => {
+test("a review page leads with the PR's title, links it on GitHub and rates once", async ({ page }) => {
   const errors = watchConsole(page);
   const db = await mockApi(page);
   await page.goto(`/reviewer/detail?sk=${encodeURIComponent(REVIEWS[0].sk)}`);
-  await expect(page.getByRole("heading", { level: 1, name: /your-team\/web #101/ })).toBeVisible();
-  await expect(page.getByText("Approved")).toBeVisible();
-  await expect(page.getByText("Low risk")).toBeVisible();
-  await expect(page.getByText(/started by: label added/)).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "Leave a note so the reviewer learns" })).toBeVisible();
+  // The record has no title; the live status does.
+  const h1 = page.getByRole("heading", { level: 1 });
+  await expect(h1).toContainText("Faster checkout with a clearer receipt page");
+  await expect(h1.getByRole("link")).toHaveAttribute("href", "https://github.com/your-team/web/pull/101");
+  const header = page.getByTestId("review-header");
+  await expect(header.getByText("web #101")).toHaveAttribute("title", "your-team/web");
+  await expect(header.getByRole("link", { name: /Open PR on GitHub/ })).toHaveAttribute("href", "https://github.com/your-team/web/pull/101");
+  await expect(header.getByRole("link", { name: "abcdef1" })).toHaveAttribute("href", "https://github.com/your-team/web/commit/abcdef1234567");
+  await expect(header.getByText("Approved")).toBeVisible();
+  await expect(header.getByText("Low risk")).toBeVisible();
+  await expect(header.getByText("Triggered by the review label")).toBeVisible();
+  // The body's own "## Summary" heading isn't said twice.
+  await expect(page.getByRole("region", { name: "Summary" }).getByRole("heading")).toHaveCount(1);
+  // The note box waits for an answer or "Add a note".
+  await expect(page.getByRole("textbox")).toHaveCount(0);
+  await expect(page.getByText("CoderHelm also learns from your replies on the PR on its own")).toBeVisible();
   await shot(page, "audit-reviewer-detail");
-  const helpful = page.getByRole("button", { name: /Helpful/ }).first();
-  await helpful.click();
-  await expect(page.getByText("Thanks, your rating is saved.")).toBeVisible();
+  const yes = page.getByRole("button", { name: "Yes", exact: true });
+  await yes.click();
+  await expect(page.getByText("Thanks, your answer is saved.")).toBeVisible();
+  await expect(yes).toHaveAttribute("aria-pressed", "true");
   // A second press would count the same person twice.
-  await expect(helpful).toBeDisabled();
-  await expect(page.getByRole("button", { name: /Not helpful/ })).toBeDisabled();
+  await expect(yes).toBeDisabled();
+  await expect(page.getByRole("button", { name: "No", exact: true })).toBeDisabled();
+  await expect(page.getByRole("textbox", { name: "Tell the reviewer why (optional)" })).toBeFocused();
   expect(db.bodies.filter((b) => b.rating === "up")).toHaveLength(1);
+  expect(errors).toEqual([]);
+});
+
+test("findings read from a review's text become cards, grouped into what to fix and notes", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page, {
+    used: {
+      skills: [{ name: "checkout-flow", kind: "skill", repo: "your-team/playbook", path: "skills/checkout-flow/SKILL.md", count: 1 }],
+      agents: [],
+      sources: [{ id: "gh", name: "GitHub history", lookups: 9 }, { id: "web", name: "Public page check", lookups: 2 }],
+      standards: [
+        { name: "writing-style", kind: "skill", repo: "your-team/playbook", path: "standards/writing-style.md", count: 2 },
+        { name: "code-standards", kind: "skill", repo: "your-team/playbook", path: "standards/code-standards.md", count: 2 },
+      ],
+    },
+  });
+  await page.goto(`/reviewer/detail?sk=${encodeURIComponent(DETAIL_REVIEWS[0].sk)}`);
+  const header = page.getByTestId("review-header");
+  // No title anywhere: the repo and number lead.
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("web #130");
+  await expect(header.getByText("Changes requested")).toBeVisible();
+  await expect(header.getByText("Medium risk")).toBeVisible();
+  await expect(header.getByText("Triggered by new commits")).toBeVisible();
+  await expect(page.getByTestId("posted-note")).toHaveText(
+    "Posted as a comment because CoderHelm opened this PR. GitHub doesn't let a PR's author approve or request changes.",
+  );
+  await expect(page.getByText("COMMENT", { exact: true })).toHaveCount(0);
+
+  await expect(page.getByRole("region", { name: "Summary" })).toContainText("one call can now run twice");
+  await expect(page.getByTestId("finding-counts")).toHaveText("1 to fix · 2 notes");
+  const fix = page.getByRole("region", { name: /To fix/ });
+  await expect(fix.getByTestId("finding")).toHaveCount(1);
+  const card = fix.getByTestId("finding").first();
+  await expect(card.getByText("Blocking")).toBeVisible();
+  await expect(card.getByRole("heading", { level: 3 })).toHaveText("Payment can be sent twice");
+  await expect(card.getByRole("link", { name: /src\/app\/checkout\/page\.tsx:84/ })).toHaveAttribute(
+    "href",
+    "https://github.com/your-team/web/blob/1c9bba5d00d1e2f3/src/app/checkout/page.tsx#L84",
+  );
+  // Code spans stay code; the title doesn't run into the body.
+  await expect(card.locator("code", { hasText: "submitOrder" })).toBeVisible();
+  await expect(card).not.toContainText("twice`submitOrder");
+  const notes = page.getByRole("region", { name: /Notes/ });
+  await expect(notes.getByTestId("finding")).toHaveCount(2);
+  await expect(notes.getByRole("heading", { level: 3 })).toHaveText(["The backoff never grows", "Typo in the heading"]);
+
+  // What the reviewer used: one quiet line that opens to chips.
+  const used = page.getByTestId("work-used");
+  await expect(used.getByText("1 skill · 2 data sources · 2 standards")).toBeVisible();
+  await expect(used.getByRole("link")).toHaveCount(0);
+  await used.getByText("What the reviewer used").click();
+  await expect(used.getByRole("link", { name: "checkout-flow" })).toHaveAttribute("href", /\/skills\/item\/?\?repo=your-team%2Fplaybook/);
+  await expect(used.getByRole("link", { name: /GitHub history/ })).toHaveAttribute("href", /\/data-sources\/activity\/?$/);
+  // Two standards read twice each say so once.
+  await expect(used.getByText("each twice", { exact: true })).toBeVisible();
+  await expect(used.getByText("×2")).toHaveCount(1); // only on the data source read twice
+  await expect(used.getByRole("link", { name: "writing-style" })).toBeVisible();
+  await shot(page, "audit-reviewer-detail-findings");
+  expect(errors).toEqual([]);
+});
+
+test("findings kept as data show their kind, and a note can be left without rating", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page);
+  await page.goto(`/reviewer/detail?sk=${encodeURIComponent(DETAIL_REVIEWS[1].sk)}`);
+  const h1 = page.getByRole("heading", { level: 1 });
+  await expect(h1).toContainText("Cache the price list for an hour");
+  await expect(h1.getByRole("link")).toHaveAttribute("title", /so the catalog page loads faster/);
+  await expect(page.getByTestId("posted-note")).toHaveText("Posted on GitHub as an approval.");
+  // The kept findings win over the text; an approval's findings are notes.
+  await expect(page.getByTestId("finding-counts")).toHaveText("2 notes");
+  await expect(page.getByText("ignored text")).toHaveCount(0);
+  const cards = page.getByTestId("finding");
+  await expect(cards.nth(0).getByText("Question")).toBeVisible();
+  await expect(cards.nth(0).getByText("Medium")).toBeVisible();
+  await expect(cards.nth(0).getByRole("link", { name: /api\/regions\.rs/ })).toHaveAttribute("href", "https://github.com/your-team/backend/blob/feedface0011/api/regions.rs");
+  await expect(cards.nth(1).getByText("Unverified concern")).toBeVisible();
+  await expect(page.getByRole("region", { name: "To fix" })).toHaveCount(0);
+  // Live status is only asked when the record has no title.
+  expect(db.calls.some((c) => c.startsWith("GET /api/reviewer/live"))).toBe(false);
+  await page.getByRole("button", { name: "Add a note" }).click();
+  const box = page.getByRole("textbox", { name: "Leave a note so the reviewer learns" });
+  await expect(box).toBeFocused();
+  await box.fill("Right call on the cache key.");
+  await page.getByRole("button", { name: "Save note" }).click();
+  await expect(page.getByRole("textbox")).toHaveCount(0);
+  expect(db.bodies.filter((b) => b.rating === "none")).toEqual([{ sk: DETAIL_REVIEWS[1].sk, rating: "none", comment: "Right call on the cache key." }]);
+  await shot(page, "audit-reviewer-detail-kept");
   expect(errors).toEqual([]);
 });
 
@@ -460,7 +613,7 @@ test("a review that fails to load offers to try again", async ({ page }) => {
   await expect(page.getByText("Could not load this review")).toBeVisible();
   db.failDetail = false;
   await page.getByRole("button", { name: "Try again" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: /your-team\/web #101/ })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Faster checkout with a clearer receipt page");
   expect(errors).toEqual([]);
 });
 
