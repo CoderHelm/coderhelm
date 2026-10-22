@@ -149,6 +149,14 @@ function NewTicket() {
   const params = useSearchParams();
   const router = useRouter();
   const from = params.get("from") || "";
+  // Where the person came from: "Report an issue", "Contact us", or "Get help".
+  const type = params.get("type");
+  const intro =
+    type === "issue"
+      ? { title: "Report an issue", lead: "Tell us what went wrong. The page you were on is attached; remove it below if it doesn't help.", placeholder: "A run stopped at the test step" }
+      : type === "contact"
+        ? { title: "Contact us", lead: "Questions, feedback or anything else. Coderhelm support answers here and by email.", placeholder: "A question about auto-merge" }
+        : { title: "Get help", lead: "Tell us what happened. Coderhelm support answers here and by email.", placeholder: "A run stopped at the test step" };
   const kindParam = params.get("kind") as SupportItemKind | null;
   const itemId = params.get("item") || "";
   const initialItem =
@@ -189,8 +197,8 @@ function NewTicket() {
             ← Support
           </Link>
         }
-        title="Get help"
-        lead="Tell us what happened. Coderhelm support answers here and by email."
+        title={intro.title}
+        lead={intro.lead}
       />
       <form
         className="mt-6 space-y-5"
@@ -207,7 +215,7 @@ function NewTicket() {
               value={subject}
               maxLength={150}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="A run stopped at the test step"
+              placeholder={intro.placeholder}
               className={inputClass}
               autoFocus
             />

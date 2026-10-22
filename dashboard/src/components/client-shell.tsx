@@ -10,12 +10,13 @@ import { ToastProvider } from "./toast";
 import { ConfirmProvider } from "./confirm-dialog";
 import { CommandPaletteButton, CommandPaletteProvider, type PalettePage } from "./command-palette";
 import { focusRing } from "./ui";
+import { helpHref, helpTargetFromUrl } from "@/lib/support";
 import {
   PlayIcon, CircleDotIcon, TrendingUpIcon, HexagonIcon, HeartIcon,
   GitBranchIcon, GearIcon, AtlassianIcon, GitHubIcon, UsersIcon,
   BellIcon, TargetIcon, RepeatIcon, ShieldCheckIcon,
   PluginIcon, ShieldIcon, TemplateIcon, CpuIcon, MemoryIcon,
-  LifeBuoyIcon, MailIcon, ExternalLinkIcon, DatabaseIcon, TestTubeIcon, GraphIcon, PlanIcon, BookIcon } from "./icons";
+  LifeBuoyIcon, MailIcon, DatabaseIcon, TestTubeIcon, GraphIcon, PlanIcon, BookIcon } from "./icons";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
 
@@ -592,6 +593,14 @@ function Sidebar({
 }) {
   const pathname = usePathname();
   const [switching, setSwitching] = useState(false);
+  // "Report an issue" carries the page the person is on, and the run,
+  // review or plan it shows. Read after render: the search string isn't
+  // known while the static page is built.
+  const [issueHref, setIssueHref] = useState("/support?new=1&type=issue");
+  useEffect(() => {
+    const search = typeof window === "undefined" ? "" : window.location.search;
+    setIssueHref(`${helpHref(pathname, helpTargetFromUrl(pathname, search))}&type=issue`);
+  }, [pathname]);
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
@@ -706,28 +715,24 @@ function Sidebar({
           </span>
           <CountBadge n={support.waiting} label="waiting on you" />
         </Link>
-        <a
-          href="https://github.com/CoderHelm/coderhelm/issues"
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`flex items-center justify-between px-2 py-1.5 rounded-md text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 transition-colors ${focusRing}`}
+        <Link
+          href={issueHref}
+          prefetch={false}
+          data-testid="nav-report-issue"
+          className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 transition-colors ${focusRing}`}
         >
-          <span className="flex items-center gap-2.5">
-            <span className="w-4 flex items-center justify-center" aria-hidden="true"><CircleDotIcon /></span>
-            Report Issue
-            <span className="sr-only">(opens in a new tab)</span>
-          </span>
-          <span className="w-3 text-zinc-600" aria-hidden="true"><ExternalLinkIcon /></span>
-        </a>
-        <a
-          href="mailto:support@coderhelm.com"
-          className={`flex items-center justify-between px-2 py-1.5 rounded-md text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 transition-colors ${focusRing}`}
+          <span className="w-4 flex items-center justify-center" aria-hidden="true"><CircleDotIcon /></span>
+          Report an issue
+        </Link>
+        <Link
+          href="/support?new=1&type=contact"
+          prefetch={false}
+          data-testid="nav-contact-us"
+          className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 transition-colors ${focusRing}`}
         >
-          <span className="flex items-center gap-2.5">
-            <span className="w-4 flex items-center justify-center" aria-hidden="true"><MailIcon /></span>
-            Contact Us
-          </span>
-        </a>
+          <span className="w-4 flex items-center justify-center" aria-hidden="true"><MailIcon /></span>
+          Contact us
+        </Link>
       </div>
 
       {/* Tokens remaining */}
