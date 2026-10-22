@@ -69,7 +69,60 @@ const TRACES = [
   { pass: "ci_fix:2", duration_ms: 90000, input_tokens: 0, output_tokens: 0, timestamp: iso(15) },
 ];
 
+// The run's asks to the team's own agents. Review steps send the same
+// framing question every time (worker `review_question`).
+const REVIEW_Q = (subject: string) =>
+  `Review this ${subject}, given in the context below, with your rubric. Apply only the parts of your rubric that fit a change of this size. Return the concrete gaps, one per line, each naming what is missing or wrong and where; or answer exactly 'none' when there are none. No praise, no summary, no rewrite.`;
+
+type Ask = Record<string, unknown> & { id: string };
+
+function ask(id: string, over: Record<string, unknown>): Ask {
+  return {
+    id, repo: "your-team/playbook", path: "agents/requirements-reviewer.md", by: "planner", origin: "your-team/web#1234",
+    run_id: "01RUNDONE000000000000000A", sha: "abc1234", question: REVIEW_Q("draft plan"), context_chars: 5200,
+    outcome: "answered", answer: "none", model: "claude-sonnet-4-6", input_tokens: 4200, output_tokens: 380, ms: 14200, at: iso(27), ...over,
+  };
+}
+
+const PLAN_GAPS = [
+  "- proposal.md: the goal never says which page the schedule replaces, so the scope can't be checked.",
+  "- spec.md: no rule for a class with no times; say whether the table is hidden or shows `No classes`.",
+  "- tasks.md: nothing verifies the table on a phone width.",
+].join("\n");
+
+const ONE_ASK = [ask("a1", { answer: PLAN_GAPS })];
+
+const MANY_ASKS = [
+  ...ONE_ASK,
+  ask("a2", { path: "agents/accessibility-checker.md", answer: "- design.md: the table has no caption or header cells for screen readers." }),
+  ask("a3", { path: "agents/security-reviewer.md", answer: "None, fine for its size.", ms: 8100 }),
+  ask("a4", { by: "writer", path: "agents/copy-editor.md", question: REVIEW_Q("pull request description"), answer: "- The summary says \"fixes\" twice; say what changed instead.", at: iso(13) }),
+  ask("a5", { by: "writer", path: "agents/release-notes-checker.md", question: REVIEW_Q("pull request description"), answer: "none", at: iso(13) }),
+  ask("a6", { by: "writer", path: "agents/link-checker.md", question: REVIEW_Q("pull request description"), outcome: "timed_out", answer: "", input_tokens: 0, output_tokens: 0, ms: 120000, at: iso(13) }),
+  ask("a7", { by: "planner", path: "agents/domain-expert.md", question: "Does a class with a waitlist count as full on the details page?", answer: "Yes. A class is **full** when its waitlist is open; show `Waitlist` instead of the time.", at: iso(28) }),
+  ask("a8", { by: "coder", path: "agents/domain-expert.md", question: "Which time zone are class times stored in?", outcome: "failed", answer: "", input_tokens: 0, output_tokens: 0, ms: 900, at: iso(22) }),
+];
+
+const reviewTrace = (pass: string, step: string, revised: boolean, reviews: { path: string; cost_usd: number }[], minsAgo: number) => ({
+  pass, duration_ms: 20000, input_tokens: 9000, output_tokens: 900, timestamp: iso(minsAgo),
+  detail: { step, revised, cost_usd: reviews.reduce((n, r) => n + r.cost_usd, 0), reviews: reviews.map((r) => ({ agent: r.path, repo: "your-team/playbook", path: r.path, outcome: "answered", cost_usd: r.cost_usd })) },
+});
+
+const ASK_TRACES = [
+  reviewTrace("plan_review", "plan", true, [
+    { path: "agents/requirements-reviewer.md", cost_usd: 0.0184 },
+    { path: "agents/accessibility-checker.md", cost_usd: 0.0061 },
+    { path: "agents/security-reviewer.md", cost_usd: 0.0043 },
+  ], 26),
+  reviewTrace("pr_review", "prose", false, [
+    { path: "agents/copy-editor.md", cost_usd: 0.0032 },
+    { path: "agents/release-notes-checker.md", cost_usd: 0.0029 },
+  ], 12),
+];
+
 interface Backend {
+  asks: Ask[];
+  traces: unknown[];
   calls: string[];
   posts: string[];
   run: Record<string, unknown> | null;
@@ -80,7 +133,7 @@ interface Backend {
 }
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
-  const db: Backend = { calls: [], posts: [], run: baseRun(), runStatus: 200, role: "admin", actionStatus: 200, agentLogFail: false, ...init };
+  const db: Backend = { asks: [], traces: TRACES, calls: [], posts: [], run: baseRun(), runStatus: 200, role: "admin", actionStatus: 200, agentLogFail: false, ...init };
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
@@ -96,7 +149,8 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/integrations") return json(route, { can_edit: false, items: [], migrated: 0 });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }] });
     if (p === "/api/plugins/catalog") return json(route, { plugins: [{ id: "linear", name: "Linear" }] });
-    if (p === "/api/skills/asks") return json(route, { asks: [] });
+    if (p === "/api/skills/asks") return json(route, { asks: db.asks });
+    if (p === "/api/skills/used") return json(route, { skills: [], agents: [], sources: [], standards: [] });
     const m = p.match(/^\/api\/runs\/([^/]+)(\/.*)?$/);
     if (m) {
       const sub = m[2] ?? "";
@@ -110,7 +164,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
         return json(route, db.run);
       }
       if (sub === "/openspec") return json(route, OPENSPEC);
-      if (sub === "/traces") return json(route, { traces: TRACES });
+      if (sub === "/traces") return json(route, { traces: db.traces });
       if (sub === "/agent-log") {
         if (db.agentLogFail) return route.fulfill({ status: 500, body: "" });
         return json(route, {
@@ -357,4 +411,75 @@ test("the agent log opens with the keyboard state announced, and a failed load c
   await page.getByRole("button", { name: /Build \(1 turn\)/ }).click();
   await expect(page.getByText("Agent", { exact: true })).toBeVisible();
   await shot(page, "runs-detail-agent-log");
+});
+
+// ── Team agents asked ────────────────────────────────────────────────
+
+/** The section alone at both widths, plus the whole page. */
+async function asksShot(page: Page, name: string) {
+  await shot(page, name);
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.waitForTimeout(200);
+    await page.getByTestId("team-asks").screenshot({ path: path.join(SHOTS_DIR, `${name}-section-${width}.png`) });
+  }
+  await page.setViewportSize({ width: 1280, height: 800 });
+}
+
+test("one ask to a team agent is one row: who asked, which agent, its gaps, and what the planner did", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page, { asks: ONE_ASK, traces: [...TRACES, ...ASK_TRACES.slice(0, 1)] });
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  const section = page.getByTestId("team-asks");
+  await expect(section.getByRole("heading", { name: /Team agents asked/ })).toContainText("(1)");
+  await expect(page.getByTestId("asks-summary")).toHaveText("1 team agent reviewed the plan · 3 gaps · plan revised once");
+  const row = section.getByTestId("ask-row");
+  await expect(row.getByRole("link", { name: "requirements-reviewer" })).toHaveAttribute("href", /\/skills\/agent\/?\?repo=your-team%2Fplaybook&path=agents%2Frequirements-reviewer\.md/);
+  await expect(row).toContainText("Asked by the Planner");
+  await expect(row).toContainText("14s");
+  await expect(row).toContainText("$0.02");
+  await expect(row).toContainText("3 gaps");
+  // The framing question is never on the row; it is behind one disclosure.
+  await expect(section.getByText("Apply only the parts of your rubric")).toBeHidden();
+  await expect(section.getByText("What the reviewing agents were asked")).toBeVisible();
+  await expect(page.getByTestId("asks-next-plan")).toHaveText("Planner revised the plan on these notes.");
+  // Collapsed until asked.
+  await expect(section.getByTestId("gap")).toHaveCount(0);
+  await row.getByRole("button", { name: "Show requirements-reviewer's answer" }).click();
+  await expect(section.getByTestId("gap")).toHaveCount(3);
+  await expect(section.getByTestId("gap-file")).toHaveText(["proposal.md", "spec.md", "tasks.md"]);
+  // The chip names the file; the line doesn't say it again.
+  await expect(section.getByTestId("gap").first()).toContainText("The goal never says which page");
+  await expect(section.getByTestId("gap").first()).not.toContainText("proposal.md:");
+  await expect(section.getByTestId("gap").nth(1).locator("code")).toHaveText("No classes");
+  await asksShot(page, "run-asks-one");
+  expect(errors).toEqual([]);
+});
+
+test("eight asks group by step, open one at a time, and say what each step did", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page, { asks: MANY_ASKS, traces: [...TRACES, ...ASK_TRACES] });
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  const section = page.getByTestId("team-asks");
+  await expect(page.getByTestId("asks-summary")).toHaveText(
+    "8 asks to 7 team agents · 5 gaps · plan revised · 2 without an answer",
+  );
+  await expect(section.getByRole("heading", { level: 3 })).toHaveText([/Plan review\s*3/, /PR description review\s*3/, /Questions\s*2/]);
+  await expect(section.getByTestId("ask-row")).toHaveCount(8);
+  await expect(page.getByTestId("asks-next-plan")).toHaveText("Planner revised the plan on these notes.");
+  await expect(page.getByTestId("asks-next-prose")).toHaveText("Writer kept the draft: the revision didn't hold.");
+  const rows = section.getByTestId("ask-row");
+  await expect(rows.filter({ hasText: "security-reviewer" })).toContainText("No gaps");
+  await expect(rows.filter({ hasText: "link-checker" })).toContainText("Timed out");
+  await expect(rows.filter({ hasText: "link-checker" })).toContainText("2m");
+  await expect(rows.filter({ hasText: "Asked by the Coder" })).toContainText("Failed");
+  // One open at a time.
+  await rows.filter({ hasText: "accessibility-checker" }).getByRole("button", { name: /Show accessibility-checker/ }).click();
+  await expect(section.getByTestId("gap")).toHaveCount(1);
+  await rows.filter({ hasText: "Asked by the Planner" }).filter({ hasText: "domain-expert" }).getByRole("button", { name: /Show domain-expert/ }).click();
+  await expect(section.getByTestId("gap")).toHaveCount(0);
+  await expect(section.getByText("Does a class with a waitlist count as full on the details page?")).toBeVisible();
+  await expect(section.locator("strong", { hasText: "full" })).toBeVisible();
+  await asksShot(page, "run-asks-many");
+  expect(errors).toEqual([]);
 });
