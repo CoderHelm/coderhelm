@@ -79,8 +79,19 @@ function livePrs(): LiveRow[] {
 const RELEASES = [
   {
     repo: "your-team/web", tag: "v2.3.0", prev_tag: "v2.2.9", pr_count: 4, headline: "Faster checkout and a clearer receipt page",
-    entry_md: "Checkout is faster.", github_release_md: "## Changes\n- Faster checkout (#101)", unclear: "",
+    entry_md: "Checkout is faster.", github_release_md: "## Changes\n- Faster checkout (#101)\n- Clearer receipt (#104)", unclear: "",
     github_release_url: "https://github.com/your-team/web/releases/tag/v2.3.0", confluence_url: "", email_sent_at: iso(60), updated_at: iso(60),
+  },
+  {
+    repo: "your-team/backend", tag: "v1.4.2", prev_tag: "v1.4.1", pr_count: 1, headline: "Nightly jobs move to the new queue",
+    entry_md: "Nightly jobs run on the new queue.", github_release_md: "## Changes\n- New queue for nightly jobs (#77)", unclear: "",
+    github_release_url: "https://github.com/your-team/backend/releases/tag/v1.4.2", confluence_url: "", email_sent_at: "", updated_at: iso(180),
+    last_error: "Confluence publish failed (403): no permission on the space", failed_at: iso(170),
+  },
+  {
+    repo: "your-team/web", tag: "v2.2.9", prev_tag: "v2.2.8", pr_count: 2, headline: "Saved carts survive a sign out",
+    entry_md: "Carts are kept.", github_release_md: "- Keep carts (#96)", unclear: "",
+    github_release_url: "https://github.com/your-team/web/releases/tag/v2.2.9", confluence_url: "", email_sent_at: iso(3000), updated_at: iso(3000),
   },
 ];
 
@@ -92,6 +103,12 @@ const CONFIG = {
   release_notes_confluence_container: "Changelog", release_notes_email_webhook_url: "", release_notes_email_webhook_secret_set: false,
   release_notes_guide: "", release_notes_instructions: "", graph_enabled: false, deploy_label: "", health_log_groups: [],
   reminders_enabled: false, teams_webhook_url: "", reminder_cooldown_hours: 4,
+};
+
+/** Release-notes settings per repo (merged over CONFIG). */
+const RELEASE_SETTINGS: Record<string, Record<string, unknown>> = {
+  "your-team/web": { release_notes: true, release_notes_email_webhook_url: "https://hooks.example.com/release" },
+  "your-team/backend": { release_notes: true, release_notes_confluence_space: "ENG", release_notes_confluence_parent_id: "12345" },
 };
 
 interface Backend {
@@ -111,13 +128,15 @@ interface Backend {
   noLive: boolean;
   /** Extra reviews listed before the fixtures (a review that just finished). */
   newReviews: ReturnType<typeof review>[];
+  /** What GET /api/releases/pending answers. */
+  pending: { waiting: unknown[]; blocked: unknown[] };
 }
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = {
     calls: [], bodies: [], role: "admin", empty: false, failList: false, failMore: false,
     failConfig: false, failOrg: false, failDetail: false, missingDetail: false, live: livePrs(), noLive: false,
-    newReviews: [], ...init,
+    newReviews: [], pending: { waiting: [], blocked: [] }, ...init,
   };
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -169,16 +188,21 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p.startsWith("/api/reviewer/config/")) {
       if (req.method() === "PUT") return db.role === "member" ? route.fulfill({ status: 403, body: "" }) : route.fulfill({ status: 200, body: "" });
       if (db.failConfig) return json(route, { error: "boom" }, 500);
-      return json(route, CONFIG);
+      // The releases page reads each repo's release-notes settings; other pages get the plain fixture.
+      const repo = decodeURIComponent(p.slice("/api/reviewer/config/".length));
+      const referer = req.headers()["referer"] || "";
+      return json(route, referer.includes("/releases") ? { ...CONFIG, ...RELEASE_SETTINGS[repo] } : CONFIG);
     }
     if (p === "/api/releases") {
       if (url.searchParams.get("cursor")) return db.failMore ? json(route, { error: "boom" }, 500) : json(route, { releases: [], next: null });
       if (db.failList) return json(route, { error: "boom" }, 500);
       if (db.empty) return json(route, { releases: [], next: null });
-      return json(route, { releases: RELEASES, next: db.failMore ? "page2" : null });
+      const repo = url.searchParams.get("repo");
+      return json(route, { releases: repo ? RELEASES.filter((r) => r.repo === repo) : RELEASES, next: db.failMore ? "page2" : null });
     }
     if (p === "/api/releases/send") return json(route, { status: "queued" });
-    if (p === "/api/releases/pending") return json(route, { waiting: [], blocked: [] });
+    if (p === "/api/releases/pending") return json(route, db.pending);
+    if (p === "/api/releases/now") return json(route, { status: "queued" });
     return json(route, { error: `Not mocked: ${req.method()} ${p}` }, 404);
   });
   return db;
@@ -525,13 +549,86 @@ test("releases list each tag and open its notes and actions", async ({ page }) =
   await expect(page.getByRole("link", { name: "Reviewer settings" })).toHaveAttribute("href", /\/reviewer\/config/);
   const row = page.getByRole("button", { name: /your-team\/web v2\.3\.0/ });
   await expect(row).toHaveAttribute("aria-expanded", "false");
+  // Counts read as words: "1 PR", "4 PRs"; the summary is not cut to one line.
+  await expect(row).toContainText("4 PRs");
+  await expect(page.getByRole("button", { name: /your-team\/backend v1\.4\.2/ })).toContainText("1 PR");
+  await expect(page.getByText("1 PRs")).toHaveCount(0);
   await row.click();
   await expect(row).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("link", { name: /GitHub release/ })).toHaveAttribute("href", "https://github.com/your-team/web/releases/tag/v2.3.0");
+  await expect(page.getByRole("link", { name: /Changes since v2\.2\.9/ })).toHaveAttribute("href", "https://github.com/your-team/web/compare/v2.2.9...v2.3.0");
+  await expect(page.getByRole("link", { name: /^#104/ })).toHaveAttribute("href", "https://github.com/your-team/web/pull/104");
   await expect(page.getByRole("button", { name: "Rewrite the notes" })).toBeVisible();
+  await page.getByRole("button", { name: "GitHub release", exact: true }).click();
+  await expect(page.getByText("Clearer receipt (#104)")).toBeVisible();
   await page.getByRole("button", { name: "Send the email again" }).click();
   await expect(page.getByText("Email queued for your-team/web v2.3.0")).toBeVisible();
   expect(db.bodies).toContainEqual({ repo: "your-team/web", tag: "v2.3.0", resend: "email" });
   await shot(page, "audit-releases");
+  expect(errors).toEqual([]);
+});
+
+test("releases are grouped by repo, without the repo name on every row or monospace pickers", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page);
+  await page.goto("/releases");
+  await expect(page.getByRole("heading", { level: 2, name: /^web/ })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: /^backend/ })).toBeVisible();
+  const web = page.getByRole("region", { name: /^web/ });
+  await expect(web.getByTestId("release-row")).toHaveCount(2);
+  // The repo is the group heading; rows show only the version.
+  const shown = await web.getByTestId("release-row").first().evaluate((el) => {
+    const copy = el.cloneNode(true) as HTMLElement;
+    copy.querySelectorAll(".sr-only, [title]").forEach((n) => n.remove());
+    return copy.textContent || "";
+  });
+  expect(shown).not.toContain("your-team/web");
+  // Only tags and versions are monospace.
+  const filter = page.getByTestId("releases-filter");
+  const font = await filter.getByRole("button", { name: "All repos" }).evaluate((el) => getComputedStyle(el).fontFamily);
+  expect(font).not.toMatch(/mono/i);
+  // One filter: picking a repo shows only its releases, without group headings.
+  await filter.getByRole("button", { name: "backend" }).click();
+  await expect(page.getByTestId("release-row")).toHaveCount(1);
+  await expect(page.getByRole("heading", { level: 2, name: /^web/ })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("each destination says its real state: published, not set up, or failed with the reason", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page);
+  await page.goto("/releases");
+  const web = page.getByTestId("release-row").filter({ hasText: "v2.3.0" });
+  await expect(web.locator('[data-dest="github"]')).toHaveAttribute("title", "GitHub release: published");
+  await expect(web.locator('[data-dest="confluence"]')).toHaveAttribute("title", "Confluence: not set up for this repo");
+  await expect(web.locator('[data-dest="email"]')).toHaveAttribute("title", /^Email: sent/);
+  const backend = page.getByTestId("release-row").filter({ hasText: "v1.4.2" });
+  await expect(backend.locator('[data-dest="confluence"]')).toHaveAttribute(
+    "title",
+    "Confluence: failed: Confluence publish failed (403): no permission on the space",
+  );
+  await expect(backend.locator('[data-dest="email"]')).toHaveAttribute("title", "Email: not set up for this repo");
+  await expect(backend).toContainText("Confluence failed");
+  await backend.getByRole("button").first().click();
+  await expect(backend.getByRole("button", { name: "Post to Confluence" })).toBeVisible();
+  await expect(backend.getByRole("button", { name: "Send the email again" })).toHaveCount(0);
+  await shot(page, "audit-releases-failed");
+  expect(errors).toEqual([]);
+});
+
+test("a release waiting out its batch window is a slim banner with Release now", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page, {
+    pending: { waiting: [{ repo: "your-team/web", fires_at: Math.floor(now / 1000) + 555, merges: 1, base_branch: "main" }], blocked: [] },
+  });
+  await page.goto("/releases");
+  const banner = page.getByTestId("pending-release");
+  await expect(banner).toContainText("1 merge waiting");
+  await expect(banner).toContainText(/releases from main in \d+:\d\d/);
+  await banner.getByRole("button", { name: "Release now" }).click();
+  await expect(page.getByText("Releasing your-team/web now")).toBeVisible();
+  expect(db.bodies).toContainEqual({ repo: "your-team/web" });
+  await shot(page, "audit-releases-pending");
   expect(errors).toEqual([]);
 });
 
@@ -557,19 +654,24 @@ test("an empty releases list says when notes appear", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test("a tag with characters the backend refuses is caught before sending", async ({ page }) => {
+test("writing notes for a tag opens a small form and catches a tag the backend refuses", async ({ page }) => {
   const errors = watchConsole(page);
   const db = await mockApi(page);
   await page.goto("/releases");
-  await page.getByRole("button", { name: /Select repo/ }).first().click();
-  await page.getByRole("button", { name: "your-team/web", exact: true }).click();
-  const tag = page.getByRole("textbox", { name: "Release tag" });
+  await expect(page.getByRole("textbox", { name: "Release tag" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Write notes for a tag" }).click();
+  const form = page.locator("#write-notes");
+  await form.getByRole("button", { name: /Select repo/ }).click();
+  await form.getByRole("button", { name: "your-team/web", exact: true }).click();
+  const tag = form.getByRole("textbox", { name: "Release tag" });
   await tag.fill("v2.3.0!");
   await expect(page.getByText("A tag can use letters, numbers and . _ - + / only.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Write notes" })).toBeDisabled();
+  await expect(form.getByRole("button", { name: "Write notes" })).toBeDisabled();
   await tag.fill("v2.3.1");
-  await page.getByRole("button", { name: "Write notes" }).click();
+  await shot(page, "audit-releases-write");
+  await form.getByRole("button", { name: "Write notes" }).click();
   await expect(page.getByText("Release notes queued for your-team/web v2.3.1")).toBeVisible();
   expect(db.bodies).toContainEqual({ repo: "your-team/web", tag: "v2.3.1", resend: "" });
+  await expect(page.locator("#write-notes")).toHaveCount(0);
   expect(errors).toEqual([]);
 });

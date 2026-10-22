@@ -9,6 +9,7 @@ export function RepoCombobox({
   selected,
   onSelect,
   label = "Repository",
+  placeholder = "Select repo...",
   id,
 }: {
   repos: Repo[];
@@ -16,6 +17,8 @@ export function RepoCombobox({
   onSelect: (name: string) => void;
   /** Spoken name of the picker; a visible <label htmlFor={id}> also works. */
   label?: string;
+  /** What the button says while nothing is picked. */
+  placeholder?: string;
   id?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -50,9 +53,9 @@ export function RepoCombobox({
         aria-expanded={open}
         className={`w-full flex items-center justify-between gap-2 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 hover:border-zinc-500 transition-colors ${focusRing}`}
       >
-        <span className="font-mono truncate">
+        <span className={`truncate ${selected ? "" : "text-zinc-400"}`}>
           <span className="sr-only">{label}: </span>
-          {selected || "Select repo..."}
+          {selected || placeholder}
         </span>
         <svg aria-hidden="true" className={`w-4 h-4 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -92,7 +95,7 @@ export function RepoCombobox({
                       : "text-zinc-300 hover:bg-zinc-800/50"
                   }`}
                 >
-                  <span className="font-mono">{r.name}</span>
+                  {r.name}
                 </button>
               ))
             )}
