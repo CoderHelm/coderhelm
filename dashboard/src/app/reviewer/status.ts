@@ -19,6 +19,7 @@ const LOOKS: Record<string, StatusLook> = {
   ci_failing: { label: "CI failing", tone: "danger" },
   merge_blocked: { label: "Merge blocked", tone: "danger" },
   paused: { label: "Auto-merge paused", tone: "neutral" },
+  stopped: { label: "Auto-merge stopped", tone: "neutral" },
   failed: { label: "Review failed", tone: "danger" },
   stalled: { label: "Review stalled", tone: "danger" },
   merged: { label: "Merged", tone: "merged" },
@@ -63,6 +64,27 @@ function gateSummary(pr: LivePr): string {
   return ["Auto-merge armed", ...parts].join(" · ");
 }
 
+/** Who stopped auto-merge, as the team knows them. */
+export function stopperName(st: { by: string; is_login?: boolean }): string {
+  return st.is_login ? `@${st.by}` : st.by || "a team member";
+}
+
+/** Gate states a person can stop (the gate may still merge on its own). */
+const STOPPABLE = new Set(["waiting_approval", "waiting_ci", "blocked_ci", "declined", "paused", "head_moved"]);
+
+/** What a person can do with a PR's auto-merge now: stop it, re-arm it, or nothing. */
+export function gateAction(state: string | undefined): "stop" | "rearm" | null {
+  if (state === "stopped") return "rearm";
+  return state && STOPPABLE.has(state) ? "stop" : null;
+}
+
+/** The dashboard page that stops or re-arms one PR's auto-merge (no secret: it asks before acting). */
+export function gateHref(repo: string, pr: number, action?: "stop" | "rearm"): string {
+  const q = new URLSearchParams({ repo, pr: String(pr) });
+  if (action) q.set("do", action);
+  return `/reviewer/pr?${q}`;
+}
+
 /** The PR's state in short words; empty when the verdict says it all. */
 export function summaryLine(pr: LivePr | undefined): string {
   if (!pr) return "";
@@ -92,6 +114,10 @@ export function summaryLine(pr: LivePr | undefined): string {
       return `GitHub refused the merge${pr.gate?.detail ? ` · ${pr.gate.detail}` : ""}`;
     case "paused":
       return "Auto-merge paused · picks up on the next CI run or review";
+    case "stopped": {
+      const st = pr.gate?.stopped;
+      return st ? `Auto-merge stopped by ${stopperName(st)} · waits for someone to re-arm it` : "Auto-merge stopped · waits for someone to re-arm it";
+    }
     case "merged":
       return "Merged by auto-merge";
     case "closed":

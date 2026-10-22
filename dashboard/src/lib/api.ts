@@ -873,6 +873,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ sk, rating, comment }),
     }),
+  /** One PR's auto-merge gate: state, checklist, who stopped it, every stop and re-arm. */
+  getGate: (repo: string, pr: number) =>
+    request<GateDetail>(`/api/reviewer/gate?${new URLSearchParams({ repo, pr: String(pr) })}`),
+  /** Stop or re-arm one PR's auto-merge. A re-arm checks every condition again before merging. */
+  controlGate: (repo: string, pr: number, action: GateAction) =>
+    request<GateControlResult>(`/api/reviewer/gate`, {
+      method: "POST",
+      body: JSON.stringify({ repo, pr, action }),
+    }),
   reReview: (repo: string, pr: number) =>
     request<{ status: "queued" | "skipped"; reason?: string }>(
       `/api/reviewer/re-review`,
@@ -1257,7 +1266,60 @@ export interface LivePr {
     head_sha?: string;
     armed_at?: string;
     checklist?: MergeChecklistLine[];
+    stopped?: GateStop | null;
   } | null;
+}
+
+/** A person's stop of auto-merge. `by` is a GitHub login when `is_login`, else the user's email. */
+export interface GateStop {
+  by: string;
+  is_login?: boolean;
+  /** comment · dashboard */
+  via: string;
+  at: string;
+}
+
+/** One stop or re-arm in a gate's audit log. */
+export interface GateControlEntry {
+  /** stop · rearm */
+  action: string;
+  by: string;
+  is_login?: boolean;
+  via: string;
+  at: string;
+  /** stopped · rearmed · recheck */
+  outcome?: string;
+}
+
+export type GateAction = "stop" | "rearm";
+
+/** GET /api/reviewer/gate: one PR's auto-merge gate. */
+export interface GateDetail {
+  repo: string;
+  pr_number: number;
+  pr_title?: string;
+  auto_merge: boolean;
+  status?: string;
+  group?: string;
+  can_control?: boolean;
+  gate: {
+    state?: string;
+    detail?: string;
+    head_sha?: string;
+    armed_at?: string;
+    updated_at?: string;
+    checklist?: MergeChecklistLine[];
+    stopped?: GateStop | null;
+    /** Newest first. */
+    controls?: GateControlEntry[];
+  } | null;
+}
+
+export interface GateControlResult {
+  /** stopped · already_stopped · rearmed · rechecking · finished · off */
+  status: string;
+  ok: boolean;
+  message: string;
 }
 
 export interface TeamUser {

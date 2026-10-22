@@ -28,7 +28,8 @@ import {
 } from "@/components/list";
 import type { Review } from "@/lib/api";
 import { RiskText, VerdictPill, riskLabel, triggerLabel } from "./labels";
-import { buildRows, statusLook, summaryLine, type Group, type PrRow } from "./status";
+import { buildRows, gateAction, gateHref, statusLook, summaryLine, type Group, type PrRow } from "./status";
+import { GateControlButton } from "./gate-control";
 
 export default function ReviewerPageGuarded() {
   return (
@@ -360,7 +361,9 @@ function PrItem({
   const reason = row.live?.review?.reason ?? "";
   const ref = `${row.repo} #${row.pr_number}`;
   const title = row.title || `Pull request #${row.pr_number}`;
-  const hasDetails = row.reviews.length > 0 || checklist.length > 0 || !!reason;
+  const gateState = row.live?.gate?.state;
+  const control = gateAction(gateState);
+  const hasDetails = row.reviews.length > 0 || checklist.length > 0 || !!reason || !!gateState;
 
   return (
     <ListRow
@@ -390,10 +393,24 @@ function PrItem({
         </>
       }
       // A review already queued or running needs no second one.
-      actions={row.group !== "active" ? <ReReviewButton repo={row.repo} pr={row.pr_number} onQueued={onQueued} /> : undefined}
+      actions={
+        row.group !== "active" || control ? (
+          <>
+            {control && <GateControlButton repo={row.repo} pr={row.pr_number} action={control} onDone={onQueued} />}
+            {row.group !== "active" && <ReReviewButton repo={row.repo} pr={row.pr_number} onQueued={onQueued} />}
+          </>
+        ) : undefined
+      }
       details={
         hasDetails ? (
           <>
+            {gateState && (
+              <p>
+                <Link href={gateHref(row.repo, row.pr_number)} className={linkButton}>
+                  Auto-merge details and history
+                </Link>
+              </p>
+            )}
             {checklist.length > 0 && (
               <DetailBlock title="Auto-merge">
                 <ul className="flex flex-col gap-0.5">
