@@ -22,12 +22,60 @@ const SUMMARY = {
   median_run_minutes: 11.5, median_hours_to_merge: 5.2, time_to_merge_known: 12, merged_untouched: 9, merged_with_edits: 3, edits_known: 12, reviews: 55,
 };
 
-function analytics(daysN: number, repo: string | null) {
+// Invented numbers: the previous period recorded nobody as asking for work.
+const PREV_COUNTS = {
+  tickets: 40, runs: 70, prs_opened: 50, prs_merged: 41, prs_open: 3, prs_reviewed: 100, reviews_posted: 400,
+  approvals: 80, changes_requested: 40, comments: 280, repos: 6, people: 0, runs_with_requester: 0,
+};
+const CUR_COUNTS = {
+  tickets: 45, runs: 62, prs_opened: 50, prs_merged: 30, prs_open: 12, prs_reviewed: 210, reviews_posted: 660,
+  approvals: 300, changes_requested: 250, comments: 110, repos: 8, people: 5, runs_with_requester: 30,
+};
+const FULL_COUNTS = { ...PREV_COUNTS, tickets: 52, runs: 90, prs_opened: 63, prs_reviewed: 140, reviews_posted: 520 };
+
+/** Running totals by day: the current period ends today, the previous one is a day shorter. */
+function compareDaily(start: Date, prevStart: Date, n: number) {
+  return Array.from({ length: n }, (_, i) => {
+    const day = (d: Date) => new Date(d.getTime() + i * 86_400_000).toISOString().slice(0, 10);
+    const last = i === n - 1;
+    return {
+      offset: i, day: day(start), previous_day: last ? null : day(prevStart),
+      tickets: 2 * (i + 1), prs_opened: i + 1, prs_reviewed: 3 * (i + 1),
+      previous_tickets: last ? null : i + 1, previous_prs_opened: last ? null : i + 1, previous_prs_reviewed: last ? null : 2 * (i + 1),
+    };
+  });
+}
+
+function windows(period: string) {
+  const now = new Date();
+  if (period === "mtd") {
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const prevStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+    const prevEnd = new Date(Math.min(prevStart.getTime() + (now.getTime() - start.getTime()), start.getTime()));
+    return { days: Math.max(1, Math.ceil((now.getTime() - start.getTime()) / 86_400_000)), start, end: now, prevStart, prevEnd, full: { start: prevStart, end: start } };
+  }
+  const n = Number(period);
+  const start = new Date(now.getTime() - n * 86_400_000);
+  return { days: n, start, end: now, prevStart: new Date(start.getTime() - n * 86_400_000), prevEnd: start, full: null };
+}
+
+function analytics(period: string, repo: string | null) {
   const scale = repo ? 0.5 : 1;
+  const w = windows(period);
+  const daysN = w.days;
   return {
     days: daysN,
-    period: { start: new Date(Date.now() - daysN * 86_400_000).toISOString(), end: new Date().toISOString() },
-    previous_period: { start: new Date(Date.now() - 2 * daysN * 86_400_000).toISOString(), end: new Date(Date.now() - daysN * 86_400_000).toISOString() },
+    basis: period === "mtd" ? "month_to_date" : "days",
+    period: { start: w.start.toISOString(), end: w.end.toISOString() },
+    previous_period: { start: w.prevStart.toISOString(), end: w.prevEnd.toISOString() },
+    comparison: {
+      current: CUR_COUNTS,
+      previous: PREV_COUNTS,
+      previous_full: w.full ? FULL_COUNTS : null,
+      previous_full_period: w.full ? { start: w.full.start.toISOString(), end: w.full.end.toISOString() } : null,
+      people_comparable: false,
+      daily: compareDaily(w.start, w.prevStart, Math.max(2, daysN)),
+    },
     summary: { ...SUMMARY, prs_merged: Math.round(21 * scale), runs: Math.round(42 * scale) },
     previous: { ...SUMMARY, prs_merged: 15, merge_rate: 0.6, cost_per_merged_pr: 5.1, failed_runs: 6, median_hours_to_merge: 7.0, reviews: 40 },
     daily: days(daysN),
@@ -74,10 +122,10 @@ function analytics(daysN: number, repo: string | null) {
   };
 }
 
-interface Backend { calls: string[]; fail: boolean; empty: boolean }
+interface Backend { calls: string[]; fail: boolean; empty: boolean; oldServer: boolean }
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
-  const db: Backend = { calls: [], fail: false, empty: false, ...init };
+  const db: Backend = { calls: [], fail: false, empty: false, oldServer: false, ...init };
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
@@ -92,8 +140,9 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }] });
     if (p === "/api/analytics") {
       if (db.fail) return json(route, { error: "boom" }, 500);
-      const d = Number(url.searchParams.get("days") || 30);
-      const body = analytics(d, url.searchParams.get("repo"));
+      const period = url.searchParams.get("period") === "mtd" ? "mtd" : url.searchParams.get("days") || "30";
+      const { comparison, ...older } = analytics(period, url.searchParams.get("repo"));
+      const body = db.oldServer ? older : { ...older, comparison };
       if (db.empty) {
         const zero = Object.fromEntries(Object.keys(SUMMARY).map((k) => [k, typeof (SUMMARY as Record<string, unknown>)[k] === "number" ? 0 : null]));
         return json(route, { ...body, summary: zero, previous: zero, reviews: { ...body.reviews, posted: 0 }, lookups: { ...body.lookups, total: 0 } });
@@ -184,4 +233,72 @@ test("empty and error states explain themselves", async ({ page }) => {
   db.fail = false;
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(page.getByTestId("tile-merged")).toContainText("21");
+});
+
+test("this period is compared with the one before, each thing counted once", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/analytics");
+  const table = page.getByRole("table", { name: "Compared with the period before" });
+  await expect(table).toBeVisible();
+  const row = (name: string) => table.locator("tbody tr").filter({ has: page.getByRole("rowheader").filter({ hasText: name }) });
+  await expect(row("Tickets worked on")).toContainText("40");
+  await expect(row("Tickets worked on")).toContainText("45");
+  await expect(row("Tickets worked on").locator("td").nth(2)).toHaveText("↑ +13%");
+  await expect(row("Runs (including reruns)").locator("td").nth(2)).toHaveText("↓ −11%");
+  await expect(row("PRs opened").locator("td").nth(2)).toHaveText("Flat");
+  await expect(row("PRs reviewed (distinct)").locator("td").nth(2)).toHaveText("↑ ×2.1");
+  await expect(row("Reviews posted").locator("td").nth(2)).toHaveText("↑ +65%");
+  await expect(row("Approvals").locator("td").nth(0)).toHaveText("80");
+  await expect(row("Plain comments").locator("td").nth(2)).toHaveText("↓ −61%");
+  // Colour follows the direction, and the arrow says it without colour.
+  await expect(row("Runs (including reruns)").locator("td").nth(2).locator("span")).toHaveClass(/text-rose-400/);
+  await expect(row("Tickets worked on").locator("td").nth(2).locator("span")).toHaveClass(/text-emerald-400/);
+  // Who asked was not recorded before: no fake jump from zero.
+  await expect(row("People who asked").locator("td").nth(2)).toHaveText("Not comparable");
+  const notes = page.getByTestId("compare-notes");
+  await expect(notes).toContainText("Who asked was recorded on 0 of 70 runs");
+  await expect(notes).toContainText("12 PRs from");
+  await expect(notes).toContainText("still open");
+  await expect(notes).toContainText("posted as plain comments (70%, against 17% now)");
+  // Rolling periods have no full-month column.
+  await expect(table.locator("thead th")).toHaveCount(4);
+
+  // The chart switches metric and reads as a table.
+  await expect(page.getByRole("img", { name: /Line chart of PRs reviewed so far by day/ })).toBeVisible();
+  await page.getByRole("group", { name: "Chart metric" }).getByRole("button", { name: "Tickets", exact: true }).click();
+  await expect(page.getByRole("img", { name: /Line chart of Tickets so far by day/ })).toBeVisible();
+  await page.getByRole("button", { name: /^Show table: Tickets so far/ }).click();
+  const days = page.getByRole("table", { name: "Tickets so far by day" });
+  await expect(days.locator("tbody tr").first()).toContainText("Day 1");
+  // The previous period was a day shorter: its last value is a gap, not a zero.
+  await expect(days.locator("tbody tr").last().locator("td").nth(1)).toHaveText("—");
+  await shot(page, "analytics-compare");
+});
+
+test("month to date compares the same days of last month and shows all of last month", async ({ page }) => {
+  const db = await mockApi(page);
+  await page.goto("/analytics");
+  await page.getByRole("group", { name: "Period" }).getByRole("button", { name: "This month" }).click();
+  await expect(page.getByTestId("tile-merged")).toContainText("vs the same days last month");
+  expect(db.calls).toContain("/api/analytics?period=mtd");
+  const table = page.getByRole("table", { name: "Compared with the period before" });
+  await expect(table.locator("thead th")).toHaveCount(5);
+  await expect(table.locator("thead th").last()).toHaveText(/^All of /);
+  await expect(table.locator("tbody tr").first().locator("td").last()).toHaveText("52");
+  // On a phone the change stays in view and last month moves out of the way.
+  await page.setViewportSize({ width: 390, height: 800 });
+  await expect(table.locator("thead th").last()).toBeHidden();
+  await expect(table.locator("tbody tr").first().locator("td").nth(2)).toBeVisible();
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(page.locator("#compare")).toContainText("the same time into the month");
+  await page.getByRole("combobox", { name: "Repository" }).selectOption("your-team/web");
+  expect(db.calls).toContain("/api/analytics?period=mtd&repo=your-team%2Fweb");
+  await shot(page, "analytics-compare-mtd");
+});
+
+test("a server without the comparison still shows the rest of the page", async ({ page }) => {
+  await mockApi(page, { oldServer: true });
+  await page.goto("/analytics");
+  await expect(page.getByTestId("tile-merged")).toContainText("21");
+  await expect(page.getByRole("table", { name: "Compared with the period before" })).toHaveCount(0);
 });

@@ -253,9 +253,11 @@ export const api = {
   getStats: () => request<{ month: Stats; all_time: Stats }>("/api/stats"),
   getStatsHistory: () =>
     request<{ months: MonthStats[] }>("/api/stats/history"),
-  /** The analytics page: one period (7, 30 or 90 days) and the one before it. */
-  getAnalytics: (days: AnalyticsDays, repo?: string) =>
-    request<Analytics>(`/api/analytics?days=${days}${repo ? `&repo=${encodeURIComponent(repo)}` : ""}`),
+  /** The analytics page: one period (7, 30 or 90 days, or this month so far) and the one before it. */
+  getAnalytics: (period: AnalyticsPeriod, repo?: string) =>
+    request<Analytics>(
+      `/api/analytics?${period === "mtd" ? "period=mtd" : `days=${period}`}${repo ? `&repo=${encodeURIComponent(repo)}` : ""}`,
+    ),
 
   // GitHub App installation
   getInstallationStatus: () =>
@@ -2031,6 +2033,55 @@ export interface DataSourceActivityFilter {
 // ── Analytics ──────────────────────────────────────────────────────────────
 
 export type AnalyticsDays = 7 | 30 | 90;
+/** A number of days, or "mtd": this month so far against the same time elapsed last month. */
+export type AnalyticsPeriod = AnalyticsDays | "mtd";
+
+/** How much work there was in one period, each thing counted once. */
+export interface AnalyticsCounts {
+  /** Distinct tickets the runs worked on. */
+  tickets: number;
+  /** Every run, reruns included. */
+  runs: number;
+  /** Distinct PRs CoderHelm's runs opened or pushed to. */
+  prs_opened: number;
+  prs_merged: number;
+  /** Neither merged nor closed yet. */
+  prs_open: number;
+  /** Distinct PRs with at least one posted review. */
+  prs_reviewed: number;
+  /** Answers to questions and re-checks that posted nothing are left out. */
+  reviews_posted: number;
+  approvals: number;
+  changes_requested: number;
+  /** Posted as a plain comment, without approving or asking for changes. */
+  comments: number;
+  repos: number;
+  people: number;
+  /** Runs that recorded who (or what) asked for them. */
+  runs_with_requester: number;
+}
+
+export interface AnalyticsComparison {
+  current: AnalyticsCounts;
+  previous: AnalyticsCounts;
+  /** All of last month, when comparing month to date. */
+  previous_full: AnalyticsCounts | null;
+  previous_full_period: { start: string; end: string } | null;
+  /** False when a period did not record who asked for nearly every run. */
+  people_comparable: boolean;
+  /** Running totals by day; the previous values are null past the end of a shorter previous period. */
+  daily: {
+    offset: number;
+    day: string;
+    previous_day: string | null;
+    tickets: number;
+    prs_opened: number;
+    prs_reviewed: number;
+    previous_tickets: number | null;
+    previous_prs_opened: number | null;
+    previous_prs_reviewed: number | null;
+  }[];
+}
 
 export interface AnalyticsSummary {
   runs: number;
@@ -2063,7 +2114,9 @@ export interface AnalyticsSummary {
 }
 
 export interface Analytics {
-  days: AnalyticsDays;
+  /** Days in the period (for month to date, the days so far). */
+  days: number;
+  basis?: "days" | "month_to_date";
   period: { start: string; end: string };
   previous_period: { start: string; end: string };
   summary: AnalyticsSummary;
@@ -2090,6 +2143,8 @@ export interface Analytics {
   merged_recent: { run_id: string; title: string; repo: string; pr_number: number; pr_url: string; hours_to_merge: number | null; human_commits: number | null }[];
   failed_recent: { run_id: string; title: string; repo: string; reason: string; at: string }[];
   repo_names: string[];
+  /** Absent from servers older than the comparison. */
+  comparison?: AnalyticsComparison;
 }
 
 // ── E2E test intelligence ─────────────────────────────────────────
