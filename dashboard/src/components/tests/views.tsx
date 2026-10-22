@@ -4,21 +4,60 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { api, type TestCase, type TestRun, type TestSummary } from "@/lib/api";
 import { CAUSE_LABEL, githubPrUrl, minutes, plural, runHref, shortSha, testHref } from "@/lib/tests";
-import { errorMessage, formatDuration, timeAgo } from "@/lib/data-sources";
-import { StatusPill } from "@/components/status-pill";
+import { errorMessage, formatDuration } from "@/lib/data-sources";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
-import { focusRing, linkButton, secondaryButton } from "@/components/ui";
-import { EmptyBox, LoadError, Loading, SectionHeading, StatCard } from "./common";
+import { linkButton, secondaryButton } from "@/components/ui";
+import {
+  DetailBlock,
+  GROUP_LABEL,
+  List,
+  ListRow,
+  ListSection,
+  ListToolbar,
+  LoadMore,
+  usePagedList,
+  useListParams,
+  type StatusLook,
+} from "@/components/list";
+import { EmptyBox, LoadError, Loading, StatCard } from "./common";
 import { QuarantineCiStep } from "./settings";
-import { TestList, impactFacts, quarantineFacts, slowFacts } from "./test-list";
+import { TestList, impactFacts, quarantineFacts, slowFacts, testMatches } from "./test-list";
 import { useLoad } from "./use-load";
+
+/** A search box over a loaded list of tests, kept in the address as `?q=`. */
+function useTestSearch() {
+  const [params, setParams] = useListParams({ q: "" });
+  const q = params.q.trim();
+  return {
+    q,
+    search: {
+      value: params.q,
+      onChange: (v: string) => setParams({ q: v }, { replace: true }),
+      placeholder: "Search by test name, file or owner",
+      label: "Search tests",
+    },
+    clear: () => setParams({ q: "" }),
+  };
+}
 
 // ── Needs attention ───────────────────────────────────────────────
 
+type AttentionState = "all" | "flaky" | "broken" | "quarantined";
+
 export function NeedsAttention({ repo, summary }: { repo: string; summary: TestSummary | null }) {
   const { data, error, loading, reload } = useLoad(() => api.listTests({ repo, sort: "impact", limit: 100 }), `attention:${repo}`);
-  const tests = (data?.tests ?? []).filter((t) => t.state === "flaky" || t.state === "broken" || t.state === "quarantined");
+  const [params, setParams] = useListParams({ q: "", state: "all" });
+  const q = params.q.trim();
+  const state: AttentionState = (["flaky", "broken", "quarantined"] as const).includes(params.state as never)
+    ? (params.state as AttentionState)
+    : "all";
+  const needing = (data?.tests ?? []).filter((t) => t.state === "flaky" || t.state === "broken" || t.state === "quarantined");
+  const matched = needing.filter((t) => testMatches(t, q));
+  const count = (s: TestCase["state"]) => matched.filter((t) => t.state === s).length;
+  const tests = state === "all" ? matched : matched.filter((t) => t.state === state);
+  const filtered = !!q || state !== "all";
+  const clear = () => setParams({ q: "", state: "all" });
 
   return (
     <div className="space-y-8">
@@ -36,21 +75,46 @@ export function NeedsAttention({ repo, summary }: { repo: string; summary: TestS
         </section>
       )}
 
-      <section aria-labelledby="attention-heading">
-        <SectionHeading id="attention-heading">Needs attention</SectionHeading>
-        <p className="mb-3 max-w-prose text-sm text-zinc-400">
-          Ranked by what each test costs your team right now: pull requests it blocked and CI time lost this week.
-        </p>
+      <ListSection
+        id="attention"
+        title="Needs attention"
+        description="Ranked by what each test costs your team right now: pull requests it blocked and CI time lost this week."
+      >
+        {needing.length > 0 && (
+          <ListToolbar
+            className="mb-3"
+            search={{
+              value: params.q,
+              onChange: (v) => setParams({ q: v }, { replace: true }),
+              placeholder: "Search by test name, file or owner",
+              label: "Search tests",
+            }}
+            status={{
+              label: "Show tests",
+              value: state,
+              onChange: (v) => setParams({ state: v }),
+              options: [
+                { value: "all", label: GROUP_LABEL.all, count: matched.length },
+                { value: "flaky", label: "Flaky", count: count("flaky"), tone: "waiting" },
+                { value: "broken", label: "Broken", count: count("broken"), tone: "danger" },
+                { value: "quarantined", label: "Quarantined", count: count("quarantined"), tone: "muted" },
+              ],
+            }}
+            onClear={filtered ? clear : undefined}
+          />
+        )}
         {error ? (
           <LoadError what="your tests" message={error} onRetry={reload} />
         ) : loading && !data ? (
           <Loading what="your tests" />
-        ) : tests.length === 0 ? (
+        ) : needing.length === 0 ? (
           <EmptyBox>Nothing needs attention. No test is flaky, broken or quarantined.</EmptyBox>
+        ) : tests.length === 0 ? (
+          <EmptyBox>No test matches. <button type="button" onClick={clear} className={linkButton}>Clear filters</button></EmptyBox>
         ) : (
           <TestList label="Tests that need attention" tests={tests} facts={impactFacts} />
         )}
-      </section>
+      </ListSection>
     </div>
   );
 }
@@ -58,117 +122,77 @@ export function NeedsAttention({ repo, summary }: { repo: string; summary: TestS
 // ── Runs ──────────────────────────────────────────────────────────
 
 export function RunsView({ repo }: { repo: string }) {
-  const [branch, setBranch] = useState("");
-  const [older, setOlder] = useState<TestRun[]>([]);
-  const [next, setNext] = useState<string | null | undefined>(undefined);
-  const [moreBusy, setMoreBusy] = useState(false);
-  const [moreError, setMoreError] = useState("");
-  const { data, error, loading, reload } = useLoad(async () => {
-    const res = await api.listTestRuns({ repo, branch: branch.trim() || undefined, limit: 30 });
-    setOlder([]);
-    setNext(res.next);
-    setMoreError("");
-    return res;
-  }, `runs:${repo}:${branch}`);
-
-  const runs = [...(data?.runs ?? []), ...older];
-
-  const loadMore = async () => {
-    if (!next) return;
-    setMoreBusy(true);
-    setMoreError("");
-    try {
-      const res = await api.listTestRuns({ repo, branch: branch.trim() || undefined, before: next, limit: 30 });
-      setOlder((prev) => [...prev, ...res.runs]);
-      setNext(res.next);
-    } catch (e) {
-      setMoreError(errorMessage(e, "The request failed."));
-    } finally {
-      setMoreBusy(false);
-    }
-  };
+  // ?branch= keeps the filter in the address.
+  const [params, setParams] = useListParams({ branch: "" });
+  const branch = params.branch.trim();
+  const { items: runs, next, loading, loadingMore, error, moreFailed, loadMore, reload } = usePagedList<TestRun>(
+    (cursor) =>
+      api
+        .listTestRuns({ repo: repo || undefined, branch: branch || undefined, before: cursor, limit: 30 })
+        .then((r) => ({ items: r.runs, next: r.next })),
+    [repo, branch],
+  );
 
   return (
-    <section aria-labelledby="runs-heading">
-      <SectionHeading id="runs-heading">Runs</SectionHeading>
-      <div className="mb-3 max-w-xs">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-zinc-500">Branch</span>
-          <input
-            type="search"
-            value={branch}
-            onChange={(e) => setBranch(e.target.value)}
-            placeholder="All branches"
-            className={`min-h-9 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100 placeholder-zinc-600 ${focusRing}`}
-          />
-        </label>
-      </div>
+    <ListSection id="runs" title="Runs">
+      <ListToolbar
+        className="mb-3"
+        search={{ value: params.branch, onChange: (v) => setParams({ branch: v }, { replace: true }), placeholder: "Filter by branch", label: "Branch" }}
+        onClear={branch ? () => setParams({ branch: "" }) : undefined}
+      />
       {error ? (
-        <LoadError what="runs" message={error} onRetry={reload} />
-      ) : loading && !data ? (
+        <LoadError what="runs" message="The request failed." onRetry={reload} />
+      ) : loading ? (
         <Loading what="runs" />
       ) : runs.length === 0 ? (
         <EmptyBox>No E2E runs yet{branch ? ` on ${branch}` : ""}. They show up here a few minutes after a workflow finishes.</EmptyBox>
       ) : (
-        <>
-          <ul aria-label="E2E runs" className="divide-y divide-zinc-800 rounded-lg border border-zinc-800 bg-zinc-900/50">
-            {runs.map((r) => <RunRow key={r.run_key} run={r} />)}
-          </ul>
-          {next && (
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <button type="button" onClick={loadMore} disabled={moreBusy} className={secondaryButton}>
-                {moreBusy ? "Loading…" : "Load older runs"}
-              </button>
-              {moreError && <span role="alert" className="text-sm text-red-300">{moreError}</span>}
-            </div>
-          )}
-        </>
+        <List label="E2E runs">
+          {runs.map((r) => <RunRow key={r.run_key} run={r} />)}
+        </List>
       )}
-    </section>
+      <LoadMore hasMore={!!next && !loading} loading={loadingMore} failed={moreFailed} onClick={loadMore} />
+    </ListSection>
   );
 }
 
 function RunRow({ run }: { run: TestRun }) {
-  const tone = run.bad_run ? "warning" : run.status === "passed" ? "success" : "error";
-  const word = run.bad_run ? "Bad run" : run.status === "passed" ? "Passed" : "Failed";
+  const look: StatusLook = run.bad_run
+    ? { label: "Bad run", tone: "waiting" }
+    : run.status === "passed"
+      ? { label: "Passed", tone: "success" }
+      : { label: "Failed", tone: "danger" };
   return (
-    <li className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 py-3.5 sm:px-5">
-      <div className="min-w-0 flex-1 basis-64">
-        <p className="flex flex-wrap items-center gap-2">
-          <StatusPill tone={tone}>{word}</StatusPill>
-          <Link href={runHref(run.run_key)} className={`break-words text-sm font-medium text-zinc-100 hover:underline underline-offset-4 rounded ${focusRing}`}>
-            {run.workflow}
-          </Link>
-        </p>
-        <p className="mt-1 break-words text-xs text-zinc-500">
-          <span className="font-mono text-zinc-400">{run.branch}</span>
-          {run.pr ? (
-            <>
-              <span aria-hidden="true"> · </span>
-              <a href={githubPrUrl(run.repo, run.pr)} target="_blank" rel="noreferrer" className="text-zinc-400 underline underline-offset-2 hover:text-zinc-200">
-                PR #{run.pr}
-              </a>
-            </>
-          ) : null}
-          <span aria-hidden="true"> · </span>
-          <span className="font-mono">{shortSha(run.sha)}</span>
-          {run.run_attempt > 1 && <span> · re-run {run.run_attempt}</span>}
-          <span aria-hidden="true"> · </span>
-          <time dateTime={run.started_at} title={new Date(run.started_at).toLocaleString()}>{timeAgo(run.started_at)}</time>
-          <span aria-hidden="true"> · </span>
-          {formatDuration(run.duration_ms)}
-        </p>
-        {run.bad_run && (
-          <p className="mt-1 text-xs text-amber-200">Most tests failed together, so this run is not counted against any test.</p>
-        )}
-      </div>
-      <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs tabular-nums">
-        <span className="text-emerald-300">{run.passed} passed</span>
-        <span className={run.failed > 0 ? "text-red-300" : "text-zinc-500"}>{run.failed} failed</span>
-        <span className={run.flaky > 0 ? "text-amber-300" : "text-zinc-500"}>{run.flaky} passed on retry</span>
-        {run.skipped > 0 && <span className="text-zinc-500">{run.skipped} skipped</span>}
-      </p>
-    </li>
+    <ListRow
+      testId="test-run-row"
+      data={{ status: run.bad_run ? "bad_run" : run.status }}
+      status={look}
+      title={run.workflow}
+      href={runHref(run.run_key)}
+      meta={[
+        look.label,
+        <span key="branch" className="font-mono text-zinc-400">{run.branch}</span>,
+        run.pr ? (
+          <a key="pr" href={githubPrUrl(run.repo, run.pr)} target="_blank" rel="noreferrer" className="text-zinc-400 underline underline-offset-2 hover:text-zinc-200">
+            PR #{run.pr}
+          </a>
+        ) : null,
+        <span key="sha" className="font-mono">{shortSha(run.sha)}</span>,
+        run.run_attempt > 1 ? `re-run ${run.run_attempt}` : null,
+        formatDuration(run.duration_ms),
+      ]}
+      summary={run.bad_run ? "Most tests failed together, so this run is not counted against any test." : undefined}
+      summaryTone="waiting"
+      chips={
+        <span className="flex flex-wrap gap-x-3 gap-y-1 text-xs tabular-nums">
+          <span className="text-emerald-300">{run.passed} passed</span>
+          <span className={run.failed > 0 ? "text-red-300" : "text-zinc-500"}>{run.failed} failed</span>
+          <span className={run.flaky > 0 ? "text-amber-300" : "text-zinc-500"}>{run.flaky} passed on retry</span>
+          {run.skipped > 0 && <span className="text-zinc-500">{run.skipped} skipped</span>}
+        </span>
+      }
+      time={run.started_at}
+    />
   );
 }
 
@@ -179,51 +203,71 @@ export function FailureGroupsView({ repo }: { repo: string }) {
   // Test names for the links under each group.
   const tests = useLoad(() => api.listTests({ repo, limit: 200 }), `group-tests:${repo}`);
   const names = useMemo(() => new Map((tests.data?.tests ?? []).map((t) => [t.id, t.title])), [tests.data]);
+  const { q, search, clear } = useTestSearch();
+  const all = groups.data?.groups ?? [];
+  const shown = all.filter((g) => {
+    if (!q) return true;
+    const hay = [g.message, g.selector ?? "", g.step ?? "", ...g.test_ids.map((id) => names.get(id) ?? "")].join(" ").toLowerCase();
+    return q.toLowerCase().split(/\s+/).every((w) => hay.includes(w));
+  });
 
   return (
-    <section aria-labelledby="groups-heading">
-      <SectionHeading id="groups-heading">Failure groups</SectionHeading>
-      <p className="mb-3 max-w-prose text-sm text-zinc-400">
-        Failures with the same error, grouped. One cause often breaks many tests, so fixing the top group can clear several at once.
-      </p>
+    <ListSection
+      id="groups"
+      title="Failure groups"
+      count={all.length || undefined}
+      description="Failures with the same error, grouped. One cause often breaks many tests, so fixing the top group can clear several at once."
+    >
+      {all.length > 0 && (
+        <ListToolbar
+          className="mb-3"
+          search={{ ...search, placeholder: "Search by error, element, step or test", label: "Search failure groups" }}
+          onClear={q ? clear : undefined}
+        />
+      )}
       {groups.error ? (
         <LoadError what="failure groups" message={groups.error} onRetry={groups.reload} />
       ) : groups.loading && !groups.data ? (
         <Loading what="failure groups" />
-      ) : (groups.data?.groups ?? []).length === 0 ? (
+      ) : all.length === 0 ? (
         <EmptyBox>No failures in the last seven days.</EmptyBox>
+      ) : shown.length === 0 ? (
+        <EmptyBox>No failure group matches. <button type="button" onClick={clear} className={linkButton}>Clear filters</button></EmptyBox>
       ) : (
-        <ul aria-label="Failure groups" className="space-y-3">
-          {groups.data!.groups.map((g) => (
-            <li key={g.signature} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 sm:p-5">
-              <p className="break-words font-mono text-sm text-zinc-100">{g.message}</p>
-              {(g.selector || g.step) && (
-                <p className="mt-1.5 break-words text-xs text-zinc-400">
-                  {g.selector && <>Element <code className="text-zinc-300">{g.selector}</code></>}
-                  {g.selector && g.step && <span aria-hidden="true"> · </span>}
-                  {g.step && <>Step: {g.step}</>}
-                </p>
-              )}
-              <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-400">
-                <span className="text-zinc-200">{plural(g.tests, "test")}</span>
-                <span>{plural(g.failures_7d, "failure")} this week</span>
-                {g.cause && g.cause !== "unknown" && <span>{CAUSE_LABEL[g.cause]}</span>}
-                <span>Last seen {timeAgo(g.last_seen)}</span>
-              </p>
+        <List label="Failure groups">
+          {shown.map((g) => (
+            <ListRow
+              key={g.signature}
+              testId="failure-group"
+              status={{ tone: "danger" }}
+              title={<span className="font-mono">{g.message}</span>}
+              titleText={g.message}
+              meta={[
+                g.selector ? <span key="sel">Element <code className="text-zinc-300">{g.selector}</code></span> : null,
+                g.step ? `Step: ${g.step}` : null,
+                <span key="tests" className="text-zinc-200">{plural(g.tests, "test")}</span>,
+                `${plural(g.failures_7d, "failure")} this week`,
+                g.cause && g.cause !== "unknown" ? CAUSE_LABEL[g.cause] : null,
+              ]}
+              time={g.last_seen}
+              details={<DetailBlock title="Error"><p className="whitespace-pre-wrap font-mono">{g.message}</p></DetailBlock>}
+              detailsLabel="Full error"
+              detailsFor={`the full error of this failure group`}
+            >
               {g.test_ids.length > 0 && (
-                <ul aria-label="Tests with this failure" className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+                <ul aria-label="Tests with this failure" className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
                   {g.test_ids.map((id) => (
                     <li key={id} className="min-w-0 max-w-full">
-                      <Link href={testHref(id)} className={`${linkButton} break-words text-left`}>{names.get(id) ?? "Open test"}</Link>
+                      <Link href={testHref(id)} className={`${linkButton} !text-xs break-words text-left`}>{names.get(id) ?? "Open test"}</Link>
                     </li>
                   ))}
                 </ul>
               )}
-            </li>
+            </ListRow>
           ))}
-        </ul>
+        </List>
       )}
-    </section>
+    </ListSection>
   );
 }
 
@@ -231,22 +275,28 @@ export function FailureGroupsView({ repo }: { repo: string }) {
 
 export function SlowestView({ repo }: { repo: string }) {
   const { data, error, loading, reload } = useLoad(() => api.listTests({ repo, sort: "slowest", limit: 50 }), `slow:${repo}`);
+  const { q, search, clear } = useTestSearch();
+  const all = data?.tests ?? [];
+  const shown = all.filter((t) => testMatches(t, q));
   return (
-    <section aria-labelledby="slow-heading">
-      <SectionHeading id="slow-heading">Slowest tests</SectionHeading>
-      <p className="mb-3 max-w-prose text-sm text-zinc-400">
-        Typical and slow-run durations over the last 30 days. Slow suites get skipped, so these are worth trimming.
-      </p>
+    <ListSection
+      id="slow"
+      title="Slowest tests"
+      description="Typical and slow-run durations over the last 30 days. Slow suites get skipped, so these are worth trimming."
+    >
+      {all.length > 0 && <ListToolbar className="mb-3" search={search} onClear={q ? clear : undefined} />}
       {error ? (
         <LoadError what="durations" message={error} onRetry={reload} />
       ) : loading && !data ? (
         <Loading what="durations" />
-      ) : (data?.tests ?? []).length === 0 ? (
+      ) : all.length === 0 ? (
         <EmptyBox>No durations yet.</EmptyBox>
+      ) : shown.length === 0 ? (
+        <EmptyBox>No test matches. <button type="button" onClick={clear} className={linkButton}>Clear filters</button></EmptyBox>
       ) : (
-        <TestList label="Slowest tests" tests={data!.tests} facts={slowFacts} />
+        <TestList label="Slowest tests" tests={shown} facts={slowFacts} />
       )}
-    </section>
+    </ListSection>
   );
 }
 
@@ -280,17 +330,24 @@ export function QuarantineView({ repo, canEdit, ticketDays = 2 }: { repo: string
     }
   };
 
+  const { q, search, clear } = useTestSearch();
   const tests = data?.tests ?? [];
+  const shown = tests.filter((t) => testMatches(t, q));
   const old = tests.filter((t) => t.quarantined_since && Date.now() - new Date(t.quarantined_since).getTime() > ticketDays * 86_400_000);
 
   return (
-    <section aria-labelledby="quarantine-heading">
-      <SectionHeading id="quarantine-heading">Quarantine</SectionHeading>
-      <p className="mb-3 max-w-prose text-sm text-zinc-400">
-        Quarantined tests still run and are still recorded. When only quarantined tests fail, Coderhelm treats the run as passing. When
-        tickets are on, the owner gets one after {plural(ticketDays, "day")} without a fix.
-      </p>
-      <details className="mb-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+    <ListSection
+      id="quarantine"
+      title="Quarantine"
+      count={tests.length || undefined}
+      description={
+        <>
+          Quarantined tests still run and are still recorded. When only quarantined tests fail, Coderhelm treats the run as passing. When
+          tickets are on, the owner gets one after {plural(ticketDays, "day")} without a fix.
+        </>
+      }
+    >
+      <details className="mb-4 mt-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
         <summary className="cursor-pointer text-sm font-medium text-zinc-100">Make quarantined tests stop failing your build</summary>
         <div className="mt-3">
           <QuarantineCiStep />
@@ -304,12 +361,16 @@ export function QuarantineView({ repo, canEdit, ticketDays = 2 }: { repo: string
         <EmptyBox>No test is quarantined.</EmptyBox>
       ) : (
         <>
+          {tests.length > 3 && <ListToolbar className="mb-3" search={search} onClear={q ? clear : undefined} />}
           {old.length > 0 && (
             <p className="mb-3 text-sm text-amber-200">{plural(old.length, "test has", "tests have")} been quarantined for over {plural(ticketDays, "day")}.</p>
           )}
-          <TestList
+          {shown.length === 0 && (
+            <EmptyBox>No test matches. <button type="button" onClick={clear} className={linkButton}>Clear filters</button></EmptyBox>
+          )}
+          {shown.length > 0 && <TestList
             label="Quarantined tests"
-            tests={tests}
+            tests={shown}
             facts={quarantineFacts}
             actions={(t) => (
               <>
@@ -322,10 +383,10 @@ export function QuarantineView({ repo, canEdit, ticketDays = 2 }: { repo: string
                 )}
               </>
             )}
-          />
+          />}
         </>
       )}
-    </section>
+    </ListSection>
   );
 }
 

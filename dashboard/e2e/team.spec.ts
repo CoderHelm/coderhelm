@@ -372,12 +372,21 @@ test("search and filters narrow the list, with a way back", async ({ page }) => 
   await page.getByRole("combobox", { name: "Filter by sign-in" }).selectOption("github");
   await expect(members(page).getByRole("listitem")).toHaveCount(2);
   await page.getByRole("combobox", { name: "Filter by sign-in" }).selectOption("all");
-  await page.getByRole("combobox", { name: "Filter by role" }).selectOption("viewer");
+  await page.getByRole("group", { name: "Filter by role" }).getByRole("button", { name: /Viewer/ }).click();
+  await expect(page).toHaveURL(/role=viewer/);
   await expect(members(page).getByRole("listitem")).toHaveCount(2);
   await page.getByRole("searchbox", { name: "Search members" }).fill("nobody-matches");
   await expect(page.getByText("No members match these filters.")).toBeVisible();
-  await page.getByRole("button", { name: "Clear filters" }).click();
+  await page.getByTestId("list-empty").getByRole("button", { name: "Clear filters" }).click();
   await expect(members(page).getByRole("listitem")).toHaveCount(7);
+});
+
+test("a link from the ⌘K palette opens the team searched for that person", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/settings/team?q=mia%40example.com");
+  await expect(page.getByRole("searchbox", { name: "Search members" })).toHaveValue("mia@example.com");
+  await expect(members(page).getByRole("listitem")).toHaveCount(1);
+  await expect(row(page, "Mia Member")).toBeVisible();
 });
 
 test("a member sees the team read-only: no invites, no controls", async ({ page }) => {

@@ -282,9 +282,9 @@ test("repositories in each state, items by kind, agents marked as askable, one o
   await expect(page.getByText("Reading…")).toBeVisible();
   await expect(page.getByText("Last sync failed")).toBeVisible();
   await expect(page.getByText("Install the app on it, then sync again.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Skills \(3\)/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Agents \(2\)/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Commands \(2\)/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Skills\s*3$/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Agents\s*2$/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Commands\s*2$/ })).toBeVisible();
   await expect(page.getByText("Agent · can be asked")).toHaveCount(2);
   await expect(page.getByRole("switch", { name: "Let Coderhelm read copy-tone" })).toHaveAttribute("aria-checked", "false");
 
@@ -337,7 +337,7 @@ test("page stats: nothing used yet says so, and a failed stats call leaves the p
   await expect(page.getByText("Coderhelm hasn't read a skill or asked an agent yet.")).toBeVisible();
   db.stats = null;
   await page.reload();
-  await expect(page.getByRole("heading", { name: /Skills \(3\)/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Skills\s*3$/ })).toBeVisible();
   await expect(page.getByRole("region", { name: "Use in the last 30 days" })).toHaveCount(0);
 });
 
@@ -368,7 +368,7 @@ test("an agent's page: when it's asked, how it runs, recent asks and its instruc
   await page.goto("/skills");
   await expect(page.getByText("asked 2 times, last 35 min ago")).toBeVisible();
   await expect(page.getByText("Short description: Coderhelm's agents decide when to ask it from this line.")).toBeVisible();
-  await page.getByRole("region", { name: /Agents \(2\)/ }).getByRole("link", { name: "agent:spec-checker" }).click();
+  await page.getByRole("region", { name: /^Agents\s*2$/ }).getByRole("link", { name: "agent:spec-checker" }).click();
   await expect(page).toHaveURL(/\/skills\/agent\/?\?repo=acme%2Fplaybook&path=agents%2Fspec-checker\.md/);
   await expect(page.getByRole("heading", { name: "spec-checker", level: 1 })).toBeVisible();
   await expect(page.getByText("Coderhelm asks this agent when")).toBeVisible();

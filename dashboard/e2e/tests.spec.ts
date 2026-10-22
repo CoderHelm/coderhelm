@@ -269,11 +269,29 @@ test("tests: needs attention ranks by impact and links to the test", async ({ pa
   await expect(page.getByRole("heading", { level: 1, name: /checkout: pays with a saved card/ })).toBeVisible();
 });
 
+test("tests: needs attention filters by state and search, kept in the address", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/tests");
+  const list = page.getByRole("list", { name: "Tests that need attention" });
+  await expect(list.getByRole("listitem")).toHaveCount(3);
+  await page.getByRole("group", { name: "Show tests" }).getByRole("button", { name: /Broken/ }).click();
+  await expect(page).toHaveURL(/state=broken/);
+  await expect(list.getByRole("listitem")).toHaveCount(1);
+  await expect(list).toContainText("classes: filters by location");
+  await page.goBack();
+  await expect(list.getByRole("listitem")).toHaveCount(3);
+  await page.getByRole("searchbox", { name: "Search tests" }).fill("saved card");
+  await expect(list.getByRole("listitem")).toHaveCount(1);
+  await expect(page).toHaveURL(/q=saved/);
+});
+
 test("tests: the repo picker narrows every request", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/tests");
   await expect(page.getByRole("list", { name: "Tests that need attention" })).toBeVisible();
-  await page.getByLabel("Repository").selectOption(MOBILE);
+  await page.getByRole("button", { name: /Repository: All repos/ }).click();
+  await page.getByRole("option", { name: MOBILE }).click();
+  await expect(page).toHaveURL(/repo=your-team%2Fmobile-app/);
   await expect.poll(() => callsTo(db, "GET", /\/api\/tests\/summary\?repo=your-team%2Fmobile-app/).length).toBeGreaterThan(0);
   await expect.poll(() => callsTo(db, "GET", /\/api\/tests\?repo=your-team%2Fmobile-app&sort=impact/).length).toBeGreaterThan(0);
 });
@@ -329,13 +347,14 @@ test("tests: runs, a branch filter, older runs and a run's tests", async ({ page
   await expect(list.getByRole("listitem")).toHaveCount(30);
   await expect(list.getByRole("listitem").first()).toContainText("passed on retry");
   await shot(page, "runs");
-  await page.getByRole("button", { name: "Load older runs" }).click();
+  await page.getByRole("button", { name: "Load more" }).click();
   await expect(list.getByRole("listitem")).toHaveCount(45);
-  await expect(page.getByRole("button", { name: "Load older runs" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Load more" })).toHaveCount(0);
   expect(callsTo(db, "GET", /\/api\/tests\/runs\?.*before=r_30/)).toHaveLength(1);
 
-  await page.getByLabel("Branch").fill("main");
+  await page.getByRole("searchbox", { name: "Branch" }).fill("main");
   await expect.poll(() => callsTo(db, "GET", /\/api\/tests\/runs\?.*branch=main/).length).toBeGreaterThan(0);
+  await expect(page).toHaveURL(/branch=main/);
   await expect(list.getByRole("listitem").first()).toContainText("main");
 
   await list.getByRole("link", { name: "E2E (Playwright)" }).first().click();

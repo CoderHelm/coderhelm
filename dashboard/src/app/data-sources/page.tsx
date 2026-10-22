@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, type AwsLogGroup, type DataSource, type DataSourceActivityEvent } from "@/lib/api";
 import {
   DEFAULT_HIDDEN_FIELDS, errorMessage, formatDuration, readSetupHint, clearSetupHint,
@@ -21,15 +21,26 @@ import { StepDot } from "@/components/stepper";
 import {
   ChevronRightIcon, CloudIcon, CodeIcon, DatabaseIcon, LogsIcon, ScanIcon, ShieldCheckIcon, WarningIcon, WrenchIcon, XIcon,
 } from "@/components/icons";
-import { Skeleton } from "@/components/skeleton";
 import { Page, PageHeader, Section } from "@/components/page";
 import { LogGroupPicker } from "@/components/log-group-picker";
 import { ActivityFeed } from "@/components/data-source-activity";
-import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { ListEmpty, ListError, ListSection, ListSkeleton, ListToolbar, StatusDot, useListParams, type Tone } from "@/components/list";
 
 export default function DataSourcesPageGuarded() {
-  return <RoleGuard minRole="admin"><DataSourcesPage /></RoleGuard>;
+  return (
+    <RoleGuard minRole="admin">
+      <Suspense fallback={<Page><PageHeader title="Data sources" /><div className="mt-8"><ListSkeleton rows={3} label="Loading your data sources" /></div></Page>}>
+        <DataSourcesPage />
+      </Suspense>
+    </RoleGuard>
+  );
 }
+
+type SourceFilter = "all" | "on" | "paused" | "attention";
+
+const isOn = (s: DataSource) => s.setup_complete && s.enabled;
+const isPaused = (s: DataSource) => s.setup_complete && !s.enabled;
 
 const CONNECT = "/data-sources/connect";
 const CONNECT_AWS = "/data-sources/connect/aws";
@@ -75,8 +86,9 @@ function DataSourcesPage() {
   const [loadError, setLoadError] = useState("");
   const [storeOpen, setStoreOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [attentionOnly, setAttentionOnly] = useState(false);
+  // ?q= search and ?status= toggle, kept in the address so a filtered view can be shared.
+  const [params, setParams] = useListParams({ q: "", status: "all" });
+  const filter: SourceFilter = (["on", "paused", "attention"] as const).find((f) => f === params.status) ?? "all";
   // `?source=<id>` opens that source's row, so a link can point at one source.
   const [linked, setLinked] = useState<string | null>(null);
   const addButton = useRef<HTMLButtonElement>(null);
@@ -123,15 +135,22 @@ function DataSourcesPage() {
   const attention = list.filter(needsAttention).length;
   const onCount = list.filter((s) => s.setup_complete && s.enabled).length;
   const pausedCount = list.filter((s) => s.setup_complete && !s.enabled).length;
-  // Search and the attention filter only earn their space once the list is long.
-  const showTools = list.length >= 5;
+  // Search and the toggles earn their space once there is more than one source.
+  const showTools = list.length >= 2;
 
-  const q = query.trim().toLowerCase();
-  const shown = list.filter(
-    (s) =>
-      (!attentionOnly || needsAttention(s)) &&
-      (!q || [s.name, whereLabel(s), engineLabel(s), kindLabel(s)].some((t) => t.toLowerCase().includes(q))),
-  );
+  const q = params.q.trim().toLowerCase();
+  const matchesText = (s: DataSource) =>
+    !q || [s.name, whereLabel(s), engineLabel(s), kindLabel(s)].some((t) => t.toLowerCase().includes(q));
+  const searched = list.filter(matchesText);
+  const keep: Record<SourceFilter, (s: DataSource) => boolean> = {
+    all: () => true,
+    on: isOn,
+    paused: isPaused,
+    attention: needsAttention,
+  };
+  const shown = searched.filter(keep[filter]);
+  const filtered = !!q || filter !== "all";
+  const clear = () => setParams({ q: "", status: "all" });
   const groups = groupSources(shown);
 
   const closeAdd = () => {
@@ -203,20 +222,15 @@ function DataSourcesPage() {
 
       {loadError && (
         <div className="mt-6">
-          <Callout variant="error" title="We couldn't load your data sources">
-            <p>{loadError} Nothing was changed.</p>
-            <p><button type="button" onClick={load} className={linkButton}>Try again</button></p>
-          </Callout>
+          <ListError title="We couldn't load your data sources" onRetry={load}>
+            {loadError} Nothing was changed.
+          </ListError>
         </div>
       )}
 
       {sources === null && !loadError && (
-        <div className="mt-8 flex flex-col gap-2" aria-busy="true">
-          <p role="status" className="sr-only">Loading your data sources…</p>
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-16 w-full" />
+        <div className="mt-8">
+          <ListSkeleton rows={3} label="Loading your data sources" />
         </div>
       )}
 
@@ -235,58 +249,36 @@ function DataSourcesPage() {
           }
         >
           {showTools && (
-            <div className="mb-5 flex flex-wrap items-center gap-2">
-              <label htmlFor="source-search" className="sr-only">Find a source</label>
-              <input
-                id="source-search"
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Find a source by name or address"
-                autoComplete="off"
-                spellCheck={false}
-                className={`${inputClass} min-w-0 flex-1 basis-56 sm:max-w-sm`}
-              />
-              {attention > 0 && (
-                <button
-                  type="button"
-                  aria-pressed={attentionOnly}
-                  onClick={() => setAttentionOnly((v) => !v)}
-                  className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors motion-reduce:transition-none ${
-                    attentionOnly
-                      ? "border-amber-500/50 bg-amber-500/15 text-amber-200"
-                      : "border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
-                  } ${focusRing}`}
-                >
-                  <span aria-hidden="true" className="h-2 w-2 rounded-full bg-amber-400" />
-                  Needs attention ({attention})
-                </button>
-              )}
-              {(q || attentionOnly) && (
-                <p role="status" className="text-sm text-zinc-500">
-                  Showing {shown.length} of {list.length}
-                </p>
-              )}
-            </div>
+            <ListToolbar
+              className="mb-5"
+              search={{
+                value: params.q,
+                onChange: (v) => setParams({ q: v }, { replace: true }),
+                placeholder: "Find a source by name or address",
+                label: "Find a source",
+              }}
+              status={{
+                label: "Show sources",
+                value: filter,
+                onChange: (v) => setParams({ status: v }),
+                options: [
+                  { value: "all", label: "All", count: searched.length },
+                  { value: "on", label: "On", count: searched.filter(isOn).length, tone: "success" },
+                  { value: "paused", label: "Paused", count: searched.filter(isPaused).length, tone: "muted" },
+                  { value: "attention", label: "Needs attention", count: searched.filter(needsAttention).length, tone: "waiting" },
+                ],
+              }}
+              onClear={filtered ? clear : undefined}
+              summary={filtered ? `Showing ${shown.length} of ${list.length}` : undefined}
+            />
           )}
 
-          {groups.length === 0 && (
-            <p className="rounded-lg border border-dashed border-zinc-800 px-4 py-6 text-center text-sm text-zinc-400">
-              No source matches.{" "}
-              <button type="button" className={linkButton} onClick={() => { setQuery(""); setAttentionOnly(false); }}>
-                Show every source
-              </button>
-            </p>
-          )}
+          {groups.length === 0 && <ListEmpty title="No source matches." onClear={clear} />}
 
           <div className="flex flex-col gap-7">
             {groups.map((g) => (
-              <section key={g.id} aria-labelledby={`group-${g.id}`}>
-                <h3 id={`group-${g.id}`} className="mb-2 flex items-center gap-2 text-sm font-semibold text-zinc-200">
-                  {g.title}
-                  <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-medium text-zinc-400">{g.list.length}</span>
-                </h3>
-                <ul className="divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/50">
+              <ListSection key={g.id} level={3} id={`group-${g.id}`} title={g.title} count={g.list.length}>
+                <ul className="divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/30">
                   {g.list.map((s) => (
                     <li key={s.id}>
                       <SourceRow
@@ -299,7 +291,7 @@ function DataSourcesPage() {
                     </li>
                   ))}
                 </ul>
-              </section>
+              </ListSection>
             ))}
           </div>
         </Section>
@@ -418,14 +410,6 @@ function KindPicker({ compact = false }: { compact?: boolean }) {
     </ul>
   );
 }
-
-const KIND_ICON: Record<DataSource["kind"], ReactNode> = {
-  api: <CodeIcon />,
-  logs: <LogsIcon />,
-  database: <DatabaseIcon />,
-  rest: <CloudIcon />,
-  search: <ScanIcon />,
-};
 
 /** Split a typed list ("a, b" or one per line) into its entries. */
 const entries = (s: string) =>
@@ -711,9 +695,12 @@ function SourceRow({
     </div>
   );
 
+  // The shared list tones: green on, grey paused, amber unfinished, red failing.
+  const tone: Tone = source.status === "error" ? "danger" : unfinished ? "waiting" : source.enabled ? "success" : "muted";
+
   return (
     <article ref={rowRef} aria-label={source.name} className={open_ ? "bg-zinc-900" : ""}>
-      <div className={`flex items-start gap-x-3 gap-y-2 px-3 py-2.5 sm:items-center sm:px-4 ${unfinished ? "flex-wrap" : ""}`}>
+      <div className={`flex items-start gap-x-3 gap-y-2 px-4 py-3 sm:items-center ${unfinished ? "flex-wrap" : ""}`}>
         <button
           type="button"
           aria-expanded={open_}
@@ -723,16 +710,12 @@ function SourceRow({
             unfinished ? "basis-72" : "basis-0"
           } ${focusRing}`}
         >
-          <span aria-hidden="true" className={`shrink-0 text-zinc-500 transition-transform motion-reduce:transition-none ${open_ ? "rotate-90" : ""}`}>
-            <ChevronRightIcon />
-          </span>
-          {/* The group heading already says the kind; on a phone the room goes to the name. */}
-          <span className="hidden sm:flex"><SourceIcon small>{KIND_ICON[source.kind]}</SourceIcon></span>
+          <StatusDot tone={tone} className="mt-[7px] self-start" />
           <span className="flex min-w-0 flex-1 basis-40 flex-col">
             <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 sm:flex-nowrap">
               <span
                 title={open_ ? undefined : source.name}
-                className={`min-w-0 font-medium text-zinc-100 ${open_ ? "break-words" : "[overflow-wrap:anywhere] sm:truncate"}`}
+                className={`min-w-0 text-sm font-medium text-zinc-100 ${open_ ? "break-words" : "[overflow-wrap:anywhere] sm:truncate"}`}
               >
                 {source.name}
               </span>
@@ -745,7 +728,7 @@ function SourceRow({
               {whereLabel(source)}
             </span>
           </span>
-          <span className="flex basis-full flex-wrap items-center gap-x-4 gap-y-1 pl-7 text-xs sm:basis-auto sm:pl-0 sm:justify-end">
+          <span className="flex basis-full flex-wrap items-center gap-x-3 gap-y-1 pl-5 text-xs sm:basis-auto sm:pl-0 sm:justify-end">
             {unfinished ? (
               <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-medium text-amber-400">
                 <span aria-hidden="true" className="h-2 w-2 rounded-full bg-amber-400" />
@@ -768,11 +751,17 @@ function SourceRow({
                 </>
               )}
             </span>
+            <span aria-hidden="true" className="inline-flex items-center gap-1 text-zinc-400">
+              Details
+              <span className={`transition-transform motion-reduce:transition-none ${open_ ? "rotate-90" : ""}`}>
+                <ChevronRightIcon />
+              </span>
+            </span>
           </span>
         </button>
 
         {unfinished ? (
-          <div className="flex items-center pl-7 sm:pl-0">
+          <div className="flex items-center pl-5 sm:pl-0">
             <Link
               href={`${CONNECT}?step=${hint?.stage ?? "choose"}&id=${encodeURIComponent(source.id)}`}
               className={`${primaryButton} !min-h-8 !px-3 !py-1.5`}
@@ -819,7 +808,7 @@ function SourceRow({
 
       {!open_ && actionError}
 
-      <div id={detailsId} hidden={!open_} className="border-t border-zinc-800 px-4 py-4 sm:pl-[4.25rem]">
+      <div id={detailsId} hidden={!open_} className="border-t border-zinc-800 px-4 py-4 sm:pl-9">
         {open_ && (
           <>
             <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">

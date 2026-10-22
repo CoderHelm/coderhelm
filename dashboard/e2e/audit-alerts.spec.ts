@@ -131,12 +131,35 @@ test("the alerts list shows each alert with its outcome in words", async ({ page
   await page.goto("/alerts");
   await expect(page.getByRole("heading", { level: 1, name: "Alerts" })).toBeVisible();
   await expect(page.getByRole("link", { name: "ALARM: web-5xx-rate" })).toHaveAttribute("href", new RegExp(`^/alerts/detail/?\\?id=${ALERT_ID}$`));
-  await expect(page.getByText("Run started")).toBeVisible();
+  const list = page.getByRole("list", { name: "Alerts" });
+  await expect(list.getByText("Run started")).toBeVisible();
   // An outcome this page doesn't know yet reads as words, not a raw value.
-  await expect(page.getByText("Some new outcome")).toBeVisible();
+  await expect(list.getByText("Some new outcome")).toBeVisible();
   await expect(page.getByText("some_new_outcome")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "(untitled alert)" })).toBeVisible();
   await shot(page, "audit-alerts-list");
+  expect(errors).toEqual([]);
+});
+
+test("the alerts toolbar searches and filters by outcome, and the address keeps it", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page);
+  await page.goto("/alerts");
+  const list = page.getByRole("list", { name: "Alerts" });
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+  const toggles = page.getByRole("group", { name: "Show alerts" });
+  await expect(toggles.getByRole("button", { name: /Run started\s*1/ })).toBeVisible();
+  await toggles.getByRole("button", { name: /Run started/ }).click();
+  await expect(page).toHaveURL(/outcome=started/);
+  await expect(list.getByRole("listitem")).toHaveCount(1);
+  await expect(list.getByRole("link", { name: "ALARM: web-5xx-rate" })).toBeVisible();
+  await page.getByRole("button", { name: "Clear filters" }).first().click();
+  await page.getByRole("searchbox", { name: "Search alerts" }).fill("ALERT-other");
+  await expect(page).toHaveURL(/q=ALERT-other/);
+  await expect(list.getByRole("listitem")).toHaveCount(1);
+  await expect(list.getByRole("link", { name: "(untitled alert)" })).toBeVisible();
+  await page.getByRole("searchbox", { name: "Search alerts" }).fill("nothing-like-this");
+  await expect(page.getByText("No alerts match")).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -151,11 +174,13 @@ test("an empty alerts list says how alerts arrive", async ({ page }) => {
 
 test("a failed alerts load says so and retries, instead of claiming there are none", async ({ page }) => {
   const errors = watchConsole(page, true);
-  const db = await mockApi(page, { listStatus: 500, listOnce: true });
+  // Fails until told otherwise: dev mode mounts twice, and the list keeps only its newest request.
+  const db = await mockApi(page, { listStatus: 500 });
   await page.goto("/alerts");
   await expect(page.getByText("We couldn't load your alerts")).toBeVisible();
   await expect(page.getByText("No alerts yet")).toHaveCount(0);
   await shot(page, "audit-alerts-error");
+  db.listStatus = 200;
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(page.getByRole("link", { name: "ALARM: web-5xx-rate" })).toBeVisible();
   // Dev mode mounts twice, so count "at least one more" rather than an exact number.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { Page, PageHeader } from "@/components/page";
 import { useRouter } from "next/navigation";
@@ -8,22 +8,52 @@ import { api, type Template } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { TrashIcon } from "@/components/icons";
-import { TableSkeleton } from "@/components/skeleton";
-import { Callout } from "@/components/callout";
-import { usePagedList, LoadMoreButton } from "@/components/load-more";
 import { focusRing, linkButton } from "@/components/ui";
+import {
+  Chip,
+  List,
+  ListEmpty,
+  ListError,
+  ListRow,
+  ListSkeleton,
+  ListToolbar,
+  LoadMore,
+  useListParams,
+  usePagedList,
+} from "@/components/list";
 
-export default function TemplatesPage() {
+function templateMatches(t: Template, q: string): boolean {
+  if (!q) return true;
+  const hay = [t.title, t.description, t.category, ...(t.tags ?? [])].filter(Boolean).join(" ").toLowerCase();
+  return q
+    .toLowerCase()
+    .split(/\s+/)
+    .every((w) => hay.includes(w));
+}
+
+export default function TemplatesPageWithParams() {
+  return (
+    <Suspense fallback={<Page><PageHeader title="Plan templates" /><div className="mt-6"><ListSkeleton rows={3} /></div></Page>}>
+      <TemplatesPage />
+    </Suspense>
+  );
+}
+
+function TemplatesPage() {
   const [usingTemplate, setUsingTemplate] = useState<string | null>(null);
   const router = useRouter();
   const { toast } = useToast();
   const { confirm } = useConfirm();
-  const { items: templates, next, loading, loadingMore, error, loadMore, reload } = usePagedList<Template>(
+  const [params, setParams] = useListParams({ q: "" });
+  const q = params.q.trim();
+  const { items: templates, next, loading, loadingMore, error, moreFailed, loadMore, reload } = usePagedList<Template>(
     (cursor) => api.listTemplates({ limit: 50, cursor }).then((d) => ({ items: d.templates, next: d.next_cursor })),
     [],
   );
   const [removed, setRemoved] = useState<Set<string>>(new Set());
-  const shown = templates.filter((t) => !removed.has(t.template_id));
+  const kept = templates.filter((t) => !removed.has(t.template_id));
+  const shown = kept.filter((t) => templateMatches(t, q));
+  const clear = () => setParams({ q: "" });
 
   const handleUseTemplate = async (templateId: string) => {
     setUsingTemplate(templateId);
@@ -55,86 +85,90 @@ export default function TemplatesPage() {
         lead="Saved plans you can start again with one click."
       />
 
-      <div className="mt-6">
-      {loading ? (
-        <TableSkeleton rows={3} cols={3} />
-      ) : error ? (
-        <Callout variant="error" title="Couldn't load your templates">
-          <button type="button" onClick={reload} className={linkButton}>
-            Try again
-          </button>
-        </Callout>
-      ) : shown.length === 0 ? (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 sm:p-12 text-center text-zinc-500">
-          <p className="text-lg mb-2 text-zinc-300">No templates yet</p>
-          <p className="text-sm mb-4">
-            Open a plan and choose &ldquo;Save as template&rdquo; to reuse it later.
-          </p>
-          <Link href="/plans" className={linkButton}>
-            Go to plans
-          </Link>
-        </div>
-      ) : (
-        <>
-          <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {shown.map((t) => (
-              <li
-                key={t.template_id}
-                className="flex flex-col rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 hover:border-zinc-700 transition-colors min-w-0"
-              >
-                <div className="mb-3 min-w-0">
-                  <h2 className="text-sm font-semibold text-zinc-100 break-words">{t.title}</h2>
-                  {t.description && (
-                    <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{t.description}</p>
-                  )}
-                </div>
-
-                {(t.category || (t.tags && t.tags.length > 0)) && (
-                  <div className="flex flex-wrap items-center gap-2 mb-3">
-                    {t.category && (
-                      <span className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 border border-zinc-700 text-zinc-300">
-                        {t.category}
-                      </span>
-                    )}
-                    {t.tags?.map((tag) => (
-                      <span key={tag} className="px-1.5 py-0.5 rounded text-xs bg-zinc-800/50 text-zinc-500">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500 mb-4">
-                  <span>{t.task_count} task{t.task_count === 1 ? "" : "s"}</span>
-                  <span>Used {t.usage_count} time{t.usage_count === 1 ? "" : "s"}</span>
-                  {t.created_by && <span className="truncate max-w-full">by {t.created_by}</span>}
-                </div>
-
-                <div className="mt-auto flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleUseTemplate(t.template_id)}
-                    disabled={usingTemplate === t.template_id}
-                    className={`flex-1 min-h-9 px-3 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-xs font-semibold hover:bg-white transition-colors disabled:opacity-50 ${focusRing}`}
-                  >
-                    {usingTemplate === t.template_id ? "Creating…" : "Use template"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(t)}
-                    aria-label={`Delete template ${t.title}`}
-                    title="Delete template"
-                    className={`min-h-9 px-2 py-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-colors ${focusRing}`}
-                  >
-                    <TrashIcon />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-          <LoadMoreButton hasMore={!!next} loading={loadingMore} onClick={loadMore} />
-        </>
+      {!loading && !error && kept.length > 0 && (
+        <ListToolbar
+          className="mt-6 mb-4"
+          search={{
+            value: params.q,
+            onChange: (v) => setParams({ q: v }, { replace: true }),
+            placeholder: "Search by title, description, category or tag",
+            label: "Search templates",
+          }}
+          onClear={q ? clear : undefined}
+        />
       )}
+
+      <div className={kept.length > 0 && !loading && !error ? "" : "mt-6"}>
+        {loading ? (
+          <ListSkeleton rows={3} label="Loading templates" />
+        ) : error ? (
+          <ListError title="Couldn't load your templates" onRetry={reload} />
+        ) : kept.length === 0 ? (
+          <ListEmpty
+            title="No templates yet"
+            action={
+              <Link href="/plans" className={linkButton}>
+                Go to plans
+              </Link>
+            }
+          >
+            Open a plan and choose &ldquo;Save as template&rdquo; to reuse it later.
+          </ListEmpty>
+        ) : shown.length === 0 ? (
+          <ListEmpty title={`No templates match “${q}”`} onClear={clear} />
+        ) : (
+          <List label="Templates">
+            {shown.map((t) => (
+              <ListRow
+                key={t.template_id}
+                testId="template-row"
+                title={t.title}
+                titleText={t.title}
+                meta={[
+                  `${t.task_count} task${t.task_count === 1 ? "" : "s"}`,
+                  `Used ${t.usage_count} time${t.usage_count === 1 ? "" : "s"}`,
+                  t.created_by ? `by ${t.created_by}` : null,
+                ]}
+                summary={t.description || undefined}
+                chips={
+                  t.category || (t.tags && t.tags.length > 0) ? (
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      {t.category && <Chip>{t.category}</Chip>}
+                      {t.tags?.map((tag) => (
+                        <Chip key={tag} tone="muted">
+                          {tag}
+                        </Chip>
+                      ))}
+                    </span>
+                  ) : undefined
+                }
+                actions={
+                  <span className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleUseTemplate(t.template_id)}
+                      disabled={usingTemplate === t.template_id}
+                      aria-label={`Use template ${t.title}`}
+                      className={`min-h-7 rounded-md bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-900 transition-colors hover:bg-white disabled:opacity-50 ${focusRing}`}
+                    >
+                      {usingTemplate === t.template_id ? "Creating…" : "Use template"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(t)}
+                      aria-label={`Delete template ${t.title}`}
+                      title="Delete template"
+                      className={`inline-flex min-h-7 items-center rounded-md px-1.5 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-red-400 ${focusRing}`}
+                    >
+                      <TrashIcon />
+                    </button>
+                  </span>
+                }
+              />
+            ))}
+          </List>
+        )}
+        {!loading && !error && <LoadMore hasMore={!!next} loading={loadingMore} failed={moreFailed} onClick={loadMore} />}
       </div>
     </Page>
   );

@@ -184,14 +184,22 @@ export const api = {
   // Runs
   /**
    * One page of runs, newest first. `q` searches ticket key or number, title,
-   * repo, PR number and status; `status` is comma-separated exact statuses.
+   * repo, PR number and status; `status` is comma-separated exact statuses;
+   * `repo` keeps one repo (older backends ignore it).
    * The server reads a bounded number of runs per call, so a filtered page
    * can be short or empty while `next` is still set.
    */
-  listRuns: (cursor?: string, filters: { q?: string; status?: string } = {}) =>
+  listRuns: (cursor?: string, filters: { q?: string; status?: string; repo?: string } = {}) =>
     request<{ runs: Run[]; next?: string | null }>(
-      `/api/runs${qs({ cursor, q: filters.q, status: filters.status })}`,
+      `/api/runs${qs({ cursor, q: filters.q, status: filters.status, repo: filters.repo })}`,
     ),
+  /**
+   * The command palette's search: a few runs, reviewed PRs, releases and plans
+   * matching every word of `q`, for the signed-in team. `types` limits the
+   * families (comma-separated). Older backends answer 404.
+   */
+  search: (q: string, opts: { limit?: number; types?: string } = {}, init?: RequestInit) =>
+    request<SearchResults>(`/api/search${qs({ q, limit: opts.limit, types: opts.types })}`, init),
   listJiraEvents: () =>
     request<{ events: JiraEvent[]; total: number }>(
       "/api/integrations/jira/events?limit=20",
@@ -1313,6 +1321,14 @@ export interface AgentLogTurn {
 export interface AgentLogPass {
   pass: string;
   conversation: AgentLogTurn[];
+}
+
+export interface SearchResults {
+  q: string;
+  runs: { run_id: string; title: string; ticket_id: string; repo: string; status: string; created_at: string }[];
+  reviews: { sk: string; repo: string; pr_number: number; title: string; verdict: string; created_at: string }[];
+  releases: { repo: string; tag: string; headline: string; updated_at: string }[];
+  plans: { plan_id: string; title: string; repo: string; status: string; created_at: string }[];
 }
 
 export interface Repo {

@@ -200,13 +200,15 @@ test("filters, sort and search ask the server", async ({ page }) => {
   await page.getByRole("combobox", { name: "Topic" }).selectOption("code-style");
   await expect(page.getByTestId("memory")).toHaveCount(1);
   await page.getByRole("combobox", { name: "Topic" }).selectOption("");
-  await page.getByRole("group", { name: "Sort" }).getByRole("button", { name: "Most used" }).click();
+  await page.getByRole("combobox", { name: "Sort" }).selectOption("most_used");
   await expect(page.getByTestId("memory").first()).toContainText("pnpm test:unit");
   expect(db.calls.some((c) => c.includes("sort=most_used"))).toBe(true);
   await page.getByRole("searchbox", { name: "Search memories" }).fill("nothing like this");
   await expect(page.getByText("Nothing matches.")).toBeVisible();
-  await page.getByRole("button", { name: "Clear the filters" }).click();
+  await expect(page).toHaveURL(/q=nothing/);
+  await page.getByTestId("list-empty").getByRole("button", { name: "Clear filters" }).click();
   await expect(page.getByTestId("memory")).toHaveCount(3);
+  await expect(page).not.toHaveURL(/q=/);
 });
 
 test("an admin can pin, edit and forget a memory", async ({ page }) => {

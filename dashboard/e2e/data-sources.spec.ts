@@ -1032,9 +1032,9 @@ test("activity: filters, and a row opens to the full lookup and its pull request
   await expect(activity.getByTestId("activity-row")).toHaveCount(1);
   await expect(activity.getByText("That lookup would change something or is not a query.")).toBeVisible();
   await activity.getByLabel("Who").selectOption("all");
-  await activity.getByLabel("Result").selectOption("refused");
+  await activity.getByRole("group", { name: "Result" }).getByRole("button", { name: "Refused" }).click();
   await expect(activity.getByTestId("activity-row")).toHaveCount(1);
-  await activity.getByLabel("Result").selectOption("all");
+  await activity.getByRole("group", { name: "Result" }).getByRole("button", { name: "All", exact: true }).click();
   await activity.getByLabel("Source").selectOption({ label: "orders-db database" });
   await expect(activity.getByTestId("activity-row")).toHaveCount(2);
   await activity.getByLabel("Source").selectOption("all");
@@ -1054,11 +1054,11 @@ test("activity: older lookups load page by page, on the full activity page too",
   await page.goto("/data-sources");
   const activity = page.locator("#activity");
   await expect(activity.getByTestId("activity-row")).toHaveCount(50);
-  await activity.getByRole("button", { name: "Load older" }).click();
+  await activity.getByRole("button", { name: "Load more" }).click();
   await expect(activity.getByTestId("activity-row")).toHaveCount(100);
-  await activity.getByRole("button", { name: "Load older" }).click();
+  await activity.getByRole("button", { name: "Load more" }).click();
   await expect(activity.getByTestId("activity-row")).toHaveCount(120);
-  await expect(activity.getByRole("button", { name: "Load older" })).toHaveCount(0);
+  await expect(activity.getByRole("button", { name: "Load more" })).toHaveCount(0);
 
   await activity.getByRole("link", { name: "Open the full activity log" }).click();
   await expect(page.getByRole("heading", { name: "Every lookup, as it happens" })).toBeVisible();
@@ -1077,7 +1077,7 @@ test("activity: an older server without cursors still lists lookups, with no pag
   await page.goto("/data-sources");
   const activity = page.locator("#activity");
   await expect(activity.getByTestId("activity-row")).toHaveCount(3);
-  await expect(activity.getByRole("button", { name: "Load older" })).toHaveCount(0);
+  await expect(activity.getByRole("button", { name: "Load more" })).toHaveCount(0);
   const row = activity.getByTestId("activity-row").first();
   await row.getByRole("button").first().click();
   await expect(row.locator("pre")).toHaveText("SELECT id, status FROM orders WHERE id = 1");
@@ -1232,11 +1232,11 @@ test("activity: a lookup that named a table the source doesn't have shows the re
   });
   await page.goto("/data-sources");
   const activity = page.locator("#activity");
-  await expect(activity.getByText("Unknown name", { exact: true })).toBeVisible();
+  await expect(activity.getByTestId("activity-row").getByText("Unknown name", { exact: true })).toBeVisible();
   await expect(activity.getByText("No table named shipments. Closest: public.order_shipment.")).toBeVisible();
-  await activity.getByLabel("Result").selectOption("unknown_name");
+  await activity.getByRole("group", { name: "Result" }).getByRole("button", { name: "Unknown name" }).click();
   await expect(activity.getByTestId("activity-row")).toHaveCount(1);
-  await activity.getByLabel("Result").selectOption("problems");
+  await activity.getByRole("group", { name: "Result" }).getByRole("button", { name: "Problems" }).click();
   await expect(activity.getByTestId("activity-row")).toHaveCount(1);
 });
 
@@ -1270,7 +1270,7 @@ test("hub: many sources are grouped by kind into rows, with health on each row",
   const connected = page.locator("#connected");
   await expect(page.getByRole("heading", { name: "Connected (8)" })).toBeVisible();
   await expect(page.getByTestId("source-summary")).toHaveText("6 on · 1 paused · 2 need attention");
-  const groups = connected.getByRole("heading", { level: 3 });
+  const groups = connected.locator("[data-testid^='list-section-'] h3");
   await expect(groups).toHaveText(["APIs3", "Databases and warehouses3", "Search1", "Logs1"]);
 
   // Within a group, sorted by name: staging and production of the same thing sit together.
@@ -1329,12 +1329,14 @@ test("hub: find a source by name or address, or only the ones that need attentio
   await expect(connected.getByRole("article")).toHaveCount(1);
   await page.getByLabel("Find a source").fill("nothing like this");
   await expect(connected.getByText("No source matches.")).toBeVisible();
-  await connected.getByRole("button", { name: "Show every source" }).click();
+  await connected.getByTestId("list-empty").getByRole("button", { name: "Clear filters" }).click();
   await expect(connected.getByRole("article")).toHaveCount(8);
 
-  const attention = connected.getByRole("button", { name: "Needs attention (2)" });
+  const attention = connected.getByRole("group", { name: "Show sources" }).getByRole("button", { name: "Needs attention 2" });
   await attention.click();
   await expect(attention).toHaveAttribute("aria-pressed", "true");
+  // The toggle lives in the address, so the view can be shared or reloaded.
+  await expect(page).toHaveURL(/status=attention/);
   await expect(connected.getByRole("article")).toHaveCount(2);
   await expect(page.getByRole("article", { name: "Storefront API staging" })).toBeVisible();
   await expect(page.getByRole("article", { name: `Logs in AWS account ${ACCOUNT}` })).toBeVisible();

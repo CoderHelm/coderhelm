@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
 import {
   canManageInvites,
@@ -24,7 +24,7 @@ import {
 } from "@/lib/team";
 import { Callout } from "@/components/callout";
 import { StatusPill } from "@/components/status-pill";
-import { Skeleton } from "@/components/skeleton";
+import { GROUP_LABEL, List, ListEmpty, ListError, ListRow, ListSection, ListSkeleton, ListToolbar, useListParams } from "@/components/list";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { CheckIcon, GitHubIcon, MailIcon } from "@/components/icons";
@@ -41,7 +41,15 @@ const ROLE_STYLE: Record<string, string> = {
 
 type StatusFilter = "all" | "active" | "github";
 
-export default function TeamPage() {
+export default function TeamPageWithParams() {
+  return (
+    <Suspense fallback={<Page><PageHeader title="Team" /><div className="mt-8"><ListSkeleton rows={3} label="Loading members" /></div></Page>}>
+      <TeamPage />
+    </Suspense>
+  );
+}
+
+function TeamPage() {
   const { toast } = useToast();
   const { confirm } = useConfirm();
   const [members, setMembers] = useState<Member[] | null>(null);
@@ -49,9 +57,12 @@ export default function TeamPage() {
   const [teamName, setTeamName] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
-  const [query, setQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  // ?q= search (the ⌘K palette links a member here by email), ?role=, ?signin=.
+  const [params, setParams] = useListParams({ q: "", role: "all", signin: "all" });
+  const query = params.q;
+  const roleFilter = params.role;
+  const statusFilter: StatusFilter = params.signin === "active" || params.signin === "github" ? params.signin : "all";
+  const clearFilters = () => setParams({ q: "", role: "all", signin: "all" });
   const [linking, setLinking] = useState<Member | null>(null);
 
   const load = useCallback(async () => {
@@ -193,12 +204,9 @@ export default function TeamPage() {
 
       {error && (
         <div className="mt-6">
-          <Callout variant="error" title="We couldn't load your team">
-            <p>{error}</p>
-            <button type="button" onClick={() => { setError(""); load(); }} className={`${linkButton} mt-1`}>
-              Try again
-            </button>
-          </Callout>
+          <ListError title="We couldn't load your team" onRetry={() => { setError(""); load(); }}>
+            {error}
+          </ListError>
         </div>
       )}
 
@@ -247,148 +255,123 @@ export default function TeamPage() {
         </section>
       )}
 
-      <section aria-labelledby="members-heading" className="mt-8">
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-          <h2 id="members-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-            Members {members && <span className="text-zinc-600">({active.length})</span>}
-          </h2>
-        </div>
-        {members && active.length > 0 && (
-          <div className="mb-3 flex flex-col gap-2 sm:flex-row">
-            <label className="sr-only" htmlFor="member-search">
-              Search members
-            </label>
-            <input
-              id="member-search"
-              type="search"
-              placeholder="Search by name, email or GitHub username"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className={`${inputClass} sm:flex-1`}
-            />
-            <div className="flex gap-2">
-              <Select label="Filter by role" value={roleFilter} onChange={setRoleFilter}>
-                <option value="all">All roles</option>
-                {(perms ? roleLadder(perms) : []).slice().reverse().map((r) => (
-                  <option key={r.key} value={r.key}>
-                    {r.label}
-                  </option>
-                ))}
-              </Select>
-              <Select label="Filter by sign-in" value={statusFilter} onChange={(v) => setStatusFilter(v as StatusFilter)}>
-                <option value="all">Any sign-in</option>
-                <option value="active">Signs in with email</option>
-                <option value="github">GitHub sign-in only</option>
-              </Select>
-            </div>
-          </div>
-        )}
-
-        {loading ? (
-          <div role="status" aria-label="Loading members" className="divide-y divide-zinc-800 rounded-lg border border-zinc-800">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="flex items-center gap-3 px-4 py-4">
-                <Skeleton className="h-10 w-10 rounded-full" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-3.5 w-40" />
-                  <Skeleton className="h-3 w-56" />
-                </div>
-                <Skeleton className="h-7 w-24" />
-              </div>
-            ))}
-          </div>
-        ) : members && active.length === 0 ? (
-          <p className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm text-zinc-400">No one is on this team yet.</p>
-        ) : members && shown.length === 0 ? (
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm text-zinc-400">
-            <p>No members match these filters.</p>
-            <button
-              type="button"
-              className={`${linkButton} mt-2`}
-              onClick={() => {
-                setQuery("");
-                setRoleFilter("all");
-                setStatusFilter("all");
+      <div className="mt-8">
+        <ListSection id="members" title="Members" count={members ? active.length : undefined}>
+          {members && active.length > 0 && (
+            <ListToolbar
+              className="mb-3"
+              search={{
+                value: query,
+                onChange: (v) => setParams({ q: v }, { replace: true }),
+                placeholder: "Search by name, email or GitHub username",
+                label: "Search members",
               }}
-            >
-              Clear filters
-            </button>
-          </div>
-        ) : members ? (
-          <ul aria-labelledby="members-heading" className="divide-y divide-zinc-800 rounded-lg border border-zinc-800 bg-zinc-900/40">
-            {shown.map((m) => (
-              <MemberRow
-                key={m.user_id}
-                m={m}
-                perms={perms}
-                manageable={canManage(m)}
-                lastOwner={isLastOwner(m)}
-                busy={busy === m.user_id}
-                linkable={canManagePeople && (isGithubOnly(m) || isLinkTarget(m))}
-                onRole={(next) => changeRole(m, next)}
-                onRemove={() => remove(m)}
-                onLink={() => setLinking(m)}
-                roleLabel={roleLabel}
-              />
-            ))}
-          </ul>
-        ) : null}
-      </section>
+              status={{
+                label: "Filter by role",
+                value: roleFilter,
+                onChange: (v) => setParams({ role: v }),
+                options: [
+                  { value: "all", label: GROUP_LABEL.all, count: active.length },
+                  ...(perms ? roleLadder(perms) : [])
+                    .slice()
+                    .reverse()
+                    .filter((r) => r.assignable || active.some((m) => m.role === r.key))
+                    .map((r) => ({ value: r.key, label: r.label, count: active.filter((m) => m.role === r.key).length })),
+                ],
+              }}
+              actions={
+                <Select label="Filter by sign-in" value={statusFilter} onChange={(v) => setParams({ signin: v })}>
+                  <option value="all">Any sign-in</option>
+                  <option value="active">Signs in with email</option>
+                  <option value="github">GitHub sign-in only</option>
+                </Select>
+              }
+              onClear={query || roleFilter !== "all" || statusFilter !== "all" ? clearFilters : undefined}
+            />
+          )}
+
+          {loading ? (
+            <ListSkeleton rows={3} label="Loading members" />
+          ) : members && active.length === 0 ? (
+            <ListEmpty title="No one is on this team yet." />
+          ) : members && shown.length === 0 ? (
+            <ListEmpty title="No members match these filters." onClear={clearFilters} />
+          ) : members ? (
+            <List label="Members">
+              {shown.map((m) => (
+                <MemberRow
+                  key={m.user_id}
+                  m={m}
+                  perms={perms}
+                  manageable={canManage(m)}
+                  lastOwner={isLastOwner(m)}
+                  busy={busy === m.user_id}
+                  linkable={canManagePeople && (isGithubOnly(m) || isLinkTarget(m))}
+                  onRole={(next) => changeRole(m, next)}
+                  onRemove={() => remove(m)}
+                  onLink={() => setLinking(m)}
+                  roleLabel={roleLabel}
+                />
+              ))}
+            </List>
+          ) : null}
+        </ListSection>
+      </div>
 
       {canInvites && members && (
-        <section aria-labelledby="invites-heading" className="mt-8">
-          <h2 id="invites-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-            Pending invites {invites.length > 0 && <span className="text-zinc-600">({invites.length})</span>}
-          </h2>
-          {invites.length === 0 ? (
-            <p className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm text-zinc-400">
-              No pending invites. People you invite show up here until they sign in.
-            </p>
-          ) : (
-            <ul aria-labelledby="invites-heading" className="divide-y divide-zinc-800 rounded-lg border border-zinc-800 bg-zinc-900/40">
-              {invites.map((m) => {
-                const expired = isInviteExpired(m);
-                const sent = relativeTime(m.invited_at ?? m.updated_at);
-                const until = shortDate(m.invite_expires_at);
-                return (
-                  <li key={m.user_id} className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5">
-                    <div className="flex min-w-0 flex-1 basis-56 items-center gap-3">
-                      <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-dashed border-zinc-700 text-zinc-500">
-                        <MailIcon />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-zinc-100">{m.email}</p>
-                        <p className="text-xs text-zinc-500">
-                          Invited as {articled(roleLabel(m.role))}
-                          {sent ? ` · sent ${sent}` : ""}
-                          {until ? (expired ? ` · expired ${until}` : ` · works until ${until}`) : ""}
-                        </p>
-                        {expired && <p className="text-xs text-zinc-500">The link no longer works. Resend it, or revoke the invite.</p>}
-                      </div>
-                    </div>
-                    {expired ? <StatusPill tone="error">Expired</StatusPill> : <StatusPill tone="warning">Invited</StatusPill>}
-                    {canInvites && (
-                      <div className="flex gap-2">
-                        <button type="button" className={secondaryButton} disabled={busy === m.user_id} onClick={() => resend(m)}>
-                          Resend
-                        </button>
-                        <button
-                          type="button"
-                          className={`inline-flex min-h-9 items-center rounded-lg px-3 text-sm font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50 ${focusRing}`}
-                          disabled={busy === m.user_id}
-                          onClick={() => remove(m)}
-                          aria-label={`Revoke invite for ${m.email}`}
-                        >
-                          Revoke
-                        </button>
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
+        <div className="mt-8">
+          <ListSection id="invites" title="Pending invites" count={invites.length || undefined} group="waiting">
+            {invites.length === 0 ? (
+              <ListEmpty title="No pending invites.">People you invite show up here until they sign in.</ListEmpty>
+            ) : (
+              <List label="Pending invites">
+                {invites.map((m) => {
+                  const expired = isInviteExpired(m);
+                  const sent = relativeTime(m.invited_at ?? m.updated_at);
+                  const until = shortDate(m.invite_expires_at);
+                  return (
+                    <ListRow
+                      key={m.user_id}
+                      testId="invite-row"
+                      leading={
+                        <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-dashed border-zinc-700 text-zinc-500">
+                          <MailIcon />
+                        </span>
+                      }
+                      title={m.email}
+                      meta={[
+                        `Invited as ${articled(roleLabel(m.role))}`,
+                        sent ? `sent ${sent}` : null,
+                        until ? (expired ? `expired ${until}` : `works until ${until}`) : null,
+                      ]}
+                      summary={expired ? "The link no longer works. Resend it, or revoke the invite." : undefined}
+                      summaryTone="muted"
+                      chips={expired ? <StatusPill tone="error">Expired</StatusPill> : <StatusPill tone="warning">Invited</StatusPill>}
+                      actions={
+                        canInvites ? (
+                          <span className="flex gap-2">
+                            <button type="button" className={`${secondaryButton} !min-h-8 !py-1`} disabled={busy === m.user_id} onClick={() => resend(m)}>
+                              Resend
+                            </button>
+                            <button
+                              type="button"
+                              className={`inline-flex min-h-8 items-center rounded-lg px-3 text-sm font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50 ${focusRing}`}
+                              disabled={busy === m.user_id}
+                              onClick={() => remove(m)}
+                              aria-label={`Revoke invite for ${m.email}`}
+                            >
+                              Revoke
+                            </button>
+                          </span>
+                        ) : undefined
+                      }
+                    />
+                  );
+                })}
+              </List>
+            )}
+          </ListSection>
+        </div>
       )}
 
       {perms && <PermissionsTable perms={perms} inUse={new Set(active.map((m) => m.role))} />}
@@ -423,7 +406,7 @@ function Select({ label, value, onChange, children }: { label: string; value: st
         aria-label={label}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`${inputClass} appearance-none pr-8 sm:w-auto`}
+        className={`min-h-9 w-full appearance-none rounded-lg border border-zinc-700 bg-zinc-900 py-1.5 pl-3 pr-8 text-sm text-zinc-100 hover:border-zinc-500 sm:w-auto ${focusRing}`}
       >
         {children}
       </select>
@@ -521,51 +504,53 @@ function MemberRow({
   }
 
   return (
-    <li className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5">
-      <div className="flex min-w-0 flex-1 basis-64 items-center gap-3">
-        <Avatar m={m} />
-        <div className="min-w-0">
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="truncate text-sm font-medium text-zinc-100">{name}</span>
-            {m.is_self && <span className="rounded border border-zinc-700 px-1.5 text-[11px] leading-5 text-zinc-400">You</span>}
-          </p>
-          <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-zinc-500">
-            {m.email && m.email !== name && <span className="truncate">{m.email}</span>}
-            {m.github_login && <GithubLink login={m.github_login} />}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 sm:w-auto sm:flex-nowrap">
-        <div className="flex min-w-0 flex-1 flex-col items-start gap-1 sm:w-40 sm:flex-none sm:items-end">
-          {githubOnly ? <StatusPill>GitHub sign-in only</StatusPill> : <StatusPill tone="success">Active</StatusPill>}
-          <span className="text-xs text-zinc-500">{seen ? `Active ${seen}` : "Not active yet"}</span>
-        </div>
-        {manageable && !lastOwner ? (
-          <div className="relative">
-            <select
-              aria-label={`Role for ${name}`}
-              value={m.role}
-              disabled={busy}
-              onChange={(e) => onRole(e.target.value)}
-              className={`min-h-8 cursor-pointer appearance-none rounded-lg border py-1 pl-2.5 pr-7 text-xs font-medium disabled:opacity-50 ${ROLE_STYLE[m.role] ?? ROLE_STYLE.member} ${focusRing}`}
-            >
-              {options.map((r) => (
-                <option key={r.key} value={r.key} className="bg-zinc-900 text-zinc-100">
-                  {r.label}
-                </option>
-              ))}
-            </select>
-            <Chevron />
-          </div>
-        ) : (
-          <span title={lastOwner && manageable ? "Make someone else an owner before changing this role" : undefined}>
-            <RoleChip role={m.role} label={roleLabel(m.role)} />
+    <ListRow
+      testId="member-row"
+      data={{ role: m.role }}
+      leading={<Avatar m={m} />}
+      title={
+        <>
+          {name}
+          {m.is_self && <span className="ml-2 rounded border border-zinc-700 px-1.5 text-[11px] font-normal leading-5 text-zinc-400">You</span>}
+        </>
+      }
+      titleText={name}
+      meta={[
+        m.email && m.email !== name ? <span key="email">{m.email}</span> : null,
+        m.github_login ? <GithubLink key="gh" login={m.github_login} /> : null,
+      ]}
+      chips={
+        <>
+          <span className="flex flex-col items-start gap-1 sm:items-end">
+            {githubOnly ? <StatusPill>GitHub sign-in only</StatusPill> : <StatusPill tone="success">Active</StatusPill>}
+            <span className="text-xs text-zinc-500">{seen ? `Active ${seen}` : "Not active yet"}</span>
           </span>
-        )}
-        {actions.length > 0 ? <ActionsMenu label={`More actions for ${name}`} actions={actions} disabled={busy} /> : <span className="hidden w-9 sm:block" />}
-      </div>
-    </li>
+          {manageable && !lastOwner ? (
+            <span className="relative">
+              <select
+                aria-label={`Role for ${name}`}
+                value={m.role}
+                disabled={busy}
+                onChange={(e) => onRole(e.target.value)}
+                className={`min-h-8 cursor-pointer appearance-none rounded-lg border py-1 pl-2.5 pr-7 text-xs font-medium disabled:opacity-50 ${ROLE_STYLE[m.role] ?? ROLE_STYLE.member} ${focusRing}`}
+              >
+                {options.map((r) => (
+                  <option key={r.key} value={r.key} className="bg-zinc-900 text-zinc-100">
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+              <Chevron />
+            </span>
+          ) : (
+            <span title={lastOwner && manageable ? "Make someone else an owner before changing this role" : undefined}>
+              <RoleChip role={m.role} label={roleLabel(m.role)} />
+            </span>
+          )}
+        </>
+      }
+      actions={actions.length > 0 ? <ActionsMenu label={`More actions for ${name}`} actions={actions} disabled={busy} /> : <span className="hidden w-9 sm:block" />}
+    />
   );
 }
 

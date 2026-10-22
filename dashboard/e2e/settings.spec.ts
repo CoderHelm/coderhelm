@@ -331,3 +331,20 @@ test("a page above your role says why instead of bouncing you", async ({ page })
   await page.getByRole("link", { name: "Back to Settings" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
 });
+
+test("repositories: the list toolbar filters on and off repos and searches by name", async ({ page }) => {
+  await mockApi(page, { role: "admin" });
+  await page.goto("/settings/repos/");
+  const list = page.getByRole("list", { name: "Repositories" });
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+  await expect(page.getByRole("switch", { name: "Let Coderhelm work on your-team/web" })).toHaveAttribute("aria-checked", "true");
+  const toggles = page.getByRole("group", { name: "Show repos" });
+  await toggles.getByRole("button", { name: /^Off\s*1$/ }).click();
+  await expect(page).toHaveURL(/status=off/);
+  await expect(list.getByRole("listitem")).toHaveCount(1);
+  await expect(list.getByText("your-team/api")).toBeVisible();
+  await page.goBack();
+  await page.getByRole("searchbox", { name: "Search repos" }).fill("web");
+  await expect(list.getByRole("listitem")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Sync repos" })).toBeVisible();
+});

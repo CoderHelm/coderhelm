@@ -4,10 +4,16 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { TestAttempt, TestState, TestRunExecution } from "@/lib/api";
 import { StatusPill } from "@/components/status-pill";
-import { Callout } from "@/components/callout";
+import { ListEmpty, ListError, ListSkeleton, type StatusLook } from "@/components/list";
 import { ATTEMPT_LABEL, STATE_HELP, STATE_LABEL, STATE_TONE } from "@/lib/tests";
 import { formatDuration } from "@/lib/data-sources";
 import { focusRing, linkButton } from "@/components/ui";
+
+/** A test state in the shared list vocabulary (dot colour and words). */
+export function stateLook(state: TestState): StatusLook {
+  const tone = { healthy: "success", flaky: "waiting", broken: "danger", quarantined: "muted", fixed: "success" } as const;
+  return { label: STATE_LABEL[state], tone: tone[state] ?? "neutral" };
+}
 
 export function StatePill({ state }: { state: TestState }) {
   return (
@@ -63,23 +69,23 @@ export function SectionHeading({ id, children, aside }: { id: string; children: 
   );
 }
 
+/** Nothing to list: the shared empty state. */
 export function EmptyBox({ children }: { children: ReactNode }) {
-  return <p className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm text-zinc-400">{children}</p>;
+  return <ListEmpty title={children} />;
 }
 
+/** The view could not be read: the shared error state, with Try again. */
 export function LoadError({ what, message, onRetry }: { what: string; message: string; onRetry: () => void }) {
   return (
-    <Callout variant="error" title={`We couldn't load ${what}`}>
-      <p>{message}</p>
-      <p>
-        <button type="button" onClick={onRetry} className={linkButton}>Try again</button>
-      </p>
-    </Callout>
+    <ListError title={`We couldn't load ${what}`} onRetry={onRetry}>
+      {message}
+    </ListError>
   );
 }
 
+/** The shared skeleton rows while a view loads. */
 export function Loading({ what }: { what: string }) {
-  return <p role="status" className="text-sm text-zinc-500">Loading {what}…</p>;
+  return <ListSkeleton rows={4} label={`Loading ${what}`} />;
 }
 
 /** The first failing attempt's error, the line most people need. */

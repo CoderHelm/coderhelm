@@ -151,7 +151,7 @@ test("the hub offers your own tools, and an empty list says how to start", async
   await page.getByRole("button", { name: "Add a data source" }).click();
   await page.getByRole("link", { name: /Your own tools/ }).click();
   await expect(page.getByRole("heading", { name: "Your own tools" })).toBeVisible();
-  await expect(page.getByText("No tools yet.")).toBeVisible();
+  await expect(page.getByText("No tools yet", { exact: true })).toBeVisible();
   await expect(page.getByText("Nothing waiting.")).toBeVisible();
   await shot(page, "tools-empty");
 });
@@ -266,11 +266,11 @@ test("ask me first: a waiting call can be approved or declined", async ({ page }
     ],
   });
   await page.goto("/data-sources/tools");
-  await expect(page.getByRole("heading", { name: /Waiting for your yes/ })).toContainText("(2)");
+  await expect(page.getByRole("heading", { name: /Waiting for your yes/ })).toHaveText("Waiting for your yes2");
   await expect(page.getByText("planner on your-team/web #41 · 9 min left")).toBeVisible();
   await shot(page, "tools-inbox");
   await page.getByRole("button", { name: "Approve this call" }).first().click();
-  await expect(page.getByText("(1)")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Waiting for your yes/ })).toHaveText("Waiting for your yes1");
   await page.getByRole("button", { name: "Decline" }).click();
   await expect(page.getByText("Nothing waiting.")).toBeVisible();
   expect(db.calls.filter((c) => c.path.startsWith("/api/tools/asks/")).map((c) => c.body?.approve)).toEqual([true, false]);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   api,
   type AgentProfile,
@@ -10,7 +10,7 @@ import {
   type Repo,
 } from "@/lib/api";
 import { Callout } from "@/components/callout";
-import { Segmented } from "@/components/segmented";
+import { Chip, List, ListEmpty, ListError, ListRow, ListSection, ListSkeleton, ListToolbar, useListParams } from "@/components/list";
 import { Skeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -40,6 +40,10 @@ const AGENT_ICON: Record<AgentProfile["id"], ReactNode> = {
 type Show = "all" | "pinned" | "run" | "person";
 type Sort = "newest" | "most_used";
 
+/** A select that sits in a list toolbar. */
+const toolbarSelect = `min-h-9 rounded-lg border border-zinc-700 bg-zinc-900 py-1.5 pl-3 text-sm text-zinc-100 hover:border-zinc-500 ${focusRing}`;
+const smallButton = `${secondaryButton} !min-h-8 !px-3 !py-1`;
+
 const ROLE_LEVEL: Record<string, number> = { viewer: 0, member: 1, billing: 2, admin: 3, owner: 4 };
 
 function errorText(e: unknown, fallback: string) {
@@ -63,13 +67,26 @@ function where(m: MemoryItem): string {
   return o.title ? `Learned on “${o.title}”` : "Learned on a ticket";
 }
 
-export default function MemoryPage() {
+export default function MemoryPageWithParams() {
+  return (
+    <Suspense fallback={<Page><PageHeader title="Memory" /><div className="mt-6"><ListSkeleton rows={3} label="Loading memories" /></div></Page>}>
+      <MemoryPage />
+    </Suspense>
+  );
+}
+
+const SHOWS: Show[] = ["all", "pinned", "run", "person"];
+
+function MemoryPage() {
   const { toast } = useToast();
   const { confirm } = useConfirm();
   const [repos, setRepos] = useState<Repo[] | null>(null);
   const [reposError, setReposError] = useState("");
   const [reposAttempt, setReposAttempt] = useState(0);
-  const [repo, setRepo] = useState("");
+  // The address holds the repo and the list's filters, so a view can be shared.
+  const [params, setParams] = useListParams({ repo: "", q: "", show: "all", sort: "newest", topic: "" });
+  const [firstRepo, setFirstRepo] = useState("");
+  const repo = params.repo || firstRepo;
   const [isAdmin, setIsAdmin] = useState(false);
 
   const [profiles, setProfiles] = useState<AgentProfile[] | null>(null);
@@ -79,11 +96,11 @@ export default function MemoryPage() {
   const [memories, setMemories] = useState<MemoryItem[] | null>(null);
   const [total, setTotal] = useState(0);
   const [listError, setListError] = useState("");
-  const [show, setShow] = useState<Show>("all");
-  const [topic, setTopic] = useState("");
-  const [sort, setSort] = useState<Sort>("newest");
-  const [search, setSearch] = useState("");
-  const [query, setQuery] = useState("");
+  const show: Show = (SHOWS as string[]).includes(params.show) ? (params.show as Show) : "all";
+  const topic = TOPICS.some((t) => t.value === params.topic) ? params.topic : "";
+  const sort: Sort = params.sort === "most_used" ? "most_used" : "newest";
+  const query = params.q.trim();
+  const clearFilters = () => setParams({ q: "", show: "all", topic: "" });
   const [teaching, setTeaching] = useState(false);
   const [reload, setReload] = useState(0);
 
@@ -99,17 +116,11 @@ export default function MemoryPage() {
       .then(({ repos }) => {
         const enabled = repos.filter((r) => r.enabled);
         setRepos(enabled);
-        if (enabled.length > 0) setRepo((cur) => cur || enabled[0].name);
+        if (enabled.length > 0) setFirstRepo(enabled[0].name);
       })
       // A failed request is not "no repositories": say so and offer a retry.
       .catch((e) => setReposError(errorText(e, "The request failed.")));
   }, [reposAttempt]);
-
-  // Searching waits for a pause in typing.
-  useEffect(() => {
-    const t = setTimeout(() => setQuery(search.trim()), 300);
-    return () => clearTimeout(t);
-  }, [search]);
 
   useEffect(() => {
     if (!repo) return;
@@ -226,8 +237,8 @@ export default function MemoryPage() {
             id="memory-repo"
             aria-label="Repository"
             value={repo}
-            onChange={(e) => { setRepo(e.target.value); setOpenAgent(null); }}
-            className={`${inputClass} !w-auto min-w-0 max-w-full`}
+            onChange={(e) => { setParams({ repo: e.target.value }); setOpenAgent(null); }}
+            className={`${toolbarSelect} min-w-0 max-w-full`}
           >
             {repos.map((r) => <option key={r.name} value={r.name}>{r.name}</option>)}
           </select>
@@ -289,86 +300,64 @@ export default function MemoryPage() {
           <TryIt repo={repo} />
 
           {/* ── Memories ─────────────────────────────────────── */}
-          <section aria-labelledby="memories-heading" className="mt-10">
-            <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
-              <h2 id="memories-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                Memories{memories !== null && !listError ? ` (${total})` : ""}
-              </h2>
-              <p className="text-xs text-zinc-500">The planner and coding agent get every pinned memory and the five most relevant on each ticket.</p>
-            </div>
+          <div className="mt-10">
+            <ListSection
+              id="memories"
+              title="Memories"
+              count={memories !== null && !listError ? total : undefined}
+              description={<span className="text-xs text-zinc-500">The planner and coding agent get every pinned memory and the five most relevant on each ticket.</span>}
+            >
+              <ListToolbar
+                className="mb-4"
+                search={{ value: params.q, onChange: (v) => setParams({ q: v }, { replace: true }), placeholder: "Search memories" }}
+                status={{
+                  label: "Show",
+                  value: show,
+                  onChange: (v) => setParams({ show: v }),
+                  options: [
+                    { value: "all", label: "All" },
+                    { value: "pinned", label: "Pinned", tone: "waiting" },
+                    { value: "run", label: "Learned on tickets" },
+                    { value: "person", label: "Added by people" },
+                  ],
+                }}
+                sort={{
+                  value: sort,
+                  onChange: (v) => setParams({ sort: v }),
+                  options: [{ value: "newest", label: "Newest" }, { value: "most_used", label: "Most used" }],
+                }}
+                actions={
+                  <select aria-label="Topic" value={topic} onChange={(e) => setParams({ topic: e.target.value })} className={`${toolbarSelect} min-w-0 max-w-full`}>
+                    <option value="">Every topic</option>
+                    {TOPICS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                }
+                onClear={filtered ? clearFilters : undefined}
+              />
 
-            <div className="flex flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="max-w-full overflow-x-auto">
-                  <Segmented<Show>
-                    label="Show"
-                    value={show}
-                    onChange={setShow}
-                    options={[
-                      { value: "all", label: "All" },
-                      { value: "pinned", label: "Pinned" },
-                      { value: "run", label: "Learned on tickets" },
-                      { value: "person", label: "Added by people" },
-                    ]}
-                  />
-                </div>
-                <Segmented<Sort>
-                  label="Sort"
-                  value={sort}
-                  onChange={setSort}
-                  options={[{ value: "newest", label: "Newest" }, { value: "most_used", label: "Most used" }]}
-                />
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <input
-                  type="search"
-                  aria-label="Search memories"
-                  placeholder="Search memories"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className={`${inputClass} !w-auto min-w-0 flex-1 basis-48`}
-                />
-                <select aria-label="Topic" value={topic} onChange={(e) => setTopic(e.target.value)} className={`${inputClass} !w-auto min-w-0 max-w-full`}>
-                  <option value="">Every topic</option>
-                  {TOPICS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div className="mt-4">
               {listError ? (
-                <Callout variant="error" title="We couldn't load the memories">
-                  <p>{listError} Your agents still use them.</p>
-                  <p><button type="button" onClick={refresh} className={linkButton}>Try again</button></p>
-                </Callout>
+                <ListError title="We couldn't load the memories" onRetry={refresh}>
+                  {listError} Your agents still use them.
+                </ListError>
               ) : memories === null ? (
-                <div className="flex flex-col gap-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-24" />)}</div>
+                <ListSkeleton rows={3} label="Loading memories" />
               ) : memories.length === 0 ? (
                 filtered ? (
-                  <p className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm text-zinc-400">
-                    Nothing matches. <button type="button" className={linkButton} onClick={() => { setShow("all"); setTopic(""); setSearch(""); }}>Clear the filters</button>
-                  </p>
+                  <ListEmpty title="Nothing matches." onClear={clearFilters} />
                 ) : (
-                  <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-zinc-300" aria-hidden="true"><MemoryIcon /></span>
-                    <p className="mt-3 font-semibold text-zinc-100">Nothing remembered about {repo} yet</p>
-                    <p className="mt-1 max-w-prose text-sm text-zinc-400">
-                      After each ticket it finishes here, Coderhelm saves up to five things it learned: conventions, mistakes to avoid,
-                      where things live. You can also teach it directly, and pin what should always apply.
-                    </p>
-                    {isAdmin && <button type="button" onClick={() => setTeaching(true)} className={`${secondaryButton} mt-4`}>Teach it something</button>}
-                  </div>
+                  <ListEmpty
+                    title={`Nothing remembered about ${repo} yet`}
+                    action={isAdmin ? <button type="button" onClick={() => setTeaching(true)} className={secondaryButton}>Teach it something</button> : undefined}
+                  >
+                    After each ticket it finishes here, Coderhelm saves up to five things it learned: conventions, mistakes to avoid,
+                    where things live. You can also teach it directly, and pin what should always apply.
+                  </ListEmpty>
                 )
               ) : (
                 <div className="flex flex-col gap-6">
-                  {grouped.map((g) => (
-                    <div key={g.topic || "all"}>
-                      {g.topic && (
-                        <h3 className="mb-2 text-sm font-semibold text-zinc-300">
-                          {topicLabel(g.topic)} <span className="font-normal text-zinc-500">{g.items.length}</span>
-                        </h3>
-                      )}
-                      <ul className="flex flex-col gap-3">
+                  {grouped.map((g) => {
+                    const rows = (
+                      <List label={g.topic ? topicLabel(g.topic) : "Memories"}>
                         {g.items.map((m) => (
                           <MemoryCard
                             key={m.id}
@@ -380,16 +369,23 @@ export default function MemoryPage() {
                             onSave={(c, t) => save(m, c, t)}
                           />
                         ))}
-                      </ul>
-                    </div>
-                  ))}
+                      </List>
+                    );
+                    return g.topic ? (
+                      <ListSection key={g.topic} id={`topic-${g.topic}`} title={topicLabel(g.topic)} count={g.items.length}>
+                        {rows}
+                      </ListSection>
+                    ) : (
+                      <div key="all">{rows}</div>
+                    );
+                  })}
                   {total > memories.length && (
                     <p className="text-sm text-zinc-500">Showing the first {memories.length} of {total}. Search or filter to find the rest.</p>
                   )}
                 </div>
               )}
-            </div>
-          </section>
+            </ListSection>
+          </div>
         </>
       )}
 
@@ -504,10 +500,44 @@ function MemoryCard({
   };
 
   const uses = m.uses ?? 0;
+  const long = m.content.length > 140;
   return (
-    <li className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4" data-testid="memory">
-      {editing ? (
-        <div className="flex flex-col gap-3">
+    <ListRow
+      testId="memory"
+      status={{ tone: m.pinned ? "waiting" : m.origin?.source === "person" ? "neutral" : "muted" }}
+      title={m.content}
+      titleText={m.content}
+      meta={[
+        showTopic ? <span key="topic" className="text-zinc-400">{topicLabel(m.topic)}</span> : null,
+        `${where(m)}${day(m.created_at) ? `, ${day(m.created_at)}` : ""}`,
+        m.origin?.edited_by ? `Edited by ${m.origin.edited_by}` : null,
+        uses === 0
+          ? "Not used yet"
+          : `Used on ${uses} ticket${uses === 1 ? "" : "s"}${m.last_used?.title ? `, last “${m.last_used.title}”` : ""}${day(m.last_used?.at) ? ` ${day(m.last_used?.at)}` : ""}`,
+      ]}
+      chips={
+        m.pinned ? (
+          <Chip tone="waiting">
+            <PinIcon /> Pinned
+          </Chip>
+        ) : undefined
+      }
+      actions={
+        isAdmin && !editing ? (
+          <span className="flex flex-wrap gap-2">
+            <button type="button" onClick={onPin} className={smallButton} aria-label={`${m.pinned ? "Unpin" : "Pin"} this memory`}>
+              {m.pinned ? "Unpin" : "Pin"}
+            </button>
+            <button type="button" onClick={() => setEditing(true)} className={smallButton}>Edit</button>
+            <button type="button" onClick={onForget} className={`${smallButton} !text-red-300`}>Forget</button>
+          </span>
+        ) : undefined
+      }
+      details={long && !editing ? <p className="whitespace-pre-wrap text-sm text-zinc-200">{m.content}</p> : undefined}
+      detailsLabel="Full text"
+    >
+      {editing && (
+        <div className="mt-3 flex flex-col gap-3">
           <label className="sr-only" htmlFor={`edit-${m.id}`}>Memory</label>
           <textarea id={`edit-${m.id}`} value={content} onChange={(e) => setContent(e.target.value)} rows={3} maxLength={1000} className={inputClass} />
           <div className="flex flex-wrap items-center gap-3">
@@ -519,39 +549,8 @@ function MemoryCard({
           </div>
           {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
         </div>
-      ) : (
-        <>
-          <div className="flex items-start gap-3">
-            <p className="min-w-0 flex-1 break-words text-sm text-zinc-100">{m.content}</p>
-            {m.pinned && (
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-300">
-                <PinIcon /> Pinned
-              </span>
-            )}
-          </div>
-          <p className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
-            {showTopic && <><span className="text-zinc-400">{topicLabel(m.topic)}</span><span aria-hidden="true">·</span></>}
-            <span>{where(m)}{day(m.created_at) && `, ${day(m.created_at)}`}</span>
-            {m.origin?.edited_by && <><span aria-hidden="true">·</span><span>Edited by {m.origin.edited_by}</span></>}
-            <span aria-hidden="true">·</span>
-            <span>
-              {uses === 0
-                ? "Not used yet"
-                : `Used on ${uses} ticket${uses === 1 ? "" : "s"}${m.last_used?.title ? `, last “${m.last_used.title}”` : ""}${day(m.last_used?.at) ? ` ${day(m.last_used?.at)}` : ""}`}
-            </span>
-          </p>
-          {isAdmin && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={onPin} className={secondaryButton} aria-label={`${m.pinned ? "Unpin" : "Pin"} this memory`}>
-                {m.pinned ? "Unpin" : "Pin"}
-              </button>
-              <button type="button" onClick={() => setEditing(true)} className={secondaryButton}>Edit</button>
-              <button type="button" onClick={onForget} className={`${secondaryButton} !text-red-300`}>Forget</button>
-            </div>
-          )}
-        </>
       )}
-    </li>
+    </ListRow>
   );
 }
 

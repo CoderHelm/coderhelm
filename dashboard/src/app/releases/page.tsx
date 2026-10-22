@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   api,
@@ -13,23 +13,36 @@ import {
 import { RoleGuard } from "@/components/role-guard";
 import { RepoCombobox } from "@/components/repo-combobox";
 import { Markdown } from "@/components/markdown";
-import { Skeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
-import { usePagedList, LoadMoreButton } from "@/components/load-more";
 import { Callout } from "@/components/callout";
 import { Segmented } from "@/components/segmented";
-import { AtlassianIcon, ChevronRightIcon, ExternalLinkIcon, GitHubIcon, MailIcon } from "@/components/icons";
+import { Modal } from "@/components/modal";
+import { AtlassianIcon, ExternalLinkIcon, GitHubIcon, MailIcon } from "@/components/icons";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
-import { Page, PageHeader, cardClass } from "@/components/page";
+import { Page, PageHeader } from "@/components/page";
+import {
+  DetailBlock,
+  GROUP_LABEL,
+  List,
+  ListEmpty,
+  ListError,
+  ListRow,
+  ListSection,
+  ListSkeleton,
+  ListToolbar,
+  LoadMore,
+  timeAgo,
+  useListParams,
+  usePagedList,
+  useTeamRepos,
+  type Tone,
+} from "@/components/list";
 
 // The characters the backend accepts in a tag (anything else is a bare 400).
 const TAG_PATTERN = /^[A-Za-z0-9._+/-]{1,200}$/;
 
 /** A compact button for rows and banners. */
 const smallButton = `inline-flex min-h-8 items-center justify-center rounded-md border border-zinc-700 bg-zinc-800 px-3 text-xs font-medium text-zinc-200 hover:bg-zinc-700 disabled:opacity-50 transition-colors motion-reduce:transition-none ${focusRing}`;
-
-/** Up to this many repos the filter is a row of tabs; more get a searchable picker. */
-const MAX_TABS = 5;
 
 /** Turn a failed send into words: the endpoint answers with bare status codes. */
 function sendError(e: unknown): string {
@@ -44,22 +57,6 @@ function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-/** "just now", "5 min ago", "3 h ago", "2 days ago", then the date after a month. */
-function timeAgo(iso: string): string {
-  if (!iso) return "";
-  const date = new Date(iso);
-  if (isNaN(date.getTime())) return "";
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-
 function fullDate(iso: string): string {
   const d = new Date(iso);
   return isNaN(d.getTime()) ? "" : d.toLocaleString();
@@ -70,20 +67,49 @@ function shortName(repo: string): string {
   return repo.split("/").pop() || repo;
 }
 
+/** The status toggles: a release's overall state from where it was published. */
+type ReleaseState = "done" | "waiting" | "failed";
+const STATE_TONE: Record<ReleaseState, Tone> = { done: "success", waiting: "waiting", failed: "danger" };
+const STATE_WORDS: Record<ReleaseState, string> = { done: "Published", waiting: "Not finished", failed: "Failed" };
+
+function releaseState(dests: Dest[]): ReleaseState {
+  if (dests.some((d) => d.tone === "failed")) return "failed";
+  if (dests.some((d) => d.tone === "pending")) return "waiting";
+  return "done";
+}
+
+function releaseMatches(r: Release, q: string): boolean {
+  if (!q) return true;
+  const hay = `${r.repo} ${r.tag} ${r.prev_tag} ${r.headline}`.toLowerCase();
+  return q
+    .toLowerCase()
+    .split(/\s+/)
+    .every((w) => hay.includes(w));
+}
+
 export default function ReleasesGuarded() {
   return (
     <RoleGuard minRole="member">
-      <ReleasesPage />
+      <Suspense fallback={<Page><PageHeader title="Releases" /><div className="mt-6"><ListSkeleton /></div></Page>}>
+        <ReleasesPage />
+      </Suspense>
     </RoleGuard>
   );
 }
 
 function ReleasesPage() {
   const [repos, setRepos] = useState<Repo[]>([]);
-  const [repoFilter, setRepoFilter] = useState("");
+  // ?q= search, ?status= done | waiting | failed, ?repo= one repo, ?write=1 opens "Write notes for a tag".
+  const [params, setParams] = useListParams({ q: "", status: "all", repo: "", write: "" });
+  const repoFilter = params.repo;
+  const q = params.q.trim();
+  const status = params.status === "done" || params.status === "waiting" || params.status === "failed" ? params.status : "all";
+  const teamRepos = useTeamRepos();
   const [open, setOpen] = useState<string | null>(null);
-  const [writing, setWriting] = useState(false);
+  const writing = params.write === "1";
+  const setWriting = (v: boolean) => setParams({ write: v ? "1" : "" }, { replace: !v });
   const [busy, setBusy] = useState("");
+  const writeButton = useRef<HTMLButtonElement>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -180,24 +206,43 @@ function ReleasesPage() {
   };
 
   const used = usedSteps(releases);
+  const rows = useMemo(
+    () =>
+      releases
+        .filter((r) => releaseMatches(r, q))
+        .map((r) => {
+          const dests = destinations(r, configs[r.repo], used.get(r.repo));
+          return { r, dests, state: releaseState(dests) };
+        }),
+    [releases, q, configs, used],
+  );
+  const counts = useMemo(() => {
+    const c: Record<ReleaseState, number> = { done: 0, waiting: 0, failed: 0 };
+    for (const x of rows) c[x.state] += 1;
+    return c;
+  }, [rows]);
+  const shown = status === "all" ? rows : rows.filter((x) => x.state === status);
   // Group by repo (newest release first) when the list spans more than one.
   const groups = useMemo(() => {
-    const m = new Map<string, Release[]>();
-    for (const r of releases) m.set(r.repo, [...(m.get(r.repo) ?? []), r]);
+    const m = new Map<string, typeof shown>();
+    for (const x of shown) m.set(x.r.repo, [...(m.get(x.r.repo) ?? []), x]);
     return [...m.entries()];
-  }, [releases]);
+  }, [shown]);
   const grouped = !repoFilter && groups.length > 1;
   const showRepoInBanner = !repoFilter && repos.length !== 1;
+  const filtered = !!(q || repoFilter || status !== "all");
+  const clear = () => setParams({ q: "", status: "all", repo: "" });
 
-  const renderList = (list: Release[]) => (
-    <ul className="divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/30">
-      {list.map((r) => {
+  const renderList = (list: typeof shown) => (
+    <List>
+      {list.map(({ r, dests }) => {
         const key = `${r.repo}@${r.tag}`;
         return (
           <ReleaseRow
             key={key}
             release={r}
-            dests={destinations(r, configs[r.repo], used.get(r.repo))}
+            dests={dests}
+            showRepo={!repoFilter && !grouped}
             isOpen={open === key}
             onToggle={() => setOpen(open === key ? null : key)}
             busy={!!busy}
@@ -207,7 +252,7 @@ function ReleasesPage() {
           />
         );
       })}
-    </ul>
+    </List>
   );
 
   return (
@@ -221,19 +266,19 @@ function ReleasesPage() {
           </>
         }
         actions={
-          <button
-            type="button"
-            onClick={() => setWriting((w) => !w)}
-            aria-expanded={writing}
-            aria-controls="write-notes"
-            className={secondaryButton}
-          >
-            Write notes for a tag
+          <button ref={writeButton} type="button" onClick={() => setWriting(true)} className={secondaryButton}>
+            Write notes for a tag…
           </button>
         }
       />
 
-      {writing && (
+      <Modal
+        open={writing}
+        onOpenChange={setWriting}
+        returnFocus={writeButton}
+        title="Write notes for a tag"
+        description="For a tag Coderhelm didn't cut, or an older release. Publishes wherever the repo is set up to."
+      >
         <WriteNotesForm
           repos={repos}
           initialRepo={repoFilter || (repos.length === 1 ? repos[0].name : "")}
@@ -241,9 +286,8 @@ function ReleasesPage() {
           onSubmit={async (repo, tag) => {
             if (await send(repo, tag, "")) setWriting(false);
           }}
-          onClose={() => setWriting(false)}
         />
-      )}
+      </Modal>
 
       {(blocked.length > 0 || waiting.length > 0) && (
         <div className="mt-6 flex flex-col gap-2">
@@ -295,100 +339,71 @@ function ReleasesPage() {
         </div>
       )}
 
-      <ReleasesRepoFilter repos={repos} value={repoFilter} onChange={setRepoFilter} />
+      <ListToolbar
+        className="mt-6 mb-4"
+        search={{
+          value: params.q,
+          onChange: (v) => setParams({ q: v }, { replace: true }),
+          placeholder: "Search by tag, summary or repo",
+          label: "Search releases",
+        }}
+        status={{
+          label: "Show releases",
+          value: status,
+          onChange: (v) => setParams({ status: v }),
+          options: [
+            { value: "all", label: GROUP_LABEL.all, count: rows.length },
+            { value: "done", label: STATE_WORDS.done, count: counts.done, tone: STATE_TONE.done },
+            { value: "waiting", label: STATE_WORDS.waiting, count: counts.waiting, tone: STATE_TONE.waiting },
+            { value: "failed", label: STATE_WORDS.failed, count: counts.failed, tone: STATE_TONE.failed },
+          ],
+        }}
+        repo={{ value: repoFilter, onChange: (v) => setParams({ repo: v }), repos: teamRepos }}
+        onClear={filtered ? clear : undefined}
+      />
 
-      <div className="mt-4">
-        {loading ? (
-          <ReleaseListSkeleton />
-        ) : error ? (
-          <Callout variant="error" title="Could not load release notes">
-            <p>Check your connection and try again.</p>
-            <button type="button" onClick={reload} className={`mt-2 ${secondaryButton}`}>
-              Try again
-            </button>
-          </Callout>
-        ) : releases.length === 0 ? (
-          <div className={`${cardClass} p-8 text-center`}>
-            <p className="mb-1 text-base text-zinc-300">
-              {repoFilter ? `No release notes for ${shortName(repoFilter)} yet` : "No release notes yet"}
-            </p>
-            <p className="text-sm text-zinc-500">
-              They appear here after the next release tag on a repo with release notes on, or use Write notes for a tag.
-            </p>
-          </div>
-        ) : grouped ? (
-          <div className="flex flex-col gap-8">
-            {groups.map(([repo, list]) => (
-              <section key={repo} aria-labelledby={`releases-${repo}`}>
-                <h2
-                  id={`releases-${repo}`}
-                  className="mb-2 flex min-w-0 items-baseline gap-2 text-sm font-semibold text-zinc-200"
-                >
-                  <span className="min-w-0 truncate" title={repo}>{shortName(repo)}</span>
-                  <span className="text-xs font-normal text-zinc-500">{plural(list.length, "release")}</span>
-                </h2>
-                {renderList(list)}
-              </section>
-            ))}
-          </div>
-        ) : (
-          renderList(releases)
-        )}
-      </div>
-      <LoadMoreButton hasMore={!!next} loading={loadingMore} failed={moreFailed} onClick={loadMore} />
+      {loading ? (
+        <ListSkeleton rows={4} label="Loading releases" />
+      ) : error ? (
+        <ListError title="Could not load release notes" onRetry={reload} />
+      ) : releases.length === 0 ? (
+        <ListEmpty
+          title={repoFilter ? `No release notes for ${shortName(repoFilter)} yet` : "No release notes yet"}
+          onClear={repoFilter ? clear : undefined}
+        >
+          They appear here after the next release tag on a repo with release notes on, or use Write notes for a tag.
+        </ListEmpty>
+      ) : shown.length === 0 ? (
+        <ListEmpty title={q ? `No releases match “${q}”` : `No ${STATE_WORDS[status as ReleaseState]?.toLowerCase() ?? ""} releases`} onClear={clear}>
+          {next ? "Only the releases loaded so far were searched. Load more to search older ones." : undefined}
+        </ListEmpty>
+      ) : grouped ? (
+        <div className="flex flex-col gap-8">
+          {groups.map(([repo, list]) => (
+            <ListSection key={repo} id={`releases-${repo.replace(/[^a-zA-Z0-9]/g, "-")}`} title={<span title={repo}>{shortName(repo)}</span>} count={list.length}>
+              {renderList(list)}
+            </ListSection>
+          ))}
+        </div>
+      ) : (
+        renderList(shown)
+      )}
+      {!loading && !error && <LoadMore hasMore={!!next} loading={loadingMore} failed={moreFailed} onClick={loadMore} />}
     </Page>
   );
 }
 
-/**
- * Which repo's releases to show. Self-contained so the shared list toolbar can
- * replace it: hidden with one repo, tabs for a few, a searchable picker beyond.
- */
-function ReleasesRepoFilter({
-  repos,
-  value,
-  onChange,
-}: {
-  repos: Repo[];
-  value: string;
-  onChange: (repo: string) => void;
-}) {
-  if (repos.length <= 1) return null;
-  if (repos.length <= MAX_TABS) {
-    const options = [{ value: "", label: "All repos" }, ...repos.map((r) => ({ value: r.name, label: shortName(r.name) }))];
-    return (
-      <div className="mt-6 max-w-full overflow-x-auto" data-testid="releases-filter">
-        <Segmented label="Show releases for" options={options} value={value} onChange={onChange} />
-      </div>
-    );
-  }
-  return (
-    <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2" data-testid="releases-filter">
-      <div className="w-full sm:w-72 [&>div]:mb-0">
-        <RepoCombobox repos={repos} selected={value} onSelect={onChange} label="Show releases for" placeholder="All repos" />
-      </div>
-      {value && (
-        <button type="button" onClick={() => onChange("")} className={`${linkButton} text-xs`}>
-          Show all repos
-        </button>
-      )}
-    </div>
-  );
-}
-
-/** Write notes for a tag Coderhelm didn't cut (or an older one). */
+/** Write notes for a tag Coderhelm didn't cut (or an older one). Sits in a small dialog. */
 function WriteNotesForm({
   repos,
   initialRepo,
   busy,
   onSubmit,
-  onClose,
 }: {
   repos: Repo[];
   initialRepo: string;
   busy: boolean;
   onSubmit: (repo: string, tag: string) => void;
-  onClose: () => void;
 }) {
   const [repo, setRepo] = useState(initialRepo);
   const [tag, setTag] = useState("");
@@ -403,52 +418,38 @@ function WriteNotesForm({
   return (
     <form
       id="write-notes"
-      aria-labelledby="write-notes-title"
+      aria-label="Write notes for a tag"
       onSubmit={(e) => {
         e.preventDefault();
         if (ready) onSubmit(repo, tag);
       }}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") onClose();
-      }}
-      className={`mt-6 ${cardClass}`}
+      className="flex flex-col gap-3"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 id="write-notes-title" className="text-sm font-semibold text-zinc-200">Write notes for a tag</h2>
-          <p className="mt-0.5 text-xs text-zinc-500">
-            For a tag Coderhelm didn&apos;t cut, or an older release. Publishes wherever the repo is set up to.
-          </p>
+      {repos.length !== 1 && (
+        <div className="[&>div]:mb-0">
+          <RepoCombobox repos={repos} selected={repo} onSelect={setRepo} placeholder="Pick a repo" />
         </div>
-        <button type="button" onClick={onClose} className={`${linkButton} shrink-0 text-xs`}>
-          Cancel
-        </button>
-      </div>
-      <div className="mt-3 flex flex-wrap items-start gap-2">
-        {repos.length !== 1 && (
-          <div className="w-full sm:w-72 [&>div]:mb-0">
-            <RepoCombobox repos={repos} selected={repo} onSelect={setRepo} />
-          </div>
-        )}
-        <input
-          ref={tagRef}
-          aria-label="Release tag"
-          aria-invalid={tagInvalid || undefined}
-          aria-describedby={tagInvalid ? "release-tag-error" : undefined}
-          placeholder="Tag, e.g. v2.3.0"
-          value={tag}
-          onChange={(e) => setTag(e.target.value.trim())}
-          className={`${inputClass} w-full font-mono sm:w-44 ${tagInvalid ? "border-red-500/60" : ""}`}
-        />
+      )}
+      <input
+        ref={tagRef}
+        aria-label="Release tag"
+        aria-invalid={tagInvalid || undefined}
+        aria-describedby={tagInvalid ? "release-tag-error" : undefined}
+        placeholder="Tag, e.g. v2.3.0"
+        value={tag}
+        onChange={(e) => setTag(e.target.value.trim())}
+        className={`${inputClass} font-mono ${tagInvalid ? "border-red-500/60" : ""}`}
+      />
+      {tagInvalid && (
+        <p id="release-tag-error" role="alert" className="text-xs text-red-400">
+          A tag can use letters, numbers and . _ - + / only.
+        </p>
+      )}
+      <div className="flex justify-end">
         <button type="submit" disabled={!ready} className={primaryButton}>
           Write notes
         </button>
       </div>
-      {tagInvalid && (
-        <p id="release-tag-error" role="alert" className="mt-2 text-xs text-red-400">
-          A tag can use letters, numbers and . _ - + / only.
-        </p>
-      )}
     </form>
   );
 }
@@ -612,6 +613,7 @@ function ExternalLink({ href, children }: { href: string; children: ReactNode })
 function ReleaseRow({
   release: r,
   dests,
+  showRepo,
   isOpen,
   onToggle,
   busy,
@@ -621,6 +623,7 @@ function ReleaseRow({
 }: {
   release: Release;
   dests: Dest[];
+  showRepo: boolean;
   isOpen: boolean;
   onToggle: () => void;
   busy: boolean;
@@ -628,67 +631,46 @@ function ReleaseRow({
   emailOn: boolean;
   onSend: (resend: "" | "email" | "all") => void;
 }) {
-  const panelId = `release-${`${r.repo}-${r.tag}`.replace(/[^a-zA-Z0-9]/g, "-")}`;
   const failed = dests.find((d) => d.tone === "failed");
+  const state = releaseState(dests);
   const prs = mentionedPrs(r.github_release_md);
   const both = !!r.entry_md && !!r.github_release_md;
   const [notesView, setNotesView] = useState<"summary" | "github">(r.entry_md ? "summary" : "github");
   const notes = notesView === "summary" ? r.entry_md : r.github_release_md;
 
   return (
-    <li data-testid="release-row">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={isOpen}
-        aria-controls={panelId}
-        className={`flex w-full gap-3 px-4 py-3 text-left hover:bg-zinc-800/30 ${focusRing} focus-visible:-outline-offset-2`}
-      >
-        <div className="min-w-0 flex-1">
-          <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span className="sr-only">{r.repo} </span>
-            <span className="font-mono text-sm font-semibold text-zinc-100 break-all">{r.tag}</span>
-            <span className="text-xs text-zinc-500">
-              {r.pr_count > 0 && <>{plural(r.pr_count, "PR")}</>}
-              {r.pr_count > 0 && r.updated_at && <span aria-hidden="true"> · </span>}
-              {r.updated_at && (
-                <time dateTime={r.updated_at} title={`Notes written ${fullDate(r.updated_at)}`}>
-                  {timeAgo(r.updated_at)}
-                </time>
-              )}
-            </span>
-          </p>
-          <p className={`mt-1 line-clamp-2 text-sm ${r.headline ? "text-zinc-300" : "italic text-zinc-500"}`}>
-            {r.headline || "No summary written yet"}
-          </p>
-          {failed && (
-            <p className="mt-1 line-clamp-1 text-xs text-red-400">
-              {failed.name} failed{r.failed_at ? ` ${timeAgo(r.failed_at)}` : ""}. Open for details.
-            </p>
-          )}
-        </div>
-        <span className="flex shrink-0 items-start gap-0.5 pt-px">
+    <ListRow
+      testId="release-row"
+      data={{ state }}
+      status={{ tone: STATE_TONE[state] }}
+      title={
+        <>
+          <span className="sr-only">{r.repo} </span>
+          <span className="font-mono">{r.tag}</span>
+        </>
+      }
+      titleText={`${r.repo} ${r.tag}`}
+      meta={[showRepo ? shortName(r.repo) : null, r.pr_count > 0 ? plural(r.pr_count, "PR") : null]}
+      summary={r.headline || <span className="italic text-zinc-500">No summary written yet</span>}
+      summaryTone="neutral"
+      chips={
+        <span className="flex items-center gap-0.5">
           {dests.map((d) => (
             <DestIcon key={d.key} dest={d} />
           ))}
-          <span
-            aria-hidden="true"
-            className={`ml-1 inline-flex h-6 items-center text-zinc-500 transition-transform motion-reduce:transition-none ${isOpen ? "rotate-90" : ""}`}
-          >
-            <ChevronRightIcon />
-          </span>
         </span>
-      </button>
-
-      {isOpen && (
-        <div id={panelId} className="flex min-w-0 flex-col gap-4 border-t border-zinc-800/70 bg-zinc-950/40 px-4 py-4">
+      }
+      time={r.updated_at}
+      open={isOpen}
+      onOpenChange={onToggle}
+      detailsFor={`notes and destinations of ${r.repo} ${r.tag}`}
+      details={
+        <>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             {r.github_release_url && <ExternalLink href={r.github_release_url}>GitHub release</ExternalLink>}
             {r.confluence_url.startsWith("http") && <ExternalLink href={r.confluence_url}>Confluence page</ExternalLink>}
             {r.prev_tag && (
-              <ExternalLink
-                href={`https://github.com/${r.repo}/compare/${encodeURIComponent(r.prev_tag)}...${encodeURIComponent(r.tag)}`}
-              >
+              <ExternalLink href={`https://github.com/${r.repo}/compare/${encodeURIComponent(r.prev_tag)}...${encodeURIComponent(r.tag)}`}>
                 <span>
                   Changes since <span className="font-mono text-xs">{r.prev_tag}</span>
                 </span>
@@ -697,8 +679,7 @@ function ReleaseRow({
           </div>
 
           {prs.length > 0 && (
-            <div>
-              <p className="mb-1 text-xs font-medium text-zinc-400">Pull requests</p>
+            <DetailBlock title="Pull requests">
               <ul className="flex flex-wrap gap-x-3 gap-y-1">
                 {prs.map((n) => (
                   <li key={n}>
@@ -714,11 +695,10 @@ function ReleaseRow({
                   </li>
                 ))}
               </ul>
-            </div>
+            </DetailBlock>
           )}
 
-          <div>
-            <p className="mb-1 text-xs font-medium text-zinc-400">Published to</p>
+          <DetailBlock title="Published to">
             <ul className="flex flex-col gap-1 text-sm">
               {dests.map((d) => (
                 <li key={d.key} className="flex min-w-0 items-start gap-2">
@@ -732,7 +712,7 @@ function ReleaseRow({
                 </li>
               ))}
             </ul>
-          </div>
+          </DetailBlock>
 
           {r.unclear && (
             <div className="whitespace-pre-line rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
@@ -743,7 +723,7 @@ function ReleaseRow({
 
           <div className="min-w-0">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-medium text-zinc-400">
+              <p className="text-xs font-medium text-zinc-300">
                 {both ? "Notes" : notesView === "summary" ? "Team summary (Confluence and email)" : "GitHub release notes"}
               </p>
               {both && (
@@ -758,7 +738,7 @@ function ReleaseRow({
                 />
               )}
             </div>
-            <div className="min-w-0 overflow-x-auto rounded-md border border-zinc-800 bg-zinc-950 p-3">
+            <div className="min-w-0 overflow-x-auto rounded-md border border-zinc-800 bg-zinc-950 p-3 text-sm text-zinc-300">
               <Markdown>{notes || "_Not written yet._"}</Markdown>
             </div>
           </div>
@@ -784,24 +764,14 @@ function ReleaseRow({
               Rewrite the notes
             </button>
           </div>
-        </div>
+        </>
+      }
+    >
+      {failed && (
+        <p className="mt-1 line-clamp-1 text-xs text-red-400">
+          {failed.name} failed{r.failed_at ? ` ${timeAgo(r.failed_at)}` : ""}. Open for details.
+        </p>
       )}
-    </li>
-  );
-}
-
-function ReleaseListSkeleton() {
-  return (
-    <div aria-busy="true" aria-label="Loading releases" className="divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="flex gap-3 px-4 py-3">
-          <div className="min-w-0 flex-1">
-            <Skeleton className="mb-2 h-3.5 w-28" />
-            <Skeleton className="h-3 w-3/4 max-w-md" />
-          </div>
-          <Skeleton className="h-4 w-16" />
-        </div>
-      ))}
-    </div>
+    </ListRow>
   );
 }

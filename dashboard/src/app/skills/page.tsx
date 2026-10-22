@@ -4,9 +4,19 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RoleGuard } from "@/components/role-guard";
 import { ActivitySummaryStrip } from "@/components/activity-summary";
-import { Skeleton } from "@/components/skeleton";
-import { Callout } from "@/components/callout";
 import { StatusPill } from "@/components/status-pill";
+import {
+  List,
+  ListEmpty,
+  ListError,
+  ListRow,
+  ListSection,
+  ListSkeleton,
+  ListToolbar,
+  Time,
+  useListParams,
+  type Tone,
+} from "@/components/list";
 import { useToast } from "@/components/toast";
 import { ToolSwitch } from "@/components/tools";
 import { inputClass, linkButton, primaryButton, secondaryButton, focusRing } from "@/components/ui";
@@ -40,7 +50,7 @@ function MissingTools({ item }: { item: Skill }) {
 export default function SkillsPageGuarded() {
   return (
     <RoleGuard minRole="member">
-      <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+      <Suspense fallback={<Page><PageHeader title="Skills" /><div className="mt-8"><ListSkeleton rows={4} label="Loading your skills" /></div></Page>}>
         <SkillsPage />
       </Suspense>
     </RoleGuard>
@@ -106,6 +116,18 @@ function Tabs({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
 
 const KINDS: SkillKind[] = ["skill", "agent", "command"];
 
+type LibraryFilter = "all" | "on" | "off" | "look";
+
+/** Items whose check found something to fix: tools it needs, a failed or partial check. */
+function needsALook(s: Skill): boolean {
+  return ["needs_tools", "failed", "partial"].some((f) => matchesCompatFilter(s, f)) || (!s.compat && (s.missing_tools?.length ?? 0) > 0);
+}
+
+function repoTone(r: SkillRepo): Tone {
+  if (!r.synced_at) return "live";
+  return r.error ? "danger" : "success";
+}
+
 function SkillsPage() {
   const { toast } = useToast();
   const router = useRouter();
@@ -117,14 +139,16 @@ function SkillsPage() {
   // summary link, back) is taken in.
   const [nav, setNav] = useState(() => ({
     tab: (params.get("tab") === "activity" ? "activity" : "library") as Tab,
-    filters: filtersFrom(params),
+    filters: params.get("tab") === "activity" ? filtersFrom(params) : NO_FILTERS,
   }));
   const written = useRef(new Set<string>());
   useEffect(() => {
     if (written.current.has(paramString)) return;
     written.current.clear();
     const q = new URLSearchParams(paramString);
-    setNav({ tab: q.get("tab") === "activity" ? "activity" : "library", filters: filtersFrom(q) });
+    // The library's own search (?q=) is not the activity log's.
+    const activity = q.get("tab") === "activity";
+    setNav({ tab: activity ? "activity" : "library", filters: activity ? filtersFrom(q) : NO_FILTERS });
   }, [paramString]);
   const { tab, filters } = nav;
 
@@ -160,6 +184,9 @@ function SkillsPage() {
   const [newRepo, setNewRepo] = useState("");
   const [stats, setStats] = useState<SkillStats | null>(null);
   const [compatFilter, setCompatFilter] = useState("");
+  // The library's toolbar: ?q=, ?status=, ?repo= (only read on the Library tab).
+  const [lib, setLib] = useListParams({ q: "", status: "all", repo: "" });
+  const libFilter: LibraryFilter = (["on", "off", "look"] as const).find((f) => f === lib.status) ?? "all";
 
   const load = useCallback(async () => {
     try {
@@ -244,11 +271,30 @@ function SkillsPage() {
       setTimeout(load, 20_000);
     });
 
-  const grouped = useMemo(
+  const libQ = lib.q.trim().toLowerCase();
+  const searched = useMemo(
     () =>
-      KINDS.map((k) => ({ kind: k, list: items.filter((i) => i.kind === k && matchesCompatFilter(i, compatFilter)) })).filter((g) => g.list.length > 0),
-    [items, compatFilter],
+      items.filter(
+        (i) =>
+          (!lib.repo || i.repo === lib.repo) &&
+          (!libQ || [i.name, `${i.kind}:${i.name}`, i.description, i.repo, i.path].some((t) => t.toLowerCase().includes(libQ))),
+      ),
+    [items, lib.repo, libQ],
   );
+  const grouped = useMemo(() => {
+    const keep: Record<LibraryFilter, (s: Skill) => boolean> = {
+      all: () => true,
+      on: (s) => s.enabled,
+      off: (s) => !s.enabled,
+      look: needsALook,
+    };
+    return KINDS.map((k) => ({
+      kind: k,
+      list: searched.filter((i) => i.kind === k && matchesCompatFilter(i, compatFilter) && keep[libFilter](i)),
+    })).filter((g) => g.list.length > 0);
+  }, [searched, compatFilter, libFilter]);
+  const libFiltered = !!libQ || libFilter !== "all" || !!lib.repo;
+  const clearLib = () => setLib({ q: "", status: "all", repo: "" });
   const on = items.filter((i) => i.enabled).length;
 
   return (
@@ -267,9 +313,9 @@ function SkillsPage() {
 
       {error && (
         <div className="mt-6">
-          <Callout variant="error" title="We couldn't load your skills">
-            <p>{error} Reload the page to try again.</p>
-          </Callout>
+          <ListError title="We couldn't load your skills" onRetry={load}>
+            {error}
+          </ListError>
         </div>
       )}
 
@@ -290,99 +336,136 @@ function SkillsPage() {
         <CompatOverview items={items} filter={compatFilter} onFilter={setCompatFilter} />
         {stats && items.length > 0 && <UsageStats stats={stats} />}
 
-        <section aria-labelledby="repos-heading" className="mt-8">
-          <h2 id="repos-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">Repositories</h2>
-          {repos === null ? (
-            <p role="status" className="text-sm text-zinc-500">Loading…</p>
-          ) : (
-            <div className="space-y-3">
-              {repos.length === 0 && (
-                <p className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm text-zinc-400">
-                  No repository connected. Coderhelm reads <code className="text-zinc-300">skills/&lt;name&gt;/SKILL.md</code>,{" "}
-                  <code className="text-zinc-300">agents/&lt;name&gt;.md</code> and <code className="text-zinc-300">commands/&lt;name&gt;.md</code>,
-                  also under <code className="text-zinc-300">.claude/</code>.
-                </p>
-              )}
-              {repos.map((r) => (
-                <div key={r.repo} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1 basis-64">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono font-semibold text-zinc-100 [overflow-wrap:anywhere]">{r.repo}</span>
-                        {!r.synced_at ? (
-                          <StatusPill tone="warning">Reading…</StatusPill>
-                        ) : r.error ? (
-                          <StatusPill tone="error">Last sync failed</StatusPill>
-                        ) : (
-                          <StatusPill tone="success">In step</StatusPill>
+        <div className="mt-8">
+          <ListSection id="repos" title="Repositories" count={repos?.length || undefined}>
+            {repos === null ? (
+              <ListSkeleton rows={2} label="Loading your repositories" />
+            ) : (
+              <div className="space-y-3">
+                {repos.length === 0 && (
+                  <ListEmpty title="No repository connected.">
+                    Coderhelm reads <code className="text-zinc-300">skills/&lt;name&gt;/SKILL.md</code>,{" "}
+                    <code className="text-zinc-300">agents/&lt;name&gt;.md</code> and <code className="text-zinc-300">commands/&lt;name&gt;.md</code>,
+                    also under <code className="text-zinc-300">.claude/</code>.
+                  </ListEmpty>
+                )}
+                {repos.length > 0 && (
+                  <List label="Connected repositories">
+                    {repos.map((r) => (
+                      <ListRow
+                        key={r.repo}
+                        testId="skills-repo"
+                        status={{ tone: repoTone(r) }}
+                        title={r.repo}
+                        meta={[
+                          `${r.items} item${r.items === 1 ? "" : "s"}`,
+                          r.sha ? <>commit <span className="font-mono">{r.sha.slice(0, 7)}</span></> : null,
+                          r.synced_at ? <>checked <Time iso={r.synced_at} /></> : null,
+                          r.added_by ? `added by ${r.added_by}` : null,
+                        ]}
+                        chips={
+                          !r.synced_at ? (
+                            <StatusPill tone="warning">Reading…</StatusPill>
+                          ) : r.error ? (
+                            <StatusPill tone="error">Last sync failed</StatusPill>
+                          ) : (
+                            <StatusPill tone="success">In step</StatusPill>
+                          )
+                        }
+                        actions={
+                          canManage ? (
+                            <>
+                              <button type="button" className={secondaryButton} disabled={busy === `sync:${r.repo}`} onClick={() => sync(r.repo)}>
+                                {busy === `sync:${r.repo}` ? "Starting…" : "Sync now"}
+                              </button>
+                              {r.items > 0 && (
+                                <button
+                                  type="button"
+                                  className={secondaryButton}
+                                  disabled={busy === `recheck:${r.repo}`}
+                                  onClick={() => recheck(r.repo)}
+                                  title="Check every item again against what your team has connected"
+                                >
+                                  {busy === `recheck:${r.repo}` ? "Starting…" : "Re-check all"}
+                                </button>
+                              )}
+                              <button type="button" className={secondaryButton} disabled={busy === `disconnect:${r.repo}`} onClick={() => disconnect(r.repo)}>
+                                Disconnect
+                              </button>
+                            </>
+                          ) : undefined
+                        }
+                      >
+                        {r.error && <p className="mt-2 text-sm text-red-300">{r.error}</p>}
+                        {r.skipped.length > 0 && (
+                          <details className="mt-2 text-xs text-zinc-500">
+                            <summary className={`cursor-pointer rounded ${focusRing}`}>{r.skipped.length} file{r.skipped.length === 1 ? "" : "s"} left out</summary>
+                            <ul className="mt-1 list-disc pl-5 space-y-0.5">
+                              {r.skipped.map((s) => (
+                                <li key={s} className="[overflow-wrap:anywhere]">{s}</li>
+                              ))}
+                            </ul>
+                          </details>
                         )}
-                      </div>
-                      <p className="mt-1 text-xs text-zinc-500">
-                        {r.items} item{r.items === 1 ? "" : "s"}
-                        {r.sha && <> · commit <span className="font-mono">{r.sha.slice(0, 7)}</span></>}
-                        {r.synced_at && <> · checked {ago(r.synced_at)}</>}
-                        {r.added_by && <> · added by {r.added_by}</>}
-                      </p>
-                      {r.error && <p className="mt-2 text-sm text-red-300">{r.error}</p>}
-                      {r.skipped.length > 0 && (
-                        <details className="mt-2 text-xs text-zinc-500">
-                          <summary className={`cursor-pointer rounded ${focusRing}`}>{r.skipped.length} file{r.skipped.length === 1 ? "" : "s"} left out</summary>
-                          <ul className="mt-1 list-disc pl-5 space-y-0.5">
-                            {r.skipped.map((s) => (
-                              <li key={s} className="[overflow-wrap:anywhere]">{s}</li>
-                            ))}
-                          </ul>
-                        </details>
-                      )}
-                    </div>
-                    {canManage && (
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" className={secondaryButton} disabled={busy === `sync:${r.repo}`} onClick={() => sync(r.repo)}>
-                          {busy === `sync:${r.repo}` ? "Starting…" : "Sync now"}
-                        </button>
-                        {r.items > 0 && (
-                          <button
-                            type="button"
-                            className={secondaryButton}
-                            disabled={busy === `recheck:${r.repo}`}
-                            onClick={() => recheck(r.repo)}
-                            title="Check every item again against what your team has connected"
-                          >
-                            {busy === `recheck:${r.repo}` ? "Starting…" : "Re-check all"}
-                          </button>
-                        )}
-                        <button type="button" className={secondaryButton} disabled={busy === `disconnect:${r.repo}`} onClick={() => disconnect(r.repo)}>
-                          Disconnect
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {canManage && (
-                <form onSubmit={connect} className="flex flex-wrap items-end gap-3 rounded-lg border border-zinc-800 bg-zinc-900/30 p-5">
-                  <label className="min-w-0 flex-1 basis-64 text-sm text-zinc-300">
-                    Connect a repository
-                    <input
-                      className={`${inputClass} mt-1.5 font-mono`}
-                      placeholder="owner/name"
-                      value={newRepo}
-                      onChange={(e) => setNewRepo(e.target.value)}
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                    <span className="mt-1.5 block text-xs text-zinc-500">
-                      Coderhelm&apos;s GitHub App must be installed on it. Every item starts switched on; switch off any you don&apos;t want used.
-                    </span>
-                  </label>
-                  <button type="submit" className={primaryButton} disabled={busy === "connect" || !newRepo.trim()}>
-                    {busy === "connect" ? "Connecting…" : "Connect"}
-                  </button>
-                </form>
-              )}
-            </div>
-          )}
-        </section>
+                      </ListRow>
+                    ))}
+                  </List>
+                )}
+                {canManage && (
+                  <form onSubmit={connect} className="flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-zinc-800 px-4 py-4">
+                    <label className="min-w-0 flex-1 basis-64 text-sm text-zinc-300">
+                      Connect a repository
+                      <input
+                        className={`${inputClass} mt-1.5 font-mono`}
+                        placeholder="owner/name"
+                        value={newRepo}
+                        onChange={(e) => setNewRepo(e.target.value)}
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                      <span className="mt-1.5 block text-xs text-zinc-500">
+                        Coderhelm&apos;s GitHub App must be installed on it. Every item starts switched on; switch off any you don&apos;t want used.
+                      </span>
+                    </label>
+                    <button type="submit" className={primaryButton} disabled={busy === "connect" || !newRepo.trim()}>
+                      {busy === "connect" ? "Connecting…" : "Connect"}
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
+          </ListSection>
+        </div>
+
+        {items.length >= 2 && (
+          <ListToolbar
+            className="mt-8"
+            search={{
+              value: lib.q,
+              onChange: (v) => setLib({ q: v }, { replace: true }),
+              placeholder: "Find by name, description, repo or path",
+              label: "Find a skill, agent or command",
+            }}
+            status={{
+              label: "Show items",
+              value: libFilter,
+              onChange: (v) => setLib({ status: v }),
+              options: [
+                { value: "all", label: "All", count: searched.length },
+                { value: "on", label: "On", count: searched.filter((i) => i.enabled).length, tone: "success" },
+                { value: "off", label: "Off", count: searched.filter((i) => !i.enabled).length, tone: "muted" },
+                { value: "look", label: "Needs a look", count: searched.filter(needsALook).length, tone: "waiting" },
+              ],
+            }}
+            repo={{ value: lib.repo, onChange: (v) => setLib({ repo: v }), repos: (repos ?? []).map((r) => r.repo) }}
+            onClear={libFiltered ? clearLib : undefined}
+          />
+        )}
+        {libFiltered && items.length > 0 && grouped.length === 0 && (
+          <div className="mt-6">
+            <ListEmpty title="Nothing matches these filters." onClear={clearLib} />
+          </div>
+        )}
 
         {compatFilter && (
           <p className="mt-6 text-sm text-zinc-400" role="status">
@@ -393,75 +476,71 @@ function SkillsPage() {
           </p>
         )}
         {grouped.map((g) => (
-          <section key={g.kind} aria-labelledby={`${g.kind}-heading`} className="mt-8">
-            <h2 id={`${g.kind}-heading`} className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
-              {KIND_LABEL[g.kind]} <span className="ml-1 text-zinc-600">({g.list.length})</span>
-            </h2>
-            <ul className="space-y-3">
-              {g.list.map((s) => {
-                const key = `${s.repo}#${s.path}`;
-                return (
-                  <li key={key} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1 basis-64">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Link
-                            href={pageHref(s)}
-                            className={`font-mono font-semibold text-zinc-100 hover:underline rounded [overflow-wrap:anywhere] ${focusRing}`}
-                          >
-                            {handle(s, items)}
-                          </Link>
+          <div key={g.kind} className="mt-8">
+            <ListSection id={`${g.kind}-list`} title={KIND_LABEL[g.kind]} count={g.list.length}>
+              <List label={KIND_LABEL[g.kind]}>
+                {g.list.map((s) => {
+                  const key = `${s.repo}#${s.path}`;
+                  return (
+                    <ListRow
+                      key={key}
+                      testId="skill-item"
+                      status={{ tone: !s.enabled ? "muted" : needsALook(s) ? "waiting" : "success" }}
+                      title={<span className="font-mono">{handle(s, items)}</span>}
+                      href={pageHref(s)}
+                      meta={[
+                        <span key="where" className="[overflow-wrap:anywhere]">{s.repo} · {s.path}</span>,
+                        s.files.length > 0 ? `${s.files.length} file${s.files.length === 1 ? "" : "s"} with it` : null,
+                        s.kind === "agent"
+                          ? s.asks > 0
+                            ? `asked ${s.asks} time${s.asks === 1 ? "" : "s"}, last ${ago(s.last_asked_at)}`
+                            : "not asked yet"
+                          : s.uses > 0
+                            ? `read ${s.uses} time${s.uses === 1 ? "" : "s"}, last by the ${s.last_used_by} ${ago(s.last_used_at)}`
+                            : "not read yet",
+                      ]}
+                      chips={
+                        <>
                           <CompatBadge item={s} />
                           <AlwaysApplyBadge item={s} />
-                          {s.kind === "agent" && (
-                            <>
-                              <StatusPill tone="success">Agent · can be asked</StatusPill>
-                              <Link href={agentHref(s)} className={`${linkButton} text-xs`}>
-                                {canManage ? "Open, see asks, try it" : "Open, see asks"}
-                              </Link>
-                            </>
-                          )}
-                        </div>
-                        {s.description && <p className="mt-1 text-sm text-zinc-400">{s.description}</p>}
-                        <SuggestionHint item={s} />
-                        {s.kind === "agent" && thinDescription(s.description) && (
-                          <p className="mt-1 text-xs text-amber-300">
-                            {s.description ? "Short description" : "No description"}: Coderhelm&apos;s agents decide when to ask it from this line.
-                          </p>
-                        )}
-                        {s.compat?.summary && s.compat.current && (
-                          <p className="mt-1 text-xs text-zinc-400">
-                            <Link href={pageHref(s)} className={`hover:text-zinc-200 hover:underline rounded ${focusRing}`}>
-                              {s.compat.summary}
-                            </Link>
-                            {s.use_translated && <span className="text-sky-300"> · agents read the translated version</span>}
-                          </p>
-                        )}
-                        {!s.compat && (s.missing_tools?.length ?? 0) > 0 && <MissingTools item={s} />}
-                        <p className="mt-1 text-xs text-zinc-500 [overflow-wrap:anywhere]">
-                          {s.repo} · {s.path}
-                          {s.files.length > 0 && <> · {s.files.length} file{s.files.length === 1 ? "" : "s"} with it</>}
-                          {" · "}
-                          {s.kind === "agent"
-                            ? s.asks > 0
-                              ? `asked ${s.asks} time${s.asks === 1 ? "" : "s"}, last ${ago(s.last_asked_at)}`
-                              : "not asked yet"
-                            : s.uses > 0
-                              ? `read ${s.uses} time${s.uses === 1 ? "" : "s"}, last by the ${s.last_used_by} ${ago(s.last_used_at)}`
-                              : "not read yet"}
-                        </p>
-                      </div>
-                      {canManage ? (
-                        <ToolSwitch on={s.enabled} label={`Let Coderhelm read ${s.name}`} busy={busy === key} onToggle={() => toggle(s)} />
-                      ) : (
-                        <StatusPill tone={s.enabled ? "success" : "neutral"}>{s.enabled ? "On" : "Off"}</StatusPill>
+                          {s.kind === "agent" && <StatusPill tone="success">Agent · can be asked</StatusPill>}
+                        </>
+                      }
+                      actions={
+                        canManage ? (
+                          <ToolSwitch on={s.enabled} label={`Let Coderhelm read ${s.name}`} busy={busy === key} onToggle={() => toggle(s)} />
+                        ) : (
+                          <StatusPill tone={s.enabled ? "success" : "neutral"}>{s.enabled ? "On" : "Off"}</StatusPill>
+                        )
+                      }
+                    >
+                      {s.description && <p className="mt-1 text-sm text-zinc-400">{s.description}</p>}
+                      {s.kind === "agent" && (
+                        <Link href={agentHref(s)} className={`${linkButton} mt-1 text-xs`}>
+                          {canManage ? "Open, see asks, try it" : "Open, see asks"}
+                        </Link>
                       )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
+                      <SuggestionHint item={s} />
+                      {s.kind === "agent" && thinDescription(s.description) && (
+                        <p className="mt-1 text-xs text-amber-300">
+                          {s.description ? "Short description" : "No description"}: Coderhelm&apos;s agents decide when to ask it from this line.
+                        </p>
+                      )}
+                      {s.compat?.summary && s.compat.current && (
+                        <p className="mt-1 text-xs text-zinc-400">
+                          <Link href={pageHref(s)} className={`hover:text-zinc-200 hover:underline rounded ${focusRing}`}>
+                            {s.compat.summary}
+                          </Link>
+                          {s.use_translated && <span className="text-sky-300"> · agents read the translated version</span>}
+                        </p>
+                      )}
+                      {!s.compat && (s.missing_tools?.length ?? 0) > 0 && <MissingTools item={s} />}
+                    </ListRow>
+                  );
+                })}
+              </List>
+            </ListSection>
+          </div>
         ))}
 
         {items.length > 0 && (

@@ -8,6 +8,7 @@ import { pushToDataLayer } from "@/lib/gtm";
 import { formatTokens, USAGE_CHANGED, usageBreakdown, usageTotal } from "@/lib/usage";
 import { ToastProvider } from "./toast";
 import { ConfirmProvider } from "./confirm-dialog";
+import { CommandPaletteButton, CommandPaletteProvider, type PalettePage } from "./command-palette";
 import { focusRing } from "./ui";
 import {
   PlayIcon, CircleDotIcon, TrendingUpIcon, HexagonIcon, HeartIcon,
@@ -103,6 +104,24 @@ const navGroups: NavGroup[] = [
     ],
   },
 ];
+
+/** The menu items this person can open, by role. */
+function visibleItems(group: NavGroup, user: User | null): NavItem[] {
+  const isAdminOrOwner = isAdmin(user);
+  const isMemberOrAbove = isAdminOrOwner || user?.role === "billing" || user?.role === "member";
+  const isSuperAdmin = user?.email === "admin@coderhelm.com";
+  return group.items.filter((item) => {
+    if (item.superAdminOnly) return isSuperAdmin;
+    if (item.memberOnly) return isMemberOrAbove;
+    if (!item.adminOnly) return true;
+    return isAdminOrOwner;
+  });
+}
+
+/** Every menu page, for the ⌘K palette. */
+function palettePages(user: User | null): PalettePage[] {
+  return navGroups.flatMap((g) => visibleItems(g, user).map((i) => ({ href: i.href, label: i.label, section: g.label })));
+}
 
 // Pages that are not in the menu, by path. Menu pages use their menu label.
 const EXTRA_TITLES: Record<string, string> = {
@@ -341,6 +360,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
     <ConfirmProvider>
+    <CommandPaletteProvider pages={palettePages(user)} user={user}>
       {tabTitle}
       <div className="flex min-h-screen bg-zinc-950">
         {menuOpen && (
@@ -375,6 +395,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               </svg>
               <span className="text-sm font-semibold text-zinc-100">Coderhelm</span>
             </Link>
+            <div className="flex items-center gap-2">
+            <CommandPaletteButton compact />
             <button
               ref={menuButtonRef}
               type="button"
@@ -388,6 +410,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               </svg>
               Menu
             </button>
+            </div>
           </header>
           {banners.filter((b) => !dismissedBanners.has(b.id)).map((banner) => (
             <div
@@ -457,6 +480,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           <main className="flex-1 p-4 md:p-8">{children}</main>
         </div>
       </div>
+    </CommandPaletteProvider>
     </ConfirmProvider>
     </ToastProvider>
   );
@@ -600,20 +624,12 @@ function Sidebar({
 
       <TeamSwitcher teams={teams} currentTeam={currentTeam ?? null} switching={switching} onSwitch={handleSwitch} />
 
+      <CommandPaletteButton />
+
       <div className="flex-1 space-y-4 overflow-y-auto min-h-0">
         {navGroups.map((group, index) => {
-          const isAdminOrOwner = isAdmin(user);
-          const isBilling = user?.role === "billing";
-          const isMemberOrAbove = isAdminOrOwner || isBilling || user?.role === "member";
-          const isSuperAdmin = user?.email === "admin@coderhelm.com";
-          const visibleItems = group.items.filter((item) => {
-            if (item.superAdminOnly) return isSuperAdmin;
-            if (item.memberOnly) return isMemberOrAbove;
-            if (!item.adminOnly) return true;
-            if (isAdminOrOwner) return true;
-            return false;
-          });
-          if (visibleItems.length === 0) return null;
+          const items = visibleItems(group, user);
+          if (items.length === 0) return null;
 
           return (
           <div key={index}>
@@ -624,7 +640,7 @@ function Sidebar({
             )}
 
             <div className="space-y-1">
-              {visibleItems.map((item) => {
+              {items.map((item) => {
                 return (
                   <Link
                     key={item.href}

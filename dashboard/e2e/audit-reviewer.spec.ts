@@ -263,7 +263,9 @@ test("the reviewer list shows one row per PR: title first, verdict as a badge, w
   await expect(row.getByRole("link", { name: "New commits" })).toBeVisible();
   await expect(row.getByText("High risk")).toBeVisible();
   await expect(row.getByText("Waiting for a person's approval")).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "Pull request number" })).toBeVisible();
+  // "Review a PR" is a small dialog behind a button, not a card on the page.
+  await expect(page.getByRole("textbox", { name: "Pull request number" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Review a PR…" })).toBeVisible();
   await shot(page, "audit-reviewer-list");
   expect(errors).toEqual([]);
 });
@@ -272,7 +274,7 @@ test("PRs being reviewed now sit at the top with their live status", async ({ pa
   const errors = watchConsole(page);
   await mockApi(page);
   await page.goto("/reviewer");
-  const inReview = page.getByRole("region", { name: /In review now/ });
+  const inReview = page.getByRole("region", { name: /^Active/ });
   const waiting = page.getByRole("region", { name: /Waiting/ });
   const done = page.getByRole("region", { name: /Done/ });
   // A first review still running has no review page yet: it links to the PR.
@@ -297,13 +299,15 @@ test("PRs being reviewed now sit at the top with their live status", async ({ pa
   await expect(page.getByTestId("reviewer-pr").first()).toHaveAttribute("data-status", /reviewing|queued/);
   await shot(page, "audit-reviewer-live");
   // The tabs filter to one group.
-  await page.getByRole("button", { name: "In review 2" }).click();
+  const tabs = page.getByRole("group", { name: "Show pull requests" });
+  await tabs.getByRole("button", { name: "Active 2" }).click();
+  await expect(page).toHaveURL(/status=active/);
   await expect(page.getByTestId("reviewer-pr")).toHaveCount(2);
   await expect(page.getByRole("link", { name: "Faster checkout with a clearer receipt page" })).toHaveCount(0);
   await shot(page, "audit-reviewer-tab-in-review");
-  await page.getByRole("button", { name: "Waiting 2" }).click();
+  await tabs.getByRole("button", { name: "Waiting 2" }).click();
   await expect(page.getByTestId("reviewer-pr")).toHaveCount(2);
-  await page.getByRole("button", { name: "Done" }).click();
+  await tabs.getByRole("button", { name: /^Done/ }).click();
   await expect(page.getByTestId("reviewer-pr")).toHaveCount(1);
   expect(errors).toEqual([]);
 });
@@ -340,7 +344,7 @@ test("queueing a review from a row refreshes the status at once", async ({ page 
   db.live = db.live.map((p) => (p.pr_number === 55 ? { ...p, status: "queued", group: "active", review: { phase: "queued", trigger: "rerequest" } } : p));
   await merged.getByRole("button", { name: "Review your-team/backend #55 again" }).click();
   await expect(merged).toHaveAttribute("data-status", "queued");
-  await expect(page.getByRole("region", { name: /In review now/ }).getByText("Explain the cache expiry")).toBeVisible();
+  await expect(page.getByRole("region", { name: /^Active/ }).getByText("Explain the cache expiry")).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -350,7 +354,7 @@ test("a backend without live status still lists the reviews and does not poll", 
   await page.goto("/reviewer");
   await expect(page.getByRole("link", { name: "Pull request #101" })).toBeVisible();
   await expect(page.getByText("Approved").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: /In review/ })).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Show pull requests" })).toHaveCount(0);
   await expect(page.getByTestId("reviewer-pr")).toHaveCount(2);
   await shot(page, "audit-reviewer-no-live");
   const liveCalls = () => db.calls.filter((c) => c.startsWith("GET /api/reviewer/live")).length;
@@ -547,14 +551,15 @@ test("releases list each tag and open its notes and actions", async ({ page }) =
   await page.goto("/releases");
   await expect(page.getByRole("heading", { level: 1, name: "Releases" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Reviewer settings" })).toHaveAttribute("href", /\/reviewer\/config/);
-  const row = page.getByRole("button", { name: /your-team\/web v2\.3\.0/ });
-  await expect(row).toHaveAttribute("aria-expanded", "false");
+  const row = page.getByTestId("release-row").filter({ hasText: "v2.3.0" });
+  const toggle = row.getByRole("button", { name: /notes and destinations of your-team\/web v2\.3\.0/ });
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
   // Counts read as words: "1 PR", "4 PRs"; the summary is not cut to one line.
   await expect(row).toContainText("4 PRs");
-  await expect(page.getByRole("button", { name: /your-team\/backend v1\.4\.2/ })).toContainText("1 PR");
+  await expect(page.getByTestId("release-row").filter({ hasText: "v1.4.2" })).toContainText("1 PR");
   await expect(page.getByText("1 PRs")).toHaveCount(0);
-  await row.click();
-  await expect(row).toHaveAttribute("aria-expanded", "true");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByRole("link", { name: /GitHub release/ })).toHaveAttribute("href", "https://github.com/your-team/web/releases/tag/v2.3.0");
   await expect(page.getByRole("link", { name: /Changes since v2\.2\.9/ })).toHaveAttribute("href", "https://github.com/your-team/web/compare/v2.2.9...v2.3.0");
   await expect(page.getByRole("link", { name: /^#104/ })).toHaveAttribute("href", "https://github.com/your-team/web/pull/104");
@@ -583,12 +588,14 @@ test("releases are grouped by repo, without the repo name on every row or monosp
     return copy.textContent || "";
   });
   expect(shown).not.toContain("your-team/web");
-  // Only tags and versions are monospace.
-  const filter = page.getByTestId("releases-filter");
-  const font = await filter.getByRole("button", { name: "All repos" }).evaluate((el) => getComputedStyle(el).fontFamily);
+  // Only tags and versions are monospace: the shared toolbar's repo filter is in the app font.
+  const filter = page.getByTestId("list-toolbar").getByRole("button", { name: /Repository: All repos/ });
+  const font = await filter.evaluate((el) => getComputedStyle(el).fontFamily);
   expect(font).not.toMatch(/mono/i);
   // One filter: picking a repo shows only its releases, without group headings.
-  await filter.getByRole("button", { name: "backend" }).click();
+  await filter.click();
+  await page.getByRole("option", { name: "your-team/backend" }).click();
+  await expect(page).toHaveURL(/repo=your-team%2Fbackend/);
   await expect(page.getByTestId("release-row")).toHaveCount(1);
   await expect(page.getByRole("heading", { level: 2, name: /^web/ })).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -661,7 +668,8 @@ test("writing notes for a tag opens a small form and catches a tag the backend r
   await expect(page.getByRole("textbox", { name: "Release tag" })).toHaveCount(0);
   await page.getByRole("button", { name: "Write notes for a tag" }).click();
   const form = page.locator("#write-notes");
-  await form.getByRole("button", { name: /Select repo/ }).click();
+  await expect(page.getByRole("dialog", { name: "Write notes for a tag" })).toBeVisible();
+  await form.getByRole("button", { name: /Pick a repo/ }).click();
   await form.getByRole("button", { name: "your-team/web", exact: true }).click();
   const tag = form.getByRole("textbox", { name: "Release tag" });
   await tag.fill("v2.3.0!");
@@ -673,5 +681,25 @@ test("writing notes for a tag opens a small form and catches a tag the backend r
   await expect(page.getByText("Release notes queued for your-team/web v2.3.1")).toBeVisible();
   expect(db.bodies).toContainEqual({ repo: "your-team/web", tag: "v2.3.1", resend: "" });
   await expect(page.locator("#write-notes")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("releases use the shared toolbar: search, state toggles with counts, and ?write=1 from the palette", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page);
+  await page.goto("/releases");
+  const toolbar = page.getByTestId("list-toolbar");
+  const states = toolbar.getByRole("group", { name: "Show releases" });
+  await expect(states.getByRole("button", { name: "Failed 1" })).toBeVisible();
+  await states.getByRole("button", { name: "Failed 1" }).click();
+  await expect(page).toHaveURL(/status=failed/);
+  await expect(page.getByTestId("release-row")).toHaveCount(1);
+  await expect(page.getByTestId("release-row")).toContainText("v1.4.2");
+  await states.getByRole("button", { name: /^All/ }).click();
+  await toolbar.getByRole("searchbox", { name: "Search releases" }).fill("v2.3");
+  await expect(page).toHaveURL(/q=v2\.3/);
+  await expect(page.getByTestId("release-row")).toHaveCount(1);
+  await page.goto("/releases?write=1");
+  await expect(page.getByRole("dialog", { name: "Write notes for a tag" })).toBeVisible();
   expect(errors).toEqual([]);
 });

@@ -1,18 +1,49 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError, api, type AdminTeam } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
-import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { focusRing, inputClass, primaryButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
+import { List, ListEmpty, ListError, ListRow, ListSkeleton, ListToolbar, useListParams } from "@/components/list";
 
 const fmtInt = (n: number) => n.toLocaleString();
 const fmtUsd = (n: number) => `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export default function AdminPage() {
+const SORTS = [
+  { value: "busy", label: "Busiest this month" },
+  { value: "total", label: "Most runs all time" },
+  { value: "new", label: "Newest" },
+  { value: "name", label: "Name" },
+];
+
+function sortTeams(teams: AdminTeam[], sort: string): AdminTeam[] {
+  const out = [...teams];
+  if (sort === "total") out.sort((a, b) => b.runs_total - a.runs_total);
+  else if (sort === "new") out.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+  else if (sort === "name") out.sort((a, b) => (a.name || a.team_id).localeCompare(b.name || b.team_id));
+  else out.sort((a, b) => b.runs_month - a.runs_month || b.cost_month_usd - a.cost_month_usd);
+  return out;
+}
+
+function words(q: string): string[] {
+  return q.toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+/** The allowlist gets its own search once it is this long. */
+const ALLOWLIST_SEARCH_AT = 6;
+
+export default function AdminPageWithParams() {
+  return (
+    <Suspense fallback={<Page><ListSkeleton rows={3} /></Page>}>
+      <AdminPage />
+    </Suspense>
+  );
+}
+
+function AdminPage() {
   const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [allowlist, setAllowlist] = useState<string[]>([]);
@@ -26,6 +57,24 @@ export default function AdminPage() {
   const [loadError, setLoadError] = useState("");
   const { toast } = useToast();
   const { confirm } = useConfirm();
+  // Team search, status and sort, and the allowlist search, live in the address.
+  const [params, setParams] = useListParams({ q: "", status: "all", sort: "busy", aq: "" });
+  const teamStatus = params.status === "active" || params.status === "other" ? params.status : "all";
+  const searched = useMemo(() => {
+    const w = words(params.q);
+    return teams.filter((t) => {
+      const hay = `${t.name} ${t.team_id}`.toLowerCase();
+      return w.every((x) => hay.includes(x));
+    });
+  }, [teams, params.q]);
+  const activeCount = searched.filter((t) => t.status === "active").length;
+  const shownTeams = sortTeams(
+    searched.filter((t) => teamStatus === "all" || (teamStatus === "active") === (t.status === "active")),
+    params.sort,
+  );
+  const teamsFiltered = !!(params.q || teamStatus !== "all");
+  const aWords = words(params.aq);
+  const shownEmails = allowlist.filter((e) => aWords.every((x) => e.toLowerCase().includes(x)));
 
   const loadList = useCallback(() => {
     setListLoading(true);
@@ -58,10 +107,8 @@ export default function AdminPage() {
   if (loading) {
     return (
       <Page className="space-y-3">
-        <div className="space-y-3" aria-busy="true">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-40 w-full" />
-        </div>
+        <Skeleton className="h-8 w-48" />
+        <ListSkeleton rows={4} label="Loading the admin page" />
       </Page>
     );
   }
@@ -69,9 +116,9 @@ export default function AdminPage() {
   if (!authorized && loadError) {
     return (
       <Page>
-        <Callout variant="error" title="Couldn't load the admin page">
-          <p>{loadError}</p>
-        </Callout>
+        <ListError title="Couldn't load the admin page" onRetry={() => window.location.reload()}>
+          {loadError}
+        </ListError>
       </Page>
     );
   }
@@ -131,7 +178,34 @@ export default function AdminPage() {
       <PageHeader title="Platform admin" lead="Internal tools for managing the Coderhelm platform." />
       <section aria-labelledby="teams-heading" className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
         <h2 id="teams-heading" className="text-base font-semibold text-zinc-100 mb-1">Teams ({teams.length})</h2>
-        <p className="text-sm text-zinc-500 mb-4">Runs all time and in {month || "this month"}, with this month&apos;s model cost. Busiest this month first.</p>
+        <p className="text-sm text-zinc-500 mb-4">Runs all time and in {month || "this month"}, with this month&apos;s model cost.</p>
+        <ListToolbar
+          className="mb-4"
+          search={{
+            value: params.q,
+            onChange: (v) => setParams({ q: v }, { replace: true }),
+            placeholder: "Search by team name or id",
+            label: "Search teams",
+          }}
+          status={{
+            label: "Show teams",
+            value: teamStatus,
+            onChange: (v) => setParams({ status: v }),
+            options: [
+              { value: "all", label: "All", count: searched.length },
+              { value: "active", label: "Active", count: activeCount, tone: "success" },
+              { value: "other", label: "Other", count: searched.length - activeCount, tone: "muted" },
+            ],
+          }}
+          sort={{ value: params.sort, onChange: (v) => setParams({ sort: v }), options: SORTS }}
+          onClear={teamsFiltered ? () => setParams({ q: "", status: "all" }) : undefined}
+        />
+        {shownTeams.length === 0 ? (
+          <ListEmpty
+            title={teams.length === 0 ? "No teams yet" : "No teams match"}
+            onClear={teamsFiltered ? () => setParams({ q: "", status: "all" }) : undefined}
+          />
+        ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-sm" data-testid="admin-teams">
             <thead>
@@ -146,7 +220,7 @@ export default function AdminPage() {
               </tr>
             </thead>
             <tbody>
-              {teams.map((t) => (
+              {shownTeams.map((t) => (
                 <tr key={t.team_id} className="border-b border-zinc-800/60 last:border-0">
                   <td className="py-2 pr-3">
                     <span className="block text-zinc-100">{t.name || "(no name)"}</span>
@@ -164,6 +238,7 @@ export default function AdminPage() {
             </tbody>
           </table>
         </div>
+        )}
       </section>
       <section aria-labelledby="allowlist-heading" className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
         <h2 id="allowlist-heading" className="text-base font-semibold text-zinc-100 mb-1">Signup allowlist</h2>
@@ -193,37 +268,47 @@ export default function AdminPage() {
           </button>
         </form>
 
+        {allowlist.length >= ALLOWLIST_SEARCH_AT && !listError && (
+          <ListToolbar
+            className="mb-3"
+            search={{
+              value: params.aq,
+              onChange: (v) => setParams({ aq: v }, { replace: true }),
+              placeholder: "Find an allowed email or domain",
+              label: "Search allowed emails",
+            }}
+          />
+        )}
         {listError ? (
-          <Callout variant="error" title="Couldn't load the allowlist">
-            <p>{listError}</p>
-            <button type="button" onClick={loadList} className={`mt-2 text-sm font-medium underline rounded ${focusRing}`}>
-              Try again
-            </button>
-          </Callout>
+          <ListError title="Couldn't load the allowlist" onRetry={loadList}>
+            {listError}
+          </ListError>
         ) : listLoading ? (
-          <div className="space-y-1.5" aria-busy="true">
-            <Skeleton className="h-9 w-full" />
-            <Skeleton className="h-9 w-full" />
-          </div>
-        ) : allowlist.length > 0 ? (
-          <ul className="space-y-1.5" aria-label="Allowed emails">
-            {allowlist.map((email) => (
-              <li key={email} className="flex items-center justify-between gap-3 px-3 py-2 bg-zinc-900 rounded-lg border border-zinc-800">
-                <span className="min-w-0 break-all text-sm text-zinc-300 font-mono">{email}</span>
-                <button
-                  type="button"
-                  onClick={() => void handleRemove(email)}
-                  disabled={removing === email}
-                  aria-label={`Remove ${email}`}
-                  className={`shrink-0 rounded text-xs text-zinc-400 hover:text-red-400 transition-colors disabled:opacity-50 ${focusRing}`}
-                >
-                  {removing === email ? "Removing..." : "Remove"}
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : (
+          <ListSkeleton rows={2} label="Loading the allowlist" />
+        ) : allowlist.length === 0 ? (
           <p className="text-sm text-zinc-500">No allowed emails yet, so nobody can sign up.</p>
+        ) : shownEmails.length === 0 ? (
+          <ListEmpty title="No allowed email matches" onClear={() => setParams({ aq: "" })} />
+        ) : (
+          <List label="Allowed emails">
+            {shownEmails.map((email) => (
+              <ListRow
+                key={email}
+                title={email}
+                actions={
+                  <button
+                    type="button"
+                    onClick={() => void handleRemove(email)}
+                    disabled={removing === email}
+                    aria-label={`Remove ${email}`}
+                    className={`shrink-0 rounded text-xs text-zinc-400 hover:text-red-400 transition-colors disabled:opacity-50 ${focusRing}`}
+                  >
+                    {removing === email ? "Removing..." : "Remove"}
+                  </button>
+                }
+              />
+            ))}
+          </List>
         )}
       </section>
     </Page>

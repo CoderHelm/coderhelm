@@ -1,61 +1,63 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useMemo } from "react";
 import Link from "next/link";
 import { api, type AlertEvent } from "@/lib/api";
-import { TableSkeleton } from "@/components/skeleton";
 import { RoleGuard } from "@/components/role-guard";
-import { useToast } from "@/components/toast";
-import { Callout } from "@/components/callout";
-import { linkButton, secondaryButton } from "@/components/ui";
+import { linkButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
-import { OutcomeBadge, formatWhen } from "./outcome";
+import {
+  GROUP_LABEL,
+  List,
+  ListEmpty,
+  ListError,
+  ListRow,
+  ListSkeleton,
+  ListToolbar,
+  LoadMore,
+  StatusText,
+  useListParams,
+  usePagedList,
+  useTeamRepos,
+} from "@/components/list";
+import { OUTCOMES, OUTCOME_GROUPS, outcomeLook } from "./outcome";
 
 export default function AlertsHistoryGuarded() {
   return (
     <RoleGuard minRole="member">
-      <AlertsHistory />
+      <Suspense fallback={<Page><PageHeader title="Alerts" /><div className="mt-6"><ListSkeleton /></div></Page>}>
+        <AlertsHistory />
+      </Suspense>
     </RoleGuard>
   );
 }
 
-function AlertsHistory() {
-  const { toast } = useToast();
-  const [alerts, setAlerts] = useState<AlertEvent[]>([]);
-  const [next, setNext] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState("");
+function alertMatches(a: AlertEvent, q: string): boolean {
+  if (!q) return true;
+  const hay = [a.title, a.ticket_id, a.repo, outcomeLook(a.outcome).label].filter(Boolean).join(" ").toLowerCase();
+  return q
+    .toLowerCase()
+    .split(/\s+/)
+    .every((w) => hay.includes(w));
+}
 
-  const load = useCallback(
-    (after?: string) => {
-      const first = !after;
-      if (first) {
-        setLoading(true);
-        setError("");
-      } else setLoadingMore(true);
-      api
-        .listAlerts(after)
-        .then((r) => {
-          setAlerts((prev) => (first ? r.alerts : [...prev, ...r.alerts]));
-          setNext(r.next ?? null);
-        })
-        .catch((e) => {
-          // A failed first page must not read as "no alerts yet".
-          if (first) setError(e instanceof Error && e.message ? e.message : "The request failed.");
-          else toast("Couldn't load more alerts. Try again.", "error");
-        })
-        .finally(() => {
-          setLoading(false);
-          setLoadingMore(false);
-        });
-    },
-    [toast],
+function AlertsHistory() {
+  const [params, setParams] = useListParams({ q: "", outcome: "all", repo: "" });
+  const q = params.q.trim();
+  const repo = params.repo;
+  const group = OUTCOME_GROUPS.some((g) => g.value === params.outcome) ? params.outcome : "all";
+  const teamRepos = useTeamRepos();
+
+  const { items: alerts, next, loading, loadingMore, error, moreFailed, loadMore, reload } = usePagedList<AlertEvent>(
+    (after) => api.listAlerts(after).then((r) => ({ items: r.alerts, next: r.next })),
+    [],
   );
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  // Search and repo first, so each toggle's count says what it would show.
+  const matched = useMemo(() => alerts.filter((a) => alertMatches(a, q) && (!repo || a.repo === repo)), [alerts, q, repo]);
+  const shown = group === "all" ? matched : matched.filter((a) => OUTCOMES[a.outcome]?.group === group);
+  const filtered = !!(q || repo || group !== "all");
+  const clear = () => setParams({ q: "", outcome: "all", repo: "" });
 
   return (
     <Page>
@@ -71,60 +73,67 @@ function AlertsHistory() {
         }
       />
 
-      <div className="mt-6">
-      {loading ? (
-        <TableSkeleton rows={5} cols={4} />
-      ) : error ? (
-        <Callout variant="error" title="We couldn't load your alerts">
-          <p>{error}</p>
-          <p>
-            <button type="button" onClick={() => load()} className={linkButton}>
-              Try again
-            </button>
-          </p>
-        </Callout>
-      ) : alerts.length === 0 ? (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-500">
-          <p className="text-lg mb-2">No alerts yet</p>
-          <p className="text-sm">Alerts appear here once a topic mapped in Alert routes publishes one.</p>
-        </div>
-      ) : (
-        <div className="border border-zinc-800 rounded-lg overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-zinc-900 text-zinc-400 text-left">
-              <tr>
-                <th className="px-4 py-3 font-medium">Alert</th>
-                <th className="px-4 py-3 font-medium">Outcome</th>
-                <th className="px-4 py-3 font-medium">Repo</th>
-                <th className="px-4 py-3 font-medium">Received</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800">
-              {alerts.map((a) => (
-                <tr key={a.id} className="hover:bg-zinc-900/50">
-                  <td className="px-4 py-3 max-w-md">
-                    <Link href={`/alerts/detail?id=${a.id}`} className="text-zinc-100 hover:underline font-medium">
-                      {a.title || "(untitled alert)"}
-                    </Link>
-                    <div className="text-[11px] text-zinc-500 font-mono mt-0.5">{a.ticket_id}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <OutcomeBadge outcome={a.outcome} />
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-zinc-400">{a.repo}</td>
-                  <td className="px-4 py-3 text-zinc-400 whitespace-nowrap">{formatWhen(a.received_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {!loading && !error && alerts.length > 0 && (
+        <ListToolbar
+          className="mt-6 mb-4"
+          search={{
+            value: params.q,
+            onChange: (v) => setParams({ q: v }, { replace: true }),
+            placeholder: "Search by alert, ticket or repo",
+            label: "Search alerts",
+          }}
+          status={{
+            label: "Show alerts",
+            value: group,
+            onChange: (v) => setParams({ outcome: v }),
+            options: [
+              { value: "all", label: GROUP_LABEL.all, count: matched.length },
+              ...OUTCOME_GROUPS.map((g) => ({
+                value: g.value,
+                label: g.label,
+                tone: g.tone,
+                count: matched.filter((a) => OUTCOMES[a.outcome]?.group === g.value).length,
+              })),
+            ],
+          }}
+          repo={{ value: repo, onChange: (v) => setParams({ repo: v }), repos: teamRepos }}
+          onClear={filtered ? clear : undefined}
+        />
       )}
 
-      {next && !loading && !error && (
-        <button type="button" onClick={() => load(next)} disabled={loadingMore} className={`${secondaryButton} mt-4`}>
-          {loadingMore ? "Loading…" : "Load more"}
-        </button>
-      )}
+      <div className={alerts.length > 0 && !loading && !error ? "" : "mt-6"}>
+        {loading ? (
+          <ListSkeleton label="Loading alerts" />
+        ) : error ? (
+          <ListError title="We couldn't load your alerts" onRetry={reload} />
+        ) : alerts.length === 0 ? (
+          <ListEmpty title="No alerts yet">Alerts appear here once a topic mapped in Alert routes publishes one.</ListEmpty>
+        ) : shown.length === 0 ? (
+          <ListEmpty title={q ? `No alerts match “${q}”` : "No alerts here"} onClear={clear}>
+            {next ? "Only the alerts loaded so far were searched. Load more to search older ones." : undefined}
+          </ListEmpty>
+        ) : (
+          <List label="Alerts">
+            {shown.map((a) => {
+              const look = outcomeLook(a.outcome);
+              return (
+                <ListRow
+                  key={a.id}
+                  testId="alert-row"
+                  data={{ outcome: a.outcome }}
+                  status={look}
+                  title={a.title || "(untitled alert)"}
+                  titleText={a.title || undefined}
+                  href={`/alerts/detail?id=${a.id}`}
+                  meta={[a.ticket_id || null, !repo ? a.repo || null : null]}
+                  chips={<StatusText look={look} />}
+                  time={a.received_at}
+                />
+              );
+            })}
+          </List>
+        )}
+        {!loading && !error && <LoadMore hasMore={!!next} loading={loadingMore} failed={moreFailed} onClick={loadMore} />}
       </div>
     </Page>
   );

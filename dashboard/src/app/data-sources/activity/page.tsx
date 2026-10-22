@@ -7,13 +7,14 @@ import { api, type DataSource } from "@/lib/api";
 import { RoleGuard } from "@/components/role-guard";
 import { ActivitySummaryStrip } from "@/components/activity-summary";
 import { ActivityFeed, feedFiltersFrom, type FeedFilters } from "@/components/data-source-activity";
-import { Skeleton } from "@/components/skeleton";
+import { ListSkeleton } from "@/components/list";
+import { Page, PageHeader } from "@/components/page";
 import { linkButton } from "@/components/ui";
 
 export default function DataSourceActivityPageGuarded() {
   return (
     <RoleGuard minRole="admin">
-      <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+      <Suspense fallback={<Page><PageHeader title="Every lookup, as it happens" /><div className="mt-8"><ListSkeleton rows={4} label="Loading lookups" /></div></Page>}>
         <DataSourceActivityPage />
       </Suspense>
     </RoleGuard>
@@ -57,19 +58,24 @@ function DataSourceActivityPage() {
   );
 
   return (
-    <div className="max-w-4xl">
-      <Link href="/data-sources" className={`${linkButton} text-sm`}>Back to data sources</Link>
-      <h1 className="mt-4 text-2xl font-bold text-zinc-100 text-balance">Every lookup, as it happens</h1>
-      <p className="mt-2 max-w-prose text-sm text-zinc-400">
-        Each time Coderhelm or a teammate looks something up in a connected source, it appears here: who asked, what they asked,
-        for which pull request or run, and whether it worked. Only the lookup is kept, never what came back, for 180 days.
-      </p>
+    <Page>
+      <PageHeader
+        breadcrumb={<Link href="/data-sources" className={`${linkButton} text-sm`}>Back to data sources</Link>}
+        title="Every lookup, as it happens"
+        titleClassName="text-balance"
+        lead={
+          <>
+            Each time Coderhelm or a teammate looks something up in a connected source, it appears here: who asked, what they asked,
+            for which pull request or run, and whether it worked. Only the lookup is kept, never what came back, for 180 days.
+          </>
+        }
+      />
       <ActivitySummaryStrip />
       <ActivityFeed sources={sources} pageSize={100} initialFilters={initial} onFiltersChange={keepInAddress} />
       <p className="mt-6 text-xs text-zinc-500">
         Looking for skills and team agents? Their reads and asks are on the{" "}
         <Link href="/skills/?tab=activity" className={`${linkButton} text-xs`}>Skills activity</Link> tab.
       </p>
-    </div>
+    </Page>
   );
 }
