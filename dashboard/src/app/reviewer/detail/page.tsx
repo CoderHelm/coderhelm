@@ -12,6 +12,7 @@ import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Page, PageHeader, cardClass } from "@/components/page";
+import { HelpLink } from "@/components/support";
 import { VerdictPill, riskLabel, triggerLabel } from "../labels";
 import { WorkUsedLine } from "@/components/work-used";
 
@@ -268,10 +269,13 @@ function ReviewDetailPage() {
         )}
       </section>
 
-      <p className="mt-6">
+      <p className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <Link href={`/reviewer?repo=${encodeURIComponent(review.repo)}`} className={linkButton}>
           More reviews of {review.repo}
         </Link>
+        <HelpLink item={{ kind: "review", id: sk, label: `${review.repo} #${review.pr_number}`, repo: review.repo }}>
+          Something wrong with this review?
+        </HelpLink>
       </p>
     </Page>
   );

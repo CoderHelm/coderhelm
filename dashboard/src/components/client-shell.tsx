@@ -101,6 +101,7 @@ const navGroups: NavGroup[] = [
       { href: "/settings/security", label: "Security", icon: <ShieldCheckIcon /> },
       { href: "/settings/budget", label: "Token limit", icon: <TargetIcon />, memberOnly: true },
       { href: "/admin", label: "Admin", icon: <ShieldIcon />, superAdminOnly: true },
+      { href: "/admin/tickets", label: "Support queue", icon: <LifeBuoyIcon />, superAdminOnly: true },
     ],
   },
 ];
@@ -133,6 +134,9 @@ const EXTRA_TITLES: Record<string, string> = {
   "/alerts/detail": "Alert",
   "/tests/run": "Test run",
   "/tests/test": "Test",
+  "/support": "Support",
+  "/support/ticket": "Support ticket",
+  "/admin/tickets": "Support queue",
 };
 
 function pageTitle(pathname: string | null): string {
@@ -592,11 +596,28 @@ function Sidebar({
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
     if (href === "/settings") return pathname === "/settings";
+    if (href === "/admin") return pathname === "/admin" || pathname === "/admin/";
     if (href === "/plans") return pathname === "/plans" || pathname.startsWith("/plans/detail") || pathname.startsWith("/plans/new");
     return pathname.startsWith(href);
   };
 
   const currentTeam = teams.find((t) => t.current);
+
+  // Support counts: tickets waiting on this team, and for platform admins
+  // tickets waiting on support. Refetched on navigation, so answering or
+  // opening a ticket updates them. An older backend answers 404: no badges.
+  const [support, setSupport] = useState<{ waiting: number; queue_open: number | null }>({ waiting: 0, queue_open: null });
+  useEffect(() => {
+    let live = true;
+    api.supportBadge().then(
+      (b) => live && setSupport(b),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [pathname]);
+  const badgeFor = (href: string) => (href === "/admin/tickets" ? support.queue_open ?? 0 : 0);
 
   const handleSwitch = async (teamId: string) => {
     setSwitching(true);
@@ -657,6 +678,7 @@ function Sidebar({
                       <span className="w-4 flex items-center justify-center" aria-hidden="true">{item.icon}</span>
                       {item.label}
                     </span>
+                    <CountBadge n={badgeFor(item.href)} label="need a reply" />
                   </Link>
                 );
               })}
@@ -669,6 +691,21 @@ function Sidebar({
       {/* Support */}
       <div className="mt-4 pt-3 border-t border-zinc-800/60 space-y-1 shrink-0">
         <p className="px-2 mb-1 text-xs font-semibold text-zinc-600 uppercase tracking-widest">Support</p>
+        <Link
+          href="/support"
+          prefetch={false}
+          aria-current={pathname.startsWith("/support") ? "page" : undefined}
+          data-testid="nav-get-help"
+          className={`flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors ${focusRing} ${
+            pathname.startsWith("/support") ? "text-zinc-100 bg-zinc-800" : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+          }`}
+        >
+          <span className="flex items-center gap-2.5">
+            <span className="w-4 flex items-center justify-center" aria-hidden="true"><LifeBuoyIcon /></span>
+            Get help
+          </span>
+          <CountBadge n={support.waiting} label="waiting on you" />
+        </Link>
         <a
           href="https://github.com/CoderHelm/coderhelm/issues"
           target="_blank"
@@ -1135,5 +1172,16 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** A small count beside a menu item; nothing when zero. */
+function CountBadge({ n, label }: { n: number; label: string }) {
+  if (!n) return null;
+  return (
+    <span className="min-w-5 rounded-full bg-amber-500/15 px-1.5 text-center text-[11px] font-semibold tabular-nums leading-5 text-amber-300" data-testid="count-badge">
+      {n}
+      <span className="sr-only"> {label}</span>
+    </span>
   );
 }

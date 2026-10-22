@@ -20,6 +20,7 @@ import { Modal } from "@/components/modal";
 import { AtlassianIcon, ExternalLinkIcon, GitHubIcon, MailIcon } from "@/components/icons";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
+import { HelpLink } from "@/components/support";
 import {
   DetailBlock,
   GROUP_LABEL,
@@ -764,6 +765,9 @@ function ReleaseRow({
               Rewrite the notes
             </button>
           </div>
+          <HelpLink item={{ kind: "release", id: `${r.repo}@${r.tag}`, label: `${r.repo} ${r.tag}`, repo: r.repo }}>
+            Something wrong with this release?
+          </HelpLink>
         </>
       }
     >

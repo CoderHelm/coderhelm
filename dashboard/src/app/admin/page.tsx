@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError, api, type AdminTeam } from "@/lib/api";
 import { useToast } from "@/components/toast";
@@ -175,7 +176,15 @@ function AdminPage() {
 
   return (
     <Page>
-      <PageHeader title="Platform admin" lead="Internal tools for managing the Coderhelm platform." />
+      <PageHeader
+        title="Platform admin"
+        lead="Internal tools for managing the Coderhelm platform."
+        actions={
+          <Link href="/admin/tickets" className={primaryButton}>
+            Support queue
+          </Link>
+        }
+      />
       <section aria-labelledby="teams-heading" className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
         <h2 id="teams-heading" className="text-base font-semibold text-zinc-100 mb-1">Teams ({teams.length})</h2>
         <p className="text-sm text-zinc-500 mb-4">Runs all time and in {month || "this month"}, with this month&apos;s model cost.</p>

@@ -15,6 +15,7 @@ import { Page } from "@/components/page";
 import { RunStatusBadge, runIsLive } from "@/components/run-status";
 import { TeamAgentAsks } from "./team-asks";
 import { WorkUsedLine } from "@/components/work-used";
+import { HelpLink } from "@/components/support";
 
 const PASSES = ["triage", "plan", "implement", "test", "security", "pr", "review"];
 
@@ -569,6 +570,9 @@ function RunDetailInner() {
             {run.ticket_source === "jira" ? "Jira" : run.ticket_source === "alert" ? "Alert" : "Issue"}: {run.ticket_id}
           </p>
         )}
+        <HelpLink className="mt-2" item={{ kind: "run", id: runId, label: run.title || undefined, repo: run.repo || undefined }}>
+          Something wrong with this run?
+        </HelpLink>
       </div>
 
       {/* Pass progress */}
