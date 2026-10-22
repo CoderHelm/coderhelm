@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { api, type Analytics, type AnalyticsDays, type AnalyticsSummary } from "@/lib/api";
+import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { api, type Analytics, type AnalyticsComparison, type AnalyticsCounts, type AnalyticsPeriod } from "@/lib/api";
 import { CardSkeleton, ChartSkeleton } from "@/components/skeleton";
 import { Segmented } from "@/components/segmented";
 import { Callout } from "@/components/callout";
@@ -14,10 +14,11 @@ import { Page, PageHeader, Section } from "@/components/page";
 // separation and contrast (blue, orange). Text never takes a series color.
 const SERIES = { first: "#3987e5", second: "#d95926" };
 
-const PERIODS: { value: `${AnalyticsDays}`; label: string }[] = [
+const PERIODS: { value: `${AnalyticsPeriod}`; label: string }[] = [
   { value: "7", label: "7 days" },
   { value: "30", label: "30 days" },
   { value: "90", label: "90 days" },
+  { value: "mtd", label: "This month" },
 ];
 
 const MINUTES_KEY = "coderhelm.analytics.minutesPerPr";
@@ -45,8 +46,7 @@ const perPr = (s: { tokens?: number; tokens_in: number; tokens_out: number; prs_
   s.tokens_per_merged_pr ?? (s.prs_merged ? Math.round(totalTokens(s) / s.prs_merged) : null);
 
 /** "+12% vs previous 30 days", or points for rates. Neutral ink: the reader judges. */
-function delta(cur: number | null, prev: number | null, kind: "count" | "rate" | "hours", days: number): string {
-  const vs = `vs previous ${days} days`;
+function delta(cur: number | null, prev: number | null, kind: "count" | "rate" | "hours", vs: string): string {
   if (cur == null || prev == null) return `— ${vs}`;
   if (kind === "rate") {
     const pts = Math.round((cur - prev) * 100);
@@ -89,12 +89,13 @@ function RatingsTile({ up, down }: { up: number; down: number }) {
   );
 }
 
-function ChartCard({ title, children, table }: { title: string; children: ReactNode; table: ReactNode }) {
+function ChartCard({ title, children, table, actions }: { title: string; children: ReactNode; table: ReactNode; actions?: ReactNode }) {
   const [showTable, setShowTable] = useState(false);
   return (
     <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-sm font-medium text-zinc-200">{title}</h3>
+        {actions && <div className="order-last w-full sm:order-none sm:ml-auto sm:w-auto">{actions}</div>}
         <button type="button" onClick={() => setShowTable((v) => !v)} aria-label={`${showTable ? "Show chart" : "Show table"}: ${title}`} className={`rounded text-xs text-zinc-400 underline-offset-2 hover:text-zinc-200 hover:underline ${focusRing}`}>
           {showTable ? "Show chart" : "Show table"}
         </button>
@@ -170,7 +171,7 @@ function peopleRows(people: Analytics["people"]) {
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function AnalyticsPage() {
-  const [days, setDays] = useState<AnalyticsDays>(30);
+  const [period, setPeriod] = useState<AnalyticsPeriod>(30);
   const [repo, setRepo] = useState("");
   const [data, setData] = useState<Analytics | null>(null);
   const [error, setError] = useState("");
@@ -181,7 +182,7 @@ export default function AnalyticsPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await api.getAnalytics(days, repo || undefined);
+      const res = await api.getAnalytics(period, repo || undefined);
       setData(res);
       // Keep the picker's full list while one repo is shown.
       if (!repo) setRepoNames(res.repo_names);
@@ -190,7 +191,7 @@ export default function AnalyticsPage() {
     } finally {
       setLoading(false);
     }
-  }, [days, repo]);
+  }, [period, repo]);
 
   useEffect(() => {
     void load();
@@ -204,7 +205,7 @@ export default function AnalyticsPage() {
       />
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
-        <Segmented label="Period" options={PERIODS} value={`${days}` as `${AnalyticsDays}`} onChange={(v) => setDays(Number(v) as AnalyticsDays)} />
+        <Segmented label="Period" options={PERIODS} value={`${period}` as `${AnalyticsPeriod}`} onChange={(v) => setPeriod(v === "mtd" ? "mtd" : (Number(v) as AnalyticsPeriod))} />
         <label className="flex min-w-0 items-center gap-2 text-sm text-zinc-400">
           <span>Repository</span>
           <select
@@ -246,12 +247,16 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
   const s = data.summary;
   const p = data.previous;
   const d = data.days;
+  const mtd = data.basis === "month_to_date";
+  /** "the last 30 days", or "this month so far". */
+  const span = mtd ? "this month so far" : `the last ${d} days`;
+  const vs = mtd ? "vs the same days last month" : `vs previous ${d} days`;
   const nothing = s.runs === 0 && data.reviews.posted === 0 && data.lookups.total === 0;
 
   if (nothing) {
     return (
       <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-6 text-sm text-zinc-400">
-        <p className="text-zinc-200">Nothing to show for the last {d} days yet.</p>
+        <p className="text-zinc-200">Nothing to show for {span} yet.</p>
         <p className="mt-1">Numbers appear here as Coderhelm works on tickets, reviews pull requests and looks things up. Try a longer period, or another repository.</p>
       </div>
     );
@@ -261,14 +266,14 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
     <div className={loading ? "opacity-60 transition-opacity" : ""}>
       <Section title="Is it worth it" id="worth">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Tile testId="tile-merged" label="PRs merged" value={count(s.prs_merged)} change={delta(s.prs_merged, p.prs_merged, "count", d)} basis={`${plural(s.prs_opened, "PR")} opened, ${count(s.prs_open)} still open`} />
-          <Tile testId="tile-merge-rate" label="Merge rate" value={pct(s.merge_rate)} change={delta(s.merge_rate, p.merge_rate, "rate", d)} basis="Merged out of opened" />
-          <Tile testId="tile-time-to-merge" label="Median time to merge" value={hours(s.median_hours_to_merge)} change={delta(s.median_hours_to_merge, p.median_hours_to_merge, "hours", d)} basis={s.time_to_merge_known ? `From ${plural(s.time_to_merge_known, "merged PR")}` : "Recorded for PRs merged from now on"} />
-          <Tile testId="tile-tokens-per-pr" label="Tokens per merged PR" value={perPr(s) == null ? "—" : tokens(perPr(s)!)} change={delta(perPr(s), perPr(p), "count", d)} basis={`${tokens(totalTokens(s))} tokens across ${plural(s.runs, "run")}`} />
+          <Tile testId="tile-merged" label="PRs merged" value={count(s.prs_merged)} change={delta(s.prs_merged, p.prs_merged, "count", vs)} basis={`${plural(s.prs_opened, "PR")} opened, ${count(s.prs_open)} still open`} />
+          <Tile testId="tile-merge-rate" label="Merge rate" value={pct(s.merge_rate)} change={delta(s.merge_rate, p.merge_rate, "rate", vs)} basis="Merged out of opened" />
+          <Tile testId="tile-time-to-merge" label="Median time to merge" value={hours(s.median_hours_to_merge)} change={delta(s.median_hours_to_merge, p.median_hours_to_merge, "hours", vs)} basis={s.time_to_merge_known ? `From ${plural(s.time_to_merge_known, "merged PR")}` : "Recorded for PRs merged from now on"} />
+          <Tile testId="tile-tokens-per-pr" label="Tokens per merged PR" value={perPr(s) == null ? "—" : tokens(perPr(s)!)} change={delta(perPr(s), perPr(p), "count", vs)} basis={`${tokens(totalTokens(s))} tokens across ${plural(s.runs, "run")}`} />
           <Tile testId="tile-untouched" label="Merged as written" value={s.edits_known ? pct(s.merged_untouched / s.edits_known) : "—"} basis={s.edits_known ? `${count(s.merged_untouched)} of ${plural(s.edits_known, "merged PR")} had no commits from people` : "Recorded for PRs merged from now on"} />
           <Tile testId="tile-ci" label="Red CI fixed by Coderhelm" value={pct(data.ci.fix_rate)} basis={data.ci.runs_with_red_ci ? `${count(data.ci.fixed_by_coderhelm)} of ${plural(data.ci.runs_with_red_ci, "run")} went green after its fixes` : "No red CI on Coderhelm's PRs"} />
           <Tile testId="tile-findings" label="Review findings acted on" value={pct(data.reviews.acted_on_rate)} basis={data.reviews.outcomes_known_reviews ? `${count(data.reviews.findings_fixed)} fixed in code, ${count(data.reviews.findings_settled_by_person)} settled by a person` : "Counted from re-reviews from now on"} />
-          <Tile testId="tile-failed" label="Failed runs" value={count(s.failed_runs)} change={delta(s.failed_runs, p.failed_runs, "count", d)} basis={s.runs ? `${pct(s.failure_rate)} of runs` : undefined} />
+          <Tile testId="tile-failed" label="Failed runs" value={count(s.failed_runs)} change={delta(s.failed_runs, p.failed_runs, "count", vs)} basis={s.runs ? `${pct(s.failure_rate)} of runs` : undefined} />
         </div>
       </Section>
 
@@ -309,7 +314,9 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
         </ChartCard>
       </div>
 
-      <TimeSaved merged={s.prs_merged} days={d} />
+      {data.comparison && <Comparison c={data.comparison} period={data.period} previous={data.previous_period} mtd={mtd} />}
+
+      <TimeSaved merged={s.prs_merged} span={span} />
 
       <Section title="Where it struggles" id="struggles" description="Failed runs grouped by what went wrong. Open the latest run of a group to see its steps.">
         <Table
@@ -320,7 +327,7 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
             f.count,
             <Link key={f.last_run_id} href={`/runs/detail?id=${f.last_run_id}`} className="text-zinc-100 underline-offset-2 hover:underline">Open run</Link>,
           ])}
-          empty={`No failed runs in the last ${d} days.`}
+          empty={`No failed runs in ${span}.`}
         />
         {data.ci.runs_with_red_ci > 0 && (
           <p className="mt-3 text-sm text-zinc-400">
@@ -331,7 +338,7 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
 
       <Section title="Reviews" id="reviews" description="Pull request reviews Coderhelm posted, and what became of the findings it raised before.">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Tile label="Reviews posted" value={count(data.reviews.posted)} change={delta(s.reviews, p.reviews, "count", d)} basis={`On ${plural(data.reviews.prs_reviewed, "PR")}`} />
+          <Tile label="Reviews posted" value={count(data.reviews.posted)} change={delta(s.reviews, p.reviews, "count", vs)} basis={`On ${plural(data.reviews.prs_reviewed, "PR")}`} />
           <Tile label="Approved / changes asked / comments" value={`${count(data.reviews.approve)} / ${count(data.reviews.request_changes)} / ${count(data.reviews.comment)}`} />
           <Tile label="Findings raised" value={count(data.reviews.findings)} basis={data.reviews.questions ? `${plural(data.reviews.questions, "question")} answered too` : undefined} />
           <RatingsTile up={data.reviews.thumbs_up} down={data.reviews.thumbs_down} />
@@ -367,7 +374,7 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
       </div>
 
       <div className="grid gap-x-6 lg:grid-cols-2">
-        <Section title="Where the work goes" id="steps" description={`Tokens and time by step, over the last ${Math.min(d, data.steps_window_days)} days (step details are kept for ${data.steps_window_days}).`}>
+        <Section title="Where the work goes" id="steps" description={`Tokens and time by step, over ${d > data.steps_window_days ? `the last ${data.steps_window_days} days` : span} (step details are kept for ${data.steps_window_days} days).`}>
           <Table
             label="By step"
             head={["Step", "Times", "Tokens", "Avg time"]}
@@ -411,7 +418,7 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
               hours(r.hours_to_merge),
               r.human_commits == null ? "—" : r.human_commits,
             ])}
-            empty={`No merged PRs in the last ${d} days.`}
+            empty={`No merged PRs in ${span}.`}
           />
         </Section>
         <Section title="Recently failed" id="failed">
@@ -425,7 +432,7 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
               </span>,
               <span key="reason" className="block text-left text-xs text-zinc-400">{r.reason}</span>,
             ])}
-            empty={`No failed runs in the last ${d} days.`}
+            empty={`No failed runs in ${span}.`}
           />
         </Section>
       </div>
@@ -433,9 +440,192 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
   );
 }
 
+// ── Compared with the period before ───────────────────────────────────────
+
+/** Keeps "1–22" together; a narrow column may still put the month above it. */
+const JOIN = "\u2060";
+
+/** "Sep 1–22", or "Aug 24 – Sep 22" across months. The end is exclusive. */
+function range(start: string, end: string) {
+  const a = new Date(start);
+  const b = new Date(new Date(end).getTime() - 1);
+  const month = (d: Date) => d.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" });
+  if (a.getUTCFullYear() === b.getUTCFullYear() && a.getUTCMonth() === b.getUTCMonth()) {
+    return a.getUTCDate() === b.getUTCDate() ? `${month(a)} ${a.getUTCDate()}` : `${month(a)} ${a.getUTCDate()}${JOIN}–${JOIN}${b.getUTCDate()}`;
+  }
+  return `${shortDay(a.toISOString().slice(0, 10))} – ${shortDay(b.toISOString().slice(0, 10))}`;
+}
+
+/** Changes smaller than this read as flat: a PR either way is noise. */
+const FLAT_PCT = 3;
+
+/** How the current number moved from the previous one: ↑ +12%, ↓ −11%, ↑ ×2.1, Flat, or New. */
+function change(cur: number, prev: number): { text: string; tone: "up" | "down" | "flat" } {
+  if (prev === 0) return cur === 0 ? { text: "Flat", tone: "flat" } : { text: "New", tone: "up" };
+  const pctChange = ((cur - prev) / prev) * 100;
+  if (Math.abs(pctChange) < FLAT_PCT) return { text: "Flat", tone: "flat" };
+  if (cur / prev >= 2) return { text: `↑ ×${(cur / prev).toFixed(1)}`, tone: "up" };
+  const rounded = Math.round(Math.abs(pctChange));
+  return pctChange > 0 ? { text: `↑ +${rounded}%`, tone: "up" } : { text: `↓ −${rounded}%`, tone: "down" };
+}
+
+const TONE = { up: "text-emerald-400", down: "text-rose-400", flat: "text-zinc-400" };
+
+function Change({ cur, prev, comparable = true }: { cur: number; prev: number; comparable?: boolean }) {
+  if (!comparable) return <span className="text-zinc-500">Not comparable</span>;
+  const c = change(cur, prev);
+  return <span className={`font-medium ${TONE[c.tone]}`}>{c.text}</span>;
+}
+
+type Metric = { key: keyof AnalyticsCounts; label: string; sub?: boolean; note?: string };
+
+const METRICS: Metric[] = [
+  { key: "tickets", label: "Tickets worked on" },
+  { key: "runs", label: "Runs (including reruns)" },
+  { key: "prs_opened", label: "PRs opened" },
+  { key: "prs_merged", label: "PRs merged", note: "merged" },
+  { key: "prs_reviewed", label: "PRs reviewed (distinct)" },
+  { key: "reviews_posted", label: "Reviews posted" },
+  { key: "approvals", label: "Approvals", sub: true },
+  { key: "changes_requested", label: "Changes requested", sub: true },
+  { key: "comments", label: "Plain comments", sub: true },
+  { key: "repos", label: "Repositories covered" },
+  { key: "people", label: "People who asked", note: "people" },
+];
+
+/** Short toggle labels so the three fit side by side on a phone; the title names the metric in full. */
+const CHART_METRICS = [
+  { value: "prs_reviewed", label: "Reviewed", title: "PRs reviewed" },
+  { value: "prs_opened", label: "Opened", title: "PRs opened" },
+  { value: "tickets", label: "Tickets", title: "Tickets" },
+] as const;
+type ChartMetric = (typeof CHART_METRICS)[number]["value"];
+
+function CompareTip({ active, payload, rows }: { active?: boolean; payload?: { name: string; value: number | null; color: string; payload: AnalyticsComparison["daily"][number] }[]; rows: AnalyticsComparison["daily"] }) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0].payload;
+  const day = (d: string | null) => (d ? shortDay(d) : "—");
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-950/95 px-3 py-2 shadow-xl">
+      <p className="mb-1 text-xs text-zinc-400">Day {row.offset + 1} of {rows.length}</p>
+      {payload.map((p, i) => (
+        <div key={p.name} className="flex items-center gap-2 text-xs">
+          <span className="h-2 w-2 rounded-full" style={{ background: p.color }} aria-hidden="true" />
+          <span className="text-zinc-400">{i === 0 ? day(row.day) : day(row.previous_day)}</span>
+          <span className="ml-auto pl-3 font-medium tabular-nums text-zinc-100">{p.value == null ? "—" : count(p.value)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** This period against the one before it: each thing counted once, from the records. */
+function Comparison({ c, period, previous, mtd }: { c: AnalyticsComparison; period: { start: string; end: string }; previous: { start: string; end: string }; mtd: boolean }) {
+  const [metric, setMetric] = useState<ChartMetric>("prs_reviewed");
+  const cur = range(period.start, period.end);
+  const prev = range(previous.start, previous.end);
+  const full = c.previous_full && c.previous_full_period ? c.previous_full : null;
+  const fullLabel = c.previous_full_period
+    ? `All of ${new Date(c.previous_full_period.start).toLocaleDateString(undefined, { month: "short", timeZone: "UTC" })}`
+    : "";
+  const label = CHART_METRICS.find((m) => m.value === metric)!.title;
+  const prevKey = `previous_${metric}` as const;
+
+  const notes: string[] = [];
+  if (c.current.prs_open > 0) {
+    notes.push(`PRs merged counts merges so far: ${plural(c.current.prs_open, "PR")} from ${cur} ${c.current.prs_open === 1 ? "is" : "are"} still open, so the latest period catches up as they merge.`);
+  }
+  const share = (x: AnalyticsCounts) => (x.reviews_posted ? x.comments / x.reviews_posted : 0);
+  if (c.previous.reviews_posted > 0 && share(c.previous) - share(c.current) >= 0.2) {
+    notes.push(`More reviews in ${prev} were posted as plain comments (${pct(share(c.previous))}, against ${pct(share(c.current))} now), before reviews approved or asked for changes. Compare reviews posted, not the split.`);
+  }
+  if (!c.people_comparable) {
+    const recorded = (x: AnalyticsCounts, when: string) => `${count(x.runs_with_requester)} of ${plural(x.runs, "run")} in ${when}`;
+    notes.push(`Who asked was recorded on ${recorded(c.previous, prev)} and ${recorded(c.current, cur)}, so people who asked is not compared: a jump from runs that recorded nobody would not be real.`);
+  }
+
+  // Phones keep the change in view; all of last month shows from the sm breakpoint.
+  const cell = "px-1.5 py-2.5 text-right tabular-nums sm:px-4";
+  const wide = "hidden sm:table-cell";
+
+  return (
+    <Section
+      title="Compared with the period before"
+      id="compare"
+      description={`${cur} against ${prev}${mtd ? ", the same time into the month" : ""}. Each thing is counted once: a ticket with three runs is one ticket, a PR reviewed five times is one PR reviewed and five reviews.`}
+    >
+      <div className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/50">
+        <table className="w-full text-sm" aria-label="Compared with the period before">
+          <thead>
+            <tr className="border-b border-zinc-800 text-xs text-zinc-400">
+              <th scope="col" className="px-3 py-2.5 text-left font-medium sm:px-4">Metric</th>
+              <th scope="col" className={`${cell} font-medium`}>{prev}</th>
+              <th scope="col" className={`${cell} font-medium`}>{cur}</th>
+              <th scope="col" className={`${cell} font-medium`}>Change</th>
+              {full && <th scope="col" className={`${cell} ${wide} font-medium`}>{fullLabel}</th>}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-800">
+            {METRICS.map((m) => (
+              <tr key={m.key}>
+                <th scope="row" className={`min-w-0 break-words px-3 py-2.5 text-left font-normal sm:px-4 ${m.sub ? "pl-6 text-zinc-400 sm:pl-8" : "text-zinc-100"}`}>
+                  {m.sub ? "·\u00a0" : ""}
+                  {m.label}
+                </th>
+                <td className={`${cell} text-zinc-300`}>{count(c.previous[m.key])}</td>
+                <td className={`${cell} text-zinc-300`}>{count(c.current[m.key])}</td>
+                <td className={cell}>
+                  <Change cur={c.current[m.key]} prev={c.previous[m.key]} comparable={m.note !== "people" || c.people_comparable} />
+                </td>
+                {full && <td className={`${cell} ${wide} text-zinc-300`}>{count(full[m.key])}</td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {full && <p className="mt-2 text-xs text-zinc-500 sm:hidden">{fullLabel} shows on a wider screen.</p>}
+      {notes.length > 0 && (
+        <ul className="mt-3 space-y-1 text-xs text-zinc-500" data-testid="compare-notes">
+          {notes.map((n) => (
+            <li key={n}>{n}</li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-4">
+        <ChartCard
+          title={`${label} so far, ${cur} against ${prev}`}
+          actions={<Segmented label="Chart metric" options={CHART_METRICS.map(({ value, label: l }) => ({ value, label: l }))} value={metric} onChange={(v) => setMetric(v)} />}
+          table={
+            <Table
+              label={`${label} so far by day`}
+              head={["Day", prev, cur]}
+              rows={c.daily.map((r) => [`Day ${r.offset + 1}`, r[prevKey] == null ? "—" : count(r[prevKey]!), count(r[metric])])}
+              empty="No days."
+            />
+          }
+        >
+          <div className="h-56" role="img" aria-label={`Line chart of ${label} so far by day, ${cur} against ${prev}`}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={c.daily}>
+                <CartesianGrid vertical={false} stroke="#27272a" />
+                <XAxis dataKey="offset" tickFormatter={(o: number) => `Day ${o + 1}`} {...axis} minTickGap={24} />
+                <YAxis allowDecimals={false} width={32} {...axis} />
+                <Tooltip cursor={{ stroke: "#3f3f46" }} content={<CompareTip rows={c.daily} />} />
+                <Legend wrapperStyle={{ fontSize: 12, color: "#a1a1aa" }} iconType="circle" iconSize={8} />
+                <Line type="monotone" dataKey={metric} name={cur} stroke={SERIES.first} strokeWidth={2} dot={false} isAnimationActive={false} />
+                <Line type="monotone" dataKey={prevKey} name={prev} stroke={SERIES.second} strokeWidth={2} strokeDasharray="4 3" dot={false} connectNulls={false} isAnimationActive={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
+      </div>
+    </Section>
+  );
+}
+
 /** Time saved is an estimate, so it only appears with the reader's own
  *  assumption, and the formula is shown beside the number. */
-function TimeSaved({ merged, days }: { merged: number; days: number }) {
+function TimeSaved({ merged, span }: { merged: number; span: string }) {
   const [minutes, setMinutes] = useState<string>("");
   useEffect(() => {
     try {
@@ -474,7 +664,7 @@ function TimeSaved({ merged, days }: { merged: number; days: number }) {
         </label>
         {valid ? (
           <p className="mt-2 text-zinc-100" data-testid="time-saved">
-            about <span className="font-semibold">{hours(total)}</span> of work in the last {days} days.
+            about <span className="font-semibold">{hours(total)}</span> of work in {span}.
             <span className="block text-xs text-zinc-500">{count(merged)} merged PRs × {perPr} minutes ÷ 60. An estimate from your number, not a measurement.</span>
           </p>
         ) : (
