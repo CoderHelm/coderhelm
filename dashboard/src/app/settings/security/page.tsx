@@ -6,6 +6,7 @@ import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import QRCode from "qrcode";
 import { Page, PageHeader } from "@/components/page";
+import { dangerButton, ghostButton, primaryButton, smallSecondaryButton } from "@/components/ui";
 
 export default function SecurityPage() {
   const { toast } = useToast();
@@ -209,7 +210,7 @@ export default function SecurityPage() {
           <button
             type="submit"
             disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
-            className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed"
+            className={primaryButton}
           >
             {changingPassword ? "Updating..." : "Update password"}
           </button>
@@ -223,7 +224,7 @@ export default function SecurityPage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-sm font-semibold text-zinc-100">Two-factor authentication</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">Add an extra layer of security with a TOTP authenticator app.</p>
+            <p className="text-xs text-zinc-500 mt-0.5">Add an extra layer of security with an authenticator app.</p>
           </div>
           {mfaEnabled && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-xs font-medium">
@@ -237,7 +238,7 @@ export default function SecurityPage() {
           <button
             onClick={() => setMfaStep("password")}
             disabled={mfaLoading}
-            className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-40 transition-colors cursor-pointer"
+            className={primaryButton}
           >
             Enable 2FA
           </button>
@@ -260,14 +261,14 @@ export default function SecurityPage() {
               <button
                 type="submit"
                 disabled={mfaLoading || !mfaPassword}
-                className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                className={primaryButton}
               >
                 {mfaLoading ? "Setting up..." : "Continue"}
               </button>
               <button
                 type="button"
                 onClick={() => { setMfaStep("idle"); setMfaPassword(""); }}
-                className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                className={ghostButton}
               >
                 Cancel
               </button>
@@ -279,7 +280,7 @@ export default function SecurityPage() {
           <button
             onClick={handleMfaDisable}
             disabled={mfaLoading}
-            className="px-4 py-2 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/20 disabled:opacity-50 transition-colors cursor-pointer"
+            className={dangerButton}
           >
             {mfaLoading ? "Disabling..." : "Disable 2FA"}
           </button>
@@ -307,7 +308,7 @@ export default function SecurityPage() {
                 </code>
                 <button
                   onClick={copySecret}
-                  className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer shrink-0"
+                  className={`shrink-0 ${smallSecondaryButton}`}
                 >
                   {copied ? "Copied!" : "Copy"}
                 </button>
@@ -316,7 +317,7 @@ export default function SecurityPage() {
 
             <button
               onClick={() => setMfaStep("verify")}
-              className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white transition-colors cursor-pointer"
+              className={primaryButton}
             >
               Next — enter code
             </button>
@@ -343,14 +344,14 @@ export default function SecurityPage() {
               <button
                 type="submit"
                 disabled={mfaLoading || mfaCode.length < 6}
-                className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                className={primaryButton}
               >
                 {mfaLoading ? "Verifying..." : "Verify & enable"}
               </button>
               <button
                 type="button"
                 onClick={() => { setMfaStep("idle"); setMfaCode(""); setMfaPassword(""); }}
-                className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                className={ghostButton}
               >
                 Cancel
               </button>

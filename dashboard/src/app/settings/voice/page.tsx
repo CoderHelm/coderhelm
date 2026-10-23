@@ -8,6 +8,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { TextareaSkeleton } from "@/components/skeleton";
 import { RepoCombobox } from "@/components/repo-combobox";
 import { Page, PageHeader } from "@/components/page";
+import { primaryButton, secondaryButton, smallSecondaryButton } from "@/components/ui";
 
 function Tab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
@@ -53,7 +54,7 @@ function VoiceEditor({
         <button
           onClick={onSave}
           disabled={saving}
-          className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 transition-colors"
+          className={primaryButton}
         >
           {saving ? "Saving..." : "Save"}
         </button>
@@ -61,12 +62,12 @@ function VoiceEditor({
           <button
             onClick={onRegenerate}
             disabled={regenerating}
-            className="px-4 py-2 bg-zinc-800 text-zinc-300 rounded-lg text-sm font-medium hover:bg-zinc-700 disabled:opacity-50 transition-colors border border-zinc-700"
+            className={secondaryButton}
           >
             {regenerating ? "Regenerating..." : "Regenerate"}
           </button>
         )}
-        <span className="text-xs text-zinc-600">Applied to PR description pass.</span>
+        <span className="text-xs text-zinc-600">Used when it writes pull request descriptions.</span>
       </div>
     </>
   );
@@ -205,7 +206,7 @@ function VoicePage() {
               <button
                 onClick={regenerate}
                 disabled={regenerating}
-                className="mt-3 px-3 py-1.5 bg-zinc-800 text-zinc-300 rounded-lg text-sm hover:bg-zinc-700 transition-colors border border-zinc-700"
+                className={`mt-3 ${smallSecondaryButton}`}
               >
                 Retry
               </button>

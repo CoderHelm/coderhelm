@@ -32,7 +32,7 @@ export default function AwsPageGuarded() {
   );
 }
 
-/** The account CoderHelm assumes the role from. Shown in the manual setup. */
+/** The account Coderhelm assumes the role from. Shown in the manual setup. */
 const CODERHELM_ACCOUNT = "654654210434";
 const ROLE_NAME = "CoderHelmLogReader";
 const ROLE_ARN_RE = /^arn:aws:iam::\d{12}:role\/CoderHelmLogReader$/;
@@ -42,7 +42,7 @@ const COMMON_REGIONS = [
   "eu-north-1", "ap-south-1", "ap-southeast-1", "ap-southeast-2", "ap-northeast-1", "sa-east-1",
 ];
 
-/** What the role lets CoderHelm do, from the CloudFormation template it ships. */
+/** What the role lets Coderhelm do, from the CloudFormation template it ships. */
 const SCOPES: { title: string; detail: string }[] = [
   { title: "List your log groups", detail: "Names, sizes and how long each keeps logs." },
   { title: "Search logs", detail: "Run Logs Insights queries and read matching lines, in the log groups you choose." },

@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
 import { focusRing, linkButton } from "../ui";
 import { StatusDot, type Tone } from "./status";
+import { ScrollFade } from "../scroll-fade";
 
 // The one toolbar above every list: search (press / to focus), status
 // toggles with counts, a repo filter once the team has more than one repo,
@@ -213,8 +214,9 @@ export function StatusToggles({
   label: string;
 }) {
   return (
-    // On a phone the toggles scroll sideways inside their own strip.
-    <div className="max-w-full overflow-x-auto [scrollbar-width:none]">
+    // On a phone the toggles scroll sideways inside their own strip, with a
+    // fade on the edge that has more.
+    <ScrollFade axis="x" className="max-w-full" innerClassName="[scrollbar-width:none]">
       <div role="group" aria-label={label} className="inline-flex shrink-0 rounded-lg border border-zinc-700 bg-zinc-900 p-0.5">
         {options.map((o) => {
           const on = o.value === value;
@@ -237,7 +239,7 @@ export function StatusToggles({
           );
         })}
       </div>
-    </div>
+    </ScrollFade>
   );
 }
 

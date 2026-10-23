@@ -188,7 +188,7 @@ test("the scorecard answers whether it is worth it, against the previous period"
   await expect(page.getByTestId("tile-ci")).toContainText("6 of 8 runs went green");
   await expect(page.getByTestId("tile-findings")).toContainText("24 fixed in code, 8 settled by a person");
   await expect(page.getByRole("table", { name: "Failures by reason" })).toContainText("Timed out after #s");
-  // People first, CoderHelm's own work next, runs that recorded nobody last.
+  // People first, Coderhelm's own work next, runs that recorded nobody last.
   await expect(page.getByRole("table", { name: "By person" }).locator("tbody tr td:first-child")).toHaveText(["Ada Lovelace", "CoderHelm (E2E tests)", "Not recorded (older runs)"]);
   await expect(page.getByRole("table", { name: "Lookups by source" })).toContainText("orders-db database");
   await expect(page.getByRole("table", { name: "By step" })).toContainText("Writing code");
@@ -324,4 +324,37 @@ test("a server without the comparison still shows the rest of the page", async (
   await page.goto("/analytics");
   await expect(page.getByTestId("tile-merged")).toContainText("21");
   await expect(page.getByRole("table", { name: "Compared with the period before" })).toHaveCount(0);
+});
+
+test("the period picker doesn't move when the selection changes, by click or by keyboard", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/analytics");
+  const picker = page.getByRole("group", { name: "Period" });
+  const segments = picker.getByRole("button");
+  await expect(segments).toHaveCount(4);
+  await expect(picker.getByRole("button", { name: "30 days" })).toHaveAttribute("aria-pressed", "true");
+  const boxes = async () =>
+    segments.evaluateAll((els) => els.map((el) => { const r = el.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map((n) => Math.round(n * 10) / 10); }));
+  const before = await boxes();
+
+  // Every choice, by click: no segment moves or changes size.
+  for (const name of ["7 days", "90 days", "This month", "30 days"]) {
+    await picker.getByRole("button", { name }).click();
+    await expect(picker.getByRole("button", { name })).toHaveAttribute("aria-pressed", "true");
+    expect(await boxes(), `selecting ${name} moved the row`).toEqual(before);
+  }
+
+  // By keyboard: the focus ring shows inside the segment and nothing moves.
+  await picker.getByRole("button", { name: "7 days" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(picker.getByRole("button", { name: "7 days" })).toHaveAttribute("aria-pressed", "true");
+  expect(await boxes()).toEqual(before);
+  const focused = picker.getByRole("button", { name: "7 days" });
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Shift+Tab");
+  await expect(focused).toBeFocused();
+  // The app's focus ring (a 2px outline), drawn inside the segment, not a thick outer outline.
+  const ring = await focused.evaluate((el) => { const s = getComputedStyle(el); return { width: s.outlineWidth, offset: s.outlineOffset, style: s.outlineStyle }; });
+  expect(ring).toEqual({ width: "2px", offset: "-3px", style: "solid" });
+  expect(await boxes()).toEqual(before);
 });

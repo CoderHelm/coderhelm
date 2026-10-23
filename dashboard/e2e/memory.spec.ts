@@ -192,17 +192,18 @@ test("filters, sort and search ask the server", async ({ page }) => {
   await expect(page.getByTestId("memory")).toHaveCount(3);
   await page.getByRole("group", { name: "Show" }).getByRole("button", { name: "Pinned" }).click();
   await expect(page.getByTestId("memory")).toHaveCount(1);
-  expect(db.calls.some((c) => c.includes("pinned=true"))).toBe(true);
+  await expect.poll(() => db.calls.some((c) => c.includes("pinned=true"))).toBe(true);
   await page.getByRole("group", { name: "Show" }).getByRole("button", { name: "Learned on tickets" }).click();
   await expect(page.getByTestId("memory")).toHaveCount(2);
-  expect(db.calls.some((c) => c.includes("source=run"))).toBe(true);
+  await expect.poll(() => db.calls.some((c) => c.includes("source=run"))).toBe(true);
   await page.getByRole("group", { name: "Show" }).getByRole("button", { name: "All" }).click();
   await page.getByRole("combobox", { name: "Topic" }).selectOption("code-style");
   await expect(page.getByTestId("memory")).toHaveCount(1);
   await page.getByRole("combobox", { name: "Topic" }).selectOption("");
+  // The first row can read the same before and after the sort, so wait for the call itself.
   await page.getByRole("combobox", { name: "Sort" }).selectOption("most_used");
   await expect(page.getByTestId("memory").first()).toContainText("pnpm test:unit");
-  expect(db.calls.some((c) => c.includes("sort=most_used"))).toBe(true);
+  await expect.poll(() => db.calls.some((c) => c.includes("sort=most_used"))).toBe(true);
   await page.getByRole("searchbox", { name: "Search memories" }).fill("nothing like this");
   await expect(page.getByText("Nothing matches.")).toBeVisible();
   await expect(page).toHaveURL(/q=nothing/);

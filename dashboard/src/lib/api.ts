@@ -1200,7 +1200,7 @@ export interface ReviewerConfig {
   auto_label_requires: string;
   /** When to use which label (free text for the reviewer). */
   auto_label_guide: string;
-  /** Write + publish release notes when CoderHelm cuts a release tag. */
+  /** Write + publish release notes when Coderhelm cuts a release tag. */
   release_notes: boolean;
   /** Only tags on this branch get notes; empty = the default branch. */
   release_notes_branch: string;
@@ -1505,7 +1505,7 @@ export interface NotificationPrefs {
   email_run_failed?: boolean;
 }
 
-/** The team's templates; an empty one keeps CoderHelm's default. */
+/** The team's templates; an empty one keeps Coderhelm's default. */
 export interface GitConventionTemplates {
   branch: string;
   commit: string;
@@ -1800,7 +1800,7 @@ export interface AlertNotifySettings {
   webhooks: WebhooksView;
 }
 
-/** A chat channel CoderHelm posts to. */
+/** A chat channel Coderhelm posts to. */
 export type ChatChannel = "teams" | "slack";
 
 /** A saved webhook, as the API shows it: never the URL, only whether one is set and a hint. */
@@ -1827,7 +1827,7 @@ export type NotifyDestination =
   | { destination: "recommendations" }
   | { destination: "reviewer"; repo: string };
 
-/** One alert CoderHelm received, and what it did with it. */
+/** One alert Coderhelm received, and what it did with it. */
 export interface AlertEvent {
   id: string;
   received_at?: string | null;
@@ -1852,7 +1852,7 @@ export interface AlertEventDetail {
   }[];
 }
 
-/** Base URL of the CoderHelm API (shown to users who subscribe endpoints). */
+/** Base URL of the Coderhelm API (shown to users who subscribe endpoints). */
 export const API_BASE_URL = API_BASE;
 
 export interface AwsConnection {
@@ -2203,7 +2203,7 @@ export interface AnalyticsCounts {
   tickets: number;
   /** Every run, reruns included. */
   runs: number;
-  /** Distinct PRs CoderHelm's runs opened or pushed to. */
+  /** Distinct PRs Coderhelm's runs opened or pushed to. */
   prs_opened: number;
   prs_merged: number;
   /** Neither merged nor closed yet. */
@@ -2285,7 +2285,7 @@ export interface Analytics {
   daily: { day: string; runs: number; prs_opened: number; merged: number; failed: number; cost_usd: number; tokens?: number; reviews: number }[];
   sources: { source: string; runs: number; prs: number; merged: number; merge_rate: number | null }[];
   repos: { repo: string; runs: number; prs: number; merged: number; failed: number; cost_usd: number; tokens?: number; merge_rate: number | null; reviews: number }[];
-  /** One row per person (however Jira, GitHub or the dashboard named them), CoderHelm's own work, and runs that recorded nobody. */
+  /** One row per person (however Jira, GitHub or the dashboard named them), Coderhelm's own work, and runs that recorded nobody. */
   people: { person: string; kind?: "person" | "coderhelm" | "not_recorded"; runs: number; merged: number }[];
   failures: { reason: string; count: number; last_run_id: string; last_at: string }[];
   ci: {

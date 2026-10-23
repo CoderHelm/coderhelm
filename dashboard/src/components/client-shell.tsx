@@ -9,6 +9,7 @@ import { BETA_SIGNUPS_CHANGED } from "@/lib/admin";
 import { formatTokens, USAGE_CHANGED, usageBreakdown, usageTotal } from "@/lib/usage";
 import { ToastProvider } from "./toast";
 import { SupportViewBanner } from "./support-access";
+import { ScrollFade } from "./scroll-fade";
 import { ConfirmProvider } from "./confirm-dialog";
 import { CommandPaletteButton, CommandPaletteProvider, type PalettePage } from "./command-palette";
 import { focusRing } from "./ui";
@@ -641,6 +642,20 @@ function Sidebar({
 
   const currentTeam = teams.find((t) => t.current);
 
+  // The current page's menu item is always in view, even when it sits below
+  // the fold of the menu (Token limit, Members on a short window).
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    const area = nav?.querySelector<HTMLElement>("[data-scroll-fade]");
+    const item = nav?.querySelector<HTMLElement>('[data-scroll-fade] a[aria-current="page"]');
+    if (!area || !item) return;
+    const a = area.getBoundingClientRect();
+    const i = item.getBoundingClientRect();
+    if (i.bottom > a.bottom - 24) area.scrollTop += i.bottom - a.bottom + 48;
+    else if (i.top < a.top) area.scrollTop -= a.top - i.top + 8;
+  }, [pathname, user]);
+
   // Support counts: tickets waiting on this team, and for platform admins
   // tickets waiting on support. Refetched on navigation, so answering or
   // opening a ticket updates them. An older backend answers 404: no badges.
@@ -668,7 +683,10 @@ function Sidebar({
   };
 
   return (
-    <nav aria-label="Main" className="w-56 border-r border-zinc-800/60 bg-zinc-950 p-3 flex flex-col h-screen sticky top-0">
+    // One scroll area for the brand, team, search and every menu group, with a
+    // fade at whichever edge has more; help and the person stay pinned below.
+    <nav ref={navRef} aria-label="Main" className="w-56 border-r border-zinc-800/60 bg-zinc-950 flex flex-col h-screen sticky top-0">
+      <ScrollFade axis="y" className="flex-1" innerClassName="px-3 pt-3 pb-2" testId="sidebar-scroll">
       <Link
         href="/"
         className={`flex items-center gap-2.5 px-2 py-2.5 mb-2 rounded-md ${focusRing}`}
@@ -685,7 +703,7 @@ function Sidebar({
 
       <CommandPaletteButton />
 
-      <div className="flex-1 space-y-4 overflow-y-auto min-h-0">
+      <div className="space-y-4">
         {navGroups.map((group, index) => {
           const items = visibleItems(group, user);
           if (items.length === 0) return null;
@@ -730,9 +748,11 @@ function Sidebar({
         })}
       </div>
 
-      {/* Support */}
-      <div className="mt-4 pt-3 border-t border-zinc-800/60 space-y-1 shrink-0">
-        <p className="px-2 mb-1 text-xs font-semibold text-zinc-600 uppercase tracking-widest">Support</p>
+      </ScrollFade>
+
+      <div className="shrink-0 px-3 pb-3" data-testid="sidebar-footer">
+      {/* Support: always in view, so help is one click from any page. */}
+      <div role="group" aria-label="Support" className="pt-2 border-t border-zinc-800/60 space-y-0.5">
         <Link
           href="/support"
           prefetch={false}
@@ -843,6 +863,7 @@ function Sidebar({
           </div>
         </div>
       )}
+      </div>
     </nav>
   );
 }

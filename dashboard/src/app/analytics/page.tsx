@@ -162,7 +162,7 @@ function stepLabel(s: string) {
 function sourceLabel(s: string) {
   return ({ github: "GitHub issues", jira: "Jira", alert: "Alerts", other: "Other" } as Record<string, string>)[s] ?? s;
 }
-/** People first, then CoderHelm's own work, then runs that recorded nobody; most runs first inside each. */
+/** People first, then Coderhelm's own work, then runs that recorded nobody; most runs first inside each. */
 function peopleRows(people: Analytics["people"]) {
   const order = (r: Analytics["people"][number]) => (r.kind === "coderhelm" ? 1 : r.kind === "not_recorded" || !r.person ? 2 : 0);
   return [...people].sort((a, b) => order(a) - order(b) || b.runs - a.runs).map((r) => [r.person || "Not recorded (older runs)", r.runs, r.merged]);

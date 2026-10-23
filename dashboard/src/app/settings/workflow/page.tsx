@@ -13,13 +13,13 @@ type WorkflowToggleKey = "commit_openspec" | "allow_plan_log_analyzer";
 const TOGGLES: { key: WorkflowToggleKey; label: string; description: string }[] = [
   {
     key: "commit_openspec",
-    label: "Commit openspec to repo",
-    description: "Include proposal, design, tasks, and acceptance criteria files in the PR branch under openspec/specs/.",
+    label: "Commit the plan's spec files",
+    description: "Adds the plan's proposal, design, tasks and acceptance criteria to the pull request branch, next to the code.",
   },
   {
     key: "allow_plan_log_analyzer",
-    label: "Allow plans to use AWS Log Analyzer",
-    description: "When enabled, plan generation can reference AWS Log Analyzer recommendations. Disabled by default.",
+    label: "Let plans read your AWS logs",
+    description: "When on, a plan can use what the logs in your connected AWS account show. Off by default.",
   },
 ];
 

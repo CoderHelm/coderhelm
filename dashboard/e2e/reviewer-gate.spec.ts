@@ -63,6 +63,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/me") return json(route, { user_id: "u_1", team_id: "t_1", github_login: "a-maintainer", email: "someone@example.com", avatar_url: "", role: db.role });
     if (p === "/api/usage") return json(route, { month: "2026-01", total_tokens: 0, tokens_in: 0, tokens_out: 0, total_runs: 0, max_tokens: 0 });
     if (p === "/api/banners") return json(route, { banners: [] });
+    if (p === "/api/support/badge") return json(route, { waiting: 0, queue_open: null });
     if (p === "/api/integrations") return json(route, { can_edit: false, items: [], migrated: 0 });
     if (p === "/api/skills/used") return json(route, { skills: [], agents: [], sources: [], standards: [] });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }] });
@@ -143,7 +144,7 @@ test("the status comment's stop link asks first, then stops with one click", asy
   // The page reloads the gate: stopped, and the stop is in the history.
   await expect(page.getByText("Auto-merge is stopped")).toBeVisible();
   const history = page.getByTestId("gate-history");
-  await expect(history.getByRole("listitem").first()).toContainText("Stopped by @a-maintainer in CoderHelm");
+  await expect(history.getByRole("listitem").first()).toContainText("Stopped by @a-maintainer in Coderhelm");
   await expect(page.getByRole("button", { name: "Re-arm auto-merge" })).toBeVisible();
   // Phone width: nothing scrolls sideways.
   await page.setViewportSize({ width: 390, height: 800 });
@@ -162,7 +163,7 @@ test("a stopped PR shows who stopped it and every stop and re-arm, and re-arms w
   const items = page.getByTestId("gate-history").getByRole("listitem");
   await expect(items).toHaveCount(3);
   await expect(items.nth(0)).toContainText("Stopped by @a-reviewer from a PR comment");
-  await expect(items.nth(1)).toContainText("Re-armed by someone@example.com in CoderHelm");
+  await expect(items.nth(1)).toContainText("Re-armed by someone@example.com in Coderhelm");
   await expect(page.getByText(/checks its approval of the current commit, the required approvals and CI again/)).toBeVisible();
   await page.getByRole("button", { name: "Re-arm auto-merge" }).click();
   await expect(page.getByTestId("gate-result")).toContainText("checks CoderHelm's approval of commit abcdef1");

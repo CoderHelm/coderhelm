@@ -37,7 +37,7 @@ interface Backend {
   jiraEvents: Record<string, unknown>[];
   assumeFails: boolean;
   calls: { method: string; path: string; body: Record<string, unknown> | null }[];
-  /** What the CoderHelm role can't read yet (metrics, airflow). */
+  /** What the Coderhelm role can't read yet (metrics, airflow). */
   roleMissing?: string[];
 }
 
@@ -355,7 +355,7 @@ test.describe("AWS role access", () => {
     await mockApi(page, { connections: [connection({}, ["metrics", "airflow"])] });
     await page.goto("/settings/integrations/aws/");
     const box = page.getByTestId(`aws-panel-${ACCOUNT}`);
-    await expect(box.getByText("Add CloudWatch metrics and Airflow to your CoderHelm role")).toBeVisible();
+    await expect(box.getByText("Add CloudWatch metrics and Airflow to your Coderhelm role")).toBeVisible();
     const link = box.getByRole("link", { name: "Add access in AWS" });
     await expect(link).toHaveAttribute("href", /stacks\/quickcreate\?stackName=CoderHelmLogReaderOps/);
     await expect(box.getByRole("switch", { name: "Let agents read Metrics" })).toBeDisabled();

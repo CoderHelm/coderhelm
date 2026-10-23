@@ -486,7 +486,7 @@ test("a review page leads with the PR's title, links it on GitHub and rates once
   await expect(page.getByRole("region", { name: "Summary" }).getByRole("heading")).toHaveCount(1);
   // The note box waits for an answer or "Add a note".
   await expect(page.getByRole("textbox")).toHaveCount(0);
-  await expect(page.getByText("CoderHelm also learns from your replies on the PR on its own")).toBeVisible();
+  await expect(page.getByText("Coderhelm also learns from your replies on the PR on its own")).toBeVisible();
   await shot(page, "audit-reviewer-detail");
   const yes = page.getByRole("button", { name: "Yes", exact: true });
   await yes.click();
@@ -521,7 +521,7 @@ test("findings read from a review's text become cards, grouped into what to fix 
   await expect(header.getByText("Medium risk")).toBeVisible();
   await expect(header.getByText("Triggered by new commits")).toBeVisible();
   await expect(page.getByTestId("posted-note")).toHaveText(
-    "Posted as a comment because CoderHelm opened this PR. GitHub doesn't let a PR's author approve or request changes.",
+    "Posted as a comment because Coderhelm opened this PR. GitHub doesn't let a PR's author approve or request changes.",
   );
   await expect(page.getByText("COMMENT", { exact: true })).toHaveCount(0);
 

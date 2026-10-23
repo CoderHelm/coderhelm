@@ -58,7 +58,7 @@ const FINISHED = new Set(["merged", "closed"]);
 type LoadState = "loading" | "ready" | "missing" | "error";
 
 function via(v: string): string {
-  return v === "comment" ? "from a PR comment" : v === "dashboard" ? "in CoderHelm" : "";
+  return v === "comment" ? "from a PR comment" : v === "dashboard" ? "in Coderhelm" : "";
 }
 
 function GatePage() {
@@ -100,7 +100,7 @@ function GatePage() {
           <p>
             {state === "error"
               ? "Check your connection and try again."
-              : "This link does not point to a pull request in a repo your team set up in CoderHelm."}
+              : "This link does not point to a pull request in a repo your team set up in Coderhelm."}
           </p>
           {state === "error" ? (
             <button type="button" onClick={() => { setState("loading"); load(); }} className={`mt-2 ${secondaryButton}`}>
@@ -197,13 +197,13 @@ function GatePage() {
           )}
           {action === "stop" && (
             <p className="mt-1 text-sm text-zinc-400">
-              CoderHelm won&apos;t merge this pull request until someone re-arms it, here or with a{" "}
+              Coderhelm won&apos;t merge this pull request until someone re-arms it, here or with a{" "}
               <code className="text-zinc-300">@coderhelm resume auto-merge</code> comment. New commits don&apos;t re-arm it.
             </p>
           )}
           {action === "rearm" && (
             <p className="mt-1 text-sm text-zinc-400">
-              Nothing is skipped: before merging, CoderHelm checks its approval of the current commit, the required
+              Nothing is skipped: before merging, Coderhelm checks its approval of the current commit, the required
               approvals and CI again. If the commit is new since its review, it reviews it first.
             </p>
           )}

@@ -22,6 +22,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { Skeleton } from "@/components/skeleton";
 import { CopyButton } from "@/components/copy-button";
 import { focusRing, inputClass, primaryButton, secondaryButton } from "@/components/ui";
+import { Tabs } from "@/components/tabs";
 import { Page, PageHeader } from "@/components/page";
 import {
   List,
@@ -200,27 +201,16 @@ function AdminPage() {
         }
       />
 
-      <nav aria-label="Admin views" className="mt-6 border-b border-zinc-800">
-        <ul className="-mb-px flex flex-wrap gap-x-1">
-          {TABS.map((t) => {
-            const current = t.value === tab;
-            return (
-              <li key={t.value}>
-                <Link
-                  href={t.value === "teams" ? "/admin" : `/admin?tab=${t.value}`}
-                  aria-current={current ? "page" : undefined}
-                  className={`inline-flex min-h-10 items-center gap-2 border-b-2 px-3 text-sm rounded-t ${
-                    current ? "border-zinc-100 font-medium text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-100"
-                  } ${focusRing}`}
-                >
-                  {t.label}
-                  {counts[t.value]}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+      <Tabs
+        label="Admin views"
+        value={tab}
+        items={TABS.map((t) => ({
+          value: t.value,
+          label: t.label,
+          href: t.value === "teams" ? "/admin" : `/admin?tab=${t.value}`,
+          count: counts[t.value],
+        }))}
+      />
 
       {tab === "teams" && (
         <TeamsView

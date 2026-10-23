@@ -377,7 +377,7 @@ export function AwsAbilitiesPanel({
         )}
       </div>
       {missing.length > 0 && a.update_url && (
-        <Callout variant="warning" title={`Add ${missing.join(" and ")} to your CoderHelm role`} live={false}>
+        <Callout variant="warning" title={`Add ${missing.join(" and ")} to your Coderhelm role`} live={false}>
           <p>
             The role can&apos;t read {missing.join(" or ")} yet. One click adds read-only access as a small stack in your account
             ({a.stack_name ?? "CoderHelmLogReaderOps"}); it doesn&apos;t change your existing stack, and deleting it takes the access away. Then

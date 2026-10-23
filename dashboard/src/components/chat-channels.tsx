@@ -86,7 +86,7 @@ export function SlackHowTo() {
     <ol className="list-decimal space-y-1 pl-5 text-sm text-zinc-400">
       <li>
         Go to <span className="text-zinc-300">api.slack.com/apps</span> and create an app &ldquo;From scratch&rdquo; in your workspace
-        (or open one your team already uses for CoderHelm).
+        (or open one your team already uses for Coderhelm).
       </li>
       <li>Open Incoming Webhooks and turn them on.</li>
       <li>Choose &ldquo;Add New Webhook&rdquo;, pick the channel, and allow it.</li>

@@ -45,9 +45,9 @@ function shortLine(line: MergeChecklistLine): string {
   if (/^CI running/i.test(t)) return "CI running";
   if (/^CI failing/i.test(t)) return t.replace(/^CI failing/i, "CI failing");
   if (/^Waiting for a person'?s approval/i.test(t)) return "waiting for 1 approval";
-  if (/^Waiting for CoderHelm'?s review/i.test(t)) return "waiting for CoderHelm's review";
+  if (/^Waiting for Coderhelm'?s review/i.test(t)) return "waiting for Coderhelm's review";
   if (/^Waiting for the PR to leave draft/i.test(t)) return "still a draft";
-  if (/^CoderHelm approved/i.test(t)) return "";
+  if (/^Coderhelm approved/i.test(t)) return "";
   if (/^Approved by/i.test(t)) return "";
   if (/^Deploy label/i.test(t)) return "";
   if (/^Adding /i.test(t)) return "adding deploy labels";

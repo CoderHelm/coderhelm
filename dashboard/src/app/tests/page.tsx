@@ -9,6 +9,7 @@ import { readRepo, writeRepo } from "@/lib/tests";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
 import { focusRing, primaryButton } from "@/components/ui";
+import { Tabs } from "@/components/tabs";
 import { Page, PageHeader } from "@/components/page";
 import { LoadError, Loading } from "@/components/tests/common";
 import { RepoFilter, useListParams } from "@/components/list";
@@ -117,26 +118,11 @@ function TestsPage() {
         }
       />
 
-      <nav aria-label="Tests views" className="mt-6 border-b border-zinc-800">
-        <ul className="-mb-px flex flex-wrap gap-x-1">
-          {visible.map((v) => {
-            const current = v.value === view;
-            return (
-              <li key={v.value}>
-                <Link
-                  href={v.value === "attention" ? "/tests" : `/tests?view=${v.value}`}
-                  aria-current={current ? "page" : undefined}
-                  className={`inline-flex min-h-10 items-center border-b-2 px-3 text-sm rounded-t ${
-                    current ? "border-zinc-100 font-medium text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-100"
-                  } ${focusRing}`}
-                >
-                  {v.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+      <Tabs
+        label="Tests views"
+        value={view}
+        items={visible.map((v) => ({ value: v.value, label: v.label, href: v.value === "attention" ? "/tests" : `/tests?view=${v.value}` }))}
+      />
 
       <div className="mt-6">
         {!loaded ? (

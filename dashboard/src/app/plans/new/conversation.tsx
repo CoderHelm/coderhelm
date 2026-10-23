@@ -13,7 +13,7 @@ import type { StreamMessage, ThinkingPart, ToolCallPart } from "@/lib/stream-typ
 import { changeWords, withoutPlanJson, type PlanChange } from "./draft";
 
 // The plan chat as a conversation: your messages as bubbles on the right,
-// CoderHelm's answers as plain text on the left. Everything it looked at
+// Coderhelm's answers as plain text on the left. Everything it looked at
 // while answering folds into one line per answer ("Worked for 12s · read 3
 // files"), which opens to each step. A plan in an answer shows as a small
 // "Drafted the plan" card instead of its JSON.
