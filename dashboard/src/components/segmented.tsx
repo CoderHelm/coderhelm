@@ -1,5 +1,6 @@
 "use client";
 
+import { ScrollFade } from "./scroll-fade";
 import { focusRing } from "./ui";
 
 export interface SegmentedOption<T extends string> {
@@ -22,7 +23,9 @@ export function Segmented<T extends string>({
   onChange: (value: T) => void;
   disabled?: boolean;
 }) {
+  // A row wider than a phone scrolls sideways, with a fade on the edge that has more.
   return (
+    <ScrollFade axis="x" className="inline-block max-w-full align-middle" innerClassName="[scrollbar-width:none]">
     <div role="group" aria-label={label} className="inline-flex shrink-0 rounded-lg border border-zinc-700">
       {options.map((option, i) => {
         const pressed = option.value === value;
@@ -44,5 +47,6 @@ export function Segmented<T extends string>({
         );
       })}
     </div>
+    </ScrollFade>
   );
 }
