@@ -1,9 +1,11 @@
 "use client";
 
-// Code graph: its own section (the graph serves BOTH the reviewer and the
-// coding agent). Per repo: index status, load-bearing files (PageRank), symbol search
-// (definitions + callers), and an interactive force-directed neighborhood
-// explorer (click a node to re-center on that file).
+// Code graph: its own section (the planner, the coding agent, CI fixes and
+// the reviewer all use it). Every repo Coderhelm works in is listed with its
+// graph's status (off, not built, queued, indexing, ready, failed) and its
+// Turn off / Rebuild actions. A ready repo opens below: load-bearing files
+// (PageRank), symbol search (definitions + callers), and an interactive
+// force-directed neighborhood explorer (click a node to re-center on it).
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -11,16 +13,32 @@ import {
   api,
   type GraphNeighborhood,
   type GraphRepo,
+  type GraphState,
   type GraphStatus,
   type GraphSymbolResult,
 } from "@/lib/api";
 import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
-import { StatusPill } from "@/components/status-pill";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
-import { focusRing, inputClass, primaryButton, secondaryButton } from "@/components/ui";
+import {
+  focusRing,
+  inputClass,
+  primaryButton,
+  secondaryButton,
+  smallSecondaryButton,
+} from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
+import {
+  List,
+  ListEmpty,
+  ListError,
+  ListRow,
+  ListSection,
+  ListSkeleton,
+  StatusText,
+  type StatusLook,
+} from "@/components/list";
 
 // ── Force layout (small, dependency-free) ───────────────────────────────────
 
@@ -228,6 +246,45 @@ function ErrorBox({ title, message, onRetry }: { title: string; message: string;
   );
 }
 
+/** A repo's state, also from a gateway that predates `state`. */
+function graphState(r: GraphRepo): GraphState {
+  if (r.state) return r.state;
+  if (!r.graph_enabled) return "off";
+  return r.indexed ? "ready" : "not_built";
+}
+
+const LOOK: Record<GraphState, StatusLook> = {
+  ready: { label: "Ready", tone: "success" },
+  indexing: { label: "Indexing", tone: "live", live: true },
+  queued: { label: "Queued", tone: "queued", live: true },
+  not_built: { label: "Not built yet", tone: "neutral" },
+  failed: { label: "Failed", tone: "danger" },
+  off: { label: "Off", tone: "muted" },
+};
+
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+
+/** The meta line under a repo: what its graph holds, or what happens next. */
+function repoMeta(r: GraphRepo, state: GraphState): string[] {
+  const stats = r.indexed
+    ? [plural(r.files, "file", "files"), plural(r.symbols, "symbol", "symbols"), r.indexed_sha ? `at ${r.indexed_sha.slice(0, 7)}` : ""]
+    : [];
+  switch (state) {
+    case "ready":
+      return r.updating ? [...stats, "updating now"] : stats;
+    case "queued":
+      return ["Queued to build"];
+    case "indexing":
+      return ["Building from the default branch"];
+    case "not_built":
+      return ["Builds when work starts on this repo, or rebuild now"];
+    case "off":
+      return ["Turned off: agents don't use it and pushes don't update it", ...stats];
+    case "failed":
+      return stats;
+  }
+}
+
 export default function GraphPage() {
   const [repos, setRepos] = useState<GraphRepo[] | null>(null);
   const [reposError, setReposError] = useState("");
@@ -240,7 +297,7 @@ export default function GraphPage() {
   const [hood, setHood] = useState<GraphNeighborhood | null>(null);
   const [hoodError, setHoodError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [toggling, setToggling] = useState(false);
+  const [acting, setActing] = useState("");
   const [canManage, setCanManage] = useState(false);
   const { toast } = useToast();
   const { confirm } = useConfirm();
@@ -252,7 +309,7 @@ export default function GraphPage() {
       .then((r) => {
         setRepos(r.repos);
         if (!keepSelection) {
-          const first = r.repos.find((x) => x.indexed) ?? r.repos[0];
+          const first = r.repos.find((x) => graphState(x) === "ready") ?? r.repos.find((x) => x.indexed);
           setRepo(first ? first.repo : "");
         }
       })
@@ -260,10 +317,21 @@ export default function GraphPage() {
   }, []);
 
   useEffect(() => {
-    // Turning indexing on or off is admin only on the server.
+    // Turning a graph off or rebuilding it is admin only on the server.
     api.me().then((u) => setCanManage(u.role === "admin" || u.role === "owner")).catch(() => {});
     void loadRepos(false);
   }, [loadRepos]);
+
+  // While a build is queued or running, check again every few seconds.
+  const building = (repos ?? []).some((r) => {
+    const st = graphState(r);
+    return st === "queued" || st === "indexing" || !!r.updating;
+  });
+  useEffect(() => {
+    if (!building) return;
+    const t = setInterval(() => void loadRepos(true), 8000);
+    return () => clearInterval(t);
+  }, [building, loadRepos]);
 
   const loadStatus = useCallback(() => {
     if (!repo) return;
@@ -303,80 +371,136 @@ export default function GraphPage() {
       .finally(() => setBusy(false));
   }, [repo, query]);
 
-  const current = repos?.find((r) => r.repo === repo);
-
-  const toggleIndexing = async () => {
-    if (!current) return;
-    const turnOn = !current.graph_enabled;
-    if (!turnOn) {
+  const setEnabled = async (r: GraphRepo, on: boolean) => {
+    if (!on) {
       const ok = await confirm({
-        title: "Turn off indexing?",
-        message: `The graph for ${current.repo} stops updating on pushes. The reviewer and coding agent keep using the last index.`,
+        title: `Turn off the code graph for ${r.repo}?`,
+        message:
+          "The planner, the coding agent, the reviewer and CI fixes stop using it for this repo, and pushes stop updating it. You can turn it back on at any time.",
         confirmLabel: "Turn off",
         destructive: true,
       });
       if (!ok) return;
     }
-    setToggling(true);
+    setActing(r.repo);
     try {
-      await api.setGraphEnabled(current.repo, turnOn);
+      await api.setGraphEnabled(r.repo, on);
       await loadRepos(true);
-      if (turnOn) toast("Indexing turned on. The first index is building.");
-      loadStatus();
+      toast(on ? `Code graph on for ${r.repo}.` : `Code graph off for ${r.repo}.`);
     } catch (e) {
-      toast(`Couldn't change indexing: ${errText(e)}`, "error");
+      toast(`Couldn't change the code graph: ${errText(e)}`, "error");
     } finally {
-      setToggling(false);
+      setActing("");
     }
   };
 
+  const rebuild = async (r: GraphRepo) => {
+    setActing(r.repo);
+    try {
+      await api.rebuildGraph(r.repo);
+      await loadRepos(true);
+      toast(`Rebuilding the code graph for ${r.repo}.`);
+    } catch (e) {
+      toast(`Couldn't start the rebuild: ${errText(e)}`, "error");
+    } finally {
+      setActing("");
+    }
+  };
+
+  const current = repos?.find((r) => r.repo === repo);
   const updated = status?.updated_at ? new Date(status.updated_at) : null;
 
   return (
     <Page className="space-y-6">
       <PageHeader
         title="Code graph"
-        lead="A map of each repo: where things are defined, who calls them and what imports what. The reviewer and the coding agent both use it. It updates on every push to the default branch."
+        lead="A map of each repo: where things are defined, who calls them and what imports what. The planner, the coding agent, the reviewer and CI fixes all use it. Every repo Coderhelm works in gets one, and it updates on every push to the default branch."
       />
 
-      {reposError ? (
-        <ErrorBox title="Couldn't load your repos" message={reposError} onRetry={() => void loadRepos(false)} />
-      ) : repos === null ? (
-        <Skeleton className="h-10 w-72" />
-      ) : repos.length === 0 ? (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-sm text-zinc-400" data-testid="graph-empty">
-          No repos have a code graph yet. A repo appears here once the reviewer is set up for it.{" "}
-          <Link href="/reviewer/config" className={`text-zinc-200 underline underline-offset-2 rounded ${focusRing}`}>
-            Set up the reviewer
-          </Link>
-        </div>
-      ) : (
-        <div className="flex items-end gap-3 flex-wrap">
-          <label className="flex min-w-0 max-w-full flex-col gap-1 text-xs text-zinc-400">
-            Repository
-            <select
-              value={repo}
-              onChange={(e) => setRepo(e.target.value)}
-              className={`max-w-full min-h-9 px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-700 text-sm text-zinc-200 ${focusRing}`}
-            >
-              {repos.map((r) => (
-                <option key={r.repo} value={r.repo}>
-                  {r.repo}{r.indexed ? "" : " (no graph yet)"}
-                </option>
-              ))}
-            </select>
-          </label>
-          {current && canManage && (
-            <button type="button" onClick={() => void toggleIndexing()} disabled={toggling} className={secondaryButton}>
-              {toggling ? "Saving..." : current.graph_enabled ? "Turn off indexing" : "Turn on indexing"}
-            </button>
-          )}
-          {current && (
-            <StatusPill tone={current.graph_enabled ? "success" : "neutral"}>
-              {current.graph_enabled ? "Indexing on" : "Indexing off"}
-            </StatusPill>
-          )}
-        </div>
+      <ListSection id="graph-repos" title="Repositories" count={repos?.length}>
+        {reposError ? (
+          <ListError title="Couldn't load your repos" onRetry={() => void loadRepos(false)}>
+            {reposError}
+          </ListError>
+        ) : repos === null ? (
+          <ListSkeleton rows={3} label="Loading repositories" />
+        ) : repos.length === 0 ? (
+          <ListEmpty
+            title="No repositories yet"
+            action={
+              <Link href="/settings/repos" className={secondaryButton}>
+                Connect repositories
+              </Link>
+            }
+          >
+            Turn a repository on and Coderhelm builds its code graph for the planner, the coding agent, the reviewer and CI fixes.
+          </ListEmpty>
+        ) : (
+          <List label="Repositories and their code graphs">
+            {repos.map((r) => {
+              const state = graphState(r);
+              const look = LOOK[state];
+              const busyRow = acting === r.repo;
+              return (
+                <ListRow
+                  key={r.repo}
+                  testId="graph-repo"
+                  data={{ repo: r.repo, state }}
+                  status={look}
+                  title={r.repo}
+                  quiet={state === "off"}
+                  meta={repoMeta(r, state)}
+                  summary={state === "failed" ? r.reason || "The build failed." : undefined}
+                  summaryTone="danger"
+                  chips={<StatusText look={look} />}
+                  time={r.indexed ? r.updated_at : null}
+                  actions={
+                    <>
+                      {r.indexed && state !== "off" && (
+                        <button
+                          type="button"
+                          onClick={() => setRepo(r.repo)}
+                          aria-pressed={repo === r.repo}
+                          className={smallSecondaryButton}
+                        >
+                          {repo === r.repo ? "Exploring" : "Explore"}
+                        </button>
+                      )}
+                      {canManage && state !== "off" && (
+                        <button
+                          type="button"
+                          onClick={() => void rebuild(r)}
+                          disabled={busyRow || state === "queued" || state === "indexing"}
+                          aria-label={`Rebuild the code graph for ${r.repo}`}
+                          className={smallSecondaryButton}
+                        >
+                          Rebuild
+                        </button>
+                      )}
+                      {canManage && (
+                        <button
+                          type="button"
+                          onClick={() => void setEnabled(r, state === "off")}
+                          disabled={busyRow}
+                          aria-label={`${state === "off" ? "Turn on" : "Turn off"} the code graph for ${r.repo}`}
+                          className={smallSecondaryButton}
+                        >
+                          {state === "off" ? "Turn on" : "Turn off"}
+                        </button>
+                      )}
+                    </>
+                  }
+                />
+              );
+            })}
+          </List>
+        )}
+      </ListSection>
+
+      {current && (
+        <h2 className="text-sm font-medium text-zinc-300 break-words" data-testid="graph-exploring">
+          Exploring <span className="text-zinc-100">{current.repo}</span>
+        </h2>
       )}
 
       {statusError && <ErrorBox title="Couldn't load the graph" message={statusError} onRetry={loadStatus} />}
@@ -384,24 +508,6 @@ export default function GraphPage() {
       {repo && !status && !statusError && (repos?.length ?? 0) > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" aria-busy="true">
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16" />)}
-        </div>
-      )}
-
-      {status && !status.indexed && (
-        <div className="text-sm text-zinc-400 border border-zinc-800 rounded-lg p-4">
-          No graph yet for this repo.{" "}
-          {current?.graph_enabled ? (
-            <>
-              The first index is building.{" "}
-              <button type="button" onClick={loadStatus} className={`underline underline-offset-2 text-zinc-200 rounded ${focusRing}`}>
-                Check again
-              </button>
-            </>
-          ) : canManage ? (
-            "Turn on indexing to build it."
-          ) : (
-            "Ask a team admin to turn on indexing."
-          )}
         </div>
       )}
 

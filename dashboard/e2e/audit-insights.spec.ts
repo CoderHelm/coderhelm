@@ -389,7 +389,7 @@ test("code graph shows stats, search and the explorer", async ({ page }) => {
   await mockApi(page);
   await page.goto("/graph");
   await expect(page.getByRole("heading", { name: "Code graph", level: 1 })).toBeVisible();
-  await expect(page.getByLabel("Repository")).toHaveValue("your-team/web");
+  await expect(page.getByTestId("graph-exploring")).toContainText("your-team/web");
   await expect(page.getByText("3,400")).toBeVisible();
   await page.getByLabel("Function, class or type name").fill("request");
   await page.getByRole("button", { name: "Search", exact: true }).click();
@@ -405,11 +405,11 @@ test("code graph shows stats, search and the explorer", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test("code graph asks before turning indexing off and hides the switch from members", async ({ page }) => {
+test("code graph asks before turning a repo's graph off and hides the switch from members", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/graph");
-  await page.getByRole("button", { name: "Turn off indexing" }).click();
-  await expect(page.getByText("Turn off indexing?")).toBeVisible();
+  await page.getByRole("button", { name: "Turn off the code graph for your-team/web" }).click();
+  await expect(page.getByText("Turn off the code graph for your-team/web?")).toBeVisible();
   await page.getByRole("button", { name: "Cancel" }).click();
   expect(db.calls.some((c) => c.startsWith("PUT /api/graph/config/"))).toBe(false);
 
@@ -417,15 +417,15 @@ test("code graph asks before turning indexing off and hides the switch from memb
   await mockApi(page, { role: "member" });
   await page.reload();
   await expect(page.getByText("3,400")).toBeVisible();
-  await expect(page.getByRole("button", { name: /indexing/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /(Turn (off|on)|Rebuild) the code graph/ })).toHaveCount(0);
 });
 
 test("code graph with no repos explains how to get one", async ({ page }) => {
   const errors = watchConsole(page);
   await mockApi(page, { graphRepos: [] });
   await page.goto("/graph");
-  await expect(page.getByTestId("graph-empty")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Set up the reviewer" })).toHaveAttribute("href", /\/reviewer\/config/);
+  await expect(page.getByTestId("list-empty")).toContainText("No repositories yet");
+  await expect(page.getByRole("link", { name: "Connect repositories" })).toHaveAttribute("href", /\/settings\/repos/);
   await shot(page, "audit-graph-empty");
   expect(errors).toEqual([]);
 });
@@ -437,7 +437,7 @@ test("code graph load failure shows an error with retry, not a blank page", asyn
   await expect(page.getByText("Couldn't load your repos")).toBeVisible();
   db.fail.clear();
   await page.getByRole("button", { name: "Try again" }).click();
-  await expect(page.getByLabel("Repository")).toHaveValue("your-team/web");
+  await expect(page.getByTestId("graph-exploring")).toContainText("your-team/web");
   // Bug: rejections were unhandled and surfaced as page errors.
   expect(errors).toEqual([]);
 });
