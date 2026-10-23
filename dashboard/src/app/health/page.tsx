@@ -1,5 +1,6 @@
 "use client";
 
+import { CodeBlock } from "@/components/code-block";
 import Link from "next/link";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { api, type HealthCheck, type HealthCheckItem, type DlqMessage } from "@/lib/api";
@@ -368,9 +369,7 @@ function DlqPanel({ onRefresh }: { onRefresh: () => void }) {
                       <span className="text-xs text-zinc-500">· {new Date(msg.sent_at).toLocaleString()}</span>
                     )}
                   </div>
-                  <pre className="text-xs font-mono text-zinc-400 bg-zinc-900 rounded p-2 mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap break-all">
-                    {JSON.stringify(msg.body, null, 2)}
-                  </pre>
+                  <CodeBlock code={JSON.stringify(msg.body, null, 2)} lang="json" label="Message" maxHeightClass="max-h-40" className="mt-1" />
                 </div>
                 <div className="flex gap-2 sm:flex-col shrink-0">
                   <button type="button" onClick={() => void handleRedrive(msg)} disabled={!!acting} className={`${smallButton} border-zinc-600 bg-zinc-800 text-zinc-200 hover:bg-zinc-700`}>

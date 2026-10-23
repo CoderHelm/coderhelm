@@ -3,14 +3,14 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { api, type Repo, type TestSettings } from "@/lib/api";
 import { errorMessage } from "@/lib/data-sources";
-import { CopyButton } from "@/components/copy-button";
+import { CodeBlock } from "@/components/code-block";
+import { Code } from "@/components/settings/code";
 import { Callout } from "@/components/callout";
 import { useToast } from "@/components/toast";
 import { focusRing, primaryButton, secondaryButton } from "@/components/ui";
 import { Select } from "./common";
 
-export const REPORTER_SNIPPET = `// playwright.config.ts
-reporter: [["html"], ["json", { outputFile: "test-results/results.json" }]],`;
+export const REPORTER_SNIPPET = `reporter: [["html"], ["json", { outputFile: "test-results/results.json" }]],`;
 
 export const QUARANTINE_SNIPPET = `# in the job that runs your Playwright tests
 permissions:
@@ -46,11 +46,11 @@ export function QuarantineCiStep() {
         auto-merge. GitHub&apos;s check still turns red, because your workflow decides that. To skip quarantined tests in the build,
         add this step before your test step. If Coderhelm can&apos;t be reached, every test runs as before.
       </p>
-      <Snippet text={QUARANTINE_SNIPPET} />
+      <CodeBlock code={QUARANTINE_SNIPPET} lang="yaml" title="GitHub Actions step" className="mt-2" />
       <p className="max-w-prose text-zinc-400">
         Skipped tests aren&apos;t recorded from that run. To keep recording them, run{" "}
-        <code className="text-zinc-200">npx playwright test --grep &quot;$QUARANTINED&quot;</code> in a separate job with{" "}
-        <code className="text-zinc-200">continue-on-error: true</code> that uploads its results the same way.
+        <Code>npx playwright test --grep &quot;$QUARANTINED&quot;</Code> in a separate job with{" "}
+        <Code>continue-on-error: true</Code> that uploads its results the same way.
       </p>
     </div>
   );
@@ -72,27 +72,16 @@ export function SetupSteps() {
           <span className="font-medium text-zinc-100">1. Write a results file.</span> Add Playwright&apos;s JSON reporter next to the one you
           have. JUnit XML and Cucumber JSON work too.
         </p>
-        <Snippet text={REPORTER_SNIPPET} />
+        <CodeBlock code={REPORTER_SNIPPET} lang="ts" filename="playwright.config.ts" className="mt-2" />
       </li>
       <li>
         <p>
           <span className="font-medium text-zinc-100">2. Keep it, even when tests fail.</span> Upload the results folder at the end of the
-          job. <code className="text-zinc-200">if: !cancelled()</code> keeps failed runs, which are the ones that matter.
+          job. <Code>if: !cancelled()</Code> keeps failed runs, which are the ones that matter.
         </p>
-        <Snippet text={UPLOAD_SNIPPET} />
+        <CodeBlock code={UPLOAD_SNIPPET} lang="yaml" title="GitHub Actions step" className="mt-2" />
       </li>
     </ol>
-  );
-}
-
-function Snippet({ text }: { text: string }) {
-  return (
-    <div className="mt-2 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
-      <div className="flex justify-end border-b border-zinc-800 px-2 py-1.5">
-        <CopyButton text={text} />
-      </div>
-      <pre className="overflow-x-auto p-3 font-mono text-xs leading-relaxed text-zinc-300">{text}</pre>
-    </div>
   );
 }
 

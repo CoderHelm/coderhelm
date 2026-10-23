@@ -5,6 +5,7 @@
 // Skills page, and on an item's page a list of its steps with what each one
 // relies on, what to connect, and the original and translated text.
 
+import { CodeBlock } from "@/components/code-block";
 import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Markdown } from "@/components/markdown";
@@ -634,22 +635,14 @@ function TextViews({ original, translated }: { original: string; translated: str
               {changed} line{changed === 1 ? "" : "s"} changed. <span className="text-red-300">Removed lines</span> are from the original,{" "}
               <span className="text-emerald-300">added lines</span> from the translation.
             </p>
-            <pre className="max-h-[36rem] overflow-auto rounded bg-zinc-950 py-2 font-mono text-xs leading-relaxed" aria-label="Changes from the original">
-              {diff.map((d, i) => (
-                <div
-                  key={i}
-                  className={`whitespace-pre-wrap break-words px-3 ${
-                    d.kind === "added" ? "bg-emerald-500/10 text-emerald-200" : d.kind === "removed" ? "bg-red-500/10 text-red-200" : "text-zinc-500"
-                  }`}
-                >
-                  <span aria-hidden="true" className="mr-2 select-none text-zinc-600">
-                    {d.kind === "added" ? "+" : d.kind === "removed" ? "-" : " "}
-                  </span>
-                  <span className="sr-only">{d.kind === "added" ? "Added: " : d.kind === "removed" ? "Removed: " : ""}</span>
-                  {d.text || " "}
-                </div>
-              ))}
-            </pre>
+            <CodeBlock
+              code={diff.map((d) => `${d.kind === "added" ? "+" : d.kind === "removed" ? "-" : " "}${d.text}`).join("\n")}
+              lang="markdown"
+              diff
+              wrap
+              label="Changes from the original"
+              maxHeightClass="max-h-[36rem]"
+            />
           </>
         )}
       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { CodeBlock } from "@/components/code-block";
 import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
 import { api, type InfraAnalysis, type InfraFinding, type Repo } from "@/lib/api";
@@ -77,8 +78,6 @@ function AnalysisView({
   stale: boolean;
   canScan: boolean;
 }) {
-  const [copied, setCopied] = useState(false);
-  const { toast } = useToast();
   const askAdmin = <p className="text-zinc-500 text-sm mt-4">Ask a team admin to run a scan.</p>;
 
   // A record is written by every finished scan (with cached_at). No record
@@ -100,13 +99,6 @@ function AnalysisView({
   }
 
   if (analysis.status === "no_infra") {
-    const handleCopy = () => {
-      if (!analysis.suggested_prompt) return;
-      navigator.clipboard.writeText(analysis.suggested_prompt).then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      }).catch(() => toast("Couldn't copy to the clipboard", "error"));
-    };
     return (
       <div className="max-w-xl mx-auto mt-12 text-center">
         <h2 className="text-lg font-semibold mb-2">No infrastructure code found</h2>
@@ -117,15 +109,7 @@ function AnalysisView({
         </p>
         {analysis.suggested_prompt && (
           <div className="text-left">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-zinc-500 uppercase tracking-wider">Suggested plan prompt</p>
-              <button type="button" onClick={handleCopy} className={`rounded text-xs text-zinc-400 hover:text-zinc-200 transition-colors ${focusRing}`}>
-                {copied ? "Copied" : "Copy"}
-              </button>
-            </div>
-            <pre className="p-4 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-400 font-mono whitespace-pre-wrap break-words leading-relaxed text-left overflow-auto max-h-64">
-              {analysis.suggested_prompt}
-            </pre>
+            <CodeBlock code={analysis.suggested_prompt} title="Suggested plan prompt" wrap maxHeightClass="max-h-64" />
           </div>
         )}
       </div>

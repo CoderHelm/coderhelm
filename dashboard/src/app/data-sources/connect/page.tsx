@@ -15,7 +15,7 @@ import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
 import { Callout } from "@/components/callout";
 import { CheckList, type CheckItem } from "@/components/check-list";
-import { CopyButton } from "@/components/copy-button";
+import { CodeBlock } from "@/components/code-block";
 import { Disclosure } from "@/components/disclosure";
 import { Field, SecretInput } from "@/components/field";
 import { HiddenFieldsEditor } from "@/components/hidden-fields-editor";
@@ -730,7 +730,6 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
 
   const panel = "rounded-lg border border-zinc-800 bg-zinc-900/50 p-5";
   const panelTitle = "text-xs font-semibold uppercase tracking-wider text-zinc-500";
-  const pre = "mt-2 max-h-96 overflow-auto rounded-lg border border-zinc-800 bg-zinc-950 p-3 font-mono text-xs leading-relaxed text-zinc-300 whitespace-pre";
   const queryLabel = kind === "database" ? "One SQL SELECT" : kind === "logs" ? "A Logs Insights search" : "A GraphQL read query";
   const placeholder =
     kind === "database"
@@ -849,11 +848,15 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
         {result && (
           <>
             <section aria-labelledby="asked-heading" className={panel}>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 id="asked-heading" className={panelTitle}>What was asked</h2>
-                <CopyButton text={result.query || asked} />
-              </div>
-              <pre className={pre} tabIndex={0}>{result.query || asked}</pre>
+              <h2 id="asked-heading" className={panelTitle}>What was asked</h2>
+              <CodeBlock
+                code={result.query || asked}
+                lang={kind === "database" ? "sql" : kind === "logs" ? undefined : "graphql"}
+                title={kind === "logs" ? "Logs Insights" : undefined}
+                label="What was asked"
+                maxHeightClass="max-h-96"
+                className="mt-2"
+              />
               {kind === "logs" && result.fields.length > 0 && (
                 <p className="mt-2 text-xs text-zinc-500">In {result.fields.join(", ")}</p>
               )}
@@ -881,7 +884,7 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
                 </div>
               ) : (
                 <>
-                  <pre className={pre} tabIndex={0}>{prettyJson(result.result ?? "")}</pre>
+                  <CodeBlock code={prettyJson(result.result ?? "")} lang="json" label="What came back" maxHeightClass="max-h-96" className="mt-2" />
                   <p className="mt-2 text-xs text-zinc-500">
                     {result.note && (
                       <span>

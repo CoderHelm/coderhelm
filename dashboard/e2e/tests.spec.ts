@@ -236,8 +236,8 @@ test("tests: off by default, an admin turns it on and sees the reporter change",
   const db = await mockApi(page, { empty: true, settings: { enabled: false, auto_quarantine: false, fix_prs: false, tickets: "off", burn_in: false, repos: [], ticket_after_days: 2 } });
   await page.goto("/tests");
   await expect(page.getByRole("heading", { name: "Turn on E2E tracking" })).toBeVisible();
-  await expect(page.getByText('["json", { outputFile: "test-results/results.json" }]')).toBeVisible();
-  await expect(page.getByText("if: ${{ !cancelled() }}")).toBeVisible();
+  await expect(page.getByRole("region", { name: "playwright.config.ts" })).toContainText('["json", { outputFile: "test-results/results.json" }]');
+  await expect(page.getByRole("region", { name: "GitHub Actions step" }).first()).toContainText("if: ${{ !cancelled() }}");
   await shot(page, "empty-off");
   await page.getByRole("button", { name: "Turn on E2E tracking" }).click();
   await expect(page.getByRole("heading", { name: "Waiting for the first E2E run" })).toBeVisible();

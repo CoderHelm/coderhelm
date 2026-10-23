@@ -14,7 +14,7 @@ import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
 import { Callout } from "@/components/callout";
 import { CheckList, type CheckItem } from "@/components/check-list";
-import { CopyButton } from "@/components/copy-button";
+import { CodeBlock } from "@/components/code-block";
 import { Disclosure } from "@/components/disclosure";
 import { FlowShell } from "@/components/data-source-flow-shell";
 import { LogGroupPicker } from "@/components/log-group-picker";
@@ -200,19 +200,7 @@ function AccessStep({
               </p>
             </Instruction>
             <Instruction n={2} title="Paste this script and press Enter">
-              <div className="rounded-lg border border-zinc-800 bg-zinc-950">
-                <div className="flex items-center justify-between gap-2 border-b border-zinc-800 px-3 py-2">
-                  <span className="text-xs text-zinc-500">Setup script</span>
-                  <CopyButton text={setup.script} label="Copy script" />
-                </div>
-                <pre
-                  tabIndex={0}
-                  aria-label="Setup script"
-                  className="max-h-56 overflow-auto p-3 font-mono text-xs leading-relaxed text-zinc-300 whitespace-pre"
-                >
-                  {setup.script}
-                </pre>
-              </div>
+              <CodeBlock code={setup.script} lang="bash" title="Setup script" maxHeightClass="max-h-56" />
             </Instruction>
             <Instruction n={3} title="Answer its questions">
               {goal === "database" ? (

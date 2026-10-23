@@ -1,5 +1,6 @@
 "use client";
 
+import { CodeBlock } from "./code-block";
 import { useEffect, useRef, useState } from "react";
 
 interface Props {
@@ -77,7 +78,7 @@ export function MermaidDiagram({ chart, className = "" }: Props) {
     return (
       <div className={`p-4 rounded-lg border border-red-500/20 bg-red-500/5 ${className}`}>
         <p className="text-xs text-red-400 font-mono">{error}</p>
-        <pre className="text-xs text-zinc-600 mt-2 overflow-auto">{chart}</pre>
+        <CodeBlock code={chart} lang="mermaid" label="Diagram source" className="mt-2" />
       </div>
     );
   }

@@ -1,11 +1,11 @@
 "use client";
 
+import { CodeBlock } from "./code-block";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type DataSource, type DataSourceActivityEvent, type DataSourceActivityFilter, type DataSourceKind } from "@/lib/api";
 import { actorLabel, errorMessage, formatDuration } from "@/lib/data-sources";
 import { RANGES, originHref, rangeSince, type Range } from "@/lib/activity";
-import { CopyButton } from "./copy-button";
 import { StatusPill } from "./status-pill";
 import { focusRing, linkButton, secondaryButton } from "./ui";
 import { List, ListEmpty, ListError, ListRow, ListSkeleton, ListToolbar, LoadMore, Time, type Tone } from "./list";
@@ -415,13 +415,7 @@ export function ActivityFeed({
                 detailsFor={`details of the lookup: ${ev.summary}`}
                 details={
                   <>
-                    <div className="rounded-lg border border-zinc-800 bg-zinc-950">
-                      <div className="flex items-center justify-between gap-2 border-b border-zinc-800 px-3 py-1.5">
-                        <span className="text-xs text-zinc-500">What was asked</span>
-                        <CopyButton text={full} />
-                      </div>
-                      <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words px-3 py-2 font-mono text-xs text-zinc-200">{full}</pre>
-                    </div>
+                    <CodeBlock code={full} title="What was asked" wrap maxHeightClass="max-h-72" />
                     {ev.detail && (
                       <p className="text-sm text-zinc-400">
                         <span className="text-zinc-500">{ev.outcome === "ok" ? "Came back: " : ev.outcome === "refused" ? "Refused because: " : ev.outcome === "unknown_name" ? "Not sent, because: " : "Failed because: "}</span>

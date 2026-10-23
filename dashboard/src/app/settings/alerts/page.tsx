@@ -24,7 +24,8 @@ import { Callout } from "@/components/callout";
 import { StatusPill } from "@/components/status-pill";
 import { Segmented } from "@/components/segmented";
 import { Disclosure } from "@/components/disclosure";
-import { CopyButton } from "@/components/copy-button";
+import { CodeBlock } from "@/components/code-block";
+import { Code } from "@/components/settings/code";
 import { Skeleton } from "@/components/skeleton";
 import { Field } from "@/components/field";
 import { Page, PageHeader, Section } from "@/components/page";
@@ -588,16 +589,13 @@ function SetupSteps({ endpoint }: { endpoint: string }) {
         <li>Add a route: the topic ARN, and rules for the alerts that should open a pull request.</li>
         <li>
           Subscribe this HTTPS endpoint to the topic. Coderhelm confirms the subscription by itself.
-          <span className="mt-1.5 flex min-w-0 flex-wrap items-center gap-2">
-            <code className="min-w-0 break-all rounded border border-zinc-800 bg-zinc-950 px-2 py-1 font-mono text-xs text-zinc-200">{endpoint}</code>
-            <CopyButton text={endpoint} />
-          </span>
+          <CodeBlock code={endpoint} title="HTTPS endpoint" className="mt-1.5" testId="alerts-endpoint" />
         </li>
       </ol>
       <Disclosure summary="Which alerts work">
         <p>
           CloudWatch alarm notifications (only the ALARM state opens a pull request), AWS Chatbot custom notifications, EventBridge events
-          and plain messages. A plain message with a <code className="text-zinc-300">Recovers: &lt;alert title&gt;</code> line is the recovery
+          and plain messages. A plain message with a <Code>Recovers: &lt;alert title&gt;</Code> line is the recovery
           of that alert.
         </p>
         <p>Repeats of the same alert fold into one run, and each route starts at most 20 runs a day.</p>
