@@ -1,25 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { api, errorStatus, type SupportDetail, type SupportItemRef } from "@/lib/api";
-import { customerLook, MAX_ATTACHMENTS, ticketItems } from "@/lib/support";
+import { api, errorStatus, type SupportDetail, type SupportItemRef, type SupportMessage, type SupportPersonRef } from "@/lib/api";
+import { customerLook, isOnTicket, MAX_ATTACHMENTS, PRIORITY_LABEL, ticketItems, ticketPeople } from "@/lib/support";
 import { hasRole } from "@/lib/roles";
 import { SupportAccessControl } from "@/components/support-access";
-import { Page, PageHeader } from "@/components/page";
+import { Page } from "@/components/page";
 import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { ListError, StatusText } from "@/components/list";
-import { ReplyBox, SupportThread, TicketContext } from "@/components/support";
+import { AvatarStack, Composer, PanelSection, SupportThread, TicketContext, TicketHeader, TicketLayout, TicketPeople } from "@/components/support";
 import { useToast } from "@/components/toast";
-import { focusRing } from "@/components/ui";
+import { focusRing, secondaryButton } from "@/components/ui";
 
 const backLink = (
   <Link href="/support" className={`rounded text-sm text-zinc-500 hover:text-zinc-300 ${focusRing}`}>
     ← Support
   </Link>
 );
+
+interface Me {
+  user_id: string;
+  email: string;
+  role: string;
+  support_view?: unknown;
+}
 
 export default function TicketPageWithParams() {
   return (
@@ -37,13 +44,17 @@ function TicketPage() {
   const [detail, setDetail] = useState<SupportDetail | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "missing" | "error">("loading");
   const [error, setError] = useState("");
-  const [canGrant, setCanGrant] = useState(false);
+  const [me, setMe] = useState<Me | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [quote, setQuote] = useState<{ text: string; n: number } | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     api
       .me()
-      .then((u) => setCanGrant(hasRole(u.role, "admin") && !u.support_view))
-      .catch(() => setCanGrant(false));
+      .then((u) => setMe(u))
+      .catch(() => setMe(null));
   }, []);
 
   const load = useCallback(() => {
@@ -95,32 +106,71 @@ function TicketPage() {
 
   const t = detail.ticket;
   const look = customerLook(t.status);
-  const send = async (body: string, _key?: string, items: SupportItemRef[] = []) => {
+  const role = me?.user_id ? isOnTicket(t, me.user_id) : null;
+  const canManage = role === "filer" || hasRole(me?.role, "admin");
+  const canGrant = hasRole(me?.role, "admin") && !me?.support_view;
+  const people = ticketPeople(t);
+  const isMine = (m: SupportMessage) => m.author === "customer" && !!me?.email && m.author_email.toLowerCase() === me.email.toLowerCase();
+
+  const run = async (what: () => Promise<SupportDetail>, failed: string) => {
     try {
-      setDetail(await api.replySupportTicket(t.id, body, items));
+      setDetail(await what());
       return true;
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Could not send your reply.", "error");
+      toast(e instanceof Error ? e.message : failed, "error");
       return false;
     }
+  };
+  const send = async (body: string, action?: string, items: SupportItemRef[] = []) => {
+    if (body || items.length > 0) {
+      if (!(await run(() => api.replySupportTicket(t.id, body, items), "Could not send your reply."))) return false;
+    }
+    if (action === "resolve") {
+      if (!(await run(() => api.resolveSupportTicket(t.id), "Could not mark it resolved."))) return false;
+      toast("Marked resolved. Coderhelm support was told.");
+    }
+    return true;
+  };
+  const addPerson = (who: SupportPersonRef) => run(() => api.addSupportPerson(t.id, who), "Could not add them.");
+  const removePerson = (who: SupportPersonRef) => run(() => api.removeSupportPerson(t.id, who), "Could not remove them.");
+  const openAdding = () => {
+    setDetailsOpen(true);
+    setAdding(true);
   };
 
   return (
     <Page>
-      <PageHeader
-        eyebrow={backLink}
-        title={t.subject}
-        lead={
-          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <StatusText look={look} />
-            <span className="text-xs text-zinc-500">
-              {t.status === "waiting"
-                ? "Coderhelm support is waiting for your answer."
-                : t.status === "resolved"
-                  ? "Reply to open it again."
-                  : "Coderhelm support will answer here and by email."}
-            </span>
-          </span>
+      <TicketHeader
+        back={backLink}
+        ticket={t}
+        status={<StatusText look={look} />}
+        note={
+          t.status === "waiting"
+            ? "Coderhelm support is waiting for your answer."
+            : t.status === "resolved"
+              ? "Reply to open it again."
+              : "Coderhelm support will answer here and by email."
+        }
+        people={
+          <>
+            <AvatarStack ticket={t} avatars={detail.avatars} />
+            {canManage ? (
+              <button type="button" onClick={openAdding} className={`${secondaryButton} !min-h-8 !py-1 !px-3`} data-testid="header-add-people">
+                + Add people
+              </button>
+            ) : (
+              me && (
+                <button
+                  type="button"
+                  onClick={() => void (role === "participant" ? removePerson({ user_id: me.user_id }) : addPerson({ user_id: me.user_id }))}
+                  className={`${secondaryButton} !min-h-8 !py-1 !px-3`}
+                  data-testid="header-follow"
+                >
+                  {role === "participant" ? "Unfollow" : "Follow"}
+                </button>
+              )
+            )}
+          </>
         }
       />
       {justOpened && (
@@ -128,30 +178,70 @@ function TicketPage() {
           Sent. We emailed Coderhelm support and will email you when they answer.
         </p>
       )}
-      <div className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="min-w-0">
-          <SupportThread messages={detail.messages} />
-          <ReplyBox onSend={send} placeholder="Add more detail, or answer support's question" attachRoom={MAX_ATTACHMENTS - ticketItems(t).length} draftKey={`support:reply:${t.id}`} />
-        </div>
-        <aside className="min-w-0 space-y-5 lg:order-last">
-          <TicketContext ticket={t} />
-          {canGrant && t.status !== "resolved" && (
-            <section aria-labelledby="let-support" className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4" data-testid="ticket-support-access">
-              <h2 id="let-support" className="mb-1 text-sm font-semibold text-zinc-100">
-                Let support look at this
-              </h2>
-              <p className="mb-3 text-xs text-zinc-500">
-                Coderhelm support sees your workspace read only, for the time you choose. You can end it any time in{" "}
-                <Link href="/settings/support-access" className={`rounded underline underline-offset-4 hover:text-zinc-300 ${focusRing}`}>
-                  Settings
-                </Link>
-                .
-              </p>
-              <SupportAccessControl ticketId={t.id} compact />
-            </section>
-          )}
-        </aside>
-      </div>
+      <TicketLayout
+        detailsOpen={detailsOpen}
+        setDetailsOpen={setDetailsOpen}
+        detailsSummary={`${look.label} · ${people.length} ${people.length === 1 ? "person" : "people"}${ticketItems(t).length ? ` · ${ticketItems(t).length} attached` : ""}`}
+        details={
+          <>
+            <PanelSection title="Status">
+              <div className="space-y-1 text-sm">
+                <StatusText look={look} />
+                <p className="text-zinc-400">Priority: {PRIORITY_LABEL[t.priority] ?? t.priority}</p>
+              </div>
+            </PanelSection>
+            <PanelSection title="People" testId="panel-people">
+              <TicketPeople
+                ticket={t}
+                avatars={detail.avatars}
+                me={me?.user_id}
+                canManage={canManage}
+                adding={adding}
+                setAdding={setAdding}
+                onAdd={addPerson}
+                onRemove={removePerson}
+              />
+            </PanelSection>
+            <PanelSection title="About">
+              <TicketContext ticket={t} />
+            </PanelSection>
+            {canGrant && t.status !== "resolved" && (
+              <PanelSection title="Let support look at this" testId="ticket-support-access">
+                <p className="mb-3 text-xs text-zinc-500">
+                  Coderhelm support sees your workspace read only, for the time you choose. You can end it any time in{" "}
+                  <Link href="/settings/support-access" className={`rounded underline underline-offset-4 hover:text-zinc-300 ${focusRing}`}>
+                    Settings
+                  </Link>
+                  .
+                </p>
+                <SupportAccessControl ticketId={t.id} compact />
+              </PanelSection>
+            )}
+          </>
+        }
+        thread={
+          <>
+            <SupportThread
+              messages={detail.messages}
+              ticketId={t.id}
+              avatars={detail.avatars}
+              isMine={isMine}
+              onQuote={(text) => setQuote({ text, n: (quote?.n ?? 0) + 1 })}
+            />
+            <div className="mt-4 pb-2 @min-[860px]:sticky @min-[860px]:bottom-0 @min-[860px]:z-10 @min-[860px]:bg-gradient-to-t @min-[860px]:from-zinc-950 @min-[860px]:from-80% @min-[860px]:to-transparent @min-[860px]:pt-4">
+              <Composer
+                onSend={send}
+                placeholder={t.status === "resolved" ? "Reply to open this ticket again" : "Add more detail, or answer support's question"}
+                attachRoom={MAX_ATTACHMENTS - ticketItems(t).length}
+                actions={canManage && t.status !== "resolved" ? [{ key: "resolve", label: "Reply & mark resolved", emptyLabel: "Mark resolved" }] : []}
+                quote={quote}
+                draftKey={`support:reply:${t.id}`}
+                inputRef={composerRef}
+              />
+            </div>
+          </>
+        }
+      />
     </Page>
   );
 }

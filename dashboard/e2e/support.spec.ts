@@ -277,7 +277,7 @@ test.describe("support tickets for a team", () => {
     await expect(page.getByTestId("ticket-context")).toContainText(RUN.title);
 
     await page.getByLabel("Reply").fill("It also fails on the second try.");
-    await page.getByRole("button", { name: "Send reply" }).click();
+    await page.getByRole("button", { name: "Reply", exact: true }).click();
     await expect(page.getByTestId("support-message")).toHaveCount(2);
     await expect(page.getByLabel("Reply")).toHaveValue("");
   });
@@ -368,7 +368,7 @@ test.describe("the platform admin's support queue", () => {
     await expect(ctx.getByRole("link", { name: "Releases" })).toHaveAttribute("href", /\/releases/);
 
     await page.getByLabel("Reply").fill("We posted the notes again.");
-    await page.getByRole("button", { name: "Send and resolve" }).click();
+    await page.getByRole("button", { name: "Reply & resolve" }).click();
     await expect(page.getByTestId("support-message")).toHaveCount(2);
     const reply = db.posts.find((x) => x.path.endsWith("/reply"))!;
     expect(reply.body).toEqual({ body: "We posted the notes again.", status: "resolved" });
@@ -386,6 +386,9 @@ test.describe("the platform admin's support queue", () => {
     await expect(page.getByTestId("queue-row")).toHaveCount(2);
     await noSideScroll(page);
     await page.goto(`/admin/tickets/?id=${db.tickets[2].id}`);
+    // On a phone the details fold under the header.
+    await expect(page.getByTestId("ticket-context")).toBeHidden();
+    await page.getByTestId("details-toggle").click();
     await expect(page.getByTestId("ticket-context")).toBeVisible();
     await noSideScroll(page);
     await shot(page, "support-queue-phone");

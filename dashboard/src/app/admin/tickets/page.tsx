@@ -3,15 +3,15 @@
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { api, ApiError, errorStatus, type SupportDetail, type SupportPriority, type SupportStatus, type SupportTicket } from "@/lib/api";
-import { adminLook, filedBy, itemHref, itemWords, PRIORITY_LABEL, queueOrder, ticketItems, timeLeft } from "@/lib/support";
+import { api, ApiError, errorStatus, type SupportDetail, type SupportPersonRef, type SupportPriority, type SupportStatus, type SupportTicket } from "@/lib/api";
+import { adminLook, filedBy, itemHref, itemWords, PRIORITY_LABEL, queueOrder, ticketItems, ticketPeople, timeLeft } from "@/lib/support";
 import { Page, PageHeader } from "@/components/page";
 import { Skeleton } from "@/components/skeleton";
 import { Chip, List, ListEmpty, ListError, ListRow, ListSkeleton, ListToolbar, StatusText, useListParams } from "@/components/list";
-import { ReplyBox, SupportThread, TicketContext, type ItemOpener } from "@/components/support";
+import { AvatarStack, Composer, PanelSection, SupportThread, TicketContext, TicketHeader, TicketLayout, TicketPeople, type ItemOpener } from "@/components/support";
 import type { SupportItem } from "@/lib/api";
 import { useToast } from "@/components/toast";
-import { focusRing, inputClass, primaryButton } from "@/components/ui";
+import { focusRing, inputClass, primaryButton, secondaryButton } from "@/components/ui";
 
 /**
  * Opens a read-only support view of the team (leaving any other one first),
@@ -83,7 +83,7 @@ function Queue() {
 
   const words = params.q.toLowerCase().split(/\s+/).filter(Boolean);
   const searched = (tickets ?? []).filter((t) => {
-    const hay = `${t.subject} ${t.team_name} ${t.team_id} ${t.opened_by_email} ${t.opened_by_name} ${ticketItems(t).map(itemWords).join(" ")}`.toLowerCase();
+    const hay = `${t.subject} ${t.team_name} ${t.team_id} ${t.opened_by_email} ${t.opened_by_name} ${(t.participants ?? []).map((p) => `${p.name} ${p.email}`).join(" ")} ${ticketItems(t).map(itemWords).join(" ")}`.toLowerCase();
     return words.every((w) => hay.includes(w));
   });
   const count = (s: string) => searched.filter((t) => t.status === s).length;
@@ -174,7 +174,9 @@ function Queue() {
                             ? `${ticketItems(t).length} items attached`
                             : null,
                         `${t.message_count} message${t.message_count === 1 ? "" : "s"}`,
+                        t.participants?.length ? `${ticketPeople(t).length} people` : null,
                       ]}
+                      summary={t.last_snippet ? `${t.last_author_name || "Someone"}: ${t.last_snippet}` : undefined}
                       chips={
                         <>
                           {t.priority !== "normal" && <Chip tone={t.priority === "urgent" ? "danger" : "waiting"}>{PRIORITY_LABEL[t.priority]}</Chip>}
@@ -207,6 +209,9 @@ function AdminTicket({ id }: { id: string }) {
   const [state, setState] = useState<"loading" | "ready" | "missing" | "denied" | "error">("loading");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [quote, setQuote] = useState<{ text: string; n: number } | null>(null);
 
   const load = useCallback(() => {
     api
@@ -266,7 +271,7 @@ function AdminTicket({ id }: { id: string }) {
   const reply = async (body: string, key?: string) => {
     try {
       setDetail(await api.adminReplySupportTicket(t.id, body, key === "resolve" ? "resolved" : undefined));
-      toast(key === "resolve" ? "Sent and resolved. The customer was emailed." : "Sent. The customer was emailed.");
+      toast(key === "resolve" ? "Sent and resolved. Everyone on the ticket was emailed." : "Sent. Everyone on the ticket was emailed.");
       return true;
     } catch (e) {
       toast(e instanceof Error ? e.message : "Could not send the reply.", "error");
@@ -283,84 +288,130 @@ function AdminTicket({ id }: { id: string }) {
       setBusy(false);
     }
   };
+  const people = async (what: () => Promise<SupportDetail>, failed: string) => {
+    try {
+      setDetail(await what());
+      return true;
+    } catch (e) {
+      toast(e instanceof Error ? e.message : failed, "error");
+      return false;
+    }
+  };
+  const addPerson = (who: SupportPersonRef) => people(() => api.addSupportPerson(t.id, who, true), "Could not add them.");
+  const removePerson = (who: SupportPersonRef) => people(() => api.removeSupportPerson(t.id, who, true), "Could not remove them.");
+  const count = ticketPeople(t).length;
 
   return (
     <Page>
-      <PageHeader
-        eyebrow={backLink}
-        title={t.subject}
-        lead={
-          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <StatusText look={look} />
-            <span className="text-xs text-zinc-500">{t.team_name || t.team_id}</span>
-          </span>
+      <TicketHeader
+        back={backLink}
+        ticket={t}
+        status={<StatusText look={look} />}
+        note={t.team_name || t.team_id}
+        people={
+          <>
+            <AvatarStack ticket={t} avatars={detail.avatars} />
+            <button
+              type="button"
+              onClick={() => {
+                setDetailsOpen(true);
+                setAdding(true);
+              }}
+              className={`${secondaryButton} !min-h-8 !py-1 !px-3`}
+              data-testid="header-add-people"
+            >
+              + Add people
+            </button>
+          </>
         }
       />
-      <div className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="min-w-0">
-          <SupportThread messages={detail.messages} admin openItem={openItem} />
-          <ReplyBox
-            onSend={reply}
-            placeholder="Reply as Coderhelm support. The customer gets this by email."
-            extra={t.status === "resolved" ? undefined : [["Send and resolve", "resolve"]]}
-            draftKey={`support-admin:reply:${t.id}`}
-          />
-        </div>
-        <aside className="min-w-0 space-y-5">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
-            <div className="text-sm">
-              <label htmlFor="ticket-status-select" className="mb-1.5 block font-medium text-zinc-300">Status</label>
-              <select
-                id="ticket-status-select"
-                value={t.status}
-                disabled={busy}
-                onChange={(e) => void change({ status: e.target.value as SupportStatus })}
-                className={inputClass}
-                data-testid="ticket-status"
-              >
-                <option value="open">Needs reply</option>
-                <option value="waiting">Waiting on customer</option>
-                <option value="resolved">Resolved</option>
-              </select>
-            </div>
-            <div className="text-sm">
-              <label htmlFor="ticket-priority-select" className="mb-1.5 block font-medium text-zinc-300">Priority</label>
-              <select
-                id="ticket-priority-select"
-                value={t.priority}
-                disabled={busy}
-                onChange={(e) => void change({ priority: e.target.value as SupportPriority })}
-                className={inputClass}
-              >
-                <option value="normal">Normal</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </select>
-            </div>
-          </div>
-          <section aria-labelledby="support-view-h" className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4" data-testid="admin-support-view">
-            <h2 id="support-view-h" className="mb-1 text-sm font-semibold text-zinc-100">
-              Support view
-            </h2>
-            {accessUntil ? (
-              <>
-                <p className="mb-3 text-xs text-zinc-400">
-                  The team lets support look, read only, until {new Date(accessUntil).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} ({timeLeft(accessUntil)}).
-                  The team sees every page you read.
+      <TicketLayout
+        detailsOpen={detailsOpen}
+        setDetailsOpen={setDetailsOpen}
+        detailsSummary={`${look.label} · ${count} ${count === 1 ? "person" : "people"}`}
+        details={
+          <>
+            <PanelSection title="Status">
+              <div className="grid grid-cols-2 gap-3 @min-[860px]:grid-cols-1">
+                <div className="text-sm">
+                  <label htmlFor="ticket-status-select" className="mb-1.5 block font-medium text-zinc-300">Status</label>
+                  <select
+                    id="ticket-status-select"
+                    value={t.status}
+                    disabled={busy}
+                    onChange={(e) => void change({ status: e.target.value as SupportStatus })}
+                    className={inputClass}
+                    data-testid="ticket-status"
+                  >
+                    <option value="open">Needs reply</option>
+                    <option value="waiting">Waiting on customer</option>
+                    <option value="resolved">Resolved</option>
+                  </select>
+                </div>
+                <div className="text-sm">
+                  <label htmlFor="ticket-priority-select" className="mb-1.5 block font-medium text-zinc-300">Priority</label>
+                  <select
+                    id="ticket-priority-select"
+                    value={t.priority}
+                    disabled={busy}
+                    onChange={(e) => void change({ priority: e.target.value as SupportPriority })}
+                    className={inputClass}
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+              </div>
+            </PanelSection>
+            <PanelSection title="People" testId="panel-people">
+              <TicketPeople ticket={t} avatars={detail.avatars} canManage admin adding={adding} setAdding={setAdding} onAdd={addPerson} onRemove={removePerson} />
+            </PanelSection>
+            <PanelSection title="Support view" testId="admin-support-view">
+              {accessUntil ? (
+                <>
+                  <p className="mb-3 text-xs text-zinc-400">
+                    The team lets support look, read only, until {new Date(accessUntil).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} ({timeLeft(accessUntil)}).
+                    The team sees every page you read.
+                  </p>
+                  <button type="button" className={primaryButton} onClick={() => void open("/")} data-testid="view-as-support">
+                    View as support
+                  </button>
+                </>
+              ) : (
+                <p className="text-xs text-zinc-500">
+                  Off. Ask the team to choose &quot;Let support look at this&quot; on the ticket, or turn it on in Settings → Support access.
                 </p>
-                <button type="button" className={primaryButton} onClick={() => void open("/")} data-testid="view-as-support">
-                  View as support
-                </button>
-              </>
-            ) : (
-              <p className="text-xs text-zinc-500">
-                Off. Ask the team to choose &quot;Let support look at this&quot; on the ticket, or turn it on in Settings → Support access.
-              </p>
-            )}
-          </section>
-          <TicketContext ticket={t} admin openItem={openItem} />
-        </aside>
-      </div>
+              )}
+            </PanelSection>
+            <PanelSection title="About">
+              <TicketContext ticket={t} admin openItem={openItem} />
+            </PanelSection>
+          </>
+        }
+        thread={
+          <>
+            <SupportThread
+              messages={detail.messages}
+              ticketId={t.id}
+              admin
+              openItem={openItem}
+              avatars={detail.avatars}
+              isMine={(m) => m.author === "support"}
+              onQuote={(text) => setQuote({ text, n: (quote?.n ?? 0) + 1 })}
+            />
+            <div className="mt-4 pb-2 @min-[860px]:sticky @min-[860px]:bottom-0 @min-[860px]:z-10 @min-[860px]:bg-gradient-to-t @min-[860px]:from-zinc-950 @min-[860px]:from-80% @min-[860px]:to-transparent @min-[860px]:pt-4">
+              <Composer
+                onSend={reply}
+                placeholder="Reply as Coderhelm support. Everyone on the ticket gets this by email."
+                actions={t.status === "resolved" ? [] : [{ key: "resolve", label: "Reply & resolve" }]}
+                quote={quote}
+                draftKey={`support-admin:reply:${t.id}`}
+              />
+            </div>
+          </>
+        }
+      />
     </Page>
   );
 }

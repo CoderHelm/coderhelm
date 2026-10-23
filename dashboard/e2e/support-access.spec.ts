@@ -238,7 +238,7 @@ test.describe("attaching items to a ticket", () => {
     await picker.getByLabel("Find something to attach").fill("orders");
     await picker.getByTestId("attach-result").filter({ hasText: SOURCE.name }).click();
     await picker.getByRole("button", { name: "Done" }).click();
-    await page.getByRole("button", { name: "Send reply" }).click();
+    await page.getByRole("button", { name: "Reply", exact: true }).click();
     await expect(page.getByTestId("support-message")).toHaveCount(2);
     const reply = db.posts.find((x) => x.path.endsWith("/reply"))!;
     expect(reply.body).toEqual({ body: "", items: [{ kind: "data_source", id: SOURCE.id, label: SOURCE.name }] });

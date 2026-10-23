@@ -151,9 +151,16 @@ function Tickets() {
                             ? `${ticketItems(t).length} items attached`
                             : null,
                         `${t.message_count} message${t.message_count === 1 ? "" : "s"}`,
+                        t.participants?.length ? `${t.participants.length + 1} people` : null,
                       ]}
-                      summary={t.status === "waiting" ? "Coderhelm support answered. Reply when you can." : undefined}
-                      summaryTone="waiting"
+                      summary={
+                        t.last_snippet
+                          ? `${t.last_author_name || "Someone"}: ${t.last_snippet}`
+                          : t.status === "waiting"
+                            ? "Coderhelm support answered. Reply when you can."
+                            : undefined
+                      }
+                      summaryTone={t.status === "waiting" ? "waiting" : undefined}
                       chips={<StatusText look={look} />}
                       time={t.updated_at}
                     />
