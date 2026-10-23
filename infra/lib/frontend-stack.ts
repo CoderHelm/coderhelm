@@ -7,10 +7,20 @@ import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as targets from "aws-cdk-lib/aws-route53-targets";
 import { Construct } from "constructs";
+import {
+  NextExportDeployment,
+  NOT_FOUND_PAGE,
+  checkFunctionSize,
+  notFoundStatusCode,
+  pageRoutes,
+  routeTable,
+} from "./static-site";
 
 interface FrontendStackProps extends cdk.StackProps {
   stage: string;
   webAclArn: string;
+  /** The site's static export. Defaults to ../out. */
+  outDir?: string;
 }
 
 export class FrontendStack extends cdk.Stack {
@@ -19,6 +29,7 @@ export class FrontendStack extends cdk.Stack {
 
     const prefix = `coderhelm-${props.stage}`;
     const domainNames = ["coderhelm.com", "www.coderhelm.com", "coderhelm.ai", "www.coderhelm.ai"];
+    const outDir = props.outDir ?? "../out";
 
     // Route53 hosted zone (must exist in the account)
     const hostedZone = route53.HostedZone.fromLookup(this, "Zone", {
@@ -107,7 +118,8 @@ export class FrontendStack extends cdk.Stack {
     // Rewrite directory paths to index.html and redirect coderhelm.ai / www → coderhelm.com
     const urlRewrite = new cloudfront.Function(this, "UrlRewrite", {
       functionName: `${prefix}-site-url-rewrite`,
-      code: cloudfront.FunctionCode.fromInline(`
+      code: cloudfront.FunctionCode.fromInline(checkFunctionSize("UrlRewrite", `
+var PAGES = ${routeTable(pageRoutes(outDir))};
 function handler(event) {
   var request = event.request;
   var host = request.headers.host && request.headers.host.value;
@@ -119,7 +131,16 @@ function handler(event) {
     };
   }
   var uri = request.uri;
-  if (uri.startsWith('/errors/')) return request;
+  if (uri.startsWith('/errors/') || uri.startsWith('/_next/')) return request;
+  // A path that is no page of the site opens the 404 page here (the
+  // distribution has no 404 error response; see static-site.ts).
+  if (uri.endsWith('/') || uri.indexOf('.') === -1) {
+    var page = uri.endsWith('/') ? uri : uri + '/';
+    if (!PAGES[page]) {
+      request.uri = ${JSON.stringify(NOT_FOUND_PAGE)};
+      return request;
+    }
+  }
   // Agents that ask for Markdown get the page's Markdown twin (built next to
   // every page as /<page>.md, and /index.md for the home page).
   var accept = request.headers.accept && request.headers.accept.value;
@@ -136,32 +157,29 @@ function handler(event) {
   }
   return request;
 }
-      `),
+      `)),
       runtime: cloudfront.FunctionRuntime.JS_2_0,
     });
 
     // Pages are served as HTML or Markdown depending on Accept, so tell every
-    // cache between us and the reader that the response varies by it.
+    // cache between us and the reader that the response varies by it. The
+    // 404 page served for an unknown path goes out as a 404.
     const varyAccept = new cloudfront.Function(this, "VaryAccept", {
       functionName: `${prefix}-site-vary-accept`,
-      code: cloudfront.FunctionCode.fromInline(`
-function handler(event) {
-  var response = event.response;
-  var uri = event.request.uri;
+      code: cloudfront.FunctionCode.fromInline(notFoundStatusCode(`
   if (uri.endsWith('.html') || uri.endsWith('.md')) {
     response.headers['vary'] = { value: 'Accept' };
-  }
-  return response;
-}
-      `),
+  }`)),
       runtime: cloudfront.FunctionRuntime.JS_2_0,
     });
 
     // CloudFront distribution
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       defaultBehavior: {
+        // LIST lets S3 answer a missing file with 404 instead of 403.
         origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket, {
           originAccessControl: oac,
+          originAccessLevels: [cloudfront.AccessLevel.READ, cloudfront.AccessLevel.LIST],
         }),
         viewerProtocolPolicy:
           cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -182,16 +200,13 @@ function handler(event) {
       webAclId: props.webAclArn,
       domainNames,
       certificate,
-      // Custom error responses: serve branded error pages
+      // Branded error pages. These apply to every path, scripts included,
+      // so there is no 404 entry: unknown pages get the 404 page from
+      // UrlRewrite, and a missing /_next/ file stays a plain 404. With LIST
+      // access S3 answers a missing key with 404, so a 403 comes from the WAF.
       errorResponses: [
         {
           httpStatus: 403,
-          responseHttpStatus: 404,
-          responsePagePath: "/errors/404.html",
-          ttl: cdk.Duration.minutes(5),
-        },
-        {
-          httpStatus: 404,
           responseHttpStatus: 404,
           responsePagePath: "/errors/404.html",
           ttl: cdk.Duration.minutes(5),
@@ -247,38 +262,20 @@ function handler(event) {
       ),
     });
 
-    // Deploy static site — hashed assets get long cache, HTML gets short cache
-    // Next.js puts hashed assets under _next/static/ — safe for immutable caching
-    new s3deploy.BucketDeployment(this, "DeploySite", {
-      sources: [s3deploy.Source.asset("../out")],
-      destinationBucket: siteBucket,
+    // Site build: /_next/ files first and kept across deploys, then the
+    // pages that name them (see static-site.ts). Markdown and llms.txt go up
+    // in their own deployments below.
+    new NextExportDeployment(this, "DeploySite", {
+      bucket: siteBucket,
       distribution,
-      distributionPaths: ["/*"],
-      exclude: ["errors/*", "_next/*", "*.md", "llms.txt", "llms-full.txt"],
-      cacheControl: [
-        s3deploy.CacheControl.setPublic(),
-        s3deploy.CacheControl.maxAge(cdk.Duration.hours(1)),
-        s3deploy.CacheControl.sMaxAge(cdk.Duration.days(1)),
-      ],
-    });
-
-    // Deploy _next/static with immutable cache (content-hashed filenames)
-    new s3deploy.BucketDeployment(this, "DeployStaticAssets", {
-      sources: [s3deploy.Source.asset("../out")],
-      destinationBucket: siteBucket,
-      include: ["_next/*"],
-      exclude: ["*"],
-      cacheControl: [
-        s3deploy.CacheControl.setPublic(),
-        s3deploy.CacheControl.maxAge(cdk.Duration.days(365)),
-        s3deploy.CacheControl.immutable(),
-      ],
+      outDir,
+      pageExclude: ["*.md", "llms.txt", "llms-full.txt"],
     });
 
     // Markdown twins and llms.txt files for agents, with an explicit UTF-8
     // charset (S3 would otherwise serve text/markdown with no charset).
     new s3deploy.BucketDeployment(this, "DeployMarkdown", {
-      sources: [s3deploy.Source.asset("../out")],
+      sources: [s3deploy.Source.asset(outDir)],
       destinationBucket: siteBucket,
       include: ["*.md"],
       exclude: ["*"],
@@ -290,7 +287,7 @@ function handler(event) {
       ],
     });
     new s3deploy.BucketDeployment(this, "DeployLlmsTxt", {
-      sources: [s3deploy.Source.asset("../out")],
+      sources: [s3deploy.Source.asset(outDir)],
       destinationBucket: siteBucket,
       include: ["llms.txt", "llms-full.txt"],
       exclude: ["*"],
