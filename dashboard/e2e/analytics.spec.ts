@@ -188,7 +188,7 @@ test("the scorecard answers whether it is worth it, against the previous period"
   await expect(page.getByTestId("tile-ci")).toContainText("6 of 8 runs went green");
   await expect(page.getByTestId("tile-findings")).toContainText("24 fixed in code, 8 settled by a person");
   await expect(page.getByRole("table", { name: "Failures by reason" })).toContainText("Timed out after #s");
-  // People first, CoderHelm's own work next, runs that recorded nobody last.
+  // People first, Coderhelm's own work next, runs that recorded nobody last.
   await expect(page.getByRole("table", { name: "By person" }).locator("tbody tr td:first-child")).toHaveText(["Ada Lovelace", "CoderHelm (E2E tests)", "Not recorded (older runs)"]);
   await expect(page.getByRole("table", { name: "Lookups by source" })).toContainText("orders-db database");
   await expect(page.getByRole("table", { name: "By step" })).toContainText("Writing code");

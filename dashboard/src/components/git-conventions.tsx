@@ -11,9 +11,9 @@ import { useToast } from "./toast";
 const SAMPLE = tokens("ABC-123", "ABC-123", "Fix the login redirect after single sign-on");
 
 const FIELDS: { key: Kind; label: string; what: string }[] = [
-  { key: "branch", label: "Branch name", what: "The branch CoderHelm works on for a ticket." },
+  { key: "branch", label: "Branch name", what: "The branch Coderhelm works on for a ticket." },
   { key: "commit", label: "Commit message", what: "The first line of each commit; {summary} is what the commit does." },
-  { key: "pr_title", label: "Pull request title", what: "The title of the pull request CoderHelm opens." },
+  { key: "pr_title", label: "Pull request title", what: "The title of the pull request Coderhelm opens." },
 ];
 
 const EMPTY: GitConventionTemplates = { branch: "", commit: "", pr_title: "" };
@@ -61,7 +61,7 @@ export function GitConventionsSection() {
     <section aria-labelledby="git-conventions" className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
       <h2 id="git-conventions" className="text-sm font-medium text-zinc-100">Git conventions</h2>
       <p className="text-xs text-zinc-500 mt-0.5 mb-4">
-        How CoderHelm names branches, writes commit messages and titles pull requests. Leave a field empty to keep the
+        How Coderhelm names branches, writes commit messages and titles pull requests. Leave a field empty to keep the
         default. A pull request already open for a ticket keeps its branch.
       </p>
 

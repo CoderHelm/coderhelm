@@ -70,7 +70,7 @@ function triggeredBy(trigger: string): string | null {
 /**
  * How the verdict reached GitHub, in words, when that differs from the
  * verdict. GitHub doesn't let a PR's author approve or request changes, so on
- * a PR CoderHelm opened the verdict goes up as a comment: a review whose
+ * a PR Coderhelm opened the verdict goes up as a comment: a review whose
  * verdict is an approval or a change request but was posted as a comment is
  * one of those. Older reviews had a "comment" verdict of their own.
  */
@@ -78,7 +78,7 @@ function postedNote(verdict: string, postedAs: string): string | null {
   if (verdict === "QUESTION") return "Answered in a comment on the PR.";
   if (verdict === "COMMENT") return "Posted as a comment. Reviews from before verdicts were always an approval or a change request.";
   if (postedAs === "COMMENT" && (verdict === "APPROVE" || verdict === "REQUEST_CHANGES")) {
-    return "Posted as a comment because CoderHelm opened this PR. GitHub doesn't let a PR's author approve or request changes.";
+    return "Posted as a comment because Coderhelm opened this PR. GitHub doesn't let a PR's author approve or request changes.";
   }
   if (postedAs === "APPROVE") return "Posted on GitHub as an approval.";
   if (postedAs === "REQUEST_CHANGES") return "Posted on GitHub as a change request.";
@@ -491,7 +491,7 @@ function Rating({ review, onSaved }: { review: Review; onSaved: () => void }) {
       )}
 
       <p className="mt-3 text-xs text-zinc-500">
-        CoderHelm also learns from your replies on the PR on its own, so there is no need to repeat them here.
+        Coderhelm also learns from your replies on the PR on its own, so there is no need to repeat them here.
       </p>
 
       {review.rating_comments.length > 0 && (

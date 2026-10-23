@@ -239,9 +239,9 @@ function PlanDetail() {
       await api.generatePlanOpenspec(planId);
       const data = await api.getPlanOpenspec(planId);
       setOpenspec(data);
-      toast("Openspec written");
+      toast("Spec written");
     } catch {
-      toast("Failed to generate openspec", "error");
+      toast("Couldn't write the spec", "error");
     } finally {
       setWritingSpec(false);
     }

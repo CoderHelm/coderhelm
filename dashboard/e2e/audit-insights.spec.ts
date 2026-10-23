@@ -72,6 +72,21 @@ const HOODS: Record<string, unknown> = {
   "src/app/page.tsx": { path: "src/app/page.tsx", imports: ["src/lib/api.ts", "src/lib/format.ts"], importers: [], symbols: [] },
 };
 
+// One organisation per team, in the shape the admin page reads since it groups teams.
+function adminOrg(id: string, name: string, runs: number, reviews: number, cost: number, created: string) {
+  const t = {
+    team_id: id, name, status: "active", plan: "", created_at: created, members: 1, invites: 0, repos: 1,
+    runs_total: runs, runs_month: Math.floor(runs / 4), reviews_total: reviews, reviews_month: reviews,
+    cost_month_usd: cost, tokens_month: 0, last_active_at: NOW, github_org: name, has_installation: true,
+    jira_site: "", personal: false, active: true, link: "main",
+  };
+  return {
+    key: id, label: name, label_from: "github", domain: "", active: true, team_count: 1, personal_count: 0,
+    members: 1, repos: 1, runs_total: runs, runs_month: t.runs_month, reviews_total: reviews, reviews_month: reviews,
+    cost_month_usd: cost, last_active_at: NOW, created_at: created, plan: "", teams: [t],
+  };
+}
+
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = {
     calls: [],
@@ -120,10 +135,17 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     // The server decides who is a platform admin.
     if (p === "/api/admin/teams") {
       if (db.email !== "admin@coderhelm.com") return json(route, { error: "Forbidden" }, 403);
-      return json(route, { month: "2026-10", teams: [
-        { team_id: "TEAM#b", name: "beta-co", status: "active", created_at: "2026-09-01T00:00:00Z", members: 3, runs_total: 140, completed_total: 90, runs_month: 42, reviews_month: 120, cost_month_usd: 310.5, tokens_month: 9000000 },
-        { team_id: "TEAM#a", name: "acme", status: "active", created_at: "2026-07-01T00:00:00Z", members: 1, runs_total: 12, completed_total: 8, runs_month: 2, reviews_month: 0, cost_month_usd: 4, tokens_month: 100000 },
-      ] });
+      const orgs = [adminOrg("TEAM#b", "beta-co", 140, 120, 310.5, "2026-09-01T00:00:00Z"), adminOrg("TEAM#a", "acme", 12, 0, 4, "2026-07-01T00:00:00Z")];
+      return json(route, {
+        month: "2026-10",
+        orgs,
+        teams: orgs.flatMap((o) => o.teams),
+        counts: { teams: 2, orgs: 2, active_orgs: 2, inactive_orgs: 0 },
+      });
+    }
+    if (p === "/api/admin/beta-signups") {
+      if (db.email !== "admin@coderhelm.com") return json(route, { error: "Forbidden" }, 403);
+      return json(route, { signups: [], counts: { new: 0, invited: 0, joined: 0, total: 0 } });
     }
     if (p === "/api/allowlist") {
       if (m === "GET") return json(route, { emails: db.allowlist });
@@ -306,10 +328,15 @@ test("admin allowlist adds once in lower case and asks before removing", async (
   const db = await mockApi(page, { email: "admin@coderhelm.com", role: "owner" });
   await page.goto("/admin");
   await expect(page.getByRole("heading", { name: "Platform admin" })).toBeVisible();
-  const teams = page.getByTestId("admin-teams");
-  await expect(teams.getByRole("row")).toHaveCount(3);
-  await expect(teams.getByRole("row").nth(1)).toContainText("beta-co");
-  await expect(teams.getByRole("row").nth(1)).toContainText("$310.50");
+  // Teams are one row per organisation, the busiest first.
+  const orgs = page.getByTestId("admin-org");
+  await expect(orgs).toHaveCount(2);
+  await expect(orgs.first()).toContainText("beta-co");
+  await orgs.first().getByRole("button", { name: "Show teams of beta-co" }).click();
+  await expect(page.getByRole("list", { name: "Teams of beta-co" })).toContainText("$310.50 this month");
+  // The allowlist has its own tab.
+  await page.getByRole("navigation", { name: "Admin views" }).getByRole("link", { name: /Allowlist/ }).click();
+  await expect(page).toHaveURL(/tab=allowlist/);
   await expect(page.getByText("first@example.com")).toBeVisible();
   const input = page.getByLabel("Email or domain to allow");
   // Bug: the raw text was appended, so "First@Example.com" showed as a second entry.
@@ -334,14 +361,14 @@ test("admin teams: search, status and sort sit above the table and live in the a
   const errors = watchConsole(page);
   await mockApi(page, { email: "admin@coderhelm.com", role: "owner" });
   await page.goto("/admin");
-  const teams = page.getByTestId("admin-teams");
-  await expect(teams.getByRole("row")).toHaveCount(3);
+  const orgs = page.getByTestId("admin-org");
+  await expect(orgs).toHaveCount(2);
   await page.getByRole("combobox", { name: "Sort" }).selectOption("name");
   await expect(page).toHaveURL(/sort=name/);
-  await expect(teams.getByRole("row").nth(1)).toContainText("acme");
+  await expect(orgs.first()).toContainText("acme");
   await page.getByRole("searchbox", { name: "Search teams" }).fill("beta");
-  await expect(teams.getByRole("row")).toHaveCount(2);
-  await expect(teams.getByRole("row").nth(1)).toContainText("beta-co");
+  await expect(orgs).toHaveCount(1);
+  await expect(orgs.first()).toContainText("beta-co");
   await page.getByRole("searchbox", { name: "Search teams" }).fill("nobody-here");
   await expect(page.getByText("No teams match")).toBeVisible();
   await expect(page.getByRole("group", { name: "Show teams" }).getByRole("button", { name: /^All\s*0$/ })).toBeVisible();
@@ -350,7 +377,7 @@ test("admin teams: search, status and sort sit above the table and live in the a
 
 test("admin allowlist load failure is shown, not presented as an empty list", async ({ page }) => {
   await mockApi(page, { email: "admin@coderhelm.com", role: "owner", fail: new Set(["/api/allowlist"]) });
-  await page.goto("/admin");
+  await page.goto("/admin?tab=allowlist");
   await expect(page.getByText("Couldn't load the allowlist")).toBeVisible();
   await expect(page.getByText("nobody can sign up")).toHaveCount(0);
 });

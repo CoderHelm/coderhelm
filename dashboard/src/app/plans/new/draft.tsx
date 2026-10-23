@@ -3,7 +3,7 @@
 import { Skeleton } from "@/components/skeleton";
 import { Chip } from "@/components/list";
 import { GitHubIcon, AtlassianIcon } from "@/components/icons";
-import { focusRing, primaryButton } from "@/components/ui";
+import { focusRing, fullWidthOnPhone, primaryButton } from "@/components/ui";
 
 // The plan the chat is drafting: read from the ```json block in its answers,
 // shown beside the conversation (a tab on a phone), with what the latest
@@ -248,7 +248,7 @@ export function DraftPanel({
               </DestButton>
             </div>
           </div>
-          <button type="button" onClick={onSave} disabled={saving} className={`${primaryButton} w-full font-semibold`}>
+          <button type="button" onClick={onSave} disabled={saving} className={`${primaryButton} ${fullWidthOnPhone} font-semibold`}>
             {saving ? "Saving..." : "Save plan"}
           </button>
           <p className="text-center text-xs text-zinc-500">Nothing runs yet. You approve each task on the plan&apos;s page.</p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, type ModelProviderConfig } from "@/lib/api";
 import { MODELS, MODEL_ROLES, modelInfo, modelName, type ModelRole, type ModelRoleKey } from "@/lib/models";
 import { useToast } from "@/components/toast";
@@ -9,13 +9,16 @@ import { Page, PageHeader } from "@/components/page";
 import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { Chip, StatusDot, timeAgo } from "@/components/list";
-import { inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { inputClass, linkButton, monoInputClass, secondaryButton } from "@/components/ui";
+import { Code, SaveBar, SettingsRow, SettingsSection, useDirtyForm } from "@/components/settings";
 
 export default function ModelProviderPageGuarded() {
   return <RoleGuard minRole="admin"><ModelProviderPage /></RoleGuard>;
 }
 
 type Models = Record<ModelRoleKey, string>;
+/** The form: the two models, and a key typed into the box ("" when none). */
+type Form = Models & { api_key: string };
 
 const RECOMMENDED: Models = Object.fromEntries(MODEL_ROLES.map((r) => [r.key, r.recommended])) as Models;
 
@@ -23,6 +26,10 @@ const RECOMMENDED: Models = Object.fromEntries(MODEL_ROLES.map((r) => [r.key, r.
 function savedModels(c: ModelProviderConfig): Models {
   return { primary_model: c.primary_model || RECOMMENDED.primary_model, heavy_model: c.heavy_model || RECOMMENDED.heavy_model };
 }
+
+/** A typed key counts once it has more than spaces; models compare as they are. */
+const sameField = (a: unknown, b: unknown, key: keyof Form) =>
+  key === "api_key" ? String(a ?? "").trim() === String(b ?? "").trim() : a === b;
 
 /** "sk-ant-...igAA" → "igAA". The gateway masks short keys as "****". */
 function keyEnding(masked: string | null): string | null {
@@ -36,60 +43,13 @@ type TestState =
   | { state: "ok" }
   | { state: "fail"; message: string };
 
-// ── Building blocks (the settings-row pattern from Reviewer → Settings) ──
-
-function SettingsSection({ id, title, description, children }: { id: string; title: string; description?: ReactNode; children: ReactNode }) {
-  return (
-    <section id={id} aria-labelledby={`${id}-heading`} className="min-w-0">
-      <h2 id={`${id}-heading`} className="text-xs font-semibold uppercase tracking-wider text-zinc-500">{title}</h2>
-      {description && <p className="mt-1 max-w-prose text-sm text-zinc-400">{description}</p>}
-      <div className="mt-3 divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/40">{children}</div>
-    </section>
-  );
-}
-
-/** Name and one-line help on the left, the control on the right (under it on a phone). */
-function Row({
-  label,
-  help,
-  marks,
-  control,
-  testId,
-}: {
-  label: string;
-  help?: ReactNode;
-  marks?: ReactNode;
-  control: (ids: { labelId: string; helpId?: string; inputId: string }) => ReactNode;
-  testId?: string;
-}) {
-  const base = useId();
-  const ids = { labelId: `${base}-label`, helpId: help ? `${base}-help` : undefined, inputId: `${base}-input` };
-  return (
-    <div className="min-w-0 px-4 py-4" data-testid={testId}>
-      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <label id={ids.labelId} htmlFor={ids.inputId} className="text-sm font-medium text-zinc-100">{label}</label>
-            {marks}
-          </div>
-          {help && <p id={ids.helpId} className="mt-0.5 max-w-prose text-sm text-zinc-400">{help}</p>}
-        </div>
-        <div className="min-w-0 sm:w-80 sm:shrink-0">{control(ids)}</div>
-      </div>
-    </div>
-  );
-}
-
 // ── The page ────────────────────────────────────────────────────────
 
 function ModelProviderPage() {
   const { toast } = useToast();
   const [load, setLoad] = useState<"loading" | "error" | "ready">("loading");
   const [config, setConfig] = useState<ModelProviderConfig | null>(null);
-  const [saved, setSaved] = useState<Models>(RECOMMENDED);
-  const [models, setModels] = useState<Models>(RECOMMENDED);
   const [replacing, setReplacing] = useState(false);
-  const [apiKey, setApiKey] = useState("");
   const [test, setTest] = useState<TestState>({ state: "idle" });
   // The gateway checks the key with Anthropic on every save, so a save that
   // went through is also a passed test. It does not report when that last
@@ -99,18 +59,23 @@ function ModelProviderPage() {
   const [problem, setProblem] = useState<string | null>(null);
   const [, tick] = useState(0);
 
+  // Nothing is unsaved until the saved settings are on screen.
+  const form = useDirtyForm<Form>({ ...RECOMMENDED, api_key: "" }, { same: sameField, disabled: load !== "ready" });
+  const models: Models = { primary_model: form.values.primary_model, heavy_model: form.values.heavy_model };
+  const apiKey = form.values.api_key;
+  const { reset } = form;
+
   const fetchConfig = useCallback(async () => {
     setLoad("loading");
     try {
       const data = await api.getModelProvider();
       setConfig(data);
-      setSaved(savedModels(data));
-      setModels(savedModels(data));
+      reset({ ...savedModels(data), api_key: "" });
       setLoad("ready");
     } catch {
       setLoad("error");
     }
-  }, []);
+  }, [reset]);
 
   useEffect(() => {
     fetchConfig();
@@ -127,17 +92,8 @@ function ModelProviderPage() {
   const ending = keyEnding(config?.api_key_masked ?? null);
   const showKeyInput = !hasKey || replacing;
   const typedKey = apiKey.trim();
-  const changedRoles = MODEL_ROLES.filter((r) => models[r.key] !== saved[r.key]);
-  const unsavedCount = changedRoles.length + (typedKey ? 1 : 0);
-  const dirty = load === "ready" && unsavedCount > 0;
-
-  // Leaving with unsaved edits asks first.
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
+  const unsavedCount = form.count;
+  const dirty = form.dirty;
 
   /**
    * The one write: PUT the chosen models, plus the typed key when there is
@@ -165,14 +121,12 @@ function ModelProviderPage() {
     try {
       const updated = await api.getModelProvider();
       setConfig(updated);
-      setSaved(savedModels(updated));
-      setModels(savedModels(updated));
+      form.reset({ ...savedModels(updated), api_key: "" });
     } catch {
       // Saved, but the re-read failed: what was sent is what is saved.
       setConfig((c) => (c ? { ...c, ...models, api_key_masked: typedKey ? `sk-ant-...${typedKey.slice(-4)}` : c.api_key_masked } : c));
-      setSaved(models);
+      form.reset({ ...models, api_key: "" });
     }
-    setApiKey("");
     setReplacing(false);
     setTestedAt(new Date().toISOString());
     return null;
@@ -208,8 +162,7 @@ function ModelProviderPage() {
   };
 
   const discard = () => {
-    setModels(saved);
-    setApiKey("");
+    form.discard();
     setReplacing(false);
     setProblem(null);
     setTest({ state: "idle" });
@@ -253,9 +206,10 @@ function ModelProviderPage() {
 
       <div className="space-y-8">
         <SettingsSection id="api-key" title="Anthropic API key">
-          <Row
+          <SettingsRow
             label="API key"
             testId="key-row"
+            controlClassName="sm:w-80"
             help="Every run calls Anthropic with this key. It is encrypted at rest with AWS KMS, and only your team can use it."
             control={(ids) => (
               <div className="min-w-0 space-y-3">
@@ -265,7 +219,7 @@ function ModelProviderPage() {
                     <>
                       <StatusDot tone="success" />
                       <span className="text-zinc-200">Key saved</span>
-                      {ending && <span className="whitespace-nowrap text-zinc-400">· ends <span className="font-mono text-zinc-300">{ending}</span></span>}
+                      {ending && <span className="whitespace-nowrap text-zinc-400">· ends <Code>{ending}</Code></span>}
                       {testedAt && <span className="whitespace-nowrap text-zinc-400">· last tested <span aria-hidden="true" className="text-emerald-400">✓</span><span className="sr-only">passed</span> {timeAgo(testedAt)}</span>}
                     </>
                   ) : (
@@ -286,12 +240,12 @@ function ModelProviderPage() {
                       spellCheck={false}
                       value={apiKey}
                       onChange={(e) => {
-                        setApiKey(e.target.value);
+                        form.set("api_key", e.target.value);
                         if (test.state !== "testing") setTest({ state: "idle" });
                       }}
                       placeholder="sk-ant-api03-…"
                       aria-describedby={ids.helpId}
-                      className={`${inputClass} font-mono`}
+                      className={monoInputClass}
                     />
                   </div>
                 )}
@@ -311,7 +265,7 @@ function ModelProviderPage() {
                     </button>
                   )}
                   {hasKey && replacing && (
-                    <button type="button" onClick={() => { setReplacing(false); setApiKey(""); setTest({ state: "idle" }); }} className={linkButton}>
+                    <button type="button" onClick={() => { setReplacing(false); form.set("api_key", ""); setTest({ state: "idle" }); }} className={linkButton}>
                       Keep the saved key
                     </button>
                   )}
@@ -336,43 +290,14 @@ function ModelProviderPage() {
               key={role.key}
               role={role}
               value={models[role.key]}
-              unsaved={models[role.key] !== saved[role.key]}
-              onChange={(v) => setModels((m) => ({ ...m, [role.key]: v }))}
+              unsaved={form.isDirty(role.key)}
+              onChange={(v) => form.set(role.key, v)}
             />
           ))}
         </SettingsSection>
       </div>
 
-      {/* Save bar: only while something is unsaved, stuck to the bottom of the screen. */}
-      {(dirty || problem) && (
-        <div
-          role="region"
-          aria-label="Save changes"
-          data-testid="save-bar"
-          className="sticky bottom-4 z-10 mt-8 rounded-lg border border-zinc-600 bg-zinc-900/95 px-4 py-3 shadow-xl backdrop-blur"
-        >
-          {problem && (
-            <div className="mb-3">
-              <Callout variant="error" title="Not saved">
-                <p>{problem}</p>
-              </Callout>
-            </div>
-          )}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p aria-live="polite" className={`text-sm ${dirty ? "text-amber-300" : "text-zinc-500"}`}>
-              {dirty ? `${unsavedCount} unsaved change${unsavedCount === 1 ? "" : "s"}` : "Nothing to save"}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={discard} disabled={saving || testing} className={secondaryButton}>
-                Discard
-              </button>
-              <button type="button" onClick={save} disabled={saving || testing || !dirty} className={primaryButton}>
-                {saving ? "Saving…" : "Save changes"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SaveBar count={unsavedCount} problem={problem} onSave={save} onDiscard={discard} saving={saving} busy={testing} idleText="Nothing to save" />
     </Page>
   );
 }
@@ -382,11 +307,12 @@ function ModelRow({ role, value, unsaved, onChange }: { role: ModelRole; value: 
   const current = MODELS.filter((m) => !m.legacy);
   const older = MODELS.filter((m) => m.legacy);
   return (
-    <Row
+    <SettingsRow
       label={role.label}
       testId={`model-row-${role.key}`}
       help={role.does}
-      marks={unsaved ? <Chip tone="waiting">Unsaved</Chip> : null}
+      controlClassName="sm:w-80"
+      unsaved={unsaved}
       control={(ids) => (
         <div className="min-w-0">
           <select

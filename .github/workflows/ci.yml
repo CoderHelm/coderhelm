@@ -22,4 +22,48 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      # The dashboard's UI rules (model names, brand spelling, jargon, labels).
+      # Needs only TypeScript, which the root install has.
+      - name: Dashboard UI lint
+        run: node dashboard/scripts/ui-lint.mjs
       - run: npm run build
+
+  dashboard:
+    name: Dashboard
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    env:
+      E2E_PORT: "3111"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: npm ci
+      - name: UI lint
+        run: npm run lint
+      - name: Type check
+        run: npm run typecheck
+      # The e2e suite runs against this build, so it points the API at the
+      # local server the specs mock.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3111
+          NEXT_PUBLIC_STREAM_URL: http://localhost:3111
+      - name: Install Playwright's Chromium
+        run: npx playwright install --with-deps chromium
+      - name: End-to-end tests
+        run: npm run test:e2e
+        env:
+          E2E_STATIC: "1"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: dashboard/test-results/
+          retention-days: 7

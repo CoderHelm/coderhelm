@@ -7,6 +7,7 @@ import { RoleGuard } from "@/components/role-guard";
 import { Skeleton } from "@/components/skeleton";
 import { RepoCombobox } from "@/components/repo-combobox";
 import { Page, PageHeader } from "@/components/page";
+import { primaryButton } from "@/components/ui";
 import {
   ShieldCheckIcon, LockIcon, ShieldAlertIcon,
   KeyIcon, RepeatIcon, ClipboardIcon, ScanIcon,
@@ -79,7 +80,7 @@ function RuleList({
         <button
           onClick={onAdd}
           disabled={!newRule.trim() || saving}
-          className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 transition-colors"
+          className={primaryButton}
         >
           Add rule
         </button>
@@ -222,7 +223,7 @@ function GuardrailsPage() {
         <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3">Platform Security (always on)</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
-            { icon: <ShieldCheckIcon />, label: "Webhook signature verification", detail: "GitHub and Jira webhooks are HMAC-verified" },
+            { icon: <ShieldCheckIcon />, label: "Webhook signature verification", detail: "Every GitHub and Jira webhook must carry a valid signature" },
             { icon: <LockIcon />, label: "Worker isolation", detail: "Agent tooling is GitHub API only — no shell, no AWS SDK access" },
             { icon: <ShieldAlertIcon />, label: "Input validation", detail: "Repo paths, payloads, and rules are validated and size-capped at 10KB" },
             { icon: <KeyIcon />, label: "Secret scoping", detail: "Worker only has access to GitHub credentials, not billing or JWT secrets" },

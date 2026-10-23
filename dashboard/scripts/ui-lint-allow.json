@@ -1,0 +1,20 @@
+[
+  {
+    "rule": "brand",
+    "file": "src/app/settings/integrations/github/page.tsx",
+    "text": "CoderHelm GitHub App",
+    "why": "The GitHub App's own name is \"CoderHelm\" (github.com/apps/coderhelm); the install screen people see on GitHub says it that way."
+  },
+  {
+    "rule": "wide-button",
+    "file": "src/components/client-shell.tsx",
+    "text": "w-full rounded-lg bg-blue-600 px-4 py-2.5",
+    "why": "Sign-in, sign-up and reset forms sit in a narrow card; their submit buttons fill the card, not the screen."
+  },
+  {
+    "rule": "wide-button",
+    "file": "src/components/client-shell.tsx",
+    "text": "flex w-full items-center justify-center gap-2 rounded-lg",
+    "why": "The Google and GitHub sign-in buttons on the same narrow sign-in card."
+  }
+]

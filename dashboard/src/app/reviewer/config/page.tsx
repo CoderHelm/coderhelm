@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type ReviewerConfig as ApiReviewerConfig, type Repo } from "@/lib/api";
 import { ChannelPicker, channelsPayload, channelsSummary, draftFrom, draftValid, type ChannelsDraft } from "@/components/chat-channels";
@@ -15,9 +15,21 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { Segmented } from "@/components/segmented";
-import { ChevronRightIcon } from "@/components/icons";
 import { Chip, StatusText, type StatusLook } from "@/components/list";
-import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { focusRing, inputClass, linkButton, monoInputClass, primaryButton, secondaryButton } from "@/components/ui";
+import {
+  Code,
+  Field,
+  RowMarks,
+  SaveBar,
+  SettingsDisclosure,
+  SettingsRow,
+  SettingsSection,
+  Switch,
+  sameSetting,
+  useDirtyForm,
+  useLeaveWarning,
+} from "@/components/settings";
 import { Page, PageHeader } from "@/components/page";
 
 export default function ReviewerConfigGuarded() {
@@ -107,13 +119,6 @@ const SECTION_KEYS: Record<SectionId, Key[]> = {
   stop: ["killed"],
 };
 
-/** Empty, false and missing all mean "not set", so a cleared box is not a change. */
-function norm(v: unknown): string {
-  if (v === undefined || v === null || v === "" || v === false) return "";
-  return JSON.stringify(v);
-}
-const same = (a: unknown, b: unknown) => norm(a) === norm(b);
-
 /** What the backend refuses with a bare 400, said before saving. */
 function configProblem(cfg: ReviewerConfig): string | null {
   if (!draftValid(cfg.channels, cfg.webhooks, cfg.reminders_enabled)) {
@@ -191,159 +196,6 @@ function summaryLines(cfg: ReviewerConfig): string[] {
 
 // ── Building blocks ─────────────────────────────────────────────────
 
-function Switch({ id, checked, onChange, labelledBy, describedBy }: { id?: string; checked: boolean; onChange: (v: boolean) => void; labelledBy: string; describedBy?: string }) {
-  return (
-    <button
-      id={id}
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-labelledby={labelledBy}
-      aria-describedby={describedBy}
-      onClick={() => onChange(!checked)}
-      className={`relative h-5 w-9 shrink-0 rounded-full transition-colors motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-60 ${checked ? "bg-emerald-600" : "bg-zinc-700"} ${focusRing}`}
-    >
-      <span aria-hidden="true" className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform motion-reduce:transition-none ${checked ? "translate-x-4" : ""}`} />
-    </button>
-  );
-}
-
-/** "Unsaved" beats "Not default": what the person just did matters most. */
-function Marks({ unsaved, changed, recommended }: { unsaved: boolean; changed: boolean; recommended?: boolean }) {
-  return (
-    <>
-      {recommended && <Chip tone="neutral">Recommended</Chip>}
-      {unsaved ? (
-        <Chip tone="waiting">Unsaved</Chip>
-      ) : changed ? (
-        <Chip tone="muted" title="This differs from what a new repo starts with">Not default</Chip>
-      ) : null}
-    </>
-  );
-}
-
-/** Longer reading tucked under a row: how a setting works in detail. */
-function More({ children }: { children: ReactNode }) {
-  return (
-    <details className="group mt-1">
-      <summary className={`inline-flex cursor-pointer list-none items-center gap-1 rounded text-xs text-zinc-500 hover:text-zinc-300 [&::-webkit-details-marker]:hidden ${focusRing}`}>
-        <span aria-hidden="true" className="transition-transform group-open:rotate-90 motion-reduce:transition-none"><ChevronRightIcon /></span>
-        How it works
-      </summary>
-      <div className="mt-1 max-w-prose space-y-2 text-xs leading-relaxed text-zinc-400">{children}</div>
-    </details>
-  );
-}
-
-/**
- * One setting: its name and a one-line help on the left, the control on the
- * right (under it on a phone, or when `stacked`). Children are the setting's
- * own options, shown only while it is switched on.
- */
-function Row({
-  label,
-  help,
-  more,
-  control,
-  stacked,
-  toggle,
-  unsaved,
-  changed,
-  recommended,
-  children,
-  testId,
-}: {
-  label: string;
-  help?: ReactNode;
-  more?: ReactNode;
-  control: (ids: { labelId: string; helpId?: string; inputId: string }) => ReactNode;
-  stacked?: boolean;
-  /** The control is a switch: it stays on the right, even on a phone. */
-  toggle?: boolean;
-  unsaved: boolean;
-  changed: boolean;
-  recommended?: boolean;
-  children?: ReactNode;
-  testId?: string;
-}) {
-  const base = useId();
-  const ids = { labelId: `${base}-label`, helpId: help ? `${base}-help` : undefined, inputId: `${base}-input` };
-  return (
-    <div className="min-w-0 px-4 py-4" data-testid={testId}>
-      <div
-        className={`flex min-w-0 ${
-          toggle ? "flex-row items-start justify-between gap-4 sm:gap-6" : stacked ? "flex-col gap-3" : "flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
-        }`}
-      >
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <label id={ids.labelId} htmlFor={ids.inputId} className="text-sm font-medium text-zinc-100">{label}</label>
-            <Marks unsaved={unsaved} changed={changed} recommended={recommended} />
-          </div>
-          {help && <p id={ids.helpId} className="mt-0.5 max-w-prose text-sm text-zinc-400">{help}</p>}
-          {more && <More>{more}</More>}
-        </div>
-        <div className={`min-w-0 ${toggle ? "shrink-0 pt-0.5" : stacked ? "" : "sm:shrink-0"}`}>{control(ids)}</div>
-      </div>
-      {children && <div className="mt-4 min-w-0 space-y-4 border-l-2 border-zinc-800 pl-4">{children}</div>}
-    </div>
-  );
-}
-
-/** A labelled field inside a row's own options. */
-function SubField({ label, help, children, unsaved, changed }: { label: string; help?: ReactNode; children: (ids: { id: string; describedBy?: string }) => ReactNode; unsaved: boolean; changed: boolean }) {
-  const id = useId();
-  const helpId = help ? `${id}-help` : undefined;
-  return (
-    <div className="min-w-0">
-      <div className="mb-1.5 flex flex-wrap items-center gap-2">
-        <label htmlFor={id} className="text-sm font-medium text-zinc-200">{label}</label>
-        <Marks unsaved={unsaved} changed={changed} />
-      </div>
-      {children({ id, describedBy: helpId })}
-      {help && <p id={helpId} className="mt-1.5 max-w-prose text-xs text-zinc-500">{help}</p>}
-    </div>
-  );
-}
-
-/** Optional overrides, folded away until someone needs them. */
-function Optional({ summary, defaultOpen, children }: { summary: string; defaultOpen: boolean; children: ReactNode }) {
-  return (
-    <details open={defaultOpen} className="group min-w-0 rounded-lg border border-zinc-800">
-      <summary className={`flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-lg px-3 py-2 text-sm text-zinc-300 hover:text-zinc-100 [&::-webkit-details-marker]:hidden ${focusRing}`}>
-        <span aria-hidden="true" className="shrink-0 transition-transform group-open:rotate-90 motion-reduce:transition-none"><ChevronRightIcon /></span>
-        {summary}
-      </summary>
-      <div className="min-w-0 space-y-4 px-3 pb-4 pt-1">{children}</div>
-    </details>
-  );
-}
-
-function SettingsSection({
-  id,
-  title,
-  description,
-  danger,
-  children,
-}: {
-  id: string;
-  title: string;
-  description?: ReactNode;
-  danger?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <section id={id} aria-labelledby={`${id}-heading`} className="min-w-0 scroll-mt-6">
-      <h2 id={`${id}-heading`} className={`text-xs font-semibold uppercase tracking-wider ${danger ? "text-red-400" : "text-zinc-500"}`}>{title}</h2>
-      {description && <p className="mt-1 max-w-prose text-sm text-zinc-400">{description}</p>}
-      <div className={`mt-3 divide-y overflow-hidden rounded-lg border bg-zinc-900/40 ${danger ? "divide-red-500/20 border-red-500/30" : "divide-zinc-800 border-zinc-800"}`}>
-        {children}
-      </div>
-    </section>
-  );
-}
-
-const monoInput = `${inputClass} font-mono`;
 const shortInput = "sm:w-64";
 
 // ── The page ────────────────────────────────────────────────────────
@@ -353,13 +205,14 @@ function ReviewerConfigPage() {
   const { confirm } = useConfirm();
   const [repos, setRepos] = useState<Repo[]>([]);
   const [repo, setRepo] = useState("");
-  const [cfg, setCfg] = useState<ReviewerConfig>(DEFAULTS);
-  // What the backend holds, to tell unsaved edits from saved values.
-  const [saved, setSaved] = useState<ReviewerConfig>(DEFAULTS);
   const [loading, setLoading] = useState(false);
   // A failed load must not show the defaults as if they were saved: saving
   // them would overwrite the repo's real settings.
   const [loadFailed, setLoadFailed] = useState(false);
+  // The edited settings against what the backend holds. A failed load counts
+  // nothing as unsaved, so nothing can be saved over the real settings.
+  const form = useDirtyForm<ReviewerConfig>(DEFAULTS, { disabled: loadFailed });
+  const { values: cfg, reset: resetForm } = form;
   const [reloadKey, setReloadKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -427,13 +280,11 @@ function ReviewerConfigPage() {
       .then((c) => {
         if (!current) return;
         const next = { ...DEFAULTS, ...c, channels: draftFrom(c.webhooks) };
-        setCfg(next);
-        setSaved(next);
+        resetForm(next);
       })
       .catch(() => {
         if (!current) return;
-        setCfg(DEFAULTS);
-        setSaved(DEFAULTS);
+        resetForm(DEFAULTS);
         setLoadFailed(true);
       })
       .finally(() => {
@@ -442,28 +293,19 @@ function ReviewerConfigPage() {
     return () => {
       current = false;
     };
-  }, [repo, reloadKey]);
+  }, [repo, reloadKey, resetForm]);
 
-  const set = <K extends Key>(k: K, v: ReviewerConfig[K]) => setCfg((p) => ({ ...p, [k]: v }));
+  const set = form.set;
 
-  const unsavedKeys = useMemo(
-    () => (Object.keys({ ...saved, ...cfg }) as Key[]).filter((k) => !same(cfg[k], saved[k])),
-    [cfg, saved],
-  );
-  const dirty = unsavedKeys.length > 0 && !loadFailed;
+  const unsavedKeys = form.dirtyKeys;
+  const dirty = form.dirty;
   const orgDirty = orgState === "ready" && orgInstructions !== orgSaved;
-  const notDefault = (Object.keys(DEFAULTS) as Key[]).filter((k) => !same(cfg[k], DEFAULTS[k]));
-  const isUnsaved = (...ks: Key[]) => ks.some((k) => unsavedKeys.includes(k));
-  const isChanged = (...ks: Key[]) => ks.some((k) => !same(cfg[k], DEFAULTS[k]));
-  const marks = (...ks: Key[]) => ({ unsaved: isUnsaved(...ks), changed: isChanged(...ks) });
+  const notDefault = (Object.keys(DEFAULTS) as Key[]).filter((k) => !sameSetting(cfg[k], DEFAULTS[k]));
+  const isChanged = (...ks: Key[]) => ks.some((k) => !sameSetting(cfg[k], DEFAULTS[k]));
+  const marks = (...ks: Key[]) => ({ unsaved: form.isDirty(...ks), notDefault: isChanged(...ks) });
 
-  // Leaving with unsaved edits asks first.
-  useEffect(() => {
-    if (!dirty && !orgDirty) return;
-    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty, orgDirty]);
+  // Leaving with unsaved repo edits asks first (useDirtyForm); so do unsaved standards.
+  useLeaveWarning(orgDirty);
 
   // The nav marks the section in view.
   useEffect(() => {
@@ -524,7 +366,7 @@ function ReviewerConfigPage() {
   };
 
   const discard = () => {
-    setCfg(saved);
+    form.discard();
     setProblem(null);
   };
 
@@ -660,23 +502,23 @@ function ReviewerConfigPage() {
               <legend className="sr-only">Settings for {repo}</legend>
 
               <SettingsSection id="reviews" title="Reviews" description="Whether the reviewer looks at pull requests here, and what it pays attention to.">
-                <Row
+                <SettingsRow
                   label="Enable reviewer for this repo"
                   help="Off: the reviewer ignores this repo entirely."
                   {...marks("enabled")}
-                  toggle
+                  layout="toggle"
                   control={({ labelId, helpId, inputId }) => <Switch id={inputId} checked={cfg.enabled} onChange={(v) => set("enabled", v)} labelledBy={labelId} describedBy={helpId} />}
                 />
-                <Row
+                <SettingsRow
                   label="Trigger label"
                   help="Add this label to a pull request to have it reviewed."
                   {...marks("label")}
                   control={({ inputId, helpId }) => (
-                    <input id={inputId} aria-describedby={helpId} value={cfg.label} onChange={(e) => set("label", e.target.value)} placeholder="ch-review" className={`${monoInput} ${shortInput}`} />
+                    <input id={inputId} aria-describedby={helpId} value={cfg.label} onChange={(e) => set("label", e.target.value)} placeholder="ch-review" className={`${monoInputClass} ${shortInput}`} />
                   )}
                 />
-                <Row
-                  stacked
+                <SettingsRow
+                  layout="stacked"
                   label="Review focus"
                   help="Optional. What to look at closely on this repo, on top of the team standards and the repo's AGENTS.md."
                   {...marks("instructions")}
@@ -695,31 +537,31 @@ function ReviewerConfigPage() {
               </SettingsSection>
 
               <SettingsSection id="tests" title="Tests">
-                <Row
+                <SettingsRow
                   label="Check the change by running tests"
                   help="Runs the affected tests and build in a sandbox; a clear failure requests changes. Slower, and uses build minutes."
                   {...marks("verify_tests")}
-                  toggle
+                  layout="toggle"
                   control={({ labelId, helpId, inputId }) => <Switch id={inputId} checked={cfg.verify_tests} onChange={(v) => set("verify_tests", v)} labelledBy={labelId} describedBy={helpId} />}
                 />
-                <Row
+                <SettingsRow
                   label="Require tests"
                   help="Blocks pull requests whose new or changed behavior comes without tests."
                   more={
                     <p>
-                      New features need new tests; changed or fixed behavior needs its tests added or updated. CoderHelm writes those tests itself
+                      New features need new tests; changed or fixed behavior needs its tests added or updated. Coderhelm writes those tests itself
                       when it plans and codes a change (following your AGENTS.md / CLAUDE.md test conventions), and the reviewer blocks any pull
-                      request, CoderHelm&apos;s or a person&apos;s, whose tests are missing or stale. Refactors, docs, config and dependency bumps are exempt.
+                      request, Coderhelm&apos;s or a person&apos;s, whose tests are missing or stale. Refactors, docs, config and dependency bumps are exempt.
                     </p>
                   }
                   {...marks("require_tests")}
-                  toggle
+                  layout="toggle"
                   control={({ labelId, helpId, inputId }) => <Switch id={inputId} checked={cfg.require_tests} onChange={(v) => set("require_tests", v)} labelledBy={labelId} describedBy={helpId} />}
                 />
               </SettingsSection>
 
               <SettingsSection id="labels" title="CI labels">
-                <Row
+                <SettingsRow
                   label="Add CI labels from what the PR changes"
                   help="Adds the labels a pull request needs, such as e2e areas or a staging deploy, from the files it touches. It only adds labels, never removes them."
                   more={
@@ -729,47 +571,54 @@ function ReviewerConfigPage() {
                     </p>
                   }
                   {...marks("auto_labels")}
-                  toggle
+                  layout="toggle"
                   control={({ labelId, helpId, inputId }) => <Switch id={inputId} checked={cfg.auto_labels} onChange={(v) => set("auto_labels", v)} labelledBy={labelId} describedBy={helpId} />}
                 >
                   {reveal(cfg.auto_labels) && (
-                    <Optional summary="Overrides (optional)" defaultOpen={isChanged("auto_label_allow", "auto_label_requires", "auto_label_guide") || !!problem}>
-                      <SubField
+                    <SettingsDisclosure summary="Overrides (optional)" defaultOpen={isChanged("auto_label_allow", "auto_label_requires", "auto_label_guide") || !!problem}>
+                      <Field
                         label="Labels it may add"
                         {...marks("auto_label_allow")}
                         help={
                           <>
                             Empty: the labels the repo&apos;s AGENTS.md / CLAUDE.md name (production labels are never picked that way). Set this to pin an
-                            exact list, comma separated names or <code>PREFIX*</code>; nothing outside it is ever added.
+                            exact list, comma separated names or <Code>PREFIX*</Code>; nothing outside it is ever added.
                           </>
                         }
-                      >
-                        {({ id, describedBy }) => (
-                          <input id={id} aria-describedby={describedBy} value={cfg.auto_label_allow} onChange={(e) => set("auto_label_allow", e.target.value)} className={monoInput} placeholder="E2E:*, CI:E2E, CI:DEPLOY_STAGING" />
-                        )}
-                      </SubField>
-                      <SubField
+                        mono
+                        value={cfg.auto_label_allow}
+                        onChange={(e) => set("auto_label_allow", e.target.value)}
+                        placeholder="E2E:*, CI:E2E, CI:DEPLOY_STAGING"
+                      />
+                      <Field
+                        as="textarea"
                         label="Required companions"
                         {...marks("auto_label_requires")}
                         help={
                           <>
                             Usually not needed: the reviewer follows what your docs say. Use this to guarantee it, one rule per line,{" "}
-                            <code>label -&gt; label, label</code> (<code>PREFIX*</code> works on the left).
+                            <Code>label -&gt; label, label</Code> (<Code>PREFIX*</Code> works on the left).
                           </>
                         }
-                      >
-                        {({ id, describedBy }) => (
-                          <textarea id={id} aria-describedby={describedBy} rows={3} value={cfg.auto_label_requires} onChange={(e) => set("auto_label_requires", e.target.value)} className={monoInput} placeholder={"E2E:join -> CI:DEPLOY_STAGING"} />
-                        )}
-                      </SubField>
-                      <SubField label="Guidance" {...marks("auto_label_guide")} help="When to use which label, in your own words.">
-                        {({ id, describedBy }) => (
-                          <textarea id={id} aria-describedby={describedBy} rows={3} value={cfg.auto_label_guide} onChange={(e) => set("auto_label_guide", e.target.value)} className={inputClass} placeholder="For example: areas and the code they cover are in e2e/test-map.json." />
-                        )}
-                      </SubField>
-                    </Optional>
+                        mono
+                        rows={3}
+                        value={cfg.auto_label_requires}
+                        onChange={(e) => set("auto_label_requires", e.target.value)}
+                        placeholder={"E2E:join -> CI:DEPLOY_STAGING"}
+                      />
+                      <Field
+                        as="textarea"
+                        label="Guidance"
+                        {...marks("auto_label_guide")}
+                        help="When to use which label, in your own words."
+                        rows={3}
+                        value={cfg.auto_label_guide}
+                        onChange={(e) => set("auto_label_guide", e.target.value)}
+                        placeholder="For example: areas and the code they cover are in e2e/test-map.json."
+                      />
+                    </SettingsDisclosure>
                   )}
-                </Row>
+                </SettingsRow>
               </SettingsSection>
 
               <SettingsSection
@@ -777,42 +626,42 @@ function ReviewerConfigPage() {
                 title="Auto-merge"
                 description="Lets the reviewer merge after it approves. It only merges the exact commit it reviewed; a later push blocks the merge."
               >
-                <Row
+                <SettingsRow
                   label="Auto-merge on approve"
                   help="Merges once the review approves and all CI has passed."
                   {...marks("auto_merge")}
-                  toggle
+                  layout="toggle"
                   control={({ labelId, helpId, inputId }) => <Switch id={inputId} checked={cfg.auto_merge} onChange={(v) => set("auto_merge", v)} labelledBy={labelId} describedBy={helpId} />}
                 >
                   {reveal(cfg.auto_merge) && (
                     <>
-                      <SubField label="Merge method" {...marks("merge_method")}>
+                      <Field as="custom" label="Merge method" {...marks("merge_method")}>
                         {() => <Segmented label="Merge method" options={MERGE_METHODS} value={cfg.merge_method} onChange={(v) => set("merge_method", v)} />}
-                      </SubField>
-                      <SubField
+                      </Field>
+                      <Field
                         label="Deploy labels (optional)"
                         {...marks("deploy_label")}
                         help={
                           <>
-                            Added to CoderHelm&apos;s own pull requests when it opens them, and to people&apos;s once they are cleared to merge, so your
+                            Added to Coderhelm&apos;s own pull requests when it opens them, and to people&apos;s once they are cleared to merge, so your
                             deploy, preview or e2e CI runs. Auto-merge waits for that CI too. Comma separate several, for example{" "}
-                            <code>E2E:IOS,E2E:ANDROID</code>. Empty: skip.
+                            <Code>E2E:IOS,E2E:ANDROID</Code>. Empty: skip.
                           </>
                         }
-                      >
-                        {({ id, describedBy }) => (
-                          <input id={id} aria-describedby={describedBy} value={cfg.deploy_label} onChange={(e) => set("deploy_label", e.target.value)} className={monoInput} placeholder="deploy-staging" />
-                        )}
-                      </SubField>
+                        mono
+                        value={cfg.deploy_label}
+                        onChange={(e) => set("deploy_label", e.target.value)}
+                        placeholder="deploy-staging"
+                      />
                     </>
                   )}
-                </Row>
-                <Row
+                </SettingsRow>
+                <SettingsRow
                   label="Also require a person's approval"
                   help="If off, the reviewer's approval alone can merge."
                   recommended
                   {...marks("require_human_approval")}
-                  toggle
+                  layout="toggle"
                   control={({ labelId, helpId, inputId }) => (
                     <Switch id={inputId} checked={cfg.require_human_approval} onChange={(v) => set("require_human_approval", v)} labelledBy={labelId} describedBy={helpId} />
                   )}
@@ -820,32 +669,33 @@ function ReviewerConfigPage() {
               </SettingsSection>
 
               <SettingsSection id="after-merge" title="Tags and health check" description="What happens once a pull request has merged.">
-                <Row
+                <SettingsRow
                   label="Tag after merge"
                   help="Cuts a release tag on the merged commit."
                   {...marks("auto_tag")}
-                  toggle
+                  layout="toggle"
                   control={({ labelId, helpId, inputId }) => <Switch id={inputId} checked={cfg.auto_tag} onChange={(v) => set("auto_tag", v)} labelledBy={labelId} describedBy={helpId} />}
                 >
                   {reveal(cfg.auto_tag) && (
                     <>
-                      <SubField label="Tag style" {...marks("tag_mode")}>
+                      <Field as="custom" label="Tag style" {...marks("tag_mode")}>
                         {() => <Segmented label="Tag style" options={TAG_MODES} value={cfg.tag_mode} onChange={(v) => set("tag_mode", v)} />}
-                      </SubField>
-                      <SubField
+                      </Field>
+                      <Field
                         label="Tag prefix"
                         {...marks("tag_prefix")}
                         help={
                           cfg.tag_mode === "date"
-                            ? <>Tags look like <code>{cfg.tag_prefix}YYYYMMDD-HHMMSS</code> (a timestamp, not a version).</>
-                            : <>Tags look like <code>{cfg.tag_prefix}1.2.4</code>: the next patch after the latest <code>{cfg.tag_prefix}X.Y.Z</code>.</>
+                            ? <>Tags look like <Code>{cfg.tag_prefix}YYYYMMDD-HHMMSS</Code> (a timestamp, not a version).</>
+                            : <>Tags look like <Code>{cfg.tag_prefix}1.2.4</Code>: the next patch after the latest <Code>{cfg.tag_prefix}X.Y.Z</Code>.</>
                         }
-                      >
-                        {({ id, describedBy }) => (
-                          <input id={id} aria-describedby={describedBy} value={cfg.tag_prefix} onChange={(e) => set("tag_prefix", e.target.value)} className={`${monoInput} sm:w-32`} placeholder="v" />
-                        )}
-                      </SubField>
-                      <SubField
+                        mono
+                        controlClassName="sm:w-32"
+                        value={cfg.tag_prefix}
+                        onChange={(e) => set("tag_prefix", e.target.value)}
+                        placeholder="v"
+                      />
+                      <Field
                         label="Batch window (minutes)"
                         {...marks("tag_batch_minutes")}
                         help={
@@ -853,36 +703,29 @@ function ReviewerConfigPage() {
                             ? "0: every merge gets its own tag right away."
                             : `Merges within ${cfg.tag_batch_minutes} minutes share one tag, on the latest commit.`
                         }
-                      >
-                        {({ id, describedBy }) => (
-                          <input
-                            id={id}
-                            aria-describedby={describedBy}
-                            type="number"
-                            min={0}
-                            max={360}
-                            value={cfg.tag_batch_minutes}
-                            onChange={(e) => set("tag_batch_minutes", Math.max(0, Math.min(360, Math.floor(Number(e.target.value) || 0))))}
-                            className={`${inputClass} sm:w-32`}
-                            placeholder="15"
-                          />
-                        )}
-                      </SubField>
+                        type="number"
+                        min={0}
+                        max={360}
+                        value={cfg.tag_batch_minutes}
+                        onChange={(e) => set("tag_batch_minutes", Math.max(0, Math.min(360, Math.floor(Number(e.target.value) || 0))))}
+                        controlClassName="sm:w-32"
+                        placeholder="15"
+                      />
                     </>
                   )}
-                </Row>
-                <Row
+                </SettingsRow>
+                <SettingsRow
                   label="Health check after merge"
                   help="Watches the deploy checks on the base branch and flags failures that were not there before. It reports; it never rolls back."
                   {...marks("health_check")}
-                  toggle
+                  layout="toggle"
                   control={({ labelId, helpId, inputId }) => <Switch id={inputId} checked={cfg.health_check} onChange={(v) => set("health_check", v)} labelledBy={labelId} describedBy={helpId} />}
                 >
                   {cfg.health_check && (
                     <div className="min-w-0">
                       <div className="mb-1.5 flex flex-wrap items-center gap-2">
                         <p className="text-sm font-medium text-zinc-200">CloudWatch log groups to watch (optional)</p>
-                        <Marks {...marks("health_log_groups")} />
+                        <RowMarks {...marks("health_log_groups")} />
                       </div>
                       {logGroups.length === 0 ? (
                         <p className="text-sm text-zinc-400">
@@ -943,90 +786,80 @@ function ReviewerConfigPage() {
                       )}
                     </div>
                   )}
-                </Row>
+                </SettingsRow>
               </SettingsSection>
 
               <SettingsSection id="release-notes" title="Release notes">
-                <Row
+                <SettingsRow
                   label="Write release notes for each release tag"
                   help="Writes GitHub release notes and a short summary for stakeholders from the pull requests and tickets since the last tag."
                   more={
                     <>
                       <p>
-                        It runs when a release tag is created on the release branch, by CoderHelm (Tag after merge), a person or CI. It follows your
-                        repo&apos;s release notes guide when it has one. CoderHelm only tags after an approved, green merge, so the tag is the approval.
+                        It runs when a release tag is created on the release branch, by Coderhelm (Tag after merge), a person or CI. It follows your
+                        repo&apos;s release notes guide when it has one. Coderhelm only tags after an approved, green merge, so the tag is the approval.
                       </p>
                       <p>Changes it can&apos;t explain from the pull request or ticket are listed as written, never guessed.</p>
                     </>
                   }
                   {...marks("release_notes")}
-                  toggle
+                  layout="toggle"
                   control={({ labelId, helpId, inputId }) => <Switch id={inputId} checked={cfg.release_notes} onChange={(v) => set("release_notes", v)} labelledBy={labelId} describedBy={helpId} />}
                 >
                   {reveal(cfg.release_notes) && (
                     <>
-                      <SubField
+                      <Field
                         label="Release branch"
                         {...marks("release_notes_branch")}
-                        help={<>Only tags on merges into this branch get notes, for example <code>main</code> when features merge into <code>develop</code>. Empty: the default branch.</>}
-                      >
-                        {({ id, describedBy }) => (
-                          <input id={id} aria-describedby={describedBy} value={cfg.release_notes_branch} onChange={(e) => set("release_notes_branch", e.target.value)} className={`${monoInput} ${shortInput}`} placeholder="main" />
-                        )}
-                      </SubField>
+                        help={<>Only tags on merges into this branch get notes, for example <Code>main</Code> when features merge into <Code>develop</Code>. Empty: the default branch.</>}
+                        mono
+                        controlClassName={shortInput}
+                        value={cfg.release_notes_branch}
+                        onChange={(e) => set("release_notes_branch", e.target.value)}
+                        placeholder="main"
+                      />
 
-                      <Optional
+                      <SettingsDisclosure
                         summary="Publish to Confluence"
                         defaultOpen={isChanged("release_notes_confluence_parent_id", "release_notes_confluence_container", "release_notes_confluence_space") || !!problem}
                       >
                         <p className="text-xs text-zinc-500">
                           Entries go to parent → {cfg.release_notes_confluence_container || "Changelog"} → one page per year, newest at the top, through the
-                          CoderHelm app in Jira (it needs Confluence access). Leave the parent empty to skip Confluence.
+                          Coderhelm app in Jira (it needs Confluence access). Leave the parent empty to skip Confluence.
                         </p>
                         <div className="grid min-w-0 gap-4 sm:grid-cols-3">
-                          <SubField label="Parent page id" {...marks("release_notes_confluence_parent_id")}>
-                            {({ id }) => (
-                              <input id={id} inputMode="numeric" value={cfg.release_notes_confluence_parent_id} onChange={(e) => set("release_notes_confluence_parent_id", e.target.value.replace(/\D/g, ""))} className={monoInput} placeholder="123456789" />
-                            )}
-                          </SubField>
-                          <SubField label="Changelog page title" {...marks("release_notes_confluence_container")}>
-                            {({ id }) => (
-                              <input id={id} value={cfg.release_notes_confluence_container} onChange={(e) => set("release_notes_confluence_container", e.target.value)} className={inputClass} placeholder="Changelog" />
-                            )}
-                          </SubField>
-                          <SubField label="Space key (for reference)" {...marks("release_notes_confluence_space")}>
-                            {({ id }) => (
-                              <input id={id} value={cfg.release_notes_confluence_space} onChange={(e) => set("release_notes_confluence_space", e.target.value)} className={monoInput} placeholder="ENG" />
-                            )}
-                          </SubField>
+                          <Field label="Parent page id" {...marks("release_notes_confluence_parent_id")} mono inputMode="numeric" value={cfg.release_notes_confluence_parent_id} onChange={(e) => set("release_notes_confluence_parent_id", e.target.value.replace(/\D/g, ""))} placeholder="123456789" />
+                          <Field label="Changelog page title" {...marks("release_notes_confluence_container")} value={cfg.release_notes_confluence_container} onChange={(e) => set("release_notes_confluence_container", e.target.value)} placeholder="Changelog" />
+                          <Field label="Space key (for reference)" {...marks("release_notes_confluence_space")} mono value={cfg.release_notes_confluence_space} onChange={(e) => set("release_notes_confluence_space", e.target.value)} placeholder="ENG" />
                         </div>
-                      </Optional>
+                      </SettingsDisclosure>
 
-                      <Optional
+                      <SettingsDisclosure
                         summary="Send to an automation webhook"
                         defaultOpen={isChanged("release_notes_email_webhook_url") || !!cfg.release_notes_email_webhook_secret_set || !!problem}
                       >
-                        <SubField
+                        <Field
                           label="Automation webhook URL"
                           {...marks("release_notes_email_webhook_url")}
                           help={
                             <>
-                              After the Confluence entry, CoderHelm POSTs <code>subject</code>, <code>summary_html</code>, <code>summary_markdown</code>,{" "}
-                              <code>confluence_url</code>, <code>release_url</code>, <code>repo</code>, <code>tag</code> and <code>date</code> here, for
+                              After the Confluence entry, Coderhelm POSTs <Code>subject</Code>, <Code>summary_html</Code>, <Code>summary_markdown</Code>,{" "}
+                              <Code>confluence_url</Code>, <Code>release_url</Code>, <Code>repo</Code>, <Code>tag</Code> and <Code>date</Code> here, for
                               example to an Atlassian Automation rule that emails your IT list. Failures post to the reminder channels below.
                             </>
                           }
-                        >
-                          {({ id, describedBy }) => (
-                            <input id={id} aria-describedby={describedBy} value={cfg.release_notes_email_webhook_url} onChange={(e) => set("release_notes_email_webhook_url", e.target.value)} className={monoInput} placeholder="https://api-private.atlassian.com/automation/webhooks/…" />
-                          )}
-                        </SubField>
-                        <SubField
+                          mono
+                          value={cfg.release_notes_email_webhook_url}
+                          onChange={(e) => set("release_notes_email_webhook_url", e.target.value)}
+                          placeholder="https://api-private.atlassian.com/automation/webhooks/…"
+                        />
+                        <Field
+                          as="custom"
                           label="Webhook secret (optional)"
                           {...marks("release_notes_email_webhook_secret", "release_notes_email_webhook_secret_clear")}
-                          help={<>Sent as the <code>X-Automation-Webhook-Token</code> header and never shown again.</>}
+                          help={<>Sent as the <Code>X-Automation-Webhook-Token</Code> header and never shown again.</>}
                         >
-                          {({ id, describedBy }) => (
+                          {({ id, "aria-describedby": describedBy }) => (
                             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
                               <input
                                 id={id}
@@ -1036,7 +869,7 @@ function ReviewerConfigPage() {
                                 autoComplete="off"
                                 value={cfg.release_notes_email_webhook_secret ?? ""}
                                 onChange={(e) => set("release_notes_email_webhook_secret", e.target.value)}
-                                className={`${monoInput} ${shortInput}`}
+                                className={`${monoInputClass} ${shortInput}`}
                                 placeholder={cfg.release_notes_email_webhook_secret_set ? "Saved. Type to replace" : "None saved"}
                               />
                               {cfg.release_notes_email_webhook_secret_set && (
@@ -1052,32 +885,32 @@ function ReviewerConfigPage() {
                               )}
                             </div>
                           )}
-                        </SubField>
-                      </Optional>
+                        </Field>
+                      </SettingsDisclosure>
 
-                      <Optional summary="How it writes (optional)" defaultOpen={isChanged("release_notes_guide", "release_notes_instructions")}>
-                        <SubField label="Writing guide" {...marks("release_notes_guide")} help="A file in the repo to follow. Empty: found on its own, for example RELEASE_NOTES.md.">
-                          {({ id, describedBy }) => (
-                            <input id={id} aria-describedby={describedBy} value={cfg.release_notes_guide} onChange={(e) => set("release_notes_guide", e.target.value)} className={monoInput} placeholder="docs/RELEASE_NOTES.md" />
-                          )}
-                        </SubField>
-                        <SubField label="Instructions" {...marks("release_notes_instructions")}>
-                          {({ id }) => (
-                            <textarea id={id} rows={2} value={cfg.release_notes_instructions} onChange={(e) => set("release_notes_instructions", e.target.value)} className={inputClass} placeholder="For example: the audience is the IT help desk." />
-                          )}
-                        </SubField>
-                      </Optional>
+                      <SettingsDisclosure summary="How it writes (optional)" defaultOpen={isChanged("release_notes_guide", "release_notes_instructions")}>
+                        <Field label="Writing guide" {...marks("release_notes_guide")} help="A file in the repo to follow. Empty: found on its own, for example RELEASE_NOTES.md." mono value={cfg.release_notes_guide} onChange={(e) => set("release_notes_guide", e.target.value)} placeholder="docs/RELEASE_NOTES.md" />
+                        <Field
+                          as="textarea"
+                          label="Instructions"
+                          {...marks("release_notes_instructions")}
+                          rows={2}
+                          value={cfg.release_notes_instructions}
+                          onChange={(e) => set("release_notes_instructions", e.target.value)}
+                          placeholder="For example: the audience is the IT help desk."
+                        />
+                      </SettingsDisclosure>
                     </>
                   )}
-                </Row>
+                </SettingsRow>
               </SettingsSection>
 
               <SettingsSection id="reminders" title="Review reminders">
-                <Row
+                <SettingsRow
                   label="Remind reviewers in Microsoft Teams or Slack"
                   help="About every 20 minutes, posts open pull requests still waiting on their requested reviewers."
                   {...marks("reminders_enabled")}
-                  toggle
+                  layout="toggle"
                   control={({ labelId, helpId, inputId }) => <Switch id={inputId} checked={cfg.reminders_enabled} onChange={(v) => set("reminders_enabled", v)} labelledBy={labelId} describedBy={helpId} />}
                 >
                   {reveal(cfg.reminders_enabled) && (
@@ -1091,31 +924,28 @@ function ReviewerConfigPage() {
                           destination={{ destination: "reviewer", repo }}
                         />
                       </div>
-                      <SubField label="Wait before reminding again (hours)" {...marks("reminder_cooldown_hours")} help="It also reminds again after a new commit.">
-                        {({ id, describedBy }) => (
-                          <input
-                            id={id}
-                            aria-describedby={describedBy}
-                            type="number"
-                            min={1}
-                            max={168}
-                            value={cfg.reminder_cooldown_hours}
-                            onChange={(e) => set("reminder_cooldown_hours", Math.max(1, Math.min(168, Number(e.target.value) || 1)))}
-                            className={`${inputClass} sm:w-32`}
-                          />
-                        )}
-                      </SubField>
+                      <Field
+                        label="Wait before reminding again (hours)"
+                        {...marks("reminder_cooldown_hours")}
+                        help="It also reminds again after a new commit."
+                        type="number"
+                        min={1}
+                        max={168}
+                        value={cfg.reminder_cooldown_hours}
+                        onChange={(e) => set("reminder_cooldown_hours", Math.max(1, Math.min(168, Number(e.target.value) || 1)))}
+                        controlClassName="sm:w-32"
+                      />
                     </>
                   )}
-                </Row>
+                </SettingsRow>
               </SettingsSection>
 
               <SettingsSection id="stop" title="Stop everything" danger>
-                <Row
+                <SettingsRow
                   label="Stop everything"
                   help="Stops every reviewer action on this repo at once, whatever is set above. Use it if something goes wrong."
                   {...marks("killed")}
-                  toggle
+                  layout="toggle"
                   control={({ labelId, helpId, inputId }) => <Switch id={inputId} checked={cfg.killed} onChange={(v) => set("killed", v)} labelledBy={labelId} describedBy={helpId} />}
                 />
               </SettingsSection>
@@ -1123,35 +953,16 @@ function ReviewerConfigPage() {
 
             {/* Save bar: sticks to the bottom of the screen while there are unsaved edits, and says what they are. */}
             {!readOnly && (
-              <div
-                role="region"
-                aria-label="Save changes"
-                data-testid="save-bar"
-                className={`mt-8 rounded-lg border px-4 py-3 ${
-                  dirty || problem ? "sticky bottom-4 z-10 border-zinc-600 bg-zinc-900/95 shadow-xl backdrop-blur" : "border-zinc-800 bg-zinc-900/40"
-                }`}
-              >
-                {problem && (
-                  <div className="mb-3">
-                    <Callout variant="error" title="Not saved">
-                      <p>{problem}</p>
-                    </Callout>
-                  </div>
-                )}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p aria-live="polite" className={`text-sm ${dirty ? "text-amber-300" : "text-zinc-500"}`}>
-                    {dirty ? `${unsavedKeys.length} unsaved change${unsavedKeys.length === 1 ? "" : "s"} on ${repo}` : "All changes saved"}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={discard} disabled={!dirty || saving} className={secondaryButton}>
-                      Discard
-                    </button>
-                    <button type="button" onClick={save} disabled={saving || !dirty} className={primaryButton}>
-                      {saving ? "Saving…" : "Save settings"}
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <SaveBar
+                persistent
+                count={unsavedKeys.length}
+                context={repo}
+                problem={problem}
+                onSave={save}
+                onDiscard={discard}
+                saving={saving}
+                saveLabel="Save settings"
+              />
             )}
           </div>
         </div>
