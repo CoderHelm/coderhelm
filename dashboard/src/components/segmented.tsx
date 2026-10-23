@@ -36,11 +36,15 @@ export function Segmented<T extends string>({
             aria-pressed={pressed}
             disabled={disabled}
             onClick={() => onChange(option.value)}
-            className={`min-h-8 px-3 py-1 text-sm disabled:opacity-50 ${i > 0 ? "border-l border-zinc-700" : ""} ${
-              i === 0 ? "rounded-l-[7px]" : ""
-            } ${i === options.length - 1 ? "rounded-r-[7px]" : ""} ${
-              pressed ? "bg-zinc-100 text-zinc-900 font-semibold" : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
-            } ${focusRing}`}
+            // One font weight for every segment: selection changes only the
+            // background and colour, so no segment changes width and the row
+            // never shifts. The focus ring sits inside the segment, so it is
+            // not clipped by the scroll strip and never covers a neighbour.
+            className={`min-h-8 whitespace-nowrap px-3 py-1 text-sm font-medium transition-colors motion-reduce:transition-none disabled:opacity-50 ${
+              i > 0 ? "border-l border-zinc-700" : ""
+            } ${i === 0 ? "rounded-l-[7px]" : ""} ${i === options.length - 1 ? "rounded-r-[7px]" : ""} ${
+              pressed ? "bg-zinc-100 text-zinc-900" : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+            } ${focusRing} focus-visible:outline-offset-[-3px] ${pressed ? "focus-visible:outline-zinc-500" : ""}`}
           >
             {option.label}
           </button>
