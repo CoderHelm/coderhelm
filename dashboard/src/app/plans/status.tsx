@@ -52,3 +52,22 @@ export function TaskStatusPill({ status }: { status: string }) {
   const s = taskInfo(status);
   return <span className={`${PILL} ${s.style}`}>{s.label}</span>;
 }
+
+// A task's status as the shared list tones, for the checklist mark and the
+// status word on a task row.
+const TASK_TONE: Record<string, StatusLook> = {
+  draft: { label: "Draft", tone: "neutral" },
+  approved: { label: "Approved", tone: "queued", live: false },
+  rejected: { label: "Skipped", tone: "muted" },
+  queued: { label: "Queued", tone: "queued" },
+  running: { label: "Running", tone: "live", live: true },
+  waiting: { label: "Waiting on a merge", tone: "waiting" },
+  failed: { label: "Failed", tone: "danger" },
+  issue_created: { label: "Issue opened", tone: "attention" },
+  done: { label: "Done", tone: "success" },
+};
+
+/** How a task's status reads on its row; unknown statuses read as plain words. */
+export function taskStatusLook(status: string): StatusLook {
+  return TASK_TONE[status] ?? { label: words(status), tone: "neutral" };
+}
