@@ -34,6 +34,13 @@ const TEMPLATES = [
   { template_id: "TPLB", title: "New settings page", description: "", tags: [], task_count: 2, usage_count: 0, created_by: "a-person", created_at: NOW },
 ];
 
+const OPENSPEC = {
+  proposal: "# Proposal\n\nMembers ask for the class schedule on the web. Today it only lives in the app.\n\n## What changes\n\n- A schedule page under `/schedule`\n- An endpoint that lists classes by day",
+  design: "# Design\n\nThe page reads `GET /api/classes?day=` and groups classes by hour.\n\n```ts\nexport async function classesFor(day: string) {\n  return fetch(`/api/classes?day=${day}`).then((r) => r.json());\n}\n```",
+  spec: "# Spec\n\n### Requirement: schedule by day\n\nThe page SHALL show every class for the chosen day, earliest first.",
+  tasks: "# Tasks\n\n- [ ] 1. Add the schedule table\n- [ ] 2. Show the schedule on the page",
+};
+
 interface Backend {
   calls: string[];
   plansEmpty: boolean;
@@ -44,6 +51,11 @@ interface Backend {
   tasks: ReturnType<typeof task>[];
   chatBody: Record<string, unknown> | null;
   usedQueries: string[];
+  /** The plan the detail page reads; tasks come from `tasks`. */
+  planExtra: Record<string, unknown>;
+  openspecMissing: boolean;
+  /** Bodies of every write, "METHOD /path" → body, in order. */
+  writes: { call: string; body: unknown }[];
 }
 
 function freshTasks() {
@@ -58,7 +70,7 @@ function freshTasks() {
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = {
     calls: [], plansEmpty: false, plansFail: false, templatesEmpty: false, planStatus: 200, slowPlan: false,
-    tasks: freshTasks(), chatBody: null, usedQueries: [], ...init,
+    tasks: freshTasks(), chatBody: null, usedQueries: [], planExtra: {}, openspecMissing: false, writes: [], ...init,
   };
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -69,6 +81,10 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     const p = url.pathname;
     const m = req.method();
     db.calls.push(`${m} ${p}${url.search}`);
+    if (m !== "GET" && p.startsWith("/api/plans/") && !p.startsWith("/api/plans/chat")) {
+      const raw = req.postData();
+      db.writes.push({ call: `${m} ${p}`, body: raw ? JSON.parse(raw) : null });
+    }
     if (p === "/api/me") return json(route, { user_id: "u_1", team_id: "t_1", github_login: null, email: "admin@example.com", avatar_url: "", role: "admin" });
     if (p === "/api/usage") return json(route, { month: "2026-01", total_tokens: 0, tokens_in: 0, tokens_out: 0, total_runs: 0, max_tokens: 0 });
     if (p === "/api/banners") return json(route, { banners: [] });
@@ -125,14 +141,25 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (one && m === "GET") {
       if (db.planStatus !== 200) return route.fulfill({ status: db.planStatus, body: "" });
       if (db.slowPlan) await new Promise((r) => setTimeout(r, 1500));
-      return json(route, { ...plan(one[1], "Add a class schedule page", "draft", { chat_id: "chat-1" }), task_count: db.tasks.length, tasks: db.tasks });
+      return json(route, { ...plan(one[1], "Add a class schedule page", "draft", { chat_id: "chat-1", ...db.planExtra }), task_count: db.tasks.length, tasks: db.tasks });
+    }
+    const taskOne = p.match(/^\/api\/plans\/\w+\/tasks\/(\w+)$/);
+    if (taskOne && (m === "PUT" || m === "DELETE")) return route.fulfill({ status: 200, body: "" });
+    if (/^\/api\/plans\/\w+\/tasks$/.test(p) && m === "POST") return json(route, { task_id: "T9" });
+    if (/^\/api\/plans\/\w+\/tasks\/\w+\/(reject|force-run)$/.test(p)) return json(route, { status: "queued" });
+    if (/^\/api\/plans\/\w+\/openspec\/generate$/.test(p) && m === "POST") {
+      db.openspecMissing = false;
+      return json(route, { files: ["proposal.md", "design.md", "tasks.md", "spec.md"] });
     }
     const approve = p.match(/^\/api\/plans\/\w+\/tasks\/(\w+)\/approve$/);
     if (approve) {
       db.tasks = db.tasks.map((t) => (t.task_id === approve[1] ? { ...t, status: "approved" } : t));
       return route.fulfill({ status: 200, body: "" });
     }
-    if (/^\/api\/plans\/\w+\/openspec$/.test(p)) return route.fulfill({ status: 404, body: "" });
+    if (/^\/api\/plans\/\w+\/openspec$/.test(p)) {
+      if (db.openspecMissing) return route.fulfill({ status: 404, body: "" });
+      return json(route, OPENSPEC);
+    }
     return json(route, { error: `Not mocked: ${m} ${p}` }, 404);
   });
   return db;
@@ -237,22 +264,71 @@ test("plans list error offers a retry that works", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test("plan detail names every task status in plain words, including failed", async ({ page }) => {
+test("plan detail reads as a document: one summary line, one action, the plan, the rest folded", async ({ page }) => {
   const errors = watchConsole(page);
   await mockApi(page);
   await page.goto("/plans/detail/?id=PLANA");
-  await expect(page.getByRole("heading", { name: "Add a class schedule page" })).toBeVisible();
-  await expect(page.getByText("Skipped", { exact: true }).first()).toBeVisible();
-  // "failed" used to fall back to a grey "failed" chip and had no filter.
-  await expect(page.getByRole("button", { name: "Failed (1)" })).toBeVisible();
-  await page.getByRole("button", { name: "Failed (1)" }).click();
-  await expect(page.getByRole("button", { name: "Failed (1)" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("heading", { name: "Add the schedule table" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Wire the schedule API" })).toBeVisible();
-  await page.getByRole("button", { name: "Failed (1)" }).click();
-  await expect(page.getByRole("button", { name: "Approve all and start" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Remove task Add the schedule table" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Add a class schedule page" })).toBeVisible();
+  // One line says where the plan stands.
+  const summary = page.getByRole("list", { name: "About this plan" });
+  await expect(summary).toContainText("Draft");
+  await expect(summary).toContainText("your-team/web");
+  await expect(summary).toContainText("4 tasks, 1 to review");
+  await expect(summary).toContainText("Sends to GitHub issues");
+  // One primary action; the rarely used ones sit in More.
+  const header = page.getByTestId("plan-header");
+  await expect(header.getByRole("button", { name: "Approve all and start" })).toBeVisible();
+  await expect(header.getByRole("button", { name: "Save as template" })).toHaveCount(0);
+  await expect(header.getByRole("button", { name: "Delete" })).toHaveCount(0);
+  await header.getByRole("button", { name: "More" }).click();
+  await expect(page.getByRole("menuitem")).toHaveText(["Save as template", "Download the spec", "Delete plan"]);
+  await page.keyboard.press("Escape");
+  // The document and its section list.
+  const nav = page.getByRole("navigation", { name: "On this page" });
+  await expect(nav.getByRole("link")).toHaveText(["Overview", "Tasks4", "Spec", "Details"]);
+  await expect(page.getByRole("heading", { level: 2, name: "Overview" })).toBeVisible();
+  await expect(page.getByText("Why: add a class schedule page")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 3, name: "Proposal" })).toBeVisible();
+  await expect(page.getByText("Members ask for the class schedule on the web.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy design.md" })).toBeVisible();
+  // Tasks are a checklist: a mark, a number, a title, a status word.
+  const tasks = page.getByRole("list", { name: "Tasks" });
+  await expect(tasks.getByTestId("task")).toHaveCount(4);
+  await expect(tasks.getByRole("img", { name: "Failed" })).toBeVisible();
+  await expect(tasks.getByRole("img", { name: "Skipped" })).toBeVisible();
+  await expect(tasks.getByTestId("task").nth(2).getByRole("button", { name: "Retry" })).toBeVisible();
+  await expect(tasks.getByTestId("task").nth(3)).toContainText("after 1");
+  // No filters for a short plan; details are folded.
+  await expect(page.getByRole("searchbox", { name: "Search tasks" })).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Destination" })).toBeHidden();
+  await expect(page.getByText("Do add the schedule table")).toHaveCount(0);
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await shot(page, "plans-detail");
+  expect(errors).toEqual([]);
+});
+
+test("a long plan gets task search and status filters, including failed", async ({ page }) => {
+  const errors = watchConsole(page);
+  const many = [
+    ...freshTasks(),
+    task("T5", "Add the empty state", "draft", 4),
+    task("T6", "Add the loading state", "draft", 5),
+    task("T7", "Link the page from the menu", "draft", 6),
+  ];
+  await mockApi(page, { tasks: many });
+  await page.goto("/plans/detail/?id=PLANA");
+  const tasks = page.getByRole("list", { name: "Tasks" });
+  await expect(tasks.getByTestId("task")).toHaveCount(7);
+  const failed = page.getByRole("group", { name: "Show tasks" }).getByRole("button", { name: "Failed (1)" });
+  await failed.click();
+  await expect(failed).toHaveAttribute("aria-pressed", "true");
+  await expect(tasks.getByTestId("task")).toHaveCount(1);
+  await expect(tasks).toContainText("Wire the schedule API");
+  await failed.click();
+  await page.getByRole("searchbox", { name: "Search tasks" }).fill("loading");
+  await expect(tasks.getByTestId("task")).toHaveCount(1);
+  await page.getByRole("searchbox", { name: "Search tasks" }).fill("nothing like it");
+  await expect(page.getByText("No tasks match.")).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -260,15 +336,96 @@ test("approving a task updates in place instead of blanking the page", async ({ 
   const errors = watchConsole(page);
   const db = await mockApi(page);
   await page.goto("/plans/detail/?id=PLANA");
-  const heading = page.getByRole("heading", { name: "Add a class schedule page" });
+  const heading = page.getByRole("heading", { level: 1, name: "Add a class schedule page" });
   await expect(heading).toBeVisible();
   db.slowPlan = true;
   await page.getByRole("button", { name: "Approve", exact: true }).click();
   // While the reload is in flight, the plan stays on screen.
   await page.waitForTimeout(400);
   await expect(heading).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Wire the schedule API" })).toBeVisible();
-  await expect(page.getByText("Approved", { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("list", { name: "Tasks" })).toContainText("Wire the schedule API");
+  await expect(page.getByRole("list", { name: "Tasks" }).getByRole("img", { name: "Approved" })).toHaveCount(2);
+  expect(db.writes).toContainEqual({ call: "POST /api/plans/PLANA/tasks/T1/approve", body: null });
+  expect(errors).toEqual([]);
+});
+
+test("a task opens to what it says; edit sends only what changed, add sends the same body as before", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page);
+  await page.goto("/plans/detail/?id=PLANA");
+  await page.getByRole("button", { name: "Show details of Add the schedule table" }).click();
+  await expect(page.getByText("Do add the schedule table")).toBeVisible();
+  await expect(page.getByText("Done when")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove task Add the schedule table" })).toBeVisible();
+  await shot(page, "plans-detail-task-open");
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByLabel("Title").fill("Add the schedule tables");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect.poll(() => db.writes.find((w) => w.call === "PUT /api/plans/PLANA/tasks/T1")?.body).toEqual({ title: "Add the schedule tables" });
+
+  // Run after, from the open task.
+  await page.getByRole("button", { name: "Show details of Show the schedule on the page" }).click();
+  await page.getByLabel("Run after").selectOption("T1");
+  await expect.poll(() => db.writes.filter((w) => w.call === "PUT /api/plans/PLANA/tasks/T2").map((w) => w.body)).toEqual([{ depends_on: "T1" }]);
+
+  await page.getByRole("button", { name: "+ Add task" }).click();
+  await page.getByLabel("Title").fill("Add a print view");
+  await page.getByRole("button", { name: "Add task", exact: true }).click();
+  await expect.poll(() => db.writes.find((w) => w.call === "POST /api/plans/PLANA/tasks")?.body).toEqual({
+    title: "Add a print view", description: "", acceptance_criteria: "", repo: "", destination: "github", order: 4,
+  });
+  expect(errors).toEqual([]);
+});
+
+test("the destination sits in Details; the summary line opens it", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page);
+  await page.goto("/plans/detail/?id=PLANA");
+  await page.getByRole("list", { name: "About this plan" }).getByRole("button", { name: "Sends to GitHub issues" }).click();
+  const dest = page.getByRole("group", { name: "Destination" });
+  await expect(dest).toBeVisible();
+  await expect(dest.getByRole("button", { name: "GitHub Issues" })).toHaveAttribute("aria-pressed", "true");
+  // Jira is not connected here, so it can't be picked.
+  await expect(dest.getByRole("button", { name: "Jira Tickets" })).toBeDisabled();
+  await expect(page.getByTestId("plan-details")).toContainText("PLANA");
+  await shot(page, "plans-detail-details");
+  expect(errors).toEqual([]);
+});
+
+test("a finished plan leads with its PR and lists its runs and PRs as rows", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page, {
+    planExtra: { status: "done", destination: "jira", executed_at: NOW, executed_by: "a-person" },
+    tasks: [
+      task("T1", "Add the schedule table", "done", 0, { run_id: "RUN1", pr_url: "https://github.com/your-team/web/pull/41", jira_ticket_key: "WEB-12", jira_ticket_url: "https://your-team.atlassian.net/browse/WEB-12" }),
+      task("T2", "Show the schedule on the page", "rejected", 1),
+    ],
+  });
+  await page.goto("/plans/detail/?id=PLANA");
+  const header = page.getByTestId("plan-header");
+  await expect(header.getByRole("link", { name: /Open PR/ })).toHaveAttribute("href", "https://github.com/your-team/web/pull/41");
+  await expect(page.getByRole("list", { name: "About this plan" })).toContainText("1 of 2 done");
+  await expect(page.getByRole("progressbar", { name: "Tasks done" })).toHaveAttribute("aria-valuenow", "1");
+  const work = page.getByRole("list", { name: "Runs and PRs" });
+  await expect(work.getByRole("link", { name: "Add the schedule table" })).toHaveAttribute("href", /\/runs\/detail\/?\?id=RUN1/);
+  await expect(work.getByRole("link", { name: "PR #41" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Tasks" }).getByRole("link", { name: "WEB-12" })).toBeVisible();
+  // A started plan has nothing to approve.
+  await expect(page.getByRole("button", { name: "Approve all and start" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Approve", exact: true })).toHaveCount(0);
+  await shot(page, "plans-detail-done");
+  expect(errors).toEqual([]);
+});
+
+test("a plan with no spec offers to write one, then shows it", async ({ page }) => {
+  const errors = watchConsole(page, true);
+  const db = await mockApi(page, { openspecMissing: true });
+  await page.goto("/plans/detail/?id=PLANA");
+  await expect(page.getByText("No spec written yet.")).toBeVisible();
+  await shot(page, "plans-detail-no-spec");
+  await page.getByRole("button", { name: "Write the spec" }).click();
+  await expect(page.getByRole("heading", { level: 3, name: "Proposal" })).toBeVisible();
+  expect(db.writes.map((w) => w.call)).toContain("POST /api/plans/PLANA/openspec/generate");
   expect(errors).toEqual([]);
 });
 
@@ -292,20 +449,30 @@ test("a missing plan says not found; a failed load offers a retry", async ({ pag
   await shot(page, "plans-detail-error");
   db.planStatus = 200;
   await page.getByRole("button", { name: "Try again" }).click();
-  await expect(page.getByRole("heading", { name: "Add a class schedule page" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Add a class schedule page" })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
-test("save as template opens a labelled dialog that Escape closes", async ({ page }) => {
+test("save as template opens from More as a labelled dialog that Escape closes", async ({ page }) => {
   const errors = watchConsole(page);
-  await mockApi(page);
+  const db = await mockApi(page);
   await page.goto("/plans/detail/?id=PLANA");
-  await page.getByRole("button", { name: "Save as template" }).click();
+  await page.getByRole("button", { name: "More" }).click();
+  await page.getByRole("menuitem", { name: "Save as template" }).click();
   const dialog = page.getByRole("dialog", { name: "Save as template" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByLabel("Title")).toBeFocused();
+  await expect(dialog.getByLabel("Title")).toHaveValue("Add a class schedule page template");
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
+  await page.getByRole("button", { name: "More" }).click();
+  await page.getByRole("menuitem", { name: "Save as template" }).click();
+  await dialog.getByLabel("Tags (optional, separated by commas)").fill("web, schedule");
+  await dialog.getByRole("button", { name: "Save template" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(db.writes.find((w) => w.call === "POST /api/plans/templates/from-plan/PLANA")?.body).toEqual({
+    title: "Add a class schedule page template", description: "Why: add a class schedule page", tags: ["web", "schedule"],
+  });
   expect(errors).toEqual([]);
 });
 
