@@ -7,10 +7,20 @@ import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as targets from "aws-cdk-lib/aws-route53-targets";
 import { Construct } from "constructs";
+import {
+  NextExportDeployment,
+  NOT_FOUND_PAGE,
+  checkFunctionSize,
+  notFoundStatusCode,
+  pageRoutes,
+  routeTable,
+} from "./static-site";
 
 interface AppStackProps extends cdk.StackProps {
   stage: string;
   webAclArn: string;
+  /** The dashboard's static export. Defaults to ../dashboard/out. */
+  outDir?: string;
 }
 
 export class AppStack extends cdk.Stack {
@@ -19,6 +29,7 @@ export class AppStack extends cdk.Stack {
 
     const prefix = `coderhelm-${props.stage}`;
     const domainName = "app.coderhelm.com";
+    const outDir = props.outDir ?? "../dashboard/out";
 
     // Route53 hosted zone (must exist in the account)
     const hostedZone = route53.HostedZone.fromLookup(this, "Zone", {
@@ -91,22 +102,32 @@ export class AppStack extends cdk.Stack {
       }
     );
 
-    // SPA rewrite: append index.html for directory paths
+    // Page paths open the page's index.html. A path that is no page of the
+    // dashboard opens the 404 page right here, so the distribution needs no
+    // 404 error response, which would also answer a missing /_next/ script
+    // with HTML. Files (a dot in the last segment) pass through untouched:
+    // S3 answers a missing one with a plain 404.
     const spaRewrite = new cloudfront.Function(this, "SpaRewrite", {
       functionName: `${prefix}-app-spa-rewrite`,
-      code: cloudfront.FunctionCode.fromInline(`
+      code: cloudfront.FunctionCode.fromInline(checkFunctionSize("SpaRewrite", `
+var PAGES = ${routeTable(pageRoutes(outDir))};
 function handler(event) {
   var request = event.request;
   var uri = request.uri;
-  if (uri.startsWith('/errors/')) return request;
-  if (uri.endsWith('/')) {
-    request.uri = uri + 'index.html';
-  } else if (uri.indexOf('.') === -1) {
-    request.uri = uri + '/index.html';
+  if (uri.startsWith('/errors/') || uri.startsWith('/_next/')) return request;
+  if (uri.endsWith('/') || uri.indexOf('.') === -1) {
+    var page = uri.endsWith('/') ? uri : uri + '/';
+    request.uri = PAGES[page] ? page + 'index.html' : ${JSON.stringify(NOT_FOUND_PAGE)};
   }
   return request;
 }
-      `),
+      `)),
+      runtime: cloudfront.FunctionRuntime.JS_2_0,
+    });
+
+    const notFoundStatus = new cloudfront.Function(this, "NotFoundStatus", {
+      functionName: `${prefix}-app-not-found-status`,
+      code: cloudfront.FunctionCode.fromInline(notFoundStatusCode()),
       runtime: cloudfront.FunctionRuntime.JS_2_0,
     });
 
@@ -129,23 +150,25 @@ function handler(event) {
             function: spaRewrite,
             eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
           },
+          {
+            function: notFoundStatus,
+            eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE,
+          },
         ],
       },
       defaultRootObject: "index.html",
       webAclId: props.webAclArn,
       domainNames: [domainName],
       certificate,
+      // Error responses apply to every path, scripts included, so there is
+      // no 404 entry: unknown pages get the 404 page from SpaRewrite, and a
+      // missing /_next/ file stays a plain 404. With LIST access S3 answers
+      // a missing key with 404, so a 403 here comes from the WAF.
       errorResponses: [
         {
           httpStatus: 403,
           responseHttpStatus: 403,
           responsePagePath: "/errors/403.html",
-          ttl: cdk.Duration.minutes(5),
-        },
-        {
-          httpStatus: 404,
-          responseHttpStatus: 404,
-          responsePagePath: "/errors/404.html",
           ttl: cdk.Duration.minutes(5),
         },
         {
@@ -178,13 +201,12 @@ function handler(event) {
       ),
     });
 
-    // Deploy dashboard build output
-    new s3deploy.BucketDeployment(this, "DeploySite", {
-      sources: [s3deploy.Source.asset("../dashboard/out")],
-      destinationBucket: siteBucket,
+    // Dashboard build: /_next/ files first and kept across deploys, then the
+    // pages that name them (see static-site.ts).
+    new NextExportDeployment(this, "DeploySite", {
+      bucket: siteBucket,
       distribution,
-      distributionPaths: ["/*"],
-      exclude: ["errors/*"],
+      outDir,
     });
 
     // Deploy error pages

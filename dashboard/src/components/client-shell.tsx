@@ -177,6 +177,11 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const [dismissedBanners, setDismissedBanners] = useState<Set<string>>(new Set());
   // Load persisted dismissals once usage data is available (keyed to usage month)
   const usageMonth = usage?.month;
+  // The app has started: the inline loading screen (lib/boot-recovery.ts)
+  // stops offering Reload, however long sign-in takes.
+  useEffect(() => {
+    document.documentElement.setAttribute("data-ch-mounted", "");
+  }, []);
   useEffect(() => {
     if (!usageMonth) return;
     try {
@@ -309,11 +314,14 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   if (!authChecked) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+      // Styled by the inline BOOT_STYLE, not Tailwind: this markup is in the
+      // static HTML and must look right even when the stylesheet failed.
+      <div className="ch-boot" role="status">
         {tabTitle}
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-5 h-5 border-2 border-zinc-700 border-t-zinc-300 rounded-full animate-spin" />
-          <span className="text-zinc-500 text-sm">Loading...</span>
+        <div className="ch-boot-inner">
+          <div className="ch-boot-spinner" aria-hidden="true" />
+          <span>Loading...</span>
+          <button type="button" className="ch-boot-reload" data-ch-reload>Reload</button>
         </div>
       </div>
     );

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ClientShell } from "@/components/client-shell";
 import { GoogleAnalytics } from "@/components/google-analytics";
+import { BOOT_RECOVERY_SCRIPT, BOOT_STYLE } from "@/lib/boot-recovery";
 
 export const metadata: Metadata = {
   // No title here: the shell names each tab after its page (client-shell.tsx).
@@ -16,6 +17,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
+      <head>
+        {/* Inline on purpose: these must work when /_next files fail to load. */}
+        <style dangerouslySetInnerHTML={{ __html: BOOT_STYLE }} />
+        <script dangerouslySetInnerHTML={{ __html: BOOT_RECOVERY_SCRIPT }} />
+      </head>
       <body className="bg-zinc-950 text-zinc-100 min-h-screen antialiased">
         <GoogleAnalytics />
         <ClientShell>{children}</ClientShell>

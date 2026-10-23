@@ -14,6 +14,7 @@
 # OS
 infra/cdk.context.json
 infra/cdk.out/
+infra/dist/
 node_modules/
 out/
 Thumbs.db
