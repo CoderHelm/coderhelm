@@ -187,10 +187,14 @@ test("memories are grouped by topic with where they came from and how often they
   const listTop = (await page.getByRole("heading", { name: /^Memories/ }).boundingBox())!.y;
   const stripTop = (await page.getByTestId("memory-agents").boundingBox())!.y;
   expect(listTop).toBeLessThan(stripTop);
-  // At 1280 the whole toolbar is one row: the topic filter doesn't sit alone under it.
-  const searchY = (await page.getByRole("searchbox", { name: "Search memories" }).boundingBox())!.y;
-  const topicY = (await page.getByRole("combobox", { name: "Topic" }).boundingBox())!.y;
-  expect(Math.abs(searchY - topicY)).toBeLessThan(8);
+  // Topic and sort sit together by the heading, at 1280 and on a phone: neither is alone on a row.
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 800 });
+    const topic = (await page.getByRole("combobox", { name: "Topic" }).boundingBox())!;
+    const sortBox = (await page.getByRole("combobox", { name: "Sort" }).boundingBox())!;
+    expect(Math.abs(topic.y - sortBox.y), `topic and sort on one row at ${width}`).toBeLessThan(8);
+  }
+  await page.setViewportSize({ width: 1280, height: 800 });
   await shot(page, "memory-list");
 });
 

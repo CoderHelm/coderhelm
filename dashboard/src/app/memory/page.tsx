@@ -10,7 +10,7 @@ import {
   type Repo,
 } from "@/lib/api";
 import { Callout } from "@/components/callout";
-import { Chip, List, ListEmpty, ListError, ListRow, ListSection, ListSkeleton, ListToolbar, MoreMenu, useListParams } from "@/components/list";
+import { Chip, List, ListEmpty, ListError, ListRow, ListSection, ListSkeleton, ListToolbar, MoreMenu, SortSelect, useListParams } from "@/components/list";
 import { SettingsDisclosure } from "@/components/settings";
 import { Skeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
@@ -254,6 +254,19 @@ function MemoryPage() {
               title="Memories"
               count={memories !== null && !listError ? total : undefined}
               description={<span className="text-xs text-zinc-500">The planner and coding agent get every pinned memory and the five most relevant on each ticket.</span>}
+              actions={
+                <>
+                <select aria-label="Topic" value={topic} onChange={(e) => setParams({ topic: e.target.value })} className={`${toolbarSelect} w-40 min-w-0 max-w-full truncate pr-8`}>
+                    <option value="">Every topic</option>
+                    {TOPICS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                <SortSelect
+                  value={sort}
+                  onChange={(v) => setParams({ sort: v })}
+                  options={[{ value: "newest", label: "Newest" }, { value: "most_used", label: "Most used" }]}
+                />
+                </>
+              }
             >
               <ListToolbar
                 className="mb-4"
@@ -269,17 +282,6 @@ function MemoryPage() {
                     { value: "person", label: "From people" },
                   ],
                 }}
-                sort={{
-                  value: sort,
-                  onChange: (v) => setParams({ sort: v }),
-                  options: [{ value: "newest", label: "Newest" }, { value: "most_used", label: "Most used" }],
-                }}
-                actions={
-                  <select aria-label="Topic" value={topic} onChange={(e) => setParams({ topic: e.target.value })} className={`${toolbarSelect} w-40 min-w-0 max-w-full truncate pr-8`}>
-                    <option value="">Every topic</option>
-                    {TOPICS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
-                }
                 onClear={filtered ? clearFilters : undefined}
               />
 
@@ -355,7 +357,7 @@ function MemoryPage() {
                       aria-controls="agent-profile"
                       title={p.role}
                       onClick={() => setOpenAgent(openAgent === p.id ? null : p.id)}
-                      className={`min-w-0 p-4 text-left transition-colors motion-reduce:transition-none ${
+                      className={`flex min-w-0 flex-col justify-start p-4 text-left transition-colors motion-reduce:transition-none ${
                         openAgent === p.id ? "bg-zinc-800" : "bg-zinc-950 hover:bg-zinc-900"
                       } ${focusRing}`}
                     >
