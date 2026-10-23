@@ -131,8 +131,9 @@ test.describe("the list toolbar", () => {
     await page.goBack();
     await expect(page.getByTestId("run-row")).toHaveCount(3);
 
-    // "/" focuses the search; typing filters after a short pause.
-    await page.locator("body").click();
+    // "/" focuses the search; typing filters after a short pause. (Blur rather
+    // than click the page's middle, which can land on a run row.)
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await page.keyboard.press("/");
     await expect(toolbar.getByRole("searchbox", { name: "Search runs" })).toBeFocused();
     await page.keyboard.type("login");

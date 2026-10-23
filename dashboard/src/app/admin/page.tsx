@@ -164,13 +164,7 @@ function AdminPage() {
   if (!authorized) {
     return (
       <Page>
-      <div className="max-w-md mx-auto mt-20 text-center">
-        <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
-          <svg aria-hidden="true" className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
-        </div>
-        <h1 className="text-2xl font-bold text-zinc-100 mb-2">Access denied</h1>
-        <p className="text-sm text-zinc-500">This page is only for Coderhelm platform administrators.</p>
-      </div>
+      <PageHeader detail crumb={false} title="Access denied" lead="This page is only for Coderhelm platform administrators." />
       </Page>
     );
   }

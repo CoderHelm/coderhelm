@@ -16,5 +16,17 @@
     "file": "src/components/client-shell.tsx",
     "text": "flex w-full items-center justify-center gap-2 rounded-lg",
     "why": "The Google and GitHub sign-in buttons on the same narrow sign-in card."
+  },
+  {
+    "rule": "page-header",
+    "file": "src/app/not-found.tsx",
+    "text": "Page not found",
+    "why": "The 404 page has no route to name it, so the top bar shows no heading and the page draws its own."
+  },
+  {
+    "rule": "page-header",
+    "file": "src/app/plans/new/starter.tsx",
+    "text": "What do you want to change?",
+    "why": "The plan composer opens on a question as its heading; plans/new/page.tsx renders <OwnTitle /> so the bar's crumb is not a second heading."
   }
 ]

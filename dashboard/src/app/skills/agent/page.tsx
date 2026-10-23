@@ -32,7 +32,7 @@ import { ItemActivity } from "../skill-activity";
 import { CompatSection } from "../compat";
 import { useRecheck } from "../use-recheck";
 import { ReviewStepsSection } from "../review-steps";
-import { Page } from "@/components/page";
+import { Page, PageHeader } from "@/components/page";
 
 export default function AgentPageGuarded() {
   return (
@@ -155,17 +155,10 @@ function AgentPage() {
 
   return (
     <Page>
-      <Link href="/skills" className={`text-sm text-zinc-400 hover:text-zinc-200 rounded ${focusRing}`}>
-        ← Skills
-      </Link>
-
       {/* Header: what it is, where it comes from, and its switch. */}
-      <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1 basis-80">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-mono text-2xl font-bold text-zinc-100 [overflow-wrap:anywhere]">{agent.name}</h1>
-            <StatusPill tone="success">Agent · can be asked</StatusPill>
-          </div>
+          <PageHeader detail title={agent.name} titleClassName="font-mono" status={<StatusPill tone="success">Agent · can be asked</StatusPill>} />
           <p className="mt-1 text-xs text-zinc-500 [overflow-wrap:anywhere]">
             From <span className="font-mono text-zinc-400">{agent.repo}</span> · {agent.path}
             {agent.sha && (

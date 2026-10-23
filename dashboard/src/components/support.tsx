@@ -11,6 +11,7 @@
 // person's consecutive messages under one header, long messages clamped,
 // email-style quotes folded, an unread divider, and "Jump to latest".
 
+import { PageHeader } from "./page";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
@@ -975,13 +976,11 @@ export function TicketLayout({
 
 /** The header: subject, status, priority, id, who opened it, and the people. */
 export function TicketHeader({
-  back,
   ticket,
   status,
   note,
   people,
 }: {
-  back: ReactNode;
   ticket: SupportTicket;
   status: ReactNode;
   note?: ReactNode;
@@ -989,11 +988,11 @@ export function TicketHeader({
 }) {
   const opened = new Date(ticket.created_at);
   return (
-    <header className="min-w-0 border-b border-zinc-800/80 bg-zinc-950/95 pb-3 backdrop-blur md:sticky md:top-0 md:z-20 md:-mx-1 md:px-1 md:pt-2" data-testid="ticket-header">
-      <div className="text-sm text-zinc-500">{back}</div>
-      <div className="mt-1 flex min-w-0 flex-wrap items-start justify-between gap-x-4 gap-y-2">
+    <header className="min-w-0 border-b border-zinc-800/80 bg-zinc-950/95 pb-3 backdrop-blur md:sticky md:top-12 md:z-20 md:-mx-1 md:px-1 md:pt-2" data-testid="ticket-header">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="w-full min-w-0 sm:w-auto sm:flex-1">
-          <h1 className="break-words text-xl font-bold text-zinc-100 sm:text-2xl">{ticket.subject}</h1>
+          {/* The page's title; the top bar above names the ticket in the trail. */}
+          <PageHeader detail title={ticket.subject} titleClassName="text-xl sm:text-2xl" />
           <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
             {status}
             {ticket.priority !== "normal" && (

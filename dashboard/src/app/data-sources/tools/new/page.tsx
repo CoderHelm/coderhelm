@@ -2,6 +2,7 @@
 
 import { CodeBlock, jsonOrText } from "@/components/code-block";
 import { Code } from "@/components/settings/code";
+import { PageHeader } from "@/components/page";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -180,11 +181,12 @@ function NewToolPage() {
   if (saved) {
     return (
       <div className="max-w-3xl">
-        <h1 className="text-2xl font-bold text-zinc-100">{saved.name} is saved</h1>
-        <p className="mt-2 max-w-prose text-sm text-zinc-400">
-          Coderhelm ran it once with your example inputs. Another admin now reviews this exact version and approves it; agents can&apos;t
-          use it until then. Any later edit is a new version that needs approval again.
-        </p>
+        <PageHeader
+          detail
+          crumb={false}
+          title={`${saved.name} is saved`}
+          lead="Coderhelm ran it once with your example inputs. Another admin now reviews this exact version and approves it; agents can't use it until then. Any later edit is a new version that needs approval again."
+        />
         <div className="mt-6">
           <RunResult run={saved.example} label="Example run" />
         </div>
@@ -200,12 +202,11 @@ function NewToolPage() {
 
   return (
     <div className="max-w-3xl">
-      <Link href="/data-sources/tools" className={`${linkButton} text-sm`}>Back to tools</Link>
-      <h1 className="mt-4 text-2xl font-bold text-zinc-100">{from ? `Edit ${from}` : "New tool"}</h1>
-      <p className="mt-2 max-w-prose text-sm text-zinc-400">
-        A tool is one fixed read on a source you connected. Coderhelm fills in only the inputs you declare, and only with values that
-        match their type. It is checked as you type, run once with your examples when you save, and then waits for another admin.
-      </p>
+      <PageHeader
+        title={from ? `Edit ${from}` : "New tool"}
+        crumb={from ? `Edit ${from}` : undefined}
+        lead="A tool is one fixed read on a source you connected. Coderhelm fills in only the inputs you declare, and only with values that match their type. It is checked as you type, run once with your examples when you save, and then waits for another admin."
+      />
 
       <div className="mt-6">
         <Segmented label="Write it as" options={[{ value: "form", label: "Form" }, { value: "yaml", label: "YAML" }]} value={mode} onChange={setMode} />

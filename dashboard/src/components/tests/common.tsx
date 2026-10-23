@@ -119,14 +119,6 @@ export function totalDuration(e: TestRunExecution): string {
   return formatDuration(e.attempts.reduce((sum, a) => sum + (a.duration_ms || 0), 0));
 }
 
-export function BackLink({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Link href={href} className={`inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-zinc-100 rounded ${focusRing}`}>
-      <span aria-hidden="true">←</span> {children}
-    </Link>
-  );
-}
-
 /** A select styled like the rest of the dashboard's inputs. */
 export function Select<T extends string>({
   label,

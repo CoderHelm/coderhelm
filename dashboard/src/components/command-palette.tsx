@@ -198,9 +198,25 @@ function useIsMac() {
 }
 
 /** The search button for the sidebar and the phone header. */
-export function CommandPaletteButton({ compact = false }: { compact?: boolean }) {
+export function CommandPaletteButton({ compact = false, inline = false }: { compact?: boolean; inline?: boolean }) {
   const { open } = useCommandPalette();
   const mac = useIsMac();
+  if (inline) {
+    // The top bar's search: a short field-like button with its shortcut.
+    return (
+      <button
+        type="button"
+        onClick={() => open()}
+        aria-keyshortcuts="Meta+K Control+K"
+        data-testid="open-command-palette"
+        className={`flex min-h-9 w-44 items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-2.5 text-sm text-zinc-500 hover:border-zinc-700 hover:text-zinc-300 lg:w-56 ${focusRing}`}
+      >
+        <SearchGlyph />
+        <span className="flex-1 text-left">Search</span>
+        <kbd className="rounded border border-zinc-700 px-1.5 text-[11px] leading-5 text-zinc-500">{mac ? "⌘K" : "Ctrl K"}</kbd>
+      </button>
+    );
+  }
   if (compact) {
     return (
       <button

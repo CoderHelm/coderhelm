@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeader } from "@/components/page";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
@@ -67,8 +68,7 @@ function ToolPage() {
   if (error) {
     return (
       <div className="max-w-3xl">
-        <Link href="/data-sources/tools" className={`${linkButton} text-sm`}>Back to tools</Link>
-        <div className="mt-6"><Callout variant="error" title="We couldn't load this tool"><p>{error}</p></Callout></div>
+        <div><Callout variant="error" title="We couldn't load this tool"><p>{error}</p></Callout></div>
       </div>
     );
   }
@@ -142,10 +142,9 @@ function ToolPage() {
 
   return (
     <div className="max-w-3xl">
-      <Link href="/data-sources/tools" className={`${linkButton} text-sm`}>Back to tools</Link>
-      <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="break-words font-mono text-2xl font-bold text-zinc-100">{tool.name}</h1>
+          <PageHeader detail title={tool.name} titleClassName="font-mono" />
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <ToolStatus tool={tool} />
             {live?.def.ask_me_first && <StatusPill>Ask me first</StatusPill>}

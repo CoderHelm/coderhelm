@@ -1061,7 +1061,7 @@ test("activity: older lookups load page by page, on the full activity page too",
   await expect(activity.getByRole("button", { name: "Load more" })).toHaveCount(0);
 
   await activity.getByRole("link", { name: "Open the full activity log" }).click();
-  await expect(page.getByRole("heading", { name: "Every lookup, as it happens" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Activity" })).toBeVisible();
   await expect(page.locator("#activity").getByTestId("activity-row")).toHaveCount(100);
   await shot(page, "activity-page");
 });

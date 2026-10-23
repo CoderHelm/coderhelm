@@ -51,10 +51,7 @@ export function Starter({
     repos.length === 0 ? null : repos.length === 1 ? repos[0].name : `${repos[0].name} and ${repos.length - 1} more`;
   return (
     <div className="mx-auto w-full max-w-2xl" data-testid="plan-starter">
-      <Link href="/plans" className={`rounded text-sm text-zinc-500 hover:text-zinc-300 ${focusRing}`}>
-        ← Plans
-      </Link>
-      <h1 className="mt-6 text-2xl font-bold text-zinc-100 sm:mt-10">What do you want to change?</h1>
+      <h1 className="mt-2 text-2xl font-bold text-zinc-100 sm:mt-10">What do you want to change?</h1>
       <p className="mt-1 max-w-prose text-sm text-zinc-400">
         Describe it in your own words. Coderhelm reads your code and drafts a plan you can change before anything runs.
       </p>

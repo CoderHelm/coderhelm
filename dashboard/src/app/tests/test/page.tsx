@@ -16,7 +16,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
 import {
-  ArtifactLinks, AttemptSquares, BackLink, EmptyBox, LoadError, Loading, SectionHeading, StatCard, StatePill, firstError,
+  ArtifactLinks, AttemptSquares, EmptyBox, LoadError, Loading, SectionHeading, StatCard, StatePill, firstError,
 } from "@/components/tests/common";
 import { Switch } from "@/components/tests/settings";
 import { useLoad } from "@/components/tests/use-load";
@@ -119,7 +119,7 @@ function TestDetail() {
   return (
     <Page>
       <PageHeader
-        eyebrow={<BackLink href="/tests">Tests</BackLink>}
+        detail
         title={testName(test)}
         lead={
           <>

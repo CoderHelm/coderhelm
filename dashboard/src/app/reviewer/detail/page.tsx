@@ -15,7 +15,7 @@ import { Callout } from "@/components/callout";
 import { HelpLink } from "@/components/support";
 import { Skeleton } from "@/components/skeleton";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
-import { Page, cardClass } from "@/components/page";
+import { Page, PageHeader, cardClass } from "@/components/page";
 import { ExternalLinkIcon, ThumbsDownIcon, ThumbsUpIcon } from "@/components/icons";
 import { TONES, Time } from "@/components/list";
 import { VerdictPill, RiskText } from "../labels";
@@ -43,12 +43,6 @@ function DetailSkeleton() {
     </Page>
   );
 }
-
-const backLink = (
-  <Link href="/reviewer" className={`text-sm text-zinc-500 hover:text-zinc-300 rounded ${focusRing}`}>
-    ← Reviewer
-  </Link>
-);
 
 type LoadState = "loading" | "ready" | "missing" | "error";
 
@@ -140,7 +134,6 @@ function ReviewDetailPage() {
   if (state === "missing" || (state === "ready" && !review)) {
     return (
       <Page className="space-y-4">
-        {backLink}
         <Callout variant="warning" title="Review not found">
           <p>This link does not point to a review. It may be mistyped, or the review was removed.</p>
           <Link href="/reviewer" className={`mt-2 ${secondaryButton}`}>See all reviews</Link>
@@ -151,7 +144,6 @@ function ReviewDetailPage() {
   if (state === "error" || !review) {
     return (
       <Page className="space-y-4">
-        {backLink}
         <Callout variant="error" title="Could not load this review">
           <p>Check your connection and try again.</p>
           <button
@@ -227,27 +219,29 @@ function Header({ review, title }: { review: Review; title: string }) {
     </span>
   );
   return (
-    <header className="min-w-0" data-testid="review-header">
-      <div className="mb-1 text-sm text-zinc-500">{backLink}</div>
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0 flex-1 basis-80">
-          <h1 className="min-w-0 text-2xl font-bold text-zinc-100">
-            <a href={prUrl} target="_blank" rel="noreferrer" className={`relative block truncate ${externalLink}`} title={title || review.repo}>
-              {title || repoRef}
-              <span className="sr-only"> (opens the PR on GitHub in a new tab)</span>
-            </a>
-          </h1>
-          {title && <p className="mt-0.5 text-sm text-zinc-500">{repoRef}</p>}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <a href={prUrl} target="_blank" rel="noreferrer" className={`${secondaryButton} gap-1.5`}>
-            Open PR on GitHub
-            <span aria-hidden="true" className="inline-flex"><ExternalLinkIcon /></span>
-            <span className="sr-only"> (opens in a new tab)</span>
+    <div className="min-w-0" data-testid="review-header">
+      <PageHeader
+        detail
+        crumb={`${shortRepo(review.repo)} #${review.pr_number}`}
+        title={
+          <a href={prUrl} target="_blank" rel="noreferrer" className={`relative block truncate ${externalLink}`} title={title || review.repo}>
+            {title || repoRef}
+            <span className="sr-only"> (opens the PR on GitHub in a new tab)</span>
           </a>
-          <ReReviewButton repo={review.repo} pr={review.pr_number} className="min-h-9 !rounded-lg !px-4 !text-sm font-medium" />
-        </div>
-      </div>
+        }
+        titleClassName="w-full"
+        lead={title ? <span className="text-zinc-500">{repoRef}</span> : undefined}
+        actions={
+          <>
+            <a href={prUrl} target="_blank" rel="noreferrer" className={`${secondaryButton} gap-1.5`}>
+              Open PR on GitHub
+              <span aria-hidden="true" className="inline-flex"><ExternalLinkIcon /></span>
+              <span className="sr-only"> (opens in a new tab)</span>
+            </a>
+            <ReReviewButton repo={review.repo} pr={review.pr_number} className="min-h-9 !rounded-lg !px-4 !text-sm font-medium" />
+          </>
+        }
+      />
 
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <VerdictPill verdict={review.verdict} />
@@ -270,7 +264,7 @@ function Header({ review, title }: { review: Review; title: string }) {
         )}
       </ul>
       {posted && <p className="mt-1.5 max-w-prose text-xs text-zinc-500" data-testid="posted-note">{posted}</p>}
-    </header>
+    </div>
   );
 }
 

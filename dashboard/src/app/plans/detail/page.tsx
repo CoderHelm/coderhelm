@@ -10,10 +10,10 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { Skeleton } from "@/components/skeleton";
 import { Markdown } from "@/components/markdown";
 import { Callout } from "@/components/callout";
-import { Page } from "@/components/page";
+import { Page, PageHeader } from "@/components/page";
 import { SectionNav, type NavSection } from "@/components/section-nav";
 import { ExternalLinkIcon } from "@/components/icons";
-import { List, ListRow, MoreMenu, StatusText, Time, TONES } from "@/components/list";
+import { List, ListRow, StatusText, Time, TONES } from "@/components/list";
 import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { planStatusLook, taskStatusLook } from "../status";
 import { TaskChecklist, type NewTask, type TaskActions } from "./tasks";
@@ -56,12 +56,6 @@ function SkeletonBody() {
     </div>
   );
 }
-
-const backLink = (
-  <Link href="/plans" className={`rounded text-sm text-zinc-500 hover:text-zinc-300 ${focusRing}`}>
-    ← Plans
-  </Link>
-);
 
 type FullPlan = Plan & { tasks: Task[] };
 
@@ -255,7 +249,6 @@ function PlanDetail() {
   if (!planId) {
     return (
       <Page>
-        {backLink}
         <p className="mt-4 text-zinc-500">No plan selected. Pick one from the plans list.</p>
       </Page>
     );
@@ -273,7 +266,6 @@ function PlanDetail() {
   if (!plan) {
     return (
       <Page className="space-y-4">
-        {backLink}
         {loadError === "missing" ? (
           <Callout variant="warning" title="Plan not found">
             <p>It may have been deleted, or it belongs to another team.</p>
@@ -347,14 +339,7 @@ function PlanDetail() {
   return (
     <Page>
       <header className="min-w-0" data-testid="plan-header">
-        <div className="mb-1">{backLink}</div>
-        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-          <h1 className="min-w-0 flex-1 basis-80 break-words text-2xl font-bold text-zinc-100">{plan.title || "Untitled plan"}</h1>
-          <div className="flex flex-wrap items-center gap-2">
-            {primary}
-            <MoreMenu items={more} />
-          </div>
-        </div>
+        <PageHeader detail title={plan.title || "Untitled plan"} actions={primary} more={more} />
         <ul className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500" aria-label="About this plan" data-testid="plan-summary">
           <li>
             <StatusText look={planStatusLook(plan.status)} />

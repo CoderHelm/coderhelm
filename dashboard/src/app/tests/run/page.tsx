@@ -13,7 +13,7 @@ import { Segmented } from "@/components/segmented";
 import { focusRing, linkButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
 import {
-  ArtifactLinks, AttemptSquares, BackLink, EmptyBox, LoadError, Loading, SectionHeading, StatCard, firstError, totalDuration,
+  ArtifactLinks, AttemptSquares, EmptyBox, LoadError, Loading, SectionHeading, StatCard, firstError, totalDuration,
 } from "@/components/tests/common";
 import { useLoad } from "@/components/tests/use-load";
 
@@ -51,7 +51,7 @@ function RunDetail() {
   return (
     <Page>
       <PageHeader
-        eyebrow={<BackLink href="/tests?view=runs">Runs</BackLink>}
+        detail
         title={run.workflow}
         lead={
           <p className="break-words">

@@ -102,11 +102,7 @@ function AlertDetail() {
   return (
     <Page>
       <PageHeader
-        eyebrow={
-          <Link href="/alerts" className="text-sm text-zinc-400 hover:text-zinc-100 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100">
-            ← All alerts
-          </Link>
-        }
+        detail
         title={a.title || "(untitled alert)"}
         lead={
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">

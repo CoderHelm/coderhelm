@@ -11,10 +11,10 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { Callout } from "@/components/callout";
 import { Markdown } from "@/components/markdown";
 import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
-import { Page } from "@/components/page";
+import { Page, PageHeader } from "@/components/page";
 import { RunStatusBadge, runCanClose, runCloseIsLikely, runIsLive } from "@/components/run-status";
 import { CloseRunDialog } from "@/components/close-run-dialog";
-import { MoreMenu, Time } from "@/components/list";
+import { Time } from "@/components/list";
 import { usePaletteActions, type PageAction } from "@/components/command-palette";
 import type { CloseRunRequest } from "@/lib/api";
 import { TeamAgentAsks } from "./team-asks";
@@ -438,14 +438,9 @@ function RunDetailInner() {
     return max;
   }, [run?.current_pass, run?.pass_history]);
 
-  const backLink = (
-    <Link href="/" className={`text-zinc-500 hover:text-zinc-300 text-sm rounded ${focusRing}`}>← Runs</Link>
-  );
-
   if (!runId) {
     return (
       <Page className="space-y-4">
-        {backLink}
         <Callout variant="info" title="No run picked">
           <p>This link has no run in it. Open a run from the runs list.</p>
         </Callout>
@@ -471,7 +466,6 @@ function RunDetailInner() {
   if (!run) {
     return (
       <Page className="space-y-4">
-        {backLink}
         {loadError === "missing" ? (
           <Callout variant="info" title="Run not found">
             <p>No run with this id exists for your team. It may belong to another team you are in.</p>
@@ -607,18 +601,25 @@ function RunDetailInner() {
   return (
     <Page className={showTaskSidebar ? "flex flex-col lg:flex-row gap-6" : ""}>
     <div className={showTaskSidebar ? "flex-1 min-w-0" : ""}>
-      {backLink}
-
       {loadError === "failed" && (
         <p role="status" className="mt-3 text-xs text-amber-400">Couldn&apos;t refresh this run. What you see may be out of date.</p>
       )}
 
       {/* Header */}
-      <div className="mt-4 mb-6">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-1">
-          <h1 className="min-w-0 text-2xl font-bold text-zinc-100 [overflow-wrap:anywhere]">{run.title || "Untitled run"}</h1>
-          <RunStatusBadge status={run.status} />
-        </div>
+      <div className="mb-6">
+        <PageHeader
+          detail
+          title={run.title || "Untitled run"}
+          status={<RunStatusBadge status={run.status} />}
+          actions={
+            canAct && closeAsButton ? (
+              <button type="button" onClick={() => setCloseOpen(true)} disabled={busy !== null} className={secondaryButton}>
+                Close run
+              </button>
+            ) : undefined
+          }
+          more={canAct && closeInMenu ? [{ label: "Close run…", onSelect: () => setCloseOpen(true) }] : undefined}
+        />
         <p className="text-sm text-zinc-500 font-mono [overflow-wrap:anywhere]">{run.repo || "Choosing a repo…"}</p>
         {run.ticket_id && (
           <p className="text-xs text-zinc-600 mt-1 [overflow-wrap:anywhere]">
@@ -692,7 +693,7 @@ function RunDetailInner() {
       )}
 
       {/* Actions, each shown only when the gateway would accept it */}
-      {canAct && (run.status === "running" || canRetry || canReset || closable) && (
+      {canAct && (run.status === "running" || canRetry || canReset) && (
         <div className="mb-6 flex flex-wrap items-center gap-3">
           {run.status === "running" && (
             <button
@@ -726,12 +727,6 @@ function RunDetailInner() {
               {busy === "reset" ? "Starting over…" : "Start over from scratch"}
             </button>
           )}
-          {closeAsButton && (
-            <button type="button" onClick={() => setCloseOpen(true)} disabled={busy !== null} className={secondaryButton}>
-              Close run
-            </button>
-          )}
-          {closeInMenu && <MoreMenu items={[{ label: "Close run…", onSelect: () => setCloseOpen(true) }]} />}
         </div>
       )}
       <CloseRunDialog

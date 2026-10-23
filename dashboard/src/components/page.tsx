@@ -1,4 +1,9 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { MoreMenu, type MenuAction } from "./list/list";
+import { usePageMeta, useTopBar } from "./top-bar";
 
 // Shared page layout. Every dashboard page sits in the same centered column
 // (the width Analytics uses), so left edges and widths line up page to page.
@@ -32,14 +37,30 @@ export function Page({
 }
 
 /**
- * Title, one-line lead and the page's primary actions (top right, wrapping
- * under the title on a phone). `breadcrumb` renders above the title.
+ * How a page describes itself. It fills the one top bar the shell draws
+ * (components/top-bar.tsx) and, under it, the page's lead line:
+ *
+ * - A section or settings page (`<PageHeader title="Security" lead="…" />`)
+ *   is named by the bar's last crumb, which is the page's heading. The name
+ *   comes from the route map (lib/routes.ts), so it is never repeated as a big
+ *   title; `title` here only names the page if the map has no entry.
+ * - An item's page (`<PageHeader detail title={run.title} status={…} />`)
+ *   shows the item's title and status under the bar as the heading, and the
+ *   bar's last crumb becomes the item's short name (`crumb`, default `title`).
+ *
+ * `actions` (the page's primary buttons) and `more` (a short list of
+ * secondary ones) go to the right of the bar, or into its actions menu on a
+ * phone (the same element, laid out per screen, so a resize never remounts
+ * them). They are rendered through a portal, so they keep the page's state.
  */
 export function PageHeader({
   title,
   lead,
   actions,
-  breadcrumb,
+  more,
+  detail = false,
+  crumb,
+  status,
   eyebrow,
   titleId,
   titleClassName = "",
@@ -47,27 +68,82 @@ export function PageHeader({
   title: ReactNode;
   lead?: ReactNode;
   actions?: ReactNode;
-  breadcrumb?: ReactNode;
-  /** Small line above the title, e.g. a status or a parent name. */
+  more?: MenuAction[];
+  /** One item's page: the title shows under the bar. */
+  detail?: boolean;
+  /**
+   * The last crumb: the item's short name, or an extra step (New request).
+   * An item's page defaults to its `title`; `false` keeps the route's label.
+   */
+  crumb?: string | false;
+  /** An item's state, beside its title. */
+  status?: ReactNode;
+  /** Small line above an item's title, e.g. its kind. */
   eyebrow?: ReactNode;
+  /** An id for the item's title, for moving focus to it. */
   titleId?: string;
   titleClassName?: string;
 }) {
+  const bar = useTopBar();
+  const moreItems = more?.filter(Boolean) ?? [];
+  const hasActions = !!actions || moreItems.length > 0;
+  const lastCrumb = crumb === false ? undefined : crumb ?? (detail && typeof title === "string" ? title : undefined);
+  usePageMeta({ crumb: lastCrumb, ownTitle: detail, hasActions });
+
+  const slot = bar?.slot ?? null;
+  const inBar =
+    slot && hasActions
+      ? createPortal(
+          <>
+            {actions}
+            {moreItems.length > 0 && <MoreMenu items={moreItems} />}
+          </>,
+          slot,
+        )
+      : null;
+
+  if (!detail) {
+    return (
+      <>
+        {inBar}
+        {/* Without a shell (a bare test render) the title still shows. */}
+        {!bar && <h1 className="text-2xl font-bold text-zinc-100">{title}</h1>}
+        {lead && (
+          <header className="min-w-0">
+            <div className="max-w-prose text-sm text-zinc-400">{lead}</div>
+          </header>
+        )}
+      </>
+    );
+  }
+
   return (
     <header className="min-w-0">
-      {breadcrumb && <div className="mb-4">{breadcrumb}</div>}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="min-w-0">
-          {eyebrow && <div className="mb-1 text-sm text-zinc-500">{eyebrow}</div>}
-          <h1 id={titleId} tabIndex={titleId ? -1 : undefined} className={`break-words text-2xl font-bold text-zinc-100 ${titleClassName}`.trim()}>
-            {title}
-          </h1>
-          {lead && <div className="mt-1 max-w-prose text-sm text-zinc-400">{lead}</div>}
-        </div>
-        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {inBar}
+      {eyebrow && <div className="mb-1 text-sm text-zinc-500">{eyebrow}</div>}
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+        <h1
+          id={titleId}
+          tabIndex={titleId ? -1 : undefined}
+          className={`min-w-0 break-words text-2xl font-bold text-zinc-100 [overflow-wrap:anywhere] focus:outline-none ${titleClassName}`.trim()}
+        >
+          {title}
+        </h1>
+        {status && <div className="flex shrink-0 items-center gap-2">{status}</div>}
       </div>
+      {lead && <div className="mt-1 max-w-prose text-sm text-zinc-400">{lead}</div>}
     </header>
   );
+}
+
+/**
+ * For a page that draws its own heading instead of a <PageHeader> (the plan
+ * composer's opening question): the top bar's last crumb then stops being
+ * the page's heading, so the page keeps exactly one.
+ */
+export function OwnTitle() {
+  usePageMeta({ ownTitle: true, hasActions: false });
+  return null;
 }
 
 /** A titled block of a page, 2.5rem below whatever comes before it. */

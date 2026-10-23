@@ -11,7 +11,9 @@ import { ToastProvider } from "./toast";
 import { SupportViewBanner } from "./support-access";
 import { ScrollFade } from "./scroll-fade";
 import { ConfirmProvider } from "./confirm-dialog";
-import { CommandPaletteButton, CommandPaletteProvider, type PalettePage } from "./command-palette";
+import { CommandPaletteProvider, type PalettePage } from "./command-palette";
+import { Logo, TopBar, TopBarProvider } from "./top-bar";
+import { tabTitle as routeTabTitle } from "@/lib/routes";
 import { focusRing } from "./ui";
 import { helpHref, helpTargetFromUrl } from "@/lib/support";
 import {
@@ -135,35 +137,6 @@ function visibleItems(group: NavGroup, user: User | null): NavItem[] {
 /** Every menu page, for the ⌘K palette. */
 function palettePages(user: User | null): PalettePage[] {
   return navGroups.flatMap((g) => visibleItems(g, user).map((i) => ({ href: i.href, label: i.label, section: g.label })));
-}
-
-// Pages that are not in the menu, by path. Menu pages use their menu label.
-const EXTRA_TITLES: Record<string, string> = {
-  "/runs/detail": "Run",
-  "/plans/detail": "Plan",
-  "/plans/new": "New plan",
-  "/reviewer/detail": "Review",
-  "/reviewer/config": "Reviewer settings",
-  "/alerts/detail": "Alert",
-  "/tests/run": "Test run",
-  "/tests/test": "Test",
-  "/support": "Support",
-  "/support/ticket": "Support ticket",
-  "/admin/tickets": "Support queue",
-};
-
-function pageTitle(pathname: string | null): string {
-  const path = (pathname || "/").replace(/\/+$/, "") || "/";
-  if (EXTRA_TITLES[path]) return EXTRA_TITLES[path];
-  // The longest menu path that this page sits under.
-  let best: NavItem | null = null;
-  for (const group of navGroups) {
-    for (const item of group.items) {
-      const under = item.href === "/" ? path === "/" : path === item.href || path.startsWith(`${item.href}/`);
-      if (under && (!best || item.href.length > best.href.length)) best = item;
-    }
-  }
-  return best?.label ?? "";
 }
 
 export function ClientShell({ children }: { children: React.ReactNode }) {
@@ -302,9 +275,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener(USAGE_CHANGED, refresh);
   }, []);
 
-  // Every page used to share one browser tab title; name the tab after the
-  // page. React hoists <title> into the document head.
-  const tabName = pageTitle(pathname);
+  // Name the tab after the page (the top bar does it once a page shows; this
+  // covers the screens before it). React hoists <title> into the head.
+  const tabName = routeTabTitle(pathname);
   const tabTitle = <title>{tabName ? `${tabName} · Coderhelm` : "Coderhelm"}</title>;
 
   if (!authChecked) {
@@ -392,7 +365,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     <ToastProvider>
     <ConfirmProvider>
     <CommandPaletteProvider pages={palettePages(user)} user={user}>
-      {tabTitle}
+    <TopBarProvider>
       <div className="flex min-h-screen bg-zinc-950">
         {menuOpen && (
           <div aria-hidden="true" className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={() => setMenuOpen(false)} />
@@ -418,32 +391,24 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         </div>
         <div className="flex-1 min-w-0 flex flex-col">
           {user.support_view && <SupportViewBanner />}
-          <header className="md:hidden sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-zinc-800/60 bg-zinc-950 px-4 py-2">
-            <Link href="/" className="flex items-center gap-2.5 rounded-md py-1">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" className="w-5 h-5 flex-shrink-0" aria-hidden="true">
-                <polygon points="106,416 158,416 226,96 174,96" fill="white"/>
-                <polygon points="196,416 248,416 316,96 264,96" fill="#3B82F6"/>
-                <polygon points="286,416 338,416 406,96 354,96" fill="white"/>
-              </svg>
-              <span className="text-sm font-semibold text-zinc-100">Coderhelm</span>
-            </Link>
-            <div className="flex items-center gap-2">
-            <CommandPaletteButton compact />
-            <button
-              ref={menuButtonRef}
-              type="button"
-              aria-expanded={menuOpen}
-              aria-controls="app-menu"
-              onClick={() => setMenuOpen(true)}
-              className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-3 text-sm font-medium text-zinc-300 hover:bg-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-                <line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" />
-              </svg>
-              Menu
-            </button>
-            </div>
-          </header>
+          <TopBar
+            teamName={teams.find((t) => t.current)?.org}
+            menuButton={
+              <button
+                ref={menuButtonRef}
+                type="button"
+                aria-label="Menu"
+                aria-expanded={menuOpen}
+                aria-controls="app-menu"
+                onClick={() => setMenuOpen(true)}
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 md:hidden ${focusRing}`}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                  <line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" />
+                </svg>
+              </button>
+            }
+          />
           {banners.filter((b) => !dismissedBanners.has(b.id)).map((banner) => (
             <div
               key={banner.id}
@@ -512,6 +477,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           <main className="flex-1 p-4 md:p-8">{children}</main>
         </div>
       </div>
+    </TopBarProvider>
     </CommandPaletteProvider>
     </ConfirmProvider>
     </ToastProvider>
@@ -691,17 +657,11 @@ function Sidebar({
         href="/"
         className={`flex items-center gap-2.5 px-2 py-2.5 mb-2 rounded-md ${focusRing}`}
       >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" className="w-5 h-5 flex-shrink-0" aria-hidden="true">
-          <polygon points="106,416 158,416 226,96 174,96" fill="white"/>
-          <polygon points="196,416 248,416 316,96 264,96" fill="#3B82F6"/>
-          <polygon points="286,416 338,416 406,96 354,96" fill="white"/>
-        </svg>
+        <Logo />
         <span className="text-sm font-semibold text-zinc-100">Coderhelm</span>
       </Link>
 
       <TeamSwitcher teams={teams} currentTeam={currentTeam ?? null} switching={switching} onSwitch={handleSwitch} />
-
-      <CommandPaletteButton />
 
       <div className="space-y-4">
         {navGroups.map((group, index) => {

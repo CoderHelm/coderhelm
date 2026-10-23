@@ -150,7 +150,7 @@ test("the hub offers your own tools, and an empty list says how to start", async
   // A source is connected, so the kinds to add sit behind one button.
   await page.getByRole("button", { name: "Add a data source" }).click();
   await page.getByRole("link", { name: /Your own tools/ }).click();
-  await expect(page.getByRole("heading", { name: "Your own tools" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Team tools" })).toBeVisible();
   await expect(page.getByText("No tools yet", { exact: true })).toBeVisible();
   await expect(page.getByText("Nothing waiting.")).toBeVisible();
   await shot(page, "tools-empty");

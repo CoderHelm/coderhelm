@@ -377,7 +377,7 @@ test("a link without a run id explains itself", async ({ page }) => {
   await mockApi(page);
   await page.goto("/runs/detail/");
   await expect(page.getByText("No run picked")).toBeVisible();
-  await expect(page.getByRole("link", { name: "← Runs" })).toBeVisible();
+  await expect(page.getByTestId("breadcrumb").getByRole("link", { name: "Runs" })).toBeVisible();
   await shot(page, "runs-detail-no-id");
   expect(errors).toEqual([]);
 });

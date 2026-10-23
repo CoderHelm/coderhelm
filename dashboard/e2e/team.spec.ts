@@ -209,11 +209,11 @@ test("admin sees one row per person, GitHub logins, statuses and the permissions
   // Pending invites have their own section.
   const invites = page.getByRole("list", { name: /Pending invites/ });
   await expect(invites.getByText("new.hire@example.com")).toBeVisible();
-  // Permissions: cumulative, with the viewer's role highlighted.
-  const admins = page.getByRole("group", { name: "Admin (your role)" });
-  await expect(admins.getByText("Admins can also")).toBeVisible();
-  await expect(admins.getByText(/Invite people, resend or revoke any pending invite/)).toBeVisible();
-  await expect(page.getByRole("group", { name: "Owner" }).getByText("Set the monthly budget")).toBeVisible();
+  // Permissions: a matrix, the viewer's role highlighted.
+  await expect(page.getByTestId("role-col-admin")).toHaveAttribute("aria-current", "true");
+  await expect(page.getByTestId("role-summary-admin")).toContainText("Your role");
+  await expect(page.getByTestId("perm-people").getByRole("rowheader")).toHaveText(/Invite people, resend or revoke any pending invite/);
+  await expect(page.getByTestId("perm-budget").getByRole("cell")).toHaveText([/No$/, /No$/, /No$/, /Yes$/]);
   await shot(page, "team-admin");
 });
 
@@ -399,7 +399,7 @@ test("a member sees the team read-only: no invites, no controls", async ({ page 
   await expect(members(page).getByRole("combobox")).toHaveCount(0);
   await expect(members(page).getByRole("button", { name: /More actions/ })).toHaveCount(0);
   await expect(page.getByRole("region", { name: /Possibly the same person/ })).toHaveCount(0);
-  await expect(page.getByRole("group", { name: "Member (your role)" })).toBeVisible();
+  await expect(page.getByTestId("role-col-member")).toHaveAttribute("aria-current", "true");
   await shot(page, "team-member");
 });
 

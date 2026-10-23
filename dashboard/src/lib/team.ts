@@ -141,14 +141,6 @@ export function roleLadder(p: Permissions): RoleInfo[] {
   return p.roles.filter((r) => r.assignable).sort((a, b) => a.level - b.level);
 }
 
-/** What a role adds over the role below it. */
-export function capabilitiesAddedBy(p: Permissions, role: RoleInfo): Capability[] {
-  const level = (key: string) => p.roles.find((r) => r.key === key)?.level ?? 0;
-  const ladder = roleLadder(p);
-  const below = ladder.filter((r) => r.level < role.level).pop();
-  return p.capabilities.filter((c) => level(c.min_role) <= role.level && (!below || level(c.min_role) > below.level));
-}
-
 // ── Duplicate suggestions ──────────────────────────────────────────
 
 export interface LinkSuggestion {

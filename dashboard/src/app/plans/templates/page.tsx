@@ -80,7 +80,6 @@ function TemplatesPage() {
   return (
     <Page>
       <PageHeader
-        eyebrow={<Link href="/plans" className={`text-zinc-500 hover:text-zinc-300 text-sm rounded ${focusRing}`}>← Plans</Link>}
         title="Plan templates"
         lead="Saved plans you can start again with one click."
       />

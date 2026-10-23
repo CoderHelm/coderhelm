@@ -5,7 +5,6 @@ import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState, typ
 import { api } from "@/lib/api";
 import {
   canManageInvites,
-  capabilitiesAddedBy,
   displayName,
   isInviteExpired,
   shortDate,
@@ -30,6 +29,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { CheckIcon, GitHubIcon, MailIcon } from "@/components/icons";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
+import { RolesMatrix } from "@/components/roles-matrix";
 
 const ROLE_STYLE: Record<string, string> = {
   owner: "border-amber-500/30 bg-amber-500/10 text-amber-300",
@@ -374,7 +374,7 @@ function TeamPage() {
         </div>
       )}
 
-      {perms && <PermissionsTable perms={perms} inUse={new Set(active.map((m) => m.role))} />}
+      {perms && <RolesMatrix perms={perms} inUse={new Set(active.map((m) => m.role))} />}
 
       {linking && members && (
         <LinkDialog
@@ -936,54 +936,5 @@ function RenameTeam({ current, onRenamed }: { current: string; onRenamed: (name:
         </button>
       </div>
     </form>
-  );
-}
-
-function PermissionsTable({ perms, inUse }: { perms: Permissions; inUse: Set<string> }) {
-  const ladder = roleLadder(perms);
-  const legacy = perms.roles.filter((r) => !r.assignable && inUse.has(r.key));
-  return (
-    <section aria-labelledby="perms-heading" className="mt-10">
-      <h2 id="perms-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-        What each role can do
-      </h2>
-      <p className="mt-2 max-w-prose text-sm text-zinc-400">Each role can do everything the roles before it can, plus its own list.</p>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        {ladder.map((r, i) => {
-          const added = capabilitiesAddedBy(perms, r);
-          const mine = perms.your_role === r.key;
-          return (
-            <div
-              key={r.key}
-              className={`rounded-lg border p-4 ${mine ? "border-zinc-500 bg-zinc-900" : "border-zinc-800 bg-zinc-900/40"}`}
-              aria-label={`${r.label}${mine ? " (your role)" : ""}`}
-              role="group"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <RoleChip role={r.key} label={r.label} />
-                {mine && <span className="text-xs text-zinc-400">Your role</span>}
-              </div>
-              <p className="mt-2 text-xs text-zinc-500">{r.summary}</p>
-              <p className="mt-3 text-xs font-semibold text-zinc-300">{i === 0 ? `${r.label}s can` : `${r.label}s can also`}</p>
-              <ul className="mt-1.5 space-y-1.5">
-                {added.map((c) => (
-                  <li key={c.key} className="flex gap-2 text-sm text-zinc-300">
-                    <span aria-hidden="true" className="mt-0.5 shrink-0 scale-75 text-emerald-400">
-                      <CheckIcon />
-                    </span>
-                    <span>{c.label}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          );
-        })}
-      </div>
-      {legacy.length > 0 && (
-        <p className="mt-3 text-xs text-zinc-500">
-          {legacy.map((r) => `${r.label}: ${r.summary}`).join(" ")}
-        </p>
-      )}
-    </section>
   );
 }

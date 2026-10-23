@@ -116,9 +116,7 @@ function ToolsPage() {
   return (
     <Page>
       <PageHeader
-        breadcrumb={<Link href="/data-sources" className={`${linkButton} text-sm`}>Back to data sources</Link>}
-        title="Your own tools"
-        titleClassName="text-balance"
+        title="Team tools"
         lead={
           <>
             Named lookups your engineers already trust, like &quot;find order by number&quot;. Someone writes the read once, another

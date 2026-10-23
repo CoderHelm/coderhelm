@@ -398,7 +398,6 @@ function ReviewerConfigPage() {
   return (
     <Page>
       <PageHeader
-        eyebrow={<Link href="/reviewer" className={`text-sm text-zinc-500 hover:text-zinc-300 rounded ${focusRing}`}>← Reviewer</Link>}
         title="Reviewer settings"
         lead="What the pull request reviewer does, set one repository at a time. A new repository starts with everything off."
       />
