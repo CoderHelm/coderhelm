@@ -330,7 +330,7 @@ const PAGES: { path: string; heading: RegExp }[] = [
   { path: "/runs/detail?id=01RUN00000000000000000003", heading: /run/i },
   { path: "/plans", heading: /Plans/ },
   { path: "/plans/detail?id=01PLAN0000000000000000000", heading: /plan/i },
-  { path: "/plans/new", heading: /plan/i },
+  { path: "/plans/new", heading: /What do you want to change/ },
   { path: "/plans/templates", heading: /templates/i },
   { path: "/reviewer", heading: /Reviewer/ },
   { path: "/reviewer/config", heading: /Reviewer settings/ },

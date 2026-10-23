@@ -50,6 +50,8 @@ interface Backend {
   slowPlan: boolean;
   tasks: ReturnType<typeof task>[];
   chatBody: Record<string, unknown> | null;
+  chatPosts: number;
+  created: Record<string, unknown> | null;
   usedQueries: string[];
   /** The plan the detail page reads; tasks come from `tasks`. */
   planExtra: Record<string, unknown>;
@@ -70,7 +72,7 @@ function freshTasks() {
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = {
     calls: [], plansEmpty: false, plansFail: false, templatesEmpty: false, planStatus: 200, slowPlan: false,
-    tasks: freshTasks(), chatBody: null, usedQueries: [], planExtra: {}, openspecMissing: false, writes: [], ...init,
+    tasks: freshTasks(), chatBody: null, chatPosts: 0, created: null, usedQueries: [], planExtra: {}, openspecMissing: false, writes: [], ...init,
   };
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -97,20 +99,48 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/plans/chat/token") return json(route, { token: "t" });
     if (p === "/api/plans/chat/stream" && m === "POST") {
       db.chatBody = JSON.parse(req.postData() || "{}");
+      db.chatPosts++;
+      const msgs = (db.chatBody?.messages ?? []) as { role: string; content: string }[];
+      const last = (msgs[msgs.length - 1]?.content ?? "").toLowerCase();
       const ev = (type: string, data: unknown) => `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
       const call = (id: string, name: string, used: unknown) =>
         ev("tool_start", { id, name }) + ev("tool_result", { id, name, status: "success", summary: "Done", used });
-      return route.fulfill({
-        status: 200,
-        contentType: "text/event-stream",
-        body:
-          call("tu1", "read_skill", { kind: "skill", label: "api-conventions", href: "/skills/item?repo=your-team%2Fplaybook&path=skills%2Fapi-conventions%2FSKILL.md" }) +
+      const stream = (body: string) => route.fulfill({ status: 200, contentType: "text/event-stream", body });
+      const planJson = (tasks: { title: string; description: string; acceptance_criteria: string }[]) =>
+        "```json\n" + JSON.stringify({ title: "Add a class schedule page", description: "Members can see classes by day.", repo: "your-team/web", tasks: tasks.map((t, i) => ({ ...t, order: i })) }, null, 2) + "\n```";
+      const T1 = { title: "Add the classes endpoint", description: "GET /api/classes?day= returns classes for a day.", acceptance_criteria: "- Returns classes sorted by time" };
+      const T2 = { title: "Show the schedule page", description: "A page at /schedule with a day picker.", acceptance_criteria: "- Shows today by default" };
+      if (last.includes("fail")) return stream(ev("error", { message: "The model is busy. Try again." }));
+      if (last.includes("plan it")) {
+        return stream(
+          ev("tool_start", { id: "g1", name: "github__read_file" }) + ev("tool_result", { id: "g1", status: "success", summary: "routes.ts" }) +
+          ev("tool_start", { id: "g2", name: "github__read_file" }) + ev("tool_result", { id: "g2", status: "success", summary: "page.tsx" }) +
+          ev("tool_start", { id: "g3", name: "github__search_code" }) + ev("tool_result", { id: "g3", status: "success", summary: "4 matches" }) +
+          ev("text_delta", { text: "Here is a plan in two steps.\n\n" + planJson([T1, T2]) }) + ev("done", {}),
+        );
+      }
+      if (last.includes("print view")) {
+        return stream(
+          ev("text_delta", { text: "Added a print view and tightened the page task.\n\n" + planJson([T1, { ...T2, description: T2.description + " Days are tabs." }, { title: "Add a print view", description: "A print stylesheet for the schedule.", acceptance_criteria: "- Prints one day per page" }]) }) +
+          ev("done", {}),
+        );
+      }
+      if (last.includes("long")) {
+        const para = "The schedule needs an endpoint, a page, and a way to pick a day. ".repeat(6);
+        return stream(ev("text_delta", { text: Array.from({ length: 10 }, (_, i) => `### Part ${i + 1}\n\n${para}`).join("\n\n") }) + ev("done", {}));
+      }
+      return stream(
+        call("tu1", "read_skill", { kind: "skill", label: "api-conventions", href: "/skills/item?repo=your-team%2Fplaybook&path=skills%2Fapi-conventions%2FSKILL.md" }) +
           call("tu2", "ask_team_agent", { kind: "agent", label: "spec-checker", href: "/skills/agent/?repo=your-team%2Fplaybook&path=agents%2Fspec-checker.md" }) +
           call("tu3", "logs_search", { kind: "source", label: "Service logs", href: "/data-sources/activity" }) +
           call("tu4", "read_skill", { kind: "skill", label: "api-conventions", href: "/skills/item?repo=your-team%2Fplaybook&path=skills%2Fapi-conventions%2FSKILL.md" }) +
           ev("text_delta", { text: "The schedule page needs an endpoint first, the way your API conventions lay out." }) +
           ev("done", {}),
-      });
+      );
+    }
+    if (p === "/api/plans" && m === "POST") {
+      db.created = JSON.parse(req.postData() || "{}");
+      return json(route, { plan_id: "PLANA" });
     }
     if (p === "/api/skills/used" && m === "GET") {
       db.usedQueries.push(url.search);
@@ -518,21 +548,33 @@ test("templates empty state", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test("new plan offers templates on a fresh chat and a template opens its plan", async ({ page }) => {
+test("new plan asks one question first, with templates and the destination folded under More options", async ({ page }) => {
   const errors = watchConsole(page);
   await mockApi(page);
   await page.goto("/plans/new/");
+  await expect(page.getByRole("heading", { level: 1, name: "What do you want to change?" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Message" })).toBeVisible();
-  // The chat starts with a greeting, which used to hide this block forever.
-  await expect(page.getByText("Start from a template")).toBeVisible();
+  await expect(page.getByText("What happens next")).toBeVisible();
+  await expect(page.getByTestId("plan-starter")).toContainText("Reads your-team/web");
+  // Folded until asked for.
+  await expect(page.getByText("Start from a template")).toBeHidden();
+  await expect(page.getByRole("group", { name: "Destination" })).toBeHidden();
+  // An example fills the box; it does not send.
+  await page.getByRole("button", { name: "Retry failed sync jobs with a backoff" }).click();
+  await expect(page.getByRole("textbox", { name: "Message" })).toHaveValue("Retry failed sync jobs with a backoff");
+  await page.getByRole("textbox", { name: "Message" }).fill("");
   await shot(page, "plans-new");
-  await page.getByRole("button", { name: /New API endpoint/ }).click();
+  await page.getByText("More options").click();
+  await expect(page.getByText("Start from a template")).toBeVisible();
+  await expect(page.getByRole("group", { name: "Destination" }).getByRole("button", { name: "Jira Tickets" })).toBeDisabled();
+  await shot(page, "plans-new-options");
+  await page.getByRole("button", { name: "Use template New API endpoint" }).click();
   await expect(page).toHaveURL(/\/plans\/detail\/?\?id=PLANA/);
-  await expect(page.getByRole("heading", { name: "Add a class schedule page" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Add a class schedule page" }).first()).toBeVisible();
   expect(errors).toEqual([]);
 });
 
-test("a plan chat answer shows the skills, agents and data sources it used, each linked", async ({ page }) => {
+test("a plan chat answer folds its steps into one line and links what it used", async ({ page }) => {
   const errors = watchConsole(page);
   const db = await mockApi(page);
   await page.goto("/plans/new/");
@@ -544,9 +586,93 @@ test("a plan chat answer shows the skills, agents and data sources it used, each
   await expect(chips.getByRole("link", { name: "Read skill: api-conventions" })).toHaveAttribute("href", /\/skills\/item\/?\?repo=your-team%2Fplaybook/);
   await expect(chips.getByRole("link", { name: "Asked agent: spec-checker" })).toHaveAttribute("href", /\/skills\/agent\/?\?repo=/);
   await expect(chips.getByRole("link", { name: "Looked up: Service logs" })).toHaveAttribute("href", /^\/data-sources\/activity\/?$/);
+  // Four tool calls, one line.
+  const work = page.getByTestId("work-line");
+  await expect(work).toHaveCount(1);
+  await expect(work).toContainText(/Worked( for \d+s)? · read 2 skills · asked 1 agent · 1 lookup/);
+  await work.getByRole("button").click();
+  await expect(work.getByRole("button", { name: /read skill/ })).toHaveCount(2);
   // The chat sends its id, so what it read is logged together.
   expect(String(db.chatBody?.chat_id ?? "")).toMatch(/^[\w-]{8,64}$/);
+  await expect(page.getByTestId("user-message")).toContainText("Plan a class schedule page");
   await shot(page, "plans-chat-used");
+  expect(errors).toEqual([]);
+});
+
+test("the draft sits beside the chat, marks what an answer changed, and saves the same body as before", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page);
+  await page.goto("/plans/new/");
+  await page.getByRole("textbox", { name: "Message" }).fill("Plan it: a class schedule page");
+  await page.getByRole("button", { name: "Draft a plan" }).click();
+  await expect(page.getByTestId("plan-card")).toContainText("Drafted the plan");
+  await expect(page.getByTestId("plan-card")).toContainText("2 tasks");
+  await expect(page.getByTestId("work-line")).toContainText("read 2 files · ran 1 code search");
+  // The JSON is not shown as text.
+  await expect(page.getByText('"acceptance_criteria"')).toHaveCount(0);
+  const panel = page.getByRole("complementary", { name: "Draft plan" });
+  await expect(panel.getByRole("heading", { name: "Add a class schedule page" })).toBeVisible();
+  await expect(panel.getByRole("list", { name: "Draft tasks" }).getByRole("listitem")).toHaveCount(2);
+  // Suggested replies once a draft exists.
+  await expect(page.getByRole("list", { name: "Suggested replies" })).toBeVisible();
+
+  await page.getByRole("textbox", { name: "Message" }).fill("Add a print view");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("plan-card").last()).toContainText("Updated the plan");
+  await expect(page.getByTestId("plan-card").last()).toContainText("+1 task · 1 changed");
+  await expect(panel.getByTestId("draft-updated")).toHaveText("Updated: +1 task · 1 changed");
+  await expect(panel.getByText("New", { exact: true })).toBeVisible();
+  await expect(panel.getByText("Changed", { exact: true })).toBeVisible();
+  await shot(page, "plans-chat-plan");
+
+  // On a phone the plan is a tab.
+  await page.setViewportSize({ width: 390, height: 800 });
+  await expect(panel).toBeHidden();
+  await page.getByRole("group", { name: "Show" }).getByRole("button", { name: /^Plan \(3\)/ }).click();
+  await expect(panel).toBeVisible();
+  await page.screenshot({ path: path.join(SHOTS_DIR, "plans-chat-plan-tab-390.png"), fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 800 });
+
+  await panel.getByRole("button", { name: "Save plan" }).click();
+  await expect(page).toHaveURL(/\/plans\/detail\/?\?id=PLANA/);
+  // Same body as before the redesign: the plan, the destination (GitHub, since Jira is not connected), the chat id.
+  expect(Object.keys(db.created ?? {}).sort()).toEqual(["chat_id", "description", "destination", "repo", "tasks", "title"]);
+  expect(db.created).toMatchObject({ title: "Add a class schedule page", repo: "your-team/web", destination: "github" });
+  expect((db.created?.tasks as unknown[]).length).toBe(3);
+  expect(errors).toEqual([]);
+});
+
+test("a failed answer says so and Retry asks again", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page);
+  await page.goto("/plans/new/");
+  await page.getByRole("textbox", { name: "Message" }).fill("This will fail");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("alert").filter({ hasText: "reply" })).toContainText("Couldn't get a reply: The model is busy. Try again.");
+  await shot(page, "plans-chat-error");
+  const before = db.chatPosts;
+  await page.getByRole("button", { name: "Retry" }).click();
+  await expect.poll(() => db.chatPosts).toBe(before + 1);
+  expect(errors).toEqual([]);
+});
+
+test("a long earlier answer folds under Show more; Start over goes back to the question", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page);
+  await page.goto("/plans/new/");
+  await page.getByRole("textbox", { name: "Message" }).fill("Give me the long version");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: "Part 10" })).toBeVisible();
+  // The newest answer is never folded.
+  await expect(page.getByRole("button", { name: "Show more" })).toHaveCount(0);
+  await page.getByRole("textbox", { name: "Message" }).fill("Plan it");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("plan-card")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Show more" })).toHaveCount(1);
+  await page.getByRole("button", { name: "Show more" }).click();
+  await expect(page.getByRole("button", { name: "Show less" })).toBeVisible();
+  await page.getByRole("button", { name: "Start over" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "What do you want to change?" })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
