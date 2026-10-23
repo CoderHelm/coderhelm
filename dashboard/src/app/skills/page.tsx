@@ -503,7 +503,7 @@ function SkillsPage() {
                       chips={
                         <>
                           <CompatBadge item={s} />
-                          <AlwaysApplyBadge item={s} />
+                          <AlwaysApplyBadge item={s} short />
                           <ReviewStepsBadge item={s} />
                           {s.kind === "agent" && <StatusPill tone="success">Agent · can be asked</StatusPill>}
                         </>

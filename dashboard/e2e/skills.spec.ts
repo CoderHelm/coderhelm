@@ -631,7 +631,8 @@ test.describe("always apply", () => {
 
     await page.goto("/skills");
     const row = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "skill:debug" }) });
-    await expect(row.getByTestId("always-badge")).toHaveText(/Always applied · web · Coder, Reviewer, PR descriptions/);
+    await expect(row.getByTestId("always-badge")).toHaveText("Always applied · web · 3 steps · 2 paths");
+    await expect(row.getByTestId("always-badge")).toHaveAttribute("title", /apps\/web\/\*\*, \*\*\/\*\.tsx/);
     await shot(page, "skills-always-list");
 
     // Switching it off saves at once.

@@ -11,6 +11,7 @@ import {
   DEFAULT_PASSES,
   PASSES,
   alwaysLabel,
+  alwaysShort,
   repoShort,
   skillsApi,
   suggestionLabel,
@@ -20,13 +21,14 @@ import {
 } from "@/lib/skills";
 
 /** "Always applied · web-app · Coder, Reviewer", or nothing when off. */
-export function AlwaysApplyBadge({ item }: { item: Pick<Skill, "always_apply" | "kind"> }) {
+/** `short` for a list row: a few words, every repo and path in the tooltip. */
+export function AlwaysApplyBadge({ item, short = false }: { item: Pick<Skill, "always_apply" | "kind">; short?: boolean }) {
   const a = item.always_apply;
   if (!a?.on || item.kind === "agent") return null;
   return (
-    <span data-testid="always-badge" className="inline-flex max-w-full">
+    <span data-testid="always-badge" className="inline-flex max-w-full" title={short ? alwaysLabel(a) : undefined}>
       <StatusPill tone="success">
-        <span className="[overflow-wrap:anywhere] whitespace-normal">{alwaysLabel(a)}</span>
+        <span className={short ? "truncate" : "[overflow-wrap:anywhere] whitespace-normal"}>{short ? alwaysShort(a) : alwaysLabel(a)}</span>
       </StatusPill>
     </span>
   );
