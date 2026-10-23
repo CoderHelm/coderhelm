@@ -156,6 +156,21 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ body, items }),
     }),
+  /** The filer or a team admin marks the ticket resolved. */
+  resolveSupportTicket: (id: string) =>
+    request<SupportDetail>(`/api/support/tickets/${encodeURIComponent(id)}/resolve`, { method: "POST", body: "{}" }),
+  /** Adds a team member (`user_id`) or copies an address (`email`). Adding yourself is following. */
+  addSupportPerson: (id: string, who: SupportPersonRef, admin = false) =>
+    request<SupportDetail>(`/api/${admin ? "admin/" : ""}support/tickets/${encodeURIComponent(id)}/participants`, {
+      method: "POST",
+      body: JSON.stringify(who),
+    }),
+  /** Takes someone off the ticket. Taking yourself off is unfollowing. */
+  removeSupportPerson: (id: string, who: SupportPersonRef, admin = false) =>
+    request<SupportDetail>(`/api/${admin ? "admin/" : ""}support/tickets/${encodeURIComponent(id)}/participants/remove`, {
+      method: "POST",
+      body: JSON.stringify(who),
+    }),
   supportBadge: () => request<{ waiting: number; queue_open: number | null }>("/api/support/badge"),
   adminSupportTickets: () =>
     request<{ tickets: SupportTicket[]; support_access?: Record<string, string> }>("/api/admin/support/tickets"),
@@ -2809,6 +2824,27 @@ export interface SupportTicket {
   updated_at: string;
   last_actor: "customer" | "support";
   message_count: number;
+  /** Everyone else on the ticket; they get its emails. */
+  participants?: SupportParticipant[];
+  /** The latest message, one line, and who wrote it. */
+  last_snippet?: string;
+  last_author_name?: string;
+}
+
+export interface SupportParticipant {
+  /** `USER#…`; empty for an address copied by email. */
+  user_id: string;
+  email: string;
+  name: string;
+  /** Copied by email only: not on the team, cannot sign in. */
+  outside: boolean;
+  added_by: string;
+  added_at: string;
+}
+
+export interface SupportPersonRef {
+  user_id?: string;
+  email?: string;
 }
 
 export interface SupportMessage {
@@ -2827,6 +2863,8 @@ export interface SupportDetail {
   messages: SupportMessage[];
   /** Admin answers only: when the team's support access ends, or null. */
   support_access?: { until: string | null };
+  /** Avatars of the people on the ticket, by lowercased address. */
+  avatars?: Record<string, string>;
 }
 
 export interface NewSupportTicket {
