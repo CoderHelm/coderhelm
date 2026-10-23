@@ -461,10 +461,19 @@ test("tests: settings save every choice", async ({ page }) => {
   await days.fill("31");
   await expect(page.getByText("Pick between 1 and 30 days before a ticket.")).toBeVisible();
   await days.fill("5");
+  // "Only these" with nothing ticked is never saved as "every repository".
+  await expect(page.getByRole("checkbox", { name: WEB })).toHaveCount(0);
+  await page.getByRole("radio", { name: "Only the repositories I tick" }).check();
+  await expect(page.getByRole("checkbox", { name: WEB })).not.toBeChecked();
+  await expect(page.getByTestId("tracked-repos")).toHaveText("Tick at least one repository.");
+  const bar = page.getByRole("region", { name: "Save changes" });
+  await bar.getByRole("button", { name: "Save changes" }).click();
+  await expect(bar).toContainText("Tick at least one repository, or choose every repository.");
+  expect(callsTo(db, "PUT", /\/api\/tests\/settings/)).toHaveLength(0);
   await page.getByRole("checkbox", { name: WEB }).check();
-  await expect(page.getByText("Only the ticked repositories are tracked.")).toBeVisible();
-  await page.getByRole("button", { name: "Save settings" }).click();
-  await expect(page.getByRole("button", { name: "Save settings" })).toBeDisabled();
+  await expect(page.getByTestId("tracked-repos")).toContainText("1 of");
+  await bar.getByRole("button", { name: "Save changes" }).click();
+  await expect(bar).toHaveCount(0);
   expect(callsTo(db, "PUT", /\/api\/tests\/settings/)[0].body).toEqual({
     enabled: true, auto_quarantine: false, fix_prs: true, tickets: "jira", burn_in: true, repos: [WEB], ticket_after_days: 5,
   });

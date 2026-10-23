@@ -1,110 +1,80 @@
 "use client";
 
-import { CodeBlock } from "@/components/code-block";
 import { useEffect, useState } from "react";
-import { api, type Repo } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
 import { TextareaSkeleton } from "@/components/skeleton";
-import { RepoCombobox } from "@/components/repo-combobox";
+import { Callout } from "@/components/callout";
 import { Page, PageHeader } from "@/components/page";
-import { Field } from "@/components/settings";
+import { secondaryButton } from "@/components/ui";
+import { Field, SaveBar, SettingsDisclosure, SettingsSection } from "@/components/settings";
 import { MarkdownEditor } from "@/components/markdown-editor";
-import { primaryButton } from "@/components/ui";
-
-const PREVIEW_NOTE = "Agents get this text as written, with your global instructions first. This is how its headings and lists read.";
-
-function Tab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
-        active ? "border-zinc-100 text-zinc-100" : "border-transparent text-zinc-500 hover:text-zinc-300"
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
+import { CodeBlock } from "@/components/code-block";
+import { ScopeBar } from "../scope-bar";
+import { useScopedText } from "../use-scoped-text";
 
 export default function InstructionsPageGuarded() {
   return <RoleGuard minRole="admin"><InstructionsPage /></RoleGuard>;
 }
 
+const PREVIEW_NOTE = "Agents get this text as written, with your instructions for every repository first. This is how its headings and lists read.";
+
+const GLOBAL_PLACEHOLDER = `Example:
+- Always use TypeScript strict mode
+- Prefer named exports over default exports
+- Use kebab-case for file names
+- Write tests for all new functions`;
+
+const REPO_PLACEHOLDER = `Add this repository's conventions, for example:
+- This is a React Native app, use Expo patterns
+- Use Prisma for all database operations
+- Follow the error handling in src/utils/errors.ts`;
+
 function InstructionsPage() {
-  const [tab, setTab] = useState<"global" | "repo">("global");
   const { toast } = useToast();
-
-  const [globalContent, setGlobalContent] = useState("");
-  const [globalLoading, setGlobalLoading] = useState(true);
-  const [globalSaving, setGlobalSaving] = useState(false);
-  const [globalGenerated, setGlobalGenerated] = useState("");
-  const [globalGeneratedExpanded, setGlobalGeneratedExpanded] = useState(false);
-
-  const [repos, setRepos] = useState<Repo[]>([]);
-  const [selectedRepo, setSelectedRepo] = useState("");
-  const [repoContent, setRepoContent] = useState("");
-  const [repoLoading, setRepoLoading] = useState(false);
-  const [repoSaving, setRepoSaving] = useState(false);
-  const [generatedContent, setGeneratedContent] = useState("");
-  const [generatedExpanded, setGeneratedExpanded] = useState(false);
+  const text = useScopedText({
+    loadGlobal: () => api.getGlobalInstructions().then((d) => d.content),
+    loadRepo: (repo) => api.getRepoInstructions(repo).then((d) => d.content),
+  });
+  const { scope, repo, repos, form } = text;
+  const isRepo = scope === "repo";
+  const [saving, setSaving] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  // What Coderhelm wrote itself about the team or the repository, read only.
+  const [generated, setGenerated] = useState("");
 
   useEffect(() => {
-    Promise.all([
-      api.getGlobalInstructions().then((d) => d.content).catch(() => ""),
-      api.getGlobalAgents().then((d) => d.content).catch(() => ""),
-    ]).then(([custom, generated]) => {
-      setGlobalContent(custom);
-      setGlobalGenerated(generated);
-      setGlobalLoading(false);
-    }).catch(() => setGlobalLoading(false));
+    setGenerated("");
+    if (isRepo && !repo) return;
+    let live = true;
+    (isRepo ? api.getRepoAgents(repo) : api.getGlobalAgents())
+      .then((d) => live && setGenerated(d.content))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [isRepo, repo]);
 
-    api.listRepos().then((data) => {
-      const enabled = data.repos.filter((r) => r.enabled);
-      setRepos(enabled);
-      if (enabled.length > 0) setSelectedRepo(enabled[0].name);
-    }).catch(() => {});
-  }, []);
+  const repoData = repos.find((r) => r.name === repo);
+  const generating = isRepo && repoData?.onboard_status === "pending" && !form.values.content;
+  const generationFailed = isRepo && repoData?.onboard_status === "failed" && !form.values.content;
 
-  useEffect(() => {
-    if (!selectedRepo) return;
-    setRepoLoading(true);
-    setGeneratedContent("");
-    setGeneratedExpanded(false);
-    Promise.all([
-      api.getRepoInstructions(selectedRepo).then((d) => d.content).catch(() => ""),
-      api.getRepoAgents(selectedRepo).then((d) => d.content).catch(() => ""),
-    ]).then(([custom, generated]) => {
-      setRepoContent(custom);
-      setGeneratedContent(generated);
-      setRepoLoading(false);
-    });
-  }, [selectedRepo]);
-
-  const selectedRepoData = repos.find((r) => r.name === selectedRepo);
-  const isGenerating = selectedRepoData?.onboard_status === "pending" && !repoContent;
-
-  const saveGlobal = async () => {
-    setGlobalSaving(true);
+  const save = async () => {
+    setSaving(true);
+    setProblem(null);
+    const content = form.values.content;
     try {
-      await api.updateGlobalInstructions(globalContent);
-      toast("Global instructions saved");
+      if (isRepo) await api.updateRepoInstructions(repo, content);
+      else await api.updateGlobalInstructions(content);
+      form.reset({ content });
+      toast(isRepo ? "Repo instructions saved" : "Global instructions saved");
     } catch {
+      setProblem("The instructions were not saved. Try again.");
       toast("Failed to save", "error");
+    } finally {
+      setSaving(false);
     }
-    setGlobalSaving(false);
-  };
-
-  const saveRepo = async () => {
-    if (!selectedRepo) return;
-    setRepoSaving(true);
-    try {
-      await api.updateRepoInstructions(selectedRepo, repoContent);
-      toast("Repo instructions saved");
-    } catch {
-      toast("Failed to save", "error");
-    }
-    setRepoSaving(false);
   };
 
   return (
@@ -112,114 +82,67 @@ function InstructionsPage() {
       <div className="mb-6">
         <PageHeader
           title="Custom instructions"
-          lead="Conventions and preferences that Coderhelm follows. Global instructions apply to all repos. Per-repo instructions add repo-specific guidance on top."
+          lead="Conventions Coderhelm follows when it writes code. A repository's own instructions are added after the ones for every repository."
         />
       </div>
 
-      <div className="flex gap-1 border-b border-zinc-800 mb-6">
-        <Tab label="Global" active={tab === "global"} onClick={() => setTab("global")} />
-        <Tab label="Per Repo" active={tab === "repo"} onClick={() => setTab("repo")} />
-      </div>
+      <ScopeBar label="Whose instructions" scope={scope} onScope={text.setScope} repos={repos} repo={repo} onRepo={text.setRepo} />
 
-      {tab === "global" ? (
-        globalLoading ? <TextareaSkeleton /> : (
-          <>
-            {globalGenerated && (
-              <div className="mb-4 border border-zinc-800 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => setGlobalGeneratedExpanded(!globalGeneratedExpanded)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-zinc-900/50 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">Generated</span>
-                    <span className="text-sm text-zinc-300">Organization overview</span>
-                  </div>
-                  <span className="text-zinc-600 text-xs">{globalGeneratedExpanded ? "Collapse" : "Expand"}</span>
-                </button>
-                {globalGeneratedExpanded && (
-                  <CodeBlock code={globalGenerated} lang="markdown" label="Organization overview" wrap maxHeightClass="max-h-96" className="!rounded-none !border-x-0 !border-b-0" />
-                )}
-              </div>
-            )}
-            <Field as="custom" id="global-instructions" label="Custom instructions (optional)" help="Applied to every repo.">
-              {(ids) => (
-                <MarkdownEditor
-                  {...ids}
-                  variant="instructions"
-                  value={globalContent}
-                  onChange={setGlobalContent}
-                  minRows={12}
-                  previewNote={PREVIEW_NOTE}
-                  placeholder={`Example:\n- Always use TypeScript strict mode\n- Prefer named exports over default exports\n- Use kebab-case for file names\n- Write tests for all new functions`}
-                />
-              )}
-            </Field>
-            <div className="mt-4 flex items-center gap-3">
-              <button type="button" onClick={saveGlobal} disabled={globalSaving} className={primaryButton}>
-                {globalSaving ? "Saving…" : "Save"}
-              </button>
+      <SettingsSection id="instructions" title={isRepo ? "This repository's instructions" : "Instructions for every repository"}>
+        <div className="space-y-4 px-4 py-4">
+          {isRepo && repos.length === 0 ? (
+            <p className="text-sm text-zinc-500">No repositories are turned on. Turn one on under Settings, Repositories first.</p>
+          ) : text.loading ? (
+            <TextareaSkeleton />
+          ) : text.failed ? (
+            <Callout variant="error" title="Could not load the instructions">
+              <p>Nothing is shown, so the saved instructions cannot be overwritten by mistake.</p>
+              <button type="button" onClick={text.reload} className={`mt-2 ${secondaryButton}`}>Try again</button>
+            </Callout>
+          ) : generating ? (
+            <div role="status" className="flex flex-col items-center justify-center py-12 text-center">
+              <div aria-hidden="true" className="mb-3 h-6 w-6 animate-spin rounded-full border-2 border-zinc-600 border-t-zinc-300 motion-reduce:animate-none" />
+              <p className="text-sm text-zinc-300">Reading this repository…</p>
+              <p className="mt-1 text-xs text-zinc-500">Coderhelm is learning its structure and conventions.</p>
             </div>
-          </>
-        )
-      ) : repos.length === 0 ? (
-        <p className="text-zinc-500 text-sm">No enabled repos. Enable repos in Settings → Repos first.</p>
-      ) : (
-        <>
-          <RepoCombobox repos={repos} selected={selectedRepo} onSelect={setSelectedRepo} />
-          {isGenerating ? (
-            <div className="flex flex-col items-center justify-center py-16 border border-zinc-800 rounded-lg">
-              <div className="w-6 h-6 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin mb-3" />
-              <p className="text-zinc-400 text-sm">Generating repo instructions...</p>
-              <p className="text-zinc-600 text-xs mt-1">Analyzing repository structure and conventions</p>
-            </div>
-          ) : selectedRepoData?.onboard_status === "failed" && !repoContent ? (
-            <div className="border border-red-500/20 bg-red-500/5 rounded-lg p-4">
-              <p className="text-red-400 text-sm font-medium">Instruction generation failed</p>
-              {selectedRepoData.onboard_error && (
-                <p className="text-red-400/70 text-xs mt-1">{selectedRepoData.onboard_error.slice(0, 200)}</p>
-              )}
-            </div>
-          ) : repoLoading ? <TextareaSkeleton /> : (
+          ) : (
             <>
-              {generatedContent && (
-                <div className="mb-4 border border-zinc-800 rounded-lg overflow-hidden">
-                  <button
-                    onClick={() => setGeneratedExpanded(!generatedExpanded)}
-                    className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-zinc-900/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">Generated</span>
-                      <span className="text-sm text-zinc-300">Codebase analysis</span>
-                    </div>
-                    <span className="text-zinc-600 text-xs">{generatedExpanded ? "Collapse" : "Expand"}</span>
-                  </button>
-                  {generatedExpanded && (
-                    <CodeBlock code={generatedContent} lang="markdown" label="Codebase analysis" wrap maxHeightClass="max-h-96" className="!rounded-none !border-x-0 !border-b-0" />
-                  )}
-                </div>
+              {generationFailed && (
+                <Callout variant="error" title="Coderhelm could not read this repository" live={false}>
+                  {repoData?.onboard_error ? <p className="break-words">{repoData.onboard_error.slice(0, 200)}</p> : <p>You can still write instructions below.</p>}
+                </Callout>
               )}
-              <Field as="custom" id="repo-instructions" label="Custom instructions (optional)" help="Added after the global instructions for this repo.">
+              <Field
+                as="custom"
+                id={isRepo ? "repo-instructions" : "global-instructions"}
+                label="Custom instructions (optional)"
+                unsaved={form.dirty}
+                help={isRepo ? `Added after the instructions for every repository, only in ${repo}. Markdown works.` : "Applied in every repository. Markdown works."}
+              >
                 {(ids) => (
                   <MarkdownEditor
                     {...ids}
                     variant="instructions"
-                    value={repoContent}
-                    onChange={setRepoContent}
-                    minRows={10}
+                    value={form.values.content}
+                    onChange={(v) => form.set("content", v)}
+                    minRows={isRepo ? 10 : 12}
                     previewNote={PREVIEW_NOTE}
-                    placeholder={`Add repo-specific conventions, e.g.:\n- This is a React Native app, use Expo patterns\n- Use Prisma for all database operations\n- Follow the error handling in src/utils/errors.ts`}
+                    placeholder={isRepo ? REPO_PLACEHOLDER : GLOBAL_PLACEHOLDER}
                   />
                 )}
               </Field>
-              <div className="mt-4 flex items-center gap-3">
-                <button type="button" onClick={saveRepo} disabled={repoSaving} className={primaryButton}>
-                  {repoSaving ? "Saving…" : "Save"}
-                </button>
-              </div>
+              {generated && (
+                <SettingsDisclosure summary={isRepo ? "What Coderhelm learned about this repository" : "What Coderhelm learned about your team"}>
+                  <p className="text-xs text-zinc-500">Written by Coderhelm and given to agents with your instructions. You can&apos;t edit it here.</p>
+                  <CodeBlock code={generated} lang="markdown" label={isRepo ? "Codebase analysis" : "Organization overview"} wrap maxHeightClass="max-h-96" />
+                </SettingsDisclosure>
+              )}
             </>
           )}
-        </>
-      )}
+        </div>
+      </SettingsSection>
+
+      <SaveBar count={form.count} onSave={save} onDiscard={() => { form.discard(); setProblem(null); }} saving={saving} problem={problem} context={isRepo ? repo : undefined} />
     </Page>
   );
 }

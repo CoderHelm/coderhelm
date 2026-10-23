@@ -5,117 +5,119 @@ import { api, type Repo } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
 import { Skeleton } from "@/components/skeleton";
-import { RepoCombobox } from "@/components/repo-combobox";
 import { Page, PageHeader } from "@/components/page";
-import { primaryButton } from "@/components/ui";
-import {
-  ShieldCheckIcon, LockIcon, ShieldAlertIcon,
-  KeyIcon, RepeatIcon, ClipboardIcon, ScanIcon,
-} from "@/components/icons";
-
-const BUILT_IN_RULES = [
-  "Never push directly to the default/main branch",
-  "Never commit secrets, credentials, or sensitive information",
-];
-
-function Tab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
-        active ? "border-zinc-100 text-zinc-100" : "border-transparent text-zinc-500 hover:text-zinc-300"
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
-
-function RuleList({
-  rules,
-  newRule,
-  setNewRule,
-  onAdd,
-  onRemove,
-  saving,
-}: {
-  rules: string[];
-  newRule: string;
-  setNewRule: (v: string) => void;
-  onAdd: () => void;
-  onRemove: (i: number) => void;
-  saving: boolean;
-}) {
-  return (
-    <>
-      <div className="space-y-2 mb-4">
-        {rules.map((rule, i) => (
-          <div
-            key={i}
-            className="flex items-center justify-between gap-3 px-4 py-3 bg-zinc-900/50 border border-zinc-800 rounded-lg"
-          >
-            <span className="text-sm text-zinc-200">{rule}</span>
-            <button
-              onClick={() => onRemove(i)}
-              className="text-zinc-600 hover:text-red-400 text-xs transition-colors shrink-0"
-            >
-              Remove
-            </button>
-          </div>
-        ))}
-        {rules.length === 0 && (
-          <p className="text-zinc-600 text-sm py-2">No custom rules yet.</p>
-        )}
-      </div>
-
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={newRule}
-          onChange={(e) => setNewRule(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && onAdd()}
-          placeholder="e.g. Never delete database migrations"
-          className="flex-1 px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
-        />
-        <button
-          onClick={onAdd}
-          disabled={!newRule.trim() || saving}
-          className={primaryButton}
-        >
-          Add rule
-        </button>
-      </div>
-
-      {saving && <p className="text-xs text-zinc-500 mt-2">Saving...</p>}
-    </>
-  );
-}
+import { buttonClass, inputClass } from "@/components/ui";
+import { SettingsSection } from "@/components/settings";
+import { ScopeBar, type Scope } from "../scope-bar";
 
 export default function GuardrailsPageGuarded() {
   return <RoleGuard minRole="admin"><GuardrailsPage /></RoleGuard>;
 }
 
+/**
+ * The team's rules, one per row, added and removed in place. Each change
+ * saves at once, as it always has: a rule list has nothing half done to hold.
+ */
+function RuleList({
+  scope,
+  rules,
+  loading,
+  saving,
+  onChange,
+}: {
+  scope: string;
+  rules: string[];
+  loading: boolean;
+  saving: boolean;
+  onChange: (next: string[]) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const trimmed = draft.trim();
+  const duplicate = !!trimmed && rules.includes(trimmed);
+
+  const add = () => {
+    if (!trimmed || duplicate || saving) return;
+    onChange([...rules, trimmed]);
+    setDraft("");
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-2 p-4" aria-busy="true" aria-label="Loading rules">
+        <Skeleton className="h-6 w-full" />
+        <Skeleton className="h-6 w-2/3" />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <ul aria-label={`Rules for ${scope}`} className="divide-y divide-zinc-800">
+        {rules.map((rule, i) => (
+          <li key={`${i}-${rule}`} className="flex min-w-0 items-start justify-between gap-4 px-4 py-3">
+            <span className="min-w-0 break-words text-sm text-zinc-200">{rule}</span>
+            <button
+              type="button"
+              onClick={() => onChange(rules.filter((_, k) => k !== i))}
+              disabled={saving}
+              aria-label={`Remove rule: ${rule}`}
+              className={buttonClass("ghost", "sm")}
+            >
+              Remove
+            </button>
+          </li>
+        ))}
+        {rules.length === 0 && <li className="px-4 py-3 text-sm text-zinc-500">No rules for {scope} yet.</li>}
+      </ul>
+      <form
+        className="border-t border-zinc-800 px-4 py-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          add();
+        }}
+      >
+        <label htmlFor="new-rule" className="text-sm font-medium text-zinc-200">Add a rule</label>
+        <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
+          <input
+            id="new-rule"
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Never delete database migrations"
+            aria-describedby="new-rule-help"
+            className={`${inputClass} min-w-0 flex-1`}
+          />
+          <button type="submit" disabled={!trimmed || duplicate || saving} className={`${buttonClass("primary")} shrink-0 self-start`}>
+            {saving ? "Saving…" : "Add rule"}
+          </button>
+        </div>
+        <p id="new-rule-help" className="mt-1.5 text-xs text-zinc-500">
+          {duplicate ? "That rule is already on the list." : "One plain sentence. It saves as soon as you add it."}
+        </p>
+      </form>
+    </>
+  );
+}
+
 function GuardrailsPage() {
-  const [tab, setTab] = useState<"global" | "repo">("global");
   const { toast } = useToast();
+  const [scope, setScope] = useState<Scope>("global");
 
   const [globalRules, setGlobalRules] = useState<string[]>([]);
-  const [globalNewRule, setGlobalNewRule] = useState("");
-  const [globalSaving, setGlobalSaving] = useState(false);
   const [globalLoading, setGlobalLoading] = useState(true);
+  const [globalSaving, setGlobalSaving] = useState(false);
 
   const [repos, setRepos] = useState<Repo[]>([]);
   const [selectedRepo, setSelectedRepo] = useState("");
   const [repoRules, setRepoRules] = useState<string[]>([]);
-  const [repoNewRule, setRepoNewRule] = useState("");
-  const [repoSaving, setRepoSaving] = useState(false);
   const [repoLoading, setRepoLoading] = useState(false);
+  const [repoSaving, setRepoSaving] = useState(false);
 
   useEffect(() => {
-    api.getGlobalRules().then((data) => {
-      setGlobalRules(data.rules);
-      setGlobalLoading(false);
-    }).catch(() => setGlobalLoading(false));
+    api.getGlobalRules()
+      .then((data) => setGlobalRules(data.rules))
+      .catch(() => {})
+      .finally(() => setGlobalLoading(false));
 
     api.listRepos().then((data) => {
       const enabled = data.repos.filter((r) => r.enabled);
@@ -127,21 +129,21 @@ function GuardrailsPage() {
   useEffect(() => {
     if (!selectedRepo) return;
     setRepoLoading(true);
-    api.getRepoRules(selectedRepo).then((data) => {
-      setRepoRules(data.rules);
-      setRepoLoading(false);
-    }).catch(() => {
-      setRepoRules([]);
-      setRepoLoading(false);
-    });
+    api.getRepoRules(selectedRepo)
+      .then((data) => setRepoRules(data.rules))
+      .catch(() => setRepoRules([]))
+      .finally(() => setRepoLoading(false));
   }, [selectedRepo]);
 
   const saveGlobal = async (updated: string[]) => {
+    const before = globalRules;
+    setGlobalRules(updated);
     setGlobalSaving(true);
     try {
       await api.updateGlobalRules(updated);
       toast("Rule saved");
     } catch {
+      setGlobalRules(before);
       toast("Failed to save rules", "error");
     }
     setGlobalSaving(false);
@@ -149,142 +151,45 @@ function GuardrailsPage() {
 
   const saveRepo = async (updated: string[]) => {
     if (!selectedRepo) return;
+    const before = repoRules;
+    setRepoRules(updated);
     setRepoSaving(true);
     try {
       await api.updateRepoRules(selectedRepo, updated);
       toast("Rule saved");
     } catch {
+      setRepoRules(before);
       toast("Failed to save rules", "error");
     }
     setRepoSaving(false);
   };
 
-  const addGlobal = () => {
-    const trimmed = globalNewRule.trim();
-    if (!trimmed || globalRules.includes(trimmed)) return;
-    const updated = [...globalRules, trimmed];
-    setGlobalRules(updated);
-    setGlobalNewRule("");
-    saveGlobal(updated);
-  };
-
-  const removeGlobal = (index: number) => {
-    const updated = globalRules.filter((_, i) => i !== index);
-    setGlobalRules(updated);
-    saveGlobal(updated);
-  };
-
-  const addRepo = () => {
-    const trimmed = repoNewRule.trim();
-    if (!trimmed || repoRules.includes(trimmed)) return;
-    const updated = [...repoRules, trimmed];
-    setRepoRules(updated);
-    setRepoNewRule("");
-    saveRepo(updated);
-  };
-
-  const removeRepo = (index: number) => {
-    const updated = repoRules.filter((_, i) => i !== index);
-    setRepoRules(updated);
-    saveRepo(updated);
-  };
-
   return (
     <Page>
       <div className="mb-6">
-        <PageHeader
-          title="Guardrails"
-          lead="Must-rules that Coderhelm enforces on every run. Global rules apply to all repos. Per-repo rules add repo-specific constraints on top."
-        />
+        <PageHeader title="Guardrails" lead="Rules every Coderhelm run must follow. A repository's own rules add to the ones for every repository." />
       </div>
 
-      <div className="border border-zinc-800 rounded-lg p-4 mb-4 bg-zinc-900/30">
-        <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3">Built-in rules (always enforced)</h3>
-        {BUILT_IN_RULES.map((rule, i) => (
-          <div key={i} className="flex items-center gap-2 text-sm text-zinc-300 mb-1.5 last:mb-0">
-            <span className="text-green-400">✓</span>
-            {rule}
-          </div>
-        ))}
-      </div>
+      <ScopeBar label="Whose rules" scope={scope} onScope={setScope} repos={repos} repo={selectedRepo} onRepo={setSelectedRepo} />
 
-      <div className="border border-emerald-900/30 rounded-lg p-4 mb-6 bg-emerald-950/20">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-emerald-400"><ScanIcon /></span>
-          <h3 className="text-xs font-medium text-emerald-400 uppercase tracking-wider">Safety Agent</h3>
-        </div>
-        <p className="text-zinc-400 text-sm">
-          Every implementation is reviewed by a safety agent before creating a pull request.
-          Violations are caught and the code is revised automatically.
-        </p>
-      </div>
-
-      <div className="border border-zinc-800 rounded-lg p-4 mb-6 bg-zinc-900/30">
-        <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3">Platform Security (always on)</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {[
-            { icon: <ShieldCheckIcon />, label: "Webhook signature verification", detail: "Every GitHub and Jira webhook must carry a valid signature" },
-            { icon: <LockIcon />, label: "Worker isolation", detail: "Agent tooling is GitHub API only — no shell, no AWS SDK access" },
-            { icon: <ShieldAlertIcon />, label: "Input validation", detail: "Repo paths, payloads, and rules are validated and size-capped at 10KB" },
-            { icon: <KeyIcon />, label: "Secret scoping", detail: "Worker only has access to GitHub credentials, not billing or JWT secrets" },
-            { icon: <RepeatIcon />, label: "Replay protection", detail: "Webhooks are idempotency-checked to prevent double-processing" },
-            { icon: <ClipboardIcon />, label: "Audit trail", detail: "Every run is logged with full token usage, pass results, and timing" },
-          ].map(({ icon, label, detail }) => (
-            <div key={label} className="flex items-start gap-3 p-3 rounded-lg bg-zinc-900/40">
-              <span className="text-zinc-500 mt-0.5 shrink-0">{icon}</span>
-              <div>
-                <p className="text-sm font-medium text-zinc-200">{label}</p>
-                <p className="text-xs text-zinc-500 mt-0.5">{detail}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex gap-1 border-b border-zinc-800 mb-6">
-        <Tab label="Global" active={tab === "global"} onClick={() => setTab("global")} />
-        <Tab label="Per Repo" active={tab === "repo"} onClick={() => setTab("repo")} />
-      </div>
-
-      {tab === "global" ? (
-        globalLoading ? (
-          <div className="space-y-2 mb-4">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
+      <SettingsSection
+        id="your-rules"
+        title="Your rules"
+        description={scope === "global" ? "Followed in every repository." : selectedRepo ? `Followed in ${selectedRepo}, after the rules for every repository.` : undefined}
+      >
+        {scope === "global" ? (
+          <RuleList scope="every repository" rules={globalRules} loading={globalLoading} saving={globalSaving} onChange={saveGlobal} />
+        ) : repos.length === 0 ? (
+          <p className="px-4 py-4 text-sm text-zinc-500">No repositories are turned on. Turn one on under Settings, Repositories first.</p>
         ) : (
-          <RuleList
-            rules={globalRules}
-            newRule={globalNewRule}
-            setNewRule={setGlobalNewRule}
-            onAdd={addGlobal}
-            onRemove={removeGlobal}
-            saving={globalSaving}
-          />
-        )
-      ) : repos.length === 0 ? (
-        <p className="text-zinc-500 text-sm">No enabled repos. Enable repos in Settings → Repos first.</p>
-      ) : (
-        <>
-          <RepoCombobox repos={repos} selected={selectedRepo} onSelect={setSelectedRepo} />
-          {repoLoading ? (
-            <div className="space-y-2 mb-4">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : (
-            <RuleList
-              rules={repoRules}
-              newRule={repoNewRule}
-              setNewRule={setRepoNewRule}
-              onAdd={addRepo}
-              onRemove={removeRepo}
-              saving={repoSaving}
-            />
-          )}
-        </>
-      )}
+          <RuleList scope={selectedRepo} rules={repoRules} loading={repoLoading} saving={repoSaving} onChange={saveRepo} />
+        )}
+      </SettingsSection>
+
+      <p className="mt-4 max-w-prose text-sm text-zinc-500" data-testid="built-in-rules">
+        Coderhelm also keeps its own rules on every run, such as never pushing to your default branch and never committing secrets, and it
+        checks the change for security problems before it opens a pull request.
+      </p>
     </Page>
   );
 }

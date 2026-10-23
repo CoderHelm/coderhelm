@@ -1,106 +1,164 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api, type WorkflowSettings, type JiraCheck, type AwsConnection } from "@/lib/api";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { api, type AwsConnection, type GitConventionTemplates, type WorkflowSettings } from "@/lib/api";
+import { preview, problem, tokens, TOKEN_HELP, TOKENS, type Kind } from "@/lib/git-conventions";
 import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
 import { Callout } from "@/components/callout";
+import { Skeleton } from "@/components/skeleton";
 import { Page, PageHeader } from "@/components/page";
-import { GitConventionsSection } from "@/components/git-conventions";
+import { inputClass, linkButton, monoInputClass, secondaryButton } from "@/components/ui";
+import { Code, SaveBar, SettingsDisclosure, SettingsRow, SettingsSection, Switch, useDirtyForm } from "@/components/settings";
 
-type WorkflowToggleKey = "commit_openspec" | "allow_plan_log_analyzer";
+export default function WorkflowPageGuarded() {
+  return <RoleGuard minRole="admin"><WorkflowPage /></RoleGuard>;
+}
 
-const TOGGLES: { key: WorkflowToggleKey; label: string; description: string }[] = [
-  {
-    key: "commit_openspec",
-    label: "Commit the plan's spec files",
-    description: "Adds the plan's proposal, design, tasks and acceptance criteria to the pull request branch, next to the code.",
-  },
-  {
-    key: "allow_plan_log_analyzer",
-    label: "Let plans read your AWS logs",
-    description: "When on, a plan can use what the logs in your connected AWS account show. Off by default.",
-  },
+/** The form: the workflow settings and the three git templates, saved with one bar. */
+type Form = WorkflowSettings & GitConventionTemplates;
+
+const WORKFLOW_KEYS = ["commit_openspec", "default_destination", "allow_plan_log_analyzer"] as const;
+const GIT_KEYS: Kind[] = ["branch", "commit", "pr_title"];
+
+const EMPTY: Form = { commit_openspec: false, default_destination: "github", allow_plan_log_analyzer: false, branch: "", commit: "", pr_title: "" };
+
+// The sample ticket the previews render.
+const SAMPLE = tokens("ABC-123", "ABC-123", "Fix the login redirect after single sign-on");
+
+const GIT_FIELDS: { key: Kind; label: string; what: string }[] = [
+  { key: "branch", label: "Branch name", what: "The branch Coderhelm works on for a ticket." },
+  { key: "commit", label: "Commit message", what: "The first line of each commit." },
+  { key: "pr_title", label: "Pull request title", what: "The title of the pull request Coderhelm opens." },
 ];
 
-export default function WorkflowPageGuarded() { return <RoleGuard minRole="admin"><WorkflowPage /></RoleGuard>; }
+/** Templates compare without their outer spaces; everything else as it is. */
+const sameField = (a: unknown, b: unknown, key: keyof Form) =>
+  (GIT_KEYS as string[]).includes(key as string) ? String(a ?? "").trim() === String(b ?? "").trim() : a === b;
+
+type Load = "loading" | "error" | "ready";
 
 function WorkflowPage() {
-  const [settings, setSettings] = useState<WorkflowSettings | null>(null);
-  const [jira, setJira] = useState<JiraCheck | null>(null);
-  const [awsConnected, setAwsConnected] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+  const [load, setLoad] = useState<Load>("loading");
+  const [defaults, setDefaults] = useState<GitConventionTemplates>({ branch: "", commit: "", pr_title: "" });
+  const [jiraConnected, setJiraConnected] = useState(false);
+  const [awsConnected, setAwsConnected] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [problemText, setProblemText] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<{ field: Kind; error: string } | null>(null);
+
+  const form = useDirtyForm<Form>(EMPTY, { same: sameField, disabled: load !== "ready" });
+  const { reset } = form;
+  const v = form.values;
+
+  const fetchAll = useCallback(async () => {
+    setLoad("loading");
+    try {
+      const [workflow, git, jira, aws] = await Promise.all([
+        api.getWorkflowSettings(),
+        api.getGitConventions(),
+        api.getJiraCheck().catch(() => null),
+        api.listAwsConnections().catch(() => ({ connections: [] as AwsConnection[] })),
+      ]);
+      reset({ ...workflow, branch: git.branch, commit: git.commit, pr_title: git.pr_title });
+      setDefaults(git.defaults);
+      setJiraConnected(!!(jira?.ready || jira?.secret_configured));
+      setAwsConnected(aws.connections.some((c) => c.status === "active"));
+      setLoad("ready");
+    } catch {
+      setLoad("error");
+    }
+  }, [reset]);
 
   useEffect(() => {
-    Promise.all([
-      api.getWorkflowSettings(),
-      api.getJiraCheck().catch(() => null),
-      api.listAwsConnections().catch(() => ({ connections: [] })),
-    ])
-      .then(([data, j, aws]) => {
-        setSettings(data);
-        setJira(j);
-        setAwsConnected(aws.connections.some((c: AwsConnection) => c.status === "active"));
-      })
-      // A failed load leaves `settings` empty and the page explains it below.
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+    fetchAll();
+  }, [fetchAll]);
 
-  const toggle = async (key: WorkflowToggleKey) => {
-    if (!settings) return;
-    const updated = { ...settings, [key]: !settings[key] };
-    setSettings(updated);
-    setSaving(true);
-    try {
-      await api.updateWorkflowSettings(updated);
-    } catch {
-      setSettings(settings);
-      toast("Failed to save preference", "error");
-    } finally {
-      setSaving(false);
+  const problems = Object.fromEntries(GIT_KEYS.map((k) => [k, problem(k, v[k])])) as Record<Kind, string | null>;
+  const blocked = GIT_KEYS.some((k) => problems[k]);
+
+  const save = async () => {
+    if (blocked) {
+      setProblemText("Fix the highlighted git template first.");
+      return;
     }
+    setSaving(true);
+    setProblemText(null);
+    setServerError(null);
+    let next: Form = { ...form.saved };
+    let failed: string | null = null;
+
+    if (form.isDirty(...WORKFLOW_KEYS)) {
+      const body: WorkflowSettings = {
+        commit_openspec: v.commit_openspec,
+        default_destination: v.default_destination,
+        allow_plan_log_analyzer: v.allow_plan_log_analyzer,
+      };
+      try {
+        await api.updateWorkflowSettings(body);
+        next = { ...next, ...body };
+      } catch {
+        failed = "The pull request and plan settings were not saved. Try again.";
+      }
+    }
+
+    if (form.isDirty(...GIT_KEYS)) {
+      const trimmed = { branch: v.branch.trim(), commit: v.commit.trim(), pr_title: v.pr_title.trim() };
+      const res = await api.updateGitConventions(trimmed);
+      if (res.ok) {
+        next = { ...next, branch: res.branch, commit: res.commit, pr_title: res.pr_title };
+      } else {
+        if (res.field) setServerError({ field: res.field, error: res.error });
+        failed = failed ?? (res.error || "The git templates were not saved.");
+      }
+    }
+
+    // What went through is saved; what didn't stays unsaved on screen.
+    const edited = v;
+    reset(next);
+    if (failed) {
+      form.update(edited);
+      setProblemText(failed);
+      toast(failed, "error");
+    } else {
+      toast("Workflow settings saved");
+    }
+    setSaving(false);
   };
 
-  const setDestination = async (dest: "github" | "jira") => {
-    if (!settings || settings.default_destination === dest) return;
-    const prev = settings;
-    const updated = { ...settings, default_destination: dest };
-    setSettings(updated);
-    setSaving(true);
-    try {
-      await api.updateWorkflowSettings(updated);
-    } catch {
-      setSettings(prev);
-      toast("Failed to save preference", "error");
-    } finally {
-      setSaving(false);
-    }
+  const discard = () => {
+    form.discard();
+    setProblemText(null);
+    setServerError(null);
   };
 
-  const jiraConnected = jira?.ready || jira?.secret_configured;
+  const header = (
+    <div className="mb-6">
+      <PageHeader title="Workflow" lead="How Coderhelm shapes the pull requests it opens and where plan tasks go." />
+    </div>
+  );
 
-  if (loading) {
+  if (load === "loading") {
     return (
       <Page>
-        <div className="mb-6">
-          <PageHeader title="Workflow" />
+        {header}
+        <div className="space-y-6" aria-busy="true" aria-label="Loading settings">
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-32 w-full" />
         </div>
-        <div className="h-48 bg-zinc-900/50 border border-zinc-800 rounded-lg animate-pulse" />
       </Page>
     );
   }
 
-  if (!settings) {
+  if (load === "error") {
     return (
       <Page>
-        <div className="mb-6">
-          <PageHeader title="Workflow" />
-        </div>
-        <Callout variant="error" title="Could not load workflow settings">
-          <p>Reload the page to try again.</p>
+        {header}
+        <Callout variant="error" title="Could not load the workflow settings">
+          <p>Nothing is shown, so the saved settings cannot be overwritten by mistake.</p>
+          <button type="button" onClick={fetchAll} className={`mt-2 ${secondaryButton}`}>Try again</button>
         </Callout>
       </Page>
     );
@@ -108,83 +166,124 @@ function WorkflowPage() {
 
   return (
     <Page>
-      <div className="mb-6">
-        <PageHeader title="Workflow" lead="Control how Coderhelm structures and commits its work." />
-      </div>
+      {header}
 
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 divide-y divide-zinc-800">
-        {TOGGLES.map((t) => {
-          const disabled = saving || (t.key === "allow_plan_log_analyzer" && !awsConnected);
-          return (
-          <div key={t.key} className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
-            <div>
-              <p className="text-sm font-medium text-zinc-100">{t.label}</p>
-              <p className="text-xs text-zinc-500 mt-0.5">{t.description}</p>
-              {t.key === "allow_plan_log_analyzer" && !awsConnected && (
-                <p className="text-xs text-yellow-500 mt-1">
-                  <a href="/settings/integrations/aws/" className="underline hover:text-yellow-300">Connect an AWS account</a> to enable this.
-                </p>
-              )}
-            </div>
-            <button
-              onClick={() => toggle(t.key)}
-              disabled={disabled}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
-                settings?.[t.key] ? "bg-emerald-500" : "bg-zinc-700"
-              } disabled:opacity-50`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                  settings?.[t.key] ? "translate-x-5" : "translate-x-0"
-                }`}
+      <div className="space-y-8">
+        <SettingsSection id="pull-requests" title="Pull requests">
+          <SettingsRow
+            label="Add the plan to the pull request"
+            layout="toggle"
+            unsaved={form.isDirty("commit_openspec")}
+            help="Commits the plan's proposal, design, tasks and acceptance criteria to the pull request branch, next to the code."
+            control={(ids) => (
+              <Switch id={ids.inputId} checked={v.commit_openspec} onChange={(on) => form.set("commit_openspec", on)} labelledBy={ids.labelId} describedBy={ids.helpId} />
+            )}
+          />
+          {GIT_FIELDS.map((f) => {
+            const template = v[f.key].trim() || defaults[f.key];
+            const err = problems[f.key] ?? (serverError?.field === f.key ? serverError.error : null);
+            return (
+              <SettingsRow
+                key={f.key}
+                label={f.label}
+                controlClassName="sm:w-80"
+                unsaved={form.isDirty(f.key)}
+                help={f.what}
+                control={(ids) => (
+                  <div className="min-w-0">
+                    <input
+                      id={ids.inputId}
+                      value={v[f.key]}
+                      placeholder={defaults[f.key]}
+                      onChange={(e) => {
+                        form.set(f.key, e.target.value);
+                        if (serverError?.field === f.key) setServerError(null);
+                      }}
+                      spellCheck={false}
+                      autoComplete="off"
+                      aria-invalid={err ? true : undefined}
+                      aria-describedby={[ids.helpId, `${ids.inputId}-note`].filter(Boolean).join(" ")}
+                      className={monoInputClass}
+                    />
+                    <p id={`${ids.inputId}-note`} className="mt-1.5 text-xs">
+                      {err ? (
+                        <span role="alert" className="text-red-400">{err}</span>
+                      ) : (
+                        <span className="text-zinc-500" data-testid={`git-${f.key}-preview`}>
+                          Example: <Code>{preview(f.key, template, SAMPLE)}</Code>
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                )}
               />
-            </button>
+            );
+          })}
+          <div className="px-4 py-4">
+            <SettingsDisclosure summary="Words you can use in the templates">
+              <p className="text-sm text-zinc-400">
+                Leave a template empty to keep the default. A pull request already open for a ticket keeps its branch. Shown for the sample
+                ticket {SAMPLE.ticket} &ldquo;{SAMPLE.title}&rdquo;:
+              </p>
+              <ul className="space-y-1 text-sm text-zinc-400">
+                {TOKENS.map((t) => (
+                  <li key={t}>
+                    <Code>{`{${t}}`}</Code> {TOKEN_HELP[t]}
+                  </li>
+                ))}
+              </ul>
+            </SettingsDisclosure>
           </div>
-          );
-        })}
+        </SettingsSection>
+
+        <SettingsSection id="plans" title="Plans">
+          <SettingsRow
+            label="Where plan tasks go"
+            controlClassName="sm:w-64"
+            unsaved={form.isDirty("default_destination")}
+            help="Where a plan's tasks become tickets, unless you pick another place for a task."
+            control={(ids) => (
+              <select
+                id={ids.inputId}
+                aria-describedby={ids.helpId}
+                value={v.default_destination}
+                onChange={(e) => form.set("default_destination", e.target.value as Form["default_destination"])}
+                className={inputClass}
+              >
+                <option value="github">GitHub issues</option>
+                {(jiraConnected || v.default_destination === "jira") && <option value="jira">Jira tickets</option>}
+              </select>
+            )}
+          />
+          <SettingsRow
+            label="Let plans read your AWS logs"
+            layout="toggle"
+            unsaved={form.isDirty("allow_plan_log_analyzer")}
+            help={
+              awsConnected ? (
+                "A plan can use what the logs in your connected AWS account show."
+              ) : (
+                <>
+                  Needs a connected AWS account.{" "}
+                  <Link href="/settings/integrations/aws/" className={linkButton}>Connect one</Link>
+                </>
+              )
+            }
+            control={(ids) => (
+              <Switch
+                id={ids.inputId}
+                checked={v.allow_plan_log_analyzer}
+                onChange={(on) => form.set("allow_plan_log_analyzer", on)}
+                labelledBy={ids.labelId}
+                describedBy={ids.helpId}
+                disabled={!awsConnected && !v.allow_plan_log_analyzer}
+              />
+            )}
+          />
+        </SettingsSection>
       </div>
 
-      {/* Default task destination */}
-      <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-        <p className="text-sm font-medium text-zinc-100">Default task destination</p>
-        <p className="text-xs text-zinc-500 mt-0.5 mb-4">
-          Where new plan tasks create tickets by default. You can override per task.
-        </p>
-        <div className="flex gap-3">
-          <button
-            onClick={() => setDestination("github")}
-            disabled={saving}
-            className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 ${
-              settings?.default_destination !== "jira"
-                ? "border-zinc-600 bg-zinc-800 text-zinc-100"
-                : "border-zinc-800 bg-transparent text-zinc-500 hover:border-zinc-700 hover:text-zinc-400"
-            }`}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-            </svg>
-            GitHub Issues
-          </button>
-          {jiraConnected && (
-            <button
-              onClick={() => setDestination("jira")}
-              disabled={saving}
-              className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 ${
-                settings?.default_destination === "jira"
-                  ? "border-zinc-600 bg-zinc-800 text-zinc-100"
-                  : "border-zinc-800 bg-transparent text-zinc-500 hover:border-zinc-700 hover:text-zinc-400"
-              }`}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#0052CC">
-                <path d="M11.53 2c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.94 4.34 4.34 4.35V2.84a.84.84 0 00-.84-.84H11.53zM6.77 6.8a4.36 4.36 0 004.34 4.34h1.8v1.72a4.36 4.36 0 004.34 4.34V7.63a.84.84 0 00-.83-.83H6.77zM2 11.6a4.35 4.35 0 004.35 4.35h1.78v1.71c0 2.4 1.94 4.35 4.34 4.34v-9.56a.84.84 0 00-.84-.84H2z"/>
-              </svg>
-              Jira Tickets
-            </button>
-          )}
-        </div>
-      </div>
-
-      <GitConventionsSection />
+      <SaveBar count={form.count} problem={problemText} onSave={save} onDiscard={discard} saving={saving} />
     </Page>
   );
 }

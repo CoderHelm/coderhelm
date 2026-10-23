@@ -17,8 +17,8 @@ import { Disclosure } from "@/components/disclosure";
 import { Skeleton } from "@/components/skeleton";
 import { AtlassianIcon, ExternalLinkIcon } from "@/components/icons";
 import { Page, PageHeader, Section } from "@/components/page";
-import { Switch } from "@/components/teams-webhook";
-import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { Code, Field, SaveBar, SettingsRow, SettingsSection, Switch, useDirtyForm } from "@/components/settings";
+import { buttonClass, focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 
 export default function JiraPageGuarded() {
   return (
@@ -181,7 +181,7 @@ function JiraPage() {
                     type="button"
                     onClick={removeIntegration}
                     disabled={deleting}
-                    className={`inline-flex min-h-9 items-center justify-center rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20 disabled:opacity-50 ${focusRing}`}
+                    className={buttonClass("danger")}
                   >
                     {deleting ? "Removing…" : "Remove integration"}
                   </button>
@@ -337,7 +337,7 @@ function StatusCard({
             type="button"
             onClick={unlink}
             disabled={unlinking}
-            className={`inline-flex min-h-9 items-center justify-center rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20 disabled:opacity-50 sm:ml-auto ${focusRing}`}
+            className={`${buttonClass("danger")} sm:ml-auto`}
           >
             {unlinking ? "Disconnecting…" : "Disconnect the app"}
           </button>
@@ -446,7 +446,7 @@ function CopyRow({ label, value, secret }: { label: string; value: string; secre
     <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
       <p className="text-xs text-zinc-500">{label}</p>
       <div className="mt-1 flex flex-wrap items-center gap-2">
-        <code className="min-w-0 flex-1 break-all font-mono text-sm text-zinc-200">{shown ? value : "•".repeat(24)}</code>
+        <Code className="min-w-0 flex-1">{shown ? value : "•".repeat(24)}</Code>
         {secret && (
           <button type="button" onClick={() => setShown((s) => !s)} aria-pressed={shown} className={`${secondaryButton} !px-3 !py-1 text-xs`}>
             {shown ? "Hide" : "Show"}
@@ -548,7 +548,7 @@ function WebhookPanel({
               type="button"
               onClick={remove}
               disabled={!!busy}
-              className={`inline-flex min-h-9 items-center justify-center rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20 disabled:opacity-50 ${focusRing}`}
+              className={buttonClass("danger")}
             >
               {busy === "remove" ? "Removing…" : "Remove webhook"}
             </button>
@@ -570,34 +570,40 @@ function WebhookPanel({
 
 // ── Projects ─────────────────────────────────────────────────────────
 
+type ProjectsForm = { projects: JiraProject[]; default_project: string };
+
+/** Projects compare by what can change on them; their order and other fields come from Jira. */
+function sameProjectsField(a: unknown, b: unknown, k: keyof ProjectsForm): boolean {
+  if (k !== "projects") return (a ?? "") === (b ?? "");
+  const x = (a as JiraProject[]) ?? [];
+  const y = (b as JiraProject[]) ?? [];
+  return x.length === y.length && x.every((p, i) => p.key === y[i]?.key && !!p.enabled === !!y[i]?.enabled && (p.repo ?? "") === (y[i]?.repo ?? ""));
+}
+
 function ProjectsSection({ config, setConfig }: { config: JiraConfig; setConfig: (c: JiraConfig) => void }) {
   const { toast } = useToast();
-  const [projects, setProjects] = useState<JiraProject[]>(config.projects);
+  const form = useDirtyForm<ProjectsForm>({ projects: config.projects, default_project: config.default_project }, { same: sameProjectsField });
+  const { reset } = form;
+  const projects = form.values.projects;
   const [repos, setRepos] = useState<Repo[]>([]);
   const [fetching, setFetching] = useState(false);
-  const [savingKey, setSavingKey] = useState<string | null>(null);
-  const [defaultProject, setDefaultProject] = useState(config.default_project);
-  const [savingDefault, setSavingDefault] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
   const [q, setQ] = useState("");
 
   useEffect(() => {
     api.listRepos().then((r) => setRepos(r.repos.filter((x) => x.enabled))).catch(() => {});
   }, []);
 
-  const persist = async (next: JiraProject[], key: string, failMsg: string) => {
-    const before = projects;
-    setProjects(next);
-    setSavingKey(key);
-    try {
-      await api.updateJiraProjects(next);
-      setConfig({ ...config, projects: next });
-    } catch {
-      setProjects(before);
-      toast(failMsg, "error");
-    } finally {
-      setSavingKey(null);
-    }
+  const savedByKey = useMemo(() => new Map(form.saved.projects.map((p) => [p.key, p])), [form.saved.projects]);
+  const changedProject = (p: JiraProject) => {
+    const s = savedByKey.get(p.key);
+    return !s || !!s.enabled !== !!p.enabled || (s.repo ?? "") !== (p.repo ?? "");
   };
+  const count = projects.filter(changedProject).length + (form.isDirty("default_project") ? 1 : 0);
+
+  const setProject = (k: string, patch: Partial<JiraProject>) =>
+    form.set("projects", projects.map((x) => (x.key === k ? { ...x, ...patch } : x)));
 
   const fetchProjects = async () => {
     setFetching(true);
@@ -605,8 +611,14 @@ function ProjectsSection({ config, setConfig }: { config: JiraConfig; setConfig:
       const { projects: fetched } = await api.fetchJiraProjects();
       const existing = new Map(projects.map((p) => [p.key, p]));
       const merged = fetched.map((p) => ({ ...p, enabled: existing.get(p.key)?.enabled ?? false, repo: existing.get(p.key)?.repo ?? "" }));
-      await persist(merged, "__all", "Could not save the project list");
-      toast(`Found ${merged.length} project${merged.length === 1 ? "" : "s"}`);
+      try {
+        await api.updateJiraProjects(merged);
+        setConfig({ ...config, projects: merged });
+        reset({ ...form.values, projects: merged });
+        toast(`Found ${merged.length} project${merged.length === 1 ? "" : "s"}`);
+      } catch {
+        toast("Could not save the project list", "error");
+      }
     } catch {
       toast("Could not reach Jira to list the projects", "error");
     } finally {
@@ -620,17 +632,38 @@ function ProjectsSection({ config, setConfig }: { config: JiraConfig; setConfig:
     return projects.filter((p) => !needle || p.key.toLowerCase().includes(needle) || p.name.toLowerCase().includes(needle));
   }, [projects, q]);
 
-  const saveDefault = async () => {
-    setSavingDefault(true);
-    try {
-      await api.updateJiraConfig({ default_project: defaultProject });
-      setConfig({ ...config, default_project: defaultProject });
-      toast("Default project saved");
-    } catch {
-      toast("Could not save the default project", "error");
-    } finally {
-      setSavingDefault(false);
+  const save = async () => {
+    setSaving(true);
+    setProblem(null);
+    const next: ProjectsForm = { ...form.saved };
+    const failed: string[] = [];
+    if (form.isDirty("projects")) {
+      try {
+        await api.updateJiraProjects(projects);
+        next.projects = projects;
+      } catch {
+        failed.push("the projects");
+      }
     }
+    if (form.isDirty("default_project")) {
+      try {
+        await api.updateJiraConfig({ default_project: form.values.default_project });
+        next.default_project = form.values.default_project;
+      } catch {
+        failed.push("the default project");
+      }
+    }
+    const edited = form.values;
+    reset(next);
+    setConfig({ ...config, projects: next.projects, default_project: next.default_project });
+    if (failed.length) {
+      form.update(edited);
+      setProblem(`Could not save ${failed.join(" or ")}. Try again.`);
+      toast("Could not save every change", "error");
+    } else {
+      toast("Jira projects saved");
+    }
+    setSaving(false);
   };
 
   return (
@@ -639,7 +672,7 @@ function ProjectsSection({ config, setConfig }: { config: JiraConfig; setConfig:
       title={`Projects that start work (${enabledProjects.length} on)`}
       description="Only tickets in projects that are on start runs. Set a repository to skip Coderhelm's own choice for that project."
       actions={
-        <button type="button" onClick={fetchProjects} disabled={fetching} className={secondaryButton}>
+        <button type="button" onClick={fetchProjects} disabled={fetching || saving} className={secondaryButton}>
           {fetching ? "Listing…" : projects.length ? "Refresh from Jira" : "List projects from Jira"}
         </button>
       }
@@ -656,74 +689,60 @@ function ProjectsSection({ config, setConfig }: { config: JiraConfig; setConfig:
               <input id="project-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${projects.length} projects`} className={`${inputClass} sm:max-w-sm`} />
             </>
           )}
-          <ul className="overflow-hidden rounded-lg border border-zinc-800 divide-y divide-zinc-800">
+          <div className="divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/40" data-testid="jira-projects">
             {shown.map((p) => (
-              <li key={p.key} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
-                <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <Switch
-                    checked={p.enabled}
-                    disabled={savingKey !== null}
-                    onChange={(enabled) =>
-                      persist(projects.map((x) => (x.key === p.key ? { ...x, enabled } : x)), p.key, `Could not change ${p.key}. It is still ${p.enabled ? "on" : "off"}.`)
-                    }
-                    label={`Tickets in ${p.key} start runs`}
-                  />
-                  <span className="min-w-0">
-                    <span className="block text-sm text-zinc-100">
-                      <span className="font-mono">{p.key}</span> <span className="text-zinc-400">{p.name}</span>
-                    </span>
-                    {p.lead && <span className="block text-xs text-zinc-500">Lead: {p.lead}</span>}
-                  </span>
-                </div>
-                {p.enabled && repos.length > 0 && (
-                  <label className="flex min-w-0 items-center gap-2 text-sm text-zinc-400 sm:w-72">
-                    <span className="shrink-0">Repository</span>
-                    <select
-                      value={p.repo ?? ""}
-                      disabled={savingKey !== null}
-                      onChange={(e) =>
-                        persist(projects.map((x) => (x.key === p.key ? { ...x, repo: e.target.value } : x)), p.key, `Could not save the repository for ${p.key}`)
-                      }
-                      className={`${inputClass} min-w-0 py-1.5`}
-                    >
-                      <option value="">Coderhelm picks</option>
-                      {repos.map((r) => (
-                        <option key={r.name} value={r.name}>{r.name}</option>
-                      ))}
-                    </select>
-                  </label>
+              <SettingsRow
+                key={p.key}
+                testId={`project-${p.key}`}
+                label={`${p.name} (${p.key})`}
+                layout="toggle"
+                unsaved={changedProject(p)}
+                help={p.lead ? `Lead: ${p.lead}` : undefined}
+                control={(ids) => (
+                  <Switch id={ids.inputId} checked={!!p.enabled} onChange={(on) => setProject(p.key, { enabled: on })} labelledBy={ids.labelId} describedBy={ids.helpId} />
                 )}
-              </li>
+              >
+                {p.enabled && repos.length > 0 ? (
+                  <Field as="select" label="Repository" controlClassName="sm:w-72" value={p.repo ?? ""} onChange={(e) => setProject(p.key, { repo: e.target.value })}>
+                    <option value="">Coderhelm picks</option>
+                    {repos.map((r) => (
+                      <option key={r.name} value={r.name}>{r.name}</option>
+                    ))}
+                  </Field>
+                ) : null}
+              </SettingsRow>
             ))}
-          </ul>
+          </div>
           {shown.length === 0 && <p className="text-sm text-zinc-500">No project matches &ldquo;{q}&rdquo;.</p>}
         </div>
       )}
 
       {enabledProjects.length > 0 && (
-        <form
-          className="mt-6 flex flex-wrap items-end gap-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            saveDefault();
-          }}
-        >
-          <div>
-            <label htmlFor="default-project" className="mb-1.5 block text-sm font-semibold text-zinc-100">
-              Default project for tickets made from plans
-            </label>
-            <select id="default-project" value={defaultProject} onChange={(e) => setDefaultProject(e.target.value)} className={`${inputClass} w-72 max-w-full`}>
-              <option value="">None</option>
-              {enabledProjects.map((p) => (
-                <option key={p.key} value={p.key}>{p.key}: {p.name}</option>
-              ))}
-            </select>
-          </div>
-          <button type="submit" disabled={savingDefault || defaultProject === config.default_project} className={primaryButton}>
-            {savingDefault ? "Saving…" : "Save"}
-          </button>
-        </form>
+        <div className="mt-6">
+          <SettingsSection id="jira-plans" title="Plans">
+            <SettingsRow
+              label="Default project for tickets made from plans"
+              controlClassName="sm:w-72"
+              unsaved={form.isDirty("default_project")}
+              control={(ids) => (
+                <select
+                  id={ids.inputId}
+                  value={form.values.default_project}
+                  onChange={(e) => form.set("default_project", e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">None</option>
+                  {enabledProjects.map((p) => (
+                    <option key={p.key} value={p.key}>{p.name} ({p.key})</option>
+                  ))}
+                </select>
+              )}
+            />
+          </SettingsSection>
+        </div>
       )}
+
+      <SaveBar count={count} onSave={save} onDiscard={() => { form.discard(); setProblem(null); }} saving={saving} busy={fetching} problem={problem} />
     </Section>
   );
 }
@@ -786,11 +805,11 @@ function EventsList() {
           const st = EVENT_STATUS[e.status] ?? { tone: "neutral" as const, label: e.status.replace(/[_-]+/g, " ") };
           return (
             <li key={e.event_id} className="flex flex-col gap-1.5 px-4 py-3 sm:flex-row sm:items-center sm:gap-4">
-              <span className="shrink-0 font-mono text-xs text-zinc-300 sm:w-24">{e.ticket_key || "No ticket"}</span>
+              <span className="shrink-0 text-xs font-medium text-zinc-300 sm:w-24">{e.ticket_key || "No ticket"}</span>
               <span className="min-w-0 flex-1">
                 <span className="block break-words text-sm text-zinc-100">{e.title || "Untitled ticket"}</span>
                 <span className="block text-xs text-zinc-500">
-                  {e.repo ? <span className="font-mono">{e.repo}</span> : "No repository"} · <time dateTime={e.created_at}>{timeAgo(e.created_at)}</time>
+                  {e.repo || "No repository"} · <time dateTime={e.created_at}>{timeAgo(e.created_at)}</time>
                 </span>
               </span>
               <span className="shrink-0"><StatusPill tone={st.tone}>{st.label}</StatusPill></span>

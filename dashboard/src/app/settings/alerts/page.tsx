@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   api,
@@ -23,13 +23,13 @@ import { RepoCombobox } from "@/components/repo-combobox";
 import { Callout } from "@/components/callout";
 import { StatusPill } from "@/components/status-pill";
 import { Segmented } from "@/components/segmented";
-import { Disclosure } from "@/components/disclosure";
 import { CodeBlock } from "@/components/code-block";
-import { Code } from "@/components/settings/code";
 import { Skeleton } from "@/components/skeleton";
 import { Field } from "@/components/field";
 import { Page, PageHeader, Section } from "@/components/page";
-import { Switch } from "@/components/teams-webhook";
+import { Switch as OnOffSwitch } from "@/components/teams-webhook";
+import { Code, SaveBar, SettingsDisclosure, SettingsRow, SettingsSection, Switch, useDirtyForm } from "@/components/settings";
+import { DetailBlock, List, ListRow, ListSkeleton } from "@/components/list";
 import {
   ChannelPicker,
   channelsPayload,
@@ -40,7 +40,7 @@ import {
   NO_WEBHOOKS,
   type ChannelsDraft,
 } from "@/components/chat-channels";
-import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { buttonClass, focusRing, inputClass, linkButton, monoInputClass, primaryButton, secondaryButton } from "@/components/ui";
 
 export default function AlertsPageGuarded() {
   return (
@@ -285,23 +285,20 @@ function AlertsPage() {
     );
   }
 
+  const addRoute = () => setEditing({ route: { ...EMPTY_ROUTE }, isNew: true });
+
   return (
     <Page>
       <PageHeader
         title="Alert routes"
-        lead={
-          <>
-            Turn monitoring alerts into pull requests or chat messages in Microsoft Teams or Slack. Each SNS topic gets a route; its rules pick
-            the alerts that open a pull request and say how to fix them. Every other alert just posts to chat. Nothing merges without a person&apos;s approval.
-          </>
-        }
+        lead="Turn monitoring alerts into pull requests or chat messages. Each SNS topic gets a route; its rules pick the alerts that open a pull request. Every other alert just posts to chat."
         actions={
           <>
             <Link href="/alerts" className={secondaryButton}>
               All received alerts
             </Link>
             {canEdit && (
-              <button type="button" onClick={() => setEditing({ route: { ...EMPTY_ROUTE }, isNew: true })} className={primaryButton}>
+              <button type="button" onClick={addRoute} className={primaryButton}>
                 Add route
               </button>
             )}
@@ -317,63 +314,62 @@ function AlertsPage() {
         </div>
       )}
 
-      <div className="mt-8 grid items-start gap-6 lg:grid-cols-3">
-        <div className="flex min-w-0 flex-col gap-4 lg:col-span-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Routes</h2>
-          {load.state === "loading" && (
-            <div className="flex flex-col gap-3" aria-busy="true">
-              <Skeleton className="h-40 w-full" />
-              <Skeleton className="h-40 w-full" />
-            </div>
-          )}
-          {load.state === "error" && (
-            <Callout variant="error" title="Could not load the alert routes">
-              <p>Nothing was changed.</p>
-              <p>
-                <button type="button" onClick={() => { setLoad({ state: "loading" }); loadRoutes(); }} className={linkButton}>
-                  Try again
-                </button>
-              </p>
-            </Callout>
-          )}
-          {load.state === "ready" && routes.length === 0 && (
-            <div className="rounded-lg border border-dashed border-zinc-700 p-8 text-center">
-              <p className="font-semibold text-zinc-100">No alert routes yet</p>
-              <p className="mx-auto mt-1 max-w-md text-sm text-zinc-400">
-                A route connects an SNS topic to Coderhelm. Follow the three steps on the right, then add the route.
-              </p>
-              {canEdit && (
-                <button type="button" onClick={() => setEditing({ route: { ...EMPTY_ROUTE }, isNew: true })} className={`${primaryButton} mt-4`}>
-                  Add your first route
-                </button>
-              )}
-            </div>
-          )}
-          {load.state === "ready" &&
-            routes.map((r) => {
-              const account = topicAccount(r.topic_arn);
-              return (
-                <RouteCard
-                  key={r.topic_arn}
-                  route={r}
-                  account={account}
-                  connected={account ? connectedAccounts.has(account) : false}
-                  lastEvent={(events ?? []).find((e) => e.topic_arn === r.topic_arn)}
-                  canEdit={canEdit}
-                  busy={busy === r.topic_arn}
-                  onEdit={() => setEditing({ route: { ...r }, isNew: false })}
-                  onToggle={() => toggle(r)}
-                  onRemove={() => remove(r)}
-                />
-              );
-            })}
-        </div>
+      <div className="mt-8 space-y-8">
+        <section aria-labelledby="routes-heading" className="min-w-0">
+          <h2 id="routes-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Routes</h2>
+          <div className="mt-3">
+            {load.state === "loading" && <ListSkeleton rows={2} label="Loading the routes" />}
+            {load.state === "error" && (
+              <Callout variant="error" title="Could not load the alert routes">
+                <p>Nothing was changed.</p>
+                <p>
+                  <button type="button" onClick={() => { setLoad({ state: "loading" }); loadRoutes(); }} className={linkButton}>
+                    Try again
+                  </button>
+                </p>
+              </Callout>
+            )}
+            {load.state === "ready" && routes.length === 0 && (
+              <div className="rounded-lg border border-dashed border-zinc-700 p-8 text-center">
+                <p className="font-semibold text-zinc-100">No alert routes yet</p>
+                <p className="mx-auto mt-1 max-w-md text-sm text-zinc-400">
+                  A route connects an SNS topic to Coderhelm. Open &ldquo;How to connect a topic&rdquo; below, then add the route.
+                </p>
+                {canEdit && (
+                  <button type="button" onClick={addRoute} className={`${primaryButton} mt-4`}>
+                    Add your first route
+                  </button>
+                )}
+              </div>
+            )}
+            {load.state === "ready" && routes.length > 0 && (
+              <List label="Alert routes">
+                {routes.map((r) => {
+                  const account = topicAccount(r.topic_arn);
+                  return (
+                    <RouteRow
+                      key={r.topic_arn}
+                      route={r}
+                      account={account}
+                      connected={account ? connectedAccounts.has(account) : false}
+                      lastEvent={(events ?? []).find((e) => e.topic_arn === r.topic_arn)}
+                      canEdit={canEdit}
+                      busy={busy === r.topic_arn}
+                      onEdit={() => setEditing({ route: { ...r }, isNew: false })}
+                      onToggle={() => toggle(r)}
+                      onRemove={() => remove(r)}
+                    />
+                  );
+                })}
+              </List>
+            )}
+          </div>
+          <div className="mt-3">
+            <SetupSteps endpoint={endpoint} defaultOpen={load.state === "ready" && routes.length === 0} />
+          </div>
+        </section>
 
-        <div className="flex min-w-0 flex-col gap-4">
-          <SetupSteps endpoint={endpoint} />
-          {canEdit && <TeamChannel />}
-          {canEdit && <AlertBudgetCard />}
-        </div>
+        {canEdit && <AlertSettings />}
       </div>
 
       <Section
@@ -402,11 +398,7 @@ function AlertsPage() {
 
 // ── A route ──────────────────────────────────────────────────────────
 
-function Chip({ children }: { children: ReactNode }) {
-  return <span className="inline-flex items-center rounded-md border border-zinc-700 px-2 py-0.5 text-xs text-zinc-300">{children}</span>;
-}
-
-function RouteCard({
+function RouteRow({
   route: r,
   account,
   connected,
@@ -429,89 +421,93 @@ function RouteCard({
 }) {
   const mode = r.notify_mode ?? "team";
   const name = topicName(r.topic_arn);
+  const titleId = useId();
+  const chat = mode === "custom" && channelsSummary(r.webhooks) ? `Own channel (${channelsSummary(r.webhooks)})` : (NOTIFY_LABEL[mode] ?? NOTIFY_LABEL.team);
+  const tone = !connected ? "waiting" : r.enabled ? "success" : "muted";
   return (
-    <article aria-label={`Route for ${name}`} className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
-      <div className="flex flex-wrap items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <h3 className="break-all font-mono text-sm font-semibold text-zinc-100">{name}</h3>
-          <p className="mt-0.5 break-all font-mono text-xs text-zinc-500">{r.topic_arn}</p>
-        </div>
-        {!connected ? (
-          <StatusPill tone="warning">Account not connected</StatusPill>
-        ) : r.enabled ? (
-          <StatusPill tone="success">On</StatusPill>
-        ) : (
-          <StatusPill>Paused</StatusPill>
-        )}
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Chip>Chat: {mode === "custom" && channelsSummary(r.webhooks) ? `Own (${channelsSummary(r.webhooks)})` : (NOTIFY_LABEL[mode] ?? NOTIFY_LABEL.team)}</Chip>
-        {mode !== "off" && <Chip>{r.post_recoveries ? "Posts recoveries" : "Recoveries not posted"}</Chip>}
-        <Chip>
-          {r.rules.length === 0 ? "No rules: chat only" : `${r.rules.length} rule${r.rules.length === 1 ? "" : "s"}`}
-        </Chip>
-      </div>
-
-      {!connected && (
-        <p className="mt-3 text-sm text-amber-300">
-          The topic&apos;s AWS account ({account ?? "unknown"}) is not connected, so its alerts are ignored.{" "}
-          <Link href="/settings/integrations/aws/" className={linkButton}>Connect it</Link>
-        </p>
-      )}
-
-      <ol aria-label="Rules, first match wins" className="mt-4 flex flex-col gap-1.5 text-sm">
-        {r.rules.map((rule, i) => (
-          <li key={rule.id ?? i} className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span className="w-5 shrink-0 text-xs text-zinc-500">{i + 1}.</span>
-            <span className="min-w-0 break-words text-zinc-300">{ruleWhen(rule)}</span>
-            <span aria-hidden="true" className="text-zinc-600">→</span>
-            <span className="sr-only">opens a pull request in</span>
-            <span className="min-w-0 break-all font-mono text-xs text-emerald-300">{rule.repo}</span>
-          </li>
-        ))}
-        <li className="flex flex-wrap items-baseline gap-x-2 text-zinc-500">
-          <span className="w-5 shrink-0" />
-          <span>{r.rules.length ? "Everything else" : "Every alert"}</span>
-          <span aria-hidden="true" className="text-zinc-600">→</span>
-          <span className="text-sky-300">{mode === "off" ? "recorded only" : "chat only"}</span>
-        </li>
-      </ol>
-
-      <p className="mt-4 text-sm text-zinc-400">
-        {lastEvent ? (
-          <span className="flex flex-wrap items-center gap-2">
-            <span>Last alert {timeAgo(lastEvent.received_at ?? "")}:</span>
-            <Link href={`/alerts/detail?id=${encodeURIComponent(lastEvent.id)}`} className={`${linkButton} min-w-0 break-words`}>
-              {lastEvent.title || "Untitled alert"}
-            </Link>
-            <OutcomeChip outcome={lastEvent.outcome} />
-          </span>
-        ) : (
-          "No alerts received recently."
-        )}
-      </p>
-
-      {connected && <RouteAlarms route={r} />}
-
-      {canEdit && (
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-zinc-800 pt-4">
-          <Switch checked={r.enabled} onChange={onToggle} disabled={busy} label={`Route for ${name} is on`} onLabel="On" offLabel="Paused" />
-          <span className="flex-1" />
-          <button type="button" onClick={onEdit} className={secondaryButton}>
-            Edit rules
-          </button>
-          <button
-            type="button"
-            onClick={onRemove}
-            disabled={busy}
-            className={`inline-flex min-h-9 items-center justify-center rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20 disabled:opacity-50 ${focusRing}`}
-          >
-            Remove
-          </button>
-        </div>
-      )}
-    </article>
+    <ListRow
+      testId={`route-${name}`}
+      status={{ tone }}
+      title={<span id={titleId}>{name}</span>}
+      titleText={r.topic_arn}
+      meta={[
+        `Chat: ${chat}`,
+        mode !== "off" && (r.post_recoveries ? "Posts recoveries" : "Recoveries not posted"),
+        r.rules.length === 0 ? "No rules: chat only" : `${r.rules.length} rule${r.rules.length === 1 ? "" : "s"}`,
+      ]}
+      summary={
+        !connected
+          ? `The topic's AWS account (${account ?? "unknown"}) is not connected, so its alerts are ignored.`
+          : lastEvent
+            ? `Last alert ${timeAgo(lastEvent.received_at ?? "")}: ${lastEvent.title || "Untitled alert"}`
+            : "No alerts received recently."
+      }
+      summaryTone={!connected ? "waiting" : undefined}
+      chips={
+        <>
+          <span className="text-xs text-zinc-400">{!connected ? "Account not connected" : r.enabled ? "On" : "Paused"}</span>
+          {canEdit && (
+            <Switch checked={r.enabled} onChange={onToggle} disabled={busy} labelledBy={titleId} />
+          )}
+        </>
+      }
+      actions={
+        canEdit ? (
+          <>
+            <button type="button" onClick={onEdit} className={buttonClass("secondary", "sm")}>
+              Edit rules
+            </button>
+            <button type="button" onClick={onRemove} disabled={busy} className={buttonClass("ghost", "sm")} aria-label={`Remove the route for ${name}`}>
+              Remove
+            </button>
+          </>
+        ) : undefined
+      }
+      details={
+        <>
+          <DetailBlock title="Topic">
+            <Code>{r.topic_arn}</Code>
+          </DetailBlock>
+          <DetailBlock title="Rules, first match wins">
+            <ol aria-label="Rules, first match wins" className="flex flex-col gap-1.5">
+              {r.rules.map((rule, i) => (
+                <li key={rule.id ?? i} className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className="w-5 shrink-0 text-zinc-500">{i + 1}.</span>
+                  <span className="min-w-0 break-words text-zinc-300">{ruleWhen(rule)}</span>
+                  <span aria-hidden="true" className="text-zinc-600">→</span>
+                  <span className="sr-only">opens a pull request in</span>
+                  <span className="min-w-0 break-all text-emerald-300">{rule.repo}</span>
+                </li>
+              ))}
+              <li className="flex flex-wrap items-baseline gap-x-2 text-zinc-500">
+                <span className="w-5 shrink-0" />
+                <span>{r.rules.length ? "Everything else" : "Every alert"}</span>
+                <span aria-hidden="true" className="text-zinc-600">→</span>
+                <span className="text-sky-300">{mode === "off" ? "recorded only" : "chat only"}</span>
+              </li>
+            </ol>
+          </DetailBlock>
+          {lastEvent && (
+            <DetailBlock title="Last alert">
+              <span className="flex flex-wrap items-center gap-2">
+                <Link href={`/alerts/detail?id=${encodeURIComponent(lastEvent.id)}`} className={`${linkButton} min-w-0 break-words !text-xs`}>
+                  {lastEvent.title || "Untitled alert"}
+                </Link>
+                <OutcomeChip outcome={lastEvent.outcome} />
+              </span>
+            </DetailBlock>
+          )}
+          {!connected && (
+            <p className="text-amber-300">
+              <Link href="/settings/integrations/aws/" className={`${linkButton} !text-xs`}>Connect the AWS account</Link>
+            </p>
+          )}
+          {connected && <RouteAlarms route={r} />}
+        </>
+      }
+      detailsLabel="Rules"
+      detailsFor={`rules of ${name}`}
+    />
   );
 }
 
@@ -529,8 +525,8 @@ function RouteAlarms({ route }: { route: AlertRoute }) {
   const [open, setOpen] = useState(false);
   const { alarms, error } = useTopicAlarms(route.topic_arn, open);
   return (
-    <div className="mt-3">
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className={linkButton}>
+    <div>
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className={`${linkButton} !text-xs`}>
         {open ? "Hide the alarms on this topic" : "Show the alarms on this topic"}
       </button>
       {open && (
@@ -549,7 +545,7 @@ function RouteAlarms({ route }: { route: AlertRoute }) {
                   <li key={a.name} className="flex flex-wrap items-center gap-2 px-3 py-2 text-xs">
                     <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${STATE_DOT[a.state ?? ""] ?? "bg-zinc-600"}`} />
                     <span className="w-16 shrink-0 text-zinc-500">{STATE_WORD[a.state ?? ""] ?? a.state ?? "Unknown"}</span>
-                    <span className="min-w-0 flex-1 break-all font-mono text-zinc-300" title={a.description ?? ""}>
+                    <span className="min-w-0 flex-1 break-all text-zinc-300" title={a.description ?? ""}>
                       {a.name}
                     </span>
                     {i >= 0 ? (
@@ -568,21 +564,12 @@ function RouteAlarms({ route }: { route: AlertRoute }) {
   );
 }
 
-// ── Side cards ───────────────────────────────────────────────────────
+// ── Connecting a topic ───────────────────────────────────────────────
 
-function SideCard({ title, children, id }: { title: string; children: ReactNode; id: string }) {
+function SetupSteps({ endpoint, defaultOpen }: { endpoint: string; defaultOpen: boolean }) {
   return (
-    <section aria-labelledby={id} className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm">
-      <h2 id={id} className="font-semibold text-zinc-100">{title}</h2>
-      <div className="mt-2 flex flex-col gap-3 text-zinc-400">{children}</div>
-    </section>
-  );
-}
-
-function SetupSteps({ endpoint }: { endpoint: string }) {
-  return (
-    <SideCard title="How to connect a topic" id="setup-heading">
-      <ol className="flex list-decimal flex-col gap-2 pl-5">
+    <SettingsDisclosure summary="How to connect a topic" defaultOpen={defaultOpen}>
+      <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm text-zinc-400">
         <li>
           Connect the topic&apos;s AWS account under <Link href="/settings/integrations/aws/" className={linkButton}>AWS</Link>.
         </li>
@@ -592,83 +579,19 @@ function SetupSteps({ endpoint }: { endpoint: string }) {
           <CodeBlock code={endpoint} title="HTTPS endpoint" className="mt-1.5" testId="alerts-endpoint" />
         </li>
       </ol>
-      <Disclosure summary="Which alerts work">
+      <div className="space-y-2 text-sm text-zinc-400">
+        <p className="font-medium text-zinc-300">Which alerts work</p>
         <p>
           CloudWatch alarm notifications (only the ALARM state opens a pull request), AWS Chatbot custom notifications, EventBridge events
-          and plain messages. A plain message with a <Code>Recovers: &lt;alert title&gt;</Code> line is the recovery
-          of that alert.
+          and plain messages. A plain message with a <Code>Recovers: &lt;alert title&gt;</Code> line is the recovery of that alert.
         </p>
         <p>Repeats of the same alert fold into one run, and each route starts at most 20 runs a day.</p>
-      </Disclosure>
-    </SideCard>
+      </div>
+    </SettingsDisclosure>
   );
 }
 
-function TeamChannel() {
-  const { toast } = useToast();
-  const [saved, setSaved] = useState<AlertNotifySettings | null>(null);
-  const [enabled, setEnabled] = useState(false);
-  const [draft, setDraft] = useState<ChannelsDraft>(draftFrom(NO_WEBHOOKS));
-  const [loadError, setLoadError] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  const load = useCallback(() => {
-    api
-      .getAlertNotify()
-      .then((s) => {
-        setSaved(s);
-        setEnabled(s.enabled);
-        setDraft(draftFrom(s.webhooks));
-      })
-      .catch(() => setLoadError(true));
-  }, []);
-  useEffect(load, [load]);
-
-  const dirty = !!saved && (saved.enabled !== enabled || draftDirty(draft, saved.webhooks));
-  const valid = draftValid(draft, saved?.webhooks, enabled);
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      await api.saveAlertNotify({ enabled, ...channelsPayload(draft, saved?.webhooks) });
-      toast("Team channel saved");
-      load();
-    } catch {
-      toast("Could not save. Check the webhook address.", "error");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <SideCard title="Team channel for alerts" id="teams-heading">
-      <p>
-        Routes set to the team channel post here, in Microsoft Teams, Slack or both: a red message when an alarm fires, a follow up with
-        the pull request link, and green recoveries on routes that post them.
-      </p>
-      {loadError ? (
-        <Callout variant="error"><p>Could not load the channel. Reload the page to try again.</p></Callout>
-      ) : (
-        <>
-          <Switch checked={enabled} onChange={setEnabled} disabled={!saved} label="Post alerts to the team channel" />
-          <ChannelPicker
-            idPrefix="team"
-            draft={draft}
-            saved={saved?.webhooks}
-            onChange={setDraft}
-            disabled={!saved}
-            destination={{ destination: "alerts" }}
-          />
-          <div>
-            <button type="button" onClick={save} disabled={!dirty || !valid || saving} className={primaryButton}>
-              {saving ? "Saving…" : "Save"}
-            </button>
-          </div>
-        </>
-      )}
-    </SideCard>
-  );
-}
+// ── Team channel and budget ──────────────────────────────────────────
 
 /** "500k", "1.5M", "250,000" → tokens; null when not a number. */
 function parseTokens(v: string): number | null {
@@ -684,65 +607,197 @@ function fmtTokens(n: number): string {
   return String(n);
 }
 
-function AlertBudgetCard() {
+type AlertForm = { enabled: boolean; budget: string };
+
+/** A budget typed as "2M" and saved as 2000000 are the same; text that isn't a number is a change. */
+const sameAlertField = (a: unknown, b: unknown, key: keyof AlertForm) => {
+  if (key !== "budget") return a === b;
+  const x = parseTokens(String(a ?? ""));
+  const y = parseTokens(String(b ?? ""));
+  return x !== null && x === y;
+};
+
+/**
+ * The team channel (Teams, Slack or both) and the daily token budget for
+ * alert runs: two settings rows saved by one bar. Each still saves through
+ * its own request, as before.
+ */
+function AlertSettings() {
   const { toast } = useToast();
+  const [notify, setNotify] = useState<AlertNotifySettings | null>(null);
+  const [notifyError, setNotifyError] = useState(false);
   const [budget, setBudget] = useState<AlertBudget | null>(null);
-  const [loadError, setLoadError] = useState(false);
-  const [value, setValue] = useState("");
+  const [budgetError, setBudgetError] = useState(false);
+  const [draft, setDraft] = useState<ChannelsDraft>(draftFrom(NO_WEBHOOKS));
   const [saving, setSaving] = useState(false);
-  useEffect(() => {
+  const [problem, setProblem] = useState<string | null>(null);
+  const form = useDirtyForm<AlertForm>({ enabled: false, budget: "" }, { same: sameAlertField, disabled: !notify && !budget });
+  const { reset } = form;
+
+  /** Re-reads the saved channels (they come back as hints, never as addresses). */
+  const reloadChannels = useCallback(() => {
     api
-      .getAlertBudget()
-      .then((b) => {
-        setBudget(b);
-        setValue(fmtTokens(b.daily_tokens));
+      .getAlertNotify()
+      .then((s) => {
+        setNotify(s);
+        setDraft(draftFrom(s.webhooks));
       })
-      .catch(() => setLoadError(true));
+      .catch(() => {});
   }, []);
-  const n = parseTokens(value);
-  const valid = n !== null && n <= 100_000_000;
+
+  useEffect(() => {
+    let live = true;
+    Promise.allSettled([api.getAlertNotify(), api.getAlertBudget()]).then(([n, b]) => {
+      if (!live) return;
+      const next: AlertForm = { enabled: false, budget: "" };
+      if (n.status === "fulfilled") {
+        setNotify(n.value);
+        setDraft(draftFrom(n.value.webhooks));
+        next.enabled = n.value.enabled;
+      } else setNotifyError(true);
+      if (b.status === "fulfilled") {
+        setBudget(b.value);
+        next.budget = fmtTokens(b.value.daily_tokens);
+      } else setBudgetError(true);
+      reset(next);
+    });
+    return () => {
+      live = false;
+    };
+  }, [reset]);
+
+  const channelsDirty = !!notify && draftDirty(draft, notify.webhooks);
+  const notifyDirty = !!notify && (form.isDirty("enabled") || channelsDirty);
+  const budgetDirty = !!budget && form.isDirty("budget");
+  const count = (notify && form.isDirty("enabled") ? 1 : 0) + (channelsDirty ? 1 : 0) + (budgetDirty ? 1 : 0);
+  const n = parseTokens(form.values.budget);
+  const budgetValid = n !== null && n <= 100_000_000;
+  const channelsValid = draftValid(draft, notify?.webhooks, form.values.enabled);
 
   const save = async () => {
-    if (n === null) return;
-    setSaving(true);
-    try {
-      await api.saveAlertBudget(n);
-      setBudget((b) => (b ? { ...b, daily_tokens: n } : b));
-      setValue(fmtTokens(n));
-      toast("Daily alert budget saved");
-    } catch {
-      toast("Could not save the budget", "error");
-    } finally {
-      setSaving(false);
+    if (budgetDirty && !budgetValid) {
+      setProblem("Enter a daily budget such as 500k or 2M, up to 100M.");
+      return;
     }
+    if (notifyDirty && !channelsValid) {
+      setProblem("Check the webhook addresses. A channel that is ticked needs a working address.");
+      return;
+    }
+    setSaving(true);
+    setProblem(null);
+    const failed: string[] = [];
+    if (notifyDirty && notify) {
+      try {
+        await api.saveAlertNotify({ enabled: form.values.enabled, ...channelsPayload(draft, notify.webhooks) });
+      } catch {
+        failed.push("the team channel (check the webhook address)");
+      }
+    }
+    if (budgetDirty && n !== null) {
+      try {
+        await api.saveAlertBudget(n);
+        setBudget((b) => (b ? { ...b, daily_tokens: n } : b));
+      } catch {
+        failed.push("the budget");
+      }
+    }
+    const edited = form.values;
+    const next: AlertForm = {
+      enabled: notifyDirty && !failed.some((f) => f.startsWith("the team")) ? edited.enabled : form.saved.enabled,
+      budget: budgetDirty && !failed.includes("the budget") && n !== null ? fmtTokens(n) : form.saved.budget,
+    };
+    reset(next);
+    if (failed.length) {
+      form.update(edited);
+      setProblem(`Could not save ${failed.join(" or ")}. Try again.`);
+      toast("Could not save every change", "error");
+    } else {
+      toast("Alert settings saved");
+    }
+    if (notifyDirty && !failed.some((f) => f.startsWith("the team"))) reloadChannels();
+    setSaving(false);
+  };
+
+  const discard = () => {
+    form.discard();
+    if (notify) setDraft(draftFrom(notify.webhooks));
+    setProblem(null);
   };
 
   const used = budget ? Math.min(100, (budget.used_24h_tokens / Math.max(budget.daily_tokens, 1)) * 100) : 0;
 
   return (
-    <SideCard title="Daily alert token budget" id="budget-heading">
-      <p>
-        Alert runs stop for the day once they have used this many tokens. Alerts keep posting to chat. Each rule also starts at most{" "}
-        {budget?.max_runs_per_rule_per_day ?? 5} runs a day. 0 turns alert runs off.
-      </p>
-      {loadError ? (
-        <Callout variant="error"><p>Could not load the budget. Reload the page to try again.</p></Callout>
-      ) : (
-        <>
+    <>
+      <SettingsSection id="alert-settings" title="Team channel and budget">
+        <SettingsRow
+          label="Post alerts to the team channel"
+          layout="toggle"
+          testId="team-channel-row"
+          unsaved={notifyDirty}
+          help="Routes set to the team channel post here: a red message when an alarm fires, a follow up with the pull request link, and green recoveries on routes that post them."
+          control={(ids) => (
+            <Switch
+              id={ids.inputId}
+              checked={form.values.enabled}
+              onChange={(on) => form.set("enabled", on)}
+              labelledBy={ids.labelId}
+              describedBy={ids.helpId}
+              disabled={!notify}
+            />
+          )}
+        >
+          {notifyError ? (
+            <Callout variant="error"><p>Could not load the team channel. Reload the page to try again.</p></Callout>
+          ) : (
+            <ChannelPicker
+              idPrefix="team"
+              draft={draft}
+              saved={notify?.webhooks}
+              onChange={setDraft}
+              disabled={!notify}
+              destination={{ destination: "alerts" }}
+            />
+          )}
+        </SettingsRow>
+        <SettingsRow
+          label="Daily token budget for alert runs"
+          controlClassName="sm:w-40"
+          unsaved={budgetDirty}
+          help={`Alert runs stop for the day once they use this many tokens; alerts keep posting to chat. Each rule also starts at most ${budget?.max_runs_per_rule_per_day ?? 5} runs a day. 0 turns alert runs off.`}
+          control={(ids) =>
+            budgetError ? (
+              <p className="text-sm text-red-400">Could not load the budget.</p>
+            ) : (
+              <div>
+                <input
+                  id={ids.inputId}
+                  value={form.values.budget}
+                  onChange={(e) => form.set("budget", e.target.value)}
+                  placeholder="500k"
+                  inputMode="decimal"
+                  disabled={!budget}
+                  aria-invalid={form.values.budget.trim() && !budgetValid ? true : undefined}
+                  aria-describedby={[ids.helpId, budget ? "alert-budget-use" : ""].filter(Boolean).join(" ")}
+                  className={inputClass}
+                />
+                {form.values.budget.trim() && !budgetValid && (
+                  <p role="alert" className="mt-1.5 text-xs text-red-400">Enter a number such as 500k or 2M, up to 100M.</p>
+                )}
+              </div>
+            )
+          }
+        >
           {budget && (
-            <div>
+            <div id="alert-budget-use">
               <div
                 role="meter"
                 aria-label="Alert tokens used in the last 24 hours"
                 aria-valuemin={0}
                 aria-valuemax={budget.daily_tokens}
                 aria-valuenow={Math.min(budget.used_24h_tokens, budget.daily_tokens)}
-                className="h-1.5 overflow-hidden rounded-full bg-zinc-800"
+                className="h-1.5 max-w-sm overflow-hidden rounded-full bg-zinc-800"
               >
-                <div
-                  className={`h-full ${used >= 100 ? "bg-red-400" : used >= 75 ? "bg-amber-400" : "bg-emerald-400"}`}
-                  style={{ width: `${used}%` }}
-                />
+                <div className={`h-full ${used >= 100 ? "bg-red-400" : used >= 75 ? "bg-amber-400" : "bg-emerald-400"}`} style={{ width: `${used}%` }} />
               </div>
               <p className="mt-1 text-xs text-zinc-500">
                 {fmtTokens(budget.used_24h_tokens)} of {fmtTokens(budget.daily_tokens)} used in the last 24 hours
@@ -750,23 +805,10 @@ function AlertBudgetCard() {
               </p>
             </div>
           )}
-          <form
-            className="flex flex-wrap items-end gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (valid && !saving) save();
-            }}
-          >
-            <Field id="alert-budget" label="Tokens a day" error={value.trim() && !valid ? "Enter a number such as 500k or 2M, up to 100M." : undefined}>
-              {(props) => <input {...props} value={value} onChange={(e) => setValue(e.target.value)} placeholder="500k" className={`${inputClass} w-32`} />}
-            </Field>
-            <button type="submit" disabled={!valid || saving || (budget !== null && n === budget.daily_tokens)} className={`${primaryButton} mb-0.5`}>
-              {saving ? "Saving…" : "Save"}
-            </button>
-          </form>
-        </>
-      )}
-    </SideCard>
+        </SettingsRow>
+      </SettingsSection>
+      <SaveBar count={count} onSave={save} onDiscard={discard} saving={saving} problem={problem} />
+    </>
   );
 }
 
@@ -877,8 +919,8 @@ function EventsTimeline({
                     {e.title || "Untitled alert"}
                   </Link>
                   <p className="mt-0.5 text-xs text-zinc-500">
-                    <span className="font-mono">{topicName(e.topic_arn)}</span>
-                    {e.repo ? <> · <span className="font-mono">{e.repo}</span></> : null}
+                    {topicName(e.topic_arn)}
+                    {e.repo ? <> · {e.repo}</> : null}
                   </p>
                   {resolves && (
                     <p className="mt-1 text-xs text-emerald-300">
@@ -959,7 +1001,7 @@ function AlarmPicker({ id, alarms, selected, onChange }: { id: string; alarms: T
             <label className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-900">
               <input type="checkbox" checked={selected.includes(a.name)} onChange={() => toggle(a.name)} className="h-4 w-4 shrink-0 accent-emerald-500" />
               <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${STATE_DOT[a.state ?? ""] ?? "bg-zinc-600"}`} />
-              <span className="min-w-0 flex-1 truncate font-mono text-xs">{a.name}</span>
+              <span className="min-w-0 flex-1 truncate text-xs">{a.name}</span>
               {a.state === "missing" ? (
                 <span className="shrink-0 text-xs text-amber-300">not on this topic</span>
               ) : (
@@ -1066,7 +1108,7 @@ function RuleEditor({
                       onChange({ ...rule, alarms: split(e.target.value) });
                     }}
                     placeholder="prod-api-5xx, prod-db-cpu"
-                    className={`${inputClass} font-mono text-xs`}
+                    className={inputClass}
                   />
                 )}
               </Field>
@@ -1283,7 +1325,7 @@ function RouteEditor({
                 onChange={(e) => setRoute({ ...route, topic_arn: e.target.value })}
                 placeholder="arn:aws:sns:us-east-1:123456789012:alarms"
                 spellCheck={false}
-                className={`${inputClass} font-mono disabled:opacity-60`}
+                className={`${monoInputClass} disabled:opacity-60`}
               />
             )}
           </Field>
@@ -1362,7 +1404,7 @@ function RouteEditor({
           </section>
 
           <div className="flex flex-wrap items-center gap-4">
-            <Switch checked={route.enabled} onChange={(enabled) => setRoute({ ...route, enabled })} label="Route is on" onLabel="On" offLabel="Paused" />
+            <OnOffSwitch checked={route.enabled} onChange={(enabled) => setRoute({ ...route, enabled })} label="Route is on" onLabel="On" offLabel="Paused" />
           </div>
 
           {saveError && (
