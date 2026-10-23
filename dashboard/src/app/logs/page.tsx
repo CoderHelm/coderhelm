@@ -21,6 +21,8 @@ import { Segmented } from "@/components/segmented";
 import { Callout } from "@/components/callout";
 import { ExternalLinkIcon } from "@/components/icons";
 import { FindingsNotify } from "@/components/findings-notify";
+import { CodeBlock } from "@/components/code-block";
+import { Code } from "@/components/settings/code";
 import { Page, PageHeader } from "@/components/page";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import {
@@ -209,7 +211,7 @@ function LogsPage() {
         title="Logs"
         lead={
           <>
-            Errors the log analyzer found in your CloudWatch logs. It looks every 6 hours. Create a fix PR from any
+            Errors Coderhelm found in your AWS logs. It looks every 6 hours. Create a fix PR from any
             finding, or let Coderhelm open one for new findings.
           </>
         }
@@ -454,8 +456,8 @@ function FindingRow({
       titleText={f.title}
       quiet={f.status === "ignored"}
       meta={[
-        <span key="g" className="font-mono" title={f.log_group}>
-          {f.log_group}
+        <span key="g" title={f.log_group}>
+          <Code>{f.log_group}</Code>
         </span>,
         typeof f.error_count === "number" && f.error_count > 0 ? plural(f.error_count, "line") : null,
         f.first_seen ? `first seen ${timeAgo(f.first_seen)}` : null,
@@ -527,14 +529,12 @@ function FindingDetail({
       )}
       {f.suspected_location && (
         <DetailBlock title="Suspected code location">
-          <code className="break-all font-mono text-zinc-300">{f.suspected_location}</code>
+          <Code>{f.suspected_location}</Code>
         </DetailBlock>
       )}
       {f.error_pattern && (
         <DetailBlock title="Error pattern">
-          <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md border border-zinc-800 bg-zinc-950 p-2 font-mono text-[11px] text-zinc-300">
-            {f.error_pattern}
-          </pre>
+          <CodeBlock code={f.error_pattern} label="Error pattern" wrap maxHeightClass="max-h-40" />
         </DetailBlock>
       )}
       {canAct && <Samples id={f.rec_id} />}
@@ -588,9 +588,13 @@ function Samples({ id }: { id: string }) {
         <p className="text-zinc-500">{state.error ?? "No matching lines in the last 24 hours."}</p>
       ) : (
         <>
-          <pre data-testid="sample-lines" className="max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-md border border-zinc-800 bg-zinc-950 p-2 font-mono text-[11px] leading-5 text-zinc-300">
-            {state.lines.map((l) => `${l.timestamp}  ${l.message}`).join("\n")}
-          </pre>
+          <CodeBlock
+            testId="sample-lines"
+            code={state.lines.map((l) => `${l.timestamp}  ${l.message}`).join("\n")}
+            label="Sample log lines"
+            wrap
+            maxHeightClass="max-h-56"
+          />
           <p className="mt-1 text-[11px] text-zinc-500">Secrets, emails and card numbers are hidden. These lines are read live and not stored.</p>
         </>
       )}
@@ -637,7 +641,7 @@ function CreateFixForm({
     <form onSubmit={submit} className="flex flex-col gap-4">
       <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm">
         <p className="font-medium text-zinc-100">{finding.title}</p>
-        <p className="mt-0.5 break-all font-mono text-xs text-zinc-500">{finding.log_group}</p>
+        <p className="mt-0.5 text-xs text-zinc-500"><Code>{finding.log_group}</Code></p>
       </div>
       <div>
         <label htmlFor="fix-repo" className="mb-1 block text-sm font-medium text-zinc-300">
@@ -877,7 +881,7 @@ function AutofixPanel({
           <ul className="mt-2 divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800">
             {rows.map((r) => (
               <li key={r.log_group} className="grid min-w-0 gap-2 px-3 py-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1.2fr)_auto_auto] md:items-center" data-testid={`group-${r.log_group}`}>
-                <span className="min-w-0 break-all font-mono text-xs text-zinc-300">{r.log_group}</span>
+                <span className="min-w-0 text-xs"><Code>{r.log_group}</Code></span>
                 <div className="min-w-0">
                   {disabled ? (
                     <span className="text-xs text-zinc-400">{r.repo || "No repo"}</span>

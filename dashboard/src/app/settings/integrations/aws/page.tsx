@@ -907,7 +907,7 @@ function ConnectPanel({ first, onCancel, onConnected }: { first: boolean; onCanc
 /** Findings moved to the Logs page; this anchor (#findings) points there. */
 function FindingsMoved() {
   return (
-    <Section id="findings" title="Findings" description="What the log analyzer finds in these accounts.">
+    <Section id="findings" title="Findings" description="Errors Coderhelm finds in these accounts' logs.">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-sm">
         <p className="min-w-0 text-zinc-400">
           Findings, fix PRs and automatic fixes now live on the Logs page.
