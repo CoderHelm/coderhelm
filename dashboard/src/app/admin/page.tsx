@@ -189,9 +189,14 @@ function AdminPage() {
         title="Platform admin"
         lead="Every organisation using Coderhelm, who is waiting to get in, and who may sign up."
         actions={
-          <Link href="/admin/tickets" className={primaryButton}>
-            Support queue
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/admin/queue" className={secondaryButton}>
+              Shared queue
+            </Link>
+            <Link href="/admin/tickets" className={primaryButton}>
+              Support queue
+            </Link>
+          </div>
         }
       />
 
