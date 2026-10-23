@@ -284,6 +284,10 @@ test("health shows checks in plain words and links failed runs", async ({ page }
   await expect(page.getByText("Running with no update for 20 minutes", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: /Failed runs \(24 hours\)/ }).click();
   await expect(page.getByRole("link", { name: "Update the pricing page" })).toHaveAttribute("href", /\/runs\/detail\/?\?id=01RUNFAILED00000000000000A/);
+  // A run's error reads as words, not red code; its start time is the shared relative time.
+  const timedOut = page.getByText("Timed out", { exact: true });
+  expect(await timedOut.evaluate((el) => getComputedStyle(el).fontFamily)).not.toMatch(/mono/i);
+  await expect(page.getByText(/^Started /).locator("time")).toBeVisible();
   await shot(page, "audit-health");
   expect(errors).toEqual([]);
 });

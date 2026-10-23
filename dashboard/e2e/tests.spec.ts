@@ -346,6 +346,17 @@ test("tests: runs, a branch filter, older runs and a run's tests", async ({ page
   const list = page.getByRole("list", { name: "E2E runs" });
   await expect(list.getByRole("listitem")).toHaveCount(30);
   await expect(list.getByRole("listitem").first()).toContainText("passed on retry");
+  // Zero counts are left out: a clean run doesn't say "0 failed · 0 passed on retry".
+  await expect(list).not.toContainText(/\b0 failed/);
+  await expect(list).not.toContainText(/\b0 passed on retry/);
+  await expect(list.getByRole("listitem").filter({ hasNotText: /failed|retry/ }).first()).toContainText("40 passed");
+  // Eight views: on a phone they are one select, not a row cut off at the edge.
+  await page.setViewportSize({ width: 390, height: 800 });
+  const views = page.getByRole("navigation", { name: "Tests views" });
+  await expect(views.getByRole("combobox", { name: "Tests views" })).toBeVisible();
+  await expect(views.getByRole("link", { name: "Runs" })).toBeHidden();
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(views.getByRole("combobox")).toBeHidden();
   await shot(page, "runs");
   await page.getByRole("button", { name: "Load more" }).click();
   await expect(list.getByRole("listitem")).toHaveCount(45);

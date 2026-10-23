@@ -10,7 +10,8 @@ import {
   type Repo,
 } from "@/lib/api";
 import { Callout } from "@/components/callout";
-import { Chip, List, ListEmpty, ListError, ListRow, ListSection, ListSkeleton, ListToolbar, useListParams } from "@/components/list";
+import { Chip, List, ListEmpty, ListError, ListRow, ListSection, ListSkeleton, ListToolbar, MoreMenu, useListParams } from "@/components/list";
+import { SettingsDisclosure } from "@/components/settings";
 import { Skeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -42,7 +43,6 @@ type Sort = "newest" | "most_used";
 
 /** A select that sits in a list toolbar. */
 const toolbarSelect = `min-h-9 rounded-lg border border-zinc-700 bg-zinc-900 py-1.5 pl-3 text-sm text-zinc-100 hover:border-zinc-500 ${focusRing}`;
-const smallButton = `${secondaryButton} !min-h-8 !px-3 !py-1`;
 
 const ROLE_LEVEL: Record<string, number> = { viewer: 0, member: 1, billing: 2, admin: 3, owner: 4 };
 
@@ -247,60 +247,8 @@ function MemoryPage() {
 
       {repo && (
         <>
-          {/* ── Agents ───────────────────────────────────────── */}
-          <section aria-labelledby="agents-heading" className="mt-10">
-            <h2 id="agents-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">Who knows what</h2>
-            {profilesError ? (
-              <Callout variant="error" title="We couldn't load the agents">
-                <p>{profilesError}</p>
-                <p><button type="button" onClick={refresh} className={linkButton}>Try again</button></p>
-              </Callout>
-            ) : profiles === null ? (
-              <div className="grid gap-3 sm:grid-cols-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-36" />)}</div>
-            ) : (
-              <>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {profiles.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      aria-expanded={openAgent === p.id}
-                      aria-controls="agent-profile"
-                      onClick={() => setOpenAgent(openAgent === p.id ? null : p.id)}
-                      className={`text-left rounded-lg border p-5 transition-colors motion-reduce:transition-none ${
-                        openAgent === p.id ? "border-zinc-500 bg-zinc-900" : "border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900"
-                      } ${focusRing}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-zinc-300" aria-hidden="true">
-                          {AGENT_ICON[p.id]}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-zinc-100">{p.name}</p>
-                          <p className="mt-1 text-sm text-zinc-400">{p.role}</p>
-                        </div>
-                      </div>
-                      <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                        <span className="text-zinc-100"><span className="font-semibold">{p.activity_count}</span> <span className="text-zinc-400">{p.activity_label}</span></span>
-                      </div>
-                      <p className="mt-2 text-xs text-zinc-500">
-                        {p.uses_repo_memory ? "Uses this repo's memories" : "Doesn't use repo memories"}
-                        <span aria-hidden="true"> · </span>
-                        {openAgent === p.id ? "Hide profile" : "Open profile"}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-                {agent && <AgentDetail agent={agent} />}
-              </>
-            )}
-          </section>
-
-          {/* ── Try it ───────────────────────────────────────── */}
-          <TryIt repo={repo} />
-
           {/* ── Memories ─────────────────────────────────────── */}
-          <div className="mt-10">
+          <div className="mt-6">
             <ListSection
               id="memories"
               title="Memories"
@@ -317,8 +265,8 @@ function MemoryPage() {
                   options: [
                     { value: "all", label: "All" },
                     { value: "pinned", label: "Pinned", tone: "waiting" },
-                    { value: "run", label: "Learned on tickets" },
-                    { value: "person", label: "Added by people" },
+                    { value: "run", label: "From tickets" },
+                    { value: "person", label: "From people" },
                   ],
                 }}
                 sort={{
@@ -327,7 +275,7 @@ function MemoryPage() {
                   options: [{ value: "newest", label: "Newest" }, { value: "most_used", label: "Most used" }],
                 }}
                 actions={
-                  <select aria-label="Topic" value={topic} onChange={(e) => setParams({ topic: e.target.value })} className={`${toolbarSelect} min-w-0 max-w-full`}>
+                  <select aria-label="Topic" value={topic} onChange={(e) => setParams({ topic: e.target.value })} className={`${toolbarSelect} w-40 min-w-0 max-w-full truncate pr-8`}>
                     <option value="">Every topic</option>
                     {TOPICS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
@@ -385,6 +333,55 @@ function MemoryPage() {
                 </div>
               )}
             </ListSection>
+          </div>
+          {/* ── Who uses memory ───────────────────────────────── */}
+          <section aria-labelledby="agents-heading" className="mt-10">
+            <h2 id="agents-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">Who uses memory</h2>
+            {profilesError ? (
+              <Callout variant="error" title="We couldn't load the agents">
+                <p>{profilesError}</p>
+                <p><button type="button" onClick={refresh} className={linkButton}>Try again</button></p>
+              </Callout>
+            ) : profiles === null ? (
+              <Skeleton className="h-24" />
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-zinc-800 bg-zinc-800 lg:grid-cols-4" data-testid="memory-agents">
+                  {profiles.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      aria-expanded={openAgent === p.id}
+                      aria-controls="agent-profile"
+                      title={p.role}
+                      onClick={() => setOpenAgent(openAgent === p.id ? null : p.id)}
+                      className={`min-w-0 p-4 text-left transition-colors motion-reduce:transition-none ${
+                        openAgent === p.id ? "bg-zinc-800" : "bg-zinc-950 hover:bg-zinc-900"
+                      } ${focusRing}`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span className="shrink-0 text-zinc-400" aria-hidden="true">{AGENT_ICON[p.id]}</span>
+                        <span className="truncate text-sm font-medium text-zinc-100">{p.name}</span>
+                      </span>
+                      <span className="mt-2 block text-xs text-zinc-400">
+                        <span className="text-base font-semibold tabular-nums text-zinc-100">{p.activity_count}</span> {p.activity_label}
+                      </span>
+                      <span className={`mt-1 block text-xs ${p.uses_repo_memory ? "text-emerald-300/90" : "text-zinc-500"}`}>
+                        {p.uses_repo_memory ? "Uses this repo's memories" : "Doesn't use repo memories"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {agent && <AgentDetail agent={agent} />}
+              </>
+            )}
+          </section>
+
+          {/* ── Preview for a ticket ─────────────────────────── */}
+          <div className="mt-10">
+            <SettingsDisclosure summary="Preview what a ticket would bring along">
+              <TryIt repo={repo} />
+            </SettingsDisclosure>
           </div>
         </>
       )}
@@ -524,13 +521,16 @@ function MemoryCard({
       }
       actions={
         isAdmin && !editing ? (
-          <span className="flex flex-wrap gap-2">
-            <button type="button" onClick={onPin} className={smallButton} aria-label={`${m.pinned ? "Unpin" : "Pin"} this memory`}>
-              {m.pinned ? "Unpin" : "Pin"}
-            </button>
-            <button type="button" onClick={() => setEditing(true)} className={smallButton}>Edit</button>
-            <button type="button" onClick={onForget} className={`${smallButton} !text-red-300`}>Forget</button>
-          </span>
+          <MoreMenu
+            compact
+            label="Memory actions"
+            buttonLabel="Actions for this memory"
+            items={[
+              { label: m.pinned ? "Unpin" : "Pin", onSelect: onPin },
+              { label: "Edit", onSelect: () => setEditing(true) },
+              { label: "Forget", danger: true, onSelect: onForget },
+            ]}
+          />
         ) : undefined
       }
       details={long && !editing ? <p className="whitespace-pre-wrap text-sm text-zinc-200">{m.content}</p> : undefined}
@@ -577,9 +577,8 @@ function TryIt({ repo }: { repo: string }) {
 
   const nothing = result && result.pinned.length === 0 && result.recalled.length === 0;
   return (
-    <section aria-labelledby="try-heading" className="mt-10">
-      <h2 id="try-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">What would it remember for a ticket?</h2>
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+    <section aria-label="What would it remember for a ticket?">
+      <div>
         <label htmlFor="try-text" className="text-sm text-zinc-300">Describe a ticket, the way someone would write it</label>
         <textarea
           id="try-text"

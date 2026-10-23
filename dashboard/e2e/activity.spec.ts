@@ -316,7 +316,7 @@ test("an item's own activity: an opened skill and an agent's page show only thei
   const call = lastCall(db, "/api/skills/activity");
   expect(call?.params.get("path")).toBe("skills/debug/SKILL.md");
 
-  await page.goto(`/skills/agent?repo=acme%2Fplaybook&path=${encodeURIComponent("agents/spec-checker.md")}`);
+  await page.goto(`/skills/agent?repo=acme%2Fplaybook&path=${encodeURIComponent("agents/spec-checker.md")}&tab=asks`);
   const all = page.locator("#skill-activity");
   await expect(all.getByRole("heading", { name: "Every read and ask" })).toBeVisible();
   await expect(all.getByTestId("skill-activity-row")).toHaveCount(2);

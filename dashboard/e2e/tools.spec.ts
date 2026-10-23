@@ -67,6 +67,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/integrations") return json(route, { can_edit: false, items: [], migrated: 0 });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }] });
     if (p === "/api/data-sources") return json(route, { sources: [SOURCE] });
+    if (p === "/api/repos") return json(route, { repos: ["your-team/web", "your-team/api", "your-team/docs"].map((name) => ({ name, enabled: true })) });
     if (p === "/api/data-sources/activity") {
       return json(route, { events: [{ at: NOW, source_id: "src_db", source_name: "Orders database", actor: "planner", repo: "your-team/web", pr: 41, summary: 'find_order_by_number({"order_number":"OR-555555"})', query: 'find_order_by_number({"order_number":"OR-555555"})', detail: "1 row", ok: true, outcome: "ok", ms: 120 }] });
     }
@@ -163,11 +164,21 @@ test("write a tool: the live check shows what will be sent, saving runs the exam
   await page.getByLabel("When to use it").fill("A ticket mentions an order number and you need its status.");
   await page.getByLabel("Source").selectOption("Orders database");
   await page.getByLabel("The read").fill("SELECT o.id, o.status FROM orders o WHERE o.number = :order_number");
-  await page.getByLabel("Input 1 name").fill("order_number");
+  // Each input's fields have labels, not only placeholders.
+  const input1 = page.getByRole("group", { name: "Input 1" });
+  await input1.getByLabel("Input name").fill("order_number");
+  await expect(input1.getByLabel("Type")).toHaveValue("string");
   // A text input with no pattern is caught by the check.
-  await page.getByLabel("Input 1 example").fill("OR-102938");
+  await input1.getByLabel("Example").fill("OR-102938");
   await expect(page.getByText("needs a pattern or a list of allowed values")).toBeVisible();
-  await page.getByLabel("Input 1 pattern").fill("[A-Z]{2}-[0-9]{4,10}");
+  await input1.getByLabel("Pattern").fill("[A-Z]{2}-[0-9]{4,10}");
+  // Repos are picked from the team's, not typed.
+  await expect(page.getByText("Every repo. Pick some to limit it to them.")).toBeVisible();
+  await page.getByRole("combobox", { name: "Add a repo" }).selectOption("your-team/web");
+  await page.getByRole("combobox", { name: "Add a repo" }).selectOption("your-team/api");
+  await page.getByRole("combobox", { name: "Add a repo" }).selectOption("your-team/docs");
+  await page.getByRole("button", { name: "Remove your-team/docs" }).click();
+  await expect(page.getByRole("list", { name: "Repos that can use it" }).getByRole("listitem")).toHaveText(["your-team/web×", "your-team/api×"]);
   await expect(page.getByText("It passes its checks")).toBeVisible();
   await expect(page.getByText("tool_find_order_by_number")).toBeVisible();
   await shot(page, "tools-new");
@@ -175,7 +186,18 @@ test("write a tool: the live check shows what will be sent, saving runs the exam
   await expect(page.getByRole("heading", { name: "find_order_by_number is saved" })).toBeVisible();
   await expect(page.getByText('"status": "shipped"')).toBeVisible();
   const saved = db.calls.find((c) => c.method === "POST" && c.path === "/api/tools");
-  expect((saved?.body?.def as Def).inputs.order_number).toMatchObject({ type: "string", pattern: "[A-Z]{2}-[0-9]{4,10}", example: "OR-102938" });
+  // The exact body the form sends, as before the redesign.
+  expect(saved?.body).toEqual({
+    def: {
+      name: "find_order_by_number",
+      use_when: "A ticket mentions an order number and you need its status.",
+      source: "Orders database",
+      kind: "sql",
+      read: "SELECT o.id, o.status FROM orders o WHERE o.number = :order_number",
+      inputs: { order_number: { type: "string", example: "OR-102938", pattern: "[A-Z]{2}-[0-9]{4,10}" } },
+      repos: ["your-team/web", "your-team/api"],
+    },
+  });
   await shot(page, "tools-saved");
 });
 

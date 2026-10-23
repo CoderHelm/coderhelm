@@ -126,12 +126,6 @@ export function OutcomeBadge({ outcome }: { outcome: string }) {
   );
 }
 
-export function formatWhen(iso?: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? "—" : d.toLocaleString();
-}
-
 /** "run_started" becomes "Run started", for values this page doesn't know yet. */
 export function humanize(value?: string | null): string {
   if (!value) return "—";
