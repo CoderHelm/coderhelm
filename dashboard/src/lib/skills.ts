@@ -136,6 +136,16 @@ export function alwaysLabel(a: Pick<AlwaysApply, "repos" | "passes" | "paths">):
   return `Always applied · ${repos} · ${passes}${paths}`;
 }
 
+/** The setting in a few words, for a chip: "Always applied · 5 repos · Coder, Reviewer".
+ * `alwaysLabel` gives every repository and path, for a tooltip. */
+export function alwaysShort(a: Pick<AlwaysApply, "repos" | "passes" | "paths">): string {
+  const repos =
+    a.repos.length === 0 ? "all repos" : a.repos.length === 1 ? repoShort(a.repos[0]) : `${a.repos.length} repos`;
+  const passes = a.passes.length <= 2 ? a.passes.map(passLabel).join(", ") : `${a.passes.length} steps`;
+  const paths = a.paths.length > 0 ? ` · ${a.paths.length === 1 ? a.paths[0] : `${a.paths.length} paths`}` : "";
+  return `Always applied · ${repos} · ${passes}${paths}`;
+}
+
 /** The suggestion as a sentence: "Suggested: always apply to web-app for Coder and Reviewer". */
 export function suggestionLabel(s: AlwaysApplySuggestion): string {
   const names = s.passes.map(passLabel);

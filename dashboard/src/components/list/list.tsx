@@ -145,7 +145,7 @@ export function ListRow({
             {children}
           </div>
           {(chips || time || actions || details) && (
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 sm:mt-0 sm:shrink-0 sm:justify-end">
+            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 sm:mt-0 sm:max-w-[50%] sm:shrink-0 sm:justify-end">
               {chips}
               {time && <Time iso={time} className="text-xs text-zinc-500" />}
               {actions}
