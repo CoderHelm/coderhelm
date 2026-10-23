@@ -47,7 +47,7 @@ export interface StatusLook {
 }
 
 /** The group words every status toggle uses, in this order. */
-export type StatusGroup = "active" | "waiting" | "attention" | "done" | "failed" | "off";
+export type StatusGroup = "active" | "waiting" | "attention" | "done" | "failed" | "closed" | "off";
 
 export const GROUP_LABEL: Record<StatusGroup | "all", string> = {
   all: "All",
@@ -56,6 +56,7 @@ export const GROUP_LABEL: Record<StatusGroup | "all", string> = {
   attention: "Needs attention",
   done: "Done",
   failed: "Failed",
+  closed: "Closed",
   off: "Off",
 };
 
@@ -66,6 +67,7 @@ export const GROUP_TONE: Record<StatusGroup, Tone> = {
   attention: "attention",
   done: "success",
   failed: "danger",
+  closed: "muted",
   off: "muted",
 };
 

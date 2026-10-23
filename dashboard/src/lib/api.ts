@@ -275,6 +275,24 @@ export const api = {
     }),
   cancelRun: (id: string) =>
     request<{ status: string }>(`/api/runs/${id}/cancel`, { method: "POST" }),
+  /**
+   * Close a run on purpose. Closing a closed run again is fine; a run that is
+   * over already comes back `ok: false` with the reason in `message`.
+   */
+  closeRun: (id: string, body: CloseRunRequest) =>
+    requestWithBody<CloseResult, CloseResult>(`/api/runs/${encodeURIComponent(id)}/close`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  /** Close up to 100 runs; one result per run, in the order sent. */
+  closeRuns: (ids: string[], body: CloseRunRequest) =>
+    request<BulkCloseAnswer>("/api/runs/close", { method: "POST", body: JSON.stringify({ run_ids: ids, ...body }) }),
+  /** Undo a close: the run shows as before (or waiting on a person); nothing restarts. */
+  reopenRun: (id: string) =>
+    requestWithBody<{ status: string; message?: string }, { status?: string; message?: string }>(
+      `/api/runs/${encodeURIComponent(id)}/reopen`,
+      { method: "POST" },
+    ),
   getRunTraces: (id: string) =>
     request<{ traces: PassTrace[] }>(`/api/runs/${id}/traces`),
 
@@ -1394,6 +1412,29 @@ export interface Run {
   current_pass?: string;
 }
 
+export interface CloseRunRequest {
+  /** A preset ("Not needed", "Duplicate", …) and the optional note, as one line. */
+  reason?: string;
+  /** Also close the run's pull request on GitHub, with a comment. */
+  close_pr?: boolean;
+}
+
+export interface CloseResult {
+  run_id: string;
+  outcome: "closed" | "already_closed" | "refused" | "not_found" | "failed";
+  /** For a person to read. */
+  message: string;
+  prs_closed?: number[];
+  prs_not_closed?: number[];
+}
+
+export interface BulkCloseAnswer {
+  results: CloseResult[];
+  closed: number;
+  already_closed: number;
+  failed: number;
+}
+
 export interface RunDetail extends Run {
   ticket_source?: string;
   branch?: string;
@@ -1417,6 +1458,12 @@ export interface RunDetail extends Run {
   outside_change_report?: string | null;
   /** The lesson saved for the repository when people said the fix was elsewhere. */
   lesson?: string | null;
+  /** Who closed the run on purpose (their name, login or email), when and why. */
+  closed_by?: string | null;
+  closed_at?: string | null;
+  close_reason?: string | null;
+  /** The status it had when it was closed. */
+  closed_from?: string | null;
 }
 
 export interface PassTrace {
@@ -2254,6 +2301,8 @@ export interface AnalyticsSummary {
   merge_rate: number | null;
   failed_runs: number;
   failure_rate: number | null;
+  /** Runs a person closed on purpose: not failures. Older backends leave it out. */
+  closed_runs?: number;
   cost_usd: number;
   cost_per_run: number | null;
   cost_per_merged_pr: number | null;

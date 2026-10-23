@@ -10,9 +10,13 @@ import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Callout } from "@/components/callout";
 import { Markdown } from "@/components/markdown";
-import { focusRing, primaryButton, secondaryButton } from "@/components/ui";
+import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Page } from "@/components/page";
-import { RunStatusBadge, runIsLive } from "@/components/run-status";
+import { RunStatusBadge, runCanClose, runCloseIsLikely, runIsLive } from "@/components/run-status";
+import { CloseRunDialog } from "@/components/close-run-dialog";
+import { MoreMenu, Time } from "@/components/list";
+import { usePaletteActions, type PageAction } from "@/components/command-palette";
+import type { CloseRunRequest } from "@/lib/api";
 import { TeamAgentAsks } from "./team-asks";
 import { WorkUsedLine } from "@/components/work-used";
 import { HelpLink } from "@/components/support";
@@ -332,7 +336,8 @@ function RunDetailInner() {
   const [loading, setLoading] = useState(true);
   // "missing" when the gateway says there is no such run, "failed" for anything else.
   const [loadError, setLoadError] = useState<"missing" | "failed" | null>(null);
-  const [busy, setBusy] = useState<"retry" | "review" | "reset" | "cancel" | null>(null);
+  const [busy, setBusy] = useState<"retry" | "review" | "reset" | "cancel" | "close" | "reopen" | null>(null);
+  const [closeOpen, setCloseOpen] = useState(false);
   const [specTab, setSpecTab] = useState<keyof Openspec>("proposal");
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [role, setRole] = useState<string | null>(null);
@@ -409,6 +414,17 @@ function RunDetailInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentLogOpen, run?.status, runId]);
 
+  // ⌘K "Close this run" while the run can be closed and the person may.
+  const closable = !!run && canAct && runCanClose(run.status);
+  const paletteActions = useMemo<PageAction[] | null>(
+    () =>
+      closable
+        ? [{ id: "close-run", label: "Close this run", sub: "Stop it and free its ticket", keywords: ["close", "stop", "done", "duplicate", "not needed"], run: () => setCloseOpen(true) }]
+        : null,
+    [closable],
+  );
+  usePaletteActions(paletteActions);
+
   const taskItems = useMemo(() => parseTaskItems(openspec?.tasks), [openspec?.tasks]);
 
   // Compute the highest pass index ever reached (not just current_pass, which regresses during CI fix cycles)
@@ -482,17 +498,23 @@ function RunDetailInner() {
   // The first spec document may not be the proposal; never show an empty tab.
   const activeSpecTab = specTabs.includes(specTab) ? specTab : specTabs[0];
 
-  const implementStarted = maxPassIdx >= 2 || ["completed", "merged", "failed", "archived", "cancelled"].includes(run.status);
+  const implementStarted = maxPassIdx >= 2 || ["completed", "merged", "failed", "archived", "cancelled", "closed"].includes(run.status);
   const showTaskSidebar = taskItems.length > 0 && implementStarted;
   const filesModified = run.files_modified ?? [];
 
   const doneCount = taskItems.filter((t) => isTaskDone(t, filesModified, run.status, maxPassIdx)).length;
 
   // What each action is allowed for, matching the gateway's own checks.
-  const canRetry = ["failed", "needs_input", "needs_outside_change", "cancelled"].includes(run.status) && run.current_pass !== "feedback";
-  const canReview = !!run.pr_url && !["running", "queued", "merged"].includes(run.status);
+  const canRetry = ["failed", "needs_input", "needs_outside_change", "cancelled", "closed"].includes(run.status) && run.current_pass !== "feedback";
+  // A closed run is reopened first; the gateway refuses a re-review of it.
+  const canReview = !!run.pr_url && !["running", "queued", "merged", "closed"].includes(run.status);
   // Starting over closes the pull request: never offered once it is merged.
-  const canReset = ["completed", "failed", "needs_input", "needs_outside_change", "cancelled", "success"].includes(run.status);
+  const canReset = ["completed", "failed", "needs_input", "needs_outside_change", "cancelled", "closed", "success"].includes(run.status);
+  // Close is a button while the run works or waits on an answer; otherwise it sits in More.
+  const closeAsButton = closable && runCloseIsLikely(run.status);
+  const closeInMenu = closable && !closeAsButton;
+  // The PR the dialog offers to close as well: open, so not merged or closed already.
+  const openPrs = run.pr_number && run.status !== "merged" ? [...new Set([run.pr_number, ...(run.pr_numbers ?? [])])] : [];
   const limitTitle = tokensExceeded ? "The monthly token limit is reached" : undefined;
 
   const retry = async () => {
@@ -533,6 +555,39 @@ function RunDetailInner() {
       router.push("/");
     } catch (e) {
       toast(actionError(e, "start this run over"), "error");
+      setBusy(null);
+    }
+  };
+  const closeRun = async (req: CloseRunRequest) => {
+    setBusy("close");
+    try {
+      const r = await api.closeRun(runId, req);
+      if (!r.ok) {
+        toast(r.message || actionError(new Error(r.error), "close this run"), "error");
+        return;
+      }
+      setCloseOpen(false);
+      toast(r.prs_not_closed?.length ? r.message : r.outcome === "already_closed" ? "It was closed already" : "Run closed");
+      fetchRun();
+    } catch (e) {
+      toast(actionError(e, "close this run"), "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+  const reopen = async () => {
+    setBusy("reopen");
+    try {
+      const r = await api.reopenRun(runId);
+      if (!r.ok) {
+        toast(r.message || actionError(new Error(r.error), "reopen this run"), "error");
+      } else {
+        toast("Reopened. Nothing restarted; use Retry to run it again.");
+      }
+      fetchRun();
+    } catch (e) {
+      toast(actionError(e, "reopen this run"), "error");
+    } finally {
       setBusy(null);
     }
   };
@@ -617,8 +672,27 @@ function RunDetailInner() {
         </p>
       )}
 
+      {/* Closed on purpose: who, why, when, and the way back */}
+      {run.status === "closed" && (
+        <div className="mb-6 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4" data-testid="closed-note">
+          <p className="text-sm text-zinc-300 [overflow-wrap:anywhere]">
+            Closed{run.closed_by ? <> by <span className="font-medium text-zinc-100">{run.closed_by}</span></> : null}
+            {run.close_reason ? <> · {run.close_reason}</> : null}
+            {run.closed_at ? <> · <Time iso={run.closed_at} /></> : null}
+          </p>
+          <p className="mt-1 text-xs text-zinc-500">
+            Nothing restarts it by itself. A reopened or edited ticket starts a new run.
+          </p>
+          {canAct && (
+            <button type="button" onClick={reopen} disabled={busy !== null} className={`${linkButton} mt-2`}>
+              {busy === "reopen" ? "Reopening…" : "Reopen"}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Actions, each shown only when the gateway would accept it */}
-      {canAct && (run.status === "running" || canRetry || canReset) && (
+      {canAct && (run.status === "running" || canRetry || canReset || closable) && (
         <div className="mb-6 flex flex-wrap items-center gap-3">
           {run.status === "running" && (
             <button
@@ -652,8 +726,22 @@ function RunDetailInner() {
               {busy === "reset" ? "Starting over…" : "Start over from scratch"}
             </button>
           )}
+          {closeAsButton && (
+            <button type="button" onClick={() => setCloseOpen(true)} disabled={busy !== null} className={secondaryButton}>
+              Close run
+            </button>
+          )}
+          {closeInMenu && <MoreMenu items={[{ label: "Close run…", onSelect: () => setCloseOpen(true) }]} />}
         </div>
       )}
+      <CloseRunDialog
+        open={closeOpen}
+        onOpenChange={setCloseOpen}
+        count={1}
+        prNumbers={openPrs}
+        busy={busy === "close"}
+        onConfirm={closeRun}
+      />
 
       {/* Stats cards */}
       {/* Tokens: the total of all four parts, then each part. */}
@@ -1054,6 +1142,13 @@ function RunDetailInner() {
                     label="Run cancelled"
                     time={run.updated_at}
                     status="failed"
+                  />
+                )}
+                {run.status === "closed" && (
+                  <TrailEntry
+                    label={run.closed_by ? `Closed by ${run.closed_by}` : "Closed"}
+                    time={run.closed_at ?? run.updated_at}
+                    status="done"
                   />
                 )}
               </div>

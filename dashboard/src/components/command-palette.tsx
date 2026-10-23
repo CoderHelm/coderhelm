@@ -8,6 +8,8 @@
 //   reviewed PRs, releases and plans from `GET /api/search` (debounced, one
 //   request at a time); data sources, skills and members from their own
 //   lists, loaded once when the palette first opens (each behind its role).
+// - The open page can offer its own actions ("Close this run") through
+//   `usePaletteActions`; they lead the Actions group while it is open.
 // - ">" at the start shows only actions. Picking a "Search in Runs" scope
 //   narrows the search to that kind; Backspace in the empty box leaves it.
 // - cmdk gives the listbox semantics and arrow / Enter / Home / End keys;
@@ -163,6 +165,29 @@ export function useCommandPalette() {
   return useContext(PaletteContext);
 }
 
+/** Something the open page can do from the palette, e.g. "Close this run". */
+export interface PageAction {
+  id: string;
+  label: string;
+  sub?: string;
+  keywords?: string[];
+  run: () => void;
+}
+
+const PageActionsContext = createContext<(actions: PageAction[] | null) => void>(() => {});
+
+/**
+ * Offer `actions` in the palette while this page is open. Pass a memoized
+ * list (or null for none); they go away when the page does.
+ */
+export function usePaletteActions(actions: PageAction[] | null) {
+  const set = useContext(PageActionsContext);
+  useEffect(() => {
+    set(actions);
+    return () => set(null);
+  }, [actions, set]);
+}
+
 /** True on Apple keyboards, where the shortcut reads ⌘K. */
 function useIsMac() {
   const [mac, setMac] = useState(false);
@@ -224,6 +249,7 @@ export function CommandPaletteProvider({
 }) {
   const [open, setOpen] = useState(false);
   const [scope, setScope] = useState<Scope | null>(null);
+  const [pageActions, setPageActions] = useState<PageAction[] | null>(null);
 
   const openPalette = useCallback((s?: Scope) => {
     setScope(s ?? null);
@@ -250,7 +276,7 @@ export function CommandPaletteProvider({
 
   return (
     <PaletteContext.Provider value={ctx}>
-      {children}
+      <PageActionsContext.Provider value={setPageActions}>{children}</PageActionsContext.Provider>
       {user && (
         <Dialog.Root open={open} onOpenChange={setOpen}>
           <Dialog.Portal>
@@ -261,7 +287,9 @@ export function CommandPaletteProvider({
               className="fixed inset-x-0 top-0 z-[71] mx-auto flex max-h-[100dvh] w-full flex-col overflow-hidden border-zinc-800 bg-zinc-900 shadow-2xl sm:inset-x-4 sm:top-[12vh] sm:max-h-[70vh] sm:max-w-xl sm:rounded-xl sm:border"
             >
               <Dialog.Title className="sr-only">Search and commands</Dialog.Title>
-              {open && <Palette pages={pages} role={user.role} scope={scope} setScope={setScope} close={() => setOpen(false)} />}
+              {open && (
+                <Palette pages={pages} pageActions={pageActions} role={user.role} scope={scope} setScope={setScope} close={() => setOpen(false)} />
+              )}
             </Dialog.Content>
           </Dialog.Portal>
         </Dialog.Root>
@@ -436,12 +464,14 @@ function useServerSearch(q: string, scope: Scope | null) {
 
 function Palette({
   pages,
+  pageActions,
   role,
   scope,
   setScope,
   close,
 }: {
   pages: PalettePage[];
+  pageActions: PageAction[] | null;
   role: string;
   scope: Scope | null;
   setScope: (s: Scope | null) => void;
@@ -475,9 +505,23 @@ function Palette({
       ? "/support?new=1"
       : helpHref(window.location.pathname, helpTargetFromUrl(window.location.pathname, window.location.search)),
   );
-  const actions = useMemo(
-    () => actionsFor(role).map((a) => (a.id === "act:get-help" ? { ...a, href: helpFrom } : a)),
-    [role, helpFrom],
+  const actions = useMemo<Entry[]>(
+    () => [
+      // The open page's own actions first: they are about what is on screen.
+      ...(pageActions ?? []).map<Entry>((a) => ({
+        id: `page-act:${a.id}`,
+        group: "actions",
+        label: a.label,
+        sub: a.sub,
+        keywords: a.keywords,
+        run: () => {
+          close();
+          a.run();
+        },
+      })),
+      ...actionsFor(role).map((a) => (a.id === "act:get-help" ? { ...a, href: helpFrom } : a)),
+    ],
+    [role, helpFrom, pageActions, close],
   );
   const pageEntries = useMemo<Entry[]>(
     () => pages.map((p) => ({ id: `page:${p.href}`, group: "pages", label: p.label, sub: p.section, href: p.href, keywords: p.section ? [p.section] : [] })),
