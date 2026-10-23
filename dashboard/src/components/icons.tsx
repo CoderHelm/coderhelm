@@ -3,6 +3,8 @@ const s = { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "
 // Sidebar nav icons
 /** A lab flask: tests and their results. */
 export const TestTubeIcon = () => <svg {...s}><path d="M9 3h6" /><path d="M10 3v6.2L4.6 18.4A1.7 1.7 0 006.1 21h11.8a1.7 1.7 0 001.5-2.6L14 9.2V3" /><path d="M7.5 15h9" /></svg>;
+/** Lines of a log with a magnifier: the log analyzer's findings. */
+export const LogFindingsIcon = () => <svg {...s}><path d="M4 5h12" /><path d="M4 10h8" /><path d="M4 15h5" /><circle cx="16.5" cy="15.5" r="3.5" /><path d="M19 18l2.5 2.5" /></svg>;
 /** Three connected nodes: the code graph. */
 export const GraphIcon = () => <svg {...s}><circle cx="5.5" cy="6" r="2.5" /><circle cx="18.5" cy="6" r="2.5" /><circle cx="12" cy="18.5" r="2.5" /><path d="M8 6h8" /><path d="M6.8 8.2l4 8" /><path d="M17.2 8.2l-4 8" /></svg>;
 /** An open book: the team's written skills. */
