@@ -257,7 +257,7 @@ test.describe("support tickets for a team", () => {
 
     await page.getByLabel("Subject").fill("The run stopped at the tests");
     await page.getByLabel("What happened?").fill("It failed on a test that passes locally.");
-    await page.getByLabel("How urgent is it?").selectOption("high");
+    await page.getByRole("group", { name: "How urgent is it?" }).getByRole("button", { name: "High" }).click();
     await shot(page, "support-new");
     await page.getByRole("button", { name: "Send to support" }).click();
 

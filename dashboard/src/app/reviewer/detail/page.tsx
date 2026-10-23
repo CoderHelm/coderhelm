@@ -6,6 +6,8 @@ import Link from "next/link";
 import { api, type Review } from "@/lib/api";
 import { RoleGuard } from "@/components/role-guard";
 import { Markdown } from "@/components/markdown";
+import { ChatMarkdown } from "@/components/chat-markdown";
+import { MarkdownEditor, clearDraft } from "@/components/markdown-editor";
 import { useToast } from "@/components/toast";
 import { ReReviewButton } from "@/components/re-review-button";
 import { Callout } from "@/components/callout";
@@ -406,6 +408,7 @@ function Rating({ review, onSaved }: { review: Review; onSaved: () => void }) {
     setSubmitting(true);
     try {
       await api.rateReview(review.sk, "none", comment.trim());
+      clearDraft(`review-note:${review.sk}`);
       toast("Note saved");
       setComment("");
       setNoteOpen(false);
@@ -466,17 +469,19 @@ function Rating({ review, onSaved }: { review: Review; onSaved: () => void }) {
 
       {noteOpen && (
         <div className="mt-4">
-          <label htmlFor="review-note" className="mb-1 block text-xs text-zinc-500">
+          <label htmlFor="review-note" className="mb-1.5 block text-sm font-medium text-zinc-200">
             {rated ? "Tell the reviewer why (optional)" : "Leave a note so the reviewer learns"}
           </label>
-          <textarea
-            ref={noteRef}
+          <MarkdownEditor
+            textareaRef={noteRef}
             id="review-note"
+            variant="prose"
             value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            rows={3}
+            onChange={setComment}
+            minRows={3}
             maxLength={4000}
-            className={inputClass}
+            draftKey={`review-note:${review.sk}`}
+            onSubmitShortcut={() => void submitComment()}
             placeholder="For example: this changes the sign in flow. Flag changes like that next time."
           />
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -504,7 +509,7 @@ function Rating({ review, onSaved }: { review: Review; onSaved: () => void }) {
                 {c.rating === "down" && <span className={TONES.danger.text}>said it was wrong</span>}
                 {c.at && <span>· {new Date(c.at).toLocaleDateString()}</span>}
               </div>
-              <p className="whitespace-pre-line break-words text-zinc-400">{c.text}</p>
+              <div className="break-words"><ChatMarkdown breaks>{c.text}</ChatMarkdown></div>
             </li>
           ))}
         </ul>

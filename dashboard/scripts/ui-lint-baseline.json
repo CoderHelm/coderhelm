@@ -1,11 +1,9 @@
 {
   "//": "Counts the UI lint tolerates today. Lower them as pages are fixed; `node scripts/ui-lint.mjs --update-baseline` rewrites this file.",
-  "fontMono": 156,
+  "fontMono": 153,
   "wideButtons": 0,
   "unlabeledInputs": {
     "src/app/settings/guardrails/page.tsx": 1,
-    "src/app/settings/instructions/page.tsx": 2,
-    "src/app/settings/security/page.tsx": 2,
-    "src/app/settings/voice/page.tsx": 1
+    "src/app/settings/security/page.tsx": 2
   }
 }

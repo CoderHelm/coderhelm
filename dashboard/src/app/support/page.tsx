@@ -6,12 +6,32 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { api, type NewSupportTicket, type SupportItemKind, type SupportItemRef, type SupportPriority, type SupportTicket } from "@/lib/api";
 import { customerLook, filedBy, itemWords, MAX_ATTACHMENTS, pageWords, ticketItems } from "@/lib/support";
 import { AttachmentChips, AttachPicker } from "@/components/support";
-import { Page, PageHeader, cardClass } from "@/components/page";
-import { Field } from "@/components/field";
-import { focusRing, inputClass, primaryButton, secondaryButton } from "@/components/ui";
+import { Page, PageHeader } from "@/components/page";
+import { Field } from "@/components/settings";
+import { MarkdownEditor, clearDraft } from "@/components/markdown-editor";
+import { Segmented } from "@/components/segmented";
+import { focusRing, fullWidthOnPhone, primaryButton, secondaryButton } from "@/components/ui";
 import { List, ListEmpty, ListError, ListRow, ListSkeleton, ListToolbar, StatusText, useListParams } from "@/components/list";
 
 const KINDS: SupportItemKind[] = ["run", "review", "release", "plan", "alert", "data_source"];
+
+const URGENCY: { value: SupportPriority; label: string; means: string }[] = [
+  { value: "normal", label: "Normal", means: "It can wait a little." },
+  { value: "high", label: "High", means: "It blocks some of our work." },
+  { value: "urgent", label: "Urgent", means: "Nothing works for us." },
+];
+
+/** Offered under the body's toolbar, never forced. */
+const ISSUE_TEMPLATE = "### What happened\n\n\n### What you expected\n\n\n### Steps to see it\n1. ";
+
+const BODY_TIPS = [
+  <>Say what you expected, what you saw, and when. A run, review or page attached below helps more than a description of it.</>,
+  <>Leave out passwords, keys and code: support never needs them, and likely secrets are hidden before the ticket is saved.</>,
+  <>Paste an error or a log between lines of three backticks to keep it readable.</>,
+  <>Select words and paste a link to make them a link.</>,
+];
+
+const NEW_TICKET_DRAFT = "support:new-ticket";
 
 export default function SupportPageWithParams() {
   return (
@@ -191,6 +211,7 @@ function NewTicket() {
     if (items.length > 0) req.items = items.map((i) => ({ kind: i.kind, id: i.id, label: i.label || undefined, repo: i.repo || undefined }));
     try {
       const r = await api.openSupportTicket(req);
+      clearDraft(NEW_TICKET_DRAFT);
       router.push(`/support/ticket?id=${encodeURIComponent(r.ticket.id)}&new=1`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not open the ticket.");
@@ -216,50 +237,66 @@ function NewTicket() {
           void submit();
         }}
       >
-        <Field id="ticket-subject" label="Subject">
-          {(p) => (
-            <input
-              {...p}
-              type="text"
-              value={subject}
-              maxLength={150}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder={intro.placeholder}
-              className={inputClass}
-              autoFocus
-            />
-          )}
-        </Field>
         <Field
-          id="ticket-body"
-          label="What happened?"
-          helper="What you expected, what you saw, and when. Please leave out passwords, keys and code: support never needs them, and likely secrets are hidden before the ticket is saved."
-        >
-          {(p) => (
-            <textarea
-              {...p}
-              rows={7}
+          id="ticket-subject"
+          label="Subject"
+          value={subject}
+          maxLength={150}
+          onChange={(e) => setSubject(e.target.value)}
+          placeholder={intro.placeholder}
+          autoFocus
+        />
+        <Field as="custom" id="ticket-body" label="What happened?">
+          {(ids) => (
+            <MarkdownEditor
+              {...ids}
+              variant="prose"
               value={body}
+              onChange={setBody}
               maxLength={8000}
-              onChange={(e) => setBody(e.target.value)}
-              className={`${inputClass} resize-y`}
+              minRows={7}
+              draftKey={NEW_TICKET_DRAFT}
+              placeholder="What happened, what you expected, and when. The template above gives you a head start."
+              template={{ label: "Use issue template", text: ISSUE_TEMPLATE }}
+              tips={BODY_TIPS}
+              onSubmitShortcut={() => void submit()}
             />
           )}
         </Field>
-        <Field id="ticket-priority" label="How urgent is it?">
-          {(p) => (
-            <select {...p} value={priority} onChange={(e) => setPriority(e.target.value as SupportPriority)} className={`${inputClass} sm:w-72`}>
-              <option value="normal">Normal: it can wait a little</option>
-              <option value="high">High: it blocks some of our work</option>
-              <option value="urgent">Urgent: nothing works for us</option>
-            </select>
-          )}
-        </Field>
+        <div>
+          <p id="ticket-priority-label" className="mb-1.5 text-sm font-medium text-zinc-200">
+            How urgent is it?
+          </p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <Segmented label="How urgent is it?" options={URGENCY} value={priority} onChange={setPriority} />
+            <span className="text-xs text-zinc-500" data-testid="ticket-urgency-means">
+              {URGENCY.find((u) => u.value === priority)?.means}
+            </span>
+          </div>
+        </div>
 
-        <section aria-labelledby="attached-heading" className={cardClass} data-testid="ticket-attached">
-          <h2 id="attached-heading" className="text-sm font-semibold text-zinc-100">
-            Sent with your ticket
-          </h2>
+        <section
+          aria-labelledby="attached-heading"
+          className="rounded-lg border border-zinc-800/80 bg-zinc-900/30 px-3 py-2.5 text-xs text-zinc-400"
+          data-testid="ticket-attached"
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <h2 id="attached-heading" className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              Sent with your ticket
+            </h2>
+            <span className="text-zinc-600">Never your code, diffs or settings.</span>
+          </div>
+          <ul className="mt-2 space-y-1">
+            {page && (
+              <li className="flex flex-wrap items-center justify-between gap-2">
+                <span className="min-w-0 [overflow-wrap:anywhere]">Page: {pageWords(page)}</span>
+                <button type="button" onClick={() => setPage("")} className={`rounded text-xs text-zinc-500 underline underline-offset-4 hover:text-zinc-300 ${focusRing}`}>
+                  Remove
+                </button>
+              </li>
+            )}
+            <li>Your team, your role and your email, so we can answer.</li>
+          </ul>
           <div className="mt-2 space-y-2">
             {items.length > 0 && (
               <AttachmentChips items={items} onRemove={(i) => setItems(items.filter((x) => x !== i))} label="Attached to your ticket" />
@@ -272,24 +309,12 @@ function NewTicket() {
                 onClick={() => setPicking(true)}
                 disabled={items.length >= MAX_ATTACHMENTS}
                 data-testid="ticket-attach"
-                className={`rounded text-sm text-zinc-300 underline underline-offset-4 hover:text-zinc-100 disabled:opacity-50 ${focusRing}`}
+                className={`rounded text-xs text-zinc-300 underline underline-offset-4 hover:text-zinc-100 disabled:opacity-50 ${focusRing}`}
               >
-                Attach runs, reviews, releases, plans, alerts or data sources
+                + Attach runs, reviews, releases, plans, alerts or data sources
               </button>
             )}
           </div>
-          <ul className="mt-3 space-y-1.5 text-sm text-zinc-400">
-            {page && (
-              <li className="flex flex-wrap items-center justify-between gap-2">
-                <span className="min-w-0 [overflow-wrap:anywhere]">Page: {pageWords(page)}</span>
-                <button type="button" onClick={() => setPage("")} className={`rounded text-xs text-zinc-500 underline underline-offset-4 hover:text-zinc-300 ${focusRing}`}>
-                  Remove
-                </button>
-              </li>
-            )}
-            <li>Your team, your role and your email, so we can answer.</li>
-          </ul>
-          <p className="mt-2 text-xs text-zinc-500">Never your code, diffs or settings.</p>
         </section>
 
         {error && (
@@ -297,11 +322,11 @@ function NewTicket() {
             {error}
           </p>
         )}
-        <div className="flex flex-wrap justify-end gap-2">
-          <Link href="/support" className={secondaryButton}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Link href="/support" className={`${secondaryButton} ${fullWidthOnPhone}`}>
             Cancel
           </Link>
-          <button type="submit" disabled={busy || !subject.trim() || !body.trim()} className={primaryButton}>
+          <button type="submit" disabled={busy || !subject.trim() || !body.trim()} className={`${primaryButton} ${fullWidthOnPhone}`}>
             {busy ? "Sending…" : "Send to support"}
           </button>
         </div>

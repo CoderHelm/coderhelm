@@ -9,6 +9,8 @@ import { TextareaSkeleton } from "@/components/skeleton";
 import { RepoCombobox } from "@/components/repo-combobox";
 import { Page, PageHeader } from "@/components/page";
 import { primaryButton, secondaryButton, smallSecondaryButton } from "@/components/ui";
+import { Field } from "@/components/settings";
+import { MarkdownEditor } from "@/components/markdown-editor";
 
 function Tab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
@@ -24,6 +26,7 @@ function Tab({ label, active, onClick }: { label: string; active: boolean; onCli
 }
 
 function VoiceEditor({
+  fieldId,
   content,
   setContent,
   saving,
@@ -32,6 +35,7 @@ function VoiceEditor({
   onRegenerate,
   loading,
 }: {
+  fieldId: string;
   content: string;
   setContent: (v: string) => void;
   saving: boolean;
@@ -43,23 +47,31 @@ function VoiceEditor({
   if (loading) return <TextareaSkeleton />;
   return (
     <>
-      <textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        rows={20}
-        placeholder={`# Team Voice\n\n## Tone\nCasual and direct. No emojis in code.\n\n## Commit Messages\nConventional commits (feat:, fix:, chore:). Imperative mood.\n\n## PR Descriptions\nStructured with Problem, Changes, Risk, Verification sections.\n\n## Language\nTechnical but concise. Avoid jargon.`}
-        className="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 font-mono placeholder-zinc-700 focus:outline-none focus:border-zinc-500 resize-y"
-      />
-      <div className="flex items-center gap-3 mt-3">
+      <Field as="custom" id={fieldId} label="Voice" help="Used when Coderhelm writes pull request descriptions, commit messages and code comments.">
+        {(ids) => (
+          <MarkdownEditor
+            {...ids}
+            variant="instructions"
+            value={content}
+            onChange={setContent}
+            minRows={14}
+            previewNote="Coderhelm reads this as written. This is how its headings and lists read."
+            placeholder={`# Team Voice\n\n## Tone\nCasual and direct. No emojis in code.\n\n## Commit Messages\nConventional commits (feat:, fix:, chore:). Imperative mood.\n\n## PR Descriptions\nStructured with Problem, Changes, Risk, Verification sections.\n\n## Language\nTechnical but concise. Avoid jargon.`}
+          />
+        )}
+      </Field>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
+          type="button"
           onClick={onSave}
           disabled={saving}
           className={primaryButton}
         >
-          {saving ? "Saving..." : "Save"}
+          {saving ? "Saving…" : "Save"}
         </button>
         {onRegenerate && (
           <button
+            type="button"
             onClick={onRegenerate}
             disabled={regenerating}
             className={secondaryButton}
@@ -67,7 +79,6 @@ function VoiceEditor({
             {regenerating ? "Regenerating..." : "Regenerate"}
           </button>
         )}
-        <span className="text-xs text-zinc-600">Used when it writes pull request descriptions.</span>
       </div>
     </>
   );
@@ -180,6 +191,7 @@ function VoicePage() {
 
       {tab === "global" ? (
         <VoiceEditor
+          fieldId="global-voice"
           content={globalContent}
           setContent={setGlobalContent}
           saving={globalSaving}
@@ -213,6 +225,7 @@ function VoicePage() {
             </div>
           ) : (
             <VoiceEditor
+              fieldId="repo-voice"
               content={repoContent}
               setContent={setRepoContent}
               saving={repoSaving}

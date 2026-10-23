@@ -131,7 +131,7 @@ function TicketPage() {
       <div className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="min-w-0">
           <SupportThread messages={detail.messages} />
-          <ReplyBox onSend={send} placeholder="Add more detail, or answer support's question" attachRoom={MAX_ATTACHMENTS - ticketItems(t).length} />
+          <ReplyBox onSend={send} placeholder="Add more detail, or answer support's question" attachRoom={MAX_ATTACHMENTS - ticketItems(t).length} draftKey={`support:reply:${t.id}`} />
         </div>
         <aside className="min-w-0 space-y-5 lg:order-last">
           <TicketContext ticket={t} />

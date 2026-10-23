@@ -692,3 +692,40 @@ test("a plan's page says what the chat it was made in used", async ({ page }) =>
   await shot(page, "plans-detail-used");
   expect(errors).toEqual([]);
 });
+
+test("the plan chat box keeps Enter to send and Shift+Enter for a new line, with formatting behind Aa", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page);
+  await page.goto("/plans/new/");
+  const box = page.getByRole("textbox", { name: "Message" });
+  await box.click();
+  await page.keyboard.type("- first line");
+  await page.keyboard.press("Shift+Enter");
+  // Shift+Enter is a plain new line in a chat box: no list marker added, nothing sent.
+  await expect(box).toHaveValue("- first line\n");
+  await page.keyboard.type("second line");
+  expect(db.chatPosts).toBe(0);
+
+  // The toolbar is folded until Aa opens it.
+  await expect(page.getByRole("toolbar", { name: "Formatting" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Show formatting" }).click();
+  await expect(page.getByRole("toolbar", { name: "Formatting" })).toBeVisible();
+  // Both widths, with no sideways scroll.
+  await shot(page, "md-editor-plan-chat");
+  // ⌘B / Ctrl+B works with the toolbar open or shut.
+  await box.press("ControlOrMeta+a");
+  await page.getByRole("toolbar", { name: "Formatting" }).getByRole("button", { name: "Bold" }).click();
+  await expect(box).toHaveValue("**- first line\nsecond line**");
+  await box.press("ControlOrMeta+z");
+  await expect(box).toHaveValue("- first line\nsecond line");
+  await box.press("End");
+
+  await page.keyboard.press("Enter");
+  await expect.poll(() => db.chatPosts).toBe(1);
+  const msgs = (db.chatBody?.messages ?? []) as { role: string; content: string }[];
+  expect(msgs[msgs.length - 1]?.content).toBe("- first line\nsecond line");
+  // What was sent shows as markdown in the thread.
+  await expect(page.getByTestId("user-message").getByRole("listitem")).toHaveCount(1);
+  await expect(page.getByTestId("user-message").getByRole("listitem")).toContainText("first line");
+  expect(errors).toEqual([]);
+});

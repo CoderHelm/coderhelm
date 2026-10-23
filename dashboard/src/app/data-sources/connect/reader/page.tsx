@@ -9,6 +9,7 @@ import { useToast } from "@/components/toast";
 import { Callout } from "@/components/callout";
 import { CheckList, type CheckItem } from "@/components/check-list";
 import { Field, SecretInput } from "@/components/field";
+import { MarkdownEditor } from "@/components/markdown-editor";
 import { FlowShell } from "@/components/data-source-flow-shell";
 import { inputClass, primaryButton } from "@/components/ui";
 
@@ -143,13 +144,14 @@ function ConnectReaderPage() {
           helper="What agents should know when they use it: what the system is, what its fields mean, where else its data lives. Optional; you can add it later."
         >
           {(p) => (
-            <textarea
+            <MarkdownEditor
               {...p}
-              rows={5}
+              variant="instructions"
+              minRows={5}
               maxLength={4000}
-              className={inputClass}
               value={guide}
-              onChange={(e) => setGuide(e.target.value)}
+              onChange={setGuide}
+              previewNote="Agents get this text as written with the source."
               placeholder={rest ? "quantity on a product is sessions per week on weekly packs, but the session count on season packs." : "schedule_class holds one document per class; facility_id is the class's own."}
             />
           )}

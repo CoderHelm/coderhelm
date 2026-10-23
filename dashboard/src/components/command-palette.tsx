@@ -232,6 +232,8 @@ export function CommandPaletteProvider({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // A text box that uses ⌘K itself (the markdown editor's link) has taken it.
+      if (e.defaultPrevented) return;
       if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey) {
         e.preventDefault();
         setOpen((v) => {
