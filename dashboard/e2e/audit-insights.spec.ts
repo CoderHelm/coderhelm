@@ -30,7 +30,7 @@ const HEALTH = {
   checks: [
     { name: "crashed_runs", status: "ok", count: 0, items: [] },
     { name: "stale_queued", status: "ok", count: 0, items: [] },
-    { name: "dlq", status: "critical", depth: 2 },
+    { name: "dlq", status: "critical", count: 1, unretryable: 0, oldest_age_secs: 600, complete: true },
     { name: "tickets", status: "ok", visible: 1, in_flight: 2 },
     {
       name: "failed_runs_24h",
@@ -290,7 +290,7 @@ test("health shows checks in plain words and links failed runs", async ({ page }
 
 test("health asks before deleting failed messages", async ({ page }) => {
   const db = await mockApi(page, {
-    dlq: [{ message_id: "m1", receipt_handle: "rh1", body: { type: "ticket", team_id: "t_1" }, sent_at: NOW, receive_count: 3, source_queue: "" }],
+    dlq: [{ message_id: "m1", type: "ticket", body: { type: "ticket", team_id: "t_1" }, sent_at: NOW, age_secs: 600, source_queue: "", retryable: true, problem: null }],
   });
   await page.goto("/health");
   await page.getByRole("button", { name: /Failed messages/ }).click();

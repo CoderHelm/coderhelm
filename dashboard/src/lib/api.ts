@@ -198,19 +198,27 @@ export const api = {
   // Health
   getHealth: () => request<HealthCheck>("/api/health"),
 
-  // DLQ Management
+  // Failed messages (the team's part of the shared DLQ). Redrive and delete
+  // name the message by id; the gateway reads it back and checks the team.
   getDlqMessages: () => request<DlqList>("/api/dlq"),
-  redriveDlqMessage: (receipt_handle: string, body: unknown) =>
+  redriveDlqMessage: (message_id: string) =>
     request<void>("/api/dlq/redrive", {
       method: "POST",
-      body: JSON.stringify({ receipt_handle, body }),
+      body: JSON.stringify({ message_id }),
     }),
-  deleteDlqMessage: (receipt_handle: string) =>
+  deleteDlqMessage: (message_id: string) =>
     request<void>("/api/dlq/delete", {
       method: "POST",
-      body: JSON.stringify({ receipt_handle }),
+      body: JSON.stringify({ message_id }),
     }),
   purgeDlq: () => request<void>("/api/dlq/purge", { method: "POST" }),
+  /** The whole shared DLQ, every team's and the global jobs'. Platform admin only. */
+  adminDlq: () => request<AdminDlqList>("/api/admin/dlq"),
+  adminDlqDelete: (message_id: string) =>
+    request<void>("/api/admin/dlq/delete", {
+      method: "POST",
+      body: JSON.stringify({ message_id }),
+    }),
 
   // Banners
   getBanners: () => request<{ banners: Banner[] }>("/api/banners"),
@@ -1722,7 +1730,11 @@ export interface HealthCheckItem {
   name: string;
   status: "ok" | "warning" | "critical";
   count?: number;
-  depth?: number;
+  /** Failed messages: when the team's oldest was first sent, and its age. */
+  oldest_sent_at?: string | null;
+  oldest_age_secs?: number | null;
+  /** Failed messages: the team's messages that can never be retried. */
+  unretryable?: number;
   visible?: number;
   in_flight?: number;
   items?: {
@@ -1742,16 +1754,44 @@ export interface HealthCheck {
 
 export interface DlqMessage {
   message_id: string;
-  receipt_handle: string;
-  body: Record<string, unknown>;
-  sent_at: string;
-  receive_count: number;
+  /** The message's type tag, as stored (null when it has none). */
+  type: string | null;
+  sent_at: string | null;
+  age_secs: number | null;
+  /** The queue it failed on, by name. */
   source_queue: string;
+  /** False when sending it again can only fail: the worker can't read it. */
+  retryable: boolean;
+  /** Why it can't be retried, e.g. "unknown message type `SkillSync`". */
+  problem: string | null;
+  /** The stored body: parsed JSON, or the raw text when it isn't JSON. */
+  body: unknown;
 }
 
 export interface DlqList {
   messages: DlqMessage[];
+  /** The team's failed messages that can be retried (its Problem). */
   count: number;
+  /** The team's messages that can't be retried. */
+  unretryable: number;
+  complete: boolean;
+}
+
+export interface AdminDlqMessage extends DlqMessage {
+  team_id: string | null;
+  global: boolean;
+  /** Counts for no team: unreadable, a global job, or no team at all. */
+  shared_only: boolean;
+}
+
+export interface AdminDlqList {
+  messages: AdminDlqMessage[];
+  count: number;
+  shared: number;
+  unreadable: number;
+  complete: boolean;
+  cleanup_after_days: number;
+  retention_days: number;
 }
 
 export interface JiraCheck {
