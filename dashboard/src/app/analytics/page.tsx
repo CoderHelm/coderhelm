@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { api, type Analytics, type AnalyticsComparison, type AnalyticsCounts, type AnalyticsPeriod } from "@/lib/api";
+import { api, type Analytics, type AnalyticsCiOutcomes, type AnalyticsComparison, type AnalyticsCounts, type AnalyticsPeriod } from "@/lib/api";
 import { CardSkeleton, ChartSkeleton } from "@/components/skeleton";
 import { Segmented } from "@/components/segmented";
 import { Callout } from "@/components/callout";
@@ -329,11 +329,14 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
           ])}
           empty={`No failed runs in ${span}.`}
         />
-        {data.ci.runs_with_red_ci > 0 && (
-          <p className="mt-3 text-sm text-zinc-400">
-            CI went red on {plural(data.ci.runs_with_red_ci, "run")}. Coderhelm tried {plural(data.ci.fix_attempts, "fix", "fixes")}, pushed {plural(data.ci.fix_commits, "change")}, and {count(data.ci.fixed_by_coderhelm)} ended green.
+        {(data.ci.runs_with_red_ci > 0 || (data.ci.red_on_base_runs ?? 0) > 0) && (
+          <p className="mt-3 text-sm text-zinc-400" data-testid="ci-line">
+            CI went red on {plural(data.ci.runs_with_red_ci, "run")}
+            {(data.ci.red_on_base_runs ?? 0) > 0 && <>, plus {plural(data.ci.red_on_base_runs ?? 0, "run")} red only on checks that already fail on the base branch</>}
+            . Coderhelm tried {plural(data.ci.fix_attempts, "fix", "fixes")}, pushed {plural(data.ci.fix_commits, "change")}, and {count(data.ci.fixed_by_coderhelm)} ended green after its fixes.
           </p>
         )}
+        {data.ci.outcomes && <CiOutcomes ci={data.ci} outcomes={data.ci.outcomes} />}
       </Section>
 
       <Section title="Reviews" id="reviews" description="Pull request reviews Coderhelm posted, and what became of the findings it raised before.">
@@ -625,6 +628,28 @@ function Comparison({ c, period, previous, mtd }: { c: AnalyticsComparison; peri
 
 /** Time saved is an estimate, so it only appears with the reader's own
  *  assumption, and the formula is shown beside the number. */
+/** How each run whose CI went red ended up: every red run is in one row. */
+function CiOutcomes({ ci, outcomes }: { ci: Analytics["ci"]; outcomes: AnalyticsCiOutcomes }) {
+  const reasons = ci.gave_up_reasons ?? [];
+  const gaveUp: ReactNode[][] = reasons.length
+    ? reasons.map((r) => [`Gave up: ${r.reason}`, r.count])
+    : [["Gave up", outcomes.gave_up]];
+  const rows: ReactNode[][] = [
+    ["Green after a Coderhelm fix", outcomes.green_after_fix],
+    ["Green without a Coderhelm fix", outcomes.green_without_fix],
+    ["Flaky: green on a re-run", outcomes.flaky],
+    ["Red only on checks that fail on the base branch", outcomes.red_on_base],
+    ...gaveUp,
+    ["Still running", outcomes.running],
+  ];
+  return (
+    <div className="mt-4">
+      <h3 className="mb-2 text-sm font-medium text-zinc-200">CI outcomes</h3>
+      <Table label="CI outcomes" head={["How red CI ended", "Runs"]} rows={rows} empty="No red CI." />
+    </div>
+  );
+}
+
 function TimeSaved({ merged, span }: { merged: number; span: string }) {
   const [minutes, setMinutes] = useState<string>("");
   useEffect(() => {

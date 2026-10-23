@@ -2288,7 +2288,21 @@ export interface Analytics {
   /** One row per person (however Jira, GitHub or the dashboard named them), CoderHelm's own work, and runs that recorded nobody. */
   people: { person: string; kind?: "person" | "coderhelm" | "not_recorded"; runs: number; merged: number }[];
   failures: { reason: string; count: number; last_run_id: string; last_at: string }[];
-  ci: { runs_with_red_ci: number; fixed_by_coderhelm: number; fix_rate: number | null; fix_attempts: number; fix_commits: number };
+  ci: {
+    /** Runs whose own CI went red (runs red only on base-branch checks are counted apart). */
+    runs_with_red_ci: number;
+    fixed_by_coderhelm: number;
+    /** Green after a Coderhelm fix, out of the red runs that are no longer running. */
+    fix_rate: number | null;
+    fix_attempts: number;
+    fix_commits: number;
+    /** Runs red only on checks that also fail on the base branch. */
+    red_on_base_runs?: number;
+    /** How each red run ended. Missing from older backends. */
+    outcomes?: AnalyticsCiOutcomes;
+    /** Why Coderhelm left a red PR to a person, most common first. */
+    gave_up_reasons?: { reason: string; count: number }[];
+  };
   reviews: {
     posted: number; approve: number; request_changes: number; comment: number; questions: number; prs_reviewed: number;
     findings: number; findings_fixed: number; findings_settled_by_person: number; acted_on_rate: number | null;
@@ -2314,7 +2328,20 @@ export type TestState = "healthy" | "flaky" | "broken" | "quarantined" | "fixed"
 export type TestSort = "impact" | "flake_rate" | "slowest" | "recent";
 export type AttemptStatus = "passed" | "failed" | "timedOut" | "skipped" | "interrupted";
 export type RunOutcome = "passed" | "failed" | "flaky" | "skipped";
-export type FixStatus = "reproducing" | "fixing" | "burn_in" | "opened" | "merged" | "failed";
+/** How the runs whose CI went red ended up; each red run is in exactly one. */
+export interface AnalyticsCiOutcomes {
+  green_after_fix: number;
+  /** Green without a Coderhelm fix (a person's push, a later run). */
+  green_without_fix: number;
+  /** Green after a re-run of the failed jobs, with no code change. */
+  flaky: number;
+  /** Red only on checks that also fail on the base branch. */
+  red_on_base: number;
+  gave_up: number;
+  running: number;
+}
+
+export type FixStatus ="reproducing" | "fixing" | "burn_in" | "opened" | "merged" | "failed";
 export type CauseLabel =
   | "selector_changed"
   | "missing_wait"
