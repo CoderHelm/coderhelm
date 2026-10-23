@@ -96,7 +96,11 @@ function analytics(period: string, repo: string | null) {
       { reason: "Timed out after #s", count: 3, last_run_id: "01RUNFAILED00000000000000A", last_at: new Date().toISOString() },
       { reason: "Branch … already exists", count: 1, last_run_id: "01RUNFAILED00000000000000B", last_at: new Date().toISOString() },
     ],
-    ci: { runs_with_red_ci: 8, fixed_by_coderhelm: 6, fix_rate: 0.75, fix_attempts: 11, fix_commits: 9 },
+    ci: {
+      runs_with_red_ci: 8, fixed_by_coderhelm: 6, fix_rate: 0.75, fix_attempts: 11, fix_commits: 9, red_on_base_runs: 1,
+      outcomes: { green_after_fix: 6, green_without_fix: 0, flaky: 1, red_on_base: 1, gave_up: 1, running: 0 },
+      gave_up_reasons: [{ reason: "Fix attempts used up", count: 1 }],
+    },
     reviews: {
       posted: 55, approve: 30, request_changes: 5, comment: 20, questions: 4, prs_reviewed: 38, findings: 70,
       findings_fixed: 24, findings_settled_by_person: 8, acted_on_rate: 0.75, outcomes_known_reviews: 20, thumbs_up: 12, thumbs_down: 2,
@@ -193,6 +197,25 @@ test("the scorecard answers whether it is worth it, against the previous period"
   await expect(page.getByRole("link", { name: "#101" })).toHaveAttribute("href", "https://github.com/your-team/web/pull/101");
   expect(db.calls).toContain("/api/analytics?days=30");
   await shot(page, "analytics");
+});
+
+test("where it struggles places every red CI run in one outcome, base-branch failures apart", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/analytics");
+  await expect(page.getByTestId("ci-line")).toContainText("CI went red on 8 runs, plus 1 run red only on checks that already fail on the base branch");
+  await expect(page.getByTestId("ci-line")).toContainText("6 ended green after its fixes");
+  const outcomes = page.getByRole("table", { name: "CI outcomes" });
+  await expect(outcomes.locator("tbody tr td:first-child")).toHaveText([
+    "Green after a Coderhelm fix",
+    "Green without a Coderhelm fix",
+    "Flaky: green on a re-run",
+    "Red only on checks that fail on the base branch",
+    "Gave up: Fix attempts used up",
+    "Still running",
+  ]);
+  await expect(outcomes.locator("tbody tr td:nth-child(2)")).toHaveText(["6", "0", "1", "1", "1", "0"]);
+  await page.getByRole("table", { name: "CI outcomes" }).scrollIntoViewIfNeeded();
+  await shot(page, "analytics-ci-outcomes");
 });
 
 test("period and repository filters reload, and a chart can be read as a table", async ({ page }) => {
