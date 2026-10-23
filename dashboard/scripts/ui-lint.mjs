@@ -10,6 +10,10 @@
 //   brand            "CoderHelm" anywhere in src; the product is "Coderhelm"
 //   jargon           openspec, "<something> pass", TOTP, HMAC, "Log Analyzer" in UI copy
 //   unlabeled-input  an <input>, <textarea> or <select> with no label, beyond the baseline
+//   page-route       a page (src/app/**/page.tsx) with no entry in lib/routes.ts, so the top bar can't name it
+//   page-header      a page drawing its own header: a raw <h1>, a "←" back link or its own breadcrumb.
+//                    The shell's one top bar holds the trail and the back arrow; pages describe
+//                    themselves with <PageHeader> (components/page.tsx)
 // Reports (never fail, counted against the baseline so they can be tightened):
 //   font-mono        `font-mono` outside <Code>, <CodeBlock> and the shared mono input
 //   pre              a hand-rolled <pre> outside <CodeBlock> (a block of code gets its header, Copy and highlighting there)
@@ -239,6 +243,57 @@ for (const file of walk(SRC)) {
     }
     node.forEachChild(visit);
   });
+}
+
+// ── One top bar per page ───────────────────────────────────────────
+//
+// The shell draws exactly one top bar (components/top-bar.tsx). Every page
+// must be named in the route map, and no page draws a heading, a back link or
+// a breadcrumb of its own: <PageHeader> does that through the bar.
+
+const ROUTES_FILE = path.join(SRC, "lib", "routes.ts");
+const routeKeys = new Set([...fs.readFileSync(ROUTES_FILE, "utf8").matchAll(/^\s*"(\/[^"]*)":\s*\{/gm)].map((m) => m[1]));
+/** Files that may draw an <h1>: the bar, PageHeader, Markdown renderers, the screens shown before the shell. */
+const H1_HOMES = new Set([
+  "src/components/top-bar.tsx",
+  "src/components/page.tsx",
+  "src/components/markdown.tsx",
+  "src/components/chat-markdown.tsx",
+  "src/components/client-shell.tsx",
+]);
+
+function textHit(rule, rel, text, index, message, match) {
+  if (allowed(rule, rel, match)) return;
+  const before = text.slice(0, index);
+  const line = before.split("\n").length;
+  const col = index - before.lastIndexOf("\n");
+  errors.push({ rule, file: rel, line, col, message });
+}
+
+for (const file of walk(SRC)) {
+  const rel = path.relative(ROOT, file).split(path.sep).join("/");
+  const text = fs.readFileSync(file, "utf8");
+  const page = rel.match(/^src\/app\/(.*)page\.tsx$/);
+  if (page) {
+    const route = "/" + page[1].replace(/\/$/, "");
+    if (!routeKeys.has(route)) textHit("page-route", rel, text, 0, `${route} has no entry in src/lib/routes.ts; add its label and parent`, route);
+  }
+  if (!rel.endsWith(".tsx")) continue;
+  if (!H1_HOMES.has(rel)) {
+    for (const m of text.matchAll(/<h1[\s>]/g)) {
+      textHit("page-header", rel, text, m.index, "raw <h1>: use <PageHeader> (an item's page: <PageHeader detail>)", text.slice(m.index, text.indexOf("\n", m.index)));
+    }
+  }
+  if (rel.startsWith("src/app/")) {
+    for (const m of text.matchAll(/←/g)) {
+      textHit("page-header", rel, text, m.index, "a back link: the top bar's trail (and its back arrow on a phone) goes up a level", text.slice(text.lastIndexOf("\n", m.index) + 1, text.indexOf("\n", m.index)).trim());
+    }
+  }
+  if (rel !== "src/components/top-bar.tsx") {
+    for (const m of text.matchAll(/aria-label="Breadcrumb"/g)) {
+      textHit("page-header", rel, text, m.index, "a breadcrumb of its own: the top bar draws the trail from src/lib/routes.ts", m[0]);
+    }
+  }
 }
 
 // ── Baselines ──────────────────────────────────────────────────────

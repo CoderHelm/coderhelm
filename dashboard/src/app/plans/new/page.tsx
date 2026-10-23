@@ -10,7 +10,7 @@ import { prefetchStreamToken } from "@/lib/stream-client";
 import { useSmartScroll, ScrollPill } from "@/components/smart-scroll";
 import { RefreshIcon } from "@/components/stream-icons";
 import { focusRing, secondaryButton } from "@/components/ui";
-import { Page } from "@/components/page";
+import { OwnTitle, Page, PageHeader } from "@/components/page";
 import { Segmented } from "@/components/segmented";
 import { Composer } from "./composer";
 import { AssistantMessage, TimeDivider, UserMessage, timeDivider } from "./conversation";
@@ -243,6 +243,7 @@ function NewPlan() {
   if (messages.length <= 1) {
     return (
       <Page>
+        <OwnTitle />
         <Starter
           input={input}
           setInput={setInput}
@@ -269,16 +270,16 @@ function NewPlan() {
   };
 
   return (
-    <Page className="flex h-[calc(100dvh-6.5rem)] flex-col md:h-[calc(100dvh-4rem)]">
-      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <Link href="/plans" className={`rounded text-sm text-zinc-500 hover:text-zinc-300 ${focusRing}`}>
-          ← Plans
-        </Link>
-        <h1 className="text-sm font-semibold text-zinc-200">New plan</h1>
-        <button type="button" onClick={startOver} disabled={isActive} className={`ml-auto ${secondaryButton} !min-h-8 !px-3 text-xs`}>
-          Start over
-        </button>
-      </div>
+    // The column fills the window under the top bar (3rem plus its border).
+    <Page className="flex h-[calc(100dvh-5.25rem)] flex-col md:h-[calc(100dvh-7.25rem)]">
+      <PageHeader
+        title="New plan"
+        actions={
+          <button type="button" onClick={startOver} disabled={isActive} className={secondaryButton}>
+            Start over
+          </button>
+        }
+      />
 
       {panelShown && (
         <div className="mb-3 lg:hidden">

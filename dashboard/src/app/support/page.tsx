@@ -229,12 +229,8 @@ function NewTicket() {
   return (
     <Page narrow>
       <PageHeader
-        breadcrumb={
-          <Link href="/support" className={`rounded text-sm text-zinc-500 hover:text-zinc-300 ${focusRing}`}>
-            ← Support
-          </Link>
-        }
         title={intro.title}
+        crumb={intro.title}
         lead={intro.lead}
       />
       <form

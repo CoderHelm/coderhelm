@@ -40,12 +40,6 @@ function GateSkeleton() {
   );
 }
 
-const backLink = (
-  <Link href="/reviewer" className={`text-sm text-zinc-500 hover:text-zinc-300 rounded ${focusRing}`}>
-    ← Reviewer
-  </Link>
-);
-
 const MARKS: Record<string, { glyph: string; cls: string; sr: string }> = {
   done: { glyph: "✓", cls: "text-emerald-400", sr: "Done:" },
   waiting: { glyph: "○", cls: "text-amber-400", sr: "Waiting:" },
@@ -95,7 +89,6 @@ function GatePage() {
   if (state === "missing" || !gate) {
     return (
       <Page className="space-y-4">
-        {backLink}
         <Callout variant={state === "error" ? "error" : "warning"} title={state === "error" ? "Could not load auto-merge" : "Pull request not found"}>
           <p>
             {state === "error"
@@ -149,8 +142,9 @@ function GatePage() {
 
   return (
     <Page className="space-y-6">
-      {backLink}
       <PageHeader
+        detail
+        crumb={`${gate.repo.split("/").pop()} #${gate.pr_number}`}
         title={gate.pr_title || `${gate.repo} #${gate.pr_number}`}
         eyebrow={
           <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">

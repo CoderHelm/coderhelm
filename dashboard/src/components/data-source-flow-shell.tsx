@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { CopyButton } from "./copy-button";
 import { Stepper } from "./stepper";
 import { focusRing } from "./ui";
+import { PageHeader } from "./page";
 
 /** Layout shared by every data-source setup screen: back link, steps, title. */
 export function FlowShell({
@@ -30,9 +31,7 @@ export function FlowShell({
           <Stepper steps={steps} current={step} />
         </nav>
         <div className="flex min-w-0 flex-col gap-5">
-          <h1 id="step-heading" tabIndex={-1} className="text-xl font-bold text-zinc-100 text-balance focus:outline-none">
-            {title}
-          </h1>
+          <PageHeader detail crumb={false} title={title} titleId="step-heading" titleClassName="text-balance" />
           {children}
           <div>
             <CopyButton

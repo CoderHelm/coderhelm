@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeader } from "@/components/page";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
@@ -168,11 +169,13 @@ function ConnectDataSourcePage() {
   } else {
     return (
       <div className="mx-auto w-full min-w-0 max-w-6xl">
-        <h1 id="step-heading" tabIndex={-1} className="text-2xl font-bold text-zinc-100 focus:outline-none">Fact-checking is on</h1>
-        <p className="mt-2 max-w-prose text-sm text-zinc-400">
-          Coderhelm uses it from now on, while it plans, writes code and reviews. When it looks something up, the plan or
-          pull request shows what it asked and what came back.
-        </p>
+        <PageHeader
+          detail
+          crumb={false}
+          title="Fact-checking is on"
+          titleId="step-heading"
+          lead="Coderhelm uses it from now on, while it plans, writes code and reviews. When it looks something up, the plan or pull request shows what it asked and what came back."
+        />
         {!source.enabled && (
           <div className="mt-5 max-w-prose">
             <Callout variant="warning" title={`${source.name} is paused right now`}>

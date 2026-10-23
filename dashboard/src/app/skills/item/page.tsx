@@ -105,11 +105,8 @@ function ItemPage() {
   return (
     <Page>
       <PageHeader
-        breadcrumb={
-          <Link href="/skills" className={`text-sm text-zinc-400 hover:text-zinc-200 rounded ${focusRing}`}>
-            ← Skills
-          </Link>
-        }
+        detail
+        crumb={item.name}
         eyebrow={<span className="capitalize">{kindWord}</span>}
         title={<span className="font-mono [overflow-wrap:anywhere]">{item.name}</span>}
         lead={item.description || undefined}

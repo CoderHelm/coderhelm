@@ -1222,10 +1222,8 @@ function RouteEditor({
   // Stable keys for rules, so moving one keeps its typed text with it.
   const keys = useRef<string[]>(initial.rules.map((r, i) => r.id ?? `k${i}`));
   const nextKey = useRef(initial.rules.length);
-  const heading = useRef<HTMLHeadingElement>(null);
-
   useEffect(() => {
-    heading.current?.focus();
+    document.getElementById("alert-route-heading")?.focus();
     window.scrollTo({ top: 0 });
   }, []);
 
@@ -1297,16 +1295,18 @@ function RouteEditor({
 
   return (
     <div>
-      <button type="button" onClick={onClose} className={`${linkButton} text-zinc-400`}>
-        <span aria-hidden="true">←&nbsp;</span>Back to alert routes
-      </button>
-      <h1 ref={heading} tabIndex={-1} className="mt-3 text-2xl font-bold text-zinc-100 focus:outline-none">
-        {isNew ? "Add an alert route" : `Edit the route for ${topicName(topic)}`}
-      </h1>
-      <p className="mt-1 max-w-prose text-sm text-zinc-400">
-        Rules are checked in order and the first one that takes an alert opens a pull request. Alerts no rule takes only post to chat, at no
-        token cost.
-      </p>
+      <PageHeader
+        detail
+        crumb={isNew ? "New route" : topicName(topic)}
+        title={isNew ? "Add an alert route" : `Edit the route for ${topicName(topic)}`}
+        titleId="alert-route-heading"
+        lead="Rules are checked in order and the first one that takes an alert opens a pull request. Alerts no rule takes only post to chat, at no token cost."
+        actions={
+          <button type="button" onClick={onClose} className={secondaryButton}>
+            Back to alert routes
+          </button>
+        }
+      />
 
       <form
         className="mt-6 grid items-start gap-6 lg:grid-cols-3"

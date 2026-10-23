@@ -15,12 +15,6 @@ import { AvatarStack, Composer, PanelSection, SupportThread, TicketContext, Tick
 import { useToast } from "@/components/toast";
 import { focusRing, secondaryButton } from "@/components/ui";
 
-const backLink = (
-  <Link href="/support" className={`rounded text-sm text-zinc-500 hover:text-zinc-300 ${focusRing}`}>
-    ← Support
-  </Link>
-);
-
 interface Me {
   user_id: string;
   email: string;
@@ -81,7 +75,6 @@ function TicketPage() {
   if (state === "loading") {
     return (
       <Page className="space-y-4">
-        {backLink}
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-24" />
       </Page>
@@ -90,7 +83,6 @@ function TicketPage() {
   if (state === "missing" || !detail) {
     return (
       <Page className="space-y-4">
-        {backLink}
         {state === "error" ? (
           <ListError title="Couldn't load this ticket" onRetry={load}>
             {error}
@@ -141,7 +133,6 @@ function TicketPage() {
   return (
     <Page>
       <TicketHeader
-        back={backLink}
         ticket={t}
         status={<StatusText look={look} />}
         note={

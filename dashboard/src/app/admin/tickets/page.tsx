@@ -41,19 +41,10 @@ function AdminTickets() {
 function Denied() {
   return (
     <Page>
-      <div className="mx-auto mt-20 max-w-md text-center">
-        <h1 className="mb-2 text-2xl font-bold text-zinc-100">Access denied</h1>
-        <p className="text-sm text-zinc-500">This page is only for Coderhelm platform administrators.</p>
-      </div>
+      <PageHeader detail crumb={false} title="Access denied" lead="This page is only for Coderhelm platform administrators." />
     </Page>
   );
 }
-
-const backLink = (
-  <Link href="/admin/tickets" className={`rounded text-sm text-zinc-500 hover:text-zinc-300 ${focusRing}`}>
-    ← Support queue
-  </Link>
-);
 
 // ── The queue ────────────────────────────────────────────────────────────
 
@@ -98,11 +89,6 @@ function Queue() {
   return (
     <Page>
       <PageHeader
-        breadcrumb={
-          <Link href="/admin" className={`rounded text-sm text-zinc-500 hover:text-zinc-300 ${focusRing}`}>
-            ← Platform admin
-          </Link>
-        }
         title="Support queue"
         lead={
           tickets
@@ -236,7 +222,6 @@ function AdminTicket({ id }: { id: string }) {
   if (state === "loading") {
     return (
       <Page className="space-y-4">
-        {backLink}
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-24" />
       </Page>
@@ -245,7 +230,6 @@ function AdminTicket({ id }: { id: string }) {
   if (state !== "ready" || !detail) {
     return (
       <Page className="space-y-4">
-        {backLink}
         <ListError title={state === "missing" ? "Ticket not found" : "Couldn't load this ticket"} onRetry={state === "error" ? load : undefined}>
           {state === "missing" ? "It may have been removed with its team." : error}
         </ListError>
@@ -304,7 +288,6 @@ function AdminTicket({ id }: { id: string }) {
   return (
     <Page>
       <TicketHeader
-        back={backLink}
         ticket={t}
         status={<StatusText look={look} />}
         note={t.team_name || t.team_id}

@@ -60,9 +60,7 @@ function DataSourceActivityPage() {
   return (
     <Page>
       <PageHeader
-        breadcrumb={<Link href="/data-sources" className={`${linkButton} text-sm`}>Back to data sources</Link>}
-        title="Every lookup, as it happens"
-        titleClassName="text-balance"
+        title="Activity"
         lead={
           <>
             Each time Coderhelm or a teammate looks something up in a connected source, it appears here: who asked, what they asked,
