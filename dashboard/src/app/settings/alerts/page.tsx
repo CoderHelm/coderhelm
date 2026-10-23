@@ -28,7 +28,17 @@ import { CopyButton } from "@/components/copy-button";
 import { Skeleton } from "@/components/skeleton";
 import { Field } from "@/components/field";
 import { Page, PageHeader, Section } from "@/components/page";
-import { Switch, TeamsHowTo, TeamsWebhookField, validTeamsUrl } from "@/components/teams-webhook";
+import { Switch } from "@/components/teams-webhook";
+import {
+  ChannelPicker,
+  channelsPayload,
+  channelsSummary,
+  draftDirty,
+  draftFrom,
+  draftValid,
+  NO_WEBHOOKS,
+  type ChannelsDraft,
+} from "@/components/chat-channels";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 
 export default function AlertsPageGuarded() {
@@ -39,13 +49,13 @@ export default function AlertsPageGuarded() {
   );
 }
 
-const EMPTY_ROUTE: AlertRoute = { topic_arn: "", rules: [], enabled: true, notify_mode: "team", teams_webhook_url: "", post_recoveries: false };
+const EMPTY_ROUTE: AlertRoute = { topic_arn: "", rules: [], enabled: true, notify_mode: "team", post_recoveries: false };
 const EMPTY_RULE: AlertRule = { alarms: [], terms: [], repo: "", instructions: "" };
 
 const NOTIFY_LABEL: Record<string, string> = {
   team: "Team channel",
   custom: "Own channel",
-  off: "No Teams cards",
+  off: "No messages",
 };
 
 // ── Matching, as the gateway does it ─────────────────────────────────
@@ -225,7 +235,7 @@ function AlertsPage() {
   const remove = async (route: AlertRoute) => {
     const ok = await confirm({
       title: `Remove the route for ${topicName(route.topic_arn)}?`,
-      message: "Alerts on this topic stop opening pull requests and posting to Teams. Unsubscribe the endpoint from the topic in AWS as well.",
+      message: "Alerts on this topic stop opening pull requests and posting to chat. Unsubscribe the endpoint from the topic in AWS as well.",
       confirmLabel: "Remove route",
       destructive: true,
     });
@@ -280,8 +290,8 @@ function AlertsPage() {
         title="Alert routes"
         lead={
           <>
-            Turn monitoring alerts into pull requests or Teams cards. Each SNS topic gets a route; its rules pick the alerts that open a pull
-            request and say how to fix them. Every other alert just posts to Teams. Nothing merges without a person&apos;s approval.
+            Turn monitoring alerts into pull requests or chat messages in Microsoft Teams or Slack. Each SNS topic gets a route; its rules pick
+            the alerts that open a pull request and say how to fix them. Every other alert just posts to chat. Nothing merges without a person&apos;s approval.
           </>
         }
         actions={
@@ -360,7 +370,7 @@ function AlertsPage() {
 
         <div className="flex min-w-0 flex-col gap-4">
           <SetupSteps endpoint={endpoint} />
-          {canEdit && <TeamsChannel />}
+          {canEdit && <TeamChannel />}
           {canEdit && <AlertBudgetCard />}
         </div>
       </div>
@@ -435,10 +445,10 @@ function RouteCard({
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <Chip>Teams: {NOTIFY_LABEL[mode] ?? NOTIFY_LABEL.team}</Chip>
+        <Chip>Chat: {mode === "custom" && channelsSummary(r.webhooks) ? `Own (${channelsSummary(r.webhooks)})` : (NOTIFY_LABEL[mode] ?? NOTIFY_LABEL.team)}</Chip>
         {mode !== "off" && <Chip>{r.post_recoveries ? "Posts recoveries" : "Recoveries not posted"}</Chip>}
         <Chip>
-          {r.rules.length === 0 ? "No rules: Teams only" : `${r.rules.length} rule${r.rules.length === 1 ? "" : "s"}`}
+          {r.rules.length === 0 ? "No rules: chat only" : `${r.rules.length} rule${r.rules.length === 1 ? "" : "s"}`}
         </Chip>
       </div>
 
@@ -463,7 +473,7 @@ function RouteCard({
           <span className="w-5 shrink-0" />
           <span>{r.rules.length ? "Everything else" : "Every alert"}</span>
           <span aria-hidden="true" className="text-zinc-600">→</span>
-          <span className="text-sky-300">{mode === "off" ? "recorded only" : "Teams only"}</span>
+          <span className="text-sky-300">{mode === "off" ? "recorded only" : "chat only"}</span>
         </li>
       </ol>
 
@@ -544,7 +554,7 @@ function RouteAlarms({ route }: { route: AlertRoute }) {
                     {i >= 0 ? (
                       <span className="shrink-0 text-emerald-300">Rule {i + 1}: PR in {route.rules[i].repo.split("/").pop()}</span>
                     ) : (
-                      <span className="shrink-0 text-sky-300">Teams only</span>
+                      <span className="shrink-0 text-sky-300">chat only</span>
                     )}
                   </li>
                 );
@@ -596,35 +606,35 @@ function SetupSteps({ endpoint }: { endpoint: string }) {
   );
 }
 
-function TeamsChannel() {
+function TeamChannel() {
   const { toast } = useToast();
   const [saved, setSaved] = useState<AlertNotifySettings | null>(null);
-  const [settings, setSettings] = useState<AlertNotifySettings>({ teams_webhook_url: "", enabled: false });
+  const [enabled, setEnabled] = useState(false);
+  const [draft, setDraft] = useState<ChannelsDraft>(draftFrom(NO_WEBHOOKS));
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     api
       .getAlertNotify()
       .then((s) => {
         setSaved(s);
-        setSettings(s);
+        setEnabled(s.enabled);
+        setDraft(draftFrom(s.webhooks));
       })
       .catch(() => setLoadError(true));
   }, []);
+  useEffect(load, [load]);
 
-  const url = settings.teams_webhook_url.trim();
-  const urlOk = validTeamsUrl(url);
-  const dirty = !!saved && (saved.enabled !== settings.enabled || saved.teams_webhook_url !== url);
-  const valid = settings.enabled ? urlOk : !url || urlOk;
+  const dirty = !!saved && (saved.enabled !== enabled || draftDirty(draft, saved.webhooks));
+  const valid = draftValid(draft, saved?.webhooks, enabled);
 
   const save = async () => {
     setSaving(true);
     try {
-      const next = { ...settings, teams_webhook_url: url };
-      await api.saveAlertNotify(next);
-      setSaved(next);
-      toast("Teams channel saved");
+      await api.saveAlertNotify({ enabled, ...channelsPayload(draft, saved?.webhooks) });
+      toast("Team channel saved");
+      load();
     } catch {
       toast("Could not save. Check the webhook address.", "error");
     } finally {
@@ -633,30 +643,24 @@ function TeamsChannel() {
   };
 
   return (
-    <SideCard title="Team channel in Teams" id="teams-heading">
+    <SideCard title="Team channel for alerts" id="teams-heading">
       <p>
-        Routes set to the team channel post here: a red card when an alarm fires, a follow up with the pull request link, and green
-        recoveries on routes that post them.
+        Routes set to the team channel post here, in Microsoft Teams, Slack or both: a red message when an alarm fires, a follow up with
+        the pull request link, and green recoveries on routes that post them.
       </p>
       {loadError ? (
         <Callout variant="error"><p>Could not load the channel. Reload the page to try again.</p></Callout>
       ) : (
         <>
-          <Switch
-            checked={settings.enabled}
-            onChange={(enabled) => setSettings({ ...settings, enabled })}
+          <Switch checked={enabled} onChange={setEnabled} disabled={!saved} label="Post alerts to the team channel" />
+          <ChannelPicker
+            idPrefix="team"
+            draft={draft}
+            saved={saved?.webhooks}
+            onChange={setDraft}
             disabled={!saved}
-            label="Post alerts to the team Teams channel"
+            destination={{ destination: "alerts" }}
           />
-          <TeamsWebhookField
-            id="team-webhook"
-            value={settings.teams_webhook_url}
-            onChange={(v) => setSettings({ ...settings, teams_webhook_url: v })}
-            disabled={!saved}
-          />
-          <Disclosure summary="How to get a webhook address">
-            <TeamsHowTo />
-          </Disclosure>
           <div>
             <button type="button" onClick={save} disabled={!dirty || !valid || saving} className={primaryButton}>
               {saving ? "Saving…" : "Save"}
@@ -720,7 +724,7 @@ function AlertBudgetCard() {
   return (
     <SideCard title="Daily alert token budget" id="budget-heading">
       <p>
-        Alert runs stop for the day once they have used this many tokens. Alerts keep posting to Teams. Each rule also starts at most{" "}
+        Alert runs stop for the day once they have used this many tokens. Alerts keep posting to chat. Each rule also starts at most{" "}
         {budget?.max_runs_per_rule_per_day ?? 5} runs a day. 0 turns alert runs off.
       </p>
       {loadError ? (
@@ -1172,6 +1176,7 @@ function RouteEditor({
 }) {
   const { toast } = useToast();
   const [route, setRoute] = useState<AlertRoute>(initial);
+  const [channels, setChannels] = useState<ChannelsDraft>(draftFrom(initial.webhooks));
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   // Stable keys for rules, so moving one keeps its typed text with it.
@@ -1189,7 +1194,7 @@ function RouteEditor({
   const arnError = topic && !account ? "Not an SNS topic ARN. It looks like arn:aws:sns:<region>:<account>:<name>." : "";
   const accountError = account && !connectedAccounts.has(account) ? `Connect AWS account ${account} under Settings, AWS first.` : "";
   const mode = route.notify_mode ?? "team";
-  const customUrlError = mode === "custom" && !validTeamsUrl(route.teams_webhook_url ?? "");
+  const customUrlError = mode === "custom" && !draftValid(channels, initial.webhooks, true);
   const { alarms, messages, error: alarmsLoadError } = useTopicAlarms(topic, !!account && !accountError);
   const notifyOnly = route.rules.length === 0;
   const silent = notifyOnly && mode === "off";
@@ -1231,7 +1236,7 @@ function RouteEditor({
         rules: route.rules,
         enabled: route.enabled,
         notify_mode: mode,
-        teams_webhook_url: mode === "custom" ? (route.teams_webhook_url ?? "").trim() : "",
+        ...(mode === "custom" ? channelsPayload(channels, initial.webhooks) : {}),
         post_recoveries: !!route.post_recoveries,
       });
       toast("Route saved");
@@ -1259,7 +1264,7 @@ function RouteEditor({
         {isNew ? "Add an alert route" : `Edit the route for ${topicName(topic)}`}
       </h1>
       <p className="mt-1 max-w-prose text-sm text-zinc-400">
-        Rules are checked in order and the first one that takes an alert opens a pull request. Alerts no rule takes only post to Teams, at no
+        Rules are checked in order and the first one that takes an alert opens a pull request. Alerts no rule takes only post to chat, at no
         token cost.
       </p>
 
@@ -1311,12 +1316,12 @@ function RouteEditor({
               Add a rule
             </button>
             <p className="text-sm text-zinc-500">
-              {route.rules.length ? "Everything else" : "Every alert"} <span aria-hidden="true">→</span> {mode === "off" ? "recorded only" : "Teams only"}
+              {route.rules.length ? "Everything else" : "Every alert"} <span aria-hidden="true">→</span> {mode === "off" ? "recorded only" : "chat only"}
             </p>
           </section>
 
           <section aria-labelledby="teams-route-heading" className="flex flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-            <h2 id="teams-route-heading" className="font-semibold text-zinc-100">Teams cards</h2>
+            <h2 id="teams-route-heading" className="font-semibold text-zinc-100">Chat messages</h2>
             <div className="max-w-full"><Segmented
               label="Where this route posts"
               options={(["team", "custom", "off"] as const)
@@ -1326,10 +1331,16 @@ function RouteEditor({
               onChange={(m) => setRoute({ ...route, notify_mode: m })}
             /></div>
             {mode === "custom" ? (
-              <TeamsWebhookField id="route-webhook" value={route.teams_webhook_url ?? ""} onChange={(v) => setRoute({ ...route, teams_webhook_url: v })} />
+              <ChannelPicker
+                idPrefix="route"
+                draft={channels}
+                saved={initial.webhooks}
+                onChange={setChannels}
+                destination={{ destination: "route", topic_arn: topic }}
+              />
             ) : (
               <p className="text-sm text-zinc-400">
-                {mode === "team" ? "Uses the team channel set on the Alert routes page." : "This route's alerts won't post to Teams."}
+                {mode === "team" ? "Uses the team channel set on the Alert routes page." : "This route's alerts won't post to chat."}
                 {notifyOnly && " A route without rules must post somewhere."}
               </p>
             )}
@@ -1361,7 +1372,7 @@ function RouteEditor({
               <p>{saveError}</p>
             </Callout>
           )}
-          {silent && <p className="text-sm text-amber-300">A route with no rules and no Teams cards would do nothing. Add a rule or choose a channel.</p>}
+          {silent && <p className="text-sm text-amber-300">A route with no rules and no chat messages would do nothing. Add a rule or choose a channel.</p>}
 
           <div className="flex flex-wrap gap-2">
             <button type="submit" disabled={!canSave} className={primaryButton}>
@@ -1394,7 +1405,7 @@ function RouteEditor({
                         Rule {rule + 1}: PR in {route.rules[rule].repo || "a repository"}
                       </span>
                     ) : (
-                      <span className="text-sky-300">{mode === "off" ? "Recorded only" : "Teams only"}</span>
+                      <span className="text-sky-300">{mode === "off" ? "Recorded only" : "Chat only"}</span>
                     )}
                   </span>
                 </li>

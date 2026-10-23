@@ -20,7 +20,9 @@ import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { Field, SecretInput } from "@/components/field";
 import { AwsAbilitiesPanel, AwsAbilitySummary, ConnectorForm, JIRA_APP } from "@/components/connections";
-import { Switch, TeamsHowTo, TeamsWebhookField, validTeamsUrl } from "@/components/teams-webhook";
+import { Switch } from "@/components/teams-webhook";
+import { ChannelPicker, channelsPayload, draftDirty, draftFrom, draftValid, NO_WEBHOOKS, type ChannelsDraft } from "@/components/chat-channels";
+import type { AlertNotifySettings, ChatChannel } from "@/lib/api";
 import { Disclosure } from "@/components/disclosure";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
@@ -71,7 +73,8 @@ const SHORT: Record<string, string> = {
   confluence: "Reads pages for context",
   opensearch: "Searches the indexes your app reads",
   rest: "Reads records from an API you use",
-  teams: "Posts alerts and pull request links to a channel",
+  teams: "Posts alerts and pull request links to a Teams channel",
+  slack: "Posts alerts and pull request links to a Slack channel",
   sentry: "Error events, issues and incidents",
   figma: "Design tokens, components and assets",
   sanity: "Documents, schemas and content",
@@ -406,7 +409,7 @@ function IntegrationRow({
             </p>
           )}
           {aws && <AwsAbilitySummary a={aws} />}
-          {item.status === "error" && kind !== "teams" && (
+          {item.status === "error" && kind !== "chat" && (
             <p className="mt-3">
               <button type="button" onClick={checkAgain} disabled={busy} className={secondaryButton}>
                 {busy ? "Checking…" : "Check again"}
@@ -429,7 +432,7 @@ function IntegrationRow({
             />
           )}
           {kind === "plugin" && <PluginPanel item={item} onChanged={onReload} onClose={() => setOpen(false)} />}
-          {kind === "teams" && <TeamsPanel onSaved={onReload} />}
+          {kind === "chat" && <ChatPanel channel={item.id as ChatChannel} onSaved={onReload} />}
           <p className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
             <button type="button" onClick={() => setOpen(false)} className={linkButton}>
               Close
@@ -446,7 +449,7 @@ function IntegrationRow({
   );
 }
 
-type Kind = "github" | "jira" | "aws_connect" | "aws_account" | "connector" | "teams" | "plugin";
+type Kind = "github" | "jira" | "aws_connect" | "aws_account" | "connector" | "chat" | "plugin";
 
 function kindOf(item: Integration): Kind {
   if (item.id === "github") return "github";
@@ -454,7 +457,7 @@ function kindOf(item: Integration): Kind {
   if (item.id === "aws") return "aws_connect";
   if (item.id.startsWith("aws-")) return "aws_account";
   if (["newrelic", "confluence", "opensearch", "rest"].includes(item.id.split(":")[0])) return "connector";
-  if (item.id === "teams") return "teams";
+  if (item.id === "teams" || item.id === "slack") return "chat";
   return "plugin";
 }
 
@@ -636,11 +639,11 @@ function PluginPanel({ item, onChanged, onClose }: { item: Integration; onChange
   );
 }
 
-/** The team's Teams channel (the same one Alert routes post to). */
-function TeamsPanel({ onSaved }: { onSaved: () => Promise<void> }) {
-  const [url, setUrl] = useState("");
+/** The team's channel in Teams or Slack (the same one Alert routes post to). */
+function ChatPanel({ channel, onSaved }: { channel: ChatChannel; onSaved: () => Promise<void> }) {
+  const [saved, setSaved] = useState<AlertNotifySettings | null>(null);
+  const [draft, setDraft] = useState<ChannelsDraft>(draftFrom(NO_WEBHOOKS));
   const [enabled, setEnabled] = useState(true);
-  const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const { toast } = useToast();
@@ -648,19 +651,25 @@ function TeamsPanel({ onSaved }: { onSaved: () => Promise<void> }) {
     api
       .getAlertNotify()
       .then((s) => {
-        setUrl(s.teams_webhook_url);
-        setEnabled(s.enabled || !s.teams_webhook_url);
+        setSaved(s);
+        // A first channel turns posting on; a saved one shows what is set.
+        const first = !s.webhooks.teams.set && !s.webhooks.slack.set;
+        setEnabled(s.enabled || first);
+        const d = draftFrom(s.webhooks);
+        setDraft({ ...d, [channel]: { on: true, url: "" } });
       })
-      .catch(() => setError("Couldn't load the channel."))
-      .finally(() => setLoaded(true));
-  }, []);
-  const ok = validTeamsUrl(url);
+      .catch(() => setError("Couldn't load the channel."));
+  }, [channel]);
+  const loaded = !!saved;
+  const ok = draftValid(draft, saved?.webhooks, enabled);
+  const dirty = !!saved && (saved.enabled !== enabled || draftDirty(draft, saved.webhooks));
+  const label = channel === "slack" ? "Slack" : "Teams";
   const save = async () => {
     setSaving(true);
     setError("");
     try {
-      await api.saveAlertNotify({ teams_webhook_url: url.trim(), enabled });
-      toast("Teams channel saved");
+      await api.saveAlertNotify({ enabled, ...channelsPayload(draft, saved?.webhooks) });
+      toast(`${label} channel saved`);
       await onSaved();
     } catch (e) {
       setError(errorMessage(e, "Couldn't save. Check the webhook address."));
@@ -676,18 +685,24 @@ function TeamsPanel({ onSaved }: { onSaved: () => Promise<void> }) {
         save();
       }}
     >
-      <TeamsWebhookField id="integrations-teams-webhook" value={url} onChange={setUrl} disabled={!loaded} />
-      <Disclosure summary="How to get a webhook address">
-        <TeamsHowTo />
-      </Disclosure>
-      <Switch checked={enabled} onChange={setEnabled} disabled={!loaded} label="Post alerts to this channel" />
+      <ChannelPicker
+        idPrefix={`integrations-${channel}`}
+        legend={`${label} channel for alerts`}
+        draft={draft}
+        saved={saved?.webhooks}
+        onChange={setDraft}
+        disabled={!loaded}
+        destination={{ destination: "alerts" }}
+        only={[channel]}
+      />
+      <Switch checked={enabled} onChange={setEnabled} disabled={!loaded} label="Post alerts to the team channel" />
       {error && (
         <p role="alert" className="text-sm text-red-400">
           {error}
         </p>
       )}
       <div>
-        <button type="submit" disabled={saving || !loaded || (enabled && !ok) || (!!url.trim() && !ok)} className={primaryButton}>
+        <button type="submit" disabled={saving || !loaded || !ok || !dirty} className={primaryButton}>
           {saving ? "Saving…" : "Save"}
         </button>
       </div>
