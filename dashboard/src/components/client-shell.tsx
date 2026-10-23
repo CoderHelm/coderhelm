@@ -8,6 +8,7 @@ import { pushToDataLayer } from "@/lib/gtm";
 import { BETA_SIGNUPS_CHANGED } from "@/lib/admin";
 import { formatTokens, USAGE_CHANGED, usageBreakdown, usageTotal } from "@/lib/usage";
 import { ToastProvider } from "./toast";
+import { SupportViewBanner } from "./support-access";
 import { ConfirmProvider } from "./confirm-dialog";
 import { CommandPaletteButton, CommandPaletteProvider, type PalettePage } from "./command-palette";
 import { focusRing } from "./ui";
@@ -23,6 +24,8 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
 
 
 interface User {
+  /** Set by /api/me in a read-only support view. */
+  support_view?: { team_id: string; until: number } | null;
   user_id: string;
   team_id: string;
   github_login: string | null;
@@ -413,6 +416,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         <div className="flex-1 min-w-0 flex flex-col">
+          {user.support_view && <SupportViewBanner />}
           <header className="md:hidden sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-zinc-800/60 bg-zinc-950 px-4 py-2">
             <Link href="/" className="flex items-center gap-2.5 rounded-md py-1">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" className="w-5 h-5 flex-shrink-0" aria-hidden="true">

@@ -4,13 +4,25 @@ import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, ApiError, errorStatus, type SupportDetail, type SupportPriority, type SupportStatus, type SupportTicket } from "@/lib/api";
-import { adminLook, filedBy, itemWords, PRIORITY_LABEL, queueOrder } from "@/lib/support";
+import { adminLook, filedBy, itemHref, itemWords, PRIORITY_LABEL, queueOrder, ticketItems, timeLeft } from "@/lib/support";
 import { Page, PageHeader } from "@/components/page";
 import { Skeleton } from "@/components/skeleton";
 import { Chip, List, ListEmpty, ListError, ListRow, ListSkeleton, ListToolbar, StatusText, useListParams } from "@/components/list";
-import { ReplyBox, SupportThread, TicketContext } from "@/components/support";
+import { ReplyBox, SupportThread, TicketContext, type ItemOpener } from "@/components/support";
+import type { SupportItem } from "@/lib/api";
 import { useToast } from "@/components/toast";
-import { focusRing, inputClass } from "@/components/ui";
+import { focusRing, inputClass, primaryButton } from "@/components/ui";
+
+/**
+ * Opens a read-only support view of the team (leaving any other one first),
+ * then goes to `to` in that view. The gateway refuses unless the team's
+ * support access is on.
+ */
+async function viewAsSupport(teamId: string, ticketId: string, to: string) {
+  await api.exitSupportView().catch(() => {});
+  await api.startSupportView(teamId, ticketId);
+  window.location.href = to;
+}
 
 export default function AdminTicketsWithParams() {
   return (
@@ -47,6 +59,7 @@ const backLink = (
 
 function Queue() {
   const [tickets, setTickets] = useState<SupportTicket[] | null>(null);
+  const [access, setAccess] = useState<Record<string, string>>({});
   const [denied, setDenied] = useState(false);
   const [error, setError] = useState("");
   const [params, setParams] = useListParams({ q: "", status: "open", sort: "queue" });
@@ -55,7 +68,10 @@ function Queue() {
     setError("");
     api
       .adminSupportTickets()
-      .then((r) => setTickets(r.tickets))
+      .then((r) => {
+        setTickets(r.tickets);
+        setAccess(r.support_access ?? {});
+      })
       .catch((e: unknown) => {
         if (e instanceof ApiError && (e.status === 401 || e.status === 403)) setDenied(true);
         else setError(e instanceof Error ? e.message : "The request failed.");
@@ -67,7 +83,7 @@ function Queue() {
 
   const words = params.q.toLowerCase().split(/\s+/).filter(Boolean);
   const searched = (tickets ?? []).filter((t) => {
-    const hay = `${t.subject} ${t.team_name} ${t.team_id} ${t.opened_by_email} ${t.opened_by_name} ${t.context.item ? itemWords(t.context.item) : ""}`.toLowerCase();
+    const hay = `${t.subject} ${t.team_name} ${t.team_id} ${t.opened_by_email} ${t.opened_by_name} ${ticketItems(t).map(itemWords).join(" ")}`.toLowerCase();
     return words.every((w) => hay.includes(w));
   });
   const count = (s: string) => searched.filter((t) => t.status === s).length;
@@ -152,12 +168,21 @@ function Queue() {
                       meta={[
                         t.team_name || t.team_id,
                         `${filedBy(t)}${t.role ? ` (${t.role})` : ""}`,
-                        t.context.item ? itemWords(t.context.item) : null,
+                        ticketItems(t).length === 1
+                          ? itemWords(ticketItems(t)[0])
+                          : ticketItems(t).length > 1
+                            ? `${ticketItems(t).length} items attached`
+                            : null,
                         `${t.message_count} message${t.message_count === 1 ? "" : "s"}`,
                       ]}
                       chips={
                         <>
                           {t.priority !== "normal" && <Chip tone={t.priority === "urgent" ? "danger" : "waiting"}>{PRIORITY_LABEL[t.priority]}</Chip>}
+                          {access[t.team_id] && t.status !== "resolved" && (
+                            <Chip tone="success" title={`Support access on, ${timeLeft(access[t.team_id])}`}>
+                              Access on
+                            </Chip>
+                          )}
                           <StatusText look={look} />
                         </>
                       }
@@ -225,6 +250,19 @@ function AdminTicket({ id }: { id: string }) {
 
   const t = detail.ticket;
   const look = adminLook(t.status);
+  const accessUntil = detail.support_access?.until ?? null;
+  const open = async (to: string) => {
+    try {
+      await viewAsSupport(t.team_id, t.id, to);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Could not open the support view.", "error");
+    }
+  };
+  // Items live in the team's workspace: a link only works inside a support view.
+  const openItem: ItemOpener = (item: SupportItem) =>
+    accessUntil
+      ? { onClick: () => void open(itemHref(item)) }
+      : { reason: "Opens in the team's workspace. Ask the team to let support look (on the ticket or in Settings → Support access)." };
   const reply = async (body: string, key?: string) => {
     try {
       setDetail(await api.adminReplySupportTicket(t.id, body, key === "resolve" ? "resolved" : undefined));
@@ -260,7 +298,7 @@ function AdminTicket({ id }: { id: string }) {
       />
       <div className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0">
-          <SupportThread messages={detail.messages} admin />
+          <SupportThread messages={detail.messages} admin openItem={openItem} />
           <ReplyBox
             onSend={reply}
             placeholder="Reply as Coderhelm support. The customer gets this by email."
@@ -299,7 +337,27 @@ function AdminTicket({ id }: { id: string }) {
               </select>
             </div>
           </div>
-          <TicketContext ticket={t} admin />
+          <section aria-labelledby="support-view-h" className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4" data-testid="admin-support-view">
+            <h2 id="support-view-h" className="mb-1 text-sm font-semibold text-zinc-100">
+              Support view
+            </h2>
+            {accessUntil ? (
+              <>
+                <p className="mb-3 text-xs text-zinc-400">
+                  The team lets support look, read only, until {new Date(accessUntil).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} ({timeLeft(accessUntil)}).
+                  The team sees every page you read.
+                </p>
+                <button type="button" className={primaryButton} onClick={() => void open("/")} data-testid="view-as-support">
+                  View as support
+                </button>
+              </>
+            ) : (
+              <p className="text-xs text-zinc-500">
+                Off. Ask the team to choose &quot;Let support look at this&quot; on the ticket, or turn it on in Settings → Support access.
+              </p>
+            )}
+          </section>
+          <TicketContext ticket={t} admin openItem={openItem} />
         </aside>
       </div>
     </Page>

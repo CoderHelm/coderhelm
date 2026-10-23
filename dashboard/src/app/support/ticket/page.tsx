@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { api, errorStatus, type SupportDetail } from "@/lib/api";
-import { customerLook } from "@/lib/support";
+import { api, errorStatus, type SupportDetail, type SupportItemRef } from "@/lib/api";
+import { customerLook, MAX_ATTACHMENTS, ticketItems } from "@/lib/support";
+import { hasRole } from "@/lib/roles";
+import { SupportAccessControl } from "@/components/support-access";
 import { Page, PageHeader } from "@/components/page";
 import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
@@ -35,6 +37,14 @@ function TicketPage() {
   const [detail, setDetail] = useState<SupportDetail | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "missing" | "error">("loading");
   const [error, setError] = useState("");
+  const [canGrant, setCanGrant] = useState(false);
+
+  useEffect(() => {
+    api
+      .me()
+      .then((u) => setCanGrant(hasRole(u.role, "admin") && !u.support_view))
+      .catch(() => setCanGrant(false));
+  }, []);
 
   const load = useCallback(() => {
     if (!id) {
@@ -85,9 +95,9 @@ function TicketPage() {
 
   const t = detail.ticket;
   const look = customerLook(t.status);
-  const send = async (body: string) => {
+  const send = async (body: string, _key?: string, items: SupportItemRef[] = []) => {
     try {
-      setDetail(await api.replySupportTicket(t.id, body));
+      setDetail(await api.replySupportTicket(t.id, body, items));
       return true;
     } catch (e) {
       toast(e instanceof Error ? e.message : "Could not send your reply.", "error");
@@ -121,10 +131,25 @@ function TicketPage() {
       <div className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="min-w-0">
           <SupportThread messages={detail.messages} />
-          <ReplyBox onSend={send} placeholder="Add more detail, or answer support's question" />
+          <ReplyBox onSend={send} placeholder="Add more detail, or answer support's question" attachRoom={MAX_ATTACHMENTS - ticketItems(t).length} />
         </div>
-        <aside className="min-w-0 lg:order-last">
+        <aside className="min-w-0 space-y-5 lg:order-last">
           <TicketContext ticket={t} />
+          {canGrant && t.status !== "resolved" && (
+            <section aria-labelledby="let-support" className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4" data-testid="ticket-support-access">
+              <h2 id="let-support" className="mb-1 text-sm font-semibold text-zinc-100">
+                Let support look at this
+              </h2>
+              <p className="mb-3 text-xs text-zinc-500">
+                Coderhelm support sees your workspace read only, for the time you choose. You can end it any time in{" "}
+                <Link href="/settings/support-access" className={`rounded underline underline-offset-4 hover:text-zinc-300 ${focusRing}`}>
+                  Settings
+                </Link>
+                .
+              </p>
+              <SupportAccessControl ticketId={t.id} compact />
+            </section>
+          )}
         </aside>
       </div>
     </Page>

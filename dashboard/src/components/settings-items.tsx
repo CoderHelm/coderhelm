@@ -48,6 +48,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     label: "Team and access",
     items: [
       { href: "/settings/team", title: "Team", description: "Who is on the team, their roles and what each role can do.", icon: <UsersIcon />, view: "viewer", edit: "admin", status: "team" },
+      { href: "/settings/support-access", title: "Support access", description: "Let Coderhelm support see your workspace, read only, for a while. See every page they read.", icon: <ShieldCheckIcon />, view: "admin", edit: "admin" },
     ],
   },
   {
