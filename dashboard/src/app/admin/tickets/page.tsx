@@ -303,6 +303,7 @@ function AdminTicket({ id }: { id: string }) {
             onSend={reply}
             placeholder="Reply as Coderhelm support. The customer gets this by email."
             extra={t.status === "resolved" ? undefined : [["Send and resolve", "resolve"]]}
+            draftKey={`support-admin:reply:${t.id}`}
           />
         </div>
         <aside className="min-w-0 space-y-5">

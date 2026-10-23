@@ -7,6 +7,11 @@ import { RoleGuard } from "@/components/role-guard";
 import { TextareaSkeleton } from "@/components/skeleton";
 import { RepoCombobox } from "@/components/repo-combobox";
 import { Page, PageHeader } from "@/components/page";
+import { Field } from "@/components/settings";
+import { MarkdownEditor } from "@/components/markdown-editor";
+import { primaryButton } from "@/components/ui";
+
+const PREVIEW_NOTE = "Agents get this text as written, with your global instructions first. This is how its headings and lists read.";
 
 function Tab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
@@ -137,23 +142,23 @@ function InstructionsPage() {
                 )}
               </div>
             )}
-            <p className="text-xs text-zinc-600 mb-2">Custom instructions (optional)</p>
-            <textarea
-              value={globalContent}
-              onChange={(e) => setGlobalContent(e.target.value)}
-              rows={16}
-              placeholder={`Example:\n- Always use TypeScript strict mode\n- Prefer named exports over default exports\n- Use kebab-case for file names\n- Write tests for all new functions`}
-              className="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 font-mono placeholder-zinc-700 focus:outline-none focus:border-zinc-500 resize-y"
-            />
-            <div className="flex items-center gap-3 mt-3">
-              <button
-                onClick={saveGlobal}
-                disabled={globalSaving}
-                className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 transition-colors"
-              >
-                {globalSaving ? "Saving..." : "Save"}
+            <Field as="custom" id="global-instructions" label="Custom instructions (optional)" help="Applied to every repo.">
+              {(ids) => (
+                <MarkdownEditor
+                  {...ids}
+                  variant="instructions"
+                  value={globalContent}
+                  onChange={setGlobalContent}
+                  minRows={12}
+                  previewNote={PREVIEW_NOTE}
+                  placeholder={`Example:\n- Always use TypeScript strict mode\n- Prefer named exports over default exports\n- Use kebab-case for file names\n- Write tests for all new functions`}
+                />
+              )}
+            </Field>
+            <div className="mt-4 flex items-center gap-3">
+              <button type="button" onClick={saveGlobal} disabled={globalSaving} className={primaryButton}>
+                {globalSaving ? "Saving…" : "Save"}
               </button>
-              <span className="text-xs text-zinc-600">Applied to all repos. Markdown supported.</span>
             </div>
           </>
         )
@@ -196,23 +201,23 @@ function InstructionsPage() {
                   )}
                 </div>
               )}
-              <p className="text-xs text-zinc-600 mb-2">Custom instructions (optional)</p>
-              <textarea
-                value={repoContent}
-                onChange={(e) => setRepoContent(e.target.value)}
-                rows={12}
-                placeholder={`Add repo-specific conventions, e.g.:\n- This is a React Native app, use Expo patterns\n- Use Prisma for all database operations\n- Follow the error handling in src/utils/errors.ts`}
-                className="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 font-mono placeholder-zinc-700 focus:outline-none focus:border-zinc-500 resize-y"
-              />
-              <div className="flex items-center gap-3 mt-3">
-                <button
-                  onClick={saveRepo}
-                  disabled={repoSaving}
-                  className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50 transition-colors"
-                >
-                  {repoSaving ? "Saving..." : "Save"}
+              <Field as="custom" id="repo-instructions" label="Custom instructions (optional)" help="Added after the global instructions for this repo.">
+                {(ids) => (
+                  <MarkdownEditor
+                    {...ids}
+                    variant="instructions"
+                    value={repoContent}
+                    onChange={setRepoContent}
+                    minRows={10}
+                    previewNote={PREVIEW_NOTE}
+                    placeholder={`Add repo-specific conventions, e.g.:\n- This is a React Native app, use Expo patterns\n- Use Prisma for all database operations\n- Follow the error handling in src/utils/errors.ts`}
+                  />
+                )}
+              </Field>
+              <div className="mt-4 flex items-center gap-3">
+                <button type="button" onClick={saveRepo} disabled={repoSaving} className={primaryButton}>
+                  {repoSaving ? "Saving…" : "Save"}
                 </button>
-                <span className="text-xs text-zinc-600">Merged with global instructions at runtime.</span>
               </div>
             </>
           )}

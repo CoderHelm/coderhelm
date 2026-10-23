@@ -375,7 +375,7 @@ export const UserMessage = memo(function UserMessage({
       )}
       <div className="min-w-0 max-w-[85%] rounded-2xl rounded-br-md bg-zinc-800 px-4 py-2.5 text-sm leading-relaxed text-zinc-100">
         <Clamped enabled>
-          <p className="whitespace-pre-wrap break-words">{text}</p>
+          <ChatMarkdown breaks>{text}</ChatMarkdown>
         </Clamped>
       </div>
     </div>

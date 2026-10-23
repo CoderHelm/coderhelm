@@ -7,6 +7,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ChatMarkdown } from "./chat-markdown";
+import { MarkdownEditor, clearDraft } from "./markdown-editor";
 import { api, type AlertEvent, type DataSource, type SupportItem, type SupportItemKind, type SupportItemRef, type SupportMessage, type SupportTicket } from "@/lib/api";
 import {
   filedBy,
@@ -87,7 +89,7 @@ export function SupportThread({
               <span className={`text-sm font-medium ${m.author === "support" ? "text-sky-300" : "text-zinc-200"}`}>{who(m, admin)}</span>
               <Time iso={m.created_at} className="text-xs text-zinc-500" />
             </div>
-            {m.body && <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-300 [overflow-wrap:anywhere]">{m.body}</p>}
+            {m.body && <div className="[overflow-wrap:anywhere]" data-testid="support-message-body"><ChatMarkdown breaks>{m.body}</ChatMarkdown></div>}
             {m.attachments && m.attachments.length > 0 && (
               <div className={m.body ? "mt-2" : ""}>
                 <AttachmentChips items={m.attachments} open={openItem} label="Attached with this message" />
@@ -108,6 +110,7 @@ export function ReplyBox({
   extra,
   disabled = false,
   attachRoom,
+  draftKey,
 }: {
   /** Resolves true when the reply was sent (the box then empties). */
   onSend: (body: string, extra?: string, items?: SupportItemRef[]) => Promise<boolean>;
@@ -118,6 +121,8 @@ export function ReplyBox({
   disabled?: boolean;
   /** Room left for attachments on the ticket; omitted, the box attaches nothing. */
   attachRoom?: number;
+  /** Keeps the unsent reply in this browser under this key (one per ticket). */
+  draftKey?: string;
 }) {
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
@@ -129,6 +134,7 @@ export function ReplyBox({
     setBusy(true);
     try {
       if (await onSend(body.trim(), key, items)) {
+        if (draftKey) clearDraft(draftKey);
         setBody("");
         setItems([]);
         setPicking(false);
@@ -148,21 +154,17 @@ export function ReplyBox({
       <label htmlFor="support-reply" className="mb-1.5 block text-sm font-medium text-zinc-300">
         Reply
       </label>
-      <textarea
+      <MarkdownEditor
         id="support-reply"
-        rows={4}
+        variant="prose"
         value={body}
+        onChange={setBody}
         maxLength={8000}
-        onChange={(e) => setBody(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            void send();
-          }
-        }}
+        minRows={4}
         placeholder={placeholder}
-        className={`${inputClass} resize-y`}
         disabled={disabled}
+        draftKey={draftKey}
+        onSubmitShortcut={() => void send()}
       />
       {attachRoom !== undefined && (
         <div className="mt-2 space-y-2">
