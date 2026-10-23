@@ -1,5 +1,6 @@
 "use client";
 
+import { CodeBlock } from "@/components/code-block";
 import { useEffect, useState } from "react";
 import { api, type Repo } from "@/lib/api";
 import { useToast } from "@/components/toast";
@@ -136,9 +137,7 @@ function InstructionsPage() {
                   <span className="text-zinc-600 text-xs">{globalGeneratedExpanded ? "Collapse" : "Expand"}</span>
                 </button>
                 {globalGeneratedExpanded && (
-                  <pre className="px-4 py-3 border-t border-zinc-800 bg-zinc-950 text-xs text-zinc-400 font-mono whitespace-pre-wrap leading-relaxed max-h-96 overflow-auto">
-                    {globalGenerated}
-                  </pre>
+                  <CodeBlock code={globalGenerated} lang="markdown" label="Organization overview" wrap maxHeightClass="max-h-96" className="!rounded-none !border-x-0 !border-b-0" />
                 )}
               </div>
             )}
@@ -195,9 +194,7 @@ function InstructionsPage() {
                     <span className="text-zinc-600 text-xs">{generatedExpanded ? "Collapse" : "Expand"}</span>
                   </button>
                   {generatedExpanded && (
-                    <pre className="px-4 py-3 border-t border-zinc-800 bg-zinc-950 text-xs text-zinc-400 font-mono whitespace-pre-wrap leading-relaxed max-h-96 overflow-auto">
-                      {generatedContent}
-                    </pre>
+                    <CodeBlock code={generatedContent} lang="markdown" label="Codebase analysis" wrap maxHeightClass="max-h-96" className="!rounded-none !border-x-0 !border-b-0" />
                   )}
                 </div>
               )}

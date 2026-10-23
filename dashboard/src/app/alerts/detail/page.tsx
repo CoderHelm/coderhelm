@@ -1,5 +1,6 @@
 "use client";
 
+import { CodeBlock, jsonOrText } from "@/components/code-block";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -160,9 +161,7 @@ function AlertDetail() {
       )}
 
       <h2 className="text-sm font-semibold text-zinc-200 mb-2">Alert</h2>
-      <pre className="p-4 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 whitespace-pre-wrap break-words overflow-x-auto">
-        {a.body || "(empty)"}
-      </pre>
+      {a.body ? <CodeBlock {...jsonOrText(a.body)} label="Alert" wrap /> : <p className="text-sm text-zinc-500">The alert had no text.</p>}
     </Page>
   );
 }

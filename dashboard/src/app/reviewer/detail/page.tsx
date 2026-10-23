@@ -8,6 +8,7 @@ import { RoleGuard } from "@/components/role-guard";
 import { Markdown } from "@/components/markdown";
 import { ChatMarkdown } from "@/components/chat-markdown";
 import { MarkdownEditor, clearDraft } from "@/components/markdown-editor";
+import { langFromPath } from "@/lib/highlight";
 import { useToast } from "@/components/toast";
 import { ReReviewButton } from "@/components/re-review-button";
 import { Callout } from "@/components/callout";
@@ -311,7 +312,7 @@ function FindingCard({ f, repo, sha }: { f: Finding; repo: string; sha: string }
         ))}
       {f.body && (
         <div className="min-w-0 overflow-x-auto [&_p:last-child]:mb-0">
-          <Markdown>{f.body}</Markdown>
+          <Markdown codeLang={langFromPath(f.file)}>{f.body}</Markdown>
         </div>
       )}
     </li>

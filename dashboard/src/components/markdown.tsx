@@ -2,8 +2,9 @@
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { markdownCode, markdownCodeFor } from "./markdown-code";
 
-export function Markdown({ children }: { children: string }) {
+export function Markdown({ children, codeLang }: { children: string; /** The language for fences that name none, e.g. from a finding's file. */ codeLang?: string }) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
@@ -16,18 +17,7 @@ export function Markdown({ children }: { children: string }) {
         ul: ({ children }) => <ul className="list-disc list-inside text-sm text-zinc-400 mb-2 space-y-0.5 ml-1">{children}</ul>,
         ol: ({ children }) => <ol className="list-decimal list-inside text-sm text-zinc-400 mb-2 space-y-0.5 ml-1">{children}</ol>,
         li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-        code: ({ className, children }) => {
-          const isBlock = className?.includes("language-");
-          if (isBlock) {
-            return (
-              <code className="block text-xs font-mono text-zinc-300 bg-zinc-900 rounded p-3 mb-2 overflow-x-auto">
-                {children}
-              </code>
-            );
-          }
-          return <code className="text-xs font-mono text-zinc-300 bg-zinc-800 px-1.5 py-0.5 rounded">{children}</code>;
-        },
-        pre: ({ children }) => <pre className="mb-2">{children}</pre>,
+        ...(codeLang ? markdownCodeFor(codeLang) : markdownCode),
         a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline underline-offset-2">{children}</a>,
         blockquote: ({ children }) => <blockquote className="border-l-2 border-zinc-700 pl-3 text-sm text-zinc-500 italic mb-2">{children}</blockquote>,
         table: ({ children }) => <div className="overflow-x-auto mb-2"><table className="text-sm text-zinc-400 border-collapse w-full">{children}</table></div>,

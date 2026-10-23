@@ -1,5 +1,7 @@
 "use client";
 
+import { CodeBlock, jsonOrText } from "@/components/code-block";
+import { Code } from "@/components/settings/code";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -333,8 +335,8 @@ function NewToolPage() {
           <p role="status" className="text-sm text-zinc-500">Checking…</p>
         ) : check?.ok ? (
           <Callout variant="success" title="It passes its checks">
-            <p>Agents will see it as <code className="font-mono">{check.function}</code>. This is exactly what will be sent:</p>
-            <pre className="mt-2 whitespace-pre-wrap break-words rounded bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-300">{check.sent}</pre>
+            <p>Agents will see it as <Code>{check.function}</Code>. This is exactly what will be sent:</p>
+            <CodeBlock {...jsonOrText(check.sent ?? "")} label="What will be sent" wrap className="mt-2" />
           </Callout>
         ) : check ? (
           <Callout variant="warning" title="Not yet">

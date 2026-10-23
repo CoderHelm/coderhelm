@@ -1,5 +1,6 @@
 "use client";
 
+import { CodeBlock, jsonOrText } from "./code-block";
 import { StatusPill } from "./status-pill";
 import { Callout } from "./callout";
 import { focusRing } from "./ui";
@@ -56,11 +57,11 @@ export function RunResult({ run, label = "Result" }: { run: ToolRunResult; label
             .join(" · ")}
         </span>
       </div>
-      <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-xs text-zinc-200">{run.result}</pre>
+      <CodeBlock {...jsonOrText(run.result ?? "")} label={label} wrap maxHeightClass="max-h-80" className="!rounded-none !border-0" />
       {run.sent && (
         <details className="border-t border-zinc-800 px-4 py-2.5">
           <summary className="cursor-pointer text-xs text-zinc-400">What was sent (values travel separately)</summary>
-          <pre className="mt-2 whitespace-pre-wrap break-words font-mono text-xs text-zinc-400">{run.sent}</pre>
+          <CodeBlock {...jsonOrText(run.sent)} label="What was sent" wrap className="mt-2" />
         </details>
       )}
     </div>
@@ -71,23 +72,11 @@ export function RunResult({ run, label = "Result" }: { run: ToolRunResult; label
 export function VersionDiff({ before, after, label }: { before: string; after: string; label: string }) {
   const lines = diffLines(before, after);
   return (
-    <div role="region" aria-label={label} className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
-      <pre className="overflow-auto px-0 py-2 font-mono text-xs">
-        {lines.map((l, i) => (
-          <div
-            key={i}
-            className={`whitespace-pre-wrap break-words px-4 ${
-              l.kind === "added" ? "bg-emerald-500/10 text-emerald-300" : l.kind === "removed" ? "bg-red-500/10 text-red-300" : "text-zinc-400"
-            }`}
-          >
-            <span aria-hidden="true" className="select-none pr-2 text-zinc-600">
-              {l.kind === "added" ? "+" : l.kind === "removed" ? "−" : " "}
-            </span>
-            <span className="sr-only">{l.kind === "added" ? "added: " : l.kind === "removed" ? "removed: " : ""}</span>
-            {l.text}
-          </div>
-        ))}
-      </pre>
-    </div>
+    <CodeBlock
+      code={lines.map((l) => `${l.kind === "added" ? "+" : l.kind === "removed" ? "-" : " "}${l.text}`).join("\n")}
+      diff
+      wrap
+      label={label}
+    />
   );
 }

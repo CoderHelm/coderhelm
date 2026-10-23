@@ -1,5 +1,6 @@
 "use client";
 
+import { CodeBlock } from "@/components/code-block";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -308,7 +309,7 @@ function AgentPage() {
               {front && (
                 <details className="mt-3 border-t border-zinc-800 pt-3">
                   <summary className={`cursor-pointer text-xs text-zinc-500 rounded ${focusRing}`}>File settings</summary>
-                  <pre className="mt-2 overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-400">{front}</pre>
+                  <CodeBlock code={front} lang="yaml" label="File settings" className="mt-2" />
                 </details>
               )}
             </div>
@@ -702,7 +703,7 @@ function TryIt({
         {out && <p className="mt-2 text-xs text-amber-300">No tries left today. They reset 24 hours after each one.</p>}
         {showSent && (
           <div className="mt-3">
-            <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-950 px-3 py-2 font-mono text-[11px] leading-relaxed text-zinc-400">{sent}</pre>
+            <CodeBlock code={sent} lang="markdown" title="What gets sent" wrap maxHeightClass="max-h-72" />
             <p className="mt-1 text-xs text-zinc-600">About {Math.ceil(sent.length / 4).toLocaleString()} tokens. No tools are sent.</p>
           </div>
         )}

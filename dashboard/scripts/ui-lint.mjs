@@ -11,7 +11,8 @@
 //   jargon           openspec, "<something> pass", TOTP, HMAC, "Log Analyzer" in UI copy
 //   unlabeled-input  an <input>, <textarea> or <select> with no label, beyond the baseline
 // Reports (never fail, counted against the baseline so they can be tightened):
-//   font-mono        `font-mono` outside <Code> and the shared mono input
+//   font-mono        `font-mono` outside <Code>, <CodeBlock> and the shared mono input
+//   pre              a hand-rolled <pre> outside <CodeBlock> (a block of code gets its header, Copy and highlighting there)
 //   wide-button      a button that stays full width from `sm:` up
 //
 // A legitimate hit goes in scripts/ui-lint-allow.json with the reason.
@@ -46,7 +47,9 @@ const JARGON = [
 /** Strings in these attributes are not copy. */
 const NOT_COPY_ATTRS = new Set(["className", "href", "src", "id", "key", "htmlFor", "data-testid", "testId", "type", "name", "role", "rel", "target", "autoComplete", "inputMode", "d", "viewBox"]);
 /** Files allowed to use font-mono: the Code component and the shared mono input. */
-const MONO_HOMES = new Set(["src/components/settings/code.tsx", "src/components/ui.ts"]);
+const MONO_HOMES = new Set(["src/components/settings/code.tsx", "src/components/code-block.tsx", "src/components/ui.ts"]);
+/** The one file that may render a <pre>. */
+const PRE_HOMES = new Set(["src/components/code-block.tsx"]);
 
 function walk(dir) {
   const out = [];
@@ -67,10 +70,10 @@ function readJson(file, fallback) {
 }
 
 const allow = readJson(ALLOW_FILE, []);
-const baseline = readJson(BASELINE_FILE, { fontMono: 0, wideButtons: 0, unlabeledInputs: {} });
+const baseline = readJson(BASELINE_FILE, { fontMono: 0, pre: 0, wideButtons: 0, unlabeledInputs: {} });
 
 const errors = [];
-const reports = { fontMono: [], wideButtons: [], unlabeledInputs: [] };
+const reports = { fontMono: [], pre: [], wideButtons: [], unlabeledInputs: [] };
 
 function allowed(rule, rel, text) {
   return allow.some((a) => a.rule === rule && a.file === rel && text.includes(a.text));
@@ -217,6 +220,9 @@ for (const file of walk(SRC)) {
           hit(reports.unlabeledInputs, "unlabeled-input", rel, sf, node.getStart(), `<${el.tag}> has no label (a <label htmlFor>, aria-label or aria-labelledby)`, el.opening.getText());
         }
       }
+      if (el.tag === "pre" && !PRE_HOMES.has(rel)) {
+        hit(reports.pre, "pre", rel, sf, node.getStart(), "a hand-rolled <pre>: use <CodeBlock> (components/code-block.tsx)", el.opening.getText());
+      }
       if (el.tag === "button" || el.tag === "Link" || el.tag === "a") {
         const init = map.get("className");
         const cls = staticText(init);
@@ -244,6 +250,7 @@ if (UPDATE) {
   const next = {
     "//": "Counts the UI lint tolerates today. Lower them as pages are fixed; `node scripts/ui-lint.mjs --update-baseline` rewrites this file.",
     fontMono: reports.fontMono.length,
+    pre: reports.pre.length,
     wideButtons: reports.wideButtons.length,
     unlabeledInputs: Object.fromEntries(Object.entries(unlabeledByFile).sort()),
   };
@@ -271,13 +278,16 @@ for (const e of errors) print(e, "error");
 
 const monoBase = baseline.fontMono ?? 0;
 const wideBase = baseline.wideButtons ?? 0;
+const preBase = baseline.pre ?? 0;
 const unlabeledBase = Object.values(known).reduce((a, b) => a + b, 0);
 if (reports.fontMono.length > monoBase) for (const h of reports.fontMono) print(h, "warning");
+if (reports.pre.length > preBase) for (const h of reports.pre) print(h, "warning");
 if (reports.wideButtons.length > wideBase) for (const h of reports.wideButtons) print(h, "warning");
 else for (const h of reports.wideButtons) console.log(`warn   ${h.file}:${h.line}:${h.col}  wide-button  ${h.message}`);
 
 console.log("");
 console.log(`font-mono outside <Code>:   ${reports.fontMono.length} (baseline ${monoBase})${reports.fontMono.length < monoBase ? "  lower than the baseline: run --update-baseline" : ""}`);
+console.log(`<pre> outside <CodeBlock>:   ${reports.pre.length} (baseline ${preBase})${reports.pre.length < preBase ? "  lower than the baseline: run --update-baseline" : ""}`);
 console.log(`wide buttons from sm: up:   ${reports.wideButtons.length} (baseline ${wideBase})`);
 console.log(`inputs without a label:     ${reports.unlabeledInputs.length} (baseline ${unlabeledBase})${reports.unlabeledInputs.length < unlabeledBase ? "  lower than the baseline: run --update-baseline" : ""}`);
 console.log(errors.length ? `\n${errors.length} UI lint error${errors.length === 1 ? "" : "s"}.` : "\nUI lint passed.");

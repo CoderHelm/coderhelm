@@ -1,5 +1,6 @@
 "use client";
 
+import { Code } from "./settings/code";
 import { useEffect, useState } from "react";
 import { api, type GitConventionTemplates, type GitConventions } from "@/lib/api";
 import { preview, problem, tokens, TOKEN_HELP, TOKENS, type Kind } from "@/lib/git-conventions";
@@ -85,7 +86,7 @@ export function GitConventionsSection() {
                     {f.what}
                     {!err && (
                       <span className="block mt-1 text-zinc-300" data-testid={`git-${f.key}-preview`}>
-                        Example: <code className="font-mono break-all">{preview(f.key, template, SAMPLE)}</code>
+                        Example: <Code>{preview(f.key, template, SAMPLE)}</Code>
                       </span>
                     )}
                   </>
@@ -114,7 +115,7 @@ export function GitConventionsSection() {
             <ul className="space-y-0.5">
               {TOKENS.map((t) => (
                 <li key={t}>
-                  <code className="font-mono text-zinc-300">{`{${t}}`}</code> {TOKEN_HELP[t]}
+                  <Code>{`{${t}}`}</Code> {TOKEN_HELP[t]}
                 </li>
               ))}
             </ul>

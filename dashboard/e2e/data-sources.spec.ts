@@ -857,7 +857,7 @@ test("connect logs: reuse the AWS connection the team already has", async ({ pag
   const existing = page.getByRole("region", { name: `AWS account ${ACCOUNT}` });
   await expect(existing.getByText("It can only read logs, so there's nothing to run.")).toBeVisible();
   // The script is there for anyone who'd rather set up a new connection.
-  await expect(page.getByRole("button", { name: "Copy script" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Copy Setup script" })).toHaveCount(0);
   await shot(page, "connect-aws-logs-existing");
   await existing.getByRole("button", { name: "Use this connection" }).click();
 
@@ -890,7 +890,7 @@ test("connect a database: script, pasted line, and a failed read-only check expl
   await expect(page.getByRole("heading", { level: 1, name: "Give Coderhelm read-only access" })).toBeVisible();
   await expect(page.getByRole("link", { name: /Open AWS CloudShell/ })).toHaveAttribute("href", "https://console.aws.amazon.com/cloudshell/home");
   await expect(page.getByRole("link", { name: /Open AWS CloudShell/ })).toHaveAttribute("target", "_blank");
-  await expect(page.getByRole("button", { name: "Copy script" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy Setup script" })).toBeVisible();
   await expect(page.getByLabel("Setup script")).toContainText("coderhelm_setup");
   await expect(page.getByText(/lists your PostgreSQL databases first/)).toBeVisible();
   await expect(page.getByText(/Then it lists your Redshift warehouses/)).toBeVisible();

@@ -15,6 +15,7 @@ import { Stepper } from "@/components/stepper";
 import { Field } from "@/components/field";
 import { Segmented } from "@/components/segmented";
 import { CopyButton } from "@/components/copy-button";
+import { CodeBlock } from "@/components/code-block";
 import { Skeleton } from "@/components/skeleton";
 import { Disclosure } from "@/components/disclosure";
 import { AwsIcon, ExternalLinkIcon } from "@/components/icons";
@@ -328,13 +329,13 @@ function ConnectPanel({ first, onCancel, onConnected }: { first: boolean; onCanc
                 </li>
               </ol>
             )}
-            <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
-              <p className="text-xs text-zinc-500">Your External ID</p>
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                <code className="min-w-0 break-all font-mono text-sm text-zinc-200">{cfn?.external_id ?? "Loading…"}</code>
-                {cfn && <CopyButton text={cfn.external_id} />}
-              </div>
-              <p className="mt-1 text-xs text-zinc-500">It stops anyone else using Coderhelm from assuming your role. The stack fills it in for you.</p>
+            <div>
+              {cfn ? (
+                <CodeBlock code={cfn.external_id} title="Your External ID" testId="external-id" />
+              ) : (
+                <p className="text-xs text-zinc-500">{cfnError ? "Your External ID couldn't load." : "Loading your External ID…"}</p>
+              )}
+              <p className="mt-1.5 text-xs text-zinc-500">It stops anyone else using Coderhelm from assuming your role. The stack fills it in for you.</p>
             </div>
           </div>
 

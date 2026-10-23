@@ -215,7 +215,7 @@ test("approve a new version from a repo file: see the diff and the example, then
   await expect(page.getByRole("heading", { name: "A new version is waiting for approval" })).toBeVisible();
   const diff = page.getByRole("region", { name: "Changes in this version" });
   await expect(diff).toContainText("o.total");
-  await expect(diff.getByText(/removed:/).first()).toBeAttached();
+  await expect(diff.getByText(/Removed:/).first()).toBeAttached();
   await expect(page.getByText("From your-team/web@abc123 .coderhelm/tools/find-order.yaml").first()).toBeVisible();
   await shot(page, "tools-review");
   await page.getByRole("button", { name: "Approve this version" }).click();

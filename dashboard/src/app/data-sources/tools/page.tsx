@@ -1,5 +1,6 @@
 "use client";
 
+import { CodeBlock } from "@/components/code-block";
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { RoleGuard } from "@/components/role-guard";
@@ -159,7 +160,7 @@ function ToolsPage() {
                     </>
                   }
                 >
-                  <pre className="mt-1.5 whitespace-pre-wrap break-words rounded bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-300">{JSON.stringify(a.inputs, null, 2)}</pre>
+                  <CodeBlock code={JSON.stringify(a.inputs, null, 2)} lang="json" label={`Inputs for ${a.tool}`} className="mt-1.5" />
                 </ListRow>
               ))}
             </List>
