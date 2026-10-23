@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { api, type Repo, type TestSettings } from "@/lib/api";
 import { errorMessage } from "@/lib/data-sources";
 import { CodeBlock } from "@/components/code-block";
 import { Code } from "@/components/settings/code";
-import { Callout } from "@/components/callout";
 import { useToast } from "@/components/toast";
-import { focusRing, primaryButton, secondaryButton } from "@/components/ui";
-import { Select } from "./common";
+import { focusRing, inputClass } from "@/components/ui";
+import { SaveBar, SettingsRow, SettingsSection, Switch as RowSwitch, useDirtyForm } from "@/components/settings";
 
 export const REPORTER_SNIPPET = `reporter: [["html"], ["json", { outputFile: "test-results/results.json" }]],`;
 
@@ -116,17 +115,8 @@ export function Switch({
   );
 }
 
-function Row({ title, children, control }: { title: string; children: ReactNode; control: ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-4 px-4 py-4 sm:px-5">
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-zinc-100">{title}</p>
-        <div className="mt-0.5 max-w-prose text-sm text-zinc-400">{children}</div>
-      </div>
-      <div className="shrink-0">{control}</div>
-    </div>
-  );
-}
+/** The repositories part of the form: every repository, or only the ticked ones. */
+type RepoMode = "all" | "some";
 
 export function SettingsView({
   settings,
@@ -136,159 +126,193 @@ export function SettingsView({
   onSaved: (s: TestSettings) => void;
 }) {
   const { toast } = useToast();
-  const [draft, setDraft] = useState<TestSettings>(settings);
+  const form = useDirtyForm<TestSettings>(settings);
+  const { reset } = form;
+  const draft = form.values;
   const [repos, setRepos] = useState<Repo[] | null>(null);
+  // "Only these" can be chosen before any box is ticked; the saved list alone can't say so.
+  const [mode, setMode] = useState<RepoMode>(settings.repos.length ? "some" : "all");
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
 
-  useEffect(() => setDraft(settings), [settings]);
+  useEffect(() => {
+    reset(settings);
+    setMode(settings.repos.length ? "some" : "all");
+  }, [settings, reset]);
   useEffect(() => {
     api.listRepos().then((r) => setRepos(r.repos.filter((x) => x.enabled))).catch(() => setRepos([]));
   }, []);
 
-  const dirty = JSON.stringify(draft) !== JSON.stringify(settings);
   const days = draft.ticket_after_days;
   const daysValid = Number.isInteger(days) && days >= 1 && days <= 30;
-  const set = <K extends keyof TestSettings>(k: K, v: TestSettings[K]) => setDraft((d) => ({ ...d, [k]: v }));
+  const noneTicked = mode === "some" && draft.repos.length === 0;
+  const modeChanged = mode !== (form.saved.repos.length ? "some" : "all");
+  const count = form.count + (modeChanged && !form.isDirty("repos") ? 1 : 0);
   const toggleRepo = (name: string) =>
-    setDraft((d) => ({ ...d, repos: d.repos.includes(name) ? d.repos.filter((r) => r !== name) : [...d.repos, name] }));
+    form.update((d) => ({ ...d, repos: d.repos.includes(name) ? d.repos.filter((r) => r !== name) : [...d.repos, name] }));
+  const chooseMode = (m: RepoMode) => {
+    setMode(m);
+    if (m === "all") form.set("repos", []);
+  };
 
   const save = async () => {
+    if (!daysValid) {
+      setProblem("Pick between 1 and 30 days before a ticket.");
+      return;
+    }
+    if (noneTicked) {
+      setProblem("Tick at least one repository, or choose every repository.");
+      return;
+    }
     setSaving(true);
-    setError("");
+    setProblem(null);
     try {
       const saved = await api.updateTestSettings(draft);
       onSaved(saved);
       toast("Settings saved");
     } catch (e) {
-      setError(errorMessage(e, "The request failed."));
+      setProblem(`${errorMessage(e, "The request failed.")} Nothing was changed.`);
     } finally {
       setSaving(false);
     }
   };
 
+  const discard = () => {
+    form.discard();
+    setMode(form.saved.repos.length ? "some" : "all");
+    setProblem(null);
+  };
+
+  const off = !draft.enabled;
+
   return (
     <div className="space-y-8">
-      <section aria-labelledby="settings-heading">
-        <h2 id="settings-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">Settings</h2>
-        <div className="divide-y divide-zinc-800 rounded-lg border border-zinc-800 bg-zinc-900/50">
-          <Row title="Track E2E tests" control={<Switch label="Track E2E tests" checked={draft.enabled} onChange={(v) => set("enabled", v)} />}>
-            Read every E2E run your CI finishes, and tell flaky tests from broken ones. Nothing changes in your repos.
-          </Row>
-          <Row
-            title="Quarantine flaky tests"
-            control={<Switch label="Quarantine flaky tests" checked={draft.auto_quarantine} onChange={(v) => set("auto_quarantine", v)} disabled={!draft.enabled} />}
-          >
-            A test that turns flaky on your main branch stops failing builds. It still runs and is still recorded. Broken tests are never
-            quarantined.
-          </Row>
-          <Row
-            title="Open fix PRs"
-            control={<Switch label="Open fix PRs" checked={draft.fix_prs} onChange={(v) => set("fix_prs", v)} disabled={!draft.enabled} />}
-          >
-            Coderhelm reproduces a flaky test, writes a fix and opens a PR only after 20 green runs. It never skips a test or weakens a check
-            to make it pass.
-          </Row>
-          <Row
-            title="Check new tests before merge"
-            control={<Switch label="Check new tests before merge" checked={draft.burn_in} onChange={(v) => set("burn_in", v)} disabled={!draft.enabled} />}
-          >
-            When a PR adds or changes a test, the review suggests running it 10 times first, so a flaky test never lands.
-          </Row>
-          <Row
-            title="Tickets for long quarantines"
-            control={
-              <div className="w-36">
-                <Select
-                  label="Tickets for long quarantines"
-                  hideLabel
-                  value={draft.tickets}
-                  onChange={(v) => set("tickets", v)}
-                  options={[
-                    { value: "github", label: "GitHub issue" },
-                    { value: "jira", label: "Jira" },
-                    { value: "off", label: "Off" },
-                  ]}
-                />
-              </div>
-            }
-          >
-            When a test stays quarantined without a fix, its owner gets a ticket with its history and likely cause.
-          </Row>
-          <Row
-            title="Days before a ticket"
-            control={
+      <SettingsSection id="test-settings" title="Settings">
+        <SettingsRow
+          label="Track E2E tests"
+          layout="toggle"
+          unsaved={form.isDirty("enabled")}
+          help="Read every E2E run your CI finishes, and tell flaky tests from broken ones. Nothing changes in your repos."
+          control={(ids) => <RowSwitch id={ids.inputId} checked={draft.enabled} onChange={(v) => form.set("enabled", v)} labelledBy={ids.labelId} describedBy={ids.helpId} />}
+        />
+        <SettingsRow
+          label="Quarantine flaky tests"
+          layout="toggle"
+          unsaved={form.isDirty("auto_quarantine")}
+          help="A test that turns flaky on your main branch stops failing builds. It still runs and is still recorded. Broken tests are never quarantined."
+          control={(ids) => (
+            <RowSwitch id={ids.inputId} checked={draft.auto_quarantine} onChange={(v) => form.set("auto_quarantine", v)} labelledBy={ids.labelId} describedBy={ids.helpId} disabled={off} />
+          )}
+        />
+        <SettingsRow
+          label="Open fix PRs"
+          layout="toggle"
+          unsaved={form.isDirty("fix_prs")}
+          help="Coderhelm reproduces a flaky test, writes a fix and opens a PR only after 20 green runs. It never skips a test or weakens a check to make it pass."
+          control={(ids) => (
+            <RowSwitch id={ids.inputId} checked={draft.fix_prs} onChange={(v) => form.set("fix_prs", v)} labelledBy={ids.labelId} describedBy={ids.helpId} disabled={off} />
+          )}
+        />
+        <SettingsRow
+          label="Check new tests before merge"
+          layout="toggle"
+          unsaved={form.isDirty("burn_in")}
+          help="When a PR adds or changes a test, the review suggests running it 10 times first, so a flaky test never lands."
+          control={(ids) => (
+            <RowSwitch id={ids.inputId} checked={draft.burn_in} onChange={(v) => form.set("burn_in", v)} labelledBy={ids.labelId} describedBy={ids.helpId} disabled={off} />
+          )}
+        />
+        <SettingsRow
+          label="Tickets for long quarantines"
+          controlClassName="sm:w-44"
+          unsaved={form.isDirty("tickets")}
+          help="When a test stays quarantined without a fix, its owner gets a ticket with its history and likely cause."
+          control={(ids) => (
+            <select
+              id={ids.inputId}
+              aria-describedby={ids.helpId}
+              value={draft.tickets}
+              onChange={(e) => form.set("tickets", e.target.value as TestSettings["tickets"])}
+              className={inputClass}
+            >
+              <option value="github">GitHub issue</option>
+              <option value="jira">Jira</option>
+              <option value="off">Off</option>
+            </select>
+          )}
+        />
+        <SettingsRow
+          label="Days before a ticket"
+          controlClassName="sm:w-28"
+          unsaved={form.isDirty("ticket_after_days")}
+          help="File a ticket after a test has been quarantined this many days. Between 1 and 30."
+          control={(ids) => (
+            <div>
               <input
-                id="ticket-after-days"
+                id={ids.inputId}
                 type="number"
                 inputMode="numeric"
                 min={1}
                 max={30}
-                aria-label="Days before a ticket"
+                aria-describedby={ids.helpId}
+                aria-invalid={daysValid ? undefined : true}
                 value={Number.isFinite(draft.ticket_after_days) ? draft.ticket_after_days : ""}
-                disabled={!draft.enabled || draft.tickets === "off"}
-                onChange={(e) => set("ticket_after_days", e.target.value === "" ? Number.NaN : Number(e.target.value))}
-                className={`w-20 rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm text-zinc-100 disabled:opacity-50 ${focusRing}`}
+                disabled={off || draft.tickets === "off"}
+                onChange={(e) => form.set("ticket_after_days", e.target.value === "" ? Number.NaN : Number(e.target.value))}
+                className={`${inputClass} w-24 disabled:opacity-50`}
               />
-            }
-          >
-            File a ticket after a test has been quarantined this many days. Between 1 and 30.
-          </Row>
+              {!daysValid && (
+                <p role="alert" className="mt-1.5 text-xs text-red-400">Pick between 1 and 30 days before a ticket.</p>
+              )}
+            </div>
+          )}
+        />
+      </SettingsSection>
+
+      <SettingsSection id="test-repos" title="Repositories" description="Which repositories' E2E runs Coderhelm reads.">
+        <div className="px-4 py-4">
+          {repos === null ? (
+            <p role="status" className="text-sm text-zinc-500">Loading repositories…</p>
+          ) : repos.length === 0 ? (
+            <p className="text-sm text-zinc-500">No repositories are set up yet.</p>
+          ) : (
+            <fieldset className="min-w-0">
+              <legend className="sr-only">Repositories to track</legend>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2.5 text-sm text-zinc-200">
+                  <input type="radio" name="test-repo-mode" checked={mode === "all"} onChange={() => chooseMode("all")} className="h-4 w-4 accent-emerald-500" />
+                  Every repository, including ones added later
+                </label>
+                <label className="flex items-center gap-2.5 text-sm text-zinc-200">
+                  <input type="radio" name="test-repo-mode" checked={mode === "some"} onChange={() => chooseMode("some")} className="h-4 w-4 accent-emerald-500" />
+                  Only the repositories I tick
+                </label>
+              </div>
+              {mode === "some" && (
+                <ul aria-label="Repositories to track" className="mt-3 space-y-2 border-l-2 border-zinc-800 pl-4">
+                  {repos.map((r) => (
+                    <li key={r.name}>
+                      <label className="flex min-w-0 items-center gap-2.5 text-sm text-zinc-200">
+                        <input type="checkbox" checked={draft.repos.includes(r.name)} onChange={() => toggleRepo(r.name)} className="h-4 w-4 accent-emerald-500" />
+                        <span className="break-all">{r.name}</span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-3 text-sm text-zinc-400" data-testid="tracked-repos">
+                {mode === "all"
+                  ? "Every repository is tracked."
+                  : noneTicked
+                    ? "Tick at least one repository."
+                    : `${draft.repos.length} of ${repos.length} repositor${repos.length === 1 ? "y is" : "ies are"} tracked.`}
+              </p>
+            </fieldset>
+          )}
         </div>
-      </section>
+      </SettingsSection>
 
-      <section aria-labelledby="repos-heading">
-        <h2 id="repos-heading" className="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-500">Repositories</h2>
-        <p className="mb-3 text-sm text-zinc-400">{draft.repos.length === 0 ? "Every repository is tracked." : "Only the ticked repositories are tracked."}</p>
-        {repos === null ? (
-          <p role="status" className="text-sm text-zinc-500">Loading repositories…</p>
-        ) : repos.length === 0 ? (
-          <p className="text-sm text-zinc-500">No repositories are set up yet.</p>
-        ) : (
-          <fieldset className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-            <legend className="sr-only">Repositories to track</legend>
-            <ul className="space-y-2">
-              {repos.map((r) => (
-                <li key={r.name}>
-                  <label className="flex min-w-0 items-center gap-2.5 text-sm text-zinc-200">
-                    <input
-                      type="checkbox"
-                      checked={draft.repos.includes(r.name)}
-                      onChange={() => toggleRepo(r.name)}
-                      className="h-4 w-4 accent-emerald-500"
-                    />
-                    <span className="break-all font-mono">{r.name}</span>
-                  </label>
-                </li>
-              ))}
-            </ul>
-            {draft.repos.length > 0 && (
-              <button type="button" onClick={() => set("repos", [])} className={`${secondaryButton} mt-3 !min-h-8 !py-1`}>
-                Track every repository
-              </button>
-            )}
-          </fieldset>
-        )}
-      </section>
-
-      {!daysValid && (
-        <p role="alert" className="text-sm text-red-300">Pick between 1 and 30 days before a ticket.</p>
-      )}
-      {error && (
-        <Callout variant="error" title="We couldn't save your settings">
-          <p>{error} Nothing was changed.</p>
-        </Callout>
-      )}
-      <div className="flex flex-wrap gap-3">
-        <button type="button" onClick={save} disabled={!dirty || saving || !daysValid} className={primaryButton}>
-          {saving ? "Saving…" : "Save settings"}
-        </button>
-        {dirty && (
-          <button type="button" onClick={() => setDraft(settings)} disabled={saving} className={secondaryButton}>
-            Discard changes
-          </button>
-        )}
-      </div>
+      <SaveBar count={count} onSave={save} onDiscard={discard} saving={saving} problem={problem} />
 
       <section aria-labelledby="setup-heading">
         <h2 id="setup-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">Make results complete</h2>

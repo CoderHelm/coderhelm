@@ -260,7 +260,7 @@ test.describe("AWS", () => {
 
     const card = page.getByRole("article", { name: `AWS account ${ACCOUNT}` });
     await expect(card.getByText("Connected", { exact: true })).toBeVisible();
-    await expect(card.getByText(ROLE_ARN)).toBeVisible();
+    await expect(card.getByLabel("Role")).toHaveValue(ROLE_ARN);
     await expect(card.getByText("1 chosen")).toBeVisible();
     await expect(card.getByText("40 minutes ago")).toBeVisible();
     await expect(page.getByRole("heading", { name: "What Coderhelm can do with it" })).toBeVisible();
@@ -269,19 +269,21 @@ test.describe("AWS", () => {
     await expect(page.getByText("1,204 times")).toBeVisible();
     await shot(page, "aws-connected");
 
-    await card.getByRole("button", { name: "Test connection" }).click();
+    await card.getByRole("button", { name: "Actions" }).click();
+    await page.getByRole("menuitem", { name: "Test connection" }).click();
     await expect(card.getByText("The connection works")).toBeVisible();
 
     await card.getByRole("button", { name: "Choose log groups" }).click();
     await expect(card.getByLabel("/ecs/api")).toBeChecked();
     await card.getByLabel("/ecs/worker").check();
-    await card.getByRole("button", { name: "Save", exact: true }).click();
+    await page.getByRole("region", { name: "Save changes" }).getByRole("button", { name: "Save changes" }).click();
     await expect.poll(() => callsTo(db, "PUT", new RegExp(`/api/aws-connections/${ACCOUNT}$`)).at(-1)?.body).toEqual({ log_groups: ["/ecs/api", "/ecs/worker"] });
 
     await page.getByRole("button", { name: "Dismiss" }).click();
     await expect(page.getByText("No open findings.")).toBeVisible();
 
-    await card.getByRole("button", { name: "Disconnect" }).click();
+    await card.getByRole("button", { name: "Actions" }).click();
+    await page.getByRole("menuitem", { name: "Disconnect" }).click();
     const dialog = page.getByRole("alertdialog");
     await expect(dialog).toContainText(`Disconnect AWS account ${ACCOUNT}?`);
     await dialog.getByRole("button", { name: "Disconnect" }).click();
@@ -293,7 +295,8 @@ test.describe("AWS", () => {
     await mockApi(page, { assumeFails: true });
     await page.goto("/settings/integrations/aws/");
     const card = page.getByRole("article", { name: `AWS account ${ACCOUNT}` });
-    await card.getByRole("button", { name: "Test connection" }).click();
+    await card.getByRole("button", { name: "Actions" }).click();
+    await page.getByRole("menuitem", { name: "Test connection" }).click();
     await expect(card.getByText("The test failed")).toBeVisible();
     await expect(card.getByText("Could not assume role: AccessDenied")).toBeVisible();
   });
@@ -354,19 +357,19 @@ test.describe("AWS role access", () => {
   test("a role that can't read metrics or Airflow shows the one-click stack link", async ({ page }) => {
     await mockApi(page, { connections: [connection({}, ["metrics", "airflow"])] });
     await page.goto("/settings/integrations/aws/");
-    const box = page.getByTestId(`aws-panel-${ACCOUNT}`);
+    const box = page.getByRole("article", { name: `AWS account ${ACCOUNT}` });
     await expect(box.getByText("Add CloudWatch metrics and Airflow to your Coderhelm role")).toBeVisible();
     const link = box.getByRole("link", { name: "Add access in AWS" });
     await expect(link).toHaveAttribute("href", /stacks\/quickcreate\?stackName=CoderHelmLogReaderOps/);
-    await expect(box.getByRole("switch", { name: "Let agents read Metrics" })).toBeDisabled();
+    await expect(box.getByRole("switch", { name: "Metrics" })).toBeDisabled();
   });
 
   test("a role that can read everything shows each ability on", async ({ page }) => {
     await mockApi(page);
     await page.goto("/settings/integrations/aws/");
-    const box = page.getByTestId(`aws-panel-${ACCOUNT}`);
-    await expect(box.getByRole("switch", { name: "Let agents read Metrics" })).toHaveAttribute("aria-checked", "true");
-    await expect(box.getByRole("switch", { name: "Let agents read Airflow" })).toHaveAttribute("aria-checked", "true");
+    const box = page.getByRole("article", { name: `AWS account ${ACCOUNT}` });
+    await expect(box.getByRole("switch", { name: "Metrics" })).toHaveAttribute("aria-checked", "true");
+    await expect(box.getByRole("switch", { name: "Airflow" })).toHaveAttribute("aria-checked", "true");
     await expect(box.getByRole("checkbox", { name: "prod-airflow" })).toBeChecked();
     await expect(box.getByRole("link", { name: "Add access in AWS" })).toHaveCount(0);
   });
@@ -378,11 +381,12 @@ test.describe("Alert routes", () => {
     await page.goto("/settings/alerts");
     await expect(page.getByRole("heading", { level: 1, name: "Alert routes" })).toBeVisible();
 
-    const card = page.getByRole("article", { name: "Route for prod-alarms" });
+    const card = page.getByTestId("route-prod-alarms");
     await expect(card.getByText("On", { exact: true }).first()).toBeVisible();
     await expect(card.getByText("Chat: Team channel")).toBeVisible();
     await expect(card.getByText("Posts recoveries")).toBeVisible();
     await expect(card.getByText("2 rules")).toBeVisible();
+    await card.getByRole("button", { name: "Show rules of prod-alarms" }).click();
     await expect(card.getByRole("list", { name: "Rules, first match wins" })).toContainText("prod-api-5xx");
     await expect(card.getByRole("list", { name: "Rules, first match wins" })).toContainText("Everything else");
     await expect(card.getByText(/Last alert 5 minutes ago/)).toBeVisible();
@@ -415,7 +419,7 @@ test.describe("Alert routes", () => {
   test("the rule builder previews which recent alerts each rule takes, and saves the route", async ({ page }) => {
     const db = await mockApi(page);
     await page.goto("/settings/alerts");
-    await page.getByRole("article", { name: "Route for prod-alarms" }).getByRole("button", { name: "Edit rules" }).click();
+    await page.getByTestId("route-prod-alarms").getByRole("button", { name: "Edit rules" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Edit the route for prod-alarms" })).toBeFocused();
 
     const preview = page.getByRole("complementary", { name: "Live preview" });
@@ -456,12 +460,12 @@ test.describe("Alert routes", () => {
   test("pause and remove a route", async ({ page }) => {
     const db = await mockApi(page);
     await page.goto("/settings/alerts");
-    const card = page.getByRole("article", { name: "Route for prod-alarms" });
-    await card.getByRole("switch", { name: "Route for prod-alarms is on" }).click();
+    const card = page.getByTestId("route-prod-alarms");
+    await card.getByRole("switch", { name: "prod-alarms" }).click();
     await expect(card.getByText("Paused", { exact: true }).first()).toBeVisible();
     expect(callsTo(db, "PUT", /\/api\/alert-routes$/).at(-1)!.body).toMatchObject({ enabled: false });
 
-    await card.getByRole("button", { name: "Remove" }).click();
+    await card.getByRole("button", { name: "Remove the route for prod-alarms" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Remove route" }).click();
     await expect(page.getByText("No alert routes yet")).toBeVisible();
   });
@@ -470,12 +474,12 @@ test.describe("Alert routes", () => {
     const db = await mockApi(page, { role: "member" });
     await page.goto("/settings/alerts");
     await expect(page.getByText("Only an admin or the owner can change them.")).toBeVisible();
-    const card = page.getByRole("article", { name: "Route for prod-alarms" });
+    const card = page.getByTestId("route-prod-alarms");
     await expect(card).toBeVisible();
     await expect(card.getByRole("button", { name: "Edit rules" })).toHaveCount(0);
     await expect(card.getByRole("switch")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Add route" })).toHaveCount(0);
-    await expect(page.getByRole("heading", { name: "Daily alert token budget" })).toHaveCount(0);
+    await expect(page.getByText("Daily token budget for alert runs")).toHaveCount(0);
     await expect(page.getByRole("list", { name: "Recent alerts" }).getByRole("listitem")).toHaveCount(5);
     expect(callsTo(db, "GET", /alert-notify|alert-budget/)).toHaveLength(0);
     await shot(page, "alerts-member");
@@ -508,11 +512,13 @@ test.describe("Where alerts post", () => {
     const slack = picker.getByRole("textbox", { name: "Slack webhook address" });
     await slack.fill("https://hooks.slack.com/triggers/T0/1/abc");
     await expect(picker.getByText("Paste the Incoming Webhook URL Slack shows")).toBeVisible();
-    const card = page.getByRole("region", { name: "Team channel for alerts" });
-    await expect(card.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+    const bar = page.getByRole("region", { name: "Save changes" });
+    await bar.getByRole("button", { name: "Save changes" }).click();
+    await expect(bar).toContainText("Check the webhook addresses.");
+    expect(callsTo(db, "PUT", /\/api\/alert-notify$/)).toHaveLength(0);
     await slack.fill(SLACK_HOOK);
-    await card.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(page.getByText("Team channel saved")).toBeVisible();
+    await bar.getByRole("button", { name: "Save changes" }).click();
+    await expect(page.getByText("Alert settings saved")).toBeVisible();
     // Teams is kept as saved (no URL sent); Slack is the new one.
     expect(callsTo(db, "PUT", /\/api\/alert-notify$/).at(-1)!.body).toEqual({ enabled: true, slack_webhook: { url: SLACK_HOOK } });
     await shot(page, "alerts-team-channel-both");
@@ -521,7 +527,7 @@ test.describe("Where alerts post", () => {
   test("a route can post to its own Slack channel and test it", async ({ page }) => {
     const db = await mockApi(page);
     await page.goto("/settings/alerts");
-    await page.getByRole("article", { name: "Route for prod-alarms" }).getByRole("button", { name: "Edit rules" }).click();
+    await page.getByTestId("route-prod-alarms").getByRole("button", { name: "Edit rules" }).click();
     await page.getByRole("group", { name: "Where this route posts" }).getByRole("button", { name: "Own channel" }).click();
     const picker = page.getByTestId("route-channels");
     await expect(page.getByRole("button", { name: "Save route" })).toBeDisabled();
@@ -566,9 +572,10 @@ test.describe("Jira", () => {
     await page.getByRole("button", { name: "Check the connection" }).click();
     await expect(page.getByText("Coderhelm reached your-team.atlassian.net and can see 3 projects.")).toBeVisible();
 
-    await page.getByRole("switch", { name: "Tickets in OPS start runs" }).click();
+    await page.getByRole("switch", { name: "Operations (OPS)" }).click();
+    await page.getByTestId("project-WEB").getByLabel("Repository").selectOption("your-team/web");
+    await page.getByRole("region", { name: "Save changes" }).getByRole("button", { name: "Save changes" }).click();
     await expect.poll(() => (callsTo(db, "PUT", /jira\/projects$/).at(-1)?.body as { projects: { key: string; enabled: boolean }[] })?.projects.find((p) => p.key === "OPS")?.enabled).toBe(true);
-    await page.getByRole("listitem").filter({ hasText: "Website" }).getByRole("combobox").selectOption("your-team/web");
     await expect.poll(() => (callsTo(db, "PUT", /jira\/projects$/).at(-1)?.body as { projects: { key: string; repo: string }[] })?.projects.find((p) => p.key === "WEB")?.repo).toBe("your-team/web");
 
     const events = page.locator("#events");

@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
-// The Git conventions section on the Workflow settings page. Every API call is
+// The git templates on the Workflow settings page (Pull requests section). Every API call is
 // answered here; nothing reaches a real backend.
 
 const DEFAULTS = { branch: "coderhelm/{ticket_lower}", commit: "{ticket}: {title}", pr_title: "{ticket}: {title}" };
@@ -43,23 +43,27 @@ async function mockApi(page: Page): Promise<Backend> {
 test("a team sets its branch, commit and PR title templates with a live preview", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/settings/workflow/");
-  await expect(page.getByRole("heading", { name: "Git conventions" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Pull requests" })).toBeVisible();
 
   const branch = page.getByLabel("Branch name");
   const commit = page.getByLabel("Commit message");
   const title = page.getByLabel("Pull request title");
-  const save = page.getByRole("button", { name: "Save git conventions" });
+  const bar = page.getByRole("region", { name: "Save changes" });
+  const save = bar.getByRole("button", { name: "Save changes" });
 
   // Empty fields show the defaults, and the preview renders them.
   await expect(branch).toHaveAttribute("placeholder", DEFAULTS.branch);
   await expect(page.getByTestId("git-branch-preview")).toContainText("coderhelm/abc-123");
   await expect(page.getByTestId("git-pr_title-preview")).toContainText("ABC-123: Fix the login redirect after single sign-on");
-  await expect(save).toBeDisabled();
+  await expect(bar).toHaveCount(0);
 
   // An unknown token is caught while typing, before any save.
   await commit.fill("{ticket}: {what}");
   await expect(page.getByText("`{what}` is not a token.")).toBeVisible();
-  await expect(save).toBeDisabled();
+  // A save with a bad template sends nothing.
+  await save.click();
+  await expect(bar).toContainText("Fix the highlighted git template first.");
+  expect(db.puts).toHaveLength(0);
 
   // A branch template has to name the ticket.
   await branch.fill("feature/{slug}");
@@ -72,16 +76,15 @@ test("a team sets its branch, commit and PR title templates with a live preview"
   await expect(page.getByTestId("git-commit-preview")).toContainText("abc-123: fix the login redirect after single sign-on");
   await expect(page.getByTestId("git-pr_title-preview")).toContainText("[ABC-123] Fix the login redirect after single sign-on");
 
-  await expect(save).toBeEnabled();
   await save.click();
-  await expect(page.getByText("Git conventions saved")).toBeVisible();
+  await expect(page.getByText("Workflow settings saved")).toBeVisible();
   expect(db.puts.at(-1)).toEqual({ branch: "feature/{ticket}-{slug}", commit: "{ticket_lower}: {summary}", pr_title: "[{ticket}] {title}" });
-  await expect(save).toBeDisabled();
+  await expect(bar).toHaveCount(0);
 
   // What the gateway refuses is shown on its field.
   await branch.fill("feature/{ticket}@{slug}");
   await save.click();
-  await expect(page.getByText("That isn't a valid git branch name.")).toBeVisible();
+  await expect(page.getByText("That isn't a valid git branch name.").first()).toBeVisible();
   expect(db.saved.branch).toBe("feature/{ticket}-{slug}");
 
   // Saved templates come back on reload.
@@ -93,6 +96,6 @@ test("the section fits a phone screen", async ({ page }) => {
   await mockApi(page);
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/settings/workflow/");
-  await expect(page.getByRole("heading", { name: "Git conventions" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Pull requests" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
 });
