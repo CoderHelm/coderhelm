@@ -45,6 +45,7 @@ const RUN_STATUS: Record<string, string> = {
   queued: "Queued",
   completed: "Completed",
   cancelled: "Cancelled",
+  closed: "Closed",
 };
 
 export default function HealthPageGuarded() {

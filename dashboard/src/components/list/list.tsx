@@ -24,7 +24,21 @@ export function List({ children, label, className = "" }: { children: ReactNode;
   );
 }
 
+/** A row's checkbox, for lists that act on several rows at once. */
+export interface RowSelect {
+  checked: boolean;
+  /** `range`: shift was held, so select every row from the last one clicked to this one. */
+  onChange: (checked: boolean, range: boolean) => void;
+  /** Spoken name, e.g. "Select Fix the login page". */
+  label: string;
+  disabled?: boolean;
+  /** Hover text, e.g. why it can't be picked. */
+  title?: string;
+}
+
 export interface ListRowProps {
+  /** A checkbox before the status dot. */
+  select?: RowSelect;
   /** The status dot at the start of the row. */
   status?: StatusLook | { tone: Tone; live?: boolean };
   /** Something else at the start instead of a dot (an icon, an avatar). */
@@ -68,6 +82,7 @@ export interface ListRowProps {
 }
 
 export function ListRow({
+  select,
   status,
   leading,
   title,
@@ -106,8 +121,26 @@ export function ListRow({
   } ${href || externalHref ? "hover:underline" : ""} ${focusRing}`;
 
   return (
-    <li className={`px-4 py-3 ${className}`} data-testid={testId} {...dataAttrs}>
+    <li
+      className={`px-4 py-3 ${select?.checked ? "bg-zinc-800/40" : ""} ${className}`}
+      data-testid={testId}
+      data-selected={select ? String(select.checked) : undefined}
+      {...dataAttrs}
+    >
       <div className="flex gap-3">
+        {select && (
+          <input
+            type="checkbox"
+            checked={select.checked}
+            disabled={select.disabled}
+            title={select.title}
+            aria-label={select.label}
+            // Click, not change: only the click knows whether shift was held.
+            onClick={(e) => select.onChange(e.currentTarget.checked, e.shiftKey)}
+            onChange={() => {}}
+            className={`mt-[3px] h-4 w-4 shrink-0 cursor-pointer accent-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 ${focusRing}`}
+          />
+        )}
         {leading ? (
           <span className="mt-0.5 shrink-0">{leading}</span>
         ) : status ? (

@@ -19,6 +19,8 @@ const LOOKS: Record<string, RunLook> = {
   merged: { label: "Merged", tone: "merged", group: "done" },
   failed: { label: "Failed", tone: "danger", group: "failed" },
   cancelled: { label: "Cancelled", tone: "neutral", group: "failed" },
+  // A person closed it on purpose (not needed, a duplicate, done by hand).
+  closed: { label: "Closed", tone: "muted", group: "closed" },
   // Set on the old run when it is retried or started over; the new run carries on.
   retried: { label: "Started again", tone: "muted" },
   // Older runs finished with this word before "completed".
@@ -27,12 +29,26 @@ const LOOKS: Record<string, RunLook> = {
 };
 
 /** The status codes behind each toggle on the runs list (sent to the server as `status=`). */
-export const RUN_GROUP_STATUSES: Record<"active" | "waiting" | "done" | "failed", string> = {
+export const RUN_GROUP_STATUSES: Record<"active" | "waiting" | "done" | "failed" | "closed", string> = {
   active: "pending,queued,running",
   waiting: "awaiting_ci,needs_input,needs_outside_change",
   done: "completed,success,merged",
   failed: "failed,cancelled",
+  closed: "closed",
 };
+
+/** Statuses of a run that is over already: there is nothing to close. Same rule as the gateway. */
+const OVER = ["closed", "cancelled", "merged", "retried", "archived"];
+
+/** A person may close a run in this status (the gateway refuses the rest). */
+export function runCanClose(status: string | null | undefined): boolean {
+  return !!status && !OVER.includes(status);
+}
+
+/** Working right now, or waiting on a person: the run page offers Close as a button, not only in More. */
+export function runCloseIsLikely(status: string | null | undefined): boolean {
+  return ["pending", "queued", "running", "awaiting_ci", "needs_input"].includes(status ?? "");
+}
 
 /** How a run status looks in a list; unknown statuses read as plain words. */
 export function runStatusLook(status: string | null | undefined): RunLook {

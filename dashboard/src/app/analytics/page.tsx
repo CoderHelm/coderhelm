@@ -273,7 +273,7 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
           <Tile testId="tile-untouched" label="Merged as written" value={s.edits_known ? pct(s.merged_untouched / s.edits_known) : "—"} basis={s.edits_known ? `${count(s.merged_untouched)} of ${plural(s.edits_known, "merged PR")} had no commits from people` : "Recorded for PRs merged from now on"} />
           <Tile testId="tile-ci" label="Red CI fixed by Coderhelm" value={pct(data.ci.fix_rate)} basis={data.ci.runs_with_red_ci ? `${count(data.ci.fixed_by_coderhelm)} of ${plural(data.ci.runs_with_red_ci, "run")} went green after its fixes` : "No red CI on Coderhelm's PRs"} />
           <Tile testId="tile-findings" label="Review findings acted on" value={pct(data.reviews.acted_on_rate)} basis={data.reviews.outcomes_known_reviews ? `${count(data.reviews.findings_fixed)} fixed in code, ${count(data.reviews.findings_settled_by_person)} settled by a person` : "Counted from re-reviews from now on"} />
-          <Tile testId="tile-failed" label="Failed runs" value={count(s.failed_runs)} change={delta(s.failed_runs, p.failed_runs, "count", vs)} basis={s.runs ? `${pct(s.failure_rate)} of runs` : undefined} />
+          <Tile testId="tile-failed" label="Failed runs" value={count(s.failed_runs)} change={delta(s.failed_runs, p.failed_runs, "count", vs)} basis={s.runs ? `${pct(s.failure_rate)} of runs${s.closed_runs ? ` · ${plural(s.closed_runs, "run")} closed by a person, not counted` : ""}` : undefined} />
         </div>
       </Section>
 
