@@ -837,7 +837,8 @@ export const api = {
     ),
 
   // Reviewer agent
-  // Code graph — its own feature (serves the reviewer AND the PR maker)
+  // Code graph — its own feature (the planner, the coding agent, CI fixes
+  // and the reviewer all use it)
   getGraphRepos: () => request<{ repos: GraphRepo[] }>(`/api/graph/repos`),
   getGraphStatus: (repo: string) =>
     request<GraphStatus>(`/api/graph/status?repo=${encodeURIComponent(repo)}`),
@@ -854,6 +855,8 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ enabled }),
     }),
+  rebuildGraph: (repo: string) =>
+    request<void>(`/api/graph/rebuild/${repo}`, { method: "POST" }),
   getReviewerConfig: (repo: string) =>
     request<ReviewerConfig>(`/api/reviewer/config/${repo}`),
   updateReviewerConfig: (repo: string, config: ReviewerConfig & ChannelsInput) =>
@@ -1128,9 +1131,19 @@ export interface BlockedRelease {
   base_branch: string;
 }
 
+/** Where a repo's code graph is: turned off, not built yet, queued,
+ * indexing, ready, or failed (with `reason`). */
+export type GraphState = "off" | "not_built" | "queued" | "indexing" | "ready" | "failed";
+
 export interface GraphRepo {
   repo: string;
   graph_enabled: boolean;
+  /** Missing from an older gateway: read from `graph_enabled`/`indexed`. */
+  state?: GraphState;
+  /** Why the last build failed. */
+  reason?: string;
+  /** A built graph is being rebuilt or updated. */
+  updating?: boolean;
   indexed: boolean;
   files: number;
   symbols: number;
@@ -1219,9 +1232,6 @@ export interface ReviewerConfig {
   /** Repo path of the writing guide; empty = auto-detect. */
   release_notes_guide: string;
   release_notes_instructions: string;
-  /// Managed from the Code Graph page (its own feature); optional here so the
-  /// reviewer form round-trips it without owning it.
-  graph_enabled?: boolean;
   deploy_label: string;
   health_log_groups: string[];
   reminders_enabled: boolean;
