@@ -24,6 +24,7 @@ const DOES: Record<string, string> = {
   newrelic: "NRQL queries, entity search, deployment markers and change events, and response time, error rate and throughput before and after a deploy.",
   confluence: "Searches and reads Confluence pages. Optionally adds text to the end of pages you list.",
   teams: "Posts alert cards, pull request links and recoveries to a Teams channel.",
+  slack: "Posts alerts, pull request links and recoveries to a Slack channel.",
   sentry: "Query error events, list issues, and resolve incidents from Sentry.",
   figma: "Extract design tokens, inspect components, and pull assets from Figma files.",
   sanity: "Query documents, read schemas, and manage content in Sanity.",
@@ -71,6 +72,7 @@ function items() {
     card("newrelic", "monitoring", "New Relic", "connected", "manage", { last_check: ago(60 * MIN), detail: { kind: "newrelic", label: "New Relic", connected: true, enabled: true, status: "ready", key_hint: "1234", region: "us", account_ids: [] } }),
     card("confluence", "docs", "Confluence", "not_connected", "connect", { detail: { kind: "confluence", connected: false } }),
     card("teams", "chat", "Microsoft Teams", "not_connected", "connect", { detail: { enabled: false, has_webhook: false } }),
+    card("slack", "chat", "Slack", "not_connected", "connect", { detail: { enabled: false, has_webhook: false } }),
     pluginCard("sentry", "Sentry", "monitoring", true, false),
     pluginCard("figma", "Figma", "docs", true, false),
     pluginCard("sanity", "Sanity", "docs", true, false),
@@ -86,10 +88,20 @@ interface Backend {
   fail: boolean;
   domains: string[];
   calls: { method: string; path: string; body: Record<string, unknown> | null }[];
+  /** The team alert channel, as the API shows it: never a URL. */
+  notify: { enabled: boolean; webhooks: Record<"teams" | "slack", { set: boolean; hint: string }> };
 }
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
-  const db: Backend = { role: "admin", items: items(), fail: false, domains: ["example.com"], calls: [], ...init };
+  const db: Backend = {
+    role: "admin",
+    items: items(),
+    fail: false,
+    domains: ["example.com"],
+    calls: [],
+    notify: { enabled: false, webhooks: { teams: { set: false, hint: "" }, slack: { set: false, hint: "" } } },
+    ...init,
+  };
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   const at = (min: Role) => LEVEL[db.role] >= LEVEL[min];
   const forbidden = (r: Route) => json(r, { error: "Forbidden" }, 403);
@@ -146,11 +158,20 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       return json(r, { status: "saved" });
     }
     if (/^\/api\/plugins\/[a-z]+\/test$/.test(p)) return json(r, { status: "ok", tool_count: 4 });
-    if (p === "/api/alert-notify" && method === "GET") return at("admin") ? json(r, { teams_webhook_url: "", enabled: false }) : forbidden(r);
+    if (p === "/api/alert-notify" && method === "GET") return at("admin") ? json(r, db.notify) : forbidden(r);
     if (p === "/api/alert-notify" && method === "PUT") {
-      db.items = db.items.map((i) => (i.id === "teams" ? card("teams", "chat", "Microsoft Teams", "connected", "manage") : i));
+      if (!at("admin")) return forbidden(r);
+      db.notify.enabled = !!body?.enabled;
+      for (const [kind, name] of [["teams", "Microsoft Teams"], ["slack", "Slack"]] as const) {
+        const change = body?.[`${kind}_webhook`] as { url?: string; clear?: boolean } | undefined;
+        if (change?.clear) db.notify.webhooks[kind] = { set: false, hint: "" };
+        if (change?.url) db.notify.webhooks[kind] = { set: true, hint: `${new URL(change.url).hostname} …${change.url.slice(-4)}` };
+        const on = db.notify.webhooks[kind].set;
+        db.items = db.items.map((i) => (i.id === kind ? card(kind, "chat", name, on ? "connected" : "not_connected", on ? "manage" : "connect") : i));
+      }
       return json(r, { ok: true });
     }
+    if (p === "/api/notify/test") return at("admin") ? json(r, { ok: true }) : forbidden(r);
     return json(r, { error: `not mocked: ${method} ${p}` }, 404);
   });
   return db;
@@ -510,4 +531,57 @@ test("your websites: members read the list but can't change it", async ({ page }
   await expect(card.getByText("Only admins can change this list.")).toBeVisible();
   await expect(card.getByRole("button")).toHaveCount(0);
   await expect(card.getByRole("textbox")).toHaveCount(0);
+});
+
+const SLACK_HOOK = "https://hooks.slack.com/services/T0EXAMPLE/B0EXAMPLE/abcdefghijklmnop";
+
+test("Slack sits next to Teams under Chat and connects with an incoming webhook", async ({ page }) => {
+  const db = await mockApi(page);
+  await page.goto("/settings/integrations");
+  await expect(page.getByRole("main").getByRole("list", { name: "Chat" }).getByRole("listitem")).toHaveCount(2);
+  await control(page, "slack", "Slack").click();
+  const panel = row(page, "slack").getByTestId("integration-panel");
+  await expect(panel.getByText(DOES.slack)).toBeVisible();
+  // Only Slack is offered here; Teams has its own row.
+  await expect(panel.getByRole("checkbox", { name: "Slack" })).toBeChecked();
+  await expect(panel.getByRole("checkbox", { name: "Microsoft Teams" })).toHaveCount(0);
+  const field = panel.getByRole("textbox", { name: "Slack webhook address" });
+  // A Teams address is not a Slack webhook.
+  await field.fill("https://acme.webhook.office.com/webhookb2/abc");
+  await expect(panel.getByText("Paste the Incoming Webhook URL Slack shows")).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Save" })).toBeDisabled();
+  await field.fill(SLACK_HOOK);
+  await panel.getByRole("button", { name: "Send test message" }).click();
+  await expect(panel.getByText("Test message sent. Check the channel.")).toBeVisible();
+  expect(db.calls.find((c) => c.path === "/api/notify/test")!.body).toEqual({ destination: "alerts", channel: "slack", url: SLACK_HOOK });
+  await panel.getByRole("button", { name: "Save" }).click();
+  await expect.poll(() => db.calls.find((c) => c.method === "PUT" && c.path === "/api/alert-notify")?.body).toEqual({
+    enabled: true,
+    slack_webhook: { url: SLACK_HOOK },
+  });
+  await expect(row(page, "slack").getByTestId("integration-status")).toContainText("Connected");
+  await shot(page, "integrations-slack");
+});
+
+test("a saved webhook shows only as a hint, is tested without the page knowing it, and can be removed", async ({ page }) => {
+  const db = await mockApi(page, {
+    notify: { enabled: true, webhooks: { teams: { set: false, hint: "" }, slack: { set: true, hint: "hooks.slack.com …mnop" } } },
+  });
+  db.items = db.items.map((i) => (i.id === "slack" ? card("slack", "chat", "Slack", "connected", "manage") : i));
+  await page.goto("/settings/integrations");
+  await control(page, "slack", "Slack").click();
+  const panel = row(page, "slack").getByTestId("integration-panel");
+  await expect(panel.getByText("hooks.slack.com …mnop")).toBeVisible();
+  await expect(panel.getByRole("textbox", { name: "Slack webhook address" })).toHaveCount(0);
+  await panel.getByRole("button", { name: "Send test message" }).click();
+  await expect(panel.getByText("Test message sent. Check the channel.")).toBeVisible();
+  // No URL in the request: the server uses the saved one.
+  expect(db.calls.find((c) => c.path === "/api/notify/test")!.body).toEqual({ destination: "alerts", channel: "slack" });
+  await panel.getByRole("checkbox", { name: "Slack" }).uncheck();
+  await panel.getByRole("switch", { name: "Post alerts to the team channel" }).click();
+  await panel.getByRole("button", { name: "Save" }).click();
+  await expect.poll(() => db.calls.find((c) => c.method === "PUT" && c.path === "/api/alert-notify")?.body).toEqual({
+    enabled: false,
+    slack_webhook: { clear: true },
+  });
 });

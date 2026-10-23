@@ -661,7 +661,7 @@ export const api = {
     request<{ endpoint_path: string; routes: AlertRoute[] }>(
       "/api/alert-routes",
     ),
-  saveAlertRoute: (route: Omit<AlertRoute, "updated_at">) =>
+  saveAlertRoute: (route: Omit<AlertRoute, "updated_at" | "webhooks"> & ChannelsInput) =>
     request<{ ok: boolean }>("/api/alert-routes", {
       method: "PUT",
       body: JSON.stringify(route),
@@ -682,15 +682,16 @@ export const api = {
       { method: "DELETE" },
     ),
   getAlertNotify: () => request<AlertNotifySettings>("/api/alert-notify"),
-  saveAlertNotify: (s: AlertNotifySettings) =>
+  saveAlertNotify: (s: { enabled: boolean } & ChannelsInput) =>
     request<{ ok: boolean }>("/api/alert-notify", {
       method: "PUT",
       body: JSON.stringify(s),
     }),
-  testAlertNotify: (teams_webhook_url: string) =>
-    request<{ ok: boolean; error?: string }>("/api/alert-notify/test", {
+  /** Post a sample message to one channel: a URL being typed, or the destination's saved one. */
+  testNotify: (t: NotifyDestination & { channel: ChatChannel; url?: string }) =>
+    request<{ ok: boolean; error?: string }>("/api/notify/test", {
       method: "POST",
-      body: JSON.stringify({ teams_webhook_url }),
+      body: JSON.stringify(t),
     }),
   listAlerts: (after?: string) =>
     request<{ alerts: AlertEvent[]; next?: string | null }>(
@@ -714,15 +715,15 @@ export const api = {
   getRecNotify: () =>
     request<{
       notify_mode: "team" | "custom" | "off";
-      teams_webhook_url: string;
+      webhooks: WebhooksView;
     }>("/api/recommendations/notify"),
   saveRecNotify: (
     notify_mode: "team" | "custom" | "off",
-    teams_webhook_url: string,
+    channels: ChannelsInput,
   ) =>
     request<{ ok: boolean }>("/api/recommendations/notify", {
       method: "PUT",
-      body: JSON.stringify({ notify_mode, teams_webhook_url }),
+      body: JSON.stringify({ notify_mode, ...channels }),
     }),
   updateAwsConnection: (
     id: string,
@@ -855,7 +856,7 @@ export const api = {
     }),
   getReviewerConfig: (repo: string) =>
     request<ReviewerConfig>(`/api/reviewer/config/${repo}`),
-  updateReviewerConfig: (repo: string, config: ReviewerConfig) =>
+  updateReviewerConfig: (repo: string, config: ReviewerConfig & ChannelsInput) =>
     request<void>(`/api/reviewer/config/${repo}`, {
       method: "PUT",
       body: JSON.stringify(config),
@@ -1224,7 +1225,8 @@ export interface ReviewerConfig {
   deploy_label: string;
   health_log_groups: string[];
   reminders_enabled: boolean;
-  teams_webhook_url: string;
+  /** Where reminders and release notes failures post. Read only: shown as a hint. */
+  webhooks?: WebhooksView;
   reminder_cooldown_hours: number;
 }
 
@@ -1762,13 +1764,14 @@ export interface AlertRule {
 
 export interface AlertRoute {
   topic_arn: string;
-  /** First matching rule opens a PR; alerts no rule takes only post to Teams. */
+  /** First matching rule opens a PR; alerts no rule takes only post to chat. */
   rules: AlertRule[];
   enabled: boolean;
-  /** Teams notifications: the team channel, the route's own channel, or none. */
+  /** Chat notifications: the team channels, the route's own channels, or none. */
   notify_mode?: "team" | "custom" | "off";
-  teams_webhook_url?: string;
-  /** Post recoveries (one per open alert card) and other non-alarm state changes to Teams. Off by default. */
+  /** The route's own webhooks (custom), shown only as a hint. */
+  webhooks?: WebhooksView;
+  /** Post recoveries (one per open alert message) and other non-alarm state changes. Off by default. */
   post_recoveries?: boolean;
   updated_at?: string;
 }
@@ -1793,9 +1796,36 @@ export interface TopicAlarm {
 }
 
 export interface AlertNotifySettings {
-  teams_webhook_url: string;
   enabled: boolean;
+  webhooks: WebhooksView;
 }
+
+/** A chat channel CoderHelm posts to. */
+export type ChatChannel = "teams" | "slack";
+
+/** A saved webhook, as the API shows it: never the URL, only whether one is set and a hint. */
+export interface WebhookView {
+  set: boolean;
+  hint: string;
+}
+export type WebhooksView = Record<ChatChannel, WebhookView>;
+
+/** A change to one saved webhook: a new URL, or clear it. Omitted = keep. */
+export interface WebhookInput {
+  url?: string;
+  clear?: boolean;
+}
+export interface ChannelsInput {
+  teams_webhook?: WebhookInput;
+  slack_webhook?: WebhookInput;
+}
+
+/** Whose saved webhook a test message uses (and which sample it posts). */
+export type NotifyDestination =
+  | { destination: "alerts" }
+  | { destination: "route"; topic_arn: string }
+  | { destination: "recommendations" }
+  | { destination: "reviewer"; repo: string };
 
 /** One alert CoderHelm received, and what it did with it. */
 export interface AlertEvent {

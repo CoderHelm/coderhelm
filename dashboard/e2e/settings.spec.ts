@@ -75,7 +75,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/alert-routes") return atLeast(db.role, "member") ? json(route, { endpoint_path: "/webhooks/alerts/sns", routes: [] }) : forbidden(route);
     if (p === "/api/alerts") return atLeast(db.role, "member") ? json(route, { alerts: [], next: null }) : forbidden(route);
     if (p === "/api/alert-budget") return admin ? json(route, { daily_tokens: 2_000_000, used_24h_tokens: 0, open_runs: 0, open_run_reserve_tokens: 0, max_runs_per_rule_per_day: 3 }) : forbidden(route);
-    if (p === "/api/alert-notify") return admin ? json(route, { teams_webhook_url: "", enabled: false }) : forbidden(route);
+    if (p === "/api/alert-notify") return admin ? json(route, { enabled: false, webhooks: { teams: { set: false, hint: "" }, slack: { set: false, hint: "" } } }) : forbidden(route);
     if (p === "/api/data-sources") return json(route, { sources: [] });
     if (p === "/api/data-sources/activity") return json(route, { events: [] });
     if (p === "/api/tools") return json(route, { tools: [], pending_asks: 0 });
@@ -93,7 +93,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/settings/git-conventions") return json(route, { branch: "", commit: "", pr_title: "", defaults: { branch: "coderhelm/{ticket_lower}", commit: "{ticket}: {title}", pr_title: "{ticket}: {title}" }, tokens: ["ticket", "ticket_lower", "slug", "summary", "title"] });
     if (p === "/api/aws-connections") return json(route, { connections: [] });
     if (p === "/api/recommendations") return json(route, { recommendations: [] });
-    if (p === "/api/recommendations/notify") return json(route, { notify_mode: "off", teams_webhook_url: "" });
+    if (p === "/api/recommendations/notify") return json(route, { notify_mode: "off", webhooks: { teams: { set: false, hint: "" }, slack: { set: false, hint: "" } } });
     if (p === "/api/rules/global") return json(route, { rules: [] });
     if (p === "/api/voice/global" || p === "/api/instructions/global" || p === "/api/agents/global") return json(route, { content: "" });
     if (p === "/api/skills") return json(route, { repos: [], items: [], can_manage: atLeast(db.role, "admin") });

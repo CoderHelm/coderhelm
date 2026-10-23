@@ -152,7 +152,8 @@ const CONFIG = {
   release_notes: false, release_notes_branch: "", release_notes_confluence_space: "", release_notes_confluence_parent_id: "",
   release_notes_confluence_container: "Changelog", release_notes_email_webhook_url: "", release_notes_email_webhook_secret_set: false,
   release_notes_guide: "", release_notes_instructions: "", graph_enabled: false, deploy_label: "", health_log_groups: [],
-  reminders_enabled: false, teams_webhook_url: "", reminder_cooldown_hours: 4,
+  reminders_enabled: false, reminder_cooldown_hours: 4,
+  webhooks: { teams: { set: false, hint: "" }, slack: { set: false, hint: "" } },
 };
 
 /** Release-notes settings per repo (merged over CONFIG). */
@@ -638,7 +639,7 @@ test("reviewer settings load for a repo, with labelled fields and switches", asy
   await page.getByRole("switch", { name: /Auto-merge on approve/ }).click();
   // Every section is one jump away.
   const nav = page.getByRole("navigation", { name: "Settings sections" });
-  for (const name of ["Reviews", "Tests", "CI labels", "Auto-merge", "Tags and health check", "Release notes", "Teams reminders", "Stop everything", "Every repository"]) {
+  for (const name of ["Reviews", "Tests", "CI labels", "Auto-merge", "Tags and health check", "Release notes", "Review reminders", "Stop everything", "Every repository"]) {
     await expect(nav.getByRole("link", { name: new RegExp(`^${name}`) })).toBeVisible();
   }
   await shot(page, "audit-reviewer-config");
@@ -680,19 +681,29 @@ test("a failed load of the shared review standards turns their save off", async 
   expect(errors).toEqual([]);
 });
 
-test("a Teams webhook that is not https is caught before saving", async ({ page }) => {
+test("a reminder webhook on the wrong host is caught before saving, and Slack works too", async ({ page }) => {
   const errors = watchConsole(page);
   const db = await mockApi(page);
   await page.goto("/reviewer/config?repo=your-team%2Fweb");
-  await page.getByRole("switch", { name: /Remind reviewers in Microsoft Teams/ }).click();
-  await page.getByRole("textbox", { name: "Teams incoming webhook URL" }).fill("http://example.com/hook");
+  await page.getByRole("switch", { name: /Remind reviewers in Microsoft Teams or Slack/ }).click();
+  const picker = page.getByTestId("reminders-channels");
+  // On with nowhere to post is caught.
   await page.getByRole("button", { name: "Save settings" }).click();
-  await expect(page.getByText("The Teams webhook URL must start with https://.")).toBeVisible();
+  await expect(page.getByText("Choose where reminders post: Microsoft Teams, Slack or both.")).toBeVisible();
+  await picker.getByRole("checkbox", { name: "Microsoft Teams" }).check();
+  await picker.getByRole("textbox", { name: "Microsoft Teams webhook address" }).fill("https://example.com/hook");
+  await page.getByRole("button", { name: "Save settings" }).click();
+  await expect(page.getByText(/Check the reminder webhook addresses/)).toBeVisible();
   expect(db.calls.some((c) => c.startsWith("PUT /api/reviewer/config/"))).toBe(false);
-  await page.getByRole("textbox", { name: "Teams incoming webhook URL" }).fill("https://example.com/hook");
+  await picker.getByRole("checkbox", { name: "Microsoft Teams" }).uncheck();
+  await picker.getByRole("checkbox", { name: "Slack" }).check();
+  await picker.getByRole("textbox", { name: "Slack webhook address" }).fill("https://hooks.slack.com/services/T0EXAMPLE/B0EXAMPLE/abcdefghijklmnop");
   await page.getByRole("button", { name: "Save settings" }).click();
   await expect(page.getByText("Reviewer settings saved")).toBeVisible();
   expect(db.calls.some((c) => c.startsWith("PUT /api/reviewer/config/your-team/web"))).toBe(true);
+  expect(db.bodies.at(-1)).toMatchObject({ slack_webhook: { url: "https://hooks.slack.com/services/T0EXAMPLE/B0EXAMPLE/abcdefghijklmnop" } });
+  expect(db.bodies.at(-1)).not.toHaveProperty("teams_webhook");
+  expect(db.bodies.at(-1)).not.toHaveProperty("webhooks");
   expect(errors).toEqual([]);
 });
 
@@ -715,8 +726,9 @@ test("saving sends the same settings body as before, with every edit in it", asy
   await page.getByRole("switch", { name: /Write release notes/ }).click();
   await page.getByText("Publish to Confluence").click();
   await page.getByRole("textbox", { name: "Parent page id" }).fill("12a34");
-  await page.getByRole("switch", { name: /Remind reviewers in Microsoft Teams/ }).click();
-  await page.getByRole("textbox", { name: "Teams incoming webhook URL" }).fill("https://example.com/hook");
+  await page.getByRole("switch", { name: /Remind reviewers in Microsoft Teams or Slack/ }).click();
+  await page.getByTestId("reminders-channels").getByRole("checkbox", { name: "Microsoft Teams" }).check();
+  await page.getByRole("textbox", { name: "Microsoft Teams webhook address" }).fill("https://acme.webhook.office.com/webhookb2/abc");
   await page.getByRole("spinbutton", { name: /Wait before reminding again/ }).fill("6");
 
   // Unsaved edits are counted and marked where they are.
@@ -729,8 +741,10 @@ test("saving sends the same settings body as before, with every edit in it", asy
   await expect(page.getByText("Reviewer settings saved")).toBeVisible();
   const puts = db.calls.filter((c) => c.startsWith("PUT /api/reviewer/config/"));
   expect(puts).toEqual(["PUT /api/reviewer/config/your-team/web"]);
+  const { webhooks: _saved, ...base } = CONFIG;
+  expect(_saved.teams.set).toBe(false);
   expect(db.bodies.at(-1)).toEqual({
-    ...CONFIG,
+    ...base,
     label: "needs-review",
     require_tests: true,
     auto_merge: true,
@@ -742,7 +756,7 @@ test("saving sends the same settings body as before, with every edit in it", asy
     release_notes: true,
     release_notes_confluence_parent_id: "1234",
     reminders_enabled: true,
-    teams_webhook_url: "https://example.com/hook",
+    teams_webhook: { url: "https://acme.webhook.office.com/webhookb2/abc" },
     reminder_cooldown_hours: 6,
   });
   expect(errors).toEqual([]);

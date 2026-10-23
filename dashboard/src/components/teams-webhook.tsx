@@ -1,9 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { api } from "@/lib/api";
-import { Field } from "./field";
-import { focusRing, inputClass, secondaryButton } from "./ui";
+import { focusRing } from "./ui";
 
 /** Teams webhook hosts the API accepts (Workflows and older incoming webhooks). */
 export function validTeamsUrl(url: string): boolean {
@@ -18,84 +15,6 @@ export function validTeamsUrl(url: string): boolean {
   } catch {
     return false;
   }
-}
-
-type TestState = { state: "idle" } | { state: "sending" } | { state: "sent" } | { state: "failed"; message: string };
-
-/**
- * A Teams webhook address with a "Send test card" button whose result shows
- * next to the field, not in a toast that disappears.
- */
-export function TeamsWebhookField({
-  id,
-  label = "Teams webhook address",
-  value,
-  onChange,
-  disabled,
-  helper,
-}: {
-  id: string;
-  label?: string;
-  value: string;
-  onChange: (v: string) => void;
-  disabled?: boolean;
-  helper?: React.ReactNode;
-}) {
-  const [test, setTest] = useState<TestState>({ state: "idle" });
-  const ok = validTeamsUrl(value);
-  const showError = value.trim() !== "" && !ok;
-
-  const send = async () => {
-    setTest({ state: "sending" });
-    try {
-      const r = await api.testAlertNotify(value.trim());
-      setTest(r.ok ? { state: "sent" } : { state: "failed", message: r.error ? `Teams refused it: ${r.error}` : "Teams refused the card." });
-    } catch {
-      setTest({ state: "failed", message: "That address is not a Teams webhook address." });
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-2">
-      <Field
-        id={id}
-        label={label}
-        helper={helper}
-        error={showError ? "Paste the address Teams Workflows shows (it ends in powerplatform.com, logic.azure.com or webhook.office.com)." : undefined}
-      >
-        {(props) => (
-          <div className="flex flex-col items-start gap-2">
-            <input
-              {...props}
-              value={value}
-              disabled={disabled}
-              onChange={(e) => {
-                onChange(e.target.value);
-                setTest({ state: "idle" });
-              }}
-              inputMode="url"
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="https://…powerplatform.com/…/workflows/…"
-              className={`${inputClass} min-w-0 font-mono text-xs disabled:opacity-60`}
-            />
-            <button
-              type="button"
-              onClick={send}
-              disabled={disabled || !ok || test.state === "sending"}
-              className={`${secondaryButton} shrink-0`}
-            >
-              {test.state === "sending" ? "Sending…" : "Send test card"}
-            </button>
-          </div>
-        )}
-      </Field>
-      <p aria-live="polite" className="text-sm">
-        {test.state === "sent" && <span className="text-emerald-400">Test card sent. Check the channel.</span>}
-        {test.state === "failed" && <span className="text-red-400">{test.message}</span>}
-      </p>
-    </div>
-  );
 }
 
 /** How to get a webhook address from Teams, as a short list. */

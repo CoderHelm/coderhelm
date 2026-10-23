@@ -2,7 +2,12 @@
 
 import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { api, type ReviewerConfig, type Repo } from "@/lib/api";
+import { api, type ReviewerConfig as ApiReviewerConfig, type Repo } from "@/lib/api";
+import { ChannelPicker, channelsPayload, channelsSummary, draftFrom, draftValid, type ChannelsDraft } from "@/components/chat-channels";
+
+/** The form: the API's settings plus the reminder channels being edited
+ * (saved webhooks are never sent back, only changes). */
+type ReviewerConfig = ApiReviewerConfig & { channels: ChannelsDraft };
 import { RoleGuard } from "@/components/role-guard";
 import { RepoCombobox } from "@/components/repo-combobox";
 import { useToast } from "@/components/toast";
@@ -53,8 +58,8 @@ const DEFAULTS: ReviewerConfig = {
   deploy_label: "",
   health_log_groups: [],
   reminders_enabled: false,
-  teams_webhook_url: "",
   reminder_cooldown_hours: 4,
+  channels: draftFrom(undefined),
 };
 
 type Key = keyof ReviewerConfig;
@@ -81,7 +86,7 @@ const SECTIONS = [
   { id: "merge", title: "Auto-merge" },
   { id: "after-merge", title: "Tags and health check" },
   { id: "release-notes", title: "Release notes" },
-  { id: "reminders", title: "Teams reminders" },
+  { id: "reminders", title: "Review reminders" },
   { id: "stop", title: "Stop everything" },
 ] as const;
 type SectionId = (typeof SECTIONS)[number]["id"];
@@ -98,7 +103,7 @@ const SECTION_KEYS: Record<SectionId, Key[]> = {
     "release_notes_confluence_space", "release_notes_email_webhook_url", "release_notes_email_webhook_secret",
     "release_notes_email_webhook_secret_clear", "release_notes_guide", "release_notes_instructions",
   ],
-  reminders: ["reminders_enabled", "teams_webhook_url", "reminder_cooldown_hours"],
+  reminders: ["reminders_enabled", "channels", "reminder_cooldown_hours"],
   stop: ["killed"],
 };
 
@@ -111,9 +116,11 @@ const same = (a: unknown, b: unknown) => norm(a) === norm(b);
 
 /** What the backend refuses with a bare 400, said before saving. */
 function configProblem(cfg: ReviewerConfig): string | null {
-  const teams = cfg.teams_webhook_url.trim();
-  if (teams && !teams.startsWith("https://")) return "The Teams webhook URL must start with https://.";
-  if (teams.length > 500) return "The Teams webhook URL is too long (500 characters at most).";
+  if (!draftValid(cfg.channels, cfg.webhooks, cfg.reminders_enabled)) {
+    return cfg.reminders_enabled && !cfg.channels.teams.on && !cfg.channels.slack.on
+      ? "Choose where reminders post: Microsoft Teams, Slack or both."
+      : "Check the reminder webhook addresses: a Teams Workflows address or a Slack incoming webhook (https://hooks.slack.com/services/…).";
+  }
   const email = cfg.release_notes_email_webhook_url.trim();
   if (email && !email.startsWith("https://")) return "The automation webhook URL for release notes must start with https://.";
   if (!/^\d*$/.test(cfg.release_notes_confluence_parent_id.trim())) return "The Confluence parent page id must be digits only.";
@@ -175,7 +182,10 @@ function summaryLines(cfg: ReviewerConfig): string[] {
     if (cfg.release_notes_email_webhook_url) where.push("your automation webhook");
     lines.push(`Writes release notes for each tag (${where.join(", ")}).`);
   }
-  if (cfg.reminders_enabled) lines.push(`Reminds waiting reviewers in Teams, at most every ${cfg.reminder_cooldown_hours} hours.`);
+  if (cfg.reminders_enabled) {
+    const where = channelsSummary(cfg.webhooks) || "chat";
+    lines.push(`Reminds waiting reviewers in ${where}, at most every ${cfg.reminder_cooldown_hours} hours.`);
+  }
   return lines;
 }
 
@@ -416,7 +426,7 @@ function ReviewerConfigPage() {
       .getReviewerConfig(repo)
       .then((c) => {
         if (!current) return;
-        const next = { ...DEFAULTS, ...c };
+        const next = { ...DEFAULTS, ...c, channels: draftFrom(c.webhooks) };
         setCfg(next);
         setSaved(next);
       })
@@ -499,7 +509,8 @@ function ReviewerConfigPage() {
     if (found) return;
     setSaving(true);
     try {
-      await api.updateReviewerConfig(repo, cfg);
+      const { channels, webhooks, ...rest } = cfg;
+      await api.updateReviewerConfig(repo, { ...rest, ...channelsPayload(channels, webhooks) });
       toast("Reviewer settings saved");
       // Re-read so a new webhook secret shows as saved and the form matches
       // what the backend kept (it trims and caps some values).
@@ -1002,7 +1013,7 @@ function ReviewerConfigPage() {
                             <>
                               After the Confluence entry, CoderHelm POSTs <code>subject</code>, <code>summary_html</code>, <code>summary_markdown</code>,{" "}
                               <code>confluence_url</code>, <code>release_url</code>, <code>repo</code>, <code>tag</code> and <code>date</code> here, for
-                              example to an Atlassian Automation rule that emails your IT list. Failures alert the Teams webhook.
+                              example to an Atlassian Automation rule that emails your IT list. Failures post to the reminder channels below.
                             </>
                           }
                         >
@@ -1061,9 +1072,9 @@ function ReviewerConfigPage() {
                 </Row>
               </SettingsSection>
 
-              <SettingsSection id="reminders" title="Teams reminders">
+              <SettingsSection id="reminders" title="Review reminders">
                 <Row
-                  label="Remind reviewers in Microsoft Teams"
+                  label="Remind reviewers in Microsoft Teams or Slack"
                   help="About every 20 minutes, posts open pull requests still waiting on their requested reviewers."
                   {...marks("reminders_enabled")}
                   toggle
@@ -1071,11 +1082,15 @@ function ReviewerConfigPage() {
                 >
                   {reveal(cfg.reminders_enabled) && (
                     <>
-                      <SubField label="Teams incoming webhook URL" {...marks("teams_webhook_url")} help="An https URL from a Teams channel: Workflows or Incoming Webhook.">
-                        {({ id, describedBy }) => (
-                          <input id={id} aria-describedby={describedBy} value={cfg.teams_webhook_url} onChange={(e) => set("teams_webhook_url", e.target.value)} className={monoInput} placeholder="https://…webhook.office.com/…" />
-                        )}
-                      </SubField>
+                      <div className="min-w-0">
+                        <ChannelPicker
+                          idPrefix="reminders"
+                          draft={cfg.channels}
+                          saved={cfg.webhooks}
+                          onChange={(d) => set("channels", d)}
+                          destination={{ destination: "reviewer", repo }}
+                        />
+                      </div>
                       <SubField label="Wait before reminding again (hours)" {...marks("reminder_cooldown_hours")} help="It also reminds again after a new commit.">
                         {({ id, describedBy }) => (
                           <input

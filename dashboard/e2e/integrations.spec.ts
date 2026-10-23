@@ -18,6 +18,9 @@ const TOPIC = `arn:aws:sns:us-east-1:${ACCOUNT}:prod-alarms`;
 const OTHER_TOPIC = "arn:aws:sns:us-east-1:999999999999:other-team";
 const EXTERNAL_ID = "1b4e28ba-2fa1-11d2-883f-0016d3cca427";
 const WEBHOOK = "https://example.environment.api.powerplatform.com/workflows/abc";
+const TEAMS_HINT = "example.environment.api.powerplatform.com …ab12";
+const SLACK_HOOK = "https://hooks.slack.com/services/T0EXAMPLE/B0EXAMPLE/abcdefghijklmnop";
+const NO_HOOKS = { teams: { set: false, hint: "" }, slack: { set: false, hint: "" } };
 
 const MIN = 60_000;
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
@@ -62,7 +65,7 @@ function connection(over: Record<string, unknown> = {}, missing: string[] = []) 
 
 function route(over: Record<string, unknown> = {}) {
   return {
-    topic_arn: TOPIC, enabled: true, notify_mode: "team", teams_webhook_url: "", post_recoveries: true,
+    topic_arn: TOPIC, enabled: true, notify_mode: "team", post_recoveries: true,
     rules: [
       { id: "r1", alarms: ["prod-api-5xx"], terms: [], repo: "your-team/backend", instructions: "Roll back the last deploy." },
       { id: "r2", alarms: [], terms: ["disk full"], repo: "your-team/infra", instructions: "" },
@@ -152,7 +155,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       return json(r, { status: "deleted" });
     }
     if (p === "/api/recommendations") return json(r, { recommendations: db.recommendations });
-    if (p === "/api/recommendations/notify" && method === "GET") return at("admin") ? json(r, { notify_mode: "off", teams_webhook_url: "" }) : forbidden();
+    if (p === "/api/recommendations/notify" && method === "GET") return at("admin") ? json(r, { notify_mode: "off", webhooks: NO_HOOKS }) : forbidden();
     if (p === "/api/recommendations/notify" && method === "PUT") return at("admin") ? json(r, { ok: true }) : forbidden();
     if (/^\/api\/recommendations\/[^/]+\/dismiss$/.test(p)) {
       if (!at("member")) return forbidden();
@@ -178,9 +181,9 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       { name: "prod-db-cpu", state: "ALARM" },
     ], messages: ["Disk full on build host"] }) : forbidden();
     if (p === "/api/alerts") return at("member") ? json(r, { alerts: db.alerts, next: null }) : forbidden();
-    if (p === "/api/alert-notify" && method === "GET") return at("admin") ? json(r, { teams_webhook_url: WEBHOOK, enabled: true }) : forbidden();
+    if (p === "/api/alert-notify" && method === "GET") return at("admin") ? json(r, { enabled: true, webhooks: { teams: { set: true, hint: TEAMS_HINT }, slack: { set: false, hint: "" } } }) : forbidden();
     if (p === "/api/alert-notify" && method === "PUT") return at("admin") ? json(r, { ok: true }) : forbidden();
-    if (p === "/api/alert-notify/test") return at("admin") ? json(r, { ok: true }) : forbidden();
+    if (p === "/api/notify/test") return at("admin") ? json(r, { ok: true }) : forbidden();
     if (p === "/api/alert-budget" && method === "GET") return at("admin") ? json(r, { daily_tokens: 2_000_000, used_24h_tokens: 600_000, open_runs: 1, open_run_reserve_tokens: 50_000, max_runs_per_rule_per_day: 5 }) : forbidden();
     if (p === "/api/alert-budget" && method === "PUT") return at("admin") ? json(r, { ok: true }) : forbidden();
 
@@ -328,7 +331,7 @@ test.describe("AWS", () => {
     await expect(card.getByRole("button", { name: "Test connection" })).toHaveCount(0);
     await expect(card.getByRole("button", { name: "Disconnect" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Connect another account" })).toHaveCount(0);
-    await expect(page.getByRole("heading", { name: "Post new findings to Teams" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Post new findings to chat" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Create a plan" })).toBeVisible();
     expect(callsTo(db, "GET", /cfn-url|recommendations\/notify/)).toHaveLength(0);
     await shot(page, "aws-member");
@@ -377,7 +380,7 @@ test.describe("Alert routes", () => {
 
     const card = page.getByRole("article", { name: "Route for prod-alarms" });
     await expect(card.getByText("On", { exact: true }).first()).toBeVisible();
-    await expect(card.getByText("Teams: Team channel")).toBeVisible();
+    await expect(card.getByText("Chat: Team channel")).toBeVisible();
     await expect(card.getByText("Posts recoveries")).toBeVisible();
     await expect(card.getByText("2 rules")).toBeVisible();
     await expect(card.getByRole("list", { name: "Rules, first match wins" })).toContainText("prod-api-5xx");
@@ -418,7 +421,7 @@ test.describe("Alert routes", () => {
     const preview = page.getByRole("complementary", { name: "Live preview" });
     await expect(preview.getByRole("listitem").filter({ hasText: "ALARM: prod-api-5xx" })).toContainText("Rule 1: PR in your-team/backend");
     await expect(preview.getByRole("listitem").filter({ hasText: "Disk full on build host" })).toContainText("Rule 2: PR in your-team/infra");
-    await expect(preview.getByRole("listitem").filter({ hasText: "nightly load failed" })).toContainText("Teams only");
+    await expect(preview.getByRole("listitem").filter({ hasText: "nightly load failed" })).toContainText(/chat only/i);
     await expect(preview.getByRole("listitem").filter({ hasText: "All clear" })).toContainText("Recovery or state change: no run");
     await shot(page, "alerts-editor");
 
@@ -427,9 +430,9 @@ test.describe("Alert routes", () => {
     await expect(page.getByRole("group", { name: "Rule 1", exact: true }).getByLabel("Phrases")).toHaveValue("disk full");
     await expect(preview.getByRole("listitem").filter({ hasText: "Disk full on build host" })).toContainText("Rule 1: PR in your-team/infra");
 
-    // Narrowing a rule to text that matches nothing moves its alert to Teams only.
+    // Narrowing a rule to text that matches nothing moves its alert to chat only.
     await page.getByLabel("Phrases").fill("never seen");
-    await expect(preview.getByRole("listitem").filter({ hasText: "Disk full on build host" })).toContainText("Teams only");
+    await expect(preview.getByRole("listitem").filter({ hasText: "Disk full on build host" })).toContainText(/chat only/i);
 
     await page.getByRole("button", { name: "Save route" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Alert routes" })).toBeVisible();
@@ -488,6 +491,64 @@ test.describe("Alert routes", () => {
     db.fail.add("/api/alert-routes");
     await page.reload();
     await expect(page.getByText("Could not load the alert routes")).toBeVisible();
+  });
+});
+
+// ── Slack and Teams ──────────────────────────────────────────────────
+
+test.describe("Where alerts post", () => {
+  test("the team channel posts to Teams, Slack or both, and saved webhooks are never sent back", async ({ page }) => {
+    const db = await mockApi(page);
+    await page.goto("/settings/alerts");
+    const picker = page.getByTestId("team-channels");
+    // The saved Teams webhook shows as a hint only.
+    await expect(picker.getByText(TEAMS_HINT)).toBeVisible();
+    await expect(picker.getByRole("checkbox", { name: "Microsoft Teams" })).toBeChecked();
+    await picker.getByRole("checkbox", { name: "Slack" }).check();
+    const slack = picker.getByRole("textbox", { name: "Slack webhook address" });
+    await slack.fill("https://hooks.slack.com/triggers/T0/1/abc");
+    await expect(picker.getByText("Paste the Incoming Webhook URL Slack shows")).toBeVisible();
+    const card = page.getByRole("region", { name: "Team channel for alerts" });
+    await expect(card.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+    await slack.fill(SLACK_HOOK);
+    await card.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByText("Team channel saved")).toBeVisible();
+    // Teams is kept as saved (no URL sent); Slack is the new one.
+    expect(callsTo(db, "PUT", /\/api\/alert-notify$/).at(-1)!.body).toEqual({ enabled: true, slack_webhook: { url: SLACK_HOOK } });
+    await shot(page, "alerts-team-channel-both");
+  });
+
+  test("a route can post to its own Slack channel and test it", async ({ page }) => {
+    const db = await mockApi(page);
+    await page.goto("/settings/alerts");
+    await page.getByRole("article", { name: "Route for prod-alarms" }).getByRole("button", { name: "Edit rules" }).click();
+    await page.getByRole("group", { name: "Where this route posts" }).getByRole("button", { name: "Own channel" }).click();
+    const picker = page.getByTestId("route-channels");
+    await expect(page.getByRole("button", { name: "Save route" })).toBeDisabled();
+    await picker.getByRole("checkbox", { name: "Slack" }).check();
+    await picker.getByRole("textbox", { name: "Slack webhook address" }).fill(SLACK_HOOK);
+    await picker.getByRole("button", { name: "Send test message" }).click();
+    await expect(picker.getByText("Test message sent. Check the channel.")).toBeVisible();
+    expect(callsTo(db, "POST", /\/api\/notify\/test$/).at(-1)!.body).toEqual({ destination: "route", topic_arn: TOPIC, channel: "slack", url: SLACK_HOOK });
+    await page.getByRole("button", { name: "Save route" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Alert routes" })).toBeVisible();
+    const saved = callsTo(db, "PUT", /\/api\/alert-routes$/).at(-1)!.body as Record<string, unknown>;
+    expect(saved.notify_mode).toBe("custom");
+    expect(saved.slack_webhook).toEqual({ url: SLACK_HOOK });
+    expect(saved).not.toHaveProperty("teams_webhook");
+    expect(saved).not.toHaveProperty("webhooks");
+  });
+
+  test("new log findings can post to Slack", async ({ page }) => {
+    const db = await mockApi(page);
+    await page.goto("/settings/integrations/aws/");
+    const box = page.getByRole("complementary", { name: "Post new findings to chat" });
+    await box.getByRole("group", { name: "Where to post new findings" }).getByRole("button", { name: "Own channel" }).click();
+    await box.getByRole("checkbox", { name: "Slack" }).check();
+    await box.getByRole("textbox", { name: "Slack webhook address" }).fill(SLACK_HOOK);
+    await box.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText("Saved where new findings are posted")).toBeVisible();
+    expect(callsTo(db, "PUT", /\/api\/recommendations\/notify$/).at(-1)!.body).toEqual({ notify_mode: "custom", slack_webhook: { url: SLACK_HOOK } });
   });
 });
 

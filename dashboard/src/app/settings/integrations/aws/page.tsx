@@ -20,7 +20,8 @@ import { Disclosure } from "@/components/disclosure";
 import { AwsIcon, ExternalLinkIcon } from "@/components/icons";
 import { Page, PageHeader, Section } from "@/components/page";
 import { AwsAbilitiesPanel } from "@/components/connections";
-import { TeamsWebhookField, validTeamsUrl } from "@/components/teams-webhook";
+import { ChannelPicker, channelsPayload, draftDirty, draftFrom, draftValid, NO_WEBHOOKS, type ChannelsDraft } from "@/components/chat-channels";
+import type { WebhooksView } from "@/lib/api";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 
 export default function AwsPageGuarded() {
@@ -849,33 +850,33 @@ type NotifyMode = (typeof NOTIFY_OPTIONS)[number]["value"];
 
 function FindingsNotify() {
   const { toast } = useToast();
-  const [saved, setSaved] = useState<{ mode: NotifyMode; url: string } | null>(null);
+  const [saved, setSaved] = useState<{ mode: NotifyMode; webhooks: WebhooksView } | null>(null);
   const [mode, setMode] = useState<NotifyMode>("off");
-  const [url, setUrl] = useState("");
+  const [draft, setDraft] = useState<ChannelsDraft>(draftFrom(NO_WEBHOOKS));
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     api
       .getRecNotify()
       .then((r) => {
-        setSaved({ mode: r.notify_mode, url: r.teams_webhook_url });
+        setSaved({ mode: r.notify_mode, webhooks: r.webhooks });
         setMode(r.notify_mode);
-        setUrl(r.teams_webhook_url);
+        setDraft(draftFrom(r.webhooks));
       })
       .catch(() => setLoadError(true));
   }, []);
+  useEffect(load, [load]);
 
-  const dirty = !!saved && (saved.mode !== mode || (mode === "custom" && saved.url !== url.trim()));
-  const valid = mode !== "custom" || validTeamsUrl(url);
+  const dirty = !!saved && (saved.mode !== mode || (mode === "custom" && draftDirty(draft, saved.webhooks)));
+  const valid = mode !== "custom" || draftValid(draft, saved?.webhooks, true);
 
   const save = async () => {
     setSaving(true);
     try {
-      const nextUrl = mode === "custom" ? url.trim() : "";
-      await api.saveRecNotify(mode, nextUrl);
-      setSaved({ mode, url: nextUrl });
+      await api.saveRecNotify(mode, mode === "custom" ? channelsPayload(draft, saved?.webhooks) : {});
       toast("Saved where new findings are posted");
+      load();
     } catch {
       toast("Could not save. Check the webhook address.", "error");
     } finally {
@@ -885,9 +886,9 @@ function FindingsNotify() {
 
   return (
     <aside aria-labelledby="findings-notify-heading" className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm">
-      <h3 id="findings-notify-heading" className="font-semibold text-zinc-100">Post new findings to Teams</h3>
+      <h3 id="findings-notify-heading" className="font-semibold text-zinc-100">Post new findings to chat</h3>
       <p className="mt-1 text-zinc-400">
-        After each analysis, new findings post as one card. The team channel is the one set in{" "}
+        After each analysis, new findings post as one message in Microsoft Teams, Slack or both. The team channel is the one set in{" "}
         <Link href="/settings/alerts" className={linkButton}>Alert routes</Link>.
       </p>
       {loadError ? (
@@ -897,7 +898,15 @@ function FindingsNotify() {
       ) : (
         <div className="mt-3 flex flex-col gap-3">
           <div className="max-w-full"><Segmented label="Where to post new findings" options={[...NOTIFY_OPTIONS]} value={mode} onChange={setMode} disabled={!saved} /></div>
-          {mode === "custom" && <TeamsWebhookField id="findings-webhook" value={url} onChange={setUrl} />}
+          {mode === "custom" && (
+            <ChannelPicker
+              idPrefix="findings"
+              draft={draft}
+              saved={saved?.webhooks}
+              onChange={setDraft}
+              destination={{ destination: "recommendations" }}
+            />
+          )}
           <div>
             <button type="button" onClick={save} disabled={!dirty || !valid || saving} className={primaryButton}>
               {saving ? "Saving…" : "Save"}
