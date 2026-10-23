@@ -159,7 +159,11 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       const t = ticket({
         subject: String(body.subject),
         priority: String(body.priority ?? "normal"),
-        context: { page: String(body.page ?? ""), item: (body.item as Record<string, string>) ?? null, user_agent: "Test browser" },
+        context: {
+          page: String(body.page ?? ""),
+          item: ((body.items as Record<string, string>[] | undefined)?.[0] ?? (body.item as Record<string, string>)) || null,
+          user_agent: "Test browser",
+        },
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });
@@ -262,7 +266,7 @@ test.describe("support tickets for a team", () => {
     expect(sent.body).toMatchObject({
       subject: "The run stopped at the tests",
       priority: "high",
-      item: { kind: "run", id: RUN.run_id, label: RUN.title, repo: "your-team/web" },
+      items: [{ kind: "run", id: RUN.run_id, label: RUN.title, repo: "your-team/web" }],
     });
     expect(String(sent.body.page)).toMatch(/^\/runs\/detail\/?$/);
     // Only ids and names travel: no run contents, no error text, no files.
@@ -357,7 +361,10 @@ test.describe("the platform admin's support queue", () => {
     await expect(ctx).toContainText("your-team");
     await expect(ctx).toContainText("member");
     await expect(ctx).toContainText("Test browser");
-    await expect(ctx.getByRole("link", { name: /Release: your-team\/web v1\.2\.0/ })).toHaveAttribute("href", /\/releases\/?\?repo=your-team%2Fweb&q=v1\.2\.0/);
+    // The item lives in the team's workspace: without the team's support access it is text, not a link.
+    await expect(ctx.getByTestId("attachment-chip")).toContainText("Release: your-team/web v1.2.0");
+    await expect(ctx.getByRole("link", { name: /Release: your-team\/web/ })).toHaveCount(0);
+    await expect(page.getByTestId("admin-support-view")).toContainText("Off.");
     await expect(ctx.getByRole("link", { name: "Releases" })).toHaveAttribute("href", /\/releases/);
 
     await page.getByLabel("Reply").fill("We posted the notes again.");

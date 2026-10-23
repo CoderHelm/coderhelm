@@ -6,9 +6,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
-import type { SupportMessage, SupportTicket } from "@/lib/api";
-import { filedBy, helpHref, itemHref, itemWords, pageWords, PRIORITY_LABEL, type HelpTarget } from "@/lib/support";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { api, type AlertEvent, type DataSource, type SupportItem, type SupportItemKind, type SupportItemRef, type SupportMessage, type SupportTicket } from "@/lib/api";
+import {
+  filedBy,
+  helpHref,
+  itemHref,
+  itemWords,
+  KIND_LABEL,
+  MAX_ATTACHMENTS,
+  pageWords,
+  PRIORITY_LABEL,
+  ticketItems,
+  type HelpTarget,
+} from "@/lib/support";
 import { DetailBlock, Time } from "./list";
 import { LifeBuoyIcon } from "./icons";
 import { focusRing, inputClass, primaryButton } from "./ui";
@@ -22,6 +33,13 @@ const EVENT_WORDS: Record<string, string> = {
 
 function eventWords(body: string): string {
   if (EVENT_WORDS[body]) return EVENT_WORDS[body];
+  if (body === "support_viewed") return "viewed your workspace (read only)";
+  if (body === "support_access_revoked") return "ended Coderhelm support's access to the workspace";
+  if (body.startsWith("support_access_granted:")) {
+    const until = new Date(body.slice("support_access_granted:".length));
+    const when = Number.isNaN(until.getTime()) ? "" : ` until ${until.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`;
+    return `let Coderhelm support see the workspace${when}`;
+  }
   if (body.startsWith("priority:")) {
     const p = body.slice("priority:".length) as keyof typeof PRIORITY_LABEL;
     return `set the priority to ${(PRIORITY_LABEL[p] ?? p).toLowerCase()}`;
@@ -35,7 +53,16 @@ function who(m: SupportMessage, admin: boolean): string {
 }
 
 /** The conversation, oldest first, with status changes inline. */
-export function SupportThread({ messages, admin = false }: { messages: SupportMessage[]; admin?: boolean }) {
+export function SupportThread({
+  messages,
+  admin = false,
+  openItem,
+}: {
+  messages: SupportMessage[];
+  admin?: boolean;
+  /** How a chip opens its item (the admin queue opens a support view first). */
+  openItem?: ItemOpener;
+}) {
   return (
     <ol className="space-y-4" aria-label="Conversation" data-testid="support-thread">
       {messages.map((m) =>
@@ -60,7 +87,12 @@ export function SupportThread({ messages, admin = false }: { messages: SupportMe
               <span className={`text-sm font-medium ${m.author === "support" ? "text-sky-300" : "text-zinc-200"}`}>{who(m, admin)}</span>
               <Time iso={m.created_at} className="text-xs text-zinc-500" />
             </div>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-300 [overflow-wrap:anywhere]">{m.body}</p>
+            {m.body && <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-300 [overflow-wrap:anywhere]">{m.body}</p>}
+            {m.attachments && m.attachments.length > 0 && (
+              <div className={m.body ? "mt-2" : ""}>
+                <AttachmentChips items={m.attachments} open={openItem} label="Attached with this message" />
+              </div>
+            )}
           </li>
         ),
       )}
@@ -75,22 +107,32 @@ export function ReplyBox({
   sendLabel = "Send reply",
   extra,
   disabled = false,
+  attachRoom,
 }: {
   /** Resolves true when the reply was sent (the box then empties). */
-  onSend: (body: string, extra?: string) => Promise<boolean>;
+  onSend: (body: string, extra?: string, items?: SupportItemRef[]) => Promise<boolean>;
   placeholder: string;
   sendLabel?: string;
   /** Other ways to send, e.g. "Send and resolve": [label, key]. */
   extra?: [string, string][];
   disabled?: boolean;
+  /** Room left for attachments on the ticket; omitted, the box attaches nothing. */
+  attachRoom?: number;
 }) {
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
+  const [items, setItems] = useState<SupportItemRef[]>([]);
+  const [picking, setPicking] = useState(false);
+  const canSend = (!!body.trim() || items.length > 0) && !busy && !disabled;
   const send = async (key?: string) => {
-    if (!body.trim() || busy) return;
+    if (!canSend) return;
     setBusy(true);
     try {
-      if (await onSend(body.trim(), key)) setBody("");
+      if (await onSend(body.trim(), key, items)) {
+        setBody("");
+        setItems([]);
+        setPicking(false);
+      }
     } finally {
       setBusy(false);
     }
@@ -122,6 +164,24 @@ export function ReplyBox({
         className={`${inputClass} resize-y`}
         disabled={disabled}
       />
+      {attachRoom !== undefined && (
+        <div className="mt-2 space-y-2">
+          {items.length > 0 && <AttachmentChips items={items} onRemove={(i) => setItems(items.filter((x) => x !== i))} label="To attach" />}
+          {picking ? (
+            <AttachPicker chosen={items} onAdd={(i) => setItems([...items, i])} room={attachRoom - items.length} onClose={() => setPicking(false)} />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setPicking(true)}
+              disabled={disabled || attachRoom - items.length <= 0}
+              className={`rounded text-xs text-zinc-400 underline underline-offset-4 hover:text-zinc-200 disabled:opacity-50 ${focusRing}`}
+              data-testid="reply-attach"
+            >
+              {attachRoom - items.length <= 0 ? `This ticket has ${MAX_ATTACHMENTS} items, the most it can carry` : "Attach a run, review, release, plan, alert or data source"}
+            </button>
+          )}
+        </div>
+      )}
       <div className="mt-2 flex flex-wrap justify-end gap-2">
         {extra?.map(([label, key]) => (
           <button
@@ -134,7 +194,7 @@ export function ReplyBox({
             {label}
           </button>
         ))}
-        <button type="submit" disabled={!body.trim() || busy || disabled} className={primaryButton}>
+        <button type="submit" disabled={!canSend} className={primaryButton}>
           {busy ? "Sending…" : sendLabel}
         </button>
       </div>
@@ -143,8 +203,19 @@ export function ReplyBox({
 }
 
 /** What the ticket was filed about: the page, the item, the team and role. */
-export function TicketContext({ ticket, admin = false }: { ticket: SupportTicket; admin?: boolean }) {
+export function TicketContext({
+  ticket,
+  admin = false,
+  openItem,
+  footer,
+}: {
+  ticket: SupportTicket;
+  admin?: boolean;
+  openItem?: ItemOpener;
+  footer?: ReactNode;
+}) {
   const { context: c } = ticket;
+  const items = ticketItems(ticket);
   const rows: [string, ReactNode][] = [];
   rows.push(["Filed by", `${filedBy(ticket)}${ticket.role ? ` · ${ticket.role}` : ""}`]);
   if (admin) {
@@ -156,14 +227,8 @@ export function TicketContext({ ticket, admin = false }: { ticket: SupportTicket
       </span>,
     ]);
   }
-  if (c.item) {
-    rows.push([
-      "About",
-      <Link key="item" href={itemHref(c.item)} className={`rounded text-zinc-200 underline underline-offset-4 hover:text-zinc-100 ${focusRing}`}>
-        {itemWords(c.item)}
-      </Link>,
-    ]);
-    if (c.item.status) rows.push(["Status then", c.item.status.replace(/_/g, " ")]);
+  if (items.length > 0) {
+    rows.push(["Attached", <AttachmentChips key="items" items={items} open={openItem} label="Attached to this ticket" />]);
   }
   if (c.page) {
     rows.push([
@@ -185,9 +250,7 @@ export function TicketContext({ ticket, admin = false }: { ticket: SupportTicket
           </div>
         ))}
       </dl>
-      {admin && c.item && (
-        <p className="mt-2 text-xs text-zinc-500">Links open in the team&apos;s own view; switch to that team first if you are a member.</p>
-      )}
+      {footer}
     </DetailBlock>
   );
 }
@@ -206,5 +269,215 @@ export function HelpLink({ item, children, className = "" }: { item: HelpTarget;
       </span>
       {children}
     </Link>
+  );
+}
+
+// ── Attachments ──────────────────────────────────────────────────────────
+
+/**
+ * How a chip opens its item. Returns the link to show, or `null` to show the
+ * chip as text with a reason (an admin without the team's support access).
+ */
+export type ItemOpener = (item: SupportItem) => { href?: string; onClick?: () => void; reason?: string } | null;
+
+/** Attached items as chips; each links to the item in the team's view. */
+export function AttachmentChips({
+  items,
+  onRemove,
+  open,
+  label,
+}: {
+  items: (SupportItem | SupportItemRef)[];
+  onRemove?: (item: SupportItemRef) => void;
+  open?: ItemOpener;
+  label: string;
+}) {
+  return (
+    <ul aria-label={label} className="flex min-w-0 flex-wrap gap-1.5" data-testid="attachment-chips">
+      {items.map((raw) => {
+        const item: SupportItem = { label: "", repo: "", status: "", ...raw } as SupportItem;
+        const words = itemWords(item);
+        const how = onRemove ? null : open ? open(item) : { href: itemHref(item) };
+        const chip = "inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-300";
+        const status = item.status ? <span className="shrink-0 text-zinc-500">· {item.status.replace(/_/g, " ")}</span> : null;
+        const text = <span className="min-w-0 truncate">{words}</span>;
+        return (
+          <li key={`${item.kind}:${item.id}`} className="min-w-0 max-w-full" data-testid="attachment-chip" data-kind={item.kind}>
+            {onRemove ? (
+              <span className={chip}>
+                {text}
+                <button
+                  type="button"
+                  onClick={() => onRemove(raw as SupportItemRef)}
+                  aria-label={`Remove ${words}`}
+                  className={`-mr-0.5 shrink-0 rounded px-1 text-zinc-500 hover:text-zinc-200 ${focusRing}`}
+                >
+                  ×
+                </button>
+              </span>
+            ) : how?.href && !how.onClick ? (
+              <Link href={how.href} className={`${chip} hover:border-zinc-500 hover:text-zinc-100 ${focusRing}`}>
+                {text}
+                {status}
+              </Link>
+            ) : how?.onClick ? (
+              <button type="button" onClick={how.onClick} className={`${chip} hover:border-zinc-500 hover:text-zinc-100 ${focusRing}`}>
+                {text}
+                {status}
+              </button>
+            ) : (
+              <span className={`${chip} text-zinc-400`} title={how?.reason}>
+                {text}
+                {status}
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+interface Hit {
+  item: SupportItemRef;
+  sub: string;
+}
+
+const SEARCH_KINDS: SupportItemKind[] = ["run", "review", "release", "plan", "alert", "data_source"];
+
+/** Matches every word of `q` in any of `fields`. */
+function matches(q: string, fields: (string | null | undefined)[]): boolean {
+  const hay = fields.filter(Boolean).join(" ").toLowerCase();
+  return q
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((w) => hay.includes(w));
+}
+
+/**
+ * Finds the team's runs, reviews, releases and plans through the ⌘K search,
+ * and its alerts and data sources from their lists (loaded once), to attach.
+ * Only ids and names leave the page; the server checks each is the team's.
+ */
+export function AttachPicker({
+  chosen,
+  onAdd,
+  room,
+  onClose,
+}: {
+  chosen: SupportItemRef[];
+  onAdd: (item: SupportItemRef) => void;
+  room: number;
+  onClose?: () => void;
+}) {
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<Hit[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const catalogs = useRef<{ alerts?: AlertEvent[]; sources?: DataSource[] }>({});
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const words = q.trim();
+    if (!words) {
+      setHits(null);
+      return;
+    }
+    const ctrl = new AbortController();
+    const t = setTimeout(async () => {
+      setBusy(true);
+      const found: Hit[] = [];
+      const [search] = await Promise.all([
+        api.search(words, { limit: 5 }, { signal: ctrl.signal }).catch(() => null),
+        catalogs.current.alerts
+          ? null
+          : api.listAlerts().then((r) => (catalogs.current.alerts = r.alerts)).catch(() => (catalogs.current.alerts = [])),
+        catalogs.current.sources
+          ? null
+          : api.listDataSources().then((r) => (catalogs.current.sources = r.sources)).catch(() => (catalogs.current.sources = [])),
+      ]);
+      if (ctrl.signal.aborted) return;
+      for (const r of search?.runs ?? []) found.push({ item: { kind: "run", id: r.run_id, label: r.title || r.ticket_id, repo: r.repo }, sub: [r.repo, r.status].filter(Boolean).join(" · ") });
+      for (const r of search?.reviews ?? [])
+        found.push({ item: { kind: "review", id: r.sk, label: `${r.repo} #${r.pr_number}`, repo: r.repo }, sub: [r.title, r.verdict].filter(Boolean).join(" · ") });
+      for (const r of search?.releases ?? []) found.push({ item: { kind: "release", id: `${r.repo}@${r.tag}`, label: `${r.repo} ${r.tag}`, repo: r.repo }, sub: r.headline });
+      for (const p of search?.plans ?? []) found.push({ item: { kind: "plan", id: p.plan_id, label: p.title, repo: p.repo }, sub: [p.repo, p.status].filter(Boolean).join(" · ") });
+      for (const a of (catalogs.current.alerts ?? []).filter((a) => matches(words, [a.title, a.repo, a.kind, a.outcome])).slice(0, 5))
+        found.push({ item: { kind: "alert", id: a.id, label: a.title || a.id, repo: a.repo || undefined }, sub: [a.repo, a.outcome].filter(Boolean).join(" · ") });
+      for (const d of (catalogs.current.sources ?? []).filter((d) => matches(words, [d.name, d.kind])).slice(0, 5))
+        found.push({ item: { kind: "data_source", id: d.id, label: d.name }, sub: d.kind });
+      found.sort((a, b) => SEARCH_KINDS.indexOf(a.item.kind) - SEARCH_KINDS.indexOf(b.item.kind));
+      setHits(found);
+      setBusy(false);
+    }, 250);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [q]);
+
+  const taken = (i: SupportItemRef) => chosen.some((c) => c.kind === i.kind && c.id === i.id);
+
+  return (
+    <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-950 p-2" data-testid="attach-picker">
+      <div className="flex items-center gap-2">
+        <label htmlFor="attach-search" className="sr-only">
+          Find something to attach
+        </label>
+        <input
+          ref={inputRef}
+          id="attach-search"
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") onClose?.();
+            if (e.key === "Enter") e.preventDefault();
+          }}
+          placeholder="Search runs, reviews, releases, plans, alerts, data sources"
+          className={`${inputClass} min-w-0 flex-1`}
+          autoComplete="off"
+        />
+        {onClose && (
+          <button type="button" onClick={onClose} className={`shrink-0 rounded px-2 py-1 text-xs text-zinc-400 hover:text-zinc-200 ${focusRing}`}>
+            Done
+          </button>
+        )}
+      </div>
+      <p className="mt-1.5 px-1 text-xs text-zinc-500">
+        {room > 0 ? `You can attach ${room} more.` : `A ticket carries at most ${MAX_ATTACHMENTS} items.`} Only the name and a link are sent, never the contents.
+      </p>
+      {busy && hits === null && <p className="mt-2 px-1 text-xs text-zinc-500">Searching…</p>}
+      {hits && hits.length === 0 && <p className="mt-2 px-1 text-xs text-zinc-500" role="status">Nothing matches.</p>}
+      {hits && hits.length > 0 && (
+        <ul className="mt-2 max-h-72 space-y-1 overflow-y-auto" aria-label="Matches">
+          {hits.map((h) => {
+            const already = taken(h.item);
+            return (
+              <li key={`${h.item.kind}:${h.item.id}`}>
+                <button
+                  type="button"
+                  disabled={already || room <= 0}
+                  onClick={() => onAdd(h.item)}
+                  data-testid="attach-result"
+                  className={`flex w-full min-w-0 items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-zinc-800/70 disabled:opacity-50 ${focusRing}`}
+                >
+                  <span className="mt-0.5 shrink-0 rounded border border-zinc-700 px-1 text-[10px] uppercase tracking-wide text-zinc-400">{KIND_LABEL[h.item.kind]}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-zinc-200">{h.item.label || h.item.id}</span>
+                    {h.sub && <span className="block truncate text-xs text-zinc-500">{h.sub}</span>}
+                  </span>
+                  <span className="shrink-0 text-xs text-zinc-500">{already ? "Attached" : "Attach"}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }

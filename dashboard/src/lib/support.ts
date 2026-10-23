@@ -24,12 +24,23 @@ export const PRIORITY_LABEL: Record<SupportPriority, string> = {
   urgent: "Urgent",
 };
 
-const KIND_LABEL: Record<SupportItemKind, string> = {
+export const KIND_LABEL: Record<SupportItemKind, string> = {
   run: "Run",
   review: "Review",
   release: "Release",
   plan: "Plan",
+  alert: "Alert",
+  data_source: "Data source",
 };
+
+/** Items one ticket can carry, over the ticket and its replies (the server's limit). */
+export const MAX_ATTACHMENTS = 10;
+
+/** Everything attached to a ticket; older tickets kept one item in `item`. */
+export function ticketItems(t: SupportTicket): SupportItem[] {
+  if (t.context.items && t.context.items.length > 0) return t.context.items;
+  return t.context.item ? [t.context.item] : [];
+}
 
 /** "Run: Fix the login page" */
 export function itemWords(item: SupportItem): string {
@@ -49,10 +60,17 @@ export function itemHref(item: SupportItem): string {
     case "plan":
       return `/plans/detail?id=${id}`;
     case "release": {
-      const [repo, tag] = item.id.split("@");
-      return `/releases?repo=${encodeURIComponent(repo || item.repo)}&q=${encodeURIComponent(tag || "")}`;
+      const at = item.id.lastIndexOf("@");
+      const repo = at > 0 ? item.id.slice(0, at) : item.repo;
+      const tag = at > 0 ? item.id.slice(at + 1) : "";
+      return `/releases?repo=${encodeURIComponent(repo)}&q=${encodeURIComponent(tag)}`;
     }
+    case "alert":
+      return `/alerts/detail?id=${id}`;
+    case "data_source":
+      return `/data-sources?source=${id}`;
   }
+  return "/";
 }
 
 /** The page a ticket was filed from, as a menu-style name. */
@@ -69,6 +87,17 @@ export function pageWords(page: string): string {
     "/settings": "Settings",
   };
   return known[path] ?? path;
+}
+
+/** When a time is, in words: "in 3 h 20 min", "in 2 days". Empty once it has passed. */
+export function timeLeft(untilIso: string, now = Date.now()): string {
+  const ms = Date.parse(untilIso) - now;
+  if (!Number.isFinite(ms) || ms <= 0) return "";
+  const min = Math.ceil(ms / 60_000);
+  if (min < 60) return `${min} min left`;
+  const h = Math.floor(min / 60);
+  if (h < 48) return `${h} h ${min % 60} min left`;
+  return `${Math.floor(h / 24)} days left`;
 }
 
 export interface HelpTarget {

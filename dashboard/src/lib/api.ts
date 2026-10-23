@@ -94,6 +94,8 @@ export const api = {
       status?: string;
       auth_provider?: string;
       mfa_enabled?: boolean;
+      /** Set in a read-only support view. */
+      support_view?: { team_id: string; until: number } | null;
     }>("/api/me"),
   signup: (email: string, password: string) =>
     request<{ status: string; message: string }>("/auth/signup", {
@@ -149,14 +151,28 @@ export const api = {
   supportTicket: (id: string) => request<SupportDetail>(`/api/support/tickets/${encodeURIComponent(id)}`),
   openSupportTicket: (body: NewSupportTicket) =>
     request<SupportDetail>("/api/support/tickets", { method: "POST", body: JSON.stringify(body) }),
-  replySupportTicket: (id: string, body: string) =>
+  replySupportTicket: (id: string, body: string, items: SupportItemRef[] = []) =>
     request<SupportDetail>(`/api/support/tickets/${encodeURIComponent(id)}/reply`, {
       method: "POST",
-      body: JSON.stringify({ body }),
+      body: JSON.stringify({ body, items }),
     }),
   supportBadge: () => request<{ waiting: number; queue_open: number | null }>("/api/support/badge"),
-  adminSupportTickets: () => request<{ tickets: SupportTicket[] }>("/api/admin/support/tickets"),
+  adminSupportTickets: () =>
+    request<{ tickets: SupportTicket[]; support_access?: Record<string, string> }>("/api/admin/support/tickets"),
   adminSupportTicket: (id: string) => request<SupportDetail>(`/api/admin/support/tickets/${encodeURIComponent(id)}`),
+  // Support access: the team lets Coderhelm support see its workspace for a while.
+  supportAccess: () => request<SupportAccess>("/api/support/access"),
+  grantSupportAccess: (body: { hours: number; note?: string; ticket_id?: string }) =>
+    request<{ grant: SupportGrant }>("/api/support/access", { method: "POST", body: JSON.stringify(body) }),
+  revokeSupportAccess: () => request<{ grant: SupportGrant | null }>("/api/support/access", { method: "DELETE" }),
+  /** Platform admins: open a read-only support view of a team that allowed it. */
+  startSupportView: (team_id: string, ticket_id?: string) =>
+    request<{ team_id: string; team_name: string; until: string; grant_until: string }>("/api/admin/support/view", {
+      method: "POST",
+      body: JSON.stringify({ team_id, ticket_id }),
+    }),
+  supportViewStatus: () => request<SupportViewStatus>("/api/support/view"),
+  exitSupportView: () => request<{ active: false }>("/api/support/view", { method: "DELETE" }),
   adminReplySupportTicket: (id: string, body: string, status?: SupportStatus) =>
     request<SupportDetail>(`/api/admin/support/tickets/${encodeURIComponent(id)}/reply`, {
       method: "POST",
@@ -2609,14 +2625,55 @@ export interface BetaSignupsReply {
 /** Whose move it is: `open` is support's, `waiting` the customer's. */
 export type SupportStatus = "open" | "waiting" | "resolved";
 export type SupportPriority = "normal" | "high" | "urgent";
-export type SupportItemKind = "run" | "review" | "release" | "plan";
+export type SupportItemKind = "run" | "review" | "release" | "plan" | "alert" | "data_source";
+
+/** An item to attach: the server reads its name and status from the team's own record. */
+export interface SupportItemRef {
+  kind: SupportItemKind;
+  id: string;
+  label?: string;
+  repo?: string;
+}
+
+export interface SupportGrant {
+  id: string;
+  granted_by_email: string;
+  granted_at: string;
+  until: string;
+  note: string;
+  ticket_id: string;
+  revoked_at: string;
+  revoked_by_email: string;
+  active: boolean;
+}
+
+export interface SupportAuditEntry {
+  id: string;
+  at: string;
+  kind: "granted" | "revoked" | "session_start" | "read" | "refused";
+  actor_email: string;
+  method: string;
+  route: string;
+  ticket_id: string;
+  detail: string;
+}
+
+export interface SupportAccess {
+  grant: SupportGrant | null;
+  windows: number[];
+  log: SupportAuditEntry[];
+}
+
+export type SupportViewStatus =
+  | { active: false }
+  | { active: true; team_id: string; team_name: string; until: string; read_only: true };
 
 export interface SupportItem {
   kind: SupportItemKind;
   id: string;
   label: string;
   repo: string;
-  /** A run's status when the ticket was filed. */
+  /** Its status when attached: a run's status, a review's verdict, an alert's outcome. */
   status: string;
 }
 
@@ -2631,7 +2688,7 @@ export interface SupportTicket {
   opened_by_email: string;
   opened_by_name: string;
   role: string;
-  context: { page: string; item: SupportItem | null; user_agent: string };
+  context: { page: string; item: SupportItem | null; items?: SupportItem[]; user_agent: string };
   created_at: string;
   updated_at: string;
   last_actor: "customer" | "support";
@@ -2646,11 +2703,14 @@ export interface SupportMessage {
   author_name: string;
   body: string;
   created_at: string;
+  attachments?: SupportItem[];
 }
 
 export interface SupportDetail {
   ticket: SupportTicket;
   messages: SupportMessage[];
+  /** Admin answers only: when the team's support access ends, or null. */
+  support_access?: { until: string | null };
 }
 
 export interface NewSupportTicket {
@@ -2658,5 +2718,6 @@ export interface NewSupportTicket {
   body: string;
   priority?: SupportPriority;
   page?: string;
-  item?: { kind: SupportItemKind; id: string; label?: string; repo?: string };
+  item?: SupportItemRef;
+  items?: SupportItemRef[];
 }

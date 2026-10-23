@@ -3,14 +3,15 @@
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api, type NewSupportTicket, type SupportItemKind, type SupportPriority, type SupportTicket } from "@/lib/api";
-import { customerLook, filedBy, itemWords, pageWords } from "@/lib/support";
+import { api, type NewSupportTicket, type SupportItemKind, type SupportItemRef, type SupportPriority, type SupportTicket } from "@/lib/api";
+import { customerLook, filedBy, itemWords, MAX_ATTACHMENTS, pageWords, ticketItems } from "@/lib/support";
+import { AttachmentChips, AttachPicker } from "@/components/support";
 import { Page, PageHeader, cardClass } from "@/components/page";
 import { Field } from "@/components/field";
 import { focusRing, inputClass, primaryButton, secondaryButton } from "@/components/ui";
 import { List, ListEmpty, ListError, ListRow, ListSkeleton, ListToolbar, StatusText, useListParams } from "@/components/list";
 
-const KINDS: SupportItemKind[] = ["run", "review", "release", "plan"];
+const KINDS: SupportItemKind[] = ["run", "review", "release", "plan", "alert", "data_source"];
 
 export default function SupportPageWithParams() {
   return (
@@ -52,7 +53,7 @@ function Tickets() {
 
   const words = params.q.toLowerCase().split(/\s+/).filter(Boolean);
   const searched = (tickets ?? []).filter((t) => {
-    const hay = `${t.subject} ${filedBy(t)} ${t.context.item ? itemWords(t.context.item) : ""}`.toLowerCase();
+    const hay = `${t.subject} ${filedBy(t)} ${ticketItems(t).map(itemWords).join(" ")}`.toLowerCase();
     return words.every((w) => hay.includes(w));
   });
   const count = (s: string) => searched.filter((t) => t.status === s).length;
@@ -124,7 +125,11 @@ function Tickets() {
                       href={`/support/ticket?id=${encodeURIComponent(t.id)}`}
                       meta={[
                         filedBy(t),
-                        t.context.item ? itemWords(t.context.item) : null,
+                        ticketItems(t).length === 1
+                          ? itemWords(ticketItems(t)[0])
+                          : ticketItems(t).length > 1
+                            ? `${ticketItems(t).length} items attached`
+                            : null,
                         `${t.message_count} message${t.message_count === 1 ? "" : "s"}`,
                       ]}
                       summary={t.status === "waiting" ? "Coderhelm support answered. Reply when you can." : undefined}
@@ -159,14 +164,18 @@ function NewTicket() {
         : { title: "Get help", lead: "Tell us what happened. Coderhelm support answers here and by email.", placeholder: "A run stopped at the test step" };
   const kindParam = params.get("kind") as SupportItemKind | null;
   const itemId = params.get("item") || "";
-  const initialItem =
+  const initialItem: SupportItemRef | null =
     kindParam && KINDS.includes(kindParam) && itemId
       ? { kind: kindParam, id: itemId, label: params.get("label") || "", repo: params.get("repo") || "" }
       : null;
-  const [item, setItem] = useState(initialItem);
+  // The item from the page the person came from is attached to start with.
+  const [items, setItems] = useState<SupportItemRef[]>(initialItem ? [initialItem] : []);
+  const [picking, setPicking] = useState(false);
   const [page, setPage] = useState(from);
   const [subject, setSubject] = useState(
-    initialItem ? `Something is wrong with ${initialItem.kind === "review" ? "a review" : `a ${initialItem.kind}`}` : "",
+    initialItem
+      ? `Something is wrong with ${initialItem.kind === "review" || initialItem.kind === "alert" ? `an ${initialItem.kind}` : initialItem.kind === "data_source" ? "a data source" : `a ${initialItem.kind}`}`
+      : "",
   );
   const [body, setBody] = useState("");
   const [priority, setPriority] = useState<SupportPriority>("normal");
@@ -179,7 +188,7 @@ function NewTicket() {
     setError("");
     const req: NewSupportTicket = { subject: subject.trim(), body: body.trim(), priority };
     if (page) req.page = page;
-    if (item) req.item = { kind: item.kind, id: item.id, label: item.label || undefined, repo: item.repo || undefined };
+    if (items.length > 0) req.items = items.map((i) => ({ kind: i.kind, id: i.id, label: i.label || undefined, repo: i.repo || undefined }));
     try {
       const r = await api.openSupportTicket(req);
       router.push(`/support/ticket?id=${encodeURIComponent(r.ticket.id)}&new=1`);
@@ -251,15 +260,25 @@ function NewTicket() {
           <h2 id="attached-heading" className="text-sm font-semibold text-zinc-100">
             Sent with your ticket
           </h2>
-          <ul className="mt-2 space-y-1.5 text-sm text-zinc-400">
-            {item && (
-              <li className="flex flex-wrap items-center justify-between gap-2">
-                <span className="min-w-0 [overflow-wrap:anywhere]">{itemWords({ ...item, status: "" })}</span>
-                <button type="button" onClick={() => setItem(null)} className={`rounded text-xs text-zinc-500 underline underline-offset-4 hover:text-zinc-300 ${focusRing}`}>
-                  Remove
-                </button>
-              </li>
+          <div className="mt-2 space-y-2">
+            {items.length > 0 && (
+              <AttachmentChips items={items} onRemove={(i) => setItems(items.filter((x) => x !== i))} label="Attached to your ticket" />
             )}
+            {picking ? (
+              <AttachPicker chosen={items} onAdd={(i) => setItems([...items, i])} room={MAX_ATTACHMENTS - items.length} onClose={() => setPicking(false)} />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setPicking(true)}
+                disabled={items.length >= MAX_ATTACHMENTS}
+                data-testid="ticket-attach"
+                className={`rounded text-sm text-zinc-300 underline underline-offset-4 hover:text-zinc-100 disabled:opacity-50 ${focusRing}`}
+              >
+                Attach runs, reviews, releases, plans, alerts or data sources
+              </button>
+            )}
+          </div>
+          <ul className="mt-3 space-y-1.5 text-sm text-zinc-400">
             {page && (
               <li className="flex flex-wrap items-center justify-between gap-2">
                 <span className="min-w-0 [overflow-wrap:anywhere]">Page: {pageWords(page)}</span>
