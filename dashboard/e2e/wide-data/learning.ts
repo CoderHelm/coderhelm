@@ -2,26 +2,27 @@ import type { Handler } from "./index";
 import { FILE, iso, REPO, REPO_2, SENTENCE, TITLE, TOKEN } from "./long";
 
 // The Learning page: rewards from outcomes, finding categories, behavior
-// changes with their evidence, examples, variants and signal weights.
+// changes with their evidence, examples, variants and signal weights. The
+// variants and default weights match the platform's (common::rewards).
 // `learningFixture` is shared with learning.spec.ts, which passes short names.
 
 export const SIGNALS: [string, string, number][] = [
   ["finding_accepted", "Review comment acted on", 1],
   ["finding_dismissed", "Review comment dismissed or argued", -1],
-  ["finding_ignored", "Review comment left open at close", -0.2],
+  ["finding_ignored", "Review comment left open at close", -0.25],
   ["rating_up", "Thumbs up", 1],
   ["rating_down", "Thumbs down", -1],
   ["pr_merged_unchanged", "PR merged as written", 1.5],
-  ["pr_merged_edited", "PR merged after people's edits", 0.5],
+  ["pr_merged_edited", "PR merged after people's edits", 1],
   ["pr_closed_unmerged", "PR closed without merging", -1],
   ["pr_reverted", "Merged change reverted", -2],
   ["ci_first_try", "CI passed first try", 0.5],
-  ["ci_fix_rounds", "CI needed fix rounds", -0.3],
+  ["ci_fix_rounds", "CI needed fix rounds", -0.75],
   ["plan_task_approved", "Plan task approved", 0.5],
-  ["plan_task_rejected", "Plan task rejected", -0.5],
-  ["time_to_merge", "Time to merge", 0.3],
+  ["plan_task_rejected", "Plan task rejected", -0.75],
+  ["time_to_merge", "Time to merge", 0.5],
   ["rereview_requested", "Re-review requested", 0],
-  ["incident_linked", "Alert tied to a merged change", -2],
+  ["incident_linked", "Alert tied to a merged change", -2.5],
 ];
 
 export interface LearningOpts {
@@ -126,7 +127,7 @@ export function learningFixture(o: LearningOpts) {
         arms: [
           { key: "standard", label: "Standard", pulls: o.empty ? 0 : 40, mean: 0.31, ucb: 0.52, eligible: true },
           { key: "evidence_first", label: "Evidence first", pulls: o.empty ? 0 : 9, mean: 0.44, ucb: 0.9, eligible: true },
-          { key: "concise", label: "Concise", pulls: o.empty ? 0 : 3, mean: -0.1, ucb: 1.1, eligible: false },
+          { key: "focused", label: "Focused", pulls: o.empty ? 0 : 3, mean: -0.1, ucb: 1.1, eligible: false },
         ],
       },
     ],
