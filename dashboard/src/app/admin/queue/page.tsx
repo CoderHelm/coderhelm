@@ -135,7 +135,7 @@ export default function SharedQueuePage() {
                           ) : (
                             <StatusPill tone="warning">Can&apos;t be retried</StatusPill>
                           )}
-                          <span className="break-all text-xs text-zinc-400">{m.team_id ?? (m.global ? "Global job" : "No team")}</span>
+                          <span className="wrap-anywhere text-xs text-zinc-400">{m.team_id ?? (m.global ? "Global job" : "No team")}</span>
                           {m.sent_at && <span className="text-xs text-zinc-500">· sent {ageWords(m.age_secs)} ago</span>}
                         </div>
                         {m.problem && (

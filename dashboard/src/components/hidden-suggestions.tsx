@@ -73,7 +73,7 @@ export function HiddenSuggestions({
         <ul aria-label="Suggested hidden columns" className="flex flex-col gap-2">
           {items.map((s) => (
             <li key={s.entry} className="flex flex-wrap items-center gap-2 text-sm">
-              <code className="rounded bg-zinc-900 px-1.5 py-0.5 font-mono text-xs text-zinc-200 break-all">{s.entry}</code>
+              <code className="rounded bg-zinc-900 px-1.5 py-0.5 font-mono text-xs text-zinc-200 wrap-anywhere">{s.entry}</code>
               {s.reason && <span className="min-w-0 flex-1 text-zinc-400">{s.reason}</span>}
               <span className="flex gap-2">
                 <button

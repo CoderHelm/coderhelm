@@ -56,7 +56,7 @@ function FindingCard({ finding }: { finding: InfraFinding }) {
             <StatusPill>{CATEGORY_LABELS[finding.category] ?? finding.category}</StatusPill>
           </div>
           <p className="text-xs text-zinc-400 mt-1 leading-relaxed">{finding.detail}</p>
-          {finding.file && <p className="text-xs text-zinc-500 font-mono mt-1 break-all">{finding.file}</p>}
+          {finding.file && <p className="text-xs text-zinc-500 font-mono mt-1 wrap-anywhere">{finding.file}</p>}
         </div>
       </div>
     </div>

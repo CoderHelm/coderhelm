@@ -14,9 +14,14 @@
 //   page-header      a page drawing its own header: a raw <h1>, a "←" back link or its own breadcrumb.
 //                    The shell's one top bar holds the trail and the back arrow; pages describe
 //                    themselves with <PageHeader> (components/page.tsx)
-//   break-words      the `break-words` class. The page already wraps long words anywhere
-//                    (globals.css); `break-words` turns that back into `break-word`, which
-//                    lets one long sha, URL or email hold a flex row wider than a phone
+//   break-all        the `break-all` class. It cuts every word that reaches the line's end,
+//                    even one that would fit whole on the next line. Long strings (shas,
+//                    URLs, emails, paths) take `wrap-anywhere`, which breaks a word only
+//                    when it is wider than the whole line
+//   anywhere-on-control  `wrap-anywhere` or `[overflow-wrap:anywhere]` on a <button>, <label>,
+//                    <th>, tab or shared button class. It lets a crowded row squeeze the
+//                    control's words to a letter a line ("Rout" over "e"); controls keep
+//                    their words whole (globals.css) and the row wraps instead
 // Reports (never fail, counted against the baseline so they can be tightened):
 //   font-mono        `font-mono` outside <Code>, <CodeBlock> and the shared mono input
 //   pre              a hand-rolled <pre> outside <CodeBlock> (a block of code gets its header, Copy and highlighting there)
@@ -178,17 +183,17 @@ for (const file of walk(SRC)) {
     errors.push({ rule: "brand", file: rel, line, col: m.index - before.lastIndexOf("\n"), message: "\"CoderHelm\": the product is spelled \"Coderhelm\"" });
   }
 
-  // break-words: undoes the page's own wrapping (globals.css) on that element.
-  for (const m of source.matchAll(/\bbreak-words\b/g)) {
+  // break-all: cuts words that would fit on the next line.
+  for (const m of source.matchAll(/\bbreak-all\b/g)) {
     const lineText = source.slice(source.lastIndexOf("\n", m.index) + 1, source.indexOf("\n", m.index));
-    if (allowed("break-words", rel, lineText)) continue;
+    if (allowed("break-all", rel, lineText)) continue;
     const before = source.slice(0, m.index);
     errors.push({
-      rule: "break-words",
+      rule: "break-all",
       file: rel,
       line: before.split("\n").length,
       col: m.index - before.lastIndexOf("\n"),
-      message: "`break-words` lets a long word push a flex row past a phone's edge; drop it (the page wraps anywhere already) and give flex children min-w-0",
+      message: "`break-all` cuts any word at the line's end, even one that fits on the next line; use `wrap-anywhere` on the element that holds the long string",
     });
   }
 
@@ -239,6 +244,16 @@ for (const file of walk(SRC)) {
           (map.has("id") && (id === "" || htmlFor.has(id) || htmlForExpr));
         if (!labelled) {
           hit(reports.unlabeledInputs, "unlabeled-input", rel, sf, node.getStart(), `<${el.tag}> has no label (a <label htmlFor>, aria-label or aria-labelledby)`, el.opening.getText());
+        }
+      }
+      {
+        const raw = map.get("className")?.getText() ?? "";
+        const role = staticText(map.get("role"));
+        const control =
+          el.tag === "button" || el.tag === "label" || el.tag === "th" || role === "tab" || role === "button" ||
+          /\b(primaryButton|secondaryButton|dangerButton|ghostButton|smallPrimaryButton|smallSecondaryButton|smallDangerButton|buttonClass|linkButton)\b/.test(raw);
+        if (control && /(\bwrap-anywhere\b|overflow-wrap:anywhere)/.test(raw)) {
+          hit(errors, "anywhere-on-control", rel, sf, node.getStart(), `wrap-anywhere on a <${el.tag}>: a squeezed row would cut its words mid-word. Put it on the inner element that holds the long string, keep the words whole`, el.opening.getText());
         }
       }
       if (el.tag === "pre" && !PRE_HOMES.has(rel)) {

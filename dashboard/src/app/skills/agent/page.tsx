@@ -437,9 +437,9 @@ function AgentTools({ tools, toolsSet }: { tools?: AgentToolset; toolsSet: boole
 
 function Fact({ term, children }: { term: string; children: React.ReactNode }) {
   return (
-    <div className="grid gap-1 p-4 sm:grid-cols-[7rem_minmax(0,1fr)] sm:gap-4">
+    <div className="grid grid-cols-1 gap-1 p-4 sm:grid-cols-[7rem_minmax(0,1fr)] sm:gap-4">
       <dt className="text-xs font-medium text-zinc-500 sm:pt-0.5">{term}</dt>
-      <dd className="text-sm text-zinc-300">{children}</dd>
+      <dd className="min-w-0 text-sm text-zinc-300 wrap-anywhere">{children}</dd>
     </div>
   );
 }

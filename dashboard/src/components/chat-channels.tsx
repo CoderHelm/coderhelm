@@ -151,7 +151,7 @@ function ChannelRow({
         <>
           {isSaved && !showInput && (
             <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-400">
-              <span className="min-w-0 break-all">
+              <span className="min-w-0 wrap-anywhere">
                 Saved webhook: <span className="font-mono text-xs text-zinc-300">{saved[kind].hint}</span>
               </span>
               <button type="button" onClick={() => setReplacing(true)} disabled={disabled} className={linkButton}>

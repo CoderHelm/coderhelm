@@ -63,7 +63,7 @@ export function RolesMatrix({ perms, inUse }: { perms: Permissions; inUse: Set<s
       </ul>
 
       {/* Wide screens: the matrix. */}
-      <div className="mt-4 hidden overflow-hidden rounded-lg border border-zinc-800 sm:block">
+      <div className="mt-4 hidden overflow-hidden rounded-lg border border-zinc-800 lg:block">
         <table className="w-full table-fixed border-collapse text-sm" data-testid="roles-matrix">
           <caption className="sr-only">What each role can do. Your role is {yours?.label ?? perms.your_role}.</caption>
           <colgroup>
@@ -137,7 +137,7 @@ export function RolesMatrix({ perms, inUse }: { perms: Permissions; inUse: Set<s
       </div>
 
       {/* Phone: pick a role, see its list. */}
-      <div className="mt-4 sm:hidden" data-testid="roles-phone">
+      <div className="mt-4 lg:hidden" data-testid="roles-phone">
         <Segmented label="Show what this role can do" value={picked} onChange={setPicked} options={ladder.map((r) => ({ value: r.key, label: r.label }))} />
         <PhoneList perms={perms} role={ladder.find((r) => r.key === picked) ?? ladder[0]} groups={groups} />
       </div>

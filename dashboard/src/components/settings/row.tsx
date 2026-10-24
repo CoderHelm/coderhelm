@@ -115,10 +115,13 @@ export function SettingsRow({
     <div className="min-w-0 px-4 py-4" data-testid={testId}>
       <div
         className={`flex min-w-0 ${
-          toggle ? "flex-row items-start justify-between gap-4 sm:gap-6" : stacked ? "flex-col gap-3" : "flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
+          toggle ? "flex-row items-start justify-between gap-4 sm:gap-6" : stacked ? "flex-col gap-3" : "flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-x-6"
         }`}
       >
-        <div className="min-w-0 flex-1">
+        {/* From `sm:` up the name and help keep at least 15rem; a control that
+            doesn't fit beside them goes under them instead of squeezing the
+            words to a letter a line. */}
+        <div className={`min-w-0 flex-1 ${toggle || stacked ? "" : "sm:basis-60"}`}>
           <div className="flex flex-wrap items-center gap-2">
             <label id={ids.labelId} htmlFor={ids.inputId} className="text-sm font-medium text-zinc-100">{label}</label>
             <RowMarks unsaved={unsaved} notDefault={notDefault} recommended={recommended} />
