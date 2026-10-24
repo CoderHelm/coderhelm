@@ -82,11 +82,18 @@ export class DocsStack extends cdk.Stack {
           override: true,
         },
       },
+      // Editors and validators fetch the plugin manifest schema from other
+      // origins. CloudFront refuses CORS headers as custom headers.
+      corsBehavior: {
+        accessControlAllowOrigins: ["*"],
+        accessControlAllowMethods: ["GET", "HEAD"],
+        accessControlAllowHeaders: ["*"],
+        accessControlAllowCredentials: false,
+        originOverride: true,
+      },
       customHeadersBehavior: {
         customHeaders: [
           { header: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()", override: true },
-          // Editors and validators fetch the plugin manifest schema from other origins.
-          { header: "Access-Control-Allow-Origin", value: "*", override: true },
         ],
       },
     });
