@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { pluginsApi } from "@/lib/plugins";
+import { api } from "@/lib/api";
 
-// Whether the team's `plugins` flag is on. Read once per page load and shared
-// by the menu and every plugin page; an older backend (404) or a failed read
-// counts as off, so nothing half-built shows.
+// Whether the team's `plugins` flag is on, from the signed-in person's
+// `/api/me` (no extra request on every page). Read once per page load and
+// shared by the menu and every plugin page; a backend that doesn't send it,
+// or a failed read, counts as off, so nothing half-built shows.
 
 export type FlagState = "checking" | "on" | "off";
 
@@ -13,10 +14,14 @@ let cached: Promise<boolean> | null = null;
 
 function readFlag(): Promise<boolean> {
   if (!cached) {
-    cached = pluginsApi
-      .flag()
-      .then((r) => !!r.enabled)
-      .catch(() => false);
+    cached = api
+      .me()
+      .then((r) => !!r.flags?.plugins)
+      .catch(() => {
+        // Not signed in yet, or a blip: ask again next time.
+        cached = null;
+        return false;
+      });
   }
   return cached;
 }

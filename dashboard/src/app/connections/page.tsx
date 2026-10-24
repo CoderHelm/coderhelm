@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type EnabledPlugin, type PluginDef } from "@/lib/api";
 import { errorMessage } from "@/lib/data-sources";
-import { hasRole } from "@/lib/roles";
-import { useMe } from "@/hooks/use-me";
+import { useCan } from "@/hooks/use-can";
 import { RoleGuard } from "@/components/role-guard";
 import { Page, PageHeader } from "@/components/page";
 import { BrandIcon } from "@/components/brand-icons";
@@ -19,15 +18,15 @@ import { linkButton, secondaryButton } from "@/components/ui";
 
 export default function ConnectionsPageGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need="view_integrations">
       <ConnectionsPage />
     </RoleGuard>
   );
 }
 
 function ConnectionsPage() {
-  const me = useMe();
-  const canEdit = hasRole(me?.role, "admin");
+  const { me, can } = useCan();
+  const canEdit = can("integrations");
   const [catalog, setCatalog] = useState<PluginDef[] | null>(null);
   const [enabled, setEnabled] = useState<EnabledPlugin[]>([]);
   const [error, setError] = useState("");

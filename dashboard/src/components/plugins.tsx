@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { usePluginsFlag } from "@/hooks/use-plugins-flag";
 import { DRAFT_STATUS, RISK_ABOUT, RISK_LABEL, refusalText, RUN_STATUS, type AuditEvent, type DraftStatus, type Risk, type RunStatus } from "@/lib/plugins";
 import { Callout } from "./callout";
+import { RoleGuard } from "./role-guard";
 import { Chip, List, ListRow, ListSkeleton, type Tone } from "./list";
 import { Page, PageHeader } from "./page";
 import { linkButton } from "./ui";
@@ -14,7 +15,7 @@ import { Code } from "./settings/code";
  * Renders a plugin page only when the team's `plugins` flag is on; otherwise
  * says so plainly. `title` names the page while it checks.
  */
-export function PluginsGate({ title, children }: { title: string; children: ReactNode }) {
+export function PluginsGate({ title, need = "plugins.view", children }: { title: string; need?: string; children: ReactNode }) {
   const flag = usePluginsFlag();
   if (flag === "checking") {
     return (
@@ -43,7 +44,7 @@ export function PluginsGate({ title, children }: { title: string; children: Reac
       </Page>
     );
   }
-  return <>{children}</>;
+  return <RoleGuard need={need}>{children}</RoleGuard>;
 }
 
 const RISK_TONE: Record<Risk, Tone> = { read: "neutral", write: "waiting", consequential: "danger" };
@@ -92,9 +93,10 @@ export function Refusal({ code, message, title = "This can't be done" }: { code?
 
 const ACTOR_KIND: Record<AuditEvent["actor_kind"], string> = { person: "Person", agent: "Agent", schedule: "Schedule", system: "Coderhelm" };
 
-/** "draft.approved" → "draft approved". */
+/** "draft.approved" → "Draft approved". */
 export function actionWords(action: string): string {
-  return action.replace(/[._]/g, " ");
+  const words = action.replace(/[._]/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 /** Audit events as a list, newest first as the server sends them. */

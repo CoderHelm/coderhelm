@@ -10,6 +10,7 @@ import { List, ListEmpty, ListError, ListRow, ListSkeleton, Time } from "@/compo
 import { Field } from "@/components/field";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
+import { useCan } from "@/hooks/use-can";
 import { dangerButton, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 
 // One draft: its versions, editing (a new version), and the decisions on it.
@@ -40,6 +41,7 @@ function inAnHour(): string {
 
 function DraftPage() {
   const id = useSearchParams().get("id") ?? "";
+  const { me, can } = useCan();
   const { toast } = useToast();
   const { confirm } = useConfirm();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -106,11 +108,17 @@ function DraftPage() {
   const d = draft;
   const current = d.versions.find((v) => v.version === d.version) ?? d.versions[d.versions.length - 1];
   const view = d.versions.find((v) => v.version === (shown ?? d.version)) ?? current;
-  const canEdit = ["draft", "in_review", "rejected"].includes(d.status);
-  const canSubmit = d.status === "draft" || d.status === "rejected";
-  const inReview = d.status === "in_review";
-  const canStop = !["stopped", "published", "cancelled", "failed"].includes(d.status);
-  const scheduled = d.status === "scheduled";
+  // Editing and sending for review: `plugins.run`. Deciding: `plugins.approve`
+  // (the server also checks the plugin's approvers). The requester may stop or
+  // cancel their own draft.
+  const mayRun = can("plugins.run");
+  const mayDecide = can("plugins.approve");
+  const isRequester = !!me && me.email === d.requested_by;
+  const canEdit = mayRun && ["draft", "in_review", "rejected"].includes(d.status);
+  const canSubmit = mayRun && (d.status === "draft" || d.status === "rejected");
+  const inReview = mayDecide && d.status === "in_review";
+  const canStop = (mayDecide || (isRequester && mayRun)) && !["stopped", "published", "cancelled", "failed"].includes(d.status);
+  const scheduled = (mayDecide || (isRequester && mayRun)) && d.status === "scheduled";
 
   const stop = async () => {
     const ok = await confirm({
@@ -148,7 +156,7 @@ function DraftPage() {
         title={d.title}
         eyebrow={
           <>
-            {d.kind} draft from <Link href={pluginHref(d.plugin_id)} className={linkButton}>{d.plugin_name}</Link>
+            {d.kind.charAt(0).toUpperCase() + d.kind.slice(1)} draft from <Link href={pluginHref(d.plugin_id)} className={linkButton}>{d.plugin_name}</Link>
           </>
         }
         status={<DraftStatusChip status={d.status} />}
@@ -170,7 +178,7 @@ function DraftPage() {
           <Refusal code="stopped" title="Stopped for good" />
         </div>
       )}
-      {scheduled && d.publish_at && (
+      {d.status === "scheduled" && d.publish_at && (
         <p className="mt-6 text-sm text-sky-300" data-testid="scheduled-note">
           Goes out <Time iso={d.publish_at} /> ({new Date(d.publish_at).toLocaleString()}). You can cancel until then.
         </p>

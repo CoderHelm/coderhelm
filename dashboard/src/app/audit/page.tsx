@@ -28,7 +28,7 @@ const ACTIONS: { value: string; label: string }[] = [
 export default function AuditPageGated() {
   return (
     <PluginsGate title="Audit log">
-      <RoleGuard minRole="admin">
+      <RoleGuard need="plugins.audit">
         <Suspense fallback={<Page><PageHeader title="Audit log" /><div className="mt-8"><ListSkeleton rows={4} label="Loading the audit log" /></div></Page>}>
           <AuditPage />
         </Suspense>
