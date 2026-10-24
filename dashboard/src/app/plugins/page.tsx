@@ -10,6 +10,7 @@ import {
   type CatalogPlugin,
   type InstalledPlugin,
   type PluginSource,
+  type TeamPluginSettings,
   type TrackKind,
 } from "@/lib/plugins";
 import { useCan } from "@/hooks/use-can";
@@ -21,6 +22,8 @@ import { Segmented } from "@/components/segmented";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
 import { inputClass, linkButton, monoInputClass, primaryButton, secondaryButton } from "@/components/ui";
+import { SecretInput } from "@/components/field";
+import { Code } from "@/components/settings/code";
 
 // Plugins: what the team installed, what its sources offer, and where the
 // plugins come from. A plugin is text plus approved tools: nothing a plugin
@@ -54,7 +57,7 @@ function PluginsPage() {
   const [installed, setInstalled] = useState<InstalledPlugin[] | null>(null);
   const [catalog, setCatalog] = useState<CatalogPlugin[]>([]);
   const [sources, setSources] = useState<PluginSource[]>([]);
-  const [cap, setCap] = useState<"read" | "write">("write");
+  const [settings, setSettings] = useState<TeamPluginSettings | null>(null);
   const [error, setError] = useState("");
   const [refusal, setRefusal] = useState<{ code: string; message: string } | null>(null);
   const [busy, setBusy] = useState("");
@@ -65,7 +68,7 @@ function PluginsPage() {
       setInstalled(i.plugins);
       setCatalog(c.plugins);
       setSources(s.sources);
-      setCap(t.autonomy_cap);
+      setSettings(t);
       setError("");
     } catch (e) {
       setError(errorOf(e).message);
@@ -281,24 +284,9 @@ function PluginsPage() {
         </ListSection>
       </div>
 
-      {isAdmin && (
+      {isAdmin && settings && (
         <div className="mt-8">
-          <ListSection id="team-settings" title="What may happen without a person" description="The most a plugin may do on its own. Publishing, sending and posting always wait for an approval.">
-            <div className="flex flex-wrap items-center gap-3">
-              <Segmented
-                label="What plugins may do without a person"
-                value={cap}
-                options={[
-                  { value: "read", label: "Only read" },
-                  { value: "write", label: "Read and save drafts" },
-                ]}
-                onChange={(v) => {
-                  setCap(v);
-                  act("cap", () => pluginsApi.saveSettings(v), v === "read" ? "Plugins only read without a person" : "Plugins may save drafts without a person");
-                }}
-              />
-            </div>
-          </ListSection>
+          <TeamSettings settings={settings} onSaved={load} />
         </div>
       )}
     </Page>
@@ -376,5 +364,113 @@ function AddSource({ onAdded }: { onAdded: () => Promise<void> }) {
         </button>
       </div>
     </form>
+  );
+}
+
+/** What plugins may do without a person, and where briefs and approvals come in from Slack and Teams. */
+function TeamSettings({ settings, onSaved }: { settings: TeamPluginSettings; onSaved: () => Promise<void> }) {
+  const { toast } = useToast();
+  const [cap, setCap] = useState(settings.autonomy_cap);
+  const [slackTeam, setSlackTeam] = useState(settings.slack_team_id ?? "");
+  const [slackSecret, setSlackSecret] = useState("");
+  const [teamsSecret, setTeamsSecret] = useState("");
+  const [path, setPath] = useState(settings.teams_webhook_path ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<{ code: string; message: string } | null>(null);
+
+  const saveCap = async (v: "read" | "write") => {
+    setCap(v);
+    try {
+      await pluginsApi.saveSettings({ autonomy_cap: v });
+      toast(v === "read" ? "Plugins only read without a person" : "Plugins may save drafts without a person");
+    } catch (e) {
+      setError(errorOf(e));
+    }
+  };
+  const chatDirty = slackTeam.trim() !== (settings.slack_team_id ?? "") || !!slackSecret.trim() || !!teamsSecret.trim();
+  const saveChat = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const body: Record<string, string> = {};
+      if (slackTeam.trim() !== (settings.slack_team_id ?? "")) body.slack_team_id = slackTeam.trim();
+      if (slackSecret.trim()) body.slack_signing_secret = slackSecret.trim();
+      if (teamsSecret.trim()) body.teams_secret = teamsSecret.trim();
+      const r = await pluginsApi.saveSettings(body);
+      if (r.teams_webhook_path) setPath(r.teams_webhook_path);
+      setSlackSecret("");
+      setTeamsSecret("");
+      toast("Chat settings saved");
+      await onSaved();
+    } catch (e) {
+      setError(errorOf(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <ListSection id="team-settings" title="What may happen without a person" description="The most a plugin may do on its own. Publishing, sending and posting always wait for an approval.">
+        <Segmented
+          label="What plugins may do without a person"
+          value={cap}
+          options={[
+            { value: "read", label: "Only read" },
+            { value: "write", label: "Read and save drafts" },
+          ]}
+          onChange={saveCap}
+        />
+      </ListSection>
+      <div className="mt-8">
+        <ListSection
+          id="chat"
+          title="Briefs and approvals from chat"
+          description="Cards for new drafts post to your team's Slack or Teams channel. To also take briefs from chat, let Coderhelm check that requests really come from your workspace."
+        >
+          <form
+            data-testid="chat-settings"
+            className="flex flex-col gap-4 rounded-lg border border-zinc-800 bg-zinc-900/30 p-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveChat();
+            }}
+          >
+            <Field id="slack-team" label="Slack workspace id" helper="Starts with T. Requests from any other workspace are refused.">
+              {(props) => <input {...props} className={monoInputClass} value={slackTeam} onChange={(e) => setSlackTeam(e.target.value)} placeholder="T0123ABCD" autoComplete="off" />}
+            </Field>
+            <Field
+              id="slack-secret"
+              label="Slack signing secret"
+              helper={settings.slack_signing_secret_set ? "Saved. Enter a new one to replace it." : "From your Slack app's Basic Information page."}
+            >
+              {(props) => (
+                <SecretInput {...props} className={inputClass} value={slackSecret} onChange={(e) => setSlackSecret(e.target.value)} placeholder={settings.slack_signing_secret_set ? "Saved" : ""} autoComplete="off" />
+              )}
+            </Field>
+            <Field
+              id="teams-secret"
+              label="Teams outgoing webhook secret"
+              helper={settings.teams_webhook_set ? "Saved. Enter a new one to replace it." : "Teams shows it once, when you create the outgoing webhook."}
+            >
+              {(props) => (
+                <SecretInput {...props} className={inputClass} value={teamsSecret} onChange={(e) => setTeamsSecret(e.target.value)} placeholder={settings.teams_webhook_set ? "Saved" : ""} autoComplete="off" />
+              )}
+            </Field>
+            {path && (
+              <p className="text-sm text-zinc-400" data-testid="teams-webhook-path">
+                In Teams, paste this as the outgoing webhook&apos;s address: <Code>{path}</Code>
+              </p>
+            )}
+            {error && <Refusal code={error.code} message={error.message} title="Not saved" />}
+            <div>
+              <button type="submit" className={primaryButton} disabled={saving || !chatDirty}>
+                {saving ? "Saving…" : "Save chat settings"}
+              </button>
+            </div>
+          </form>
+        </ListSection>
+      </div>
+    </>
   );
 }
