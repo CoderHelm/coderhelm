@@ -473,7 +473,7 @@ function RouteRow({
               {r.rules.map((rule, i) => (
                 <li key={rule.id ?? i} className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
                   <span className="w-5 shrink-0 text-zinc-500">{i + 1}.</span>
-                  <span className="min-w-0 break-words text-zinc-300">{ruleWhen(rule)}</span>
+                  <span className="min-w-0 text-zinc-300">{ruleWhen(rule)}</span>
                   <span aria-hidden="true" className="text-zinc-600">→</span>
                   <span className="sr-only">opens a pull request in</span>
                   <span className="min-w-0 break-all text-emerald-300">{rule.repo}</span>
@@ -490,7 +490,7 @@ function RouteRow({
           {lastEvent && (
             <DetailBlock title="Last alert">
               <span className="flex flex-wrap items-center gap-2">
-                <Link href={`/alerts/detail?id=${encodeURIComponent(lastEvent.id)}`} className={`${linkButton} min-w-0 break-words !text-xs`}>
+                <Link href={`/alerts/detail?id=${encodeURIComponent(lastEvent.id)}`} className={`${linkButton} min-w-0 !text-xs`}>
                   {lastEvent.title || "Untitled alert"}
                 </Link>
                 <OutcomeChip outcome={lastEvent.outcome} />
@@ -915,7 +915,7 @@ function EventsTimeline({
                   {e.received_at ? timeAgo(e.received_at) : "Unknown time"}
                 </time>
                 <div className="min-w-0 flex-1">
-                  <Link href={`/alerts/detail?id=${encodeURIComponent(e.id)}`} className={`${linkButton} break-words text-zinc-100`}>
+                  <Link href={`/alerts/detail?id=${encodeURIComponent(e.id)}`} className={`${linkButton} text-zinc-100`}>
                     {e.title || "Untitled alert"}
                   </Link>
                   <p className="mt-0.5 text-xs text-zinc-500">
@@ -1435,7 +1435,7 @@ function RouteEditor({
             <ul aria-live="polite" className="mt-3 flex flex-col divide-y divide-zinc-800">
               {preview.map(({ event: e, rule }) => (
                 <li key={e.id} className="flex flex-col gap-1 py-2">
-                  <span className="break-words text-zinc-200">{e.title || "Untitled alert"}</span>
+                  <span className="text-zinc-200">{e.title || "Untitled alert"}</span>
                   <span className="flex flex-wrap items-center gap-2 text-xs">
                     <span className="text-zinc-500">{e.received_at ? timeAgo(e.received_at) : ""}</span>
                     {rule === -2 ? (

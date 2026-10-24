@@ -25,7 +25,7 @@ export function CheckList({ items, label = "Checks" }: { items: CheckItem[]; lab
       {items.map((item) => (
         <li key={item.id} data-state={item.state} className="flex items-start gap-3">
           <CheckDot state={item.state} />
-          <div className="min-w-0 flex-1 text-sm break-words">
+          <div className="min-w-0 flex-1 text-sm">
             <p className="font-semibold text-zinc-100">
               {item.label}
               <span

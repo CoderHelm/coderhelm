@@ -125,7 +125,7 @@ export function PageHeader({
         <h1
           id={titleId}
           tabIndex={titleId ? -1 : undefined}
-          className={`min-w-0 break-words text-2xl font-bold text-zinc-100 [overflow-wrap:anywhere] focus:outline-none ${titleClassName}`.trim()}
+          className={`min-w-0 text-2xl font-bold text-zinc-100 [overflow-wrap:anywhere] focus:outline-none ${titleClassName}`.trim()}
         >
           {title}
         </h1>

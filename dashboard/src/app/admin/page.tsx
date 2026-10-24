@@ -363,7 +363,7 @@ function TeamLine({ team: t }: { team: AdminTeam }) {
   return (
     <li className="py-2" data-testid="admin-team" data-team={t.team_id}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="text-sm text-zinc-100 break-words">{teamName(t)}</span>
+        <span className="text-sm text-zinc-100">{teamName(t)}</span>
         {t.link !== "main" && <Chip tone="muted">{LINK_WORDS[t.link]}</Chip>}
         {t.personal && <Chip tone="muted">Personal</Chip>}
         {!t.active && <Chip tone="muted">No activity</Chip>}

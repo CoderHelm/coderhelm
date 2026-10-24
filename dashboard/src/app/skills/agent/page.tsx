@@ -564,7 +564,7 @@ function AskRow({ ask, currentSha, canAskAgain, onAskAgain }: { ask: AgentAsk; c
       <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-200 [overflow-wrap:anywhere]">{ask.question}</p>
       {ask.answer && (
         <div className="mt-2 rounded-md bg-zinc-950 px-3 py-2">
-          <div className={`whitespace-pre-wrap break-words text-sm text-zinc-300 ${!full && long ? "line-clamp-6" : ""}`}>{ask.answer}</div>
+          <div className={`whitespace-pre-wrap text-sm text-zinc-300 ${!full && long ? "line-clamp-6" : ""}`}>{ask.answer}</div>
           {long && (
             <button type="button" className={`${linkButton} mt-1 text-xs`} onClick={() => setFull(!full)} aria-expanded={full}>
               {full ? "Show less" : "Show the whole answer"}
@@ -760,7 +760,7 @@ function TryIt({
         <div className="mt-4" aria-live="polite">
           {result.outcome === "answered" ? (
             <>
-              <div className="max-h-[20rem] overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-950 px-4 py-3 text-sm text-zinc-300">{result.answer}</div>
+              <div className="max-h-[20rem] overflow-auto whitespace-pre-wrap rounded bg-zinc-950 px-4 py-3 text-sm text-zinc-300">{result.answer}</div>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs text-zinc-600">
                   {(result.input_tokens + result.output_tokens).toLocaleString()} tokens · {(result.ms / 1000).toFixed(1)} s

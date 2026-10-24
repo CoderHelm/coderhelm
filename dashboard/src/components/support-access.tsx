@@ -180,9 +180,9 @@ export function SupportAccessLog({ access }: { access: SupportAccess }) {
             </code>
           )}
           {e.detail && <span className="min-w-0 text-xs text-zinc-500 [overflow-wrap:anywhere]">{e.detail}</span>}
-          <span className="ml-auto flex shrink-0 items-baseline gap-2 text-xs text-zinc-500">
-            <span className="[overflow-wrap:anywhere]">{e.actor_email}</span>
-            <Time iso={e.at} />
+          <span className="ml-auto flex min-w-0 items-baseline gap-2 text-xs text-zinc-500">
+            <span className="min-w-0 [overflow-wrap:anywhere]">{e.actor_email}</span>
+            <span className="shrink-0"><Time iso={e.at} /></span>
           </span>
         </li>
       ))}

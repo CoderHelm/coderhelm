@@ -121,7 +121,7 @@ function VoicePage() {
             </div>
           ) : generationFailed ? (
             <Callout variant="error" title="Coderhelm could not write this voice">
-              {repoData?.onboard_error && <p className="break-words">{repoData.onboard_error.slice(0, 200)}</p>}
+              {repoData?.onboard_error && <p>{repoData.onboard_error.slice(0, 200)}</p>}
               <button type="button" onClick={regenerate} disabled={regenerating} className={`mt-2 ${secondaryButton}`}>
                 Try again
               </button>

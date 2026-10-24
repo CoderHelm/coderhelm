@@ -440,7 +440,7 @@ function SourceFact({ label, children }: { label: string; children: ReactNode })
   return (
     <div className="min-w-0">
       <dt className="text-xs text-zinc-500">{label}</dt>
-      <dd className="mt-0.5 break-words text-sm text-zinc-200">{children}</dd>
+      <dd className="mt-0.5 text-sm text-zinc-200">{children}</dd>
     </div>
   );
 }
@@ -716,7 +716,7 @@ function SourceRow({
             <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 sm:flex-nowrap">
               <span
                 title={open_ ? undefined : source.name}
-                className={`min-w-0 text-sm font-medium text-zinc-100 ${open_ ? "break-words" : "[overflow-wrap:anywhere] sm:truncate"}`}
+                className={`min-w-0 text-sm font-medium text-zinc-100 ${open_ ? "" : "[overflow-wrap:anywhere] sm:truncate"}`}
               >
                 {source.name}
               </span>

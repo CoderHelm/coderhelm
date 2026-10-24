@@ -231,7 +231,7 @@ function GatePage() {
                 <li key={i} className="flex gap-2 text-zinc-400">
                   <span aria-hidden="true" className={`w-3 shrink-0 text-center ${m.cls}`}>{m.glyph}</span>
                   <span className="sr-only">{m.sr}</span>
-                  <span className="min-w-0 break-words">{c.text}</span>
+                  <span className="min-w-0">{c.text}</span>
                 </li>
               );
             })}

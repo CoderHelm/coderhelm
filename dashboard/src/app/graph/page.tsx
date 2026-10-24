@@ -498,7 +498,7 @@ export default function GraphPage() {
       </ListSection>
 
       {current && (
-        <h2 className="text-sm font-medium text-zinc-300 break-words" data-testid="graph-exploring">
+        <h2 className="text-sm font-medium text-zinc-300" data-testid="graph-exploring">
           Exploring <span className="text-zinc-100">{current.repo}</span>
         </h2>
       )}
@@ -620,7 +620,7 @@ export default function GraphPage() {
           </div>
 
           <div className="min-w-0">
-            <h2 className="text-sm font-medium text-zinc-300 mb-2 break-words">
+            <h2 className="text-sm font-medium text-zinc-300 mb-2">
               Explorer{hood && <span className="text-zinc-500 font-normal">: {hood.path}</span>}
             </h2>
             {hoodError && (

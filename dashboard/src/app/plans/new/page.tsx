@@ -335,7 +335,7 @@ function NewPlan() {
           <div className="mx-auto w-full max-w-3xl shrink-0 space-y-2 border-t border-zinc-800/80 pt-3">
             {status === "error" && error && (
               <div className="flex items-center gap-3 rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-sm">
-                <span className="min-w-0 break-words text-zinc-300" role="alert">
+                <span className="min-w-0 text-zinc-300" role="alert">
                   Couldn&apos;t get a reply: {error}
                 </span>
                 <button

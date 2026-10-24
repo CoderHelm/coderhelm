@@ -170,14 +170,14 @@ function AlertDetail() {
             {fields.map((f) => (
               <Fragment key={f.label}>
                 <dt className="text-xs text-zinc-500 sm:pt-0.5">{f.label}</dt>
-                <dd className="mb-2 min-w-0 break-words text-zinc-200 sm:mb-0 [overflow-wrap:anywhere]">
+                <dd className="mb-2 min-w-0 text-zinc-200 sm:mb-0 [overflow-wrap:anywhere]">
                   {f.when ? <Time iso={f.value} className="!whitespace-normal" /> : f.value}
                 </dd>
               </Fragment>
             ))}
           </dl>
         ) : (
-          <p className={`whitespace-pre-wrap break-words text-sm text-zinc-200 ${cardClass}`}>{a.body || "(empty)"}</p>
+          <p className={`whitespace-pre-wrap text-sm text-zinc-200 ${cardClass}`}>{a.body || "(empty)"}</p>
         )}
         {fields.length > 0 && a.body && (
           <div className="mt-3">

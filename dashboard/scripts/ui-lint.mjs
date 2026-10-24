@@ -14,6 +14,9 @@
 //   page-header      a page drawing its own header: a raw <h1>, a "←" back link or its own breadcrumb.
 //                    The shell's one top bar holds the trail and the back arrow; pages describe
 //                    themselves with <PageHeader> (components/page.tsx)
+//   break-words      the `break-words` class. The page already wraps long words anywhere
+//                    (globals.css); `break-words` turns that back into `break-word`, which
+//                    lets one long sha, URL or email hold a flex row wider than a phone
 // Reports (never fail, counted against the baseline so they can be tightened):
 //   font-mono        `font-mono` outside <Code>, <CodeBlock> and the shared mono input
 //   pre              a hand-rolled <pre> outside <CodeBlock> (a block of code gets its header, Copy and highlighting there)
@@ -173,6 +176,20 @@ for (const file of walk(SRC)) {
     const before = source.slice(0, m.index);
     const line = before.split("\n").length;
     errors.push({ rule: "brand", file: rel, line, col: m.index - before.lastIndexOf("\n"), message: "\"CoderHelm\": the product is spelled \"Coderhelm\"" });
+  }
+
+  // break-words: undoes the page's own wrapping (globals.css) on that element.
+  for (const m of source.matchAll(/\bbreak-words\b/g)) {
+    const lineText = source.slice(source.lastIndexOf("\n", m.index) + 1, source.indexOf("\n", m.index));
+    if (allowed("break-words", rel, lineText)) continue;
+    const before = source.slice(0, m.index);
+    errors.push({
+      rule: "break-words",
+      file: rel,
+      line: before.split("\n").length,
+      col: m.index - before.lastIndexOf("\n"),
+      message: "`break-words` lets a long word push a flex row past a phone's edge; drop it (the page wraps anywhere already) and give flex children min-w-0",
+    });
   }
 
   // font-mono: counted, outside its homes.

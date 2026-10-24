@@ -54,7 +54,7 @@ function RunDetail() {
         detail
         title={run.workflow}
         lead={
-          <p className="break-words">
+          <p>
             {run.repo} · <span className="font-mono">{run.branch}</span>
             {run.pr ? (
               <> · <a href={githubPrUrl(run.repo, run.pr)} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-zinc-300">PR #{run.pr}</a></>
@@ -124,7 +124,7 @@ function ExecutionRow({ e, runUrl }: { e: TestRunExecution; runUrl: string }) {
     <li className="px-4 py-3.5 sm:px-5">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1 basis-64">
-          <Link href={testHref(e.test_id)} className={`break-words text-sm font-medium text-zinc-100 hover:underline underline-offset-4 rounded ${focusRing}`}>
+          <Link href={testHref(e.test_id)} className={`text-sm font-medium text-zinc-100 hover:underline underline-offset-4 rounded ${focusRing}`}>
             {e.project ? `${e.title} (${e.project})` : e.title}
           </Link>
           <p className="mt-0.5 break-all font-mono text-xs text-zinc-500">{e.file}</p>
@@ -135,7 +135,7 @@ function ExecutionRow({ e, runUrl }: { e: TestRunExecution; runUrl: string }) {
           <span className="tabular-nums">{totalDuration(e)}</span>
         </p>
       </div>
-      {err && <p className="mt-1.5 break-words font-mono text-xs text-red-200">{err}</p>}
+      {err && <p className="mt-1.5 font-mono text-xs text-red-200">{err}</p>}
       {(e.outcome === "failed" || e.outcome === "flaky") && (
         <p className="mt-1.5 text-xs"><ArtifactLinks attempts={e.attempts} runUrl={runUrl} /></p>
       )}

@@ -970,7 +970,7 @@ function ReviewStep({ source, onTurnedOn }: { source: DataSource; onTurnedOn: (s
       k: "Connected",
       v: (
         <>
-          <span className="break-words">{source.name}</span>
+          <span>{source.name}</span>
           {where && <span className="block break-all font-mono text-xs text-zinc-400">{where}</span>}
           {kind === "logs" && source.aws?.log_groups.length ? (
             <span className="block break-all font-mono text-xs text-zinc-400">{source.aws.log_groups.join(", ")}</span>
@@ -1003,7 +1003,7 @@ function ReviewStep({ source, onTurnedOn }: { source: DataSource; onTurnedOn: (s
               ? `No ${noun.many} are hidden`
               : `See ${source.hidden_fields.length === 1 ? `the hidden ${noun.one}` : `the ${source.hidden_fields.length} hidden ${noun.many}`}`}
             {source.hidden_fields.length > 0 && (
-              <span className="block break-words font-mono text-xs text-zinc-400">{source.hidden_fields.join(", ")}</span>
+              <span className="block font-mono text-xs text-zinc-400">{source.hidden_fields.join(", ")}</span>
             )}
           </li>
           <li>Use a source that is paused or needs attention</li>

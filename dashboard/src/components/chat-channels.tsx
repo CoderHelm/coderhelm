@@ -190,7 +190,7 @@ function ChannelRow({
             </button>
             <p aria-live="polite" className="min-w-0 text-sm">
               {test.state === "sent" && <span className="text-emerald-400">Test message sent. Check the channel.</span>}
-              {test.state === "failed" && <span className="break-words text-red-400">{test.message}</span>}
+              {test.state === "failed" && <span className="text-red-400">{test.message}</span>}
             </p>
           </div>
           <Disclosure summary={`How to get a ${label} webhook address`}>{kind === "teams" ? <TeamsHowTo /> : <SlackHowTo />}</Disclosure>
