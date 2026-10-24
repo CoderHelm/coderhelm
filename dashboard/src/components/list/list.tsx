@@ -116,7 +116,7 @@ export function ListRow({
   const panelId = useId();
   const dataAttrs = Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [`data-${k}`, v]));
   const metaBits = (meta ?? []).filter((m) => m !== null && m !== undefined && m !== false && m !== "");
-  const titleClass = `block break-words line-clamp-2 sm:truncate rounded text-sm font-medium ${
+  const titleClass = `block line-clamp-2 sm:truncate rounded text-sm font-medium ${
     quiet ? "text-zinc-400" : "text-zinc-100"
   } ${href || externalHref ? "hover:underline" : ""} ${focusRing}`;
 
@@ -215,7 +215,7 @@ export function DetailBlock({ title, children }: { title: ReactNode; children: R
   return (
     <div className="min-w-0">
       <p className="mb-1 font-medium text-zinc-300">{title}</p>
-      <div className="break-words text-zinc-400">{children}</div>
+      <div className="text-zinc-400">{children}</div>
     </div>
   );
 }

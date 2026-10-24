@@ -504,7 +504,7 @@ function Rating({ review, onSaved }: { review: Review; onSaved: () => void }) {
                 {c.rating === "down" && <span className={TONES.danger.text}>said it was wrong</span>}
                 {c.at && <span>· {new Date(c.at).toLocaleDateString()}</span>}
               </div>
-              <div className="break-words"><ChatMarkdown breaks>{c.text}</ChatMarkdown></div>
+              <div><ChatMarkdown breaks>{c.text}</ChatMarkdown></div>
             </li>
           ))}
         </ul>

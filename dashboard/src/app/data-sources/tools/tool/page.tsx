@@ -211,9 +211,12 @@ function ToolPage() {
           {versions.map((v) => (
             <li key={v.hash} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-sm">
               <code className="font-mono text-zinc-300">{v.hash}</code>
-              {v.hash === tool.approved && <StatusPill tone="success">Approved{tool.approved_by ? ` by ${tool.approved_by}` : ""}</StatusPill>}
+              {v.hash === tool.approved && <StatusPill tone="success">Approved</StatusPill>}
               {v.hash === tool.latest && v.hash !== tool.approved && <StatusPill tone="warning">Latest</StatusPill>}
-              <span className="text-xs text-zinc-500">{origin(v)} · {v.author} · {when(v.created_at)}</span>
+              <span className="min-w-0 text-xs text-zinc-500">
+                {v.hash === tool.approved && tool.approved_by ? `Approved by ${tool.approved_by} · ` : ""}
+                {origin(v)} · {v.author} · {when(v.created_at)}
+              </span>
             </li>
           ))}
         </ul>
@@ -228,7 +231,7 @@ function ToolPage() {
             {activity.slice(0, 20).map((e, i) => (
               <li key={`${e.at}-${i}`} className="flex flex-wrap items-start justify-between gap-2 px-5 py-3 text-sm">
                 <div className="min-w-0 flex-1 basis-64">
-                  <p className="break-words font-mono text-xs text-zinc-200">{e.query ?? e.summary}</p>
+                  <p className="font-mono text-xs text-zinc-200">{e.query ?? e.summary}</p>
                   <p className="mt-1 text-xs text-zinc-500">{e.actor} · {when(e.at)}{e.detail ? ` · ${e.detail}` : ""}</p>
                 </div>
                 {e.outcome === "ok" ? <StatusPill tone="success">OK</StatusPill> : e.outcome === "refused" ? <StatusPill tone="warning">Refused</StatusPill> : <StatusPill tone="error">Failed</StatusPill>}

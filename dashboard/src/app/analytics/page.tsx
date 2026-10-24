@@ -143,7 +143,7 @@ function Table({ head, rows, empty, label }: { head: string[]; rows: ReactNode[]
           {rows.map((r, i) => (
             <tr key={i}>
               {r.map((c, j) => (
-                <td key={j} className={`px-3 py-2.5 sm:px-4 ${j > 0 ? "text-right tabular-nums text-zinc-300" : "min-w-0 break-words text-zinc-100"}`}>{c}</td>
+                <td key={j} className={`px-3 py-2.5 sm:px-4 ${j > 0 ? "text-right tabular-nums text-zinc-300" : "min-w-0 text-zinc-100"}`}>{c}</td>
               ))}
             </tr>
           ))}
@@ -571,7 +571,7 @@ function Comparison({ c, period, previous, mtd }: { c: AnalyticsComparison; peri
           <tbody className="divide-y divide-zinc-800">
             {METRICS.map((m) => (
               <tr key={m.key}>
-                <th scope="row" className={`min-w-0 break-words px-3 py-2.5 text-left font-normal sm:px-4 ${m.sub ? "pl-6 text-zinc-400 sm:pl-8" : "text-zinc-100"}`}>
+                <th scope="row" className={`min-w-0 px-3 py-2.5 text-left font-normal sm:px-4 ${m.sub ? "pl-6 text-zinc-400 sm:pl-8" : "text-zinc-100"}`}>
                   {m.sub ? "·\u00a0" : ""}
                   {m.label}
                 </th>

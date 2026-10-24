@@ -73,7 +73,7 @@ const COMPONENTS: Partial<Components> = {
  */
 export const ChatMarkdown = memo(function ChatMarkdown({ children, breaks = false }: { children: string; breaks?: boolean }) {
   return (
-    <div className="chat-md overflow-hidden break-words min-w-0 max-w-full">
+    <div className="chat-md overflow-hidden min-w-0 max-w-full">
       <ReactMarkdown remarkPlugins={breaks ? REMARK_PLUGINS_BREAKS : REMARK_PLUGINS} components={COMPONENTS} skipHtml>
         {children}
       </ReactMarkdown>

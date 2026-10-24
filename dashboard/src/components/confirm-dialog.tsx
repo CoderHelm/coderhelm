@@ -93,7 +93,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             className="relative w-full max-w-sm rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl"
           >
             <h2 id={titleId} className="text-base font-semibold text-zinc-100">{opts.title}</h2>
-            <p id={messageId} className="mt-2 text-sm text-zinc-400 leading-relaxed break-words">{opts.message}</p>
+            <p id={messageId} className="mt-2 text-sm text-zinc-400 leading-relaxed">{opts.message}</p>
             <div className="mt-6 flex flex-wrap justify-end gap-3">
               <button
                 type="button"

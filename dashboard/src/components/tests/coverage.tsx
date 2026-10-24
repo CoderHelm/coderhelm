@@ -78,7 +78,7 @@ export function CoverageView({ repo, canEdit }: { repo: string; canEdit: boolean
             {open.map((r) => (
               <li key={r.id} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 sm:p-5">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <p className="min-w-0 flex-1 basis-64 break-words text-sm font-medium text-zinc-100">{r.title}</p>
+                  <p className="min-w-0 flex-1 basis-64 text-sm font-medium text-zinc-100">{r.title}</p>
                   <StatusPill tone={r.status === "pr_opened" ? "success" : "neutral"}>{RECOMMENDATION_STATUS[r.status]}</StatusPill>
                 </div>
                 {r.area && <p className="mt-1 text-xs text-zinc-500">Area: {r.area}</p>}
@@ -86,7 +86,7 @@ export function CoverageView({ repo, canEdit }: { repo: string; canEdit: boolean
                 {r.evidence.length > 0 && (
                   <ul aria-label="Evidence" className="mt-2 space-y-1 text-xs text-zinc-400">
                     {r.evidence.map((ev, i) => (
-                      <li key={i} className="break-words">
+                      <li key={i}>
                         <span className="text-zinc-500">{EVIDENCE_LABEL[ev.kind]}:</span>{" "}
                         {ev.url ? (
                           <a href={ev.url} target="_blank" rel="noreferrer" className="text-zinc-300 underline underline-offset-2 hover:text-zinc-100">{ev.text}</a>
@@ -149,7 +149,7 @@ function AreaRow({ area }: { area: { area: string; paths: string[]; tests: { id:
   return (
     <li className="px-4 py-3.5 sm:px-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="min-w-0 break-words text-sm font-medium text-zinc-100">{area.area}</p>
+        <p className="min-w-0 text-sm font-medium text-zinc-100">{area.area}</p>
         {area.covered ? <StatusPill tone="success">{plural(area.tests.length, "test")}</StatusPill> : <StatusPill tone="warning">No test</StatusPill>}
       </div>
       {area.paths.length > 0 && (
@@ -159,7 +159,7 @@ function AreaRow({ area }: { area: { area: string; paths: string[]; tests: { id:
         <ul aria-label={`Tests for ${area.area}`} className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
           {area.tests.slice(0, 6).map((t) => (
             <li key={t.id} className="min-w-0 max-w-full">
-              <Link href={testHref(t.id)} className={`${linkButton} break-words text-left`}>{t.title}</Link>
+              <Link href={testHref(t.id)} className={`${linkButton} text-left`}>{t.title}</Link>
             </li>
           ))}
         </ul>

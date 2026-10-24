@@ -173,7 +173,7 @@ export function DraftPanel({
             )}
           </div>
           {plan?.title ? (
-            <h2 className={`break-words text-base font-semibold text-zinc-100 ${change?.header && !live ? "rounded bg-sky-500/10 px-1 -mx-1" : ""}`}>
+            <h2 className={`text-base font-semibold text-zinc-100 ${change?.header && !live ? "rounded bg-sky-500/10 px-1 -mx-1" : ""}`}>
               {plan.title}
             </h2>
           ) : (
@@ -199,7 +199,7 @@ export function DraftPanel({
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-zinc-200">
-                      <span className="min-w-0 break-words">{task.title || "…"}</span>
+                      <span className="min-w-0">{task.title || "…"}</span>
                       {mark && <Chip tone="live">{mark === "new" ? "New" : "Changed"}</Chip>}
                     </p>
                     {task.description && (

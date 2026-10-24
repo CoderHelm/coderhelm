@@ -228,7 +228,7 @@ function TestDetail() {
                 <p className="text-zinc-100">
                   {STATE_LABEL[ev.from]} <span aria-hidden="true">→</span><span className="sr-only">to</span> {STATE_LABEL[ev.to]}
                 </p>
-                <p className="mt-0.5 break-words text-zinc-400">{ev.reason}</p>
+                <p className="mt-0.5 text-zinc-400">{ev.reason}</p>
                 <p className="mt-1 text-xs text-zinc-500">
                   {ev.actor} · <time dateTime={ev.at} title={new Date(ev.at).toLocaleString()}>{timeAgo(ev.at)}</time>
                 </p>
@@ -288,7 +288,7 @@ function HistoryRow({ run, repo }: { run: TestHistoryRun; repo: string }) {
         </p>
         <ArtifactLinks attempts={run.attempts} />
       </div>
-      {err && <p className="mt-1.5 break-words font-mono text-xs text-red-200">{err}</p>}
+      {err && <p className="mt-1.5 font-mono text-xs text-red-200">{err}</p>}
     </li>
   );
 }

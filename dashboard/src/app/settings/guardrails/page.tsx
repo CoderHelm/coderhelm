@@ -55,7 +55,7 @@ function RuleList({
       <ul aria-label={`Rules for ${scope}`} className="divide-y divide-zinc-800">
         {rules.map((rule, i) => (
           <li key={`${i}-${rule}`} className="flex min-w-0 items-start justify-between gap-4 px-4 py-3">
-            <span className="min-w-0 break-words text-sm text-zinc-200">{rule}</span>
+            <span className="min-w-0 text-sm text-zinc-200">{rule}</span>
             <button
               type="button"
               onClick={() => onChange(rules.filter((_, k) => k !== i))}

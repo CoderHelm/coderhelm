@@ -413,7 +413,7 @@ function AgentDetail({ agent }: { agent: AgentProfile }) {
             {agent.knows.map((k) => (
               <div key={k.label}>
                 <dt className="text-sm text-zinc-200">{k.label}</dt>
-                <dd className="mt-0.5 break-words text-sm text-zinc-400">{k.detail}</dd>
+                <dd className="mt-0.5 text-sm text-zinc-400">{k.detail}</dd>
               </div>
             ))}
           </dl>
@@ -432,7 +432,7 @@ function AgentDetail({ agent }: { agent: AgentProfile }) {
             <ul className="mt-2 flex flex-col gap-3">
               {agent.learned.map((l, i) => (
                 <li key={i} className="rounded-md border border-zinc-800 bg-zinc-950/50 p-3">
-                  <p className="break-words text-sm text-zinc-200">{l.text}</p>
+                  <p className="text-sm text-zinc-200">{l.text}</p>
                   <p className="mt-1 text-xs text-zinc-500">
                     {l.link ? <a href={l.link} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-zinc-300">{l.source}</a> : l.source}
                     {day(l.at) && <><span aria-hidden="true"> · </span>{day(l.at)}</>}
@@ -451,7 +451,7 @@ function AgentDetail({ agent }: { agent: AgentProfile }) {
           <ul className="mt-2 divide-y divide-zinc-800 rounded-md border border-zinc-800">
             {agent.recent.map((r, i) => (
               <li key={i} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-3 py-2 text-sm">
-                <span className="min-w-0 break-words text-zinc-200">
+                <span className="min-w-0 text-zinc-200">
                   {r.link ? <a href={r.link} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-zinc-100">{r.title || "Untitled"}</a> : r.title || "Untitled"}
                 </span>
                 <span className="text-xs text-zinc-500">{r.outcome}{day(r.at) && <> · {day(r.at)}</>}</span>
@@ -603,13 +603,13 @@ function TryIt({ repo }: { repo: string }) {
               <ol className="flex flex-col gap-2">
                 {result.pinned.map((m) => (
                   <li key={m.id} className="rounded-md border border-zinc-800 bg-zinc-950/50 p-3">
-                    <p className="break-words text-sm text-zinc-200">{m.content}</p>
+                    <p className="text-sm text-zinc-200">{m.content}</p>
                     <p className="mt-1 text-xs text-amber-300">Pinned, so always included</p>
                   </li>
                 ))}
                 {result.recalled.map(({ memory: m, score }) => (
                   <li key={m.id} className="rounded-md border border-zinc-800 bg-zinc-950/50 p-3">
-                    <p className="break-words text-sm text-zinc-200">{m.content}</p>
+                    <p className="text-sm text-zinc-200">{m.content}</p>
                     <p className="mt-1 text-xs text-zinc-500">{topicLabel(m.topic)} · {where(m)} · match {Math.round(Math.min(1, score / 0.08) * 100)}%</p>
                   </li>
                 ))}

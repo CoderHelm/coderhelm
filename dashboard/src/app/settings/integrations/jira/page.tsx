@@ -316,7 +316,7 @@ function StatusCard({
       {test && (
         <div className="mt-4">
           <Callout variant={test.ok ? "success" : "error"} title={test.ok ? "The connection works" : "The check failed"}>
-            <p className="break-words">{test.text}</p>
+            <p>{test.text}</p>
           </Callout>
         </div>
       )}
@@ -807,7 +807,7 @@ function EventsList() {
             <li key={e.event_id} className="flex flex-col gap-1.5 px-4 py-3 sm:flex-row sm:items-center sm:gap-4">
               <span className="shrink-0 text-xs font-medium text-zinc-300 sm:w-24">{e.ticket_key || "No ticket"}</span>
               <span className="min-w-0 flex-1">
-                <span className="block break-words text-sm text-zinc-100">{e.title || "Untitled ticket"}</span>
+                <span className="block text-sm text-zinc-100">{e.title || "Untitled ticket"}</span>
                 <span className="block text-xs text-zinc-500">
                   {e.repo || "No repository"} · <time dateTime={e.created_at}>{timeAgo(e.created_at)}</time>
                 </span>

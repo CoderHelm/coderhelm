@@ -334,7 +334,7 @@ function IntegrationRow({
       <BrandIcon id={item.id} name={item.name} />
       <span className="min-w-0">
         <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-          <span className="min-w-0 break-words font-medium text-zinc-100 sm:truncate">{item.name}</span>
+          <span className="min-w-0 font-medium text-zinc-100 sm:truncate">{item.name}</span>
           <span className="shrink-0 text-xs sm:hidden">{statusText}</span>
         </span>
         <span id={lineId} data-testid="integration-does" title={item.does} className="block text-sm text-zinc-500 sm:truncate">

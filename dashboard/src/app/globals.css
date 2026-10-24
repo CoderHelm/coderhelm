@@ -5,6 +5,22 @@ html {
   color-scheme: dark;
 }
 
+/* Long unbroken text (shas, URLs, branch names, emails, stack frames) wraps
+   instead of pushing the page sideways on a phone. `anywhere`, unlike
+   `break-word`, also lets a flex or grid item shrink below its longest word,
+   so a row of text and badges fits without a min-w-0 on every child. A table
+   keeps its columns as wide as their longest word and scrolls inside its own
+   box instead; code never wraps unless asked (white-space: pre). Checked on
+   every page by e2e/no-sideways-scroll.spec.ts. */
+@layer base {
+  body {
+    overflow-wrap: anywhere;
+  }
+  table {
+    overflow-wrap: break-word;
+  }
+}
+
 button, [role="button"] {
   cursor: pointer;
 }

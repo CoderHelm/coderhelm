@@ -41,7 +41,7 @@ export function Callout({
       <span className={`mt-0.5 shrink-0 ${style.icon}`} aria-hidden="true">
         {ICONS[variant]}
       </span>
-      <div className="min-w-0 flex-1 space-y-1 break-words">
+      <div className="min-w-0 flex-1 space-y-1">
         <span className="sr-only">{style.label}: </span>
         {title && <p className="font-semibold text-zinc-100">{title}</p>}
         {children}

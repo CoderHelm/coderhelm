@@ -22,7 +22,7 @@ export function Disclosure({
         </span>
         {summary}
       </summary>
-      <div className="flex flex-col gap-2 px-4 pb-4 break-words">{children}</div>
+      <div className="flex flex-col gap-2 px-4 pb-4">{children}</div>
     </details>
   );
 }

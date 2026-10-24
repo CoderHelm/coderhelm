@@ -20,12 +20,16 @@ const ICONS: Record<Tone, ReactNode> = {
   error: <XIcon />,
 };
 
-/** A short status word in a pill. The icon repeats what the color says. */
+/**
+ * A short status word in a pill. The icon repeats what the color says. It
+ * never wraps; on a screen too narrow for it, the word is cut with an ellipsis
+ * rather than pushing the page sideways. Names and emails go beside it, not in it.
+ */
 export function StatusPill({ tone = "neutral", children }: { tone?: Tone; children: ReactNode }) {
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ${TONE_CLASS[tone]}`}>
-      {ICONS[tone] && <span aria-hidden="true" className="scale-75 -ml-0.5">{ICONS[tone]}</span>}
-      {children}
+    <span className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ${TONE_CLASS[tone]}`}>
+      {ICONS[tone] && <span aria-hidden="true" className="scale-75 -ml-0.5 shrink-0">{ICONS[tone]}</span>}
+      <span className="min-w-0 truncate">{children}</span>
     </span>
   );
 }

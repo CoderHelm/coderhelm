@@ -272,7 +272,7 @@ export function AwsAbilitySummary({ a }: { a: AwsAccountAbilities }) {
       <li key={name} className="flex min-w-0 flex-wrap items-baseline gap-x-2">
         <span className="font-medium text-zinc-200">{name}</span>
         <span className={tone}>{state}</span>
-        {extra && <span className="min-w-0 break-words text-zinc-400">{extra}</span>}
+        {extra && <span className="min-w-0 text-zinc-400">{extra}</span>}
       </li>
     );
   };

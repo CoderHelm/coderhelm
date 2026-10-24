@@ -109,7 +109,7 @@ function InstructionsPage() {
             <>
               {generationFailed && (
                 <Callout variant="error" title="Coderhelm could not read this repository" live={false}>
-                  {repoData?.onboard_error ? <p className="break-words">{repoData.onboard_error.slice(0, 200)}</p> : <p>You can still write instructions below.</p>}
+                  {repoData?.onboard_error ? <p>{repoData.onboard_error.slice(0, 200)}</p> : <p>You can still write instructions below.</p>}
                 </Callout>
               )}
               <Field

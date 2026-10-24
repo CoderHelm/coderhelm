@@ -260,7 +260,7 @@ export function FailureGroupsView({ repo }: { repo: string }) {
                 <ul aria-label="Tests with this failure" className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
                   {g.test_ids.map((id) => (
                     <li key={id} className="min-w-0 max-w-full">
-                      <Link href={testHref(id)} className={`${linkButton} !text-xs break-words text-left`}>{names.get(id) ?? "Open test"}</Link>
+                      <Link href={testHref(id)} className={`${linkButton} !text-xs text-left`}>{names.get(id) ?? "Open test"}</Link>
                     </li>
                   ))}
                 </ul>

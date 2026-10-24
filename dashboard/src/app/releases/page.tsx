@@ -294,7 +294,7 @@ function ReleasesPage() {
         <div className="mt-6 flex flex-col gap-2">
           {blocked.map((b) => (
             <Callout key={`blocked:${b.repo}`} variant="error" title={`Release blocked for ${b.repo}`}>
-              <p className="text-xs break-words">{b.error}</p>
+              <p className="text-xs">{b.error}</p>
               <p className="mt-1 text-[11px] opacity-80">
                 Tried {plural(b.attempts, "time")}
                 {b.failed_at && <>, last {fullDate(b.failed_at)}</>}. Fix the cause (for example a tag rule on GitHub),
@@ -706,7 +706,7 @@ function ReleaseRow({
                   <span aria-hidden="true" className={`mt-0.5 shrink-0 [&_svg]:h-3.5 [&_svg]:w-3.5 ${DEST_TONES[d.tone]}`}>
                     {DEST_ICONS[d.key]()}
                   </span>
-                  <span className="min-w-0 break-words">
+                  <span className="min-w-0">
                     <span className="text-zinc-300">{d.name}</span>
                     <span className={d.tone === "failed" ? "text-red-400" : "text-zinc-500"}>: {d.state}</span>
                   </span>

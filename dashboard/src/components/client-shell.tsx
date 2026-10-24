@@ -436,7 +436,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                 }`}>
                   {banner.type === "error" ? "⚠" : banner.type === "warning" ? "⚡" : "ℹ"}
                 </span>
-                <p className={`text-sm font-medium ${
+                <p className={`min-w-0 text-sm font-medium [overflow-wrap:anywhere] ${
                   banner.type === "error" ? "text-red-100" : banner.type === "warning" ? "text-yellow-100" : "text-blue-100"
                 }`}>
                   {banner.message}

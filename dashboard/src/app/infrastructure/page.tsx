@@ -51,10 +51,10 @@ function FindingCard({ finding }: { finding: InfraFinding }) {
         <span className="mt-0.5 flex-shrink-0 scale-75" aria-hidden="true">{SEVERITY_ICONS[finding.severity] ?? SEVERITY_ICONS.info}</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold break-words">{finding.title}</span>
+            <span className="min-w-0 text-xs font-semibold">{finding.title}</span>
             <StatusPill>{CATEGORY_LABELS[finding.category] ?? finding.category}</StatusPill>
           </div>
-          <p className="text-xs text-zinc-400 mt-1 leading-relaxed break-words">{finding.detail}</p>
+          <p className="text-xs text-zinc-400 mt-1 leading-relaxed">{finding.detail}</p>
           {finding.file && <p className="text-xs text-zinc-500 font-mono mt-1 break-all">{finding.file}</p>}
         </div>
       </div>

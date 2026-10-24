@@ -223,7 +223,7 @@ function CheckCard({ check, onRefresh }: { check: HealthCheckItem; onRefresh: ()
                 ) : (
                   <p className="text-zinc-200 truncate">{item.title || "Untitled run"}</p>
                 )}
-                {item.error && <p className="mt-1 break-words text-xs text-zinc-400">{item.error}</p>}
+                {item.error && <p className="mt-1 text-xs text-zinc-400">{item.error}</p>}
                 {item.created_at && (
                   <p className="text-zinc-500 text-xs mt-1">Started <Time iso={item.created_at} /></p>
                 )}

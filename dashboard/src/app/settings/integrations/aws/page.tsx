@@ -375,13 +375,13 @@ function AccountSettings({
       <div className="mt-3 flex flex-col gap-3 empty:hidden">
         {!healthy && (
           <Callout variant="error" title="Coderhelm cannot use the role" live={false}>
-            <p className="break-words">{c.error_message || "The last check failed."}</p>
+            <p>{c.error_message || "The last check failed."}</p>
             <p>No logs are read until this is fixed. Check the role&apos;s trust policy, then test again.</p>
           </Callout>
         )}
         {lastAnalysisFailed && (
           <Callout variant="warning" title="The last analysis failed" live={false}>
-            <p className="break-words">
+            <p>
               {c.last_error_at ? `${timeAgo(c.last_error_at)}: ` : ""}
               {c.error_message}
             </p>
@@ -389,7 +389,7 @@ function AccountSettings({
         )}
         {test && (
           <Callout variant={test.ok ? "success" : "error"} title={test.ok ? "The connection works" : "The test failed"}>
-            <p className="break-words">{test.message}</p>
+            <p>{test.message}</p>
           </Callout>
         )}
         {a?.check_error && (
@@ -886,7 +886,7 @@ function ConnectPanel({ first, onCancel, onConnected }: { first: boolean; onCanc
             <p className="-mt-2 text-sm text-zinc-400">Coderhelm tries the role once before it saves anything.</p>
             {result && !result.ok && (
               <Callout variant="error" title="Coderhelm could not use the role">
-                <p className="break-words">{result.message}</p>
+                <p>{result.message}</p>
                 <p>Check that the trust policy names account {CODERHELM_ACCOUNT} and your External ID, then try again.</p>
               </Callout>
             )}
