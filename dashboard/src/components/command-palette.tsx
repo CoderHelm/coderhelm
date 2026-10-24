@@ -146,7 +146,7 @@ const SETTINGS: { label: string; href: string; need?: string; keywords: string[]
   { label: "Team voice", href: "/settings/voice", need: "agent_settings", keywords: ["tone", "writing"] },
   { label: "AI models", href: "/settings/models", need: "model_provider", keywords: ["model", "llm"] },
   { label: "Repositories", href: "/settings/repos", need: ANY_CHANGE, keywords: ["repo", "sync", "role"] },
-  { label: "Integrations", href: "/settings/integrations", need: "view_integrations", keywords: ["connect", "mcp", "plugins"] },
+  { label: "Integrations", href: "/settings/integrations", need: "view_integrations", keywords: ["connect"] },
   { label: "GitHub integration", href: "/settings/integrations/github", need: "view_integrations", keywords: ["app", "install"] },
   { label: "Jira integration", href: "/settings/integrations/jira", need: "integrations", keywords: ["tickets", "atlassian"] },
   { label: "AWS accounts", href: "/settings/integrations/aws", need: "view_integrations", keywords: ["cloud", "role"] },

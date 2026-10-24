@@ -12,8 +12,7 @@ import {
   type PluginSource,
   type TrackKind,
 } from "@/lib/plugins";
-import { hasRole } from "@/lib/roles";
-import { useMe } from "@/hooks/use-me";
+import { useCan } from "@/hooks/use-can";
 import { PluginsGate, Refusal, RiskChip } from "@/components/plugins";
 import { Page, PageHeader } from "@/components/page";
 import { Chip, List, ListEmpty, ListError, ListRow, ListSection, ListSkeleton, type Tone } from "@/components/list";
@@ -47,8 +46,9 @@ function errorOf(e: unknown): { code: string; message: string } {
 }
 
 function PluginsPage() {
-  const me = useMe();
-  const isAdmin = hasRole(me?.role, "admin");
+  const { can } = useCan();
+  // Sources, installs and the team setting: `plugins.install`.
+  const isAdmin = can("plugins.install");
   const { toast } = useToast();
   const { confirm } = useConfirm();
   const [installed, setInstalled] = useState<InstalledPlugin[] | null>(null);
@@ -364,7 +364,7 @@ function AddSource({ onAdded }: { onAdded: () => Promise<void> }) {
             }}
           />
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="w-full min-w-0 sm:w-auto sm:flex-1">
           <Field id="source-ref" label={kind === "sha" ? "Commit" : kind === "tag" ? "Tag" : "Branch"}>
             {(props) => <input {...props} className={inputClass} value={value} onChange={(e) => setValue(e.target.value)} autoComplete="off" />}
           </Field>

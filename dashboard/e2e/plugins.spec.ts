@@ -32,7 +32,7 @@ interface Draft {
 }
 
 interface Backend {
-  me: { email: string; role: string };
+  me: { email: string; role: string; capabilities?: string[] };
   flag: boolean;
   admins: number;
   plugins: Plugin[];
@@ -118,7 +118,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     const method = req.method();
     const body = req.postData() ? (JSON.parse(req.postData() as string) as Json) : null;
     db.calls.push({ method, path: p, body });
-    if (p === "/api/me") return json(route, { user_id: "u_1", team_id: "t_1", github_login: null, email: db.me.email, avatar_url: "", role: db.me.role });
+    if (p === "/api/me") return json(route, { user_id: "u_1", team_id: "t_1", github_login: null, email: db.me.email, avatar_url: "", role: db.me.role, capabilities: db.me.capabilities, flags: { plugins: db.flag } });
     if (p === "/api/usage") return json(route, { month: "2026-01", total_tokens: 0, tokens_in: 0, tokens_out: 0, total_runs: 0, max_tokens: 0 });
     if (p === "/api/banners") return json(route, { banners: [] });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }] });
@@ -385,7 +385,7 @@ test("pinning to a commit stops updates", async ({ page }) => {
   await page.goto("/plugins/plugin?id=marketing");
   const opts = page.getByTestId("update-options");
   await opts.getByRole("button", { name: "Pin to a commit" }).click();
-  await expect(opts.getByLabel("Commit")).toHaveValue("aaaaaaaaaaaa1111");
+  await expect(opts.getByRole("textbox", { name: "Commit" })).toHaveValue("aaaaaaaaaaaa1111");
   await opts.getByRole("button", { name: "Save" }).click();
   await expect(page.getByTestId("pinned-note")).toContainText("Pinned to commit aaaaaaaaaaaa");
   await expect(opts.getByRole("switch", { name: "Take new versions on their own" })).toBeDisabled();
@@ -490,7 +490,7 @@ test("a stop is permanent: nothing can be approved or edited after it", async ({
   const db = await mockApi(page, { me: { email: EDITOR, role: "member" } });
   await page.goto("/plugins/draft?id=d1");
   await page.getByRole("button", { name: "Stop for good" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Stop for good" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Stop for good" }).click();
   await expect(page.getByTestId("draft-status")).toHaveAttribute("data-status", "stopped");
   await expect(page.getByTestId("refusal").first()).toHaveAttribute("data-code", "stopped");
   await expect(page.getByRole("button", { name: "Approve and publish now" })).toHaveCount(0);
@@ -498,6 +498,27 @@ test("a stop is permanent: nothing can be approved or edited after it", async ({
   await page.reload();
   await expect(page.getByTestId("draft-status")).toHaveAttribute("data-status", "stopped");
   expect(db.drafts[0].status).toBe("stopped");
+});
+
+test("a custom role with plugins.install installs; a plain member doesn't see Install", async ({ page }) => {
+  const db = await mockApi(page, { me: { email: "lead@example.com", role: "member", capabilities: ["view", "view_team", "own_account", "plugins.view", "plugins.install"] } });
+  await page.goto("/plugins");
+  const row = page.getByTestId("catalog-plugin").filter({ hasText: "Support digest" });
+  await expect(row.getByRole("button", { name: "Install" })).toBeVisible();
+  await expect(page.getByTestId("add-source")).toBeVisible();
+  db.me = { email: "member@example.com", role: "member" };
+  await page.reload();
+  await expect(page.getByTestId("catalog-plugin")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Install" })).toHaveCount(0);
+  await expect(page.getByTestId("add-source")).toHaveCount(0);
+});
+
+test("a viewer reads a draft but gets no controls to change or decide it", async ({ page }) => {
+  await mockApi(page, { me: { email: EDITOR, role: "viewer" } });
+  await page.goto("/plugins/draft?id=d1");
+  await expect(page.getByTestId("draft-content")).toBeVisible();
+  await expect(page.getByTestId("decide")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Edit" })).toHaveCount(0);
 });
 
 test("the old Plugins address leads to Connections", async ({ page }) => {
@@ -519,7 +540,7 @@ test("the audit log filters by plugin and action and loads more", async ({ page 
   await expect(page.getByTestId("audit-event")).toHaveCount(2);
   await page.getByLabel("What happened").selectOption("draft.approved");
   await expect(page.getByTestId("audit-event")).toHaveCount(1);
-  await expect(page.getByTestId("audit-event")).toContainText("draft approved");
+  await expect(page.getByTestId("audit-event")).toContainText("Draft approved");
   await page.getByLabel("What happened").selectOption("");
   await expect(page.getByTestId("audit-event")).toHaveCount(2);
   await page.getByRole("button", { name: /load more/i }).click();

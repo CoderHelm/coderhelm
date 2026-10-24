@@ -14,7 +14,7 @@ import { roleLevel } from "./roles";
 export const ANY_CHANGE = "any_change";
 
 /** Everyone on the team holds these. */
-export const BASELINE = ["view", "view_team", "own_account"];
+export const BASELINE = ["view", "view_team", "own_account", "plugins.view"];
 
 /**
  * The lowest built-in role of each capability, only for an `/api/me` answer
@@ -45,6 +45,11 @@ const BUILT_IN_MIN: Record<string, "viewer" | "member" | "admin" | "owner"> = {
   system: "admin",
   budget: "admin",
   support: "admin",
+  "plugins.view": "viewer",
+  "plugins.run": "member",
+  "plugins.approve": "member",
+  "plugins.install": "admin",
+  "plugins.audit": "admin",
   manage_admins: "owner",
   team_name: "owner",
   disconnect: "owner",
