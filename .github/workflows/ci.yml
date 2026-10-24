@@ -68,6 +68,49 @@ jobs:
           path: dashboard/test-results/
           retention-days: 7
 
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs
+    env:
+      E2E_PORT: "3460"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The changelog is built from this repo's merged pull requests.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+      - run: npm ci
+      # The route extractor and the plugin validator.
+      - name: Unit tests
+        run: npm run test:unit
+      # Imports the self-hosting guides, routes and changelog from the
+      # coderhelm-platform commit pinned in docs/platform.lock.json.
+      - name: Build
+        run: npm run build
+      - name: Type check
+        run: npm run typecheck
+      - name: No broken internal links
+        run: npm run check:links
+      - name: llms.txt, Markdown twins, sitemap and Open Graph images
+        run: npm run check:output
+      - name: Install Playwright's Chromium
+        run: npx playwright install --with-deps chromium
+      - name: End-to-end tests
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: docs-playwright-results
+          path: docs/test-results/
+          retention-days: 7
+
   infra:
     name: Infra
     runs-on: ubuntu-latest

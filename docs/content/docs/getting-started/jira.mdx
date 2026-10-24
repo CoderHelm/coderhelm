@@ -1,0 +1,47 @@
+---
+title: Connect Jira
+description: Start CoderHelm runs from Jira tickets with the Jira app or a Jira webhook.
+---
+
+You can start runs from Jira tickets. CoderHelm reads the ticket (including screenshots attached to it), picks the repository, and posts its progress and the pull request link back on the ticket.
+
+Open **Integrations** → **Jira**. Under **How to connect** there are two ways.
+
+<Tabs items={['Jira app (recommended)', 'Jira webhook']}>
+<Tab value="Jira app (recommended)">
+
+The Jira app is installed in your Atlassian site. It sends ticket events to CoderHelm, posts comments back, and lets CoderHelm read and create tickets for [plans](/getting-started/plans). It can also read Confluence pages and publish release notes there.
+
+1. **Install the Jira app.** Use the link on the Jira page of the dashboard. You need to be a Jira admin.
+2. **Paste your Team ID and secret.** The dashboard shows both. In Jira, open the app's **Coderhelm Settings** admin page and paste them. This links your Jira site to your CoderHelm team.
+3. **Label and assign a ticket.** See below.
+
+The app listens for tickets being created, assigned, updated and commented on.
+
+</Tab>
+<Tab value="Jira webhook">
+
+If you can't install apps in your Jira site, use a plain Jira webhook instead.
+
+1. On the Jira page of the dashboard, generate webhook credentials. You get a URL of the form `https://api.coderhelm.com/webhooks/jira/<token>` and, optionally, a secret.
+2. In Jira, go to **Settings** → **System** → **WebHooks** and create a webhook with that URL. Select the issue events (created, updated) and comment events (created).
+3. If you generated a secret, add it to the webhook so Jira signs each request.
+
+With a webhook, CoderHelm can't post comments back to the ticket or create tickets, so progress shows only in the dashboard.
+
+</Tab>
+</Tabs>
+
+## Choose projects
+
+On the same page, switch on the Jira projects CoderHelm should listen to. Tickets in other projects are ignored. If you never change the project list, every project is allowed.
+
+## Start a run from Jira
+
+Add the label `coderhelm` to a ticket and assign it to the CoderHelm user. In practice either one is enough: the label (or any label starting with `coderhelm:`), or an assignee whose name contains "CoderHelm".
+
+Write the ticket the way you would for a new teammate: what should change, where it shows up, and how to know it works. Screenshots and mockups help; CoderHelm reads them.
+
+A comment on the ticket is handled too. If the run failed, a comment retries it. If the run already opened a pull request, the comment is sent to that pull request as feedback.
+
+A status or field change on its own never starts a run.

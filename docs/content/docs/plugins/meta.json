@@ -1,0 +1,23 @@
+{
+  "title": "Plugins",
+  "pages": [
+    "index",
+    "walkthrough",
+    "---Build---",
+    "layout",
+    "manifest-reference",
+    "skills-agents-tools",
+    "settings",
+    "triggers",
+    "outputs",
+    "connections",
+    "budgets",
+    "testing",
+    "---Ship---",
+    "versioning",
+    "repos",
+    "marketplace",
+    "publishing",
+    "security"
+  ]
+}

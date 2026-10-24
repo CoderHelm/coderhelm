@@ -1,0 +1,28 @@
+---
+title: How CoderHelm works
+description: The pieces of CoderHelm and how they fit together, on one page.
+---
+
+CoderHelm has two parts: a **gateway** that receives events (a labeled issue, a Jira comment, a new push) and serves the dashboard's API, and a **worker** that does the work. Each piece of work is a message on a queue, so a slow run never blocks anything else.
+
+```txt
+GitHub / Jira / alerts ──► gateway ──► queue ──► worker ──► agents ──► pull request
+                              ▲                     │
+          dashboard ──────────┘                     └── your code, code graph, memories,
+                                                        skills, data sources, connections
+```
+
+| Concept | In one line |
+| --- | --- |
+| [Agents](/concepts/agents) | The planner, the coder and the reviewer, each with its own model and tools. |
+| [Skills](/concepts/skills) | Your team's instructions in Markdown, read from a git repo. |
+| [Memories](/concepts/memories) | What CoderHelm has learned about each repository. |
+| [Code graph](/concepts/code-graph) | A map of where things are defined and who calls them. |
+| [Data sources](/concepts/data-sources) | Read-only access to your databases, APIs, search and logs. |
+| [Connections](/concepts/connections) | Outside tools (MCP servers) the agents can use. |
+| [Knowledge bases](/concepts/knowledge) | Documents the agents can search, and a chat that answers from them. |
+| [Roles](/concepts/roles) | Who on the team can do what. |
+| [Token limits](/concepts/token-limits) | Monthly caps on new tokens, cache reads and cache writes. |
+| [Usage and audit](/concepts/usage-and-audit) | What CoderHelm did and what it cost. |
+
+Everything CoderHelm reads from your systems is read-only unless a page here says otherwise. Code changes always arrive as a pull request you can review.

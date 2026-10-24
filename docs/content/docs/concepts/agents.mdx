@@ -1,0 +1,30 @@
+---
+title: Agents
+description: The planner, the coder and the reviewer, which model each uses, and what each may touch.
+---
+
+A run is carried out by several agents, each a Claude model with its own instructions and tools.
+
+| Agent | Does | Model setting |
+| --- | --- | --- |
+| **Planner** | Triage, the plan, and plan chat. Reads code, the code graph, memories, skills and connections; never writes. | Planning & reviews |
+| **Coder** | Writes the change, runs the build and tests in the sandbox, fixes CI failures and answers feedback. | Writing code |
+| **Reviewer** | Reviews CoderHelm's own pull requests and your team's (see [The PR reviewer](/getting-started/reviewer)). | Planning & reviews |
+| **Writer** | Pull request descriptions, replies to comments, and release notes. | Planning & reviews |
+
+Choose the models on **AI Models** (admins only). The models on offer are Claude Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 4.5, plus older models for teams that pinned one. A model that Anthropic retires runs as its replacement automatically.
+
+## What agents can touch
+
+- **Your code**: read through the GitHub App. Changes are pushed only to `coderhelm/` branches and arrive as pull requests.
+- **The sandbox**: builds, linters and tests run in an isolated build environment with no credentials and no access to your systems.
+- **Your data**: only through [data sources](/concepts/data-sources) and [team tools](/concepts/skills#team-tools), which are read-only.
+- **Outside tools**: only through [connections](/concepts/connections) an admin switched on.
+
+## Team agents
+
+Your team can add its own agents, written as Markdown files in a skill repo. A team agent is a specialist the main agents can ask, for example "the payments expert". Team agents answer questions with read-only tools; they never write code. See [Skills](/concepts/skills#agents).
+
+## Instructions
+
+Besides skills, admins can set plain-text instructions in **Settings**, for the whole team or one repository: general instructions, rules, the voice for PR descriptions and comments, and git conventions (branch, commit and pull request title templates).

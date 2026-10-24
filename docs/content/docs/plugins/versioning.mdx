@@ -1,0 +1,39 @@
+---
+title: Versioning and updates
+description: How plugins are pinned, which changes apply by themselves, and which wait for an admin.
+status: coming-soon
+---
+
+<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
+
+## Installs are pinned
+
+When an admin installs a plugin, it is pinned to the exact content of that version (a hash of the package) and the commit it came from. If the team has two or more admins, a second admin approves the install ("Install waiting for a second admin").
+
+`version` in `plugin.yaml` is a label for people. Raise it whenever you publish a change; CoderHelm goes by the content.
+
+## What applies by itself, and what waits
+
+From the plugin's page: "Wording changes apply on their own and are logged. A version that adds or widens tools, triggers, connections or outputs waits for an admin."
+
+| Change in a new version | What happens |
+| --- | --- |
+| Wording: skills, agent instructions, descriptions | Applies by itself, and is logged. |
+| A new or wider tool (a new tool, a longer `allow` list, a higher `risk`) | Waits for an admin. |
+| A new trigger | Waits for an admin. |
+| A new connection or OAuth scope | Waits for an admin. |
+| A new or wider output | Waits for an admin. |
+
+While an update waits, the plugin keeps running on the version already approved. The waiting update lists exactly what widened, for example "adds tool publish_post (consequential)", with what was added, removed and changed.
+
+## Following a branch, a tag or a commit
+
+Each plugin follows a branch, a tag or one commit of its source, and **Take new versions on their own** decides whether new versions are picked up by themselves (still under the rules above). **Pin to a commit** freezes a plugin on one version. See [Public and private repos](/plugins/repos).
+
+## Semantic versions
+
+Use `MAJOR.MINOR.PATCH`:
+
+- **Patch** for wording fixes.
+- **Minor** for new abilities (which wait for an admin).
+- **Major** when settings change in a way teams must act on.

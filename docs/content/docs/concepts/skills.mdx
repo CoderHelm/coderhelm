@@ -1,0 +1,116 @@
+---
+title: Skills
+description: Teach CoderHelm your team's conventions with Markdown files in a git repo, in the same layout Claude Code uses.
+---
+
+A **skill** is a Markdown file of instructions, such as "how we write database migrations" or "our API error format". CoderHelm reads skills from git repositories you connect, and the agents read the ones that matter for each task.
+
+Open **Skills** to connect a repository and see every item it holds.
+
+## Repo layout
+
+CoderHelm reads three kinds of item from a repository's default branch. Each can also sit under `.claude/`, so a repo you already use with Claude Code works as it is.
+
+<Files>
+  <Folder name="skills" defaultOpen>
+    <Folder name="migrations" defaultOpen>
+      <File name="SKILL.md" />
+      <File name="example.sql" />
+    </Folder>
+  </Folder>
+  <Folder name="agents" defaultOpen>
+    <File name="payments-expert.md" />
+  </Folder>
+  <Folder name="commands" defaultOpen>
+    <File name="release-checklist.md" />
+  </Folder>
+</Files>
+
+| Kind | Path | What it is |
+| --- | --- | --- |
+| Skill | `skills/<name>/SKILL.md` | Instructions, plus text files next to it (examples, templates). |
+| Agent | `agents/<name>.md` | A specialist the main agents can ask. Its body is its instructions. |
+| Command | `commands/<name>.md` | A named procedure, such as a checklist. |
+
+Nothing in a skill repo is ever run. Scripts next to a skill are read as text, never executed.
+
+## Frontmatter
+
+```md title="skills/migrations/SKILL.md"
+---
+name: migrations
+description: How to write a database migration in this codebase. Read before changing any table.
+---
+
+# Migrations
+
+- One migration per pull request.
+- Every migration has a down step...
+```
+
+| Field | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `name` | string | The folder name (skills) or file name (agents, commands) | Lowercased; characters other than `a-z 0-9 - _ .` become `-`; up to 64 characters. |
+| `description` | string | The first line of the body that is not a heading | Up to 240 characters. Agents choose skills by their description, so make it say when to use the skill. |
+| `tools` or `allowed-tools` | list, or one string split by commas | none | Claude Code tool names, mapped to CoderHelm's own (below). |
+| `model` | string | none | Agents only. A hint for which model answers. |
+
+Claude Code tool names map like this: `Read` → read files, `Edit`/`MultiEdit` → edit files, `Write` → write files, `Grep` → search code, `Glob`/`LS` → list files. Others (shell, web, notebooks, sub-agents) have no equivalent and are reported as missing.
+
+## Limits
+
+| Limit | Value |
+| --- | --- |
+| Repos per team | 5 |
+| Items per repo | 200 |
+| Size of one item | 64,000 bytes |
+| Size of a file next to a skill | 32,000 bytes |
+| Files per skill | 20 |
+| Total per repo | 2,000,000 bytes |
+
+Files next to a skill must be text (Markdown, JSON, YAML, SQL, code and similar). Anything skipped is listed with the reason.
+
+## Syncing and pinning
+
+A repository syncs when you connect it, on every push to its default branch, and when an admin clicks **Sync now**. Only merged code on the default branch is read; pushes to other branches are ignored. Each item records the commit it was read at and a hash of its content, so you can always see exactly which version an agent used.
+
+## The compatibility check
+
+Skills written for Claude Code often mention tools CoderHelm doesn't have. After each sync, CoderHelm checks every step of every item against your team's real tools, connections and data sources, and marks each requirement:
+
+- **Available**: CoderHelm can do it.
+- **Translated**: it can, with a different tool (named).
+- **Missing**: it needs something you haven't connected, with what to connect.
+- **Blocked**: it needs to write somewhere no connected tool can.
+
+The check runs again only when the text or your tools change. An admin can choose to use the translated version of an item.
+
+## Always apply
+
+By default agents see a list of skills and read the ones they need. An admin can mark a skill or command **Always apply** so it is given in full, choosing the repositories, the agents (planner, coder, reviewer, PR descriptions, review comments, replies, release notes) and file paths it applies to. Agents can also join reviews as steps (plan, code or prose).
+
+## Agents
+
+A team agent answers questions from the main agents, in one turn. It only gets read-only tools, worked out from its own `tools:` list; write tools are always blocked. An agent with no `tools:` gets none. Admins can try an agent from its page under **Skills**.
+
+## Team tools
+
+A **team tool** is a named, typed lookup, such as "find an order by id", that agents can call. Each tool reads one [data source](/concepts/data-sources) with a fixed query (SQL, GraphQL, a logs query or an HTTP GET), and its inputs are typed and checked before they are bound into the query, never pasted into it.
+
+Find them under **Data sources** → **Team tools**. Define one in the dashboard, or commit it as `.coderhelm/tools/<name>.yaml` on a default branch; a pushed file becomes a proposal and is never switched on by itself.
+
+```yaml title=".coderhelm/tools/order_by_id.yaml"
+name: order_by_id
+use_when: You need an order's status and total from its id.
+source: orders-db
+kind: sql
+read: SELECT id, status, total FROM orders WHERE id = :order_id
+inputs:
+  order_id:
+    type: integer
+    min: 1
+    example: 1042
+max_rows: 1
+```
+
+Every version runs once with its examples, and then another admin must approve that exact version (a team with one admin approves its own). Any edit makes a new version that needs approval again. A tool can also be set to **ask me first**, so each call waits for a person's yes (for up to ten minutes).

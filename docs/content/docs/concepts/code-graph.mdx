@@ -1,0 +1,13 @@
+---
+title: Code graph
+description: A map of each repository, where things are defined, who calls them and what imports what, used by every agent.
+---
+
+The **code graph** is a map of a repository: where each function, class and type is defined, who calls it, and which files import which. The planner, the coder, the reviewer and CI fixes all use it, so they can follow a change through the codebase instead of guessing from file names.
+
+Open **Code Graph** to explore it: search for a symbol and see its definition, callers and neighbors.
+
+- Every repository CoderHelm works on gets a graph, and it updates on every push to the default branch.
+- Each repository has its own switch on the Code Graph page, separate from the reviewer.
+- The graph stores symbol names and references, not copies of your source files.
+- A build that takes more than 15 minutes is marked failed and retried on the next push. Admins can rebuild a graph by hand.

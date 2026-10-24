@@ -1,0 +1,44 @@
+---
+title: Connections
+description: Connect outside tools, such as your issue tracker, error tracker or CMS, as MCP servers the agents can use.
+---
+
+**Connections** are outside tools the agents can use while they work, through the [Model Context Protocol](https://modelcontextprotocol.io) (MCP). Connect your error tracker and the planner can read the stack trace behind a ticket; connect your design tool and the coder can read the mockup.
+
+Open **Integrations**. The page groups everything CoderHelm connects to: code and tickets, cloud, monitoring, docs and design, chat (Slack or Teams), and **Other tools**, the MCP servers. Each card shows **Connected**, **Needs credentials**, **Not connected** or **Not working**.
+
+## Built-in MCP servers
+
+| Server | You provide |
+| --- | --- |
+| Figma | API token |
+| Sentry | Auth token, organization slug |
+| Linear | API key |
+| Notion | API key |
+| Vercel | API token |
+| Stripe | Secret key |
+| PostHog | API key, host |
+| GitLab | API token, base URL |
+| Neon | API key |
+| Turso | API token, organization |
+| Snyk | API token |
+| LaunchDarkly | Access token |
+| MongoDB Atlas | Public key, private key, project id |
+| Grafana | API key, base URL |
+| Redis | Connection URL |
+| Upstash | Email, API key |
+| Sanity | API token, project id |
+
+Connecting a server needs an admin. After connecting, use **Test** to check it works. You can add a short prompt per server telling the agents when to use it.
+
+## How keys are kept
+
+Keys are encrypted with AWS KMS, with your team and the server bound into the encryption, so a copied value is useless anywhere else. A key is opened only at the moment a call needs it, is never returned by the API, never shown to a model, and never logged.
+
+Each server runs only from an approved list of packages, isolated from CoderHelm's own systems.
+
+## Remote servers and OAuth
+
+<Badge status="coming-soon" />
+
+Connecting remote MCP servers over HTTP, with OAuth sign-in instead of a pasted key, is being built as part of [plugins](/plugins/connections). Until then, every connection uses a key.

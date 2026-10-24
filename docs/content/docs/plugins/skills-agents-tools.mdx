@@ -1,0 +1,76 @@
+---
+title: Skills, agents and tools
+description: How a plugin's agents are written, which tools they may call, and what read, write and consequential mean.
+status: coming-soon
+---
+
+<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
+
+## Skills
+
+A plugin's skills are ordinary [SKILL.md files](/concepts/skills#frontmatter): a name, a description that says when to use it, and instructions. They apply only to this plugin's runs; other plugins and the coding agents don't see them.
+
+Use skills for what stays true across runs: the brand voice, a checklist, the format of a support reply.
+
+## Agents
+
+An agent file is Markdown with frontmatter. The body is the agent's instructions for a run.
+
+<include meta='title="agents/launch-writer.md"'>../../../examples/marketing/agents/launch-writer.md</include>
+
+| Field | Meaning |
+| --- | --- |
+| `name` | The agent's id. Defaults to the file name. |
+| `description` | One line saying what it does. |
+| `tools` | The tools it uses. Each must be granted in `plugin.yaml`; the [validator](/plugins/testing) refuses any that aren't. |
+
+The plugin's page in the dashboard lists its skills and agents under **Skills and agents**.
+
+## Tools
+
+Tools are declared in the manifest's `tools` list, in one of two shapes.
+
+**Tools from an MCP server** on the team's Connections page. List the tool names (or `*` globs) the plugin may call; every other tool on that server is hidden from the run.
+
+```yaml
+tools:
+  - ref: mcp:sanity
+    allow: [get_document, query_documents, create_draft]
+    risk: write
+```
+
+**Named tools**: one of CoderHelm's built-in tools (`kind: builtin`), or a tool the plugin defines to call an outside service with the team's connection (`kind: http`).
+
+```yaml
+tools:
+  - name: get_release_notes
+    kind: builtin
+    risk: read
+  - name: publish_post
+    kind: http
+    description: Publish an approved post to the company's LinkedIn page.
+    risk: consequential
+```
+
+The plugin's page shows every tool and its risk under **What it can do**.
+
+## Risk levels
+
+Every tool has one of three risk levels.
+
+| Risk | Means | Runs |
+| --- | --- | --- |
+| `read` | Only looks: search, fetch, list. | Whenever the agent calls it. |
+| `write` | Changes something a person can still review before anyone sees it, such as a draft in a CMS. | Only if the team lets plugins save drafts without a person (below). |
+| `consequential` | Reaches people or money: publish, send, post. | Only through a `publish` output, after a person approves the exact version of a draft. |
+
+## What may happen without a person
+
+Each team chooses, on the **Plugins** page, the most a plugin may do on its own:
+
+- **Plugins only read without a person**: every write waits for a yes too.
+- **Plugins may save drafts without a person** (read and save drafts).
+
+Publishing, sending and posting always wait for an approval, whatever the team picks.
+
+A tool missing from the manifest can't be called, by any agent, in any run.

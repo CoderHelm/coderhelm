@@ -1,0 +1,122 @@
+---
+title: Build the marketing plugin
+description: A full walkthrough, from an empty repo to a plugin that drafts launch posts from each release and publishes after an editor approves.
+status: coming-soon
+---
+
+<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
+
+In this walkthrough you build a plugin that:
+
+- reads each new release (and a weekly schedule, and briefs from people),
+- drafts a blog post in your CMS, three LinkedIn posts and an email, in your brand voice,
+- waits for an editor to approve a post, then publishes it to LinkedIn at the time they pick.
+
+The finished plugin is in the docs repository at [`docs/examples/marketing`](https://github.com/CoderHelm/coderhelm/tree/main/docs/examples/marketing). The files on this page are included from it, and the docs' tests validate it on every build, so what you read here is what passes.
+
+<Steps>
+<Step>
+
+### Create the repo
+
+```bash
+mkdir marketing-plugin && cd marketing-plugin
+git init
+mkdir -p skills/brand-voice skills/launch-checklist agents
+```
+
+</Step>
+<Step>
+
+### Write the brand voice skill
+
+The skill holds what is true for every draft. It refers to the team's own guide, a setting, rather than containing any brand's text.
+
+<include meta='title="skills/brand-voice/SKILL.md"'>../../../examples/marketing/skills/brand-voice/SKILL.md</include>
+
+</Step>
+<Step>
+
+### Add a checklist skill
+
+A second skill the agent runs over each draft before saving it.
+
+<include meta='title="skills/launch-checklist/SKILL.md"'>../../../examples/marketing/skills/launch-checklist/SKILL.md</include>
+
+</Step>
+<Step>
+
+### Write the agent
+
+The agent's instructions say what it gets for each trigger, what to produce, and what it must never do. Its `tools:` list names only tools the manifest will grant.
+
+<include meta='title="agents/launch-writer.md"'>../../../examples/marketing/agents/launch-writer.md</include>
+
+</Step>
+<Step>
+
+### Write the manifest
+
+Now declare everything the plugin needs.
+
+<include meta='title="plugin.yaml"'>../../../examples/marketing/plugin.yaml</include>
+
+Section by section:
+
+- **settings**: the brand guide and banned claims are values the team types; the agent reads them. \`sanity\` and \`linkedin\` are accounts the team connects.
+- **tools**: \`get_release_notes\` is a built-in read tool. From Sanity, only three tools, at \`write\` risk because drafts there are not public. \`publish_post\` is the plugin's own tool, \`consequential\` because it reaches the public, and it signs in with the team's \`linkedin\` connection.
+- **triggers**: every release, Mondays at 14:00, and a brief form with a list of channels.
+- **outputs**: three kinds of draft, and publishing through \`publish_post\` once one approver says yes.
+- **budget**: at most 2 million tokens a month, unless the team changes it.
+
+</Step>
+<Step>
+
+### Validate
+
+\`\`\`bash
+curl -fsSLO https://docs.coderhelm.com/tools/validate-plugin.mjs
+node validate-plugin.mjs .
+\`\`\`
+
+\`\`\`txt
+ok       marketing 1.0.0
+\`\`\`
+
+Try breaking it: change \`publish_post\`'s \`risk\` to \`write\` and the validator refuses, because a publish output must go through a consequential tool. Add \`delete_document\` to the agent's \`tools:\` and it refuses again, because the manifest doesn't grant it.
+
+</Step>
+<Step>
+
+### Push and install
+
+Push the repo to GitHub. Then, in CoderHelm:
+
+1. An admin opens **Plugins**, adds the repository under **Plugin sources** (its public address, or \`owner/name\` if your GitHub App can read it), and picks the branch, tag or commit to follow.
+2. **marketing** appears under **Plugins you can install**. The admin installs it; with two or more admins, a second admin approves.
+3. On the plugin's page, the team fills in \`brand_voice_doc\` and \`banned_claims\`, connects Sanity (on **Connections**) and LinkedIn, and lists the editors under **Who approves what goes out**.
+
+</Step>
+<Step>
+
+### Run it
+
+Start it by hand first: on the plugin's page, under **Write a brief**, ask for "Announce the new export button", pick channels and click **Start the run**. Or publish a release on a connected repository.
+
+The run reads the release notes, checks earlier posts in Sanity, and saves the drafts. If the team turned on Slack or Teams notices, a card goes to the channel.
+
+</Step>
+<Step>
+
+### Approve and publish
+
+An editor (not the person who asked) opens **Plugins** → **Review**, edits one LinkedIn variant (which saves a new version), and approves it for Tuesday at 10:00 with **Approve for that time**. On Tuesday, CoderHelm calls \`publish_post\` with exactly the approved text. Until then, anyone allowed can **Cancel publish**. The **Audit log** shows the trigger, the plugin version, each tool call and its risk, the editor's approval and the result.
+
+</Step>
+</Steps>
+
+## Where to go next
+
+- Add a `email` publish tool for your email provider, with its own approval.
+- Add a read tool for post analytics from your connections, so next week's run can see what worked.
+- Put the plugin in your [private marketplace](/plugins/marketplace) for other teams.

@@ -1,0 +1,52 @@
+---
+title: Roles and permissions
+description: The built-in roles, custom roles your team makes, and the capability behind every action.
+---
+
+Everyone on a team has one role. Change roles on **Members** (Settings → Team); the page also shows the full table of who can do what.
+
+## Built-in roles
+
+| Role | Can |
+| --- | --- |
+| **Viewer** | Read everything on the team; change nothing but their own account. |
+| **Member** | Work with CoderHelm: plans, runs, reviews and recommendations. |
+| **Admin** | Run the workspace: repos, integrations, agent settings, the token limit and people. |
+| **Owner** | Everything, plus account-level changes and managing admins. |
+
+## Capabilities
+
+Every request to CoderHelm is checked in one place, on the server, against the capability its action belongs to. Each capability has a lowest built-in role that holds it.
+
+| Lowest role | Capabilities |
+| --- | --- |
+| Viewer | `view`, `view_team`, `own_account` |
+| Member | `plans`, `runs`, `reviews`, `recommendations`, `view_alerts`, `view_integrations` |
+| Admin | `people`, `roles`, `delete_plans`, `repos`, `agent_settings`, `memory`, `integrations`, `data_sources` (includes team tools and skills), `tests`, `alerts`, `model_provider`, `system`, `budget`, `support` |
+| Owner | `manage_admins`, `team_name`, `disconnect` (removes Jira or the model key), `reset` |
+
+A request without the capability it needs gets `403`, with the name of the missing capability.
+
+## Custom roles
+
+When the built-in roles don't fit, make your own. For example, a "Release manager" who is a member but can also change reviewer and repository settings, or an "Analyst" who can read everything and manage data sources.
+
+1. On **Members**, under **Custom roles**, click to create a role.
+2. Give it a name and a description, start from Viewer, Member or Admin, and tick the capabilities it should hold. New capabilities CoderHelm adds later appear in the editor by themselves.
+3. Give the role to people from the role selector, or pick it when you invite someone.
+
+The rules, enforced on the server:
+
+- Only built-in admins and owners create, edit, delete or give custom roles. A custom role can never manage roles itself.
+- Owner-only capabilities (account changes, managing admins and owners, renaming the team, reset, disconnecting) and `support` are never offered in a custom role.
+- Nobody can create, edit or give a role that holds more than they hold, or change someone whose role holds more than theirs.
+- Deleting a role that people hold asks which role they move to.
+- Every role created, edited, deleted or given out is recorded in **Role changes**, kept for a year.
+
+Everyone else on the team can see the custom roles and what each one can do. A change to a role applies within 30 seconds.
+
+## Invites and approvals
+
+Invites expire after 30 days; admins can resend them.
+
+Some actions need a second person, even an admin: approving a new version of a [team tool](/concepts/skills#team-tools) needs another admin when the team has more than one.

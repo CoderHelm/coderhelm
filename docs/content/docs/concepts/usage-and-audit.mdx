@@ -1,0 +1,28 @@
+---
+title: Usage and audit
+description: What CoderHelm delivered, the tokens it used, and the records of what it looked at and changed.
+---
+
+## Analytics
+
+Open **Analytics** for the last 7, 30 or 90 days, or this month, for all repositories or one:
+
+- **Is it worth it**: pull requests merged, merge rate, median time to merge, tokens per merged pull request, pull requests merged as written, red CI fixed by CoderHelm, review findings acted on, and failed runs.
+- **Pull requests opened and merged per day**, and **tokens per day**. Token counts cover all four parts of every model call (new input, cache reads, cache writes and output), including streamed and failed calls.
+- **Where it struggles**: failed runs grouped by reason, each linked to its run.
+- **Reviews**: reviews posted and findings raised, by repository.
+- **Where tickets come from** and **who asks for work**.
+
+Each period is compared with the one before it, with notes on what changed.
+
+## Records of what happened
+
+| Record | Where | What it shows |
+| --- | --- | --- |
+| Run log | **Runs** → a run | Every step, tool call and decision in a run. |
+| Skills activity | **Skills** → Activity | Which agent read which skill, and when. |
+| Data source activity | **Data sources** → Activity | Every lookup in your systems, by which agent, with what result. |
+| Auto-merge gate | **Reviewer** → a pull request | Each approval, stop and re-arm, and who did it. |
+| Support access | **Settings** → **Support access** | When CoderHelm support viewed your workspace (read-only, only after you grant it). |
+
+A single audit log that brings these together, and records every plugin action, is being built with [plugins](/plugins/security).

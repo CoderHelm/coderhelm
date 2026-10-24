@@ -1,0 +1,34 @@
+---
+title: Connections and OAuth
+description: Ask each team to connect the accounts your plugin needs.
+status: coming-soon
+---
+
+<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
+
+A plugin that saves drafts in a CMS or posts to LinkedIn needs an account to do it with. Declare it as a `connection` setting:
+
+```yaml
+settings:
+  - key: linkedin
+    type: connection
+    provider: oauth2
+    scopes: [w_member_social]
+  - key: sanity
+    type: connection
+    provider: mcp
+```
+
+`provider` says how the account is connected: `oauth2` signs in with the service, and `mcp` uses an MCP server from the team's **Connections** page. With plugins on, Connections is its own page in the dashboard, listing every MCP server the team has connected and its status.
+
+## Installing grants nothing
+
+Installing a plugin never gives it access to anything. The team connects each account separately, and a plugin can only use the tools its manifest grants on that connection: an MCP connection exposes only the tool names in the plugin's `allow` list.
+
+## Tokens stay out of the model
+
+Connection tokens are sealed like other secrets, added to a request after the model has chosen the call, and never shown to a model or sent back to the dashboard.
+
+## Scopes
+
+List the narrowest OAuth scopes the plugin needs. A new version that asks for a new scope or a new connection waits for an admin.

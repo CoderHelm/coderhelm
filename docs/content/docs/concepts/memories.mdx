@@ -1,0 +1,32 @@
+---
+title: Memories
+description: What CoderHelm knows about each repository, where it learned it, and how to teach or correct it.
+---
+
+CoderHelm keeps **memories** for each repository: short facts it has learned, such as "API handlers return errors as `{ error: string }`" or "never edit the generated client in `src/gen`". The planner and the coder read them on every ticket.
+
+Open **Memory** (under Insights) to see them.
+
+## Kinds
+
+| Kind | Example |
+| --- | --- |
+| How things are done here | Feature flags are added in `flags.ts` and default to off. |
+| Code style | Use named exports; no default exports. |
+| How the code is built | The worker and the API share types from `packages/types`. |
+| Things to avoid | Don't call the payments API from the browser. |
+| Corrections | The settings page is `settings/page.tsx`, not `account/page.tsx`. |
+| Other things it learned | Anything else. |
+
+## Where memories come from
+
+- **From tickets**: when a pull request is closed without merging, or someone says the fix belonged somewhere else, CoderHelm writes down what it got wrong.
+- **From people**: an admin clicks **Teach it something** and writes one.
+
+## What agents get
+
+On each ticket, the planner and the coder get every **pinned** memory, plus the five most relevant others. Pin a memory when every change should know it.
+
+## Change or remove
+
+Admins can edit a memory, pin or unpin it, or click **Forget it** to delete it. Filter by All, Pinned, From tickets or From people, and sort by newest or most used.

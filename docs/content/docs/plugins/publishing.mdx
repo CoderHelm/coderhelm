@@ -1,0 +1,26 @@
+---
+title: Publishing
+description: Share a plugin with other teams, in your organization or publicly.
+status: coming-soon
+---
+
+<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
+
+Publishing a plugin means putting it where teams can install it. There is no upload step and no review queue at CoderHelm: a plugin is published by merging it to the default branch of a repository teams can read.
+
+## Checklist
+
+1. **Validate it.** `node validate-plugin.mjs .` passes with no errors. See [Test a plugin locally](/plugins/testing).
+2. **Run it on a test team** with a manual brief, and read the drafts.
+3. **No team data in the repo.** Brand documents, account ids, keys and approvers are settings.
+4. **Narrow tools.** List exact tool names in `allow`, not `*`. Mark each tool's real risk.
+5. **A README** that says what the plugin does, which connections it needs, and what each setting is for.
+6. **Raise `version`.**
+7. **Merge to the default branch.**
+
+## Where to publish
+
+- **Your organization**: a private repository, or a folder in your [private marketplace](/plugins/marketplace).
+- **Everyone**: a public repository. Any team can install it by name.
+
+Teams that already installed the plugin get the new version under the [update rules](/plugins/versioning).

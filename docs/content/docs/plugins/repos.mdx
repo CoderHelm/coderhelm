@@ -1,0 +1,31 @@
+---
+title: Public and private repos
+description: Install plugins from public or private repositories, and how each one stays up to date.
+status: coming-soon
+---
+
+<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
+
+Plugins come from **plugin sources**: git repositories an admin adds on the **Plugins** page. Each source is read at a pinned commit.
+
+| | Public repository | Private repository |
+| --- | --- | --- |
+| How you add it | Its public GitHub address | `owner/name`, for a repository your team's GitHub App can read |
+| Who sees it | Your team | Your team only; private repositories stay private to your team |
+
+A source can hold one plugin at its root, or several in folders. Its plugins appear under **Plugins you can install**.
+
+## Following changes
+
+Each source, and each installed plugin, follows a branch, a tag or one commit. CoderHelm checks sources for changes and shows when it last checked.
+
+- **Take new versions on their own**: new versions are picked up by themselves. Wording changes apply; anything that widens what the plugin can do still waits for an admin ([Versioning and updates](/plugins/versioning)).
+- **Pin to a commit**: the plugin stays on one version until someone moves it.
+
+## Removing a source
+
+When a source is removed, its plugins stop showing in the catalog. Plugins already installed from it keep their current version.
+
+## Forking
+
+To change a public plugin for your team, fork it into your own organization and add the fork as a source. Your team's own values belong in [settings](/plugins/settings), so most teams never need to fork.

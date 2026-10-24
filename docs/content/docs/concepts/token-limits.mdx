@@ -1,0 +1,39 @@
+---
+title: Token limits
+description: Monthly caps on new tokens, cache reads and cache writes, so a busy month never surprises you.
+---
+
+Your team pays Anthropic directly for the tokens CoderHelm uses. **Token limit** (under Account) sets monthly caps so usage can't run away.
+
+There are three limits, because the three kinds of token cost very different amounts:
+
+| Limit | What it counts |
+| --- | --- |
+| **New tokens (input + output)** | Tokens sent to the model for the first time, plus everything the model writes. |
+| **Cache read tokens** | Input the model reads back from its prompt cache. Much cheaper than new input. |
+| **Cache write tokens** | Input written into the prompt cache so later calls can read it. |
+
+A run re-reads the same code and instructions many times, so most of its input is cache reads. Splitting the limits lets you set a tight cap on the expensive kind without stopping runs over cheap cache reads.
+
+## How limits work
+
+- Leave a limit blank (or 0) for no limit.
+- Each limit is checked on its own. The first one reached pauses new work until the next month starts (UTC).
+- CoderHelm sends a warning email when a limit reaches 80%, and again at 100%.
+- The status at the top of the page reads **Under the limits**, **Near a limit** or **Limit reached**.
+
+When a limit stops a ticket, CoderHelm comments on it, for example: "You've reached this month's **cache write** limit (… of …). Raise or clear that limit in Settings → Token Limit to continue."
+
+Only admins can change limits. Teams that set a single limit before the split keep it until they save the new fields.
+
+## Example
+
+A team that wants to spend at most about the price of 20 million new tokens a month, without counting cheap re-reads, might set:
+
+| Limit | Value |
+| --- | --- |
+| New tokens | 20,000,000 |
+| Cache read tokens | blank (no limit) |
+| Cache write tokens | 10,000,000 |
+
+See [Usage and audit](/concepts/usage-and-audit) for where each token went.

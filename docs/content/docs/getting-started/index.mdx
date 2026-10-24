@@ -1,0 +1,69 @@
+---
+title: Quickstart
+description: From a new account to your first CoderHelm pull request in about ten minutes.
+---
+
+This page takes you from a new account to a pull request that CoderHelm opened for you. You need admin rights on a GitHub organization (or your own account) and an Anthropic API key.
+
+<Steps>
+<Step>
+
+### Create your account
+
+Go to [app.coderhelm.com](https://app.coderhelm.com) and sign up with email, Google or GitHub. CoderHelm is in a closed beta: if you see **Join waitlist**, leave your email and you will get an invite.
+
+If your GitHub organization already uses CoderHelm, don't create a new workspace. Ask one of its admins to invite you from **Members**.
+
+</Step>
+<Step>
+
+### Add your Anthropic API key
+
+Open **AI Models** in the sidebar (under Configure) and paste your key into **Anthropic API key**. Every model call CoderHelm makes for your team uses this key, so the usage shows up on your own Anthropic bill.
+
+On the same page you choose the model for each part of a run:
+
+| Part | What it does | Recommended |
+| --- | --- | --- |
+| Planning & reviews | Triage, the plan, the self-review and the PR reviewer | Claude Sonnet 5.5 |
+| Writing code | Writing and fixing the change | Claude Opus 5.5 |
+
+Changes apply from the next run.
+
+</Step>
+<Step>
+
+### Connect GitHub
+
+Open **Integrations**, choose **GitHub** and click **Install**. GitHub asks which repositories CoderHelm may see. Then open **Repos** and switch on the repositories CoderHelm should work on. Details: [Connect GitHub](/getting-started/github).
+
+</Step>
+<Step>
+
+### Ask for a change
+
+In one of those repositories, open an issue that describes a small, concrete change. For example:
+
+```md title="Issue: Show the build date in the footer"
+The site footer should show "Built on <date>" using the date of the build.
+It should use the same small gray text as the copyright line.
+```
+
+Then either add the label `coderhelm` or assign the issue to the CoderHelm bot. Either one starts a run.
+
+</Step>
+<Step>
+
+### Watch the run
+
+Open **Runs** in the dashboard. The run moves through Triage, Plan, Build, Test, Security, Pull request and Review. When it is done there is a draft pull request on a `coderhelm/` branch, linked from the issue and from the run. What each stage does: [Your first run](/getting-started/first-run).
+
+</Step>
+</Steps>
+
+## Next steps
+
+- [Connect Jira](/getting-started/jira) to start runs from Jira tickets.
+- Turn on the [PR reviewer](/getting-started/reviewer) for your team's own pull requests.
+- Use [Plans](/getting-started/plans) to split a bigger change into tickets.
+- Set [token limits](/concepts/token-limits) so a busy month cannot surprise you.

@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=https://docs.coderhelm.com/schema/plugin-manifest.v1.json
+name: marketing
+version: 1.0.0
+description: Drafts launch posts, emails and blog updates from each release, in your brand voice, for an editor to approve.
+
+skills:
+  - skills/*/SKILL.md
+agents:
+  - agents/*.md
+
+settings:
+  - key: brand_voice_doc
+    type: string
+  - key: banned_claims
+    type: string
+  - key: sanity
+    type: connection
+    provider: mcp
+  - key: linkedin
+    type: connection
+    provider: oauth2
+    scopes: [w_member_social]
+    sensitive: true
+
+tools:
+  - name: get_release_notes
+    kind: builtin
+    description: Read the release notes CoderHelm wrote for a release, with its merged pull requests.
+    risk: read
+  - ref: mcp:sanity
+    allow: [get_document, query_documents, create_draft]
+    risk: write
+  - name: publish_post
+    kind: http
+    description: Publish an approved post to the company's LinkedIn page.
+    risk: consequential
+
+triggers:
+  - on: github.release
+  - on: schedule
+    cron: "0 14 * * MON"
+  - on: manual
+    form:
+      brief: text
+      channels: [linkedin, blog, email]
+
+outputs:
+  - type: draft
+    kinds: [blog, social, email]
+  - type: publish
+    via: publish_post
+    approval:
+      role: marketing_editor
+      min: 1
+
+budget:
+  monthly_tokens: 2000000

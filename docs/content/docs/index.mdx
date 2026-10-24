@@ -1,0 +1,35 @@
+---
+title: CoderHelm documentation
+description: Guides and reference for CoderHelm, the AI agent that turns tickets into pull requests, reviews code, and stays on the code after the PR.
+---
+
+CoderHelm is an AI coding agent for teams. Assign it a GitHub issue or a Jira ticket and it opens a pull request: it reads your code, plans the change, writes it, runs your build and tests, reviews its own work, and keeps fixing until CI is green. It also reviews your team's pull requests, writes release notes, and watches your logs and tests for problems worth fixing.
+
+You bring your own Anthropic API key, so the model calls are billed to you directly and you choose which Claude model does each part of the work.
+
+## Start here
+
+<Cards>
+  <Card title="Quickstart" href="/getting-started">
+    Sign up, add your model key, connect GitHub and get your first pull request.
+  </Card>
+  <Card title="How it works" href="/concepts">
+    Agents, skills, memories, the code graph and the rest, explained.
+  </Card>
+  <Card title="Build a plugin" href="/plugins">
+    Package instructions, agents and tools for marketing, support or any other team.
+  </Card>
+  <Card title="Self-hosting" href="/self-host">
+    Run CoderHelm in your own AWS account.
+  </Card>
+  <Card title="API" href="/api">
+    Authentication, webhooks and every route the gateway serves.
+  </Card>
+  <Card title="Changelog" href="/changelog">
+    What changed, month by month.
+  </Card>
+</Cards>
+
+## For agents and tools
+
+Every page on this site is also plain Markdown. Add `.md` to a page's URL (for example [/getting-started.md](/getting-started.md)), or send the header `Accept: text/markdown`. The index of all pages is at [/llms.txt](/llms.txt) and the whole site in one file is at [/llms-full.txt](/llms-full.txt).

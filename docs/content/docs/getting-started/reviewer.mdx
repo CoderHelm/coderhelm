@@ -1,0 +1,47 @@
+---
+title: The PR reviewer
+description: Turn on CoderHelm's reviewer for your team's pull requests, and control what it checks, when it merges and what it learns.
+---
+
+The reviewer reviews pull requests written by people (and by CoderHelm). It posts a real GitHub review, either **Approve** or **Request changes**, with comments on the lines that matter, and a risk level of low, medium or high. Changes that touch migrations, authentication, secrets or payments are always rated high.
+
+## Turn it on
+
+1. Open **Reviewer** → **Reviewer settings** and pick a repository.
+2. Switch on **Enable reviewer for this repo**.
+3. Keep the **Trigger label** `ch-review`, or change it.
+
+Add the label to a pull request to get a review. Once a pull request has the label, every new push is reviewed again. Draft pull requests are skipped until they are marked ready.
+
+## Talk to it on a pull request
+
+| Comment | What happens |
+| --- | --- |
+| `@coderhelm re-review` | Reviews the latest commit again. GitHub's **Re-request review** button does the same. |
+| `@coderhelm <question>` | Answers a question about the change, in the thread. |
+| `@coderhelm stop auto-merge` | Stops an automatic merge. The stop holds until someone resumes it. |
+| `@coderhelm resume auto-merge` | Re-arms auto-merge; every check is evaluated again from the start. |
+
+## Settings
+
+| Section | What you can set |
+| --- | --- |
+| Reviews | On or off, trigger label, what to focus on |
+| Tests | Check the change by running tests; require tests |
+| CI labels | Labels it may add, labels that must go together, guidance |
+| Auto-merge | Merge when it approves, merge method, deploy labels, also require a person's approval |
+| Tags and health check | Tag after merge, tag style and prefix, batch window, health check after merge |
+| Release notes | Where notes are written: GitHub, a Confluence page, a webhook; a writing guide |
+| Review reminders | Remind people in Slack or Teams |
+
+## Auto-merge is careful
+
+When auto-merge is on, CoderHelm merges only the exact commit it reviewed and approved, and only after CI passes. A new push means a new review. If anyone stops it, it stays stopped until a person re-arms it.
+
+## It learns from pushback
+
+When someone disagrees with a review (replies under a comment, dismisses the review, merges anyway, or closes the pull request unmerged), CoderHelm waits ten quiet minutes and then decides whether the review was wrong. If it was, it writes one general lesson for that repository or the whole team, and uses it in later reviews. Admins can read and delete lessons on the **Reviewer** page. People can also rate any review with a thumbs up or down.
+
+## Release notes
+
+With release notes on, every release tag gets notes written from the merged pull requests, published to GitHub and, if you set them up, Confluence and email. They are listed on the **Releases** page.
