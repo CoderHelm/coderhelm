@@ -70,6 +70,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   onboard: "Onboarding",
   infra: "Infrastructure analysis",
   chat: "Plan chat",
+  brain: "Company brain",
   plan: "Plan tasks",
   log_analysis: "Log analysis",
   release_notes: "Release notes",

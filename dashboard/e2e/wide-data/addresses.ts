@@ -20,4 +20,7 @@ export const SAMPLE_QUERY: Record<string, string> = {
   "/skills/item": `?repo=${encodeURIComponent(REPO)}&path=${encodeURIComponent(".claude/skills/schedule-table-conventions/SKILL.md")}`,
   "/skills/agent": `?repo=${encodeURIComponent(REPO)}&path=${encodeURIComponent(".claude/agents/payments-reconciliation-reviewer.md")}`,
   "/support/ticket": `?id=${SUPPORT_TICKET_ID}`,
+  "/brain/knowledge/base": "?id=kb_wide",
+  // Not an item's page, but its fullest view is an open thread.
+  "/brain": "?thread=th_wide",
 };
