@@ -29,7 +29,7 @@ export function errorStatus(e: unknown): number | undefined {
   return e instanceof ApiError ? e.status : undefined;
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+export async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${apiBase()}${path}`, {
     ...options,
     credentials: "include",

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -86,10 +86,46 @@ const COMPONENTS: Record<ChatMarkdownTone, Partial<Components>> = { chat: compon
  * and unsafe link targets are dropped (react-markdown's defaults). `breaks`
  * turns single newlines into line breaks, for text people typed.
  */
-export const ChatMarkdown = memo(function ChatMarkdown({ children, breaks = false, tone = "chat" }: { children: string; breaks?: boolean; tone?: ChatMarkdownTone }) {
+export const ChatMarkdown = memo(function ChatMarkdown({
+  children,
+  breaks = false,
+  tone = "chat",
+  onCite,
+}: {
+  children: string;
+  breaks?: boolean;
+  tone?: ChatMarkdownTone;
+  /** Links to `#cite-<id>` become citation buttons that call this. */
+  onCite?: (id: string) => void;
+}) {
+  const parts = useMemo<Partial<Components>>(
+    () =>
+      onCite
+        ? {
+            ...COMPONENTS[tone],
+            a: ({ href, children: label }) =>
+              href?.startsWith("#cite-") ? (
+                <button
+                  type="button"
+                  onClick={() => onCite(href.slice(6))}
+                  aria-label={`Source ${String(label)}`}
+                  data-testid="cite-marker"
+                  className="mx-0.5 inline-flex h-4 min-w-4 -translate-y-1 items-center justify-center rounded bg-zinc-800 px-1 align-baseline text-[10px] font-semibold text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-zinc-100"
+                >
+                  {label}
+                </button>
+              ) : (
+                <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline underline-offset-2">
+                  {label}
+                </a>
+              ),
+          }
+        : COMPONENTS[tone],
+    [onCite, tone],
+  );
   return (
     <div className="chat-md overflow-hidden min-w-0 max-w-full">
-      <ReactMarkdown remarkPlugins={breaks ? REMARK_PLUGINS_BREAKS : REMARK_PLUGINS} components={COMPONENTS[tone]} skipHtml>
+      <ReactMarkdown remarkPlugins={breaks ? REMARK_PLUGINS_BREAKS : REMARK_PLUGINS} components={parts} skipHtml>
         {children}
       </ReactMarkdown>
     </div>

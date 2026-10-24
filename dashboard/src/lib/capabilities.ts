@@ -14,7 +14,7 @@ import { roleLevel } from "./roles";
 export const ANY_CHANGE = "any_change";
 
 /** Everyone on the team holds these. */
-export const BASELINE = ["view", "view_team", "own_account"];
+export const BASELINE = ["view", "brain_read", "view_team", "own_account"];
 
 /**
  * The lowest built-in role of each capability, only for an `/api/me` answer
@@ -25,6 +25,8 @@ const BUILT_IN_MIN: Record<string, "viewer" | "member" | "admin" | "owner"> = {
   view: "viewer",
   view_team: "viewer",
   own_account: "viewer",
+  brain_read: "viewer",
+  brain_ask: "member",
   plans: "member",
   runs: "member",
   reviews: "member",
@@ -32,6 +34,7 @@ const BUILT_IN_MIN: Record<string, "viewer" | "member" | "admin" | "owner"> = {
   view_alerts: "member",
   view_integrations: "member",
   mcp_connect: "member",
+  knowledge_manage: "admin",
   people: "admin",
   roles: "admin",
   delete_plans: "admin",
