@@ -15,7 +15,7 @@ import { inputClass, primaryButton } from "@/components/ui";
 
 export default function ConnectReaderPageGuarded() {
   return (
-    <RoleGuard minRole="admin">
+    <RoleGuard need="data_sources">
       <Suspense fallback={null}>
         <ConnectReaderPage />
       </Suspense>

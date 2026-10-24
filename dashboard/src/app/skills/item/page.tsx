@@ -1,5 +1,7 @@
 "use client";
 
+import { useCan } from "@/hooks/use-can";
+import { ANY_CHANGE } from "@/lib/capabilities";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -19,7 +21,7 @@ import { AlwaysApplySection } from "../always-apply";
 
 export default function ItemPageGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need={ANY_CHANGE}>
       <Suspense fallback={<Skeleton className="h-40 w-full" />}>
         <ItemPage />
       </Suspense>
@@ -36,7 +38,9 @@ function ItemPage() {
   const { toast } = useToast();
   const [item, setItem] = useState<SkillWithBody | null>(null);
   const [repo, setRepo] = useState<SkillRepo | null>(null);
-  const [canManage, setCanManage] = useState(false);
+  // Skills are managed with data sources and team tools.
+  const { can } = useCan();
+  const canManage = can("data_sources");
   const [missing, setMissing] = useState(false);
   const [switching, setSwitching] = useState(false);
 
@@ -44,7 +48,6 @@ function ItemPage() {
     const [it, list] = await Promise.all([skillsApi.item(repoName, path), skillsApi.list()]);
     setItem(it);
     setRepo(list.repos.find((r) => r.repo === it.repo) ?? null);
-    setCanManage(list.can_manage);
     return it;
   }, [repoName, path]);
 

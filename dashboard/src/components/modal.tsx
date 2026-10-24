@@ -16,8 +16,11 @@ export function Modal({
   title,
   description,
   returnFocus,
+  wide = false,
   children,
 }: {
+  /** Room for a longer form (a list of checkboxes): wider from `sm:` up. */
+  wide?: boolean;
   /** Where focus goes on close when the dialog was not opened by a Radix trigger (e.g. from the address). */
   returnFocus?: React.RefObject<HTMLElement | null>;
   open: boolean;
@@ -37,7 +40,7 @@ export function Modal({
             e.preventDefault();
             returnFocus.current.focus();
           }}
-          className="fixed inset-x-4 top-4 z-[61] mx-auto max-h-[calc(100dvh-2rem)] max-w-md overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900 p-5 shadow-2xl sm:top-[15vh]"
+          className={`fixed inset-x-4 top-4 z-[61] mx-auto max-h-[calc(100dvh-2rem)] ${wide ? "max-w-2xl" : "max-w-md"} overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900 p-5 shadow-2xl ${wide ? "sm:top-[8vh]" : "sm:top-[15vh]"}`}
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">

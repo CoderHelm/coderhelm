@@ -13,7 +13,7 @@ import { linkButton } from "@/components/ui";
 
 export default function DataSourceActivityPageGuarded() {
   return (
-    <RoleGuard minRole="admin">
+    <RoleGuard need="data_sources">
       <Suspense fallback={<Page><PageHeader title="Every lookup, as it happens" /><div className="mt-8"><ListSkeleton rows={4} label="Loading lookups" /></div></Page>}>
         <DataSourceActivityPage />
       </Suspense>

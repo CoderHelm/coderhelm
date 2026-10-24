@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Role } from "@/lib/roles";
+import { ANY_CHANGE } from "@/lib/capabilities";
 import {
   BellIcon, BookIcon, CpuIcon, DatabaseIcon, GitBranchIcon,
   LockIcon, PenIcon, PlanIcon, PluginIcon, ShieldCheckIcon, TargetIcon, UsersIcon, WrenchIcon,
@@ -14,10 +14,10 @@ export interface SettingsItem {
   title: string;
   description: string;
   icon: ReactNode;
-  /** Lowest role that can open the page. */
-  view: Role;
-  /** Lowest role that can change what the page shows. */
-  edit: Role;
+  /** The capability (lib/capabilities.ts) that opens the page. */
+  view: string;
+  /** The capability that changes what the page shows. */
+  edit: string;
   status?: SettingsStatusKey;
 }
 
@@ -31,71 +31,71 @@ export interface SettingsGroup {
 // page and the e2e test that opens each page all read it, so a page cannot be
 // listed in one place and missing (or gated differently) in another.
 //
-// `view`/`edit` match the gateway's checks: a page is only listed for roles
-// whose requests it would accept, so nothing on the hub leads to a page that
-// turns the person away.
+// `view`/`edit` are capabilities from the gateway's table, the same ones its
+// checks use: a page is only listed for someone whose requests it would
+// accept, so nothing on the hub leads to a page that turns the person away.
 export const SETTINGS_GROUPS: SettingsGroup[] = [
   {
     id: "account",
     label: "Your account",
     items: [
-      { href: "/settings/notifications", title: "Notifications", description: "Choose which emails Coderhelm sends you.", icon: <BellIcon />, view: "viewer", edit: "viewer" },
-      { href: "/settings/security", title: "Security", description: "Change your password and turn on two step sign in.", icon: <LockIcon />, view: "viewer", edit: "viewer", status: "security" },
+      { href: "/settings/notifications", title: "Notifications", description: "Choose which emails Coderhelm sends you.", icon: <BellIcon />, view: "own_account", edit: "own_account" },
+      { href: "/settings/security", title: "Security", description: "Change your password and turn on two step sign in.", icon: <LockIcon />, view: "own_account", edit: "own_account", status: "security" },
     ],
   },
   {
     id: "team",
     label: "Team and access",
     items: [
-      { href: "/settings/team", title: "Team", description: "Who is on the team, their roles and what each role can do.", icon: <UsersIcon />, view: "viewer", edit: "admin", status: "team" },
-      { href: "/settings/support-access", title: "Support access", description: "Let Coderhelm support see your workspace, read only, for a while. See every page they read.", icon: <ShieldCheckIcon />, view: "admin", edit: "admin" },
+      { href: "/settings/team", title: "Team", description: "Who is on the team, their roles and what each role can do.", icon: <UsersIcon />, view: "view_team", edit: "people", status: "team" },
+      { href: "/settings/support-access", title: "Support access", description: "Let Coderhelm support see your workspace, read only, for a while. See every page they read.", icon: <ShieldCheckIcon />, view: "support", edit: "support" },
     ],
   },
   {
     id: "code",
     label: "Repositories",
     items: [
-      { href: "/settings/repos", title: "Repositories", description: "Turn Coderhelm on or off for each repository.", icon: <GitBranchIcon />, view: "member", edit: "admin", status: "repos" },
+      { href: "/settings/repos", title: "Repositories", description: "Turn Coderhelm on or off for each repository.", icon: <GitBranchIcon />, view: ANY_CHANGE, edit: "repos", status: "repos" },
     ],
   },
   {
     id: "automation",
     label: "How Coderhelm works",
     items: [
-      { href: "/settings/workflow", title: "Workflow", description: "Where plans go, what lands in the pull request and which tools plans may use.", icon: <PlanIcon />, view: "admin", edit: "admin" },
-      { href: "/settings/guardrails", title: "Guardrails", description: "Rules Coderhelm always follows, for every repository or just one.", icon: <ShieldCheckIcon />, view: "admin", edit: "admin" },
-      { href: "/settings/voice", title: "Team voice", description: "How Coderhelm writes commits, pull requests and comments.", icon: <PenIcon />, view: "admin", edit: "admin" },
-      { href: "/settings/instructions", title: "Custom instructions", description: "Conventions and preferences Coderhelm reads before it starts work.", icon: <WrenchIcon />, view: "admin", edit: "admin" },
-      { href: "/settings/models", title: "AI models", description: "Your Anthropic API key and which Claude models do the work.", icon: <CpuIcon />, view: "admin", edit: "admin", status: "models" },
+      { href: "/settings/workflow", title: "Workflow", description: "Where plans go, what lands in the pull request and which tools plans may use.", icon: <PlanIcon />, view: "agent_settings", edit: "agent_settings" },
+      { href: "/settings/guardrails", title: "Guardrails", description: "Rules Coderhelm always follows, for every repository or just one.", icon: <ShieldCheckIcon />, view: "agent_settings", edit: "agent_settings" },
+      { href: "/settings/voice", title: "Team voice", description: "How Coderhelm writes commits, pull requests and comments.", icon: <PenIcon />, view: "agent_settings", edit: "agent_settings" },
+      { href: "/settings/instructions", title: "Custom instructions", description: "Conventions and preferences Coderhelm reads before it starts work.", icon: <WrenchIcon />, view: "agent_settings", edit: "agent_settings" },
+      { href: "/settings/models", title: "AI models", description: "Your Anthropic API key and which Claude models do the work.", icon: <CpuIcon />, view: "model_provider", edit: "model_provider", status: "models" },
     ],
   },
   {
     id: "alerts",
     label: "Alerts",
     items: [
-      { href: "/settings/alerts", title: "Alert routes", description: "Turn monitoring alerts into pull requests or Teams cards.", icon: <BellIcon />, view: "member", edit: "admin", status: "alerts" },
+      { href: "/settings/alerts", title: "Alert routes", description: "Turn monitoring alerts into pull requests or Teams cards.", icon: <BellIcon />, view: "view_alerts", edit: "alerts", status: "alerts" },
     ],
   },
   {
     id: "data",
     label: "Data sources",
     items: [
-      { href: "/data-sources", title: "Data sources", description: "Live systems the reviewer may read to check facts. Read only.", icon: <DatabaseIcon />, view: "admin", edit: "admin", status: "dataSources" },
-      { href: "/skills", title: "Skills", description: "Written know how from a repository that Coderhelm can follow.", icon: <BookIcon />, view: "member", edit: "member" },
+      { href: "/data-sources", title: "Data sources", description: "Live systems the reviewer may read to check facts. Read only.", icon: <DatabaseIcon />, view: "data_sources", edit: "data_sources", status: "dataSources" },
+      { href: "/skills", title: "Skills", description: "Written know how from a repository that Coderhelm can follow.", icon: <BookIcon />, view: ANY_CHANGE, edit: ANY_CHANGE },
     ],
   },
   {
     id: "integrations",
     label: "Integrations",
     items: [
-      { href: "/settings/integrations", title: "Integrations", description: "GitHub, Jira, AWS, New Relic, Sentry, Confluence, Teams and other tools: what each can do and whether it works.", icon: <PluginIcon />, view: "member", edit: "admin", status: "integrations" },
+      { href: "/settings/integrations", title: "Integrations", description: "GitHub, Jira, AWS, New Relic, Sentry, Confluence, Teams and other tools: what each can do and whether it works.", icon: <PluginIcon />, view: "view_integrations", edit: "integrations", status: "integrations" },
     ],
   },
   {
     id: "usage",
     label: "Usage and limits",
     items: [
-      { href: "/settings/budget", title: "Token limit", description: "A monthly cap on tokens. Runs pause when the team reaches it.", icon: <TargetIcon />, view: "member", edit: "admin", status: "usage" },
+      { href: "/settings/budget", title: "Token limit", description: "A monthly cap on tokens. Runs pause when the team reaches it.", icon: <TargetIcon />, view: ANY_CHANGE, edit: "budget", status: "usage" },
     ],
   },
 ];

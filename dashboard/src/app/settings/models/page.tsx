@@ -13,7 +13,7 @@ import { inputClass, linkButton, monoInputClass, secondaryButton } from "@/compo
 import { Code, SaveBar, SettingsRow, SettingsSection, useDirtyForm } from "@/components/settings";
 
 export default function ModelProviderPageGuarded() {
-  return <RoleGuard minRole="admin"><ModelProviderPage /></RoleGuard>;
+  return <RoleGuard need="model_provider"><ModelProviderPage /></RoleGuard>;
 }
 
 type Models = Record<ModelRoleKey, string>;

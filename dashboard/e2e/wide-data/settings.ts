@@ -146,6 +146,22 @@ export const settingsData: Handler = ({ method, path, url }) => {
 
   if (p === "/api/repos") return { repos: REPOS };
   if (p === "/api/users") return { users: USERS };
+  // Custom roles: a long name and description, and a long log line.
+  if (p === "/api/roles") {
+    return {
+      roles: [
+        {
+          id: "r_wide", key: "custom:r_wide", name: "Release-and-quality-engineering-lead", description: `${SENTENCE} ${TOKEN}`,
+          capabilities: ["view", "plans", "people"], acts_as: "viewer", template: "member", member_count: 3, created_at: iso(600), updated_at: iso(60),
+        },
+      ],
+      can_manage: true, max_roles: 30, customizable: ["plans", "people"], baseline: ["view"], yours: ["view", "plans", "people"],
+      templates: { viewer: [], member: ["plans"], admin: ["plans", "people"] },
+    };
+  }
+  if (p === "/api/roles/audit") {
+    return { entries: [{ at: iso(30), actor: EMAIL, action: "updated", role_id: "r_wide", role_name: "Release-and-quality-engineering-lead", detail: `Added: ${SENTENCE} ${TOKEN}` }] };
+  }
   if (p === "/api/users/permissions") {
     return { roles: ROLES, capabilities: CAPABILITIES, your_role: "owner", grantable_roles: ["viewer", "member", "admin", "owner"], manageable_roles: ["viewer", "member", "admin", "owner"], can_manage_invites: true };
   }

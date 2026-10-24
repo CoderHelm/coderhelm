@@ -15,7 +15,7 @@ import { ScopeBar } from "../scope-bar";
 import { useScopedText } from "../use-scoped-text";
 
 export default function InstructionsPageGuarded() {
-  return <RoleGuard minRole="admin"><InstructionsPage /></RoleGuard>;
+  return <RoleGuard need="agent_settings"><InstructionsPage /></RoleGuard>;
 }
 
 const PREVIEW_NOTE = "Agents get this text as written, with your instructions for every repository first. This is how its headings and lists read.";

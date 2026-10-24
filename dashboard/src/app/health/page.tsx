@@ -52,7 +52,7 @@ const RUN_STATUS: Record<string, string> = {
 };
 
 export default function HealthPageGuarded() {
-  return <RoleGuard minRole="admin"><HealthPage /></RoleGuard>;
+  return <RoleGuard need="system"><HealthPage /></RoleGuard>;
 }
 
 function HealthPage() {

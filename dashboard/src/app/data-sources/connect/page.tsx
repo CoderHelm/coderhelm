@@ -26,7 +26,7 @@ import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } fro
 
 export default function ConnectDataSourcePageGuarded() {
   return (
-    <RoleGuard minRole="admin">
+    <RoleGuard need="data_sources">
       <Suspense fallback={null}>
         <ConnectDataSourcePage />
       </Suspense>

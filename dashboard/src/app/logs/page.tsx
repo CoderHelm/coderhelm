@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/hooks/use-can";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
@@ -12,7 +13,6 @@ import {
   type LogSeverity,
   type Repo,
 } from "@/lib/api";
-import { hasRole } from "@/lib/roles";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
 import { Modal } from "@/components/modal";
@@ -96,7 +96,7 @@ function hourLabel(h: number): string {
 
 export default function LogsGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need="recommendations">
       <Suspense
         fallback={
           <Page>
@@ -124,7 +124,7 @@ function LogsPage() {
 
   const [data, setData] = useState<LogFindingsList | null>(null);
   const [error, setError] = useState(false);
-  const [role, setRole] = useState("");
+  const { can } = useCan();
   const [repos, setRepos] = useState<Repo[]>([]);
   const [autofix, setAutofix] = useState<{ autofix: LogAutofix; runs_today: number } | null>(null);
   const [fixing, setFixing] = useState<LogFinding | null>(null);
@@ -147,7 +147,6 @@ function LogsPage() {
   useEffect(() => {
     load();
     loadAutofix();
-    api.me().then((u) => setRole(u.role)).catch(() => {});
     api.listRepos().then((d) => setRepos(d.repos.filter((r) => r.enabled))).catch(() => {});
   }, [load, loadAutofix]);
 
@@ -159,8 +158,11 @@ function LogsPage() {
     return () => clearInterval(t);
   }, [moving, load]);
 
-  const isAdmin = hasRole(role, "admin");
-  const canAct = hasRole(role, "member");
+  // Automatic fixes are alert settings; acting on a finding is its own
+  // capability; remembering one writes team memory.
+  const canEditAutofix = can("alerts");
+  const canAct = can("recommendations");
+  const canRemember = can("memory");
 
   const findings = useMemo(() => data?.findings ?? [], [data]);
   const searched = useMemo(
@@ -242,7 +244,7 @@ function LogsPage() {
           runsToday={autofix.runs_today}
           groups={groups}
           repos={repos}
-          canEdit={isAdmin}
+          canEdit={canEditAutofix}
           onSaved={(a) => setAutofix((prev) => ({ runs_today: prev?.runs_today ?? 0, autofix: a }))}
           onClose={() => {
             setParams({ auto: "" }, { replace: true });
@@ -361,7 +363,7 @@ function LogsPage() {
           <CreateFixForm
             finding={fixing}
             repos={repos}
-            canRemember={isAdmin}
+            canRemember={canRemember}
             onDone={() => {
               setFixing(null);
               load();

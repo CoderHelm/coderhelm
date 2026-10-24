@@ -24,7 +24,7 @@ import { KIND_LABEL, toolsApi, type Tool, type ToolAsk } from "@/lib/tools";
 
 export default function ToolsPageGuarded() {
   return (
-    <RoleGuard minRole="admin">
+    <RoleGuard need="data_sources">
       <Suspense fallback={<Page><PageHeader title="Your own tools" /><div className="mt-8"><ListSkeleton rows={3} label="Loading your tools" /></div></Page>}>
         <ToolsPage />
       </Suspense>

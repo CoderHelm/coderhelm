@@ -23,7 +23,7 @@ import { inputClass, linkButton, primaryButton, secondaryButton } from "@/compon
 
 export default function ConnectAwsPageGuarded() {
   return (
-    <RoleGuard minRole="admin">
+    <RoleGuard need="data_sources">
       <Suspense fallback={null}>
         <ConnectAwsPage />
       </Suspense>

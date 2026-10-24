@@ -15,7 +15,7 @@ import { ScopeBar } from "../scope-bar";
 import { useScopedText } from "../use-scoped-text";
 
 export default function VoicePageGuarded() {
-  return <RoleGuard minRole="admin"><VoicePage /></RoleGuard>;
+  return <RoleGuard need="agent_settings"><VoicePage /></RoleGuard>;
 }
 
 const PLACEHOLDER = `# Team voice

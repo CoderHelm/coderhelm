@@ -79,6 +79,7 @@ const CAPABILITIES = [
   { key: "plans", label: "Create, edit, approve and run plans and templates", min_role: "member" },
   { key: "runs", label: "Retry, re-run, re-review or cancel runs", min_role: "member" },
   { key: "people", label: "Invite people, resend or revoke any pending invite, link GitHub accounts, and change or remove members and viewers", min_role: "admin" },
+  { key: "roles", label: "Create, edit and delete custom roles, give people a custom role, and see the log of role changes", min_role: "admin" },
   { key: "repos", label: "Manage repositories: sync, turn on, roles, code graph and infrastructure scans", min_role: "admin" },
   { key: "manage_admins", label: "Make someone an admin or owner, and change or remove admins and owners", min_role: "owner" },
   { key: "budget", label: "Set the monthly budget", min_role: "owner" },
@@ -86,22 +87,55 @@ const CAPABILITIES = [
 const LEVEL: Record<string, number> = { viewer: 0, member: 1, billing: 2, admin: 3, owner: 4 };
 const canManage = (actor: string, target: string) => LEVEL[actor] >= 4 || (LEVEL[actor] >= 3 && LEVEL[target] <= 2);
 
+interface CustomRole {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  capabilities: string[];
+  acts_as: string;
+  template: string | null;
+  member_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 interface Backend {
   members: Member[];
-  calls: { method: string; path: string; body: Record<string, unknown> | null }[];
+  calls: { method: string; path: string; body: Record<string, unknown> | null; search: string }[];
   failUsers: boolean;
+  roles: CustomRole[];
+  changes: { at: string; actor: string; action: string; role_id: string; role_name: string; detail: string }[];
+  /** You hold this custom role (your record's role); requests run as `selfRole`. */
+  selfCustom?: string;
+}
+
+// The gateway's rules for custom roles, as the mock answers them.
+const BASELINE = ["view", "view_team"];
+const NEVER_CUSTOM = (key: string) => CAPABILITIES.find((c) => c.key === key)?.min_role === "owner" || key === "roles";
+const holds = (role: string) => CAPABILITIES.filter((c) => LEVEL[c.min_role] <= (LEVEL[role] ?? 0)).map((c) => c.key);
+const template = (role: string) => holds(role).filter((k) => !NEVER_CUSTOM(k));
+
+function customRole(p: Partial<CustomRole> & { id: string; name: string }): CustomRole {
+  return {
+    key: `custom:${p.id}`, description: "", capabilities: [...BASELINE, "plans"], acts_as: "viewer", template: null, member_count: 0,
+    created_at: ago(DAY), updated_at: ago(DAY), ...p,
+  };
 }
 
 async function mockApi(page: Page, selfRole = "admin", init: Partial<Backend> = {}): Promise<Backend> {
-  const db: Backend = { members: team(selfRole), calls: [], failUsers: false, ...init };
+  const db: Backend = { members: team(selfRole), calls: [], failUsers: false, roles: [], changes: [], ...init };
+  const manages = () => LEVEL[selfRole] >= 3 && !db.selfCustom;
+  const counted = () => db.roles.map((r) => ({ ...r, member_count: db.members.filter((m) => m.role === r.key).length }));
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
   await page.route((url) => url.hostname === "localhost" && /^\/(api|auth)\//.test(url.pathname), async (route) => {
     const req = route.request();
-    const p = new URL(req.url()).pathname;
+    const url = new URL(req.url());
+    const p = url.pathname;
     const method = req.method();
     const body = req.postData() ? (JSON.parse(req.postData() as string) as Record<string, unknown>) : null;
-    db.calls.push({ method, path: p, body });
+    db.calls.push({ method, path: p, body, search: url.search });
     const self = db.members.find((m) => m.is_self);
     if (p === "/api/me") return json(route, { user_id: self?.user_id ?? "u-admin", team_id: "t_1", github_login: null, email: self?.email ?? "", avatar_url: "", role: selfRole });
     if (p === "/api/usage") return json(route, { month: "2026-01", total_tokens: 0, tokens_in: 0, tokens_out: 0, total_runs: 0, max_tokens: 0 });
@@ -112,11 +146,78 @@ async function mockApi(page: Page, selfRole = "admin", init: Partial<Backend> = 
       return json(route, {
         roles: ROLES,
         capabilities: CAPABILITIES,
-        your_role: selfRole,
-        grantable_roles: ROLES.filter((r) => r.assignable && canManage(selfRole, r.key)).map((r) => r.key),
-        manageable_roles: ROLES.filter((r) => canManage(selfRole, r.key)).map((r) => r.key),
+        your_role: db.selfCustom ?? selfRole,
+        grantable_roles: [
+          ...ROLES.filter((r) => r.assignable && canManage(selfRole, r.key)).map((r) => r.key),
+          ...(manages() ? db.roles.map((r) => r.key) : []),
+        ],
+        manageable_roles: [
+          ...ROLES.filter((r) => canManage(selfRole, r.key)).map((r) => r.key),
+          ...(LEVEL[selfRole] >= 3 ? db.roles.map((r) => r.key) : []),
+        ],
         can_manage_invites: LEVEL[selfRole] >= 3,
+        can_manage_roles: manages(),
       });
+    }
+    if (p === "/api/roles" && method === "GET") {
+      return json(route, {
+        roles: counted(),
+        can_manage: manages(),
+        max_roles: 30,
+        customizable: CAPABILITIES.filter((c) => !NEVER_CUSTOM(c.key)).map((c) => c.key),
+        baseline: BASELINE,
+        yours: holds(selfRole),
+        templates: { viewer: template("viewer"), member: template("member"), admin: template("admin") },
+      });
+    }
+    if (p === "/api/roles/audit") {
+      if (!manages()) return json(route, { error: "Only admins and owners can create, change, delete or give out custom roles." }, 403);
+      return json(route, { entries: db.changes });
+    }
+    const rm = p.match(/^\/api\/roles(?:\/([^/]+))?$/);
+    if (rm && method !== "GET") {
+      if (!manages()) return json(route, { error: "Only admins and owners can create, change, delete or give out custom roles." }, 403);
+      const log = (action: string, r: CustomRole, detail: string) => db.changes.unshift({ at: new Date().toISOString(), actor: "alex@example.com", action, role_id: r.id, role_name: r.name, detail });
+      const checkCaps = (caps: string[]) => {
+        const bad = caps.find((k) => NEVER_CUSTOM(k));
+        if (bad) return `"${CAPABILITIES.find((c) => c.key === bad)?.label}" stays with owners and can't go into a custom role.`;
+        const more = caps.find((k) => !holds(selfRole).includes(k));
+        if (more) return `You can't give a role "${CAPABILITIES.find((c) => c.key === more)?.label}", because your own role doesn't include it.`;
+        return "";
+      };
+      if (method === "POST") {
+        const name = String(body?.name ?? "").trim();
+        if (!name) return json(route, { error: "Give the role a name." }, 400);
+        if (db.roles.some((r) => r.name.toLowerCase() === name.toLowerCase())) return json(route, { error: "Another role already has that name." }, 400);
+        const caps = (body?.capabilities as string[]) ?? [];
+        const why = checkCaps(caps);
+        if (why) return json(route, { error: why }, 403);
+        const r = customRole({ id: `r${db.roles.length + 1}`, name, description: String(body?.description ?? ""), capabilities: [...new Set([...BASELINE, ...caps])], template: (body?.template as string) ?? null, updated_at: new Date().toISOString() });
+        db.roles.push(r);
+        log("created", r, `Can: ${caps.join(", ")}`);
+        return json(route, { role: r });
+      }
+      const r = db.roles.find((x) => x.id === rm[1]);
+      if (!r) return json(route, { error: "That role doesn't exist." }, 404);
+      if (method === "PUT") {
+        const caps = (body?.capabilities as string[]) ?? r.capabilities;
+        const why = checkCaps(caps.filter((k) => !BASELINE.includes(k)));
+        if (why) return json(route, { error: why }, 403);
+        Object.assign(r, { name: String(body?.name ?? r.name), description: String(body?.description ?? r.description), capabilities: [...new Set([...BASELINE, ...caps])], updated_at: new Date().toISOString() });
+        log("updated", r, "Changed");
+        return json(route, { role: r, changed: true });
+      }
+      if (method === "DELETE") {
+        const held = db.members.filter((m) => m.role === r.key);
+        const replacement = url.searchParams.get("replacement");
+        if (held.length > 0 && !replacement) {
+          return json(route, { error: `${held.length} ${held.length === 1 ? "person has" : "people have"} this role. Pick the role they get instead, then delete it.`, needs_replacement: true, member_count: held.length }, 409);
+        }
+        held.forEach((m) => (m.role = String(replacement)));
+        db.roles = db.roles.filter((x) => x !== r);
+        log("deleted", r, held.length ? `${held.length} moved to ${replacement}` : "No one held it");
+        return json(route, { status: "deleted", moved: held.length, replacement });
+      }
     }
     if (p === "/api/users" && method === "GET") {
       if (db.failUsers) return json(route, { error: "The team service is down." }, 500);
@@ -135,7 +236,9 @@ async function mockApi(page: Page, selfRole = "admin", init: Partial<Backend> = 
       const target = db.members.find((x) => x.user_id === id);
       if (!target) return json(route, { error: "That person isn't on this team." }, 404);
       if (m[2] === "role") {
-        target.role = String(body?.role);
+        const next = String(body?.role);
+        if (next.startsWith("custom:") && !manages()) return json(route, { error: "Only admins and owners can give someone a custom role." }, 403);
+        target.role = next;
         return json(route, { status: "updated", role: target.role });
       }
       // Same rules as the gateway: admins and owners handle every pending
@@ -410,4 +513,157 @@ test("a failed load says so and can retry", async ({ page }) => {
   db.failUsers = false;
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(members(page).getByRole("listitem")).toHaveCount(7);
+});
+
+// ── Custom roles ─────────────────────────────────────────────────────
+
+const customSection = (page: Page) => page.getByTestId("custom-roles");
+const roleRow = (page: Page, name: string) => customSection(page).getByTestId("custom-role-row").filter({ hasText: name });
+
+async function shotAt(page: Page, name: string, widths = [1280, 390]) {
+  fs.mkdirSync(SHOTS_DIR, { recursive: true });
+  await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.waitForTimeout(250);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow, `${name} scrolls sideways at ${width}px`).toBeLessThanOrEqual(0);
+    await page.screenshot({ path: path.join(SHOTS_DIR, `${name}-${width}.png`), fullPage: true });
+  }
+  await page.setViewportSize({ width: 1280, height: 800 });
+}
+
+test("an admin creates a role from a template, gives it to a member, and the change is logged", async ({ page }) => {
+  const db = await mockApi(page, "admin");
+  await page.goto("/settings/team");
+  await expect(customSection(page).getByText("No custom roles yet.")).toBeVisible();
+  await customSection(page).getByRole("button", { name: "New role" }).click();
+
+  const editor = page.getByTestId("role-editor");
+  await expect(editor).toBeVisible();
+  // Owner-only abilities and role management are never offered.
+  await expect(editor.getByRole("checkbox", { name: /Make someone an admin or owner/ })).toHaveCount(0);
+  await expect(editor.getByRole("checkbox", { name: /custom roles/ })).toHaveCount(0);
+  await expect(page.getByTestId("role-left-out")).toContainText("make someone an admin or owner");
+  await expect(page.getByTestId("role-left-out")).toContainText("custom roles");
+  // Everyone can see the team: always on, can't be unticked.
+  await expect(editor.getByRole("checkbox", { name: /See who is on the team/ })).toBeChecked();
+  await expect(editor.getByRole("checkbox", { name: /See who is on the team/ })).toBeDisabled();
+
+  await editor.getByLabel("Name").fill("QA lead");
+  await editor.getByLabel("Description").fill("Plans and runs, plus repositories.");
+  await editor.getByLabel("Start from").selectOption("member");
+  await expect(editor.getByRole("checkbox", { name: /Create, edit, approve and run plans/ })).toBeChecked();
+  await expect(editor.getByRole("checkbox", { name: /Manage repositories/ })).not.toBeChecked();
+  await editor.getByRole("checkbox", { name: /Manage repositories/ }).check();
+  await shotAt(page, "custom-role-editor");
+  await editor.getByRole("button", { name: "Create role" }).click();
+
+  await expect(page.getByText("QA lead created")).toBeVisible();
+  const post = db.calls.find((c) => c.method === "POST" && c.path === "/api/roles");
+  expect(post?.body?.template).toBe("member");
+  expect(post?.body?.capabilities).toEqual(expect.arrayContaining(["plans", "runs", "repos"]));
+  expect(post?.body?.capabilities).not.toContain("manage_admins");
+  await expect(roleRow(page, "QA lead")).toBeVisible();
+  await roleRow(page, "QA lead").getByRole("button", { name: "Show what QA lead can do" }).click();
+  await expect(roleRow(page, "QA lead")).toContainText("Manage repositories");
+
+  // Give it to Sam.
+  await row(page, "Sam Rivera").getByRole("combobox", { name: "Role for Sam Rivera" }).selectOption({ label: "QA lead" });
+  await page.getByRole("button", { name: "Make QA lead" }).click();
+  await expect(page.getByText("Sam Rivera is now a QA lead")).toBeVisible();
+  const put = db.calls.find((c) => c.method === "PUT" && c.path === "/api/users/u-sam/role");
+  expect(put?.body).toEqual({ role: "custom:r1" });
+  await expect(row(page, "Sam Rivera").getByRole("combobox")).toHaveValue("custom:r1");
+  await expect(roleRow(page, "QA lead")).toContainText("1 person");
+
+  // The role log shows the change.
+  await expect(page.getByTestId("role-change").first()).toContainText("Created: QA lead");
+  await shotAt(page, "custom-roles-admin");
+});
+
+test("deleting a role people have needs a replacement role for them", async ({ page }) => {
+  const db = await mockApi(page, "admin", { roles: [customRole({ id: "r1", name: "Release manager" }), customRole({ id: "r2", name: "Ops" })] });
+  db.members.find((m) => m.user_id === "u-mem")!.role = "custom:r1";
+  await page.goto("/settings/team");
+  await expect(roleRow(page, "Release manager")).toContainText("1 person");
+  await roleRow(page, "Release manager").getByRole("button", { name: "Delete Release manager" }).click();
+
+  const dialog = page.getByTestId("delete-role");
+  await expect(dialog).toContainText("1 person has this role");
+  const go = dialog.getByRole("button", { name: "Move them and delete" });
+  await expect(go).toBeDisabled();
+  // Owner is never offered; the role being deleted isn't either.
+  await expect(dialog.getByLabel("Move them to").locator("option")).toHaveText(["Pick a role", "Viewer", "Member", "Ops"]);
+  await shotAt(page, "custom-role-delete");
+  await dialog.getByLabel("Move them to").selectOption("member");
+  await go.click();
+
+  await expect(page.getByText("Release manager deleted. 1 moved to Member.")).toBeVisible();
+  const del = db.calls.find((c) => c.method === "DELETE" && c.path === "/api/roles/r1");
+  expect(del?.search).toBe("?replacement=member");
+  await expect(roleRow(page, "Release manager")).toHaveCount(0);
+  await expect(row(page, "Mia Member").getByRole("combobox")).toHaveValue("member");
+});
+
+test("a role nobody has is deleted at once; one given out meanwhile asks for a replacement", async ({ page }) => {
+  const db = await mockApi(page, "admin", { roles: [customRole({ id: "r1", name: "Release manager" })] });
+  await page.goto("/settings/team");
+  await roleRow(page, "Release manager").getByRole("button", { name: "Delete Release manager" }).click();
+  const dialog = page.getByTestId("delete-role");
+  await expect(dialog).toContainText("No one has this role");
+  // Someone was given the role after the page loaded: the server refuses.
+  db.members.find((m) => m.user_id === "u-sam")!.role = "custom:r1";
+  await dialog.getByRole("button", { name: "Delete role" }).click();
+  await expect(dialog.getByRole("alert")).toContainText("1 person has this role. Pick the role they get instead");
+  await expect(dialog.getByLabel("Move them to")).toBeVisible();
+  await dialog.getByLabel("Move them to").selectOption("viewer");
+  await dialog.getByRole("button", { name: "Move them and delete" }).click();
+  await expect(roleRow(page, "Release manager")).toHaveCount(0);
+});
+
+test("refusals from the server show in the editor", async ({ page }) => {
+  await mockApi(page, "admin", { roles: [customRole({ id: "r1", name: "Release manager" })] });
+  await page.goto("/settings/team");
+  await customSection(page).getByRole("button", { name: "New role" }).click();
+  const editor = page.getByTestId("role-editor");
+  // No name: said next to the field, nothing sent.
+  await editor.getByRole("button", { name: "Create role" }).click();
+  await expect(editor.getByRole("alert")).toHaveText("Give the role a name.");
+  // A taken name: the server's answer.
+  await editor.getByLabel("Name").fill("release manager");
+  await editor.getByRole("button", { name: "Create role" }).click();
+  await expect(editor.getByRole("alert")).toHaveText("Another role already has that name.");
+  await expect(editor).toBeVisible();
+});
+
+test("an admin can't tick what their own role doesn't hold", async ({ page }) => {
+  await mockApi(page, "admin");
+  await page.goto("/settings/team");
+  await customSection(page).getByRole("button", { name: "New role" }).click();
+  const editor = page.getByTestId("role-editor");
+  // Admins hold every ability a custom role may have; the owner-only budget
+  // row isn't offered at all.
+  await expect(editor.getByRole("checkbox", { name: /Set the monthly budget/ })).toHaveCount(0);
+  await expect(editor.getByText("Your own role doesn't include this")).toHaveCount(0);
+});
+
+test("members, viewers and custom-role holders see custom roles read-only", async ({ page }) => {
+  for (const [selfRole, selfCustom] of [["member", undefined], ["viewer", undefined], ["member", "custom:r1"]] as const) {
+    const db = await mockApi(page, selfRole, { roles: [customRole({ id: "r1", name: "Release manager", description: "Ships releases." })], selfCustom });
+    await page.goto("/settings/team");
+    await expect(roleRow(page, "Release manager")).toContainText("Ships releases.");
+    await expect(customSection(page)).toContainText("Only admins and owners can create or change them.");
+    await expect(customSection(page).getByRole("button", { name: "New role" })).toHaveCount(0);
+    await expect(customSection(page).getByRole("button", { name: /^(Edit|Delete) / })).toHaveCount(0);
+    await expect(page.getByTestId("list-section-role-changes")).toHaveCount(0);
+    // What the role can do is still there to read.
+    await roleRow(page, "Release manager").getByRole("button", { name: "Show what Release manager can do" }).click();
+    await expect(roleRow(page, "Release manager")).toContainText("Create, edit, approve and run plans");
+    if (selfCustom) await expect(roleRow(page, "Release manager")).toContainText("Your role");
+    expect(db.calls.some((c) => c.path.startsWith("/api/roles") && c.method !== "GET")).toBe(false);
+    expect(db.calls.some((c) => c.path === "/api/roles/audit")).toBe(false);
+    if (selfRole === "member" && !selfCustom) await shotAt(page, "custom-roles-member");
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  }
 });

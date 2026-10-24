@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { formatTokens, LIMIT_LABELS, limitsTone, usageBreakdown, usageLimits, usageTotal } from "@/lib/usage";
-import { hasRole } from "@/lib/roles";
+import { can } from "@/lib/capabilities";
 import { SETTINGS_ITEMS, type SettingsStatusKey } from "@/components/settings-items";
 
 export type StatusTone = "neutral" | "success" | "warning" | "error";
@@ -17,6 +17,8 @@ export interface ItemStatus {
 
 export interface Me {
   role: string;
+  capabilities?: string[];
+  custom_role?: { id: string; name: string } | null;
   auth_provider?: string;
   github_login: string | null;
   mfa_enabled?: boolean;
@@ -88,7 +90,7 @@ export function useSettingsStatus(me: Me | null): Partial<Record<SettingsStatusK
     if (!me) return;
     let live = true;
     const keys = new Set(
-      SETTINGS_ITEMS.filter((i) => i.status && hasRole(me.role, i.view)).map((i) => i.status as SettingsStatusKey),
+      SETTINGS_ITEMS.filter((i) => i.status && can(me, i.view)).map((i) => i.status as SettingsStatusKey),
     );
     for (const key of keys) {
       LOADERS[key](me)

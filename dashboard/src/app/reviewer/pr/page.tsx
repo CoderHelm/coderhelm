@@ -1,5 +1,6 @@
 "use client";
 
+import { ANY_CHANGE } from "@/lib/capabilities";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -20,7 +21,7 @@ import { GATE_ACTION_LABEL } from "../gate-control";
 
 export default function GatePageGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need={ANY_CHANGE}>
       <Suspense fallback={<GateSkeleton />}>
         <GatePage />
       </Suspense>

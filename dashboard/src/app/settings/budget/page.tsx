@@ -1,5 +1,6 @@
 "use client";
 
+import { ANY_CHANGE, can } from "@/lib/capabilities";
 import { useCallback, useEffect, useState } from "react";
 import { api, type TokenLimitKind, type TokenLimitsInput, type UsageInfo } from "@/lib/api";
 import { useToast } from "@/components/toast";
@@ -11,11 +12,9 @@ import { Field } from "@/components/field";
 import { TokenMeters } from "@/components/token-meters";
 import { inputClass, primaryButton, secondaryButton } from "@/components/ui";
 import { cacheHitRate, FEATURE_LABELS, formatTokens, LIMIT_HELP, LIMIT_LABELS, limitsTone, USAGE_CHANGED, usageBreakdown, usageLimits, usageParts, usageTotal } from "@/lib/usage";
-import { hasRole } from "@/lib/roles";
 import { Page, PageHeader } from "@/components/page";
 
 // Who may change the limits. The gateway checks the same role on save.
-const EDIT_ROLE = "admin" as const;
 
 /** The three limits a team sets, the body field each saves to, and its input id. */
 type SetKind = Exclude<TokenLimitKind, "all_tokens">;
@@ -35,7 +34,7 @@ type Drafts = Record<SetKind, string>;
 
 export default function TokenLimitPageGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need={ANY_CHANGE}>
       <TokenLimitPage />
     </RoleGuard>
   );
@@ -73,7 +72,7 @@ function TokenLimitPage() {
     // Usage carries the stored limits too, so one read gives both.
     Promise.all([api.getUsage(), api.me()])
       .then(([usage, me]) => {
-        setLoad({ state: "ready", usage, canEdit: hasRole(me.role, EDIT_ROLE) });
+        setLoad({ state: "ready", usage, canEdit: can(me, "budget") });
         setDrafts(draftsFrom(usage));
       })
       .catch(() => setLoad({ state: "error" }));

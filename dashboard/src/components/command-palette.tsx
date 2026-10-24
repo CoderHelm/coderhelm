@@ -15,6 +15,7 @@
 // - cmdk gives the listbox semantics and arrow / Enter / Home / End keys;
 //   Radix Dialog gives the focus trap, Escape and the return of focus.
 
+import { ANY_CHANGE, can } from "@/lib/capabilities";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Command, defaultFilter } from "cmdk";
 import { useRouter } from "next/navigation";
@@ -73,8 +74,6 @@ const SCOPE_TITLE: Record<Scope, string> = {
 /** The families `/api/search` answers, by scope. */
 const SERVER_TYPES: Partial<Record<Scope, string>> = { runs: "runs", prs: "reviews", releases: "releases", plans: "plans" };
 
-const ROLE_LEVEL: Record<string, number> = { owner: 4, admin: 3, billing: 2, member: 1 };
-const level = (role?: string) => ROLE_LEVEL[role ?? ""] ?? 0;
 
 export interface PalettePage {
   href: string;
@@ -84,6 +83,8 @@ export interface PalettePage {
 
 export interface PaletteUser {
   role: string;
+  /** The capability keys this person holds (lib/capabilities.ts). */
+  capabilities?: string[];
 }
 
 // ── Recent items (this browser only) ─────────────────────────────────────
@@ -117,44 +118,44 @@ function remember(e: Entry) {
 
 // ── Static catalogs ──────────────────────────────────────────────────────
 
-function actionsFor(role: string): (Entry & { minLevel: number })[] {
-  const all: (Entry & { minLevel: number })[] = [
-    { id: "act:review-pr", group: "actions", label: "Review a PR…", sub: "Review any pull request's latest commit now", href: "/reviewer?review=1", minLevel: 1, keywords: ["re-review", "pull request"] },
-    { id: "act:write-notes", group: "actions", label: "Write release notes for a tag…", sub: "Releases", href: "/releases?write=1", minLevel: 1, keywords: ["release", "changelog", "tag"] },
-    { id: "act:release-now", group: "actions", label: "Release now…", sub: "Releases waiting to go out", href: "/releases", minLevel: 1, keywords: ["release", "ship", "deploy"] },
-    { id: "act:new-plan", group: "actions", label: "New plan", sub: "Break work into tasks Coderhelm builds", href: "/plans/new", minLevel: 1, keywords: ["new run", "start", "create", "task"] },
-    { id: "act:add-source", group: "actions", label: "Add a data source", sub: "Connect an API, logs or a database", href: "/data-sources/connect", minLevel: 3, keywords: ["connect", "database", "api"] },
-    { id: "act:new-tool", group: "actions", label: "Write a tool", sub: "A named lookup Coderhelm can call", href: "/data-sources/tools/new", minLevel: 3, keywords: ["lookup", "query"] },
-    { id: "act:invite", group: "actions", label: "Invite a teammate", sub: "Team", href: "/settings/team", minLevel: 3, keywords: ["member", "add person", "user"] },
-    { id: "act:skills-repo", group: "actions", label: "Connect a skills repository", sub: "Skills", href: "/skills", minLevel: 1, keywords: ["skill", "agent", "command"] },
-    { id: "act:reviewer-config", group: "actions", label: "Configure the reviewer", sub: "Reviewer settings", href: "/reviewer/config", minLevel: 1, keywords: ["label", "auto-merge", "release notes"] },
+function actionsFor(who: PaletteUser): (Entry & { need?: string })[] {
+  const all: (Entry & { need?: string })[] = [
+    { id: "act:review-pr", group: "actions", label: "Review a PR…", sub: "Review any pull request's latest commit now", href: "/reviewer?review=1", need: "reviews", keywords: ["re-review", "pull request"] },
+    { id: "act:write-notes", group: "actions", label: "Write release notes for a tag…", sub: "Releases", href: "/releases?write=1", need: "reviews", keywords: ["release", "changelog", "tag"] },
+    { id: "act:release-now", group: "actions", label: "Release now…", sub: "Releases waiting to go out", href: "/releases", need: "reviews", keywords: ["release", "ship", "deploy"] },
+    { id: "act:new-plan", group: "actions", label: "New plan", sub: "Break work into tasks Coderhelm builds", href: "/plans/new", need: "plans", keywords: ["new run", "start", "create", "task"] },
+    { id: "act:add-source", group: "actions", label: "Add a data source", sub: "Connect an API, logs or a database", href: "/data-sources/connect", need: "data_sources", keywords: ["connect", "database", "api"] },
+    { id: "act:new-tool", group: "actions", label: "Write a tool", sub: "A named lookup Coderhelm can call", href: "/data-sources/tools/new", need: "data_sources", keywords: ["lookup", "query"] },
+    { id: "act:invite", group: "actions", label: "Invite a teammate", sub: "Team", href: "/settings/team", need: "people", keywords: ["member", "add person", "user"] },
+    { id: "act:skills-repo", group: "actions", label: "Connect a skills repository", sub: "Skills", href: "/skills", need: "data_sources", keywords: ["skill", "agent", "command"] },
+    { id: "act:reviewer-config", group: "actions", label: "Configure the reviewer", sub: "Reviewer settings", href: "/reviewer/config", need: ANY_CHANGE, keywords: ["label", "auto-merge", "release notes"] },
     // The href is filled in when the palette opens, with the page it opened on.
-    { id: "act:get-help", group: "actions", label: "Get help…", sub: "Open a support ticket about this page", href: "/support?new=1", minLevel: 0, keywords: ["support", "ticket", "help", "contact", "broken", "bug"] },
-    { id: "act:tickets", group: "actions", label: "Your support tickets", sub: "Support", href: "/support", minLevel: 0, keywords: ["support", "ticket", "help", "replies"] },
-    { id: "act:report", group: "actions", label: "Report an issue", sub: "Open a ticket about something that went wrong", href: "/support?new=1&type=issue", minLevel: 0, keywords: ["bug", "feedback", "support", "broken"] },
-    { id: "act:contact", group: "actions", label: "Contact us", sub: "Ask Coderhelm support a question", href: "/support?new=1&type=contact", minLevel: 0, keywords: ["contact", "email", "question", "feedback"] },
+    { id: "act:get-help", group: "actions", label: "Get help…", sub: "Open a support ticket about this page", href: "/support?new=1", keywords: ["support", "ticket", "help", "contact", "broken", "bug"] },
+    { id: "act:tickets", group: "actions", label: "Your support tickets", sub: "Support", href: "/support", keywords: ["support", "ticket", "help", "replies"] },
+    { id: "act:report", group: "actions", label: "Report an issue", sub: "Open a ticket about something that went wrong", href: "/support?new=1&type=issue", keywords: ["bug", "feedback", "support", "broken"] },
+    { id: "act:contact", group: "actions", label: "Contact us", sub: "Ask Coderhelm support a question", href: "/support?new=1&type=contact", keywords: ["contact", "email", "question", "feedback"] },
   ];
-  return all.filter((a) => level(role) >= a.minLevel);
+  return all.filter((a) => !a.need || can(who, a.need));
 }
 
-const SETTINGS: { label: string; href: string; minLevel: number; keywords: string[] }[] = [
-  { label: "General settings", href: "/settings", minLevel: 0, keywords: ["team name", "reset", "danger zone"] },
-  { label: "Custom instructions", href: "/settings/instructions", minLevel: 3, keywords: ["prompt", "rules", "style"] },
-  { label: "Workflow and git conventions", href: "/settings/workflow", minLevel: 3, keywords: ["branch", "commit", "pr title", "naming"] },
-  { label: "Guardrails", href: "/settings/guardrails", minLevel: 3, keywords: ["limits", "safety", "files"] },
-  { label: "Team voice", href: "/settings/voice", minLevel: 3, keywords: ["tone", "writing"] },
-  { label: "AI models", href: "/settings/models", minLevel: 3, keywords: ["model", "llm"] },
-  { label: "Repositories", href: "/settings/repos", minLevel: 1, keywords: ["repo", "sync", "role"] },
-  { label: "Integrations", href: "/settings/integrations", minLevel: 1, keywords: ["connect", "mcp", "plugins"] },
-  { label: "GitHub integration", href: "/settings/integrations/github", minLevel: 1, keywords: ["app", "install"] },
-  { label: "Jira integration", href: "/settings/integrations/jira", minLevel: 3, keywords: ["tickets", "atlassian"] },
-  { label: "AWS accounts", href: "/settings/integrations/aws", minLevel: 1, keywords: ["cloud", "role"] },
-  { label: "Reviewer settings", href: "/reviewer/config", minLevel: 1, keywords: ["review label", "auto-merge", "release notes"] },
-  { label: "Alert routes", href: "/settings/alerts", minLevel: 1, keywords: ["alarm", "sns", "topic"] },
-  { label: "Notifications", href: "/settings/notifications", minLevel: 0, keywords: ["email"] },
-  { label: "Team members", href: "/settings/team", minLevel: 0, keywords: ["people", "roles", "invite"] },
-  { label: "Security", href: "/settings/security", minLevel: 0, keywords: ["password", "two-factor", "mfa"] },
-  { label: "Token limit", href: "/settings/budget", minLevel: 1, keywords: ["budget", "usage", "cost"] },
+const SETTINGS: { label: string; href: string; need?: string; keywords: string[] }[] = [
+  { label: "General settings", href: "/settings", keywords: ["team name", "reset", "danger zone"] },
+  { label: "Custom instructions", href: "/settings/instructions", need: "agent_settings", keywords: ["prompt", "rules", "style"] },
+  { label: "Workflow and git conventions", href: "/settings/workflow", need: "agent_settings", keywords: ["branch", "commit", "pr title", "naming"] },
+  { label: "Guardrails", href: "/settings/guardrails", need: "agent_settings", keywords: ["limits", "safety", "files"] },
+  { label: "Team voice", href: "/settings/voice", need: "agent_settings", keywords: ["tone", "writing"] },
+  { label: "AI models", href: "/settings/models", need: "model_provider", keywords: ["model", "llm"] },
+  { label: "Repositories", href: "/settings/repos", need: ANY_CHANGE, keywords: ["repo", "sync", "role"] },
+  { label: "Integrations", href: "/settings/integrations", need: "view_integrations", keywords: ["connect", "mcp", "plugins"] },
+  { label: "GitHub integration", href: "/settings/integrations/github", need: "view_integrations", keywords: ["app", "install"] },
+  { label: "Jira integration", href: "/settings/integrations/jira", need: "integrations", keywords: ["tickets", "atlassian"] },
+  { label: "AWS accounts", href: "/settings/integrations/aws", need: "view_integrations", keywords: ["cloud", "role"] },
+  { label: "Reviewer settings", href: "/reviewer/config", need: ANY_CHANGE, keywords: ["review label", "auto-merge", "release notes"] },
+  { label: "Alert routes", href: "/settings/alerts", need: "view_alerts", keywords: ["alarm", "sns", "topic"] },
+  { label: "Notifications", href: "/settings/notifications", keywords: ["email"] },
+  { label: "Team members", href: "/settings/team", keywords: ["people", "roles", "invite"] },
+  { label: "Security", href: "/settings/security", keywords: ["password", "two-factor", "mfa"] },
+  { label: "Token limit", href: "/settings/budget", need: ANY_CHANGE, keywords: ["budget", "usage", "cost"] },
 ];
 
 // ── Context ──────────────────────────────────────────────────────────────
@@ -304,7 +305,7 @@ export function CommandPaletteProvider({
             >
               <Dialog.Title className="sr-only">Search and commands</Dialog.Title>
               {open && (
-                <Palette pages={pages} pageActions={pageActions} role={user.role} scope={scope} setScope={setScope} close={() => setOpen(false)} />
+                <Palette pages={pages} pageActions={pageActions} who={user} scope={scope} setScope={setScope} close={() => setOpen(false)} />
               )}
             </Dialog.Content>
           </Dialog.Portal>
@@ -324,12 +325,10 @@ interface Catalogs {
 
 let catalogsOnce: Promise<Catalogs> | null = null;
 
-function loadCatalogs(role: string): Promise<Catalogs> {
+function loadCatalogs(who: PaletteUser): Promise<Catalogs> {
   catalogsOnce ??= (async () => {
-    const admin = level(role) >= 3;
-    const member = level(role) >= 1;
     const [sources, skills, members] = await Promise.all([
-      admin
+      can(who, "data_sources")
         ? api.listDataSources().then(
             (r) =>
               r.sources.map<Entry>((s) => ({
@@ -343,7 +342,7 @@ function loadCatalogs(role: string): Promise<Catalogs> {
             () => [],
           )
         : [],
-      member
+      can(who, ANY_CHANGE)
         ? skillsApi.list().then(
             (r) =>
               r.items.map<Entry>((s) => ({
@@ -357,7 +356,7 @@ function loadCatalogs(role: string): Promise<Catalogs> {
             () => [],
           )
         : [],
-      admin
+      can(who, "people")
         ? api.listUsers().then(
             (r) =>
               r.users.map<Entry>((u) => {
@@ -481,14 +480,14 @@ function useServerSearch(q: string, scope: Scope | null) {
 function Palette({
   pages,
   pageActions,
-  role,
+  who,
   scope,
   setScope,
   close,
 }: {
   pages: PalettePage[];
   pageActions: PageAction[] | null;
-  role: string;
+  who: PaletteUser;
   scope: Scope | null;
   setScope: (s: Scope | null) => void;
   close: () => void;
@@ -501,11 +500,11 @@ function Palette({
 
   useEffect(() => {
     let live = true;
-    loadCatalogs(role).then((c) => live && setCatalogs(c), () => live && setCatalogs({ sources: [], skills: [], members: [] }));
+    loadCatalogs(who).then((c) => live && setCatalogs(c), () => live && setCatalogs({ sources: [], skills: [], members: [] }));
     return () => {
       live = false;
     };
-  }, [role]);
+  }, [who]);
 
   // ">" means actions only.
   const actionMode = scope === null && text.startsWith(">");
@@ -513,7 +512,6 @@ function Palette({
   const q = (actionMode ? text.slice(1) : text).trim();
   const server = useServerSearch(q, effectiveScope);
 
-  const lvl = level(role);
   // "Get help…" carries the page the palette was opened on (and the run,
   // review or plan it shows). The palette mounts on open, so this is read then.
   const [helpFrom] = useState(() =>
@@ -535,9 +533,9 @@ function Palette({
           a.run();
         },
       })),
-      ...actionsFor(role).map((a) => (a.id === "act:get-help" ? { ...a, href: helpFrom } : a)),
+      ...actionsFor(who).map((a) => (a.id === "act:get-help" ? { ...a, href: helpFrom } : a)),
     ],
-    [role, helpFrom, pageActions, close],
+    [who, helpFrom, pageActions, close],
   );
   const pageEntries = useMemo<Entry[]>(
     () => pages.map((p) => ({ id: `page:${p.href}`, group: "pages", label: p.label, sub: p.section, href: p.href, keywords: p.section ? [p.section] : [] })),
@@ -545,7 +543,7 @@ function Palette({
   );
   const settingsEntries = useMemo<Entry[]>(
     () =>
-      SETTINGS.filter((s) => lvl >= s.minLevel).map((s) => ({
+      SETTINGS.filter((s) => !s.need || can(who, s.need)).map((s) => ({
         id: `settings:${s.href}`,
         group: "settings",
         label: s.label,
@@ -553,19 +551,19 @@ function Palette({
         href: s.href,
         keywords: s.keywords,
       })),
-    [lvl],
+    [who],
   );
   const scopeEntries = useMemo<Entry[]>(() => {
     const avail: Scope[] = ["runs", "prs", "releases", "plans"];
-    if (lvl >= 3) avail.push("sources");
-    if (lvl >= 1) avail.push("skills");
-    if (lvl >= 3) avail.push("members");
+    if (can(who, "data_sources")) avail.push("sources");
+    if (can(who, ANY_CHANGE)) avail.push("skills");
+    if (can(who, "people")) avail.push("members");
     avail.push("pages", "actions");
     // Reviewer and Releases pages are for members and up.
     return avail
-      .filter((s) => lvl >= 1 || (s !== "prs" && s !== "releases"))
+      .filter((s) => can(who, ANY_CHANGE) || (s !== "prs" && s !== "releases"))
       .map((s) => ({ id: `scope:${s}`, group: "scopes", label: `Search ${SCOPE_TITLE[s].toLowerCase()}`, run: () => setScope(s) }));
-  }, [lvl, setScope]);
+  }, [who, setScope]);
 
   const groups = useMemo(() => {
     // Fuzzy, but not scattered: letters strewn across a long label score
@@ -618,8 +616,8 @@ function Palette({
     const order = new Map(out.map(([g], i) => [g, i]));
     if (q) out.sort((x, y) => (scored.get(y[0]) ?? 0) - (scored.get(x[0]) ?? 0) || order.get(x[0])! - order.get(y[0])!);
     // Pull requests and releases are member pages.
-    return out.filter(([g]) => lvl >= 1 || (g !== "prs" && g !== "releases"));
-  }, [q, effectiveScope, recent, actions, scopeEntries, pageEntries, settingsEntries, server, catalogs, lvl]);
+    return out.filter(([g]) => can(who, ANY_CHANGE) || (g !== "prs" && g !== "releases"));
+  }, [q, effectiveScope, recent, actions, scopeEntries, pageEntries, settingsEntries, server, catalogs, who]);
 
   const total = groups.reduce((n, [, l]) => n + l.length, 0);
 

@@ -1,5 +1,8 @@
 "use client";
 
+import { Callout } from "@/components/callout";
+import { useCan } from "@/hooks/use-can";
+import { ANY_CHANGE } from "@/lib/capabilities";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { api, type Repo } from "@/lib/api";
 import { RoleGuard } from "@/components/role-guard";
@@ -39,13 +42,15 @@ function repoLook(repo: Repo): StatusLook {
 
 export default function ReposPageGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need={ANY_CHANGE}>
       <Suspense fallback={<Page><PageHeader title="Repositories" /><div className="mt-6"><ListSkeleton /></div></Page>}>
         <ReposPage />
       </Suspense>
     </RoleGuard>
   );
 }
+
+const ROLE_NAMES: Record<string, string> = { web: "Web", backend: "Backend", mobile: "Mobile", cms: "CMS", infra: "Infra", data: "Data" };
 
 function ReposPage() {
   const [repos, setRepos] = useState<Repo[]>([]);
@@ -55,6 +60,9 @@ function ReposPage() {
   const [toggling, setToggling] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [savingRole, setSavingRole] = useState<string | null>(null);
+  // Turning repos on or off, syncing and routing roles need `repos`.
+  const { ready, can } = useCan();
+  const canManage = can("repos");
   const [params, setParams] = useListParams({ q: "", status: "all" });
   const q = params.q.trim().toLowerCase();
   const status = params.status === "on" || params.status === "off" ? params.status : "all";
@@ -138,6 +146,13 @@ function ReposPage() {
         title="Repositories"
         lead="Repos connected via the GitHub App. Enable the ones you want Coderhelm to work on, and set a role (web, backend, …) so Jira tickets route to the right repo."
       />
+      {ready && !canManage && (
+        <div className="mt-6" data-testid="repos-read-only">
+          <Callout live={false}>
+            <p>Your role can see these repos but not change them. Ask an admin or owner to turn a repo on or off.</p>
+          </Callout>
+        </div>
+      )}
 
       {!loading && !error && repos.length > 0 && (
         <ListToolbar
@@ -158,9 +173,11 @@ function ReposPage() {
             ],
           }}
           actions={
-            <button type="button" onClick={sync} disabled={syncing} className={secondaryButton} title="Pull latest repos from GitHub">
-              {syncing ? "Syncing..." : "Sync repos"}
-            </button>
+            canManage ? (
+              <button type="button" onClick={sync} disabled={syncing} className={secondaryButton} title="Pull latest repos from GitHub">
+                {syncing ? "Syncing..." : "Sync repos"}
+              </button>
+            ) : undefined
           }
           onClear={anyFilter ? clear : undefined}
           summary={`${filtered.length} repo${filtered.length !== 1 ? "s" : ""}${q ? ` matching "${params.q.trim()}"` : ""}`}
@@ -180,9 +197,11 @@ function ReposPage() {
                 <a href="https://github.com/apps/coderhelm" className={secondaryButton}>
                   Install the GitHub App
                 </a>
-                <button type="button" onClick={sync} disabled={syncing} className={secondaryButton}>
-                  {syncing ? "Syncing..." : "Sync repos"}
-                </button>
+                {canManage && (
+                  <button type="button" onClick={sync} disabled={syncing} className={secondaryButton}>
+                    {syncing ? "Syncing..." : "Sync repos"}
+                  </button>
+                )}
               </>
             }
           />
@@ -204,10 +223,10 @@ function ReposPage() {
                       aria-checked={repo.enabled}
                       aria-label={`Let Coderhelm work on ${repo.name}`}
                       onClick={() => handleToggle(repo)}
-                      disabled={toggling === repo.name}
+                      disabled={!canManage || toggling === repo.name}
                       className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
                         repo.enabled ? "bg-green-500" : "bg-zinc-700"
-                      } ${toggling === repo.name ? "opacity-50" : "cursor-pointer"} ${focusRing}`}
+                      } ${toggling === repo.name ? "opacity-50" : canManage ? "cursor-pointer" : "cursor-not-allowed"} ${focusRing}`}
                     >
                       <span
                         className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
@@ -228,14 +247,14 @@ function ReposPage() {
                     ) : repo.enabled && repo.onboard_status === "failed" ? (
                       <span className="inline-flex flex-wrap items-center gap-2">
                         <span title={repo.onboard_error}>✕ {parseOnboardError(repo.onboard_error)}</span>
-                        <button
+                        {canManage && <button
                           type="button"
                           onClick={() => retry(repo)}
                           disabled={toggling === repo.name}
                           className={`rounded text-xs text-zinc-400 underline underline-offset-2 hover:text-zinc-200 disabled:opacity-50 ${focusRing}`}
                         >
                           Retry
-                        </button>
+                        </button>}
                       </span>
                     ) : repo.enabled && repo.onboard_status === "ready" ? (
                       "✓ Ready"
@@ -243,7 +262,9 @@ function ReposPage() {
                   }
                   summaryTone={look.tone}
                   chips={
-                    repo.enabled ? (
+                    repo.enabled && !canManage ? (
+                      repo.role ? <span className="rounded-md border border-zinc-800 px-2.5 py-1 text-xs text-zinc-400">{ROLE_NAMES[repo.role] ?? repo.role}</span> : undefined
+                    ) : repo.enabled ? (
                       <span className="relative" title="Primary role for this repo — routes matching Jira tickets here">
                         <select
                           aria-label={`Role of ${repo.name}`}

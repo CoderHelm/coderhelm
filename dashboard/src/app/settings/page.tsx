@@ -10,7 +10,8 @@ import { Skeleton } from "@/components/skeleton";
 import { ChevronRightIcon } from "@/components/icons";
 import { focusRing, inputClass, secondaryButton } from "@/components/ui";
 import { SETTINGS_GROUPS, type SettingsItem } from "@/components/settings-items";
-import { hasRole, ROLE_LABEL, whoCan, type Role } from "@/lib/roles";
+import { ROLE_LABEL, whoCan, type Role } from "@/lib/roles";
+import { builtInRoleFor, can } from "@/lib/capabilities";
 import { useSettingsStatus, type ItemStatus, type Me } from "./use-settings-status";
 import { Page, PageHeader } from "@/components/page";
 
@@ -24,9 +25,9 @@ export default function SettingsPage() {
   }, []);
 
   const groups = me
-    ? SETTINGS_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => hasRole(me.role, i.view)) })).filter((g) => g.items.length > 0)
+    ? SETTINGS_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => can(me, i.view)) })).filter((g) => g.items.length > 0)
     : [];
-  const roleLabel = me ? ROLE_LABEL[me.role as Role] ?? me.role : null;
+  const roleLabel = me ? (me.custom_role?.name ?? ROLE_LABEL[me.role as Role] ?? me.role) : null;
 
   return (
     <Page>
@@ -73,7 +74,7 @@ export default function SettingsPage() {
             <ul className="rounded-lg border border-zinc-800 bg-zinc-900/40 divide-y divide-zinc-800 overflow-hidden">
               {group.items.map((item) => (
                 <li key={item.href}>
-                  <SettingsRow item={item} readOnly={!hasRole(me?.role, item.edit)} status={item.status ? status[item.status] : undefined} />
+                  <SettingsRow item={item} readOnly={!can(me, item.edit)} status={item.status ? status[item.status] : undefined} />
                 </li>
               ))}
             </ul>
@@ -81,7 +82,7 @@ export default function SettingsPage() {
         ))}
       </div>
 
-      {me && hasRole(me.role, "owner") && <DangerZone />}
+      {me && can(me, "reset") && <DangerZone />}
     </Page>
   );
 }
@@ -99,7 +100,7 @@ function SettingsRow({ item, readOnly, status }: { item: SettingsItem; readOnly:
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="text-sm font-medium text-zinc-100">{item.title}</span>
           {readOnly && (
-            <span title={`Only ${whoCan(item.edit)} can change this`}>
+            <span title={`Only ${whoCan(builtInRoleFor(item.edit))}, or a role that includes it, can change this`}>
               <StatusPill>View only</StatusPill>
             </span>
           )}

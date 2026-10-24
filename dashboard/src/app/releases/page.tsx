@@ -90,7 +90,7 @@ function releaseMatches(r: Release, q: string): boolean {
 
 export default function ReleasesGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need="reviews">
       <Suspense fallback={<Page><PageHeader title="Releases" /><div className="mt-6"><ListSkeleton /></div></Page>}>
         <ReleasesPage />
       </Suspense>

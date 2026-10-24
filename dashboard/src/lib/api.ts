@@ -96,6 +96,10 @@ export const api = {
       mfa_enabled?: boolean;
       /** Set in a read-only support view. */
       support_view?: { team_id: string; until: number } | null;
+      /** The capability keys this person holds (lib/capabilities.ts). */
+      capabilities?: string[];
+      /** Set when their role is one of the team's custom roles. */
+      custom_role?: { id: string; name: string } | null;
     }>("/api/me"),
   signup: (email: string, password: string) =>
     request<{ status: string; message: string }>("/auth/signup", {

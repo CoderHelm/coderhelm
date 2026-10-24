@@ -1,5 +1,7 @@
 "use client";
 
+import { useCan } from "@/hooks/use-can";
+import { ANY_CHANGE } from "@/lib/capabilities";
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -23,7 +25,7 @@ import { useLoad } from "@/components/tests/use-load";
 
 export default function TestDetailGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need={ANY_CHANGE}>
       <Suspense fallback={<Page><Loading what="this test" /></Page>}>
         <TestDetail />
       </Suspense>
@@ -31,18 +33,17 @@ export default function TestDetailGuarded() {
   );
 }
 
-const ADMIN_ROLES = new Set(["admin", "owner"]);
 
 function TestDetail() {
   const id = useSearchParams().get("id") || "";
   const { toast } = useToast();
   const { confirm } = useConfirm();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { can } = useCan();
+  const isAdmin = can("tests");
   const [busy, setBusy] = useState("");
   const { data, setData, error, loading, reload } = useLoad(() => (id ? api.getTest(id) : Promise.resolve(null)), `test:${id}`);
 
   useEffect(() => {
-    api.me().then((u) => setIsAdmin(ADMIN_ROLES.has(u.role))).catch(() => setIsAdmin(false));
   }, []);
 
   if (!id) return <Page><EmptyBox>No test was named. Go back to <Link href="/tests" className={linkButton}>Tests</Link>.</EmptyBox></Page>;

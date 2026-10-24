@@ -16,7 +16,7 @@ import { defText, KIND_LABEL, parseExample, toolsApi, type Tool, type ToolRunRes
 
 export default function ToolPageGuarded() {
   return (
-    <RoleGuard minRole="admin">
+    <RoleGuard need="data_sources">
       <Suspense fallback={null}>
         <ToolPage />
       </Suspense>

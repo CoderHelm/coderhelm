@@ -1,5 +1,6 @@
 "use client";
 
+import { ANY_CHANGE } from "@/lib/capabilities";
 import Link from "next/link";
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -19,7 +20,7 @@ import { useLoad } from "@/components/tests/use-load";
 
 export default function RunDetailGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need={ANY_CHANGE}>
       <Suspense fallback={<Page><Loading what="this run" /></Page>}>
         <RunDetail />
       </Suspense>

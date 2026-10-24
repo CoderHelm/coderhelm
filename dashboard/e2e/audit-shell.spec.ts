@@ -253,14 +253,15 @@ test("banners are announced and the dismiss button has a name", async ({ page })
   await page.goto("/");
   await expect(page.getByRole("status").filter({ hasText: "Scheduled maintenance tonight." })).toBeVisible();
   const limit = page.getByRole("alert").filter({ hasText: "New tokens limit reached" });
-  await expect(limit.getByRole("link", { name: "See usage" })).toHaveAttribute("href", /\/settings\/budget/);
+  // An admin can set the token limit, so is told to raise it.
+  await expect(limit.getByRole("link", { name: "Raise the limit" })).toHaveAttribute("href", /\/settings\/budget/);
   await shot(page, "shell-banners");
   await page.getByRole("button", { name: "Dismiss this message" }).click();
   await expect(page.getByText("Scheduled maintenance tonight.")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
-test("token limit banner: only the owner is told to raise it; others are told who can", async ({ page }) => {
+test("token limit banner: only someone who can set the limit is told to raise it; others are told who can", async ({ page }) => {
   const errors = watchConsole(page);
   const db = await mockApi(page, {
     role: "member",
@@ -277,7 +278,7 @@ test("token limit banner: only the owner is told to raise it; others are told wh
   await page.goto("/");
   const limit = page.getByRole("alert").filter({ hasText: "Cache read limit reached" });
   await expect(limit).toContainText("51M of your 50M cache read limit");
-  await expect(limit.getByText(/Ask the team owner to raise the limit/)).toBeVisible();
+  await expect(limit.getByText(/Ask an admin or the owner to raise the limit/)).toBeVisible();
   await expect(limit.getByRole("link", { name: "See usage" })).toBeVisible();
   db.role = "owner";
   await page.reload();

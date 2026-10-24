@@ -1,9 +1,9 @@
 "use client";
 
+import { useCan } from "@/hooks/use-can";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { api, type AwsAccountAbilities, type AwsConnection, type LogGroup } from "@/lib/api";
-import { hasRole } from "@/lib/roles";
 import { timeAgo } from "@/lib/data-sources";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
@@ -23,7 +23,7 @@ import { Chip, MoreMenu } from "@/components/list";
 
 export default function AwsPageGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need="view_integrations">
       <AwsPage />
     </RoleGuard>
   );
@@ -55,7 +55,8 @@ type Load = { state: "loading" } | { state: "error" } | { state: "ready"; connec
 
 function AwsPage() {
   const [load, setLoad] = useState<Load>({ state: "loading" });
-  const [canEdit, setCanEdit] = useState(false);
+  const { can } = useCan();
+  const canEdit = can("integrations");
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -75,7 +76,6 @@ function AwsPage() {
   }, [reset]);
 
   useEffect(() => {
-    api.me().then((me) => setCanEdit(hasRole(me.role, "admin"))).catch(() => setCanEdit(false));
     refresh();
   }, [refresh]);
 
