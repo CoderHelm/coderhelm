@@ -404,32 +404,50 @@ test("an agent's page: when it's asked, how it runs, recent asks and its instruc
   await expect(tools).toContainText("Write blocked: Write");
   await expect(page.getByText(/Up to 12 tool calls and 3 minutes/)).toBeVisible();
   await expect(page.getByText("Your team's heavy model")).toBeVisible();
+  // "Not checked yet" once, on the badge; the line under it says when it runs.
+  await expect(page.getByTestId("compat-section").getByText(/Not checked yet/)).toHaveCount(1);
+  await shot(page, "agent-page");
+
+  // Asks: one list, filtered by the shared toolbar.
+  await page.getByRole("navigation", { name: "Agent views" }).getByRole("link", { name: /^Asks/ }).click();
+  await expect(page).toHaveURL(/tab=asks/);
+  await expect(page.getByTestId("ask-row")).toHaveCount(3);
   await expect(page.getByRole("link", { name: "acme/web#412" })).toHaveAttribute("href", "https://github.com/acme/web/issues/412");
   await expect(page.getByRole("link", { name: "View run" })).toHaveAttribute("href", /\/runs\/detail\/?\?id=run_77/);
   await expect(page.getByText("(an older version)")).toBeVisible();
   await expect(page.getByText("sent 6,120 characters of context, not kept")).toBeVisible();
-  // Instructions render as text, the file's settings fold away.
-  await expect(page.getByText("You review specs before work starts.")).toBeVisible();
-  await expect(page.getByText("tools: Read, Grep, Bash, WebFetch")).toBeHidden();
-  await shot(page, "agent-page");
+  await shot(page, "agent-asks");
 
-  await page.getByRole("button", { name: "No answer" }).click();
+  await page.getByRole("group", { name: "Show asks" }).getByRole("button", { name: /No answer/ }).click();
   await expect(page.getByText("Check this ticket for contradictions before I plan it.")).toBeVisible();
   await expect(page.getByText("Does this PR's spec for the refund flow")).toHaveCount(0);
+
+  // Instructions render as text, the file's settings fold away.
+  await page.getByRole("navigation", { name: "Agent views" }).getByRole("link", { name: "Instructions" }).click();
+  await expect(page.getByText("You review specs before work starts.")).toBeVisible();
+  await expect(page.getByText("tools: Read, Grep, Bash, WebFetch")).toBeHidden();
+  await shot(page, "agent-instructions");
 });
 
 test("an admin tries the agent, sees what gets sent, and asks a past question again", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto(AGENT_URL);
-  await expect(page.getByText("19 of 20 tries left today")).toBeVisible();
+  // "Try it" opens a dialog instead of taking a column of the page.
+  await page.getByRole("button", { name: "Try it" }).click();
+  const dialog = page.getByRole("dialog", { name: "Try spec-checker" });
+  await expect(dialog.getByText("19 of 20 tries left today")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Try it" })).toBeFocused();
+  await page.goto(`${AGENT_URL}&tab=asks`);
   await page.getByRole("button", { name: "Ask again" }).first().click();
-  await expect(page.getByLabel("Question")).toHaveValue(/refund flow/);
+  await expect(dialog.getByLabel("Question")).toHaveValue(/refund flow/);
   await page.getByLabel("Question").fill("Is \"the page should load fast\" testable?");
   await page.getByLabel(/Context/).fill("Spec line 4: the page should load fast.");
   await page.getByRole("button", { name: "What gets sent" }).click();
   await expect(page.getByText(/--- The question ---\s+Is "the page should load fast" testable\?/)).toBeVisible();
   await page.getByRole("button", { name: "Ask spec-checker" }).click();
-  await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 15_000 });
+  await expect(dialog.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 15_000 });
   const post = db.calls.find((c) => c.method === "POST" && c.path === "/api/skills/asks");
   expect(post?.body).toEqual({ repo: "acme/playbook", path: "agents/spec-checker.md", question: "Is \"the page should load fast\" testable?", context: "Spec line 4: the page should load fast." });
   await shot(page, "agent-try");
@@ -437,10 +455,11 @@ test("an admin tries the agent, sees what gets sent, and asks a past question ag
 
 test("members see an agent's asks but can't try it or switch it", async ({ page }) => {
   await mockApi(page, { role: "member" });
-  await page.goto(AGENT_URL);
+  await page.goto(`${AGENT_URL}&tab=asks`);
   await expect(page.getByRole("heading", { name: "spec-checker", level: 1 })).toBeVisible();
   await expect(page.getByRole("link", { name: "acme/web#412" })).toBeVisible();
   await expect(page.getByText("Admins can try this agent with a question of their own.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Try it" })).toHaveCount(0);
   await expect(page.getByLabel("Question")).toHaveCount(0);
   await expect(page.getByRole("switch")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Ask again" })).toHaveCount(0);
@@ -448,7 +467,7 @@ test("members see an agent's asks but can't try it or switch it", async ({ page 
 
 test("an agent with no asks yet, and an unknown agent", async ({ page }) => {
   await mockApi(page, { asks: [] });
-  await page.goto(AGENT_URL);
+  await page.goto(`${AGENT_URL}&tab=asks`);
   await expect(page.getByText("Nobody has asked spec-checker anything yet.")).toBeVisible();
   await page.goto("/skills/agent?repo=acme%2Fplaybook&path=agents%2Fgone.md");
   await expect(page.getByText("Agent not found")).toBeVisible();

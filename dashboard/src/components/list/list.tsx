@@ -359,6 +359,8 @@ export interface MenuAction {
   /** Short hint on the right, e.g. a shortcut. */
   hint?: string;
   disabled?: boolean;
+  /** Red text, for "Forget" and other destructive choices. */
+  danger?: boolean;
 }
 
 /**
@@ -366,18 +368,52 @@ export interface MenuAction {
  * ("Review a PR…", "Write notes for a tag…") so they don't take the page's
  * best space.
  */
-export function MoreMenu({ label = "More", items }: { label?: string; items: MenuAction[] }) {
+export function MoreMenu({
+  label = "More",
+  items,
+  compact = false,
+  buttonLabel,
+}: {
+  label?: string;
+  items: MenuAction[];
+  /** A small "⋯" button instead of the labelled one: a row's overflow menu. */
+  compact?: boolean;
+  /** Spoken name of the button, e.g. "Actions for this memory". Defaults to `label`. */
+  buttonLabel?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const box = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const menuId = useId();
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  // The menu is placed against the window, so a list box's rounded,
+  // overflow-hidden corners can't cut it off.
+  const [place, setPlace] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
 
   useEffect(() => {
     if (!open) return;
     itemRefs.current[active]?.focus();
   }, [open, active]);
+
+  useEffect(() => {
+    if (!open) return;
+    const measure = () => {
+      const r = button.current?.getBoundingClientRect();
+      if (!r) return;
+      const right = Math.max(8, window.innerWidth - r.right);
+      // Opens upward when the space below can't hold it.
+      const height = items.length * 40 + 8;
+      setPlace(r.bottom + 4 + height > window.innerHeight && r.top > height ? { bottom: window.innerHeight - r.top + 4, right } : { top: r.bottom + 4, right });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [open, items.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -401,6 +437,7 @@ export function MoreMenu({ label = "More", items }: { label?: string; items: Men
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
+        aria-label={buttonLabel}
         onClick={() => {
           setActive(0);
           setOpen((v) => !v);
@@ -412,12 +449,26 @@ export function MoreMenu({ label = "More", items }: { label?: string; items: Men
             setOpen(true);
           }
         }}
-        className={`${secondaryButton} gap-1.5 !px-3`}
+        className={
+          compact
+            ? `inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 ${focusRing}`
+            : `${secondaryButton} gap-1.5 !px-3`
+        }
       >
-        {label}
-        <svg aria-hidden="true" className="h-3.5 w-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        {compact ? (
+          <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="5" cy="12" r="1.75" />
+            <circle cx="12" cy="12" r="1.75" />
+            <circle cx="19" cy="12" r="1.75" />
+          </svg>
+        ) : (
+          <>
+            {label}
+            <svg aria-hidden="true" className="h-3.5 w-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </>
+        )}
       </button>
       {open && (
         <div
@@ -438,6 +489,7 @@ export function MoreMenu({ label = "More", items }: { label?: string; items: Men
               setOpen(false);
             }
           }}
+          style={place ? { position: "fixed", top: place.top, bottom: place.bottom, right: place.right, marginTop: 0 } : undefined}
           className="absolute right-0 z-40 mt-1 w-60 max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-xl"
         >
           {items.map((item, i) => (
@@ -455,7 +507,7 @@ export function MoreMenu({ label = "More", items }: { label?: string; items: Men
                 item.onSelect();
               }}
               onMouseEnter={() => setActive(i)}
-              className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800 focus:bg-zinc-800 focus:outline-none disabled:opacity-50"
+              className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm ${item.danger ? "text-red-300" : "text-zinc-200"} hover:bg-zinc-800 focus:bg-zinc-800 focus:outline-none disabled:opacity-50`}
             >
               {item.label}
               {item.hint && <span className="text-xs text-zinc-500">{item.hint}</span>}

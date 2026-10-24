@@ -1,7 +1,7 @@
 "use client";
 
 import { CodeBlock, jsonOrText } from "@/components/code-block";
-import { Suspense, useEffect, useState } from "react";
+import { Fragment, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api, type AlertEventDetail, errorStatus } from "@/lib/api";
@@ -10,9 +10,12 @@ import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
 import { Callout } from "@/components/callout";
 import { RunStatusBadge } from "@/components/run-status";
-import { linkButton, secondaryButton } from "@/components/ui";
-import { Page, PageHeader, cardClass } from "@/components/page";
-import { KIND_LABEL, OUTCOMES, OutcomeBadge, formatWhen, humanize } from "../outcome";
+import { focusRing, linkButton, secondaryButton } from "@/components/ui";
+import { Page, PageHeader, Section, cardClass } from "@/components/page";
+import { Chip, List, ListRow, Time } from "@/components/list";
+import { Code } from "@/components/settings";
+import { Disclosure } from "@/components/disclosure";
+import { KIND_LABEL, OUTCOMES, OutcomeBadge, humanize } from "../outcome";
 
 export default function AlertDetailGuarded() {
   return (
@@ -98,6 +101,7 @@ function AlertDetail() {
     a.outcome === "run_started"
       ? [...data.runs].reverse().find((r) => new Date(r.created_at ?? 0).getTime() >= received - 60_000)
       : undefined;
+  const fields = alertFields(a.body);
 
   return (
     <Page>
@@ -107,8 +111,8 @@ function AlertDetail() {
         lead={
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
             <OutcomeBadge outcome={a.outcome} />
-            <span>{formatWhen(a.received_at)}</span>
-            <span className="font-mono">{a.ticket_id}</span>
+            <Time iso={a.received_at} />
+            {a.ticket_id && <Code>{a.ticket_id}</Code>}
           </div>
         }
         actions={
@@ -118,46 +122,111 @@ function AlertDetail() {
         }
       />
 
-      <div className={`mt-6 mb-6 text-sm ${cardClass}`}>
+      <div className={`mt-6 text-sm ${cardClass}`}>
         <p className="text-zinc-300">{OUTCOMES[a.outcome]?.detail ?? a.outcome}</p>
-        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+        <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-xs">
           <dt className="text-zinc-500">Repo</dt>
-          <dd className="font-mono text-zinc-300 break-all">{a.repo || "—"}</dd>
+          <dd className="break-all text-zinc-300">{a.repo || "—"}</dd>
           <dt className="text-zinc-500">Topic</dt>
-          <dd className="font-mono text-zinc-300 break-all">{a.topic_arn || "—"}</dd>
+          <dd className="min-w-0 text-zinc-300">{a.topic_arn ? <Code>{a.topic_arn}</Code> : "—"}</dd>
           <dt className="text-zinc-500">Source</dt>
           <dd className="text-zinc-300">{a.kind ? KIND_LABEL[a.kind] ?? humanize(a.kind) : "—"}</dd>
         </dl>
       </div>
 
-      <h2 className="text-sm font-semibold text-zinc-200 mb-2">Runs for this alert</h2>
-      {data.runs.length === 0 ? (
-        <p className="text-sm text-zinc-500 mb-6">No runs.</p>
-      ) : (
-        <ul className="mb-6 border border-zinc-800 rounded-lg divide-y divide-zinc-800">
-          {data.runs.map((r) => (
-            <li key={r.run_id} className="px-4 py-3 flex flex-wrap items-center gap-3 text-sm">
-              <Link href={`/runs/detail?id=${encodeURIComponent(r.run_id)}`} className="text-zinc-100 hover:underline">
-                {formatWhen(r.created_at)}
-              </Link>
-              <RunStatusBadge status={r.status} />
-              {own?.run_id === r.run_id && (
-                <span className="text-[10px] text-emerald-400 border border-emerald-500/30 rounded px-1.5 py-0.5">
-                  started by this alert
-                </span>
-              )}
-              {r.pr_url && (
-                <a href={r.pr_url} target="_blank" rel="noreferrer" className={linkButton}>
-                  Pull request<span aria-hidden="true"> ↗</span>
-                </a>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+      <Section title="Runs for this alert" className="!mt-8">
+        {data.runs.length === 0 ? (
+          <p className="text-sm text-zinc-500">No runs.</p>
+        ) : (
+          <List label="Runs for this alert">
+            {data.runs.map((r) => (
+              <ListRow
+                key={r.run_id}
+                title={r.title || "Untitled run"}
+                href={`/runs/detail?id=${encodeURIComponent(r.run_id)}`}
+                chips={
+                  <>
+                    <RunStatusBadge status={r.status} />
+                    {own?.run_id === r.run_id && <Chip tone="success">started by this alert</Chip>}
+                  </>
+                }
+                time={r.created_at}
+                actions={
+                  r.pr_url ? (
+                    <a href={r.pr_url} target="_blank" rel="noreferrer" className={`${linkButton} !text-xs`}>
+                      Pull request<span aria-hidden="true"> ↗</span>
+                    </a>
+                  ) : undefined
+                }
+              />
+            ))}
+          </List>
+        )}
+      </Section>
 
-      <h2 className="text-sm font-semibold text-zinc-200 mb-2">Alert</h2>
-      {a.body ? <CodeBlock {...jsonOrText(a.body)} label="Alert" wrap /> : <p className="text-sm text-zinc-500">The alert had no text.</p>}
+      <Section title="Alert" className="!mt-8">
+        {fields.length > 0 ? (
+          <dl className={`grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-[minmax(8rem,auto)_minmax(0,1fr)] sm:gap-y-2 ${cardClass}`} data-testid="alert-fields">
+            {fields.map((f) => (
+              <Fragment key={f.label}>
+                <dt className="text-xs text-zinc-500 sm:pt-0.5">{f.label}</dt>
+                <dd className="mb-2 min-w-0 break-words text-zinc-200 sm:mb-0 [overflow-wrap:anywhere]">
+                  {f.when ? <Time iso={f.value} className="!whitespace-normal" /> : f.value}
+                </dd>
+              </Fragment>
+            ))}
+          </dl>
+        ) : (
+          <p className={`whitespace-pre-wrap break-words text-sm text-zinc-200 ${cardClass}`}>{a.body || "(empty)"}</p>
+        )}
+        {fields.length > 0 && a.body && (
+          <div className="mt-3">
+            <Disclosure summary="Raw alert">
+              <CodeBlock {...jsonOrText(a.body)} label="The alert as it came" wrap />
+            </Disclosure>
+          </div>
+        )}
+      </Section>
     </Page>
   );
+}
+
+const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
+/** "NewStateReason" or "new_state_reason" becomes "New state reason". */
+function fieldLabel(key: string): string {
+  const words = key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_.-]+/g, " ")
+    .trim()
+    .toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * The alert's JSON as label/value pairs, two levels deep ("Trigger metric
+ * name"), for reading. Text that isn't a JSON object gives none, and shows as
+ * it came.
+ */
+function alertFields(body?: string | null): { label: string; value: string; when: boolean }[] {
+  if (!body) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return [];
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return [];
+  const out: { label: string; value: string; when: boolean }[] = [];
+  const add = (key: string, v: unknown, depth: number) => {
+    if (v === null || v === undefined || v === "") return;
+    if (typeof v === "object" && !Array.isArray(v) && depth < 1) {
+      for (const [k, inner] of Object.entries(v as Record<string, unknown>)) add(`${key} ${fieldLabel(k).toLowerCase()}`, inner, depth + 1);
+      return;
+    }
+    const value = typeof v === "string" ? v : typeof v === "number" || typeof v === "boolean" ? String(v) : JSON.stringify(v);
+    out.push({ label: fieldLabel(key), value, when: typeof v === "string" && ISO.test(v) && !Number.isNaN(Date.parse(v)) });
+  };
+  for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) add(k, v, 0);
+  return out.slice(0, 30);
 }

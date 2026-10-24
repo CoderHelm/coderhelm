@@ -1,5 +1,6 @@
 "use client";
 
+import { Code } from "@/components/settings";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { api, type TestCase, type TestRun, type TestSummary } from "@/lib/api";
@@ -171,13 +172,13 @@ function RunRow({ run }: { run: TestRun }) {
       href={runHref(run.run_key)}
       meta={[
         look.label,
-        <span key="branch" className="font-mono text-zinc-400">{run.branch}</span>,
+        <Code key="branch">{run.branch}</Code>,
         run.pr ? (
           <a key="pr" href={githubPrUrl(run.repo, run.pr)} target="_blank" rel="noreferrer" className="text-zinc-400 underline underline-offset-2 hover:text-zinc-200">
             PR #{run.pr}
           </a>
         ) : null,
-        <span key="sha" className="font-mono">{shortSha(run.sha)}</span>,
+        <span key="sha" title={run.sha}>{shortSha(run.sha)}</span>,
         run.run_attempt > 1 ? `re-run ${run.run_attempt}` : null,
         formatDuration(run.duration_ms),
       ]}
@@ -186,8 +187,9 @@ function RunRow({ run }: { run: TestRun }) {
       chips={
         <span className="flex flex-wrap gap-x-3 gap-y-1 text-xs tabular-nums">
           <span className="text-emerald-300">{run.passed} passed</span>
-          <span className={run.failed > 0 ? "text-red-300" : "text-zinc-500"}>{run.failed} failed</span>
-          <span className={run.flaky > 0 ? "text-amber-300" : "text-zinc-500"}>{run.flaky} passed on retry</span>
+          {/* Zero counts say nothing; only what happened is shown. */}
+          {run.failed > 0 && <span className="text-red-300">{run.failed} failed</span>}
+          {run.flaky > 0 && <span className="text-amber-300">{run.flaky} passed on retry</span>}
           {run.skipped > 0 && <span className="text-zinc-500">{run.skipped} skipped</span>}
         </span>
       }

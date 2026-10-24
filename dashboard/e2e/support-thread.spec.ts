@@ -287,6 +287,13 @@ test.describe("the ticket thread", () => {
     await page.getByTestId("thread-show-earlier").click();
     await page.evaluate(() => window.scrollTo(0, 0));
     await expect(page.getByTestId("jump-to-latest")).toBeVisible();
+    // The reply box sticks to the bottom of the window too; the button sits above it, never under it.
+    const covered = await page.getByTestId("jump-to-latest").evaluate((b) => {
+      const r = b.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return !(hit && b.contains(hit));
+    });
+    expect(covered).toBe(false);
     await page.getByTestId("jump-to-latest").click();
     await expect(page.getByTestId("thread-end")).toBeInViewport();
   });

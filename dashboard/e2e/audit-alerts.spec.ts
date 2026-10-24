@@ -28,12 +28,24 @@ interface Backend {
   eventOnce: boolean;
   reposStatus: number;
   reposOnce: boolean;
+  /** The alert's text is plain words, not JSON. */
+  plainBody: boolean;
 }
+
+// A CloudWatch alarm as SNS delivers it. Invented values.
+const ALARM_BODY = JSON.stringify({
+  AlarmName: "web-5xx-rate",
+  NewStateValue: "ALARM",
+  NewStateReason: "Threshold crossed: 1 datapoint [73.0] was greater than the threshold (50.0).",
+  StateChangeTime: iso(31),
+  Region: "US East (N. Virginia)",
+  Trigger: { MetricName: "HTTPCode_Target_5XX_Count", Namespace: "AWS/ApplicationELB", Threshold: 50 },
+});
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = {
     calls: [], listStatus: 200, listOnce: false, empty: false, more: false,
-    eventStatus: 200, eventOnce: false, reposStatus: 200, reposOnce: false, ...init,
+    eventStatus: 200, eventOnce: false, reposStatus: 200, reposOnce: false, plainBody: false, ...init,
   };
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -70,7 +82,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
         return route.fulfill({ status, body: "" });
       }
       return json(route, {
-        alert: { ...ALERTS[0], body: "Threshold crossed: 1 datapoint [73.0] was greater than the threshold (50.0)." },
+        alert: { ...ALERTS[0], body: db.plainBody ? "Threshold crossed: 1 datapoint [73.0] was greater than the threshold (50.0)." : ALARM_BODY },
         runs: [
           { run_id: "01RUN0000000000000000000B", status: "awaiting_ci", title: "Fix the 5xx rate", pr_url: "https://github.com/your-team/web/pull/12", created_at: iso(29) },
           { run_id: "01RUN0000000000000000000A", status: "completed", title: "Fix the 5xx rate", pr_url: null, created_at: iso(600) },
@@ -215,7 +227,30 @@ test("an alert's page shows its source, runs and text in words", async ({ page }
   const label = await page.locator("dt", { hasText: "Source" }).boundingBox();
   const value = await page.locator("dd", { hasText: "CloudWatch alarm" }).boundingBox();
   expect(label && value && Math.abs(label.y - value.y) < 4 && value.x > label.x).toBeTruthy();
+  // Times read in words, the exact one on hover; no raw "10/23/2026, 9:07:40 AM".
+  await expect(page.locator("time").first()).toHaveText("30 min ago");
+  await expect(page.getByText(/\d{1,2}\/\d{1,2}\/\d{4}, \d/)).toHaveCount(0);
+  // The alert's JSON reads as fields; the raw text folds away.
+  const fields = page.getByTestId("alert-fields");
+  await expect(fields.locator("dt", { hasText: "New state reason" })).toBeVisible();
+  await expect(fields).toContainText("Threshold crossed: 1 datapoint [73.0]");
+  await expect(fields.locator("dt", { hasText: "Trigger metric name" })).toBeVisible();
+  await expect(fields).toContainText("HTTPCode_Target_5XX_Count");
+  await expect(fields.locator("dd time")).toHaveText("31 min ago");
+  await expect(page.getByText('"AlarmName"')).toBeHidden();
+  await page.locator("summary", { hasText: "Raw alert" }).click();
+  await expect(page.locator("details", { hasText: "Raw alert" })).toContainText('"AlarmName": "web-5xx-rate"');
   await shot(page, "audit-alert-detail");
+  expect(errors).toEqual([]);
+});
+
+test("an alert whose text is plain words shows it as written", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page, { plainBody: true });
+  await page.goto(`/alerts/detail?id=${ALERT_ID}`);
+  await expect(page.getByText("Threshold crossed: 1 datapoint [73.0] was greater than the threshold (50.0).")).toBeVisible();
+  await expect(page.getByTestId("alert-fields")).toHaveCount(0);
+  await expect(page.getByText("Raw alert")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

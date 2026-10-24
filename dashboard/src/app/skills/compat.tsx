@@ -368,7 +368,7 @@ export function CompatSection({
             </div>
             <p className="mt-1.5 text-xs text-zinc-500">
               {!c
-                ? "Not checked yet. Coderhelm checks each item after it syncs, or when an admin asks."
+                ? "Coderhelm checks each item after it syncs, or when an admin asks."
                 : badge === "stale"
                   ? `The text changed since the check ${ago(c.at)}. A new check runs on the next sync, or now with Re-check.`
                   : badge === "failed"

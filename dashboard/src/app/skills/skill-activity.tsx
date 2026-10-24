@@ -204,6 +204,9 @@ export function SkillActivity({
         </p>
       </div>
 
+      {/* One item with nothing logged yet: no filters over an empty list. */}
+      {!(item && !filtering && !loading && !error && events.length === 0) && (
+      <>
       <ListToolbar
         className="mb-3"
         search={{
@@ -258,6 +261,8 @@ export function SkillActivity({
           ))}
         </FilterSelect>
       </div>
+      </>
+      )}
 
       {error ? (
         <ListError title="We couldn't load the activity" onRetry={reload}>

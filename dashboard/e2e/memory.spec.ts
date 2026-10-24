@@ -183,6 +183,18 @@ test("memories are grouped by topic with where they came from and how often they
   const learned = list.filter({ hasText: "pricing service" });
   await expect(learned).toContainText("Learned on “Fix the checkout total after a coupon”");
   await expect(list.filter({ hasText: "shared Button" })).toContainText("Not used yet");
+  // Memories come first; who uses them is one strip under the list.
+  const listTop = (await page.getByRole("heading", { name: /^Memories/ }).boundingBox())!.y;
+  const stripTop = (await page.getByTestId("memory-agents").boundingBox())!.y;
+  expect(listTop).toBeLessThan(stripTop);
+  // Topic and sort sit together by the heading, at 1280 and on a phone: neither is alone on a row.
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 800 });
+    const topic = (await page.getByRole("combobox", { name: "Topic" }).boundingBox())!;
+    const sortBox = (await page.getByRole("combobox", { name: "Sort" }).boundingBox())!;
+    expect(Math.abs(topic.y - sortBox.y), `topic and sort on one row at ${width}`).toBeLessThan(8);
+  }
+  await page.setViewportSize({ width: 1280, height: 800 });
   await shot(page, "memory-list");
 });
 
@@ -193,7 +205,7 @@ test("filters, sort and search ask the server", async ({ page }) => {
   await page.getByRole("group", { name: "Show" }).getByRole("button", { name: "Pinned" }).click();
   await expect(page.getByTestId("memory")).toHaveCount(1);
   await expect.poll(() => db.calls.some((c) => c.includes("pinned=true"))).toBe(true);
-  await page.getByRole("group", { name: "Show" }).getByRole("button", { name: "Learned on tickets" }).click();
+  await page.getByRole("group", { name: "Show" }).getByRole("button", { name: "From tickets" }).click();
   await expect(page.getByTestId("memory")).toHaveCount(2);
   await expect.poll(() => db.calls.some((c) => c.includes("source=run"))).toBe(true);
   await page.getByRole("group", { name: "Show" }).getByRole("button", { name: "All" }).click();
@@ -216,11 +228,15 @@ test("an admin can pin, edit and forget a memory", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/memory");
   const shared = page.getByTestId("memory").filter({ hasText: "shared Button" });
-  await shared.getByRole("button", { name: "Pin this memory" }).click();
+  // Each row's actions sit in one overflow menu.
+  await expect(shared.getByRole("button", { name: "Pin" })).toHaveCount(0);
+  await shared.getByRole("button", { name: "Actions for this memory" }).click();
+  await page.getByRole("menuitem", { name: /^Pin/ }).click();
   await expect(page.getByTestId("memory").filter({ hasText: "shared Button" })).toContainText("Pinned");
   expect(db.bodies).toContainEqual({ repo: REPO, pinned: true });
 
-  await page.getByTestId("memory").filter({ hasText: "shared Button" }).getByRole("button", { name: "Edit" }).click();
+  await page.getByTestId("memory").filter({ hasText: "shared Button" }).getByRole("button", { name: "Actions for this memory" }).click();
+  await page.getByRole("menuitem", { name: "Edit" }).click();
   const editor = page.getByTestId("memory").filter({ has: page.getByLabel("Memory", { exact: true }) });
   await editor.getByLabel("Memory", { exact: true }).fill("Components live in src/components and use the shared Button and Card.");
   await editor.getByRole("combobox", { name: "Topic for this memory" }).selectOption("architecture");
@@ -229,7 +245,8 @@ test("an admin can pin, edit and forget a memory", async ({ page }) => {
   await expect(edited).toContainText("Edited by admin@example.com");
   expect(db.bodies).toContainEqual({ repo: REPO, content: "Components live in src/components and use the shared Button and Card.", topic: "architecture" });
 
-  await page.getByTestId("memory").filter({ hasText: "pricing service" }).getByRole("button", { name: "Forget" }).click();
+  await page.getByTestId("memory").filter({ hasText: "pricing service" }).getByRole("button", { name: "Actions for this memory" }).click();
+  await page.getByRole("menuitem", { name: "Forget" }).click();
   // The shared confirm dialog has no dialog role; find it by its words.
   await expect(page.getByText("Forget this memory?")).toBeVisible();
   await page.getByRole("button", { name: "Forget it" }).click();
@@ -257,6 +274,9 @@ test("teach it something adds a pinned memory", async ({ page }) => {
 test("try it shows what a ticket would bring along", async ({ page }) => {
   await mockApi(page);
   await page.goto("/memory");
+  // The preview folds away under the list.
+  await expect(page.getByLabel("Describe a ticket, the way someone would write it")).toBeHidden();
+  await page.getByText("Preview what a ticket would bring along").click();
   await page.getByLabel("Describe a ticket, the way someone would write it").fill("The checkout total is wrong after a coupon");
   await page.getByRole("button", { name: "Show what it would remember" }).click();
   const section = page.getByRole("region", { name: "What would it remember for a ticket?" }).or(page.locator("section[aria-labelledby=try-heading]"));
@@ -283,7 +303,7 @@ test("a member sees memories but can't change them", async ({ page }) => {
   await page.goto("/memory");
   await expect(page.getByTestId("memory")).toHaveCount(3);
   await expect(page.getByRole("button", { name: "Teach it something" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Forget" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Actions for this memory" })).toHaveCount(0);
 });
 
 test("a failed load says so", async ({ page }) => {
