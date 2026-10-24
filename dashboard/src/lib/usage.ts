@@ -1,5 +1,7 @@
-// Token counts and how close a team is to its monthly limit, shared by the
-// sidebar meter, the Settings hub and the Token limit page so all three agree.
+// Token counts and how close a team is to its monthly limits, shared by the
+// sidebar meters, the Settings hub and the Token limit page so all three agree.
+
+import type { TokenLimitKind, TokenLimitUse, UsageInfo } from "./api";
 
 /** Fired after the limit changes so the sidebar meter and banner re-read usage. */
 export const USAGE_CHANGED = "coderhelm:usage-changed";
@@ -83,4 +85,67 @@ export function usageTone(used: number, limit: number): "success" | "warning" | 
   if (used >= limit) return "error";
   if (used >= limit * 0.8) return "warning";
   return "success";
+}
+
+/** Short names for each limit, as the meters and the form show them. */
+export const LIMIT_LABELS: Record<TokenLimitKind, string> = {
+  new_tokens: "New tokens",
+  cache_read: "Cache read",
+  cache_write: "Cache write",
+  all_tokens: "All tokens",
+};
+
+/** What each limit counts, in plain words (hovers and the form's help). */
+export const LIMIT_HELP: Record<TokenLimitKind, string> = {
+  new_tokens: "New input plus output: what is sent to the model fresh and what it writes back.",
+  cache_read: "Input the model reads back from the prompt cache instead of being sent again.",
+  cache_write: "Input written to the prompt cache so later calls can read it back.",
+  all_tokens: "All four kinds together: new input, cache reads, cache writes and output.",
+};
+
+/** The limit's name inside a sentence: "the cache read limit". */
+export function limitName(kind: TokenLimitKind): string {
+  return kind === "all_tokens" ? "token" : LIMIT_LABELS[kind].toLowerCase();
+}
+
+const KIND_ORDER: TokenLimitKind[] = ["new_tokens", "cache_read", "cache_write", "all_tokens"];
+
+/**
+ * Each set limit with what it counts this month, in display order. A response
+ * without `limits` (an older gateway) falls back to its single `max_tokens`.
+ */
+export function usageLimits(u: UsageInfo): TokenLimitUse[] {
+  if (u.limits) {
+    return u.limits
+      .filter((l) => l.max > 0)
+      .sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
+  }
+  if (u.max_tokens > 0) {
+    return [{ kind: u.limit_counts_cache ? "all_tokens" : "new_tokens", max: u.max_tokens, used: u.counted_tokens ?? u.total_tokens }];
+  }
+  return [];
+}
+
+/** The first limit the team has reached this month, if any. */
+export function reachedLimit(u: UsageInfo): TokenLimitUse | undefined {
+  return usageLimits(u).find((l) => l.used >= l.max);
+}
+
+/** The most urgent tone across the set limits. */
+export function limitsTone(limits: TokenLimitUse[]): "success" | "warning" | "error" | "neutral" {
+  const tones = limits.map((l) => usageTone(l.used, l.max));
+  if (tones.includes("error")) return "error";
+  if (tones.includes("warning")) return "warning";
+  return tones.length > 0 ? "success" : "neutral";
+}
+
+/** Share of a limit used, 0 to 100. */
+export function limitPct(l: TokenLimitUse): number {
+  return l.max > 0 ? Math.min(100, Math.round((l.used / l.max) * 100)) : 0;
+}
+
+/** Bar color class for a limit's tone. */
+export function limitBarClass(l: TokenLimitUse): string {
+  const tone = usageTone(l.used, l.max);
+  return tone === "error" ? "bg-red-500" : tone === "warning" ? "bg-amber-500" : "bg-emerald-500";
 }

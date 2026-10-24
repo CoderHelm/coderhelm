@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { formatTokens, usageBreakdown, usageTone, usageTotal } from "@/lib/usage";
+import { formatTokens, LIMIT_LABELS, limitsTone, usageBreakdown, usageLimits, usageTotal } from "@/lib/usage";
 import { hasRole } from "@/lib/roles";
 import { SETTINGS_ITEMS, type SettingsStatusKey } from "@/components/settings-items";
 
@@ -32,8 +32,12 @@ const LOADERS: Record<SettingsStatusKey, (me: Me) => Promise<ItemStatus | null>>
     // All four parts (new input, read from cache, written to cache, output).
     const used = usageTotal(u);
     const title = usageBreakdown(u);
-    if (u.max_tokens <= 0) return { text: `No limit · ${formatTokens(used)} used this month`, tone: "neutral", title };
-    return { text: `${formatTokens(used)} of ${formatTokens(u.max_tokens)} used this month`, tone: usageTone(used, u.max_tokens), title };
+    const limits = usageLimits(u);
+    if (limits.length === 0) return { text: `No limit · ${formatTokens(used)} used this month`, tone: "neutral", title };
+    // One limit: its count against it. Several: the one closest to its limit.
+    const closest = limits.reduce((a, b) => (b.used / b.max > a.used / a.max ? b : a));
+    const name = limits.length > 1 ? `${LIMIT_LABELS[closest.kind]}: ` : "";
+    return { text: `${name}${formatTokens(closest.used)} of ${formatTokens(closest.max)} used this month`, tone: limitsTone(limits), title };
   },
   repos: async () => {
     const { repos } = await api.listRepos();

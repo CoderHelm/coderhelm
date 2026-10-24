@@ -33,14 +33,19 @@ const atLeast = (role: Role, min: Role) => LEVEL[role] >= LEVEL[min];
 
 interface Backend {
   role: Role;
-  maxTokens: number;
+  /** The three monthly limits, in tokens (0 = no limit). */
+  limits: { new_tokens: number; cache_read: number; cache_write: number };
+  /** An old single limit that counts every kind (0 = none); replaced on save. */
+  legacyAllTokens: number;
   usedTokens: number;
+  cacheRead: number;
+  cacheWrite: number;
   prefs: Record<string, boolean>;
   calls: { method: string; path: string; body: Record<string, unknown> | null }[];
 }
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
-  const db: Backend = { role: "admin", maxTokens: 5_000_000, usedTokens: 1_200_000, prefs: { email_run_complete: true, email_run_failed: true, email_weekly_summary: true, email_token_warning: true }, calls: [], ...init };
+  const db: Backend = { role: "admin", limits: { new_tokens: 5_000_000, cache_read: 0, cache_write: 0 }, legacyAllTokens: 0, usedTokens: 1_200_000, cacheRead: 30_000_000, cacheWrite: 4_000_000, prefs: { email_run_complete: true, email_run_failed: true, email_weekly_summary: true, email_token_warning: true }, calls: [], ...init };
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   const forbidden = (route: Route) => json(route, { error: "Forbidden" }, 403);
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
@@ -53,12 +58,27 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     const admin = atLeast(db.role, "admin");
 
     if (p === "/api/me") return json(route, { user_id: "u_1", team_id: "t_1", github_login: null, email: "person@example.com", avatar_url: "", role: db.role, auth_provider: "email", mfa_enabled: false });
-    if (p === "/api/usage") return json(route, { month: "2026-01", total_tokens: db.usedTokens, tokens_in: db.usedTokens / 2, tokens_out: db.usedTokens / 2, total_runs: 14, max_tokens: db.maxTokens });
-    if (p === "/api/settings/budget" && method === "GET") return json(route, { max_tokens: db.maxTokens });
+    if (p === "/api/usage") {
+      // Each set limit with what it counts, the way the gateway lists them.
+      const used = { new_tokens: db.usedTokens, cache_read: db.cacheRead, cache_write: db.cacheWrite };
+      const total = db.usedTokens + db.cacheRead + db.cacheWrite;
+      const limits = db.legacyAllTokens > 0
+        ? [{ kind: "all_tokens", max: db.legacyAllTokens, used: total }]
+        : (["new_tokens", "cache_read", "cache_write"] as const).filter((k) => db.limits[k] > 0).map((k) => ({ kind: k, max: db.limits[k], used: used[k] }));
+      return json(route, {
+        month: "2026-01", total_tokens: total, tokens_in: db.usedTokens / 2, tokens_out: db.usedTokens / 2,
+        cache_read_tokens: db.cacheRead, cache_write_tokens: db.cacheWrite, new_tokens: db.usedTokens,
+        limits, limits_legacy: db.legacyAllTokens > 0, total_runs: 14, max_tokens: db.legacyAllTokens,
+      });
+    }
+    if (p === "/api/settings/budget" && method === "GET") {
+      return json(route, { max_new_tokens: db.limits.new_tokens, max_cache_read_tokens: db.limits.cache_read, max_cache_write_tokens: db.limits.cache_write, legacy: db.legacyAllTokens > 0, max_tokens: db.legacyAllTokens, limit_counts_cache: db.legacyAllTokens > 0 });
+    }
     if (p === "/api/settings/budget" && method === "PUT") {
-      // The gateway lets admins and the owner change the limit.
+      // The gateway lets admins and the owner change the limits.
       if (!admin) return forbidden(route);
-      db.maxTokens = Number(body?.max_tokens ?? 0);
+      db.limits = { new_tokens: Number(body?.max_new_tokens ?? 0), cache_read: Number(body?.max_cache_read_tokens ?? 0), cache_write: Number(body?.max_cache_write_tokens ?? 0) };
+      db.legacyAllTokens = 0;
       return route.fulfill({ status: 200, body: "" });
     }
     if (p === "/api/notifications" && method === "GET") return json(route, db.prefs);
@@ -181,36 +201,52 @@ test("a member sees the hub with view only items", async ({ page }) => {
 });
 
 for (const role of ["owner", "admin"] as Role[]) {
-test(`the ${role} sets and removes the token limit`, async ({ page }) => {
+test(`the ${role} sets and removes each token limit on its own`, async ({ page }) => {
   const db = await mockApi(page, { role });
   await page.goto("/settings/");
   await hubLink(page, "Token limit").click();
   await expect(page.getByRole("heading", { level: 1, name: "Token limit" })).toBeVisible();
-  await expect(page.getByText("of 5M tokens")).toBeVisible();
-  await expect(page.getByRole("progressbar", { name: "Share of the monthly limit used" })).toHaveAttribute("aria-valuenow", "24");
+  // Only the new tokens limit is set: one bar on the page, one in the sidebar.
+  const pageBars = page.getByTestId("usage-limits");
+  await expect(pageBars.getByRole("progressbar")).toHaveCount(1);
+  await expect(pageBars.getByRole("progressbar", { name: "New tokens limit used" })).toHaveAttribute("aria-valuenow", "24");
+  await expect(page.getByTestId("sidebar-token-meter").getByRole("progressbar")).toHaveCount(1);
 
-  const input = page.getByLabel("Millions of tokens a month");
-  await expect(input).toHaveValue("5");
-  await input.fill("-1");
+  const fresh = page.getByLabel("New tokens (input + output)");
+  const read = page.getByLabel("Cache read tokens");
+  const write = page.getByLabel("Cache write tokens");
+  await expect(fresh).toHaveValue("5");
+  await expect(read).toHaveValue("");
+  await expect(write).toHaveValue("");
+  await expect(page.getByText("Input the model reads back from the prompt cache")).toBeVisible();
+
+  await read.fill("-1");
   await expect(page.getByText("Enter a number of 0 or more.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Save" })).toBeDisabled();
 
-  await input.fill("2.5");
-  await expect(page.getByText("Runs pause after 2.5M tokens in a month.")).toBeVisible();
+  await fresh.fill("2.5");
+  await read.fill("40");
+  await expect(page.getByText("Runs pause after 2.5M in a month.")).toBeVisible();
+  await expect(page.getByText("Runs pause after 40M in a month.")).toBeVisible();
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByText("Token limit set to 2.5M a month")).toBeVisible();
+  await expect(page.getByText("Token limits saved: 2 of 3 set")).toBeVisible();
   const puts = db.calls.filter((c) => c.method === "PUT" && c.path === "/api/settings/budget");
-  expect(puts.at(-1)?.body).toEqual({ max_tokens: 2_500_000 });
-  await expect(page.getByText("of 2.5M tokens")).toBeVisible();
-  // The sidebar meter picks up the new limit without a reload.
-  await expect(page.getByText("1.2M / 2.5M")).toBeVisible();
+  expect(puts.at(-1)?.body).toEqual({ max_new_tokens: 2_500_000, max_cache_read_tokens: 40_000_000, max_cache_write_tokens: null });
+  // Two bars now, each against what it counts; the sidebar follows without a reload.
+  await expect(pageBars.getByRole("progressbar")).toHaveCount(2);
+  const side = page.getByTestId("sidebar-token-meter");
+  await expect(side.getByTestId("token-meter-new_tokens")).toContainText("1.2M / 2.5M");
+  await expect(side.getByTestId("token-meter-cache_read")).toContainText("30M / 40M");
+  await expect(side.getByTestId("token-meter-cache_write")).toHaveCount(0);
   await shot(page, `token-limit-${role}-1280.png`);
 
-  await input.fill("");
-  await input.press("Enter");
-  await expect(page.getByText("Token limit removed")).toBeVisible();
-  expect(db.calls.filter((c) => c.method === "PUT" && c.path === "/api/settings/budget").at(-1)?.body).toEqual({ max_tokens: 0 });
-  expect(db.maxTokens).toBe(0);
+  await fresh.fill("");
+  await read.fill("");
+  await read.press("Enter");
+  await expect(page.getByText("Token limits removed")).toBeVisible();
+  expect(db.calls.filter((c) => c.method === "PUT" && c.path === "/api/settings/budget").at(-1)?.body).toEqual({ max_new_tokens: null, max_cache_read_tokens: null, max_cache_write_tokens: null });
+  expect(db.limits).toEqual({ new_tokens: 0, cache_read: 0, cache_write: 0 });
+  await expect(page.getByTestId("sidebar-token-meter")).toHaveCount(0);
 
   await page.setViewportSize({ width: 375, height: 812 });
   await page.reload();
@@ -220,21 +256,53 @@ test(`the ${role} sets and removes the token limit`, async ({ page }) => {
 });
 }
 
-test("a member sees the token limit without a form", async ({ page }) => {
-  const db = await mockApi(page, { role: "member" });
+test("all three limits: three bars, and a reached cache write limit is the one named", async ({ page }) => {
+  await mockApi(page, { role: "owner", limits: { new_tokens: 20_000_000, cache_read: 100_000_000, cache_write: 4_000_000 } });
+  await page.goto("/settings/budget/");
+  const side = page.getByTestId("sidebar-token-meter");
+  await expect(side.getByRole("progressbar")).toHaveCount(3);
+  await expect(side.getByTestId("token-meter-value")).toHaveText(["1.2M / 20M", "30M / 100M", "4M / 4M"]);
+  await expect(page.getByRole("alert").filter({ hasText: "Cache write limit reached" })).toContainText("4M of your 4M cache write limit");
+  await expect(page.getByRole("region", { name: /Used in/ }).getByText("Limit reached")).toBeVisible();
+  await shot(page, "token-limit-three-1280.png");
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.reload();
+  await expect(page.getByTestId("usage-limits").getByRole("progressbar")).toHaveCount(3);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+  await shot(page, "token-limit-three-375.png");
+});
+
+test("an old single limit that counts every kind keeps showing until the new limits are saved", async ({ page }) => {
+  const db = await mockApi(page, { role: "admin", limits: { new_tokens: 0, cache_read: 0, cache_write: 0 }, legacyAllTokens: 200_000_000 });
+  await page.goto("/settings/budget/");
+  await expect(page.getByText("Current limit: 200M tokens of every kind")).toBeVisible();
+  await expect(page.getByTestId("sidebar-token-meter").getByTestId("token-meter-all_tokens")).toContainText("35.2M / 200M");
+  await expect(page.getByLabel("New tokens (input + output)")).toHaveValue("");
+  await page.getByLabel("New tokens (input + output)").fill("20");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Token limits saved: 1 of 3 set")).toBeVisible();
+  expect(db.legacyAllTokens).toBe(0);
+  await expect(page.getByText("Current limit: 200M tokens of every kind")).toHaveCount(0);
+  await expect(page.getByTestId("sidebar-token-meter").getByTestId("token-meter-new_tokens")).toContainText("1.2M / 20M");
+});
+
+test("a member sees the token limits without a form", async ({ page }) => {
+  const db = await mockApi(page, { role: "member", limits: { new_tokens: 5_000_000, cache_read: 0, cache_write: 8_000_000 } });
   await page.goto("/settings/budget/");
   await expect(page.getByRole("heading", { level: 1, name: "Token limit" })).toBeVisible();
-  await expect(page.getByText("5M tokens a month")).toBeVisible();
-  await expect(page.getByText("Only admins and the owner can change the limit.")).toBeVisible();
-  await expect(page.getByLabel("Millions of tokens a month")).toHaveCount(0);
+  await expect(page.getByTestId("limit-new_tokens")).toContainText("5M a month");
+  await expect(page.getByTestId("limit-cache_read")).toContainText("No limit");
+  await expect(page.getByTestId("limit-cache_write")).toContainText("8M a month");
+  await expect(page.getByText("Only admins and the owner can change the limits.")).toBeVisible();
+  await expect(page.getByLabel("New tokens (input + output)")).toHaveCount(0);
   expect(db.calls.some((c) => c.method === "PUT")).toBe(false);
   await shot(page, "token-limit-member-1280.png");
 });
 
-test("every token meter shows the total of all four parts, never input plus output", async ({ page }) => {
+test("each meter counts what its limit counts; the page total is all four parts", async ({ page }) => {
   await mockApi(page, { role: "member" });
-  // What the gateway returns: total_tokens is the four parts added up;
-  // counted_tokens is the old rule while the limit doesn't count cache yet.
+  // What the gateway returns: total_tokens is the four parts added up; each
+  // limit carries its own count (new tokens = new input + output).
   const usage = {
     month: "2026-10",
     total_tokens: 71_320_000,
@@ -242,49 +310,53 @@ test("every token meter shows the total of all four parts, never input plus outp
     cache_read_tokens: 61_400_000,
     cache_write_tokens: 8_800_000,
     tokens_out: 1_000_000,
+    new_tokens: 1_120_000,
     cache_hit_rate: 61_400_000 / 70_320_000,
-    counted_tokens: 1_120_000,
-    limit_counts_cache: false,
+    limits: [
+      { kind: "new_tokens", max: 20_000_000, used: 1_120_000 },
+      { kind: "cache_read", max: 200_000_000, used: 61_400_000 },
+    ],
+    limits_legacy: false,
     features: [
       { feature: "run", total_tokens: 60_000_000, tokens_in: 100_000, cache_read_tokens: 52_000_000, cache_write_tokens: 7_100_000, tokens_out: 800_000 },
       { feature: "review", total_tokens: 11_320_000, tokens_in: 20_000, cache_read_tokens: 9_400_000, cache_write_tokens: 1_700_000, tokens_out: 200_000 },
     ],
     total_runs: 64,
-    max_tokens: 200_000_000,
+    max_tokens: 0,
   };
   await page.route((url) => url.pathname === "/api/usage", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(usage) }),
   );
 
-  // Sidebar meter: the total, with the four parts on hover.
+  // Sidebar: one small bar per set limit; the four parts on hover.
   await page.goto("/settings/");
-  const meter = page.getByTestId("sidebar-token-meter-value");
-  await expect(meter).toHaveText("71.3M / 200M");
-  await expect(meter).not.toContainText("1.1M");
-  const hover = await page.getByTestId("sidebar-token-meter").locator("[title]").first().getAttribute("title");
+  const side = page.getByTestId("sidebar-token-meter");
+  await expect(side.getByTestId("token-meter-value")).toHaveText(["1.1M / 20M", "61.4M / 200M"]);
+  await expect(side.getByTestId("token-meter-cache_write")).toHaveCount(0);
+  const hover = await side.getAttribute("title");
   expect(hover).toContain("New input 120K");
   expect(hover).toContain("Read from cache 61.4M");
   expect(hover).toContain("Written to cache 8.8M");
   expect(hover).toContain("Output 1M");
   expect(hover).toContain("Cache hit rate 87%");
 
-  // Settings hub row.
-  await expect(hubLink(page, "Token limit")).toContainText("71.3M of 200M used this month");
+  // Settings hub row: the limit closest to being reached, named.
+  await expect(hubLink(page, "Token limit")).toContainText("Cache read: 61.4M of 200M used this month");
 
   // Token limit page: the total equals the four parts from the API, plus the
   // hit rate, the split by feature, and no money anywhere.
   await page.goto("/settings/budget/");
-  await expect(page.getByRole("region", { name: /Used in/ })).toContainText("71.3M of 200M tokens");
+  await expect(page.getByRole("region", { name: /Used in/ })).toContainText("71.3M tokens in all");
   const parts = page.getByTestId("usage-part");
   await expect(parts).toHaveCount(4);
   await expect(parts.locator("dt")).toHaveText(["New input", "Read from cache", "Written to cache", "Output"]);
   const values = await parts.locator("dd").evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-value"))));
   expect(values).toEqual([120_000, 61_400_000, 8_800_000, 1_000_000]);
   expect(values.reduce((a, b) => a + b, 0)).toBe(usage.total_tokens);
+  await expect(page.getByTestId("usage-limits").getByTestId("token-meter-value")).toHaveText(["1.1M / 20M", "61.4M / 200M"]);
   await expect(page.getByTestId("cache-hit-rate")).toContainText("Cache hit rate 87%");
   await expect(page.getByRole("list", { name: "Tokens by feature" })).toContainText("Ticket runs");
   await expect(page.getByRole("list", { name: "Tokens by feature" })).toContainText("PR reviews");
-  await expect(page.getByTestId("limit-rule")).toContainText("1.1M so far");
   await expect(page.locator("main")).not.toContainText("$");
   await shot(page, "token-limit-four-parts-1280.png");
 
@@ -305,7 +377,7 @@ test("the token limit page explains a failed load and retries", async ({ page })
   await expect(page.getByText("Could not load the token limit")).toBeVisible();
   fail = false;
   await page.getByRole("button", { name: "Try again" }).click();
-  await expect(page.getByLabel("Millions of tokens a month")).toHaveValue("5");
+  await expect(page.getByLabel("New tokens (input + output)")).toHaveValue("5");
 });
 
 test("the token usage email switch saves and stays off", async ({ page }) => {
