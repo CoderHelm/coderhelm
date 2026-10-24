@@ -210,8 +210,11 @@ export function avatarTone(key: string): string {
   return tones[h % tones.length];
 }
 
+/** Who is on a ticket: its filer and participants. A ticket not sent yet has these too. */
+export type TicketPeopleSource = Pick<SupportTicket, "opened_by_id" | "opened_by_email" | "opened_by_name" | "participants">;
+
 /** Everyone on a ticket, filer first. */
-export function ticketPeople(t: SupportTicket): { key: string; name: string; email: string; filer: boolean; outside: boolean; p?: SupportParticipant }[] {
+export function ticketPeople(t: TicketPeopleSource): { key: string; name: string; email: string; filer: boolean; outside: boolean; p?: SupportParticipant }[] {
   const filer = { key: `filer:${t.opened_by_id}`, name: personName(t.opened_by_name, t.opened_by_email), email: t.opened_by_email, filer: true, outside: false };
   return [
     filer,

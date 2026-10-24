@@ -5,8 +5,9 @@ import path from "node:path";
 // The ticket thread and the people on a ticket: long threads fold their
 // middle, status and people changes are one-line events, one person's
 // messages share a header, the two-column page folds its details on narrow
-// screens, and people are added, removed, and follow. Every API call is
-// answered by the in-memory backend below.
+// screens, and people are added, removed, and follow, on a ticket or on the
+// new-ticket form before it is sent. Every API call is answered by the
+// in-memory backend below.
 
 const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots");
 const now = Date.now();
@@ -120,7 +121,7 @@ interface Backend {
   posts: { path: string; body: Record<string, unknown> }[];
 }
 
-async function mockApi(page: Page, init: { me?: string; ticket?: Partial<Ticket>; thread?: Msg[] } = {}): Promise<Backend> {
+async function mockApi(page: Page, init: { me?: string; ticket?: Partial<Ticket>; thread?: Msg[]; /** Users the gateway no longer finds on the team (removed since the page loaded). */ gone?: string[] } = {}): Promise<Backend> {
   const db: Backend = {
     me: TEAM.find((u) => u.user_id === (init.me ?? "u_1"))!,
     ticket: ticket(init.ticket),
@@ -160,6 +161,24 @@ async function mockApi(page: Page, init: { me?: string; ticket?: Partial<Ticket>
     if (p === "/api/search") return json(route, { q: "", runs: [], reviews: [], releases: [], plans: [] });
     if (p === "/api/support/badge") return json(route, { waiting: 0, queue_open: null });
     if (p === "/api/support/access") return json(route, { grant: null, windows: [24, 72, 168], log: [] });
+    if (p === "/api/support/tickets" && method === "POST") {
+      // As the gateway: each person checked against the team, the filer and
+      // repeats skipped, then the ticket with them on it and an event each.
+      const at = new Date().toISOString();
+      const people: Participant[] = [];
+      for (const who of (body.people as { user_id?: string; email?: string }[] | undefined) ?? []) {
+        const member = TEAM.find((u) => !(init.gone ?? []).includes(u.user_id) && (u.user_id === who.user_id || `USER#${u.user_id}` === who.user_id || (!!who.email && u.email === who.email)));
+        if (who.user_id && !member) return json(route, { error: "That person is not on this team." }, 400);
+        const p2: Participant = member
+          ? { user_id: `USER#${member.user_id}`, email: member.email, name: member.name || member.github_login || "", outside: false, added_by: db.me.name ?? "", added_at: at }
+          : { user_id: "", email: String(who.email), name: "", outside: true, added_by: db.me.name ?? "", added_at: at };
+        if (member?.user_id === db.me.user_id || people.some((q) => q.email === p2.email)) continue;
+        people.push(p2);
+      }
+      db.ticket = ticket({ id: "01TICKETNEW0000000000001", subject: String(body.subject), priority: String(body.priority ?? "normal"), opened_by_id: `USER#${db.me.user_id}`, opened_by_email: db.me.email, created_at: at, updated_at: at, message_count: 1, participants: people, context: { page: "", item: null, items: [], user_agent: "" } });
+      db.thread = [msg({ author_email: db.me.email, body: String(body.body), created_at: at }), ...people.map((p2) => msg({ kind: "event", author_email: db.me.email, body: `added:${label(p2)}`, created_at: at }))];
+      return json(route, detail());
+    }
     if (p === "/api/support/tickets") return json(route, { tickets: [db.ticket] });
 
     const m = /^\/api\/support\/tickets\/([^/]+)(\/reply|\/resolve|\/participants|\/participants\/remove)?$/.exec(p);
@@ -401,6 +420,137 @@ test.describe("people on a ticket", () => {
     const row = page.getByTestId("support-ticket-row");
     await expect(row).toContainText("2 people");
     await expect(row).toContainText("Coderhelm support: Which run? Attach it if you can.");
+  });
+});
+
+test.describe("people on a new ticket", () => {
+  const fill = async (page: Page) => {
+    await page.getByLabel("Subject").fill("Checkout runs fail on the bank step");
+    await page.getByLabel("What happened?").fill("Every run since this morning stops at the bank step.");
+  };
+  const creates = (db: Backend) => db.posts.filter((x) => x.path === "/api/support/tickets");
+
+  test("the filer adds teammates and an outside address, removes one before sending, and the thread shows them", async ({ page }) => {
+    const db = await mockApi(page);
+    await page.goto("/support/?new=1");
+    await fill(page);
+    const box = page.getByTestId("new-ticket-people");
+    const person = box.getByTestId("ticket-person");
+    // The person filing is always on it, and cannot be taken off.
+    await expect(person).toHaveCount(1);
+    await expect(person.first()).toContainText("(you)");
+    await expect(person.first()).toContainText("Filed");
+    await expect(person.first().getByRole("button")).toHaveCount(0);
+    await expect(box.getByTestId("follow-ticket")).toHaveCount(0);
+
+    await box.getByTestId("add-people").click();
+    const form = box.getByTestId("add-people-form");
+    const input = form.getByRole("combobox");
+    // Search by name; invites and the filer are never offered.
+    await input.fill("sam");
+    await expect(form.getByTestId("add-person-option")).toHaveCount(1);
+    await form.getByTestId("add-person-option").click();
+    await expect(person).toHaveCount(2);
+    // Search by email; Enter picks it and does not send the form.
+    await input.fill("robin.diaz@");
+    await expect(form.getByTestId("add-person-option")).toHaveCount(1);
+    await input.press("Enter");
+    await expect(person).toHaveCount(3);
+    await expect(person.nth(2)).toContainText("rdiaz");
+    // Someone already on it is not offered again.
+    await input.fill("sam");
+    await expect(form.getByTestId("add-person-option")).toHaveCount(0);
+    // A bad address is refused; a good one outside the team is copied by email.
+    await input.fill("alex.guest@");
+    await expect(form.getByRole("status")).toHaveText("Enter a valid email address.");
+    await expect(form.getByTestId("add-person-option")).toHaveCount(0);
+    await input.fill("Alex.Guest@Example.org");
+    await expect(form.getByTestId("add-person-option")).toContainText("Copy alex.guest@example.org by email");
+    await expect(form.getByTestId("add-person-option")).toContainText("they get the emails but can't sign in");
+    await input.press("Enter");
+    await expect(person).toHaveCount(4);
+    await expect(person.last()).toContainText("Copied");
+    expect(creates(db)).toHaveLength(0);
+
+    // Taken off before sending.
+    await box.getByRole("button", { name: "Remove rdiaz from this ticket" }).click();
+    await expect(person).toHaveCount(3);
+    await form.getByRole("button", { name: "Done" }).click();
+    await expect(form).toHaveCount(0);
+    await shot(page, "new-ticket-people-1280");
+
+    await page.getByRole("button", { name: "Send to support" }).click();
+    await expect(page).toHaveURL(/\/support\/ticket\/?\?id=01TICKETNEW0000000000001&new=1/);
+    expect(creates(db)).toHaveLength(1);
+    expect(creates(db)[0].body.people).toEqual([{ user_id: "u_2" }, { email: "alex.guest@example.org" }]);
+
+    // The created ticket has them on it, and the thread says who added them.
+    await expect(page.getByTestId("avatar-stack")).toContainText("3 people on this ticket");
+    const people = page.getByTestId("panel-people").getByTestId("ticket-person");
+    await expect(people).toHaveCount(3);
+    await expect(people.nth(1)).toContainText("Sam Ortiz");
+    await expect(people.nth(2)).toContainText("alex.guest@example.org");
+    await expect(people.nth(2)).toContainText("Copied");
+    const events = page.getByTestId("support-event");
+    await expect(events).toHaveCount(2);
+    await expect(events.first()).toContainText("Pat Lee added Sam Ortiz");
+    await expect(events.last()).toContainText("added alex.guest@example.org");
+    await shot(page, "new-ticket-created-1280");
+  });
+
+  test("a ticket sent with no one added goes without people", async ({ page }) => {
+    const db = await mockApi(page);
+    await page.goto("/support/?new=1");
+    await fill(page);
+    await page.getByRole("button", { name: "Send to support" }).click();
+    await expect(page).toHaveURL(/new=1/);
+    await expect.poll(() => creates(db).length).toBe(1);
+    expect(creates(db)[0].body).not.toHaveProperty("people");
+  });
+
+  test("when the gateway refuses someone, nothing is sent and the form keeps its people", async ({ page }) => {
+    // Sam left the team after the page loaded the member list.
+    const db = await mockApi(page, { gone: ["u_2"] });
+    await page.goto("/support/?new=1");
+    await fill(page);
+    const box = page.getByTestId("new-ticket-people");
+    await box.getByTestId("add-people").click();
+    await box.getByRole("combobox").fill("sam");
+    await box.getByTestId("add-person-option").click();
+    await page.getByRole("button", { name: "Send to support" }).click();
+    await expect(page.locator("form").getByRole("alert")).toHaveText("That person is not on this team.");
+    await expect(page).toHaveURL(/\/support\/?\?new=1$/);
+    await expect(box.getByTestId("ticket-person")).toHaveCount(2);
+    // Taken off, the ticket goes.
+    await box.getByRole("button", { name: "Remove Sam Ortiz from this ticket" }).click();
+    await page.getByRole("button", { name: "Send to support" }).click();
+    await expect(page).toHaveURL(/id=01TICKETNEW0000000000001/);
+    expect(creates(db).at(-1)!.body).not.toHaveProperty("people");
+  });
+
+  test("on a phone the people fit, and nothing scrolls sideways before or after sending", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockApi(page);
+    await page.goto("/support/?new=1");
+    await fill(page);
+    const box = page.getByTestId("new-ticket-people");
+    await box.getByTestId("add-people").click();
+    const input = box.getByRole("combobox");
+    await input.fill("sam");
+    await box.getByTestId("add-person-option").click();
+    await input.fill("a.very.long.outside.address.for.testing@subdomain.example.org");
+    await input.press("Enter");
+    await expect(box.getByTestId("ticket-person")).toHaveCount(3);
+    await noSideScroll(page);
+    const b = (await box.boundingBox())!;
+    expect(b.x).toBeGreaterThanOrEqual(0);
+    expect(b.x + b.width).toBeLessThanOrEqual(390);
+    await shot(page, "new-ticket-people-390");
+    await page.getByRole("button", { name: "Send to support" }).click();
+    await expect(page).toHaveURL(/id=01TICKETNEW0000000000001/);
+    await expect(page.getByTestId("avatar-stack")).toContainText("3 people on this ticket");
+    await noSideScroll(page);
+    await shot(page, "new-ticket-created-390");
   });
 });
 
