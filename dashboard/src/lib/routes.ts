@@ -57,6 +57,10 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/health": { label: "System health" },
   "/memory": { label: "Memory" },
 
+  "/brain": { label: "Brain", tab: "Company brain" },
+  "/brain/knowledge": { label: "Knowledge bases", parent: "/brain" },
+  "/brain/knowledge/base": { label: "Knowledge base", parent: "/brain/knowledge", detail: true },
+
   "/skills": { label: "Skills" },
   "/skills/item": { label: "Skill", parent: "/skills", detail: true },
   "/skills/agent": { label: "Agent", parent: "/skills", detail: true },
