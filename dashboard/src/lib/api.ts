@@ -2891,6 +2891,8 @@ export interface AdminTeam {
   /** Has runs or reviews, or (not personal) repos or a GitHub installation. */
   active: boolean;
   link: AdminTeamLink;
+  /** Team switches; only `plugins` so far. */
+  flags?: { plugins?: boolean };
 }
 
 /** Teams that belong together: the same GitHub installation, Jira site, people or company domain. */

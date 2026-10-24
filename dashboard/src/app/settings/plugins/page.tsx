@@ -1,6 +1,6 @@
 import { Redirect } from "@/components/redirect";
 
-/** MCP servers are cards on Settings → Integrations now. */
+/** MCP servers have their own page now: Connections. */
 export default function Moved() {
-  return <Redirect to="/settings/integrations/" hash="#other-tools" />;
+  return <Redirect to="/connections/" />;
 }
