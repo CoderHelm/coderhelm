@@ -84,7 +84,7 @@ export function LogGroupPicker({
                     onChange={(e) => toggle(g.name, e.target.checked)}
                     className={`h-4 w-4 shrink-0 accent-white ${focusRing}`}
                   />
-                  <span className="min-w-0 flex-1 break-all font-mono text-xs text-zinc-200">{g.name}</span>
+                  <span className="min-w-0 flex-1 wrap-anywhere font-mono text-xs text-zinc-200">{g.name}</span>
                   <span className="shrink-0 text-xs text-zinc-500">
                     {g.stored_mb < 0 ? (g.name.endsWith("*") ? "every group starting with this" : "not found now") : formatSize(g.stored_mb)}
                   </span>

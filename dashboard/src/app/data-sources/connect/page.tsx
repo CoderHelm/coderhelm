@@ -451,7 +451,7 @@ function KeyStep({ url, onConnected }: { url: string; onConnected: (source: Data
         else if (phase === "idle" && key.trim()) runCheck(key);
       }}
     >
-      <p className="text-sm text-zinc-400 break-all">
+      <p className="text-sm text-zinc-400 wrap-anywhere">
         For <span className="font-mono text-xs text-zinc-200">{url}</span>
       </p>
       <Field
@@ -619,7 +619,7 @@ function ChooseStep({ source, onSaved }: { source: DataSource; onSaved: (saved: 
                         onChange={(e) => setPicked((prev) => (e.target.checked ? [...prev, name] : prev.filter((p) => p !== name)))}
                         className={`h-4 w-4 shrink-0 accent-white ${focusRing}`}
                       />
-                      <span className="break-all">{name}</span>
+                      <span className="wrap-anywhere">{name}</span>
                     </label>
                   </li>
                 ))}
@@ -971,9 +971,9 @@ function ReviewStep({ source, onTurnedOn }: { source: DataSource; onTurnedOn: (s
       v: (
         <>
           <span>{source.name}</span>
-          {where && <span className="block break-all font-mono text-xs text-zinc-400">{where}</span>}
+          {where && <span className="block wrap-anywhere font-mono text-xs text-zinc-400">{where}</span>}
           {kind === "logs" && source.aws?.log_groups.length ? (
-            <span className="block break-all font-mono text-xs text-zinc-400">{source.aws.log_groups.join(", ")}</span>
+            <span className="block wrap-anywhere font-mono text-xs text-zinc-400">{source.aws.log_groups.join(", ")}</span>
           ) : null}
         </>
       ),
@@ -986,7 +986,7 @@ function ReviewStep({ source, onTurnedOn }: { source: DataSource; onTurnedOn: (s
           <li>
             {kind === "logs" ? "Search these logs" : "Look things up"} while it plans, writes code and reviews
             {source.repos.length === 0 ? " in any repository" : ` in ${source.repos.length === 1 ? "one repository" : `${source.repos.length} repositories`}`}
-            {source.repos.length > 0 && <span className="block break-all text-xs text-zinc-400">{source.repos.join(", ")}</span>}
+            {source.repos.length > 0 && <span className="block wrap-anywhere text-xs text-zinc-400">{source.repos.join(", ")}</span>}
           </li>
           <li>Quote what it found, with the {kind === "logs" ? "search" : "lookup"} it ran</li>
         </ul>

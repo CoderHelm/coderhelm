@@ -103,7 +103,7 @@ export function UsageStats({ stats }: { stats: SkillStats }) {
         </p>
       ) : (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Tile label="Reads" value={stats.reads.toLocaleString()} note="skills, briefs, commands" />
             <Tile
               label="Agent asks"

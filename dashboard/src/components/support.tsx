@@ -946,7 +946,7 @@ export function TicketContext({
   }
   rows.push(["Created", <time key="c" dateTime={ticket.created_at}>{when(ticket.created_at)}</time>]);
   rows.push(["Updated", <time key="u" dateTime={ticket.updated_at}>{when(ticket.updated_at)}</time>]);
-  if (admin && c.user_agent) rows.push(["Browser", <span key="ua" className="break-all text-zinc-500">{c.user_agent}</span>]);
+  if (admin && c.user_agent) rows.push(["Browser", <span key="ua" className="wrap-anywhere text-zinc-500">{c.user_agent}</span>]);
   return (
     <div className="min-w-0" data-testid="ticket-context">
       {items.length > 0 && (

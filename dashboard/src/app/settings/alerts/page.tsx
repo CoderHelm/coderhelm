@@ -477,7 +477,7 @@ function RouteRow({
                   <span className="min-w-0 text-zinc-300">{ruleWhen(rule)}</span>
                   <span aria-hidden="true" className="text-zinc-600">→</span>
                   <span className="sr-only">opens a pull request in</span>
-                  <span className="min-w-0 break-all text-emerald-300">{rule.repo}</span>
+                  <span className="min-w-0 wrap-anywhere text-emerald-300">{rule.repo}</span>
                 </li>
               ))}
               <li className="flex flex-wrap items-baseline gap-x-2 text-zinc-500">
@@ -546,7 +546,7 @@ function RouteAlarms({ route }: { route: AlertRoute }) {
                   <li key={a.name} className="flex flex-wrap items-center gap-2 px-3 py-2 text-xs">
                     <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${STATE_DOT[a.state ?? ""] ?? "bg-zinc-600"}`} />
                     <span className="w-16 shrink-0 text-zinc-500">{STATE_WORD[a.state ?? ""] ?? a.state ?? "Unknown"}</span>
-                    <span className="min-w-0 flex-1 break-all text-zinc-300" title={a.description ?? ""}>
+                    <span className="min-w-0 flex-1 wrap-anywhere text-zinc-300" title={a.description ?? ""}>
                       {a.name}
                     </span>
                     {i >= 0 ? (
@@ -881,9 +881,9 @@ function EventsTimeline({
           onChange={setFilter}
         /></div>
         {routes.length > 1 && (
-          <label className="flex items-center gap-2 text-sm text-zinc-400">
-            Route
-            <select value={topic} onChange={(e) => setTopic(e.target.value)} className={`${inputClass} w-auto py-1.5`}>
+          <label className="flex min-w-0 max-w-full items-center gap-2 text-sm text-zinc-400">
+            <span className="shrink-0 whitespace-nowrap">Route</span>
+            <select value={topic} onChange={(e) => setTopic(e.target.value)} className={`${inputClass} w-auto min-w-0 py-1.5`}>
               <option value="all">Every route</option>
               {routes.map((r) => (
                 <option key={r.topic_arn} value={r.topic_arn}>{topicName(r.topic_arn)}</option>

@@ -69,7 +69,7 @@ export function ToolCallCard({ tool }: ToolCallCardProps) {
           {tool.input && (
             <div>
               <span className="text-zinc-600 text-[10px] uppercase tracking-wider">Input</span>
-              <pre className="text-zinc-500 font-mono whitespace-pre-wrap break-all mt-0.5 max-h-32 overflow-y-auto">
+              <pre className="text-zinc-500 font-mono whitespace-pre-wrap wrap-anywhere mt-0.5 max-h-32 overflow-y-auto">
                 {formatToolInput(tool.input)}
               </pre>
             </div>

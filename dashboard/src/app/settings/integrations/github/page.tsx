@@ -227,15 +227,15 @@ function GitHubSettingsPage() {
                 <svg className="w-4 h-4 text-zinc-500 flex-shrink-0" viewBox="0 0 16 16" fill="currentColor">
                   <path d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1h-8a1 1 0 00-1 1v6.708A2.486 2.486 0 014.5 9h8.5V1.5zM5 12.25v3.25a.25.25 0 00.4.2l1.45-1.087a.25.25 0 01.3 0L8.6 15.7a.25.25 0 00.4-.2v-3.25a.25.25 0 00-.25-.25h-3.5a.25.25 0 00-.25.25z" />
                 </svg>
-                <span className="text-sm text-zinc-200 font-mono">{repo.name}</span>
+                <span className="min-w-0 text-sm text-zinc-200 font-mono wrap-anywhere">{repo.name}</span>
                 {repo.onboard_status === "ready" && (
-                  <span className="ml-auto text-xs text-emerald-400">Ready</span>
+                  <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-emerald-400">Ready</span>
                 )}
                 {repo.onboard_status === "pending" && (
-                  <span className="ml-auto text-xs text-yellow-400">Onboarding</span>
+                  <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-yellow-400">Onboarding</span>
                 )}
                 {repo.onboard_status === "failed" && (
-                  <span className="ml-auto text-xs text-red-400">Failed</span>
+                  <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-red-400">Failed</span>
                 )}
               </div>
             ))}

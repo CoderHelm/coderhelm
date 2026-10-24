@@ -341,7 +341,7 @@ export function RepoFilter({ value, onChange, repos }: { value: string; onChange
                 onMouseEnter={() => setActive(i)}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => pick(r)}
-                className={`flex cursor-pointer items-center justify-between gap-2 px-3 py-1.5 text-sm break-all ${
+                className={`flex cursor-pointer items-center justify-between gap-2 px-3 py-1.5 text-sm wrap-anywhere ${
                   i === active ? "bg-zinc-800 text-zinc-100" : "text-zinc-300"
                 }`}
               >
