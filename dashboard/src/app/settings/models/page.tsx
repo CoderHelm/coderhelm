@@ -89,6 +89,8 @@ function ModelProviderPage() {
   }, [testedAt]);
 
   const hasKey = !!config?.api_key_masked;
+  // This install calls Claude through Amazon Bedrock: no team key at all.
+  const bedrock = config?.deployment_provider === "bedrock";
   const ending = keyEnding(config?.api_key_masked ?? null);
   const showKeyInput = !hasKey || replacing;
   const typedKey = apiKey.trim();
@@ -144,7 +146,7 @@ function ModelProviderPage() {
   };
 
   const save = async () => {
-    if (!typedKey && !hasKey) {
+    if (!typedKey && !hasKey && !bedrock) {
       setProblem("Add your Anthropic API key first. Nothing is saved without one.");
       return;
     }
@@ -205,84 +207,92 @@ function ModelProviderPage() {
       {header}
 
       <div className="space-y-8">
-        <SettingsSection id="api-key" title="Anthropic API key">
-          <SettingsRow
-            label="API key"
-            testId="key-row"
-            controlClassName="sm:w-80"
-            help="Every run calls Anthropic with this key. It is encrypted at rest with AWS KMS, and only your team can use it."
-            control={(ids) => (
-              <div className="min-w-0 space-y-3">
-                {/* Status: what is saved now. */}
-                <p data-testid="key-status" className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
-                  {hasKey ? (
-                    <>
-                      <StatusDot tone="success" />
-                      <span className="text-zinc-200">Key saved</span>
-                      {ending && <span className="whitespace-nowrap text-zinc-400">· ends <Code>{ending}</Code></span>}
-                      {testedAt && <span className="whitespace-nowrap text-zinc-400">· last tested <span aria-hidden="true" className="text-emerald-400">✓</span><span className="sr-only">passed</span> {timeAgo(testedAt)}</span>}
-                    </>
-                  ) : (
-                    <>
-                      <StatusDot tone="waiting" />
-                      <span className="text-amber-300">No key saved</span>
-                      <span className="text-zinc-400">· add one to start runs</span>
-                    </>
-                  )}
-                </p>
+        {bedrock ? (
+          <SettingsSection id="api-key" title="Model access">
+            <p className="text-sm text-zinc-400" data-testid="bedrock-note">
+              This install calls Claude through Amazon Bedrock in its own AWS account. No API key is needed, and usage is billed to that account.
+            </p>
+          </SettingsSection>
+        ) : (
+          <SettingsSection id="api-key" title="Anthropic API key">
+            <SettingsRow
+              label="API key"
+              testId="key-row"
+              controlClassName="sm:w-80"
+              help="Every run calls Anthropic with this key. It is encrypted at rest with AWS KMS, and only your team can use it."
+              control={(ids) => (
+                <div className="min-w-0 space-y-3">
+                  {/* Status: what is saved now. */}
+                  <p data-testid="key-status" className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
+                    {hasKey ? (
+                      <>
+                        <StatusDot tone="success" />
+                        <span className="text-zinc-200">Key saved</span>
+                        {ending && <span className="whitespace-nowrap text-zinc-400">· ends <Code>{ending}</Code></span>}
+                        {testedAt && <span className="whitespace-nowrap text-zinc-400">· last tested <span aria-hidden="true" className="text-emerald-400">✓</span><span className="sr-only">passed</span> {timeAgo(testedAt)}</span>}
+                      </>
+                    ) : (
+                      <>
+                        <StatusDot tone="waiting" />
+                        <span className="text-amber-300">No key saved</span>
+                        <span className="text-zinc-400">· add one to start runs</span>
+                      </>
+                    )}
+                  </p>
 
-                {showKeyInput && (
-                  <div>
-                    <input
-                      id={ids.inputId}
-                      type="password"
-                      autoComplete="off"
-                      spellCheck={false}
-                      value={apiKey}
-                      onChange={(e) => {
-                        form.set("api_key", e.target.value);
-                        if (test.state !== "testing") setTest({ state: "idle" });
-                      }}
-                      placeholder="sk-ant-api03-…"
-                      aria-describedby={ids.helpId}
-                      className={monoInputClass}
-                    />
+                  {showKeyInput && (
+                    <div>
+                      <input
+                        id={ids.inputId}
+                        type="password"
+                        autoComplete="off"
+                        spellCheck={false}
+                        value={apiKey}
+                        onChange={(e) => {
+                          form.set("api_key", e.target.value);
+                          if (test.state !== "testing") setTest({ state: "idle" });
+                        }}
+                        placeholder="sk-ant-api03-…"
+                        aria-describedby={ids.helpId}
+                        className={monoInputClass}
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={runTest}
+                      disabled={testing || saving || (!hasKey && !typedKey)}
+                      className={secondaryButton}
+                    >
+                      {testing ? "Testing…" : "Test key"}
+                    </button>
+                    {hasKey && !replacing && (
+                      <button type="button" onClick={() => { setReplacing(true); setTest({ state: "idle" }); }} className={linkButton}>
+                        Replace key
+                      </button>
+                    )}
+                    {hasKey && replacing && (
+                      <button type="button" onClick={() => { setReplacing(false); form.set("api_key", ""); setTest({ state: "idle" }); }} className={linkButton}>
+                        Keep the saved key
+                      </button>
+                    )}
                   </div>
-                )}
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={runTest}
-                    disabled={testing || saving || (!hasKey && !typedKey)}
-                    className={secondaryButton}
-                  >
-                    {testing ? "Testing…" : "Test key"}
-                  </button>
-                  {hasKey && !replacing && (
-                    <button type="button" onClick={() => { setReplacing(true); setTest({ state: "idle" }); }} className={linkButton}>
-                      Replace key
-                    </button>
-                  )}
-                  {hasKey && replacing && (
-                    <button type="button" onClick={() => { setReplacing(false); form.set("api_key", ""); setTest({ state: "idle" }); }} className={linkButton}>
-                      Keep the saved key
-                    </button>
-                  )}
+                  <div aria-live="polite" data-testid="key-test-result">
+                    {test.state === "ok" && (
+                      <p className="text-sm text-emerald-300">
+                        <span aria-hidden="true">✓ </span>The key works. It is saved, with the models below.
+                      </p>
+                    )}
+                    {test.state === "fail" && <p className="text-sm text-red-300">{test.message}</p>}
+                  </div>
                 </div>
-
-                <div aria-live="polite" data-testid="key-test-result">
-                  {test.state === "ok" && (
-                    <p className="text-sm text-emerald-300">
-                      <span aria-hidden="true">✓ </span>The key works. It is saved, with the models below.
-                    </p>
-                  )}
-                  {test.state === "fail" && <p className="text-sm text-red-300">{test.message}</p>}
-                </div>
-              </div>
-            )}
-          />
-        </SettingsSection>
+              )}
+            />
+          </SettingsSection>
+        )}
 
         <SettingsSection id="models" title="Models" description="Changes apply from the next run. Runs already going keep the models they started with.">
           {MODEL_ROLES.map((role) => (

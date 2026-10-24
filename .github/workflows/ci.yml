@@ -111,6 +111,36 @@ jobs:
           path: docs/test-results/
           retention-days: 7
 
+  selfhost-dashboard:
+    name: Dashboard (self-host build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    env:
+      E2E_PORT: "3112"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: npm ci
+      # The build a self-host release ships: no API URL baked in. Where the
+      # API is comes from runtime-config.js, which each install writes.
+      - name: Build without an API URL
+        run: |
+          npm run build
+          test -f out/runtime-config.js
+          grep -q 'src="/runtime-config.js"' out/index.html
+      - name: Install Playwright's Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Self-host checks
+        run: npx playwright test e2e/selfhost.spec.ts
+        env:
+          E2E_STATIC: "1"
+
   infra:
     name: Infra
     runs-on: ubuntu-latest

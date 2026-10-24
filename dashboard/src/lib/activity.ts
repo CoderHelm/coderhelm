@@ -4,8 +4,8 @@
 // read or answered.
 
 import type { SkillKind } from "./skills";
+import { apiBase } from "@/lib/runtime-config";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
 
 /** "apply": given in full by its "Always apply" setting. "agent_tool": one
  * read-only tool call a team agent made while answering an ask (`file` is the
@@ -59,7 +59,7 @@ export interface SkillActivityFilter {
 }
 
 async function call<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { credentials: "include", cache: "no-store" });
+  const res = await fetch(`${apiBase()}${path}`, { credentials: "include", cache: "no-store" });
   const text = await res.text().catch(() => "");
   let body: Record<string, unknown> = {};
   try {

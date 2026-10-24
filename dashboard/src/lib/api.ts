@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
+import { apiBase } from "@/lib/runtime-config";
 
 /**
  * Words for a failed request when the server sent no message of its own (the
@@ -30,7 +30,7 @@ export function errorStatus(e: unknown): number | undefined {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${apiBase()}${path}`, {
     ...options,
     credentials: "include",
     cache: "no-store",
@@ -60,7 +60,7 @@ async function requestWithBody<T, E>(
   path: string,
   options?: RequestInit,
 ): Promise<({ ok: true } & T) | ({ ok: false; error: string } & Partial<E>)> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${apiBase()}${path}`, {
     ...options,
     credentials: "include",
     cache: "no-store",
@@ -1084,6 +1084,14 @@ export const api = {
   deleteDataSource: (id: string) =>
     request<{ ok: true }>(`/api/data-sources/${encodeURIComponent(id)}`, { method: "DELETE" }),
   getIntegrations: () => request<IntegrationsResponse>("/api/integrations"),
+  /** Self-hosted installs (install admins): this build, the latest release, settings, history. */
+  getSystemVersion: () => request<SystemVersion>("/api/system/version"),
+  setAutoUpdate: (settings: Partial<AutoUpdateSettings>) =>
+    request<{ settings: AutoUpdateSettings }>("/api/system/auto-update", { method: "PUT", body: JSON.stringify(settings) }),
+  updateNow: (version?: string) =>
+    request<UpdateEntry>("/api/system/update", { method: "POST", body: JSON.stringify(version ? { version } : {}) }),
+  rollbackInstall: () => request<UpdateEntry>("/api/system/rollback", { method: "POST", body: "{}" }),
+  sendTestEmail: () => request<{ sent: boolean; to?: string; reason?: string }>("/api/system/test-email", { method: "POST", body: "{}" }),
 
   // Remote MCP servers
   listMcpServers: () =>
@@ -1791,6 +1799,8 @@ export interface ModelProviderConfig {
   api_key_masked: string | null;
   primary_model: string | null;
   heavy_model: string | null;
+  /** How this install calls Claude: "bedrock" needs no team key. */
+  deployment_provider?: "anthropic" | "bedrock";
 }
 
 export interface Banner {
@@ -2118,7 +2128,8 @@ export interface AlertEventDetail {
 }
 
 /** Base URL of the Coderhelm API (shown to users who subscribe endpoints). */
-export const API_BASE_URL = API_BASE;
+/** The API base for fetch calls ("" means this hostname). */
+export const apiBaseUrl = apiBase;
 
 export interface AwsConnection {
   connection_id: string;
@@ -3320,4 +3331,38 @@ export interface Learning {
   changes: LearningChange[];
   exemplars: LearningExemplar[];
   bandit: LearningBandit[];
+}
+
+// ── This install (self-hosted) ──────────────────────────────────────────
+
+export interface AutoUpdateSettings {
+  auto: boolean;
+  channel: "stable" | "preview";
+  /** mon…sun, or daily */
+  day: string;
+  hour: number;
+  timezone: string;
+  majors: "ask" | "auto";
+}
+
+export interface UpdateEntry {
+  id?: string;
+  version: string;
+  from_version?: string;
+  actor: string;
+  mode?: "update" | "rollback";
+  status: "running" | "succeeded" | "failed" | "rolled_back";
+  reason?: string;
+  started_at?: string;
+  finished_at?: string;
+}
+
+export interface SystemVersion {
+  self_hosted: boolean;
+  current: { version: string | null; commit: string | null; released_at: string | null; config_fingerprint: string | null };
+  latest: null | { version: string; notes: string; published_at?: string; url?: string; prerelease?: boolean; breaking: boolean };
+  update_available: boolean;
+  settings?: AutoUpdateSettings;
+  running?: boolean;
+  history?: UpdateEntry[];
 }

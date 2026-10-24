@@ -3,11 +3,9 @@
 // ---------------------------------------------------------------------------
 
 import type { StreamEvent } from "./stream-types";
+import { apiBase, streamBase } from "@/lib/runtime-config";
 
-const STREAM_BASE =
-  process.env.NEXT_PUBLIC_STREAM_URL || "https://stream.coderhelm.com";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
 
 /** How long to wait for the token fetch or initial stream connection */
 const CONNECT_TIMEOUT_MS = 15_000;
@@ -99,7 +97,7 @@ async function fetchStreamToken(signal?: AbortSignal): Promise<string> {
   assertOnline();
 
   const res = await withTimeout(
-    fetch(`${API_BASE}/api/plans/chat/token`, {
+    fetch(`${apiBase()}/api/plans/chat/token`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -142,7 +140,7 @@ export async function streamChat(
   const token = await fetchStreamToken(signal);
 
   const res = await withTimeout(
-    fetch(`${STREAM_BASE}/api/plans/chat/stream`, {
+    fetch(`${streamBase()}/api/plans/chat/stream`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

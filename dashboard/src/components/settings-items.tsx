@@ -19,6 +19,8 @@ export interface SettingsItem {
   /** The capability that changes what the page shows. */
   edit: string;
   status?: SettingsStatusKey;
+  /** Only on a self-hosted install, and only for its install admins. */
+  selfHostOnly?: boolean;
 }
 
 export interface SettingsGroup {
@@ -89,6 +91,14 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     label: "Integrations",
     items: [
       { href: "/settings/integrations", title: "Integrations", description: "GitHub, Jira, AWS, New Relic, Sentry, Confluence, Teams and other tools: what each can do and whether it works.", icon: <PluginIcon />, view: "view_integrations", edit: "integrations", status: "integrations" },
+    ],
+  },
+  {
+    id: "install",
+    label: "This install",
+    items: [
+      { href: "/settings/setup", title: "Setup", description: "What is left to set up, checked live: GitHub, repositories, models, email, updates.", icon: <WrenchIcon />, view: "system", edit: "system", selfHostOnly: true },
+      { href: "/settings/system", title: "System", description: "Which version runs, updates and their history, automatic updates and roll back.", icon: <CpuIcon />, view: "system", edit: "system", selfHostOnly: true },
     ],
   },
   {

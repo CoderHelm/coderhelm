@@ -74,6 +74,8 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/settings/models": { label: "AI models", parent: "/settings" },
   "/settings/alerts": { label: "Alert routes", parent: "/settings" },
   "/settings/budget": { label: "Token limit", parent: "/settings" },
+  "/settings/setup": { label: "Setup", parent: "/settings" },
+  "/settings/system": { label: "System", parent: "/settings" },
   "/settings/integrations": { label: "Integrations", parent: "/settings" },
   "/settings/integrations/aws": { label: "AWS", parent: "/settings/integrations", tab: "AWS integration" },
   "/settings/integrations/github": { label: "GitHub", parent: "/settings/integrations", tab: "GitHub integration" },
