@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { convertGuide } from './import-platform.mjs';
+import { convertGuide, guideOrder, sortByOrder } from './import-platform.mjs';
 
 const REF = '0123456789abcdef0123456789abcdef01234567';
 
@@ -22,4 +22,11 @@ test('links inside the guides stay relative; links out of the folder point at Gi
   assert.match(out, /\[config\]\(\.\/config\.md#keys\)/);
   assert.match(out, new RegExp(`\\[infra\\]\\(https://github.com/CoderHelm/coderhelm-platform/blob/${REF}/infra/README.md\\)`));
   assert.match(out, /\[site\]\(https:\/\/example.com\)/);
+});
+
+test('guides are listed by their order front matter, the rest by name', () => {
+  assert.equal(guideOrder('---\ntitle: A\norder: 3\n---\nBody'), 3);
+  assert.equal(guideOrder('# No front matter'), undefined);
+  const order = new Map([['quick-start', 1], ['faq', 13], ['requirements', 2]]);
+  assert.deepEqual(sortByOrder(['faq', 'zeta', 'quick-start', 'alpha', 'requirements'], order), ['quick-start', 'requirements', 'faq', 'alpha', 'zeta']);
 });

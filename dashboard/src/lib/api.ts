@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
+import { apiBase } from "@/lib/runtime-config";
 
 /**
  * Words for a failed request when the server sent no message of its own (the
@@ -30,7 +30,7 @@ export function errorStatus(e: unknown): number | undefined {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${apiBase()}${path}`, {
     ...options,
     credentials: "include",
     cache: "no-store",
@@ -60,7 +60,7 @@ async function requestWithBody<T, E>(
   path: string,
   options?: RequestInit,
 ): Promise<({ ok: true } & T) | ({ ok: false; error: string } & Partial<E>)> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${apiBase()}${path}`, {
     ...options,
     credentials: "include",
     cache: "no-store",
@@ -1791,6 +1791,8 @@ export interface ModelProviderConfig {
   api_key_masked: string | null;
   primary_model: string | null;
   heavy_model: string | null;
+  /** How this install calls Claude: "bedrock" needs no team key. */
+  deployment_provider?: "anthropic" | "bedrock";
 }
 
 export interface Banner {
@@ -2118,7 +2120,8 @@ export interface AlertEventDetail {
 }
 
 /** Base URL of the Coderhelm API (shown to users who subscribe endpoints). */
-export const API_BASE_URL = API_BASE;
+/** The API base for fetch calls ("" means this hostname). */
+export const apiBaseUrl = apiBase;
 
 export interface AwsConnection {
   connection_id: string;

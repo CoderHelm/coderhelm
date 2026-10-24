@@ -24,8 +24,8 @@ import {
   BellIcon, TargetIcon, RepeatIcon, ShieldCheckIcon,
   PluginIcon, ShieldIcon, TemplateIcon, CpuIcon, MemoryIcon,
   LifeBuoyIcon, MailIcon, DatabaseIcon, TestTubeIcon, LogFindingsIcon, GraphIcon, PlanIcon, BookIcon } from "./icons";
+import { apiBase, siteUrl } from "@/lib/runtime-config";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
 
 
 interface User {
@@ -40,6 +40,8 @@ interface User {
   status?: string;
   /** The capability keys this person holds (lib/capabilities.ts). */
   capabilities?: string[];
+  /** An admin of the whole install (the server's PLATFORM_ADMIN_EMAILS). */
+  platform_admin?: boolean;
 }
 
 interface NavItem {
@@ -120,6 +122,8 @@ const navGroups: NavGroup[] = [
 
 /** Who sees the platform admin page. The server checks again on every call. */
 function isPlatformAdmin(user: User | null): boolean {
+  if (typeof user?.platform_admin === "boolean") return user.platform_admin;
+  // A gateway from before the field: the hosted admin.
   return user?.email === "admin@coderhelm.com";
 }
 
@@ -334,7 +338,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               Reinstall GitHub App
             </a>
             <a
-              href={`${API_BASE}/auth/github`}
+              href={`${apiBase()}/auth/github`}
               className={`text-sm text-zinc-400 hover:text-zinc-200 underline transition-colors rounded ${focusRing}`}
             >
               Then sign in with GitHub again
@@ -825,8 +829,20 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
+  // The hosted site's terms; a self-hosted install has none unless it names a site.
+  const site = siteUrl();
+  // A self-hosted install has no terms to agree to (no site): the box is pre-ticked and hidden.
+  useEffect(() => {
+    if (!site) setAgreedTos(true);
+  }, [site]);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    // The installer's first-admin link opens the sign-up form.
+    if (params.get("signup") === "1") {
+      setView("signup");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
     if (params.get("error") === "closed_beta") {
       setError("Coderhelm is in closed beta. Join the waitlist to get notified.");
       setView("waitlist");
@@ -989,14 +1005,14 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
               </div>
               <div className="space-y-3">
                 <a
-                  href={`${API_BASE}/auth/google`}
+                  href={`${apiBase()}/auth/google`}
                   className="flex w-full items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-200 transition-colors"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
                   Continue with Google
                 </a>
                 <a
-                  href={`${API_BASE}/auth/github`}
+                  href={`${apiBase()}/auth/github`}
                   className="flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-2.5 text-sm font-medium text-zinc-100 hover:bg-zinc-700 transition-colors"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
@@ -1043,16 +1059,18 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
                 <input type="password" name="password" id="signup-password" autoComplete="new-password" aria-label="Password, at least 8 characters" placeholder="Password (8+ chars)" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
-                <label className="flex items-start gap-2 cursor-pointer">
-                  <input type="checkbox" checked={agreedTos} onChange={(e) => setAgreedTos(e.target.checked)}
-                    className="mt-0.5 rounded border-zinc-700 bg-zinc-900 text-blue-600 focus:ring-0 focus:ring-offset-0 cursor-pointer" />
-                  <span className="text-xs text-zinc-500">
-                    I agree to the{" "}
-                    <a href="https://coderhelm.com/terms" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-200 underline">Terms of Service</a>
-                    {" "}and{" "}
-                    <a href="https://coderhelm.com/privacy" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-200 underline">Privacy Policy</a>
-                  </span>
-                </label>
+                {site && (
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input type="checkbox" checked={agreedTos} onChange={(e) => setAgreedTos(e.target.checked)}
+                      className="mt-0.5 rounded border-zinc-700 bg-zinc-900 text-blue-600 focus:ring-0 focus:ring-offset-0 cursor-pointer" />
+                    <span className="text-xs text-zinc-500">
+                      I agree to the{" "}
+                      <a href={`${site}/terms`} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-200 underline">Terms of Service</a>
+                      {" "}and{" "}
+                      <a href={`${site}/privacy`} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-200 underline">Privacy Policy</a>
+                    </span>
+                  </label>
+                )}
                 <button type="submit" disabled={loading || !email || password.length < 8 || !agreedTos}
                   className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed">
                   {loading ? "Creating account..." : "Create account"}
@@ -1170,11 +1188,13 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
             </div>
           )}
 
-          <div className="flex gap-3 text-xs text-zinc-600 mt-4">
-            <a href="https://coderhelm.com/terms" className="hover:text-zinc-400 transition-colors">Terms</a>
-            <span>·</span>
-            <a href="https://coderhelm.com/privacy" className="hover:text-zinc-400 transition-colors">Privacy</a>
-          </div>
+          {site && (
+            <div className="flex gap-3 text-xs text-zinc-600 mt-4">
+              <a href={`${site}/terms`} className="hover:text-zinc-400 transition-colors">Terms</a>
+              <span>·</span>
+              <a href={`${site}/privacy`} className="hover:text-zinc-400 transition-colors">Privacy</a>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
+import { apiBase } from "@/lib/runtime-config";
 // A team's own tools: named, typed, reviewed reads its agents can call.
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
 
 export type ToolKind = "sql" | "graphql" | "logs" | "http";
 export type InputType = "string" | "integer" | "date";
@@ -96,7 +96,7 @@ export interface ToolCheck {
 }
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${apiBase()}${path}`, {
     ...init,
     credentials: "include",
     cache: "no-store",
