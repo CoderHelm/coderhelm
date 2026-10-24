@@ -114,14 +114,18 @@ function signups(): Signup[] {
   ];
 }
 
+/** The usage check's last run, as GET /api/admin/usage-check returns it: all clear. */
+const USAGE_OK = { state: "ran", checked_at: ago(2 * 3_600_000), secret: null, day: "2026-10-22", teams: 3, flagged_models: 0, failed_teams: 0 };
+
 interface Backend {
   signups: Signup[];
   allowlist: string[];
+  usageCheck: Record<string, unknown>;
   calls: { method: string; path: string; body: Record<string, unknown> | null }[];
 }
 
-async function mockApi(page: Page, email = ADMIN_EMAIL): Promise<Backend> {
-  const db: Backend = { signups: signups(), allowlist: ["fay@hooli.test", "*@acme.test"], calls: [] };
+async function mockApi(page: Page, email = ADMIN_EMAIL, usageCheck: Record<string, unknown> = USAGE_OK): Promise<Backend> {
+  const db: Backend = { signups: signups(), allowlist: ["fay@hooli.test", "*@acme.test"], usageCheck, calls: [] };
   const admin = email === ADMIN_EMAIL;
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
@@ -159,6 +163,7 @@ async function mockApi(page: Page, email = ADMIN_EMAIL): Promise<Backend> {
       if (!db.allowlist.includes(target.email)) db.allowlist.push(target.email);
       return json(route, { status: "invited", email: target.email, invited_at: target.invited_at });
     }
+    if (p === "/api/admin/usage-check") return json(route, db.usageCheck);
     if (p === "/api/allowlist" && method === "GET") return json(route, { emails: db.allowlist });
     return json(route, { error: `Not mocked: ${p}` }, 404);
   });
@@ -271,4 +276,43 @@ test("anyone but the platform admin is refused and sees no Admin menu item", asy
   await page.goto("/admin");
   await expect(page.getByRole("heading", { name: "Access denied" })).toBeVisible();
   await expect(page.getByRole("link", { name: /^Admin/ })).toHaveCount(0);
+});
+
+test("the usage check reads OK when recorded usage matches the report", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/admin");
+  const panel = page.getByTestId("usage-check");
+  await expect(panel).toHaveAttribute("data-state", "ok");
+  await expect(page.getByRole("region", { name: "Usage check" })).toContainText("OK");
+  await expect(panel).toContainText("Recorded usage matches Anthropic's report: 3 teams compared for 2026-10-22, checked 2 h ago.");
+  await expect(page.getByTestId("usage-problem")).toHaveCount(0);
+  await shot(page, "admin-usage-ok");
+});
+
+test("the usage check lists each problem it found", async ({ page }) => {
+  const db = await mockApi(page, ADMIN_EMAIL, { ...USAGE_OK, flagged_models: 2, failed_teams: 1 });
+  await page.goto("/admin");
+  const panel = page.getByTestId("usage-check");
+  await expect(panel).toHaveAttribute("data-state", "problems");
+  await expect(page.getByRole("region", { name: "Usage check" })).toContainText("2 problems");
+  await expect(panel).not.toContainText("matches");
+  const problems = page.getByRole("list", { name: "Usage check problems" }).getByTestId("usage-problem");
+  await expect(problems).toHaveCount(2);
+  await expect(problems.nth(0)).toContainText("2 models off from Anthropic's report");
+  await expect(problems.nth(1)).toContainText("1 team not checked");
+  expect(db.calls.some((c) => c.path === "/api/admin/usage-check")).toBe(true);
+  await shot(page, "admin-usage-problems");
+});
+
+test("the usage check says when it is off or hasn't run", async ({ page }) => {
+  const db = await mockApi(page, ADMIN_EMAIL, { state: "off", checked_at: ago(3_600_000), secret: "example/anthropic-admin-keys", day: null, teams: 0, flagged_models: 0, failed_teams: 0 });
+  await page.goto("/admin");
+  const panel = page.getByTestId("usage-check");
+  await expect(panel).toHaveAttribute("data-state", "off");
+  await expect(page.getByTestId("usage-problem")).toContainText("Add the key to example/anthropic-admin-keys.");
+
+  db.usageCheck = { state: "never" };
+  await page.reload();
+  await expect(panel).toHaveAttribute("data-state", "never");
+  await expect(page.getByTestId("usage-problem")).toContainText("Not run yet");
 });
