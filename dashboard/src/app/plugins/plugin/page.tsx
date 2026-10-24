@@ -15,9 +15,8 @@ import {
   type PluginVersion,
   type TrackKind,
 } from "@/lib/plugins";
-import { hasRole } from "@/lib/roles";
 import { formatTokens } from "@/lib/usage";
-import { useMe } from "@/hooks/use-me";
+import { useCan } from "@/hooks/use-can";
 import { PluginsGate, Refusal, RiskChip, RunStatusChip } from "@/components/plugins";
 import { Page, PageHeader, Section, cardClass } from "@/components/page";
 import { Chip, List, ListEmpty, ListError, ListRow, ListSkeleton } from "@/components/list";
@@ -46,9 +45,10 @@ function errorOf(e: unknown): { code: string; message: string } {
 
 function PluginPage() {
   const id = useSearchParams().get("id") ?? "";
-  const me = useMe();
-  const isAdmin = hasRole(me?.role, "admin");
-  const isMember = hasRole(me?.role, "member");
+  const { can } = useCan();
+  // Installing, updates, settings, limits and approvers: `plugins.install`; starting runs: `plugins.run`.
+  const isAdmin = can("plugins.install");
+  const isMember = can("plugins.run");
   const router = useRouter();
   const { toast } = useToast();
   const { confirm } = useConfirm();
@@ -480,7 +480,7 @@ function UpdateOptions({ plugin, busy, act }: { plugin: InstalledPlugin; busy: s
               }}
             />
           </div>
-          <div className="min-w-0 flex-1">
+          <div className="w-full min-w-0 sm:w-auto sm:flex-1">
             <Field id="track-value" label={kind === "sha" ? "Commit" : kind === "tag" ? "Tag" : "Branch"}>
               {(props) => <input {...props} className={monoInputClass} value={value} onChange={(e) => setValue(e.target.value)} autoComplete="off" />}
             </Field>
@@ -529,7 +529,7 @@ function SettingsForm({ plugin, act }: { plugin: InstalledPlugin; act: Act }) {
             label={s.key}
             helper={
               s.type === "connection"
-                ? `A ${s.provider ?? ""} connection${s.scopes?.length ? ` with ${s.scopes.join(", ")}` : ""}. Connect it on Connections, then name it here.`
+                ? `A connection${s.provider ? ` (${s.provider})` : ""}${s.scopes?.length ? ` with ${s.scopes.join(", ")}` : ""}. Connect it on Connections, then name it here.`
                 : s.sensitive
                   ? s.set
                     ? "Set. Enter a new value to replace it."

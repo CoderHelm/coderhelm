@@ -100,6 +100,8 @@ export const api = {
       capabilities?: string[];
       /** Set when their role is one of the team's custom roles. */
       custom_role?: { id: string; name: string } | null;
+      /** The team's switches; `plugins` turns plugins on. */
+      flags?: { plugins?: boolean };
     }>("/api/me"),
   signup: (email: string, password: string) =>
     request<{ status: string; message: string }>("/auth/signup", {
