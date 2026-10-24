@@ -7,6 +7,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type FocusEvent,
   type KeyboardEvent,
   type ReactNode,
   type Ref,
@@ -33,6 +34,10 @@ import {
 //   <Field as="custom" label="What happened?">
 //     {(ids) => <MarkdownEditor {...ids} variant="prose" value={v} onChange={setV} draftKey="support:new" />}
 //   </Field>
+//
+// Saved instructions (the "instructions" variant) are read far more often
+// than written: while the box is not being edited and holds text, it shows
+// the text formatted, with an Edit button. `readOnly` shows only that.
 
 export type MarkdownEditorVariant = "prose" | "instructions" | "compact";
 
@@ -55,8 +60,22 @@ export interface MarkdownEditorProps {
   maxLength?: number;
   /** Height of the empty box, in lines. */
   minRows?: number;
-  /** The box grows with the text up to this many pixels, then scrolls. */
-  maxHeight?: number;
+  /**
+   * The box grows with the text up to this height, then scrolls inside: pixels,
+   * or a CSS `vh` length. Default 60vh (200px for a chat box).
+   */
+  maxHeight?: number | `${number}vh`;
+  /** Monospace text, only for content that is code (a query, a list of globs). */
+  mono?: boolean;
+  /** Show the text formatted, with no way to change it (a viewer's role). */
+  readOnly?: boolean;
+  /**
+   * While not being edited and not empty, show the text formatted with an Edit
+   * button. Default on for "instructions", off otherwise.
+   */
+  previewWhenIdle?: boolean;
+  /** Read-only and empty: what to say instead. */
+  emptyText?: string;
   disabled?: boolean;
   autoFocus?: boolean;
   /** Keeps unsent text in this browser under this key; `clearDraft(key)` after sending. */
@@ -76,7 +95,7 @@ export interface MarkdownEditorProps {
   textareaRef?: Ref<HTMLTextAreaElement>;
   /** Classes for the outer frame. */
   className?: string;
-  /** Test id on the text box. */
+  /** Test id on the text box; the whole field gets `${testId}-field`. */
   testId?: string;
 }
 
@@ -276,6 +295,122 @@ function setRef<T>(ref: Ref<T> | undefined, value: T | null) {
   else (ref as { current: T | null }).current = value;
 }
 
+/** A height like 480 or "60vh" in pixels, now. */
+function toPixels(h: number | string): number {
+  if (typeof h === "number") return h;
+  const vh = /^([\d.]+)vh$/.exec(h);
+  if (vh && typeof window !== "undefined") return Math.round((window.innerHeight * Number(vh[1])) / 100);
+  return 480;
+}
+
+/** `toPixels`, kept current when the window is resized. */
+function useMaxPixels(h: number | string): number {
+  const [px, setPx] = useState(() => (typeof h === "number" ? h : 480));
+  useLayoutEffect(() => {
+    const measure = () => setPx(toPixels(h));
+    measure();
+    if (typeof h === "number") return;
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [h]);
+  return px;
+}
+
+/**
+ * A box that scrolls fades its edge when there is more past it, so a line
+ * half hidden at the top or bottom is never a hard cut through the text.
+ */
+function edgeFade(el: HTMLElement | null): string | undefined {
+  if (!el || el.scrollHeight <= el.clientHeight + 1) return undefined;
+  const top = el.scrollTop > 1;
+  const bottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+  if (!top && !bottom) return undefined;
+  return `linear-gradient(to bottom, ${top ? "transparent 0, #000 1.5rem" : "#000 0"}, ${bottom ? "#000 calc(100% - 1.5rem), transparent 100%" : "#000 100%"})`;
+}
+
+function useEdgeFade<T extends HTMLElement>(ref: { current: T | null }, deps: unknown[]) {
+  const apply = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const mask = edgeFade(el) ?? "";
+    el.style.maskImage = mask;
+    el.style.webkitMaskImage = mask;
+    if (mask) el.dataset.faded = "true";
+    else delete el.dataset.faded;
+  }, [ref]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(apply, deps);
+  return apply;
+}
+
+const PencilIcon = () => (
+  <svg {...ic} width={14} height={14}>
+    <path d="M4 20h4L19 9a2.8 2.8 0 00-4-4L4 16z" />
+    <path d="M13.5 6.5l4 4" />
+  </svg>
+);
+
+/** Formatted text that grows with its content up to `max` pixels, then scrolls inside. */
+function ReadingView({ value, max, minHeight, empty, id, describedBy, testId }: {
+  value: string;
+  max: number;
+  minHeight?: string;
+  empty: ReactNode;
+  id?: string;
+  describedBy?: string;
+  testId: string;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const fade = useEdgeFade(ref, [value, max]);
+  return (
+    <div
+      ref={ref}
+      id={id}
+      aria-describedby={describedBy}
+      tabIndex={0}
+      onScroll={fade}
+      className={`overflow-y-auto overscroll-contain px-3 py-2.5 [scrollbar-width:thin] ${focusRing}`}
+      style={{ maxHeight: max, minHeight }}
+      data-testid={testId}
+    >
+      {value.trim() ? <ChatMarkdown breaks tone="reading">{value}</ChatMarkdown> : <p className="text-sm text-zinc-500">{empty}</p>}
+    </div>
+  );
+}
+
+/** The Preview tab: how the text reads, at most `max` pixels tall. */
+function PreviewPanel({ id, labelledBy, value, max, minHeight, note }: {
+  id: string;
+  labelledBy: string;
+  value: string;
+  max: number;
+  minHeight: string;
+  note?: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const fade = useEdgeFade(ref, [value, max]);
+  return (
+    <div
+      ref={ref}
+      id={id}
+      role="tabpanel"
+      aria-labelledby={labelledBy}
+      tabIndex={0}
+      onScroll={fade}
+      className={`overflow-y-auto overscroll-contain px-3 py-2.5 [scrollbar-width:thin] ${focusRing}`}
+      style={{ minHeight, maxHeight: max }}
+      data-testid="md-preview"
+    >
+      {note && <p className="mb-2 text-xs text-zinc-500">{note}</p>}
+      {value.trim() ? (
+        <ChatMarkdown breaks tone="reading">{value}</ChatMarkdown>
+      ) : (
+        <p className="text-sm text-zinc-500">Nothing to preview yet.</p>
+      )}
+    </div>
+  );
+}
+
 // ── The editor ──────────────────────────────────────────────────────────
 
 export function MarkdownEditor({
@@ -290,6 +425,10 @@ export function MarkdownEditor({
   maxLength,
   minRows,
   maxHeight,
+  mono = false,
+  readOnly = false,
+  previewWhenIdle,
+  emptyText = "Nothing here yet.",
   disabled = false,
   autoFocus = false,
   draftKey,
@@ -307,7 +446,7 @@ export function MarkdownEditor({
   const id = givenId ?? `md-${generated}`;
   const compact = variant === "compact";
   const rows = minRows ?? (compact ? 1 : variant === "instructions" ? 10 : 6);
-  const max = maxHeight ?? (compact ? 200 : variant === "instructions" ? 640 : 480);
+  const max = useMaxPixels(maxHeight ?? (compact ? 200 : "60vh"));
   const mac = useIsMac();
   const mod = mac ? "⌘" : "Ctrl+";
 
@@ -316,6 +455,52 @@ export function MarkdownEditor({
   const [tipsOpen, setTipsOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const draft = useDraft(draftKey, value, onChange);
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  // Being edited: focus is inside the editor (or was, until the click that took it away ends).
+  const [editing, setEditing] = useState(false);
+  const idleView = !compact && !readOnly && (previewWhenIdle ?? variant === "instructions") && !editing && value.trim() !== "";
+  const pointerDown = useRef(false);
+
+  // Leaving the editor goes back to the formatted view, but only once the
+  // click that moved focus is over: changing the box's height under a
+  // half-done click would move the button being clicked.
+  useEffect(() => {
+    const down = () => { pointerDown.current = true; };
+    const up = () => { setTimeout(() => { pointerDown.current = false; }, 0); };
+    document.addEventListener("pointerdown", down, true);
+    document.addEventListener("pointerup", up, true);
+    document.addEventListener("pointercancel", up, true);
+    return () => {
+      document.removeEventListener("pointerdown", down, true);
+      document.removeEventListener("pointerup", up, true);
+      document.removeEventListener("pointercancel", up, true);
+    };
+  }, []);
+
+  // Checked a moment later: the Edit button hands focus to the box on the next frame.
+  const leaveIfOutside = useCallback(() => {
+    setTimeout(() => {
+      const frame = frameRef.current;
+      if (frame && frame.contains(document.activeElement)) return;
+      setEditing(false);
+      setTab("write");
+    }, 60);
+  }, []);
+
+  const onFrameBlur = (e: FocusEvent<HTMLDivElement>) => {
+    if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget as Node)) return;
+    if (!pointerDown.current) {
+      leaveIfOutside();
+      return;
+    }
+    const after = () => {
+      document.removeEventListener("click", after, true);
+      document.removeEventListener("pointerup", after, true);
+      leaveIfOutside();
+    };
+    document.addEventListener("click", after, true);
+    document.addEventListener("pointerup", after, true);
+  };
 
   const writeTabId = `${id}-write-tab`;
   const previewTabId = `${id}-preview-tab`;
@@ -323,14 +508,32 @@ export function MarkdownEditor({
   const tipsId = `${id}-tips`;
   const toolbarId = `${id}-toolbar`;
 
-  // Grow with the text, between `rows` lines and `max` pixels.
+  // Grow with the text, between `rows` lines and `max` pixels. Once it
+  // scrolls, the box holds whole lines, and a cut edge fades.
+  const fadeTextarea = useEdgeFade(ref, [value, max, tab, idleView]);
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el || tab !== "write") return;
+    if (!el) return;
+    if (tab !== "write" || idleView) {
+      el.style.height = "";
+      el.style.overflowY = "";
+      return;
+    }
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight + 2, max)}px`;
-    el.style.overflowY = el.scrollHeight + 2 > max ? "auto" : "hidden";
-  }, [value, max, tab]);
+    const full = el.scrollHeight;
+    if (full <= max) {
+      el.style.height = `${full}px`;
+      el.style.overflowY = "hidden";
+    } else {
+      const cs = getComputedStyle(el);
+      const line = parseFloat(cs.lineHeight) || 24;
+      const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+      const lines = Math.max(rows, Math.floor((max - pad) / line));
+      el.style.height = `${Math.round(lines * line + pad)}px`;
+      el.style.overflowY = "auto";
+    }
+    fadeTextarea();
+  }, [value, max, tab, idleView, rows, fadeTextarea]);
 
   const run = useCallback((action: Action) => {
     const el = ref.current;
@@ -466,6 +669,8 @@ export function MarkdownEditor({
       id={id}
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      onFocus={() => setEditing(true)}
+      onScroll={fadeTextarea}
       onKeyDown={handleKeyDown}
       onPaste={(e) => {
         const el = e.currentTarget;
@@ -483,11 +688,13 @@ export function MarkdownEditor({
       rows={rows}
       disabled={disabled}
       autoFocus={autoFocus}
-      spellCheck
+      // In the formatted view the Edit button is the stop; the label still focuses the box.
+      tabIndex={idleView ? -1 : undefined}
+      spellCheck={!mono}
       data-testid={testId}
-      className={`block w-full resize-none bg-transparent text-sm leading-relaxed text-zinc-100 placeholder-zinc-500 focus:outline-none disabled:opacity-60 ${
-        compact ? "px-3 pb-1 pt-2.5" : "px-3 py-2.5"
-      }`}
+      className={`block w-full resize-none bg-transparent text-sm leading-relaxed text-zinc-300 placeholder-zinc-500 [scrollbar-width:thin] focus:outline-none disabled:opacity-60 ${
+        mono ? "font-mono" : ""
+      } ${compact ? "px-3 pb-1 pt-2.5" : "px-3 py-2.5"}`}
     />
   );
 
@@ -535,10 +742,47 @@ export function MarkdownEditor({
     );
   }
 
+  const minHeight = `${rows * 1.42 + 1.25}rem`;
+
+  if (readOnly) {
+    return (
+      <div className={`min-w-0 ${className}`} data-variant={variant} data-mode="read" data-testid={testId ? `${testId}-field` : undefined}>
+        <div className={`${frame} ${border} overflow-hidden`}>
+          <ReadingView value={value} max={max} empty={emptyText} id={id} describedBy={describedBy} testId="md-reading" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={`min-w-0 ${className}`} data-variant={variant}>
-      <div className={`${frame} ${border} overflow-hidden`}>
-        <div className="flex min-w-0 flex-wrap items-end gap-x-2 border-b border-zinc-800 bg-zinc-900/60 px-1.5 pt-1">
+    <div className={`min-w-0 ${className}`} data-variant={variant} data-mode={idleView ? "view" : "edit"} data-testid={testId ? `${testId}-field` : undefined}>
+      <div ref={frameRef} onBlur={onFrameBlur} className={`${frame} ${border} relative overflow-hidden`}>
+        {idleView && (
+          <>
+            <div className="flex min-w-0 items-center justify-end gap-2 border-b border-zinc-800 bg-zinc-900/60 px-1.5 py-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditing(true);
+                  setTab("write");
+                  // The box is in place once this render lands.
+                  requestAnimationFrame(() => ref.current?.focus());
+                }}
+                disabled={disabled}
+                aria-controls={id}
+                className={`inline-flex min-h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-40 ${focusRing}`}
+                data-testid="md-edit"
+              >
+                <PencilIcon />
+                Edit
+              </button>
+            </div>
+            <ReadingView value={value} max={max} empty={emptyText} testId="md-reading" />
+          </>
+        )}
+        <div
+          className={idleView ? "hidden" : "flex min-w-0 flex-wrap items-end gap-x-2 border-b border-zinc-800 bg-zinc-900/60 px-1.5 pt-1"}
+        >
           <div role="tablist" aria-label="Write or preview" className="flex shrink-0">
             {tabButton("write", "Write", writeTabId)}
             {tabButton("preview", "Preview", previewTabId)}
@@ -559,28 +803,20 @@ export function MarkdownEditor({
           {/* On a phone the toolbar takes its own row under the tabs. */}
           <div className={`w-full pb-1 sm:w-auto ${template ? "" : "sm:ml-auto"}`}>{toolbar}</div>
         </div>
-        <div id={`${id}-write`} role="tabpanel" aria-labelledby={writeTabId} hidden={tab !== "write"}>
+        {/* Always in the same place, so focus survives the switch from the formatted view. */}
+        <div
+          id={`${id}-write`}
+          role="tabpanel"
+          aria-labelledby={writeTabId}
+          hidden={!idleView && tab !== "write"}
+          className={idleView ? "sr-only" : undefined}
+        >
           {textarea}
         </div>
-        {tab === "preview" && (
-          <div
-            id={previewId}
-            role="tabpanel"
-            aria-labelledby={previewTabId}
-            tabIndex={0}
-            className={`overflow-y-auto px-3 py-2.5 ${focusRing}`}
-            style={{ minHeight: `${rows * 1.42 + 1.25}rem`, maxHeight: max }}
-            data-testid="md-preview"
-          >
-            {previewNote && <p className="mb-2 text-xs text-zinc-500">{previewNote}</p>}
-            {value.trim() ? (
-              <ChatMarkdown breaks>{value}</ChatMarkdown>
-            ) : (
-              <p className="text-sm text-zinc-500">Nothing to preview yet.</p>
-            )}
-          </div>
+        {tab === "preview" && !idleView && (
+          <PreviewPanel id={previewId} labelledBy={previewTabId} value={value} max={max} minHeight={minHeight} note={previewNote} />
         )}
-        <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-zinc-800/70 px-3 py-1.5 text-xs">
+        <div className={`${idleView ? "hidden" : "flex"} min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-zinc-800/70 px-3 py-1.5 text-xs`}>
           <button
             type="button"
             onClick={() => setTipsOpen((v) => !v)}
@@ -598,7 +834,7 @@ export function MarkdownEditor({
           </button>
           {status}
         </div>
-        {tipsOpen && (
+        {tipsOpen && !idleView && (
           <ul id={tipsId} className="space-y-1 border-t border-zinc-800/70 px-3 py-2 text-xs leading-relaxed text-zinc-400" data-testid="md-tips">
             {tipList.map((t, i) => (
               <li key={i} className="flex gap-2">

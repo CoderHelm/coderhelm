@@ -46,3 +46,33 @@ export const MARKDOWN = [
   ``,
   `Branch: \`${BRANCH}\``,
 ].join("\n");
+
+/**
+ * Saved instructions as people write them: a long bulleted list with a nested
+ * level, a heading, inline code and a long unbroken token. Used for review
+ * focus, team standards, custom instructions, guides and alert-route notes,
+ * so each is drawn the way a real one is read.
+ */
+export const NOTES = [
+  `## Pay close attention to`,
+  ``,
+  `- Auth changes: any edit under \`src/auth/\` or to the session cookie must keep the \`SameSite=Lax\` flag and the CSRF check in place.`,
+  `- Database migrations: every migration needs a matching down step, and must not lock the \`orders\` table for more than a second on production data.`,
+  `- Payments: ${SENTENCE}`,
+  `  - Retries must reuse the same idempotency key.`,
+  `  - Never log card numbers, tokens or the full customer email.`,
+  `- New dependencies: flag any package that is not already in \`package-lock.json\`, and say why it is needed.`,
+  `- Feature flags: a new flag needs an owner and a removal date in \`flags.yaml\`.`,
+  `- Error handling: wrap every handler in \`withErrorBoundary\`; bare \`try\`/\`catch\` that swallows errors is a request-changes.`,
+  `- Long identifiers stay readable: \`${FILE}\``,
+  `- Tests: new behaviour comes with a test next to the code; snapshot-only tests do not count.`,
+  `- Accessibility: every new control has a label, and nothing relies on colour alone.`,
+  `- Performance: no new request in a render loop, and no unbounded list without paging.`,
+  `- Logging: structured fields only, and nothing that identifies a person.`,
+  `- Copy: plain words, no jargon, and every error says what to do next.`,
+  ``,
+  `## Ignore`,
+  ``,
+  `- Generated files under \`src/gen/\` and lockfile churn.`,
+  `- Formatting-only diffs that the linter already fixes.`,
+].join("\n");

@@ -1,7 +1,7 @@
 import type { Handler } from "./index";
 import { ALERT_ID, REVIEW_SK, SUPPORT_TICKET_ID, TEST_ID, TEST_RUN_KEY } from "./ids";
 import {
-  ARN, BRANCH, EMAIL, FILE, FILE_2, iso, LOG_GROUP, LONG_URL, MARKDOWN, ORG, PR_URL, REPO, REPO_2, SENTENCE, SHA, TICKET, TITLE, TOKEN,
+  ARN, BRANCH, EMAIL, FILE, FILE_2, iso, LOG_GROUP, LONG_URL, MARKDOWN, NOTES, ORG, PR_URL, REPO, REPO_2, SENTENCE, SHA, TICKET, TITLE, TOKEN,
 } from "./long";
 
 // The reviewer, tests, alerts, support and skills parts of the invented
@@ -75,7 +75,7 @@ function livePr(i: number) {
 }
 
 const REVIEWER_CONFIG = {
-  enabled: true, label: "coderhelm-review-please-with-a-very-long-label-name", killed: false, instructions: MARKDOWN, auto_merge: true,
+  enabled: true, label: "coderhelm-review-please-with-a-very-long-label-name", killed: false, instructions: NOTES, auto_merge: true,
   merge_method: "squash", require_human_approval: true, auto_tag: true, tag_mode: "semver", tag_prefix: "release-candidate-for-production-",
   tag_batch_minutes: 30, health_check: true, verify_tests: true, require_tests: true, auto_labels: true, auto_label_allow: `${TOKEN},${TOKEN}`,
   auto_label_requires: TOKEN, auto_label_guide: MARKDOWN, release_notes: true, release_notes_branch: BRANCH, release_notes_confluence_space: "ENGINEERINGPLATFORMRELEASES",
@@ -153,7 +153,7 @@ const ALERT_ROUTES = {
       topic_arn: TOPIC, enabled: true, notify_mode: "custom", post_recoveries: true, updated_at: iso(DAY),
       webhooks: { teams: { set: true, hint: "example.environment.api.powerplatform.com …ab12" }, slack: { set: true, hint: "hooks.slack.example.com …cd34" } },
       rules: [
-        { id: "r1", alarms: ["production-payments-reconciliation-service-5xx-rate-above-threshold"], terms: [], repo: REPO, instructions: MARKDOWN },
+        { id: "r1", alarms: ["production-payments-reconciliation-service-5xx-rate-above-threshold"], terms: [], repo: REPO, instructions: NOTES },
         { id: "r2", alarms: [], terms: [TOKEN, LOG_GROUP], repo: REPO_2, instructions: SENTENCE },
       ],
     },
@@ -277,7 +277,7 @@ export const reviewData: Handler = ({ method, path, url }) => {
       auto_merge: true, status: "stopped", group: "waiting", can_control: true, gate: GATE,
     };
   }
-  if (path === "/api/reviewer/org-config") return { instructions: MARKDOWN, web_domains: ["staging.web-platform-frontend-monorepo.example.com", LONG_URL] };
+  if (path === "/api/reviewer/org-config") return { instructions: NOTES, web_domains: ["staging.web-platform-frontend-monorepo.example.com", LONG_URL] };
   if (path.startsWith("/api/reviewer/config/")) return REVIEWER_CONFIG;
 
   // Tests

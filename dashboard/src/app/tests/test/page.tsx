@@ -289,7 +289,7 @@ function HistoryRow({ run, repo }: { run: TestHistoryRun; repo: string }) {
         </p>
         <ArtifactLinks attempts={run.attempts} />
       </div>
-      {err && <p className="mt-1.5 font-mono text-xs text-red-200">{err}</p>}
+      {err && <p className="mt-1.5 max-h-48 overflow-y-auto overscroll-contain whitespace-pre-wrap font-mono text-xs leading-relaxed text-red-200 [scrollbar-width:thin]" tabIndex={0}>{err}</p>}
     </li>
   );
 }

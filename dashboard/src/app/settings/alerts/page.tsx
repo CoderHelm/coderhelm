@@ -26,6 +26,7 @@ import { Segmented } from "@/components/segmented";
 import { CodeBlock } from "@/components/code-block";
 import { Skeleton } from "@/components/skeleton";
 import { Field } from "@/components/field";
+import { MarkdownEditor } from "@/components/markdown-editor";
 import { Page, PageHeader, Section } from "@/components/page";
 import { Switch as OnOffSwitch } from "@/components/teams-webhook";
 import { Code, SaveBar, SettingsDisclosure, SettingsRow, SettingsSection, Switch, useDirtyForm } from "@/components/settings";
@@ -1181,14 +1182,15 @@ function RuleEditor({
           helper="Alert text is treated as data, never as instructions, so put every rule for the fix here."
         >
           {(props) => (
-            <textarea
+            <MarkdownEditor
               {...props}
+              variant="instructions"
               value={rule.instructions}
-              onChange={(e) => onChange({ ...rule, instructions: e.target.value })}
-              rows={4}
+              onChange={(v) => onChange({ ...rule, instructions: v })}
+              minRows={4}
               maxLength={8000}
+              previewNote="The agent that fixes these alerts reads this as written."
               placeholder="When memory passes 80%, resize the node in envs/prod/main.tf one size up. Quote the alarm's numbers in the pull request."
-              className={inputClass}
             />
           )}
         </Field>

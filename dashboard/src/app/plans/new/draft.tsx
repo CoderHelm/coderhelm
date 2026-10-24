@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/skeleton";
 import { Chip } from "@/components/list";
 import { GitHubIcon, AtlassianIcon } from "@/components/icons";
 import { focusRing, fullWidthOnPhone, primaryButton } from "@/components/ui";
+import { Markdown } from "@/components/markdown";
 
 // The plan the chat is drafting: read from the ```json block in its answers,
 // shown beside the conversation (a tab on a phone), with what the latest
@@ -179,7 +180,7 @@ export function DraftPanel({
           ) : (
             <Skeleton className="mt-1 h-5 w-3/4" />
           )}
-          {plan?.description && <p className="mt-1 text-sm leading-relaxed text-zinc-400">{plan.description}</p>}
+          {plan?.description && <div className="mt-1"><Markdown>{plan.description}</Markdown></div>}
           {plan?.repo && <p className="mt-1 text-xs text-zinc-500">{plan.repo}</p>}
         </div>
 
@@ -203,7 +204,9 @@ export function DraftPanel({
                       {mark && <Chip tone="live">{mark === "new" ? "New" : "Changed"}</Chip>}
                     </p>
                     {task.description && (
-                      <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-zinc-400">{task.description}</p>
+                      <div className="mt-1 line-clamp-4">
+                        <Markdown>{task.description}</Markdown>
+                      </div>
                     )}
                     {task.acceptance_criteria && !live && (
                       <details className="group mt-1.5">
@@ -211,7 +214,9 @@ export function DraftPanel({
                           <span aria-hidden="true" className="mr-1 inline-block transition-transform group-open:rotate-90 motion-reduce:transition-none">›</span>
                           Done when
                         </summary>
-                        <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-zinc-400">{task.acceptance_criteria}</p>
+                        <div className="mt-1">
+                          <Markdown>{task.acceptance_criteria}</Markdown>
+                        </div>
                       </details>
                     )}
                   </div>

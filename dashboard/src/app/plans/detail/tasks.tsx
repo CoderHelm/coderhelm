@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { Repo, Task } from "@/lib/api";
 import { DetailBlock, List, ListRow, StatusText, TONES } from "@/components/list";
 import { Markdown } from "@/components/markdown";
+import { MarkdownEditor } from "@/components/markdown-editor";
 import { RepoCombobox } from "@/components/repo-combobox";
 import { focusRing, inputClass, primaryButton, secondaryButton } from "@/components/ui";
 import { TASK_ORDER, taskInfo, taskStatusLook } from "../status";
@@ -430,6 +431,7 @@ function TaskForm({
 }) {
   const [v, setV] = useState<NewTask>(initial);
   const [saving, setSaving] = useState(false);
+  const formId = useId();
   const set = (k: keyof NewTask) => (val: string) => setV((f) => ({ ...f, [k]: val }));
   const submit = async () => {
     if (!v.title.trim() || saving) return;
@@ -449,20 +451,21 @@ function TaskForm({
         <span className="mb-1 block text-xs text-zinc-400">Title</span>
         <input autoFocus={autoFocus} value={v.title} onChange={(e) => set("title")(e.target.value)} className={inputClass} />
       </label>
-      <label className="block">
-        <span className="mb-1 block text-xs text-zinc-400">What to do (optional)</span>
-        <textarea value={v.description} onChange={(e) => set("description")(e.target.value)} rows={3} className={`${inputClass} resize-y`} />
-      </label>
-      <label className="block">
-        <span className="mb-1 block text-xs text-zinc-400">Done when (optional)</span>
-        <textarea
+      <div>
+        <label htmlFor={`${formId}-what`} className="mb-1 block text-xs text-zinc-400">What to do (optional)</label>
+        <MarkdownEditor id={`${formId}-what`} variant="instructions" value={v.description} onChange={set("description")} minRows={3} />
+      </div>
+      <div>
+        <label htmlFor={`${formId}-done`} className="mb-1 block text-xs text-zinc-400">Done when (optional)</label>
+        <MarkdownEditor
+          id={`${formId}-done`}
+          variant="instructions"
           value={v.acceptance_criteria}
-          onChange={(e) => set("acceptance_criteria")(e.target.value)}
-          rows={2}
+          onChange={set("acceptance_criteria")}
+          minRows={2}
           placeholder="- The page loads the schedule"
-          className={`${inputClass} resize-y`}
         />
-      </label>
+      </div>
       <details className="group">
         <summary className={`cursor-pointer list-none rounded text-xs text-zinc-400 hover:text-zinc-200 [&::-webkit-details-marker]:hidden ${focusRing}`}>
           <span aria-hidden="true" className="mr-1 inline-block transition-transform group-open:rotate-90 motion-reduce:transition-none">›</span>

@@ -5,6 +5,7 @@ import { api, type AwsAccountAbilities, type AwsAbilityReply, type Connector, ty
 import { errorMessage, timeAgo } from "@/lib/data-sources";
 import { Callout } from "./callout";
 import { Field, SecretInput } from "./field";
+import { MarkdownEditor } from "./markdown-editor";
 import { Switch } from "./teams-webhook";
 import { useToast } from "./toast";
 import { inputClass, linkButton, primaryButton, secondaryButton } from "./ui";
@@ -234,13 +235,14 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
         helper="What agents should know when they use it: what the system is, what its fields mean, where else its data lives. Sent with every lookup."
       >
         {(p) => (
-          <textarea
+          <MarkdownEditor
             {...p}
-            rows={5}
+            variant="instructions"
+            minRows={5}
             maxLength={4000}
-            className={inputClass}
             value={guide}
-            onChange={(e) => setGuide(e.target.value)}
+            onChange={setGuide}
+            previewNote="Agents get this text as written with the source."
             placeholder="quantity on a product is sessions per week on weekly packs, but the session count on season packs. Raw copies of these records are in the warehouse."
           />
         )}

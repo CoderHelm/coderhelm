@@ -2,6 +2,7 @@
 
 import { useCan } from "@/hooks/use-can";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { InlineMarkdown, Markdown } from "@/components/markdown";
 import {
   api,
   type AgentProfile,
@@ -504,7 +505,7 @@ function MemoryCard({
     <ListRow
       testId="memory"
       status={{ tone: m.pinned ? "waiting" : m.origin?.source === "person" ? "neutral" : "muted" }}
-      title={m.content}
+      title={<InlineMarkdown>{m.content}</InlineMarkdown>}
       titleText={m.content}
       meta={[
         showTopic ? <span key="topic" className="text-zinc-400">{topicLabel(m.topic)}</span> : null,
@@ -535,7 +536,7 @@ function MemoryCard({
           />
         ) : undefined
       }
-      details={long && !editing ? <p className="whitespace-pre-wrap text-sm text-zinc-200">{m.content}</p> : undefined}
+      details={long && !editing ? <Markdown>{m.content}</Markdown> : undefined}
       detailsLabel="Full text"
     >
       {editing && (

@@ -136,7 +136,7 @@ function ExecutionRow({ e, runUrl }: { e: TestRunExecution; runUrl: string }) {
           <span className="tabular-nums">{totalDuration(e)}</span>
         </p>
       </div>
-      {err && <p className="mt-1.5 font-mono text-xs text-red-200">{err}</p>}
+      {err && <p className="mt-1.5 max-h-48 overflow-y-auto overscroll-contain whitespace-pre-wrap font-mono text-xs leading-relaxed text-red-200 [scrollbar-width:thin]" tabIndex={0}>{err}</p>}
       {(e.outcome === "failed" || e.outcome === "flaky") && (
         <p className="mt-1.5 text-xs"><ArtifactLinks attempts={e.attempts} runUrl={runUrl} /></p>
       )}

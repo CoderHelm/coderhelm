@@ -33,6 +33,7 @@ import {
   useLeaveWarning,
 } from "@/components/settings";
 import { Page, PageHeader } from "@/components/page";
+import { MarkdownEditor } from "@/components/markdown-editor";
 
 export default function ReviewerConfigGuarded() {
   return (
@@ -525,14 +526,18 @@ function ReviewerConfigPage() {
                   help="Optional. What to look at closely on this repo, on top of the team standards and the repo's AGENTS.md."
                   {...marks("instructions")}
                   control={({ inputId, helpId }) => (
-                    <textarea
+                    <MarkdownEditor
                       id={inputId}
                       aria-describedby={helpId}
+                      variant="instructions"
                       value={cfg.instructions}
-                      onChange={(e) => set("instructions", e.target.value)}
-                      rows={4}
-                      className={inputClass}
+                      onChange={(v) => set("instructions", v)}
+                      minRows={4}
+                      readOnly={readOnly}
+                      emptyText="No extra focus for this repo."
+                      previewNote="The reviewer reads this as written, on top of the team standards."
                       placeholder="For example: pay special attention to auth changes and database migrations."
+                      testId="review-focus"
                     />
                   )}
                 />
@@ -608,16 +613,20 @@ function ReviewerConfigPage() {
                         onChange={(e) => set("auto_label_requires", e.target.value)}
                         placeholder={"E2E:join -> CI:DEPLOY_STAGING"}
                       />
-                      <Field
-                        as="textarea"
-                        label="Guidance"
-                        {...marks("auto_label_guide")}
-                        help="When to use which label, in your own words."
-                        rows={3}
-                        value={cfg.auto_label_guide}
-                        onChange={(e) => set("auto_label_guide", e.target.value)}
-                        placeholder="For example: areas and the code they cover are in e2e/test-map.json."
-                      />
+                      <Field as="custom" label="Guidance" {...marks("auto_label_guide")} help="When to use which label, in your own words.">
+                        {(ids) => (
+                          <MarkdownEditor
+                            {...ids}
+                            variant="instructions"
+                            value={cfg.auto_label_guide}
+                            onChange={(v) => set("auto_label_guide", v)}
+                            minRows={3}
+                            readOnly={readOnly}
+                            emptyText="No guidance."
+                            placeholder="For example: areas and the code they cover are in e2e/test-map.json."
+                          />
+                        )}
+                      </Field>
                     </SettingsDisclosure>
                   )}
                 </SettingsRow>
@@ -892,15 +901,20 @@ function ReviewerConfigPage() {
 
                       <SettingsDisclosure summary="How it writes (optional)" defaultOpen={isChanged("release_notes_guide", "release_notes_instructions")}>
                         <Field label="Writing guide" {...marks("release_notes_guide")} help="A file in the repo to follow. Empty: found on its own, for example RELEASE_NOTES.md." mono value={cfg.release_notes_guide} onChange={(e) => set("release_notes_guide", e.target.value)} placeholder="docs/RELEASE_NOTES.md" />
-                        <Field
-                          as="textarea"
-                          label="Instructions"
-                          {...marks("release_notes_instructions")}
-                          rows={2}
-                          value={cfg.release_notes_instructions}
-                          onChange={(e) => set("release_notes_instructions", e.target.value)}
-                          placeholder="For example: the audience is the IT help desk."
-                        />
+                        <Field as="custom" label="Instructions" {...marks("release_notes_instructions")}>
+                          {(ids) => (
+                            <MarkdownEditor
+                              {...ids}
+                              variant="instructions"
+                              value={cfg.release_notes_instructions}
+                              onChange={(v) => set("release_notes_instructions", v)}
+                              minRows={3}
+                              readOnly={readOnly}
+                              emptyText="No instructions."
+                              placeholder="For example: the audience is the IT help desk."
+                            />
+                          )}
+                        </Field>
                       </SettingsDisclosure>
                     </>
                   )}
@@ -1028,15 +1042,19 @@ function StandardsSection({
           </Callout>
         ) : (
           <>
-            <textarea
+            <MarkdownEditor
               id="org-standards"
               aria-describedby="org-standards-help"
+              variant="instructions"
               value={value}
-              onChange={(e) => onChange(e.target.value)}
-              disabled={state !== "ready" || readOnly}
-              rows={5}
-              className={`${inputClass} disabled:opacity-60`}
+              onChange={onChange}
+              disabled={state !== "ready"}
+              readOnly={readOnly}
+              minRows={5}
+              emptyText="No standards yet."
+              previewNote="The reviewer reads this as written, on every repo."
               placeholder={state === "loading" ? "Loading…" : "For example: use our error handling wrapper in every handler. Flag any new dependency. Never log secrets."}
+              testId="org-standards"
             />
             {!readOnly && (
               <div className="mt-3 flex justify-end">

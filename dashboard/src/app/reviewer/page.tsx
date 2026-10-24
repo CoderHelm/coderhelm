@@ -31,6 +31,7 @@ import type { Review } from "@/lib/api";
 import { RiskText, VerdictPill, riskLabel, triggerLabel } from "./labels";
 import { buildRows, gateAction, gateHref, statusLook, summaryLine, type Group, type PrRow } from "./status";
 import { GateControlButton } from "./gate-control";
+import { Markdown } from "@/components/markdown";
 
 export default function ReviewerPageGuarded() {
   return (
@@ -431,7 +432,7 @@ function PrItem({
             {reason && <DetailBlock title="What went wrong">{reason}</DetailBlock>}
             {latest?.action_summary && (
               <DetailBlock title="After the last review">
-                <p className="whitespace-pre-wrap">{latest.action_summary.replace(/[#*`]/g, "").trim()}</p>
+                <Markdown>{latest.action_summary}</Markdown>
               </DetailBlock>
             )}
             {row.reviews.length > 0 && (
