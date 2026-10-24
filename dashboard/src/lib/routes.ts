@@ -77,6 +77,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/settings/integrations/aws": { label: "AWS", parent: "/settings/integrations", tab: "AWS integration" },
   "/settings/integrations/github": { label: "GitHub", parent: "/settings/integrations", tab: "GitHub integration" },
   "/settings/integrations/jira": { label: "Jira", parent: "/settings/integrations", tab: "Jira integration" },
+  "/settings/integrations/mcp-callback": { label: "Connecting", parent: "/settings/integrations", tab: "Connecting an MCP server" },
   // Old addresses that redirect to their new place.
   "/settings/aws": { label: "AWS", parent: "/settings/integrations" },
   "/settings/github": { label: "GitHub", parent: "/settings/integrations" },

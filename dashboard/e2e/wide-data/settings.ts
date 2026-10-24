@@ -67,7 +67,40 @@ function plugin(id: string, name: string, category: string) {
     docs_url: LONG_URL, repo_url: LONG_URL, default_prompt: "Read only.", recommended_permissions: "Read-only access",
   };
 }
+// A remote MCP server added by address, with the longest strings it can carry.
+const MCP_SERVER = {
+  id: "engineering-docs",
+  name: "Engineering documentation and runbooks server",
+  url: `https://mcp.engineering-platform-documentation-space.example.com/v1/mcp/${SHA}`,
+  catalog_id: "",
+  auth: "oauth",
+  sharing: "personal",
+  header_name: "",
+  has_key: false,
+  issuer: "https://login.engineering-platform-documentation-space.example.com/oauth2/default",
+  registration: "dynamic",
+  needs_client: false,
+  has_client: true,
+  scopes: ["docs:read", "runbooks:read"],
+  status: "connected",
+  status_reason: "",
+  status_at: iso(30),
+  my_connection: { status: "needs_reconnect", status_reason: TOKEN, connected_at: iso(60 * 24) },
+  tools: [
+    { name: "search_engineering_documentation_and_runbooks_by_keyword", title: null, description: SENTENCE, access: "read", allowed: true, approved: true, offerable: true },
+    { name: "create_runbook_page_in_the_selected_space", title: null, description: SENTENCE, access: "write", allowed: true, approved: false, offerable: true },
+  ],
+  skipped: [{ name: TOKEN, reason: "a header mark sits somewhere other than a plain property" }],
+  tools_listed_at: iso(30),
+  awaiting_approval: ["create_runbook_page_in_the_selected_space"],
+  changed_by: EMAIL,
+  custom_prompt: SENTENCE,
+  added_by: EMAIL,
+  added_at: iso(60 * 24 * 3),
+};
+
 const INTEGRATIONS = [
+  card(`mcp:${MCP_SERVER.id}`, "mcp", MCP_SERVER.name, "needs_reconnect", "reconnect", { reason: TOKEN, detail: { remote: MCP_SERVER } }),
   card("github", "code", "GitHub", "connected", "manage", { reason: `Installed on ${ORG}, with access to ${REPO}.`, manage_href: "/settings/integrations/github" }),
   card("jira", "code", "Jira", "error", "check_again", { reason: TOKEN, manage_href: "/settings/integrations/jira" }),
   card(`aws-${ACCOUNT}`, "cloud", `AWS account ${ACCOUNT}`, "connected", "manage", { manage_href: "/settings/integrations/aws", detail: awsAbilities() }),
@@ -170,6 +203,11 @@ export const settingsData: Handler = ({ method, path, url }) => {
 
   // Integrations
   if (p === "/api/integrations") return { can_edit: true, items: INTEGRATIONS, migrated: 0 };
+  if (p === "/api/mcp-servers") return { servers: [MCP_SERVER], can_edit: true, redirect_uri: "https://app.coderhelm.com/settings/integrations/mcp-callback/" };
+  if (p === `/api/mcp-servers/${MCP_SERVER.id}`) return { server: MCP_SERVER };
+  if (p === `/api/mcp-servers/${MCP_SERVER.id}/activity`) {
+    return { calls: [{ tool: MCP_SERVER.tools[0].name, actor: `planner, run ${SHA}`, ok: false, ms: 1200, detail: TOKEN, at: iso(10) }] };
+  }
   if (p === "/api/integrations/jira/check") {
     return { ready: true, secret_configured: true, configured_repos: { total: 2, enabled: 2 }, enabled_repos: [REPO, REPO_2], jira_events_seen: true, last_jira_event_at: iso(120), jira_event_count: 41, installation_id: 7, team_id: "t_1", forge_secret: `forge-secret-${SHA}${SHA}` };
   }

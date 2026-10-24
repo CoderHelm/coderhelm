@@ -1,0 +1,9 @@
+{
+  "client_id": "https://app.coderhelm.com/oauth/mcp-client.json",
+  "client_name": "Coderhelm",
+  "client_uri": "https://coderhelm.com",
+  "redirect_uris": ["https://app.coderhelm.com/settings/integrations/mcp-callback/"],
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none"
+}

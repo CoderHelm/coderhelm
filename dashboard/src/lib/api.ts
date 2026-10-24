@@ -1064,6 +1064,55 @@ export const api = {
   deleteDataSource: (id: string) =>
     request<{ ok: true }>(`/api/data-sources/${encodeURIComponent(id)}`, { method: "DELETE" }),
   getIntegrations: () => request<IntegrationsResponse>("/api/integrations"),
+
+  // Remote MCP servers
+  listMcpServers: () =>
+    request<{ servers: McpServer[]; can_edit: boolean; redirect_uri: string }>("/api/mcp-servers"),
+  detectMcpServer: (url: string) =>
+    request<{ url: string; detected: McpDetected; redirect_uri: string }>("/api/mcp-servers/detect", {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    }),
+  addMcpServer: (body: McpAddRequest) =>
+    request<{ server: McpServer; detected: McpDetected }>("/api/mcp-servers", { method: "POST", body: JSON.stringify(body) }),
+  /** Where to send the browser to sign in. */
+  connectMcpServer: (id: string) =>
+    request<{ authorize_url: string }>(`/api/mcp-servers/${encodeURIComponent(id)}/connect`, { method: "POST" }),
+  finishMcpSignIn: (body: { state: string; code?: string; error?: string; iss?: string }) =>
+    request<{ server: McpServer; tools_error: string | null }>("/api/mcp-servers/oauth/callback", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  disconnectMcpServer: (id: string) =>
+    request<{ server: McpServer; revoked: boolean }>(`/api/mcp-servers/${encodeURIComponent(id)}/connection`, { method: "DELETE" }),
+  removeMcpServer: (id: string) =>
+    request<{ status: string }>(`/api/mcp-servers/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  setMcpClient: (id: string, client_id: string, client_secret: string) =>
+    request<{ server: McpServer }>(`/api/mcp-servers/${encodeURIComponent(id)}/client`, {
+      method: "PUT",
+      body: JSON.stringify({ client_id, client_secret }),
+    }),
+  setMcpKey: (id: string, header_name: string, header_value: string) =>
+    request<{ server: McpServer }>(`/api/mcp-servers/${encodeURIComponent(id)}/key`, {
+      method: "PUT",
+      body: JSON.stringify({ header_name, header_value }),
+    }),
+  setMcpTools: (id: string, allowed: string[]) =>
+    request<{ server: McpServer }>(`/api/mcp-servers/${encodeURIComponent(id)}/tools`, {
+      method: "PUT",
+      body: JSON.stringify({ allowed }),
+    }),
+  approveMcpTools: (id: string) =>
+    request<{ server: McpServer }>(`/api/mcp-servers/${encodeURIComponent(id)}/approve`, { method: "POST" }),
+  checkMcpServer: (id: string) =>
+    request<{ server: McpServer; error: string | null }>(`/api/mcp-servers/${encodeURIComponent(id)}/check`, { method: "POST" }),
+  setMcpPrompt: (id: string, custom_prompt: string) =>
+    request<{ server: McpServer }>(`/api/mcp-servers/${encodeURIComponent(id)}/prompt`, {
+      method: "PUT",
+      body: JSON.stringify({ custom_prompt }),
+    }),
+  getMcpActivity: (id: string) =>
+    request<{ calls: McpCall[] }>(`/api/mcp-servers/${encodeURIComponent(id)}/activity`),
   checkAwsAbilities: (account: string) =>
     request<AwsAbilityReply>(`/api/aws-connections/${encodeURIComponent(account)}/abilities/check`, { method: "POST" }),
   setAwsAbilities: (account: string, body: { metrics?: boolean; airflow?: boolean; airflow_environments?: string[] }) =>
@@ -2176,6 +2225,8 @@ export interface PluginDef {
   repo_url: string;
   default_prompt: string;
   recommended_permissions: string;
+  /** The vendor's own remote server, signed in to with OAuth; empty when it runs none. */
+  remote_url?: string;
 }
 
 export interface EnabledPlugin {
@@ -2802,9 +2853,95 @@ export interface Connector {
   updated_by?: string;
 }
 
-export type IntegrationStatus = "connected" | "needs_credentials" | "not_connected" | "error";
-export type IntegrationAction = "connect" | "add_credentials" | "check_again" | "manage";
-export type IntegrationSection = "code" | "cloud" | "monitoring" | "docs" | "chat" | "other";
+export type IntegrationStatus = "connected" | "needs_credentials" | "needs_reconnect" | "not_connected" | "error";
+export type IntegrationAction = "connect" | "add_credentials" | "reconnect" | "check_again" | "manage";
+export type IntegrationSection = "code" | "cloud" | "monitoring" | "docs" | "chat" | "mcp" | "other";
+
+// ── Remote MCP servers ────────────────────────────────────────────
+
+/** How a remote MCP server signs in. */
+export type McpAuth = "none" | "header" | "oauth";
+export type McpStatus = "not_connected" | "connected" | "needs_reconnect" | "failed";
+
+/** One tool a remote server lists, and whether agents get it. */
+export interface McpTool {
+  name: string;
+  title: string | null;
+  description: string;
+  /** From the server's own hints; `unknown` when it gives none. */
+  access: "read" | "write" | "unknown";
+  allowed: boolean;
+  /** Approved by a second admin (always, with one admin). */
+  approved: boolean;
+  /** False when its name can't be offered to a model (too long or unusual). */
+  offerable: boolean;
+}
+
+/** A remote MCP server, as the API shows it: never a token, key or client secret. */
+export interface McpServer {
+  id: string;
+  name: string;
+  url: string;
+  /** The catalog entry it connects (`linear`), or empty for one added by address. */
+  catalog_id: string;
+  auth: McpAuth;
+  /** One connection for the team, or one per person. */
+  sharing: "shared" | "personal";
+  header_name: string;
+  has_key: boolean;
+  issuer: string | null;
+  registration: string | null;
+  /** The sign-in server has no registration: an admin pastes a client id. */
+  needs_client: boolean;
+  has_client: boolean;
+  scopes: string[];
+  status: McpStatus;
+  status_reason: string;
+  status_at: string;
+  /** Your own connection (a personal server), or the team's. */
+  my_connection: { status: McpStatus; status_reason: string; connected_at: string } | null;
+  tools: McpTool[];
+  skipped: { name: string; reason: string }[];
+  tools_listed_at: string;
+  /** Allowed tools waiting for a second admin. */
+  awaiting_approval: string[];
+  /** Who last widened the allowed tools (they can't approve them). */
+  changed_by: string;
+  custom_prompt: string;
+  added_by: string;
+  added_at: string;
+}
+
+/** What asking a server how it signs in found. */
+export interface McpDetected {
+  auth: McpAuth;
+  tool_count?: number;
+  issuer?: string;
+  resource?: string;
+  scopes?: string[];
+  /** `manual`: the sign-in server can't register Coderhelm on its own. */
+  registration?: "automatic" | "manual";
+}
+
+export interface McpCall {
+  tool: string;
+  actor: string;
+  ok: boolean;
+  ms: number;
+  detail: string;
+  at: string;
+}
+
+export interface McpAddRequest {
+  url?: string;
+  name?: string;
+  catalog_id?: string;
+  sharing?: "shared" | "personal";
+  header_name?: string;
+  header_value?: string;
+  client_id?: string;
+  client_secret?: string;
+}
 
 /** One card on Settings → Integrations. */
 export interface Integration {
