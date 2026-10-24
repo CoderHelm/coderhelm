@@ -13,7 +13,7 @@ import { inputClass, linkButton, monoInputClass, secondaryButton } from "@/compo
 import { Code, SaveBar, SettingsDisclosure, SettingsRow, SettingsSection, Switch, useDirtyForm } from "@/components/settings";
 
 export default function WorkflowPageGuarded() {
-  return <RoleGuard minRole="admin"><WorkflowPage /></RoleGuard>;
+  return <RoleGuard need="agent_settings"><WorkflowPage /></RoleGuard>;
 }
 
 /** The form: the workflow settings and the three git templates, saved with one bar. */

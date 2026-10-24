@@ -1,9 +1,9 @@
 "use client";
 
+import { useCan } from "@/hooks/use-can";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { api, type JiraCheck, type JiraConfig, type JiraEvent, type JiraProject, type Repo } from "@/lib/api";
-import { hasRole } from "@/lib/roles";
 import { timeAgo } from "@/lib/data-sources";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
@@ -22,7 +22,7 @@ import { buttonClass, focusRing, inputClass, linkButton, primaryButton, secondar
 
 export default function JiraPageGuarded() {
   return (
-    <RoleGuard minRole="admin">
+    <RoleGuard need="integrations">
       <JiraPage />
     </RoleGuard>
   );
@@ -42,7 +42,9 @@ function JiraPage() {
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const [check, setCheck] = useState<JiraCheck | null>(null);
   const [config, setConfig] = useState<JiraConfig | null>(null);
-  const [isOwner, setIsOwner] = useState(false);
+  const { can } = useCan();
+  // Removing the integration is an owner-level capability.
+  const canDisconnect = can("disconnect");
   const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -58,7 +60,6 @@ function JiraPage() {
   }, []);
 
   useEffect(() => {
-    api.me().then((me) => setIsOwner(hasRole(me.role, "owner"))).catch(() => setIsOwner(false));
     refresh();
   }, [refresh]);
 
@@ -174,9 +175,9 @@ function JiraPage() {
               <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-red-500/20 p-4">
                 <p className="max-w-prose text-sm text-zinc-400">
                   Deletes every Jira setting, the webhook credentials and the event history.
-                  {!isOwner && " Only the team owner can do this."}
+                  {!canDisconnect && " Only the team owner can do this."}
                 </p>
-                {isOwner && (
+                {canDisconnect && (
                   <button
                     type="button"
                     onClick={removeIntegration}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/hooks/use-can";
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { api, type CloseResult, type CloseRunRequest, type Run } from "@/lib/api";
@@ -34,7 +35,6 @@ type StatusTab = "all" | keyof typeof RUN_GROUP_STATUSES;
 const TABS: StatusTab[] = ["all", "active", "waiting", "done", "failed", "closed"];
 const TAB_TONE = { active: "live", waiting: "waiting", done: "success", failed: "danger", closed: "muted" } as const;
 
-const ROLE_LEVEL: Record<string, number> = { viewer: 0, member: 1, billing: 2, admin: 3, owner: 4 };
 
 interface RunGroup {
   ticket_id: string;
@@ -90,11 +90,8 @@ function RunsPage() {
 
   // Selecting runs to close: members and up (the gateway refuses viewers).
   const { toast } = useToast();
-  const [role, setRole] = useState<string | null>(null);
-  useEffect(() => {
-    api.me().then((u) => setRole(u.role)).catch(() => {});
-  }, []);
-  const canClose = role != null && (ROLE_LEVEL[role] ?? 0) >= 1;
+  const { can } = useCan();
+  const canClose = can("runs");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const lastClicked = useRef<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);

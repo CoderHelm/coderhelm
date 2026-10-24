@@ -24,7 +24,7 @@ import { OUTCOMES, OUTCOME_GROUPS, outcomeLook } from "./outcome";
 
 export default function AlertsHistoryGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need="view_alerts">
       <Suspense fallback={<Page><PageHeader title="Alerts" /><div className="mt-6"><ListSkeleton /></div></Page>}>
         <AlertsHistory />
       </Suspense>

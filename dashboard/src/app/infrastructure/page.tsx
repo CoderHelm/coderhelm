@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/hooks/use-can";
 import { CodeBlock } from "@/components/code-block";
 import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
@@ -227,12 +228,12 @@ export default function InfrastructurePage() {
   const [refreshing, setRefreshing] = useState(false);
   const [pollStart, setPollStart] = useState<number | null>(null);
   const [pollStale, setPollStale] = useState(false);
-  const [canScan, setCanScan] = useState(false);
+  const { can } = useCan();
+  const canScan = can("repos");
   const { toast } = useToast();
 
   useEffect(() => {
     // Starting a scan is admin only on the server; members only read.
-    api.me().then((u) => setCanScan(u.role === "admin" || u.role === "owner")).catch(() => {});
     api.listRepos().then((data) => {
       const enabled = data.repos.filter((r) => r.enabled);
       setRepos(enabled);

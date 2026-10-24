@@ -1,5 +1,6 @@
 "use client";
 
+import { ANY_CHANGE, can } from "@/lib/capabilities";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -37,18 +38,16 @@ interface User {
   avatar_url: string;
   role: string;
   status?: string;
-}
-
-function isAdmin(user: User | null): boolean {
-  return user?.role === "admin" || user?.role === "owner";
+  /** The capability keys this person holds (lib/capabilities.ts). */
+  capabilities?: string[];
 }
 
 interface NavItem {
   href: string;
   label: string;
   icon: ReactNode;
-  adminOnly?: boolean;
-  memberOnly?: boolean;
+  /** Shown only to someone whose role includes this capability (or `ANY_CHANGE`). */
+  need?: string;
   superAdminOnly?: boolean;
   /** A number shown beside the label, e.g. new beta sign-ups. */
   countKey?: "betaSignups";
@@ -63,11 +62,11 @@ const navGroups: NavGroup[] = [
   {
     items: [
       { href: "/", label: "Runs", icon: <PlayIcon /> },
-      { href: "/reviewer", label: "Reviewer", icon: <ShieldCheckIcon />, memberOnly: true },
-      { href: "/tests", label: "Tests", icon: <TestTubeIcon />, memberOnly: true },
-      { href: "/logs", label: "Logs", icon: <LogFindingsIcon />, memberOnly: true },
-      { href: "/releases", label: "Releases", icon: <GitBranchIcon />, memberOnly: true },
-      { href: "/graph", label: "Code Graph", icon: <GraphIcon />, memberOnly: true },
+      { href: "/reviewer", label: "Reviewer", icon: <ShieldCheckIcon />, need: ANY_CHANGE },
+      { href: "/tests", label: "Tests", icon: <TestTubeIcon />, need: ANY_CHANGE },
+      { href: "/logs", label: "Logs", icon: <LogFindingsIcon />, need: "recommendations" },
+      { href: "/releases", label: "Releases", icon: <GitBranchIcon />, need: "reviews" },
+      { href: "/graph", label: "Code Graph", icon: <GraphIcon />, need: ANY_CHANGE },
       { href: "/plans", label: "Plans", icon: <PlanIcon /> },
       { href: "/plans/templates", label: "Templates", icon: <TemplateIcon /> },
     ],
@@ -76,29 +75,29 @@ const navGroups: NavGroup[] = [
     // What Coderhelm is connected to, near the top so it's easy to find.
     label: "Connections",
     items: [
-      { href: "/settings/integrations", label: "Integrations", icon: <PluginIcon />, memberOnly: true },
-      { href: "/data-sources", label: "Data sources", icon: <DatabaseIcon />, adminOnly: true },
+      { href: "/settings/integrations", label: "Integrations", icon: <PluginIcon />, need: "view_integrations" },
+      { href: "/data-sources", label: "Data sources", icon: <DatabaseIcon />, need: "data_sources" },
     ],
   },
   {
     label: "Insights",
     items: [
-      { href: "/analytics", label: "Analytics", icon: <TrendingUpIcon />, memberOnly: true },
-      { href: "/infrastructure", label: "Infrastructure", icon: <HexagonIcon />, memberOnly: true },
-      { href: "/alerts", label: "Alerts", icon: <BellIcon />, memberOnly: true },
-      { href: "/health", label: "Health", icon: <HeartIcon />, adminOnly: true },
-      { href: "/memory", label: "Memory", icon: <MemoryIcon />, memberOnly: true },
+      { href: "/analytics", label: "Analytics", icon: <TrendingUpIcon />, need: ANY_CHANGE },
+      { href: "/infrastructure", label: "Infrastructure", icon: <HexagonIcon />, need: ANY_CHANGE },
+      { href: "/alerts", label: "Alerts", icon: <BellIcon />, need: "view_alerts" },
+      { href: "/health", label: "Health", icon: <HeartIcon />, need: "system" },
+      { href: "/memory", label: "Memory", icon: <MemoryIcon />, need: ANY_CHANGE },
     ],
   },
   {
     label: "Configure",
     items: [
-      { href: "/settings/repos", label: "Repos", icon: <GitBranchIcon />, memberOnly: true },
+      { href: "/settings/repos", label: "Repos", icon: <GitBranchIcon />, need: ANY_CHANGE },
       { href: "/settings", label: "Settings", icon: <GearIcon /> },
       { href: "/settings/notifications", label: "Notifications", icon: <BellIcon /> },
-      { href: "/settings/alerts", label: "Alert routes", icon: <BellIcon />, adminOnly: true },
-      { href: "/skills", label: "Skills", icon: <BookIcon />, memberOnly: true },
-      { href: "/settings/models", label: "AI Models", icon: <CpuIcon />, adminOnly: true },
+      { href: "/settings/alerts", label: "Alert routes", icon: <BellIcon />, need: "alerts" },
+      { href: "/skills", label: "Skills", icon: <BookIcon />, need: ANY_CHANGE },
+      { href: "/settings/models", label: "AI Models", icon: <CpuIcon />, need: "model_provider" },
     ],
   },
   {
@@ -111,7 +110,7 @@ const navGroups: NavGroup[] = [
     label: "Account",
     items: [
       { href: "/settings/security", label: "Security", icon: <ShieldCheckIcon /> },
-      { href: "/settings/budget", label: "Token limit", icon: <TargetIcon />, memberOnly: true },
+      { href: "/settings/budget", label: "Token limit", icon: <TargetIcon />, need: ANY_CHANGE },
       { href: "/admin", label: "Admin", icon: <ShieldIcon />, superAdminOnly: true, countKey: "betaSignups" },
       { href: "/admin/tickets", label: "Support queue", icon: <LifeBuoyIcon />, superAdminOnly: true },
     ],
@@ -123,16 +122,12 @@ function isPlatformAdmin(user: User | null): boolean {
   return user?.email === "admin@coderhelm.com";
 }
 
-/** The menu items this person can open, by role. */
+/** The menu items this person can open, by what their role includes. */
 function visibleItems(group: NavGroup, user: User | null): NavItem[] {
-  const isAdminOrOwner = isAdmin(user);
-  const isMemberOrAbove = isAdminOrOwner || user?.role === "billing" || user?.role === "member";
   const isSuperAdmin = isPlatformAdmin(user);
   return group.items.filter((item) => {
     if (item.superAdminOnly) return isSuperAdmin;
-    if (item.memberOnly) return isMemberOrAbove;
-    if (!item.adminOnly) return true;
-    return isAdminOrOwner;
+    return !item.need || can(user, item.need);
   });
 }
 
@@ -477,7 +472,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                     </p>
                     <p className="text-xs text-red-300 mt-0.5">
                       You&apos;ve used {formatTokens(hit.used)} of your {formatTokens(hit.max)} {name} limit this month.{" "}
-                      {user?.role === "owner" ? "Raise the limit or wait for next month." : "Ask the team owner to raise the limit, or wait for next month."}
+                      {can(user, "budget") ? "Raise the limit or wait for next month." : "Ask an admin or the owner to raise the limit, or wait for next month."}
                     </p>
                   </div>
                 </div>
@@ -485,7 +480,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                   href="/settings/budget"
                   className={`shrink-0 rounded-md bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-500 transition-colors ${focusRing}`}
                 >
-                  {user?.role === "owner" ? "Raise the limit" : "See usage"}
+                  {can(user, "budget") ? "Raise the limit" : "See usage"}
                 </Link>
               </div>
             );

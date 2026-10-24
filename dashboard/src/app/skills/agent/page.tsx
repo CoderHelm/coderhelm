@@ -1,5 +1,7 @@
 "use client";
 
+import { useCan } from "@/hooks/use-can";
+import { ANY_CHANGE } from "@/lib/capabilities";
 import { CodeBlock } from "@/components/code-block";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -39,7 +41,7 @@ import { Page, PageHeader } from "@/components/page";
 
 export default function AgentPageGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need={ANY_CHANGE}>
       <Suspense fallback={<Skeleton className="h-40 w-full" />}>
         <AgentPage />
       </Suspense>
@@ -66,7 +68,9 @@ function AgentPage() {
   const [agent, setAgent] = useState<SkillWithBody | null>(null);
   const [repo, setRepo] = useState<SkillRepo | null>(null);
   const [missing, setMissing] = useState(false);
-  const [canManage, setCanManage] = useState(false);
+  // Skills are managed with data sources and team tools.
+  const { can } = useCan();
+  const canManage = can("data_sources");
   const [asks, setAsks] = useState<AgentAsk[] | null>(null);
   const [triesLeft, setTriesLeft] = useState<number | null>(null);
   const [triesPerDay, setTriesPerDay] = useState(20);
@@ -106,7 +110,6 @@ function AgentPage() {
         }
         setAgent(item);
         setRepo(list.repos.find((r) => r.repo === item.repo) ?? null);
-        setCanManage(list.can_manage);
       })
       .catch(() => setMissing(true));
     loadAsks();

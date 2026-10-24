@@ -19,7 +19,7 @@ import { KIND_LABEL, OUTCOMES, OutcomeBadge, humanize } from "../outcome";
 
 export default function AlertDetailGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need="view_alerts">
       <Suspense fallback={<Page><Skeleton className="h-40 w-full" /></Page>}>
         <AlertDetail />
       </Suspense>

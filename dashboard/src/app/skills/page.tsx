@@ -1,5 +1,7 @@
 "use client";
 
+import { useCan } from "@/hooks/use-can";
+import { ANY_CHANGE } from "@/lib/capabilities";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RoleGuard } from "@/components/role-guard";
@@ -50,7 +52,7 @@ function MissingTools({ item }: { item: Skill }) {
 
 export default function SkillsPageGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need={ANY_CHANGE}>
       <Suspense fallback={<Page><PageHeader title="Skills" /><div className="mt-8"><ListSkeleton rows={4} label="Loading your skills" /></div></Page>}>
         <SkillsPage />
       </Suspense>
@@ -179,7 +181,9 @@ function SkillsPage() {
   const setFilters = useCallback((f: ActivityFilters) => go("activity", f), [go]);
   const [repos, setRepos] = useState<SkillRepo[] | null>(null);
   const [items, setItems] = useState<Skill[]>([]);
-  const [canManage, setCanManage] = useState(false);
+  // Skills are managed with data sources and team tools.
+  const { can } = useCan();
+  const canManage = can("data_sources");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [newRepo, setNewRepo] = useState("");
@@ -194,7 +198,6 @@ function SkillsPage() {
       const r = await skillsApi.list();
       setRepos(r.repos);
       setItems(r.items);
-      setCanManage(r.can_manage);
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "The request failed.");

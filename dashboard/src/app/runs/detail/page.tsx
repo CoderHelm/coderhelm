@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/hooks/use-can";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -57,7 +58,6 @@ function outsideHeading(status: string, fixLocation?: string | null): string {
 /** Still working: keep refreshing. Queued runs are about to start, so they refresh too. */
 const isActive = (status: string) => runIsLive(status) || status === "queued";
 
-const ROLE_LEVEL: Record<string, number> = { viewer: 0, member: 1, billing: 2, admin: 3, owner: 4 };
 
 /** Plain words for a failed run action. The gateway answers with a bare status code. */
 function actionError(e: unknown, what: string): string {
@@ -340,7 +340,7 @@ function RunDetailInner() {
   const [closeOpen, setCloseOpen] = useState(false);
   const [specTab, setSpecTab] = useState<keyof Openspec>("proposal");
   const [usage, setUsage] = useState<UsageInfo | null>(null);
-  const [role, setRole] = useState<string | null>(null);
+  const { can } = useCan();
   const [catalog, setCatalog] = useState<PluginDef[]>([]);
   const [traces, setTraces] = useState<PassTrace[]>([]);
   const tracesLoaded = useRef(false);
@@ -353,7 +353,6 @@ function RunDetailInner() {
   const { confirm } = useConfirm();
 
   useEffect(() => { api.getUsage().then(setUsage).catch(() => {}); }, []);
-  useEffect(() => { api.me().then((u) => setRole(u.role)).catch(() => {}); }, []);
   // Only the catalog is needed: it turns the run's server ids into names.
   useEffect(() => { api.getPluginCatalog().then((c) => setCatalog(c.plugins)).catch(() => {}); }, []);
   // Any one monthly limit reached stops new work.
@@ -361,7 +360,7 @@ function RunDetailInner() {
   const tokensExceeded = limitHit !== undefined;
   // Retry, review, start over and cancel are member-only on the gateway; a viewer
   // would only ever see them fail. Unknown role (still loading) hides them too.
-  const canAct = role != null && (ROLE_LEVEL[role] ?? 0) >= 1;
+  const canAct = can("runs");
 
   const fetchRun = useCallback(() => {
     if (!runId) return;

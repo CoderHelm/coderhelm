@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/hooks/use-can";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   api,
@@ -44,7 +45,6 @@ type Sort = "newest" | "most_used";
 /** A select that sits in a list toolbar. */
 const toolbarSelect = `min-h-9 rounded-lg border border-zinc-700 bg-zinc-900 py-1.5 pl-3 text-sm text-zinc-100 hover:border-zinc-500 ${focusRing}`;
 
-const ROLE_LEVEL: Record<string, number> = { viewer: 0, member: 1, billing: 2, admin: 3, owner: 4 };
 
 function errorText(e: unknown, fallback: string) {
   const m = e instanceof Error ? e.message : "";
@@ -87,7 +87,8 @@ function MemoryPage() {
   const [params, setParams] = useListParams({ repo: "", q: "", show: "all", sort: "newest", topic: "" });
   const [firstRepo, setFirstRepo] = useState("");
   const repo = params.repo || firstRepo;
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { can } = useCan();
+  const isAdmin = can("memory");
 
   const [profiles, setProfiles] = useState<AgentProfile[] | null>(null);
   const [profilesError, setProfilesError] = useState("");
@@ -105,7 +106,6 @@ function MemoryPage() {
   const [reload, setReload] = useState(0);
 
   useEffect(() => {
-    api.me().then((u) => setIsAdmin((ROLE_LEVEL[u.role] ?? 0) >= 3)).catch(() => setIsAdmin(false));
   }, []);
 
   useEffect(() => {

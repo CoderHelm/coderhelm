@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/hooks/use-can";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
@@ -14,7 +15,6 @@ import {
   type Repo,
   type TopicAlarm,
 } from "@/lib/api";
-import { hasRole } from "@/lib/roles";
 import { timeAgo } from "@/lib/data-sources";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
@@ -44,7 +44,7 @@ import { buttonClass, focusRing, inputClass, linkButton, monoInputClass, primary
 
 export default function AlertsPageGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need="view_alerts">
       <AlertsPage />
     </RoleGuard>
   );
@@ -194,7 +194,8 @@ function AlertsPage() {
   const [events, setEvents] = useState<AlertEvent[] | null>(null);
   const [eventsNext, setEventsNext] = useState<string | null>(null);
   const [eventsError, setEventsError] = useState(false);
-  const [canEdit, setCanEdit] = useState(false);
+  const { can } = useCan();
+  const canEdit = can("alerts");
   const [editing, setEditing] = useState<{ route: AlertRoute; isNew: boolean } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -222,7 +223,6 @@ function AlertsPage() {
   }, []);
 
   useEffect(() => {
-    api.me().then((me) => setCanEdit(hasRole(me.role, "admin"))).catch(() => setCanEdit(false));
     loadRoutes();
     loadEvents();
     api.listRepos().then((r) => setRepos(r.repos.filter((x) => x.enabled))).catch(() => {});

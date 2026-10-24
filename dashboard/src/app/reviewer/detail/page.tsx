@@ -1,5 +1,6 @@
 "use client";
 
+import { ANY_CHANGE } from "@/lib/capabilities";
 import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -24,7 +25,7 @@ import { bySeverity, fileUrl, reviewParts, type Finding } from "./findings";
 
 export default function ReviewDetailGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need={ANY_CHANGE}>
       <Suspense fallback={<DetailSkeleton />}>
         <ReviewDetailPage />
       </Suspense>

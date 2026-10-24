@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/hooks/use-can";
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
@@ -104,7 +105,8 @@ function TeamPage() {
   }, [load, loadRoles]);
 
   const role = perms?.your_role ?? "viewer";
-  const isOwner = role === "owner";
+  const { can } = useCan();
+  const canRenameTeam = can("team_name");
   const canManagePeople = (perms?.manageable_roles.length ?? 0) > 0;
   // Invites are not seats: an admin may resend or revoke every pending invite,
   // including one that offers the admin role.
@@ -223,7 +225,7 @@ function TeamPage() {
           </>
         }
       />
-      {isOwner && <RenameTeam current={teamName} onRenamed={setTeamName} />}
+      {canRenameTeam && <RenameTeam current={teamName} onRenamed={setTeamName} />}
 
       {error && (
         <div className="mt-6">

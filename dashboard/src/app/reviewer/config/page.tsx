@@ -1,5 +1,7 @@
 "use client";
 
+import { useCan } from "@/hooks/use-can";
+import { ANY_CHANGE } from "@/lib/capabilities";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type ReviewerConfig as ApiReviewerConfig, type Repo } from "@/lib/api";
@@ -34,7 +36,7 @@ import { Page, PageHeader } from "@/components/page";
 
 export default function ReviewerConfigGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need={ANY_CHANGE}>
       <ReviewerConfigPage />
     </RoleGuard>
   );
@@ -216,7 +218,9 @@ function ReviewerConfigPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  // Reviewer settings are agent settings; null while your role loads.
+  const { ready: meReady, can } = useCan();
+  const isAdmin = meReady ? can("agent_settings") : null;
   const [logGroups, setLogGroups] = useState<string[]>([]);
   const [loadingLogGroups, setLoadingLogGroups] = useState(false);
   const [logGroupFilter, setLogGroupFilter] = useState("");
@@ -237,7 +241,6 @@ function ReviewerConfigPage() {
 
   useEffect(() => {
     // Members can read these settings; only admins can save them.
-    api.me().then((u) => setIsAdmin(u.role === "admin" || u.role === "owner")).catch(() => setIsAdmin(false));
     api.listRepos().then((d) => setRepos(d.repos)).catch(() => {});
     // Load the connected AWS account's log groups for the health-check picker
     // (no free text — pick from the real list). Best-effort; empty if no account.

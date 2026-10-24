@@ -8,7 +8,7 @@ import { SupportAccessControl, SupportAccessLog } from "@/components/support-acc
 
 export default function SupportAccessPageGuarded() {
   return (
-    <RoleGuard minRole="admin">
+    <RoleGuard need="support">
       <SupportAccessPage />
     </RoleGuard>
   );

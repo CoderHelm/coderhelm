@@ -7,6 +7,7 @@
 // (PageRank), symbol search (definitions + callers), and the neighbourhood
 // explorer (explorer.tsx; click a node to re-center on it).
 
+import { useCan } from "@/hooks/use-can";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -109,7 +110,8 @@ export default function GraphPage() {
   const [hiddenKinds, setHiddenKinds] = useState<ReadonlySet<Filterable>>(new Set());
   const [busy, setBusy] = useState(false);
   const [acting, setActing] = useState("");
-  const [canManage, setCanManage] = useState(false);
+  const { can } = useCan();
+  const canManage = can("repos");
   const { toast } = useToast();
   const { confirm } = useConfirm();
 
@@ -129,7 +131,6 @@ export default function GraphPage() {
 
   useEffect(() => {
     // Turning a graph off or rebuilding it is admin only on the server.
-    api.me().then((u) => setCanManage(u.role === "admin" || u.role === "owner")).catch(() => {});
     void loadRepos(false);
   }, [loadRepos]);
 

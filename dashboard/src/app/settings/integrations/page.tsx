@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/hooks/use-can";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -39,7 +40,7 @@ import { BrandIcon } from "@/components/brand-icons";
 
 export default function IntegrationsPageGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need="view_integrations">
       <IntegrationsPage />
     </RoleGuard>
   );
@@ -105,14 +106,18 @@ function anchorOf(item: Integration, firstAws: boolean): string {
 }
 
 function IntegrationsPage() {
-  const [data, setData] = useState<{ items: Integration[]; canEdit: boolean } | null>(null);
+  const [items, setItems] = useState<Integration[] | null>(null);
+  // Whether you may connect or change integrations: your role, not the
+  // answer's `can_edit` (which a custom role's request reads as its floor).
+  const { can } = useCan();
+  const data = items ? { items, canEdit: can("integrations") } : null;
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     setError("");
     try {
       const r = await api.getIntegrations();
-      setData({ items: r.items, canEdit: r.can_edit });
+      setItems(r.items);
     } catch (e) {
       setError(errorMessage(e, "The request failed."));
     }
@@ -143,7 +148,7 @@ function IntegrationsPage() {
   }, [data]);
 
   const replace = (next: Integration) =>
-    setData((d) => (d ? { ...d, items: d.items.map((i) => (i.id === next.id ? next : i)) } : d));
+    setItems((d) => (d ? d.map((i) => (i.id === next.id ? next : i)) : d));
 
   return (
     <Page testId="integrations-page">

@@ -11,7 +11,7 @@ import { SettingsSection } from "@/components/settings";
 import { ScopeBar, type Scope } from "../scope-bar";
 
 export default function GuardrailsPageGuarded() {
-  return <RoleGuard minRole="admin"><GuardrailsPage /></RoleGuard>;
+  return <RoleGuard need="agent_settings"><GuardrailsPage /></RoleGuard>;
 }
 
 /**

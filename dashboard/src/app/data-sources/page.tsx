@@ -30,7 +30,7 @@ import { ListEmpty, ListError, ListSection, ListSkeleton, ListToolbar, StatusDot
 
 export default function DataSourcesPageGuarded() {
   return (
-    <RoleGuard minRole="admin">
+    <RoleGuard need="data_sources">
       <Suspense fallback={<Page><PageHeader title="Data sources" /><div className="mt-8"><ListSkeleton rows={3} label="Loading your data sources" /></div></Page>}>
         <DataSourcesPage />
       </Suspense>

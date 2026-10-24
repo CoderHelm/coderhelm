@@ -1,5 +1,6 @@
 "use client";
 
+import { ANY_CHANGE } from "@/lib/capabilities";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { api, ApiError, type LivePr, type Repo } from "@/lib/api";
@@ -33,7 +34,7 @@ import { GateControlButton } from "./gate-control";
 
 export default function ReviewerPageGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need={ANY_CHANGE}>
       <Suspense fallback={<Page><PageHeader title="Reviewer" /><div className="mt-6"><ListSkeleton /></div></Page>}>
         <ReviewerPage />
       </Suspense>

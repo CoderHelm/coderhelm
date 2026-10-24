@@ -1,11 +1,11 @@
 "use client";
 
+import { can } from "@/lib/capabilities";
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, errorStatus, type SupportDetail, type SupportItemRef, type SupportMessage, type SupportPersonRef } from "@/lib/api";
 import { customerLook, isOnTicket, MAX_ATTACHMENTS, PRIORITY_LABEL, ticketItems, ticketPeople } from "@/lib/support";
-import { hasRole } from "@/lib/roles";
 import { SupportAccessControl } from "@/components/support-access";
 import { Page } from "@/components/page";
 import { Callout } from "@/components/callout";
@@ -99,8 +99,8 @@ function TicketPage() {
   const t = detail.ticket;
   const look = customerLook(t.status);
   const role = me?.user_id ? isOnTicket(t, me.user_id) : null;
-  const canManage = role === "filer" || hasRole(me?.role, "admin");
-  const canGrant = hasRole(me?.role, "admin") && !me?.support_view;
+  const canManage = role === "filer" || can(me, "support");
+  const canGrant = can(me, "support") && !me?.support_view;
   const people = ticketPeople(t);
   const isMine = (m: SupportMessage) => m.author === "customer" && !!me?.email && m.author_email.toLowerCase() === me.email.toLowerCase();
 

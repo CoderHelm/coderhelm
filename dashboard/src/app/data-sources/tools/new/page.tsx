@@ -19,7 +19,7 @@ import { KIND_LABEL, toolsApi, type InputType, type ToolCheck, type ToolDef, typ
 
 export default function NewToolPageGuarded() {
   return (
-    <RoleGuard minRole="admin">
+    <RoleGuard need="data_sources">
       <Suspense fallback={null}>
         <NewToolPage />
       </Suspense>

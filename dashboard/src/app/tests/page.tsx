@@ -1,5 +1,7 @@
 "use client";
 
+import { useCan } from "@/hooks/use-can";
+import { ANY_CHANGE } from "@/lib/capabilities";
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -20,7 +22,7 @@ import { SettingsView, SetupSteps } from "@/components/tests/settings";
 
 export default function TestsPageGuarded() {
   return (
-    <RoleGuard minRole="member">
+    <RoleGuard need={ANY_CHANGE}>
       <Suspense fallback={<Page><Loading what="your tests" /></Page>}>
         <TestsPage />
       </Suspense>
@@ -41,14 +43,14 @@ const VIEWS: { value: View; label: string; adminOnly?: boolean }[] = [
   { value: "settings", label: "Settings", adminOnly: true },
 ];
 
-const ADMIN_ROLES = new Set(["admin", "owner"]);
 
 function TestsPage() {
   const params = useSearchParams();
   const asked = params.get("view") as View | null;
   const { toast } = useToast();
 
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { can } = useCan();
+  const isAdmin = can("tests");
   const [settings, setSettings] = useState<TestSettings | null>(null);
   const [summary, setSummary] = useState<TestSummary | null>(null);
   // ?repo= leads; without one, the repo picked last time in this browser.
@@ -64,7 +66,6 @@ function TestsPage() {
 
   useEffect(() => {
     setStored(readRepo());
-    api.me().then((u) => setIsAdmin(ADMIN_ROLES.has(u.role))).catch(() => setIsAdmin(false));
   }, []);
 
   const load = useCallback(async () => {
