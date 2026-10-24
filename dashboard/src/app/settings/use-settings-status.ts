@@ -22,6 +22,8 @@ export interface Me {
   auth_provider?: string;
   github_login: string | null;
   mfa_enabled?: boolean;
+  /** An admin of the whole install (self-hosted installs). */
+  platform_admin?: boolean;
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;

@@ -24,7 +24,8 @@ import {
   BellIcon, TargetIcon, RepeatIcon, ShieldCheckIcon,
   PluginIcon, ShieldIcon, TemplateIcon, CpuIcon, MemoryIcon,
   LifeBuoyIcon, MailIcon, DatabaseIcon, TestTubeIcon, LogFindingsIcon, GraphIcon, PlanIcon, BookIcon } from "./icons";
-import { apiBase, siteUrl } from "@/lib/runtime-config";
+import { apiBase, runtimeConfig, siteUrl } from "@/lib/runtime-config";
+import { SetupBanner } from "@/components/setup-banner";
 
 
 
@@ -490,7 +491,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               </div>
             );
           })()}
-          <main className="flex-1 p-4 md:p-8">{children}</main>
+          <main className="flex-1 p-4 md:p-8"><SetupBanner />{children}</main>
         </div>
       </div>
     </TopBarProvider>
@@ -789,6 +790,11 @@ function Sidebar({
           <div className="min-w-0 flex-1">
             <p className="text-sm text-zinc-300 truncate">{user.github_login || user.email}</p>
             {user.github_login && <p className="text-xs text-zinc-500 truncate">{user.email}</p>}
+            {runtimeConfig().version && (
+              <p className="text-xs text-zinc-600 truncate" data-testid="install-version" title="This install's Coderhelm version">
+                Coderhelm {runtimeConfig().version}
+              </p>
+            )}
           </div>
           <button
             type="button"

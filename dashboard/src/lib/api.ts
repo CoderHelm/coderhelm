@@ -1084,6 +1084,14 @@ export const api = {
   deleteDataSource: (id: string) =>
     request<{ ok: true }>(`/api/data-sources/${encodeURIComponent(id)}`, { method: "DELETE" }),
   getIntegrations: () => request<IntegrationsResponse>("/api/integrations"),
+  /** Self-hosted installs (install admins): this build, the latest release, settings, history. */
+  getSystemVersion: () => request<SystemVersion>("/api/system/version"),
+  setAutoUpdate: (settings: Partial<AutoUpdateSettings>) =>
+    request<{ settings: AutoUpdateSettings }>("/api/system/auto-update", { method: "PUT", body: JSON.stringify(settings) }),
+  updateNow: (version?: string) =>
+    request<UpdateEntry>("/api/system/update", { method: "POST", body: JSON.stringify(version ? { version } : {}) }),
+  rollbackInstall: () => request<UpdateEntry>("/api/system/rollback", { method: "POST", body: "{}" }),
+  sendTestEmail: () => request<{ sent: boolean; to?: string; reason?: string }>("/api/system/test-email", { method: "POST", body: "{}" }),
 
   // Remote MCP servers
   listMcpServers: () =>
@@ -3323,4 +3331,38 @@ export interface Learning {
   changes: LearningChange[];
   exemplars: LearningExemplar[];
   bandit: LearningBandit[];
+}
+
+// ── This install (self-hosted) ──────────────────────────────────────────
+
+export interface AutoUpdateSettings {
+  auto: boolean;
+  channel: "stable" | "preview";
+  /** mon…sun, or daily */
+  day: string;
+  hour: number;
+  timezone: string;
+  majors: "ask" | "auto";
+}
+
+export interface UpdateEntry {
+  id?: string;
+  version: string;
+  from_version?: string;
+  actor: string;
+  mode?: "update" | "rollback";
+  status: "running" | "succeeded" | "failed" | "rolled_back";
+  reason?: string;
+  started_at?: string;
+  finished_at?: string;
+}
+
+export interface SystemVersion {
+  self_hosted: boolean;
+  current: { version: string | null; commit: string | null; released_at: string | null; config_fingerprint: string | null };
+  latest: null | { version: string; notes: string; published_at?: string; url?: string; prerelease?: boolean; breaking: boolean };
+  update_available: boolean;
+  settings?: AutoUpdateSettings;
+  running?: boolean;
+  history?: UpdateEntry[];
 }

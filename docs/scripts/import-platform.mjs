@@ -187,8 +187,7 @@ export function convertGuide(raw, srcPath, ref) {
 function writeSelfHostStub(ref) {
   write('self-host/index.mdx', `---
 title: Self-hosting
-description: Run CoderHelm in your own AWS account. The guides are being written and will appear here.
-status: coming-soon
+description: Run CoderHelm in your own AWS account.
 editUrl: ${yamlString(`${REPO_URL}/tree/main/${SELF_HOST_SRC}`)}
 generated: true
 ---

@@ -21,6 +21,10 @@ export interface RuntimeConfig {
   supportEmail?: string;
   /** A website to link to, or null. */
   siteUrl?: string | null;
+  /** This install's release, commit and release date (self-hosted). */
+  version?: string | null;
+  commit?: string | null;
+  releasedAt?: string | null;
 }
 
 declare global {
