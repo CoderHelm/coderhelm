@@ -326,6 +326,8 @@ test("phone width: no sideways scroll, actions reachable", async ({ page }) => {
   }
   expect(overflow).toBeLessThanOrEqual(0);
   await shot(page, "logs-390");
+  // On a phone the page's actions live in the top bar's actions menu.
+  await page.getByRole("button", { name: "Page actions" }).click();
   await page.getByTestId("autofix-toggle").click();
   await expect(page.getByTestId("autofix-panel")).toBeVisible();
   const overflow2 = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
