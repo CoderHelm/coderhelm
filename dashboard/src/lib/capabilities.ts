@@ -38,6 +38,7 @@ const BUILT_IN_MIN: Record<string, "viewer" | "member" | "admin" | "owner"> = {
   repos: "admin",
   agent_settings: "admin",
   memory: "admin",
+  learning: "admin",
   integrations: "admin",
   data_sources: "admin",
   tests: "admin",

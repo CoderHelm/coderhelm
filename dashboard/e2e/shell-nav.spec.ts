@@ -12,7 +12,7 @@ const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots"
 const LINKS = [
   "Runs", "Reviewer", "Tests", "Releases", "Code Graph", "Plans", "Templates",
   "Integrations", "Data sources",
-  "Analytics", "Infrastructure", "Alerts", "Health", "Memory",
+  "Analytics", "Learning", "Infrastructure", "Alerts", "Health", "Memory",
   "Repos", "Settings", "Notifications", "Alert routes", "Skills", "AI Models",
   "Members",
   "Security", "Token limit", "Admin", "Support queue",

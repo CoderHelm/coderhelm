@@ -50,6 +50,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/data-sources/tools/tool": { label: "Tool", parent: "/data-sources/tools", detail: true },
 
   "/analytics": { label: "Analytics" },
+  "/learning": { label: "Learning" },
   "/infrastructure": { label: "Infrastructure" },
   "/alerts": { label: "Alerts" },
   "/alerts/detail": { label: "Alert", parent: "/alerts", detail: true },

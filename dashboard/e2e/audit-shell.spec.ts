@@ -364,6 +364,7 @@ const PAGES: { path: string; heading: RegExp }[] = [
   { path: "/tests/test?id=t_1", heading: /./ },
   { path: "/graph", heading: /Code graph/i },
   { path: "/analytics", heading: /Analytics/ },
+  { path: "/learning", heading: /Learning/ },
   { path: "/infrastructure", heading: /Infrastructure/ },
   { path: "/alerts", heading: /Alerts/ },
   { path: "/alerts/detail?id=01ALERT000000000000000000", heading: /alert/i },

@@ -83,6 +83,7 @@ const navGroups: NavGroup[] = [
     label: "Insights",
     items: [
       { href: "/analytics", label: "Analytics", icon: <TrendingUpIcon />, need: ANY_CHANGE },
+      { href: "/learning", label: "Learning", icon: <TargetIcon />, need: ANY_CHANGE },
       { href: "/infrastructure", label: "Infrastructure", icon: <HexagonIcon />, need: ANY_CHANGE },
       { href: "/alerts", label: "Alerts", icon: <BellIcon />, need: "view_alerts" },
       { href: "/health", label: "Health", icon: <HeartIcon />, need: "system" },

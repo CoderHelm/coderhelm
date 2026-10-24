@@ -354,6 +354,26 @@ export const api = {
       `/api/analytics?${period === "mtd" ? "period=mtd" : `days=${period}`}${repo ? `&repo=${encodeURIComponent(repo)}` : ""}`,
     ),
 
+  // Learning: what Coderhelm learned from outcomes and what it changed because of them.
+  /** The Learning page: rewards, finding categories, behavior changes, exemplars and variants. */
+  getLearning: (days: number, repo?: string) =>
+    request<Learning>(`/api/learning?days=${days}${repo ? `&repo=${encodeURIComponent(repo)}` : ""}`),
+  /** Pin one variant for an agent (admin), or `null` to let results choose again. */
+  pinVariant: (agent: string, arm: string | null) =>
+    request<{ ok: boolean }>("/api/learning/pin", { method: "POST", body: JSON.stringify({ agent, arm }) }),
+  /** Turn one behavior change off (admin). */
+  revertChange: (id: string) =>
+    request<{ reverted: number }>("/api/learning/revert", { method: "POST", body: JSON.stringify({ id }) }),
+  /** Turn every active behavior change off for one repository (admin). */
+  revertRepo: (repo: string) =>
+    request<{ reverted: number }>("/api/learning/revert", { method: "POST", body: JSON.stringify({ repo }) }),
+  /** Turn a reverted change back on (admin). */
+  restoreChange: (id: string) =>
+    request<{ ok: boolean }>("/api/learning/restore", { method: "POST", body: JSON.stringify({ id }) }),
+  /** The team's signal weights (admin); `{}` goes back to the defaults. */
+  putRewardWeights: (weights: Record<string, number>) =>
+    request<{ weights: Record<string, number> }>("/api/learning/weights", { method: "PUT", body: JSON.stringify({ weights }) }),
+
   // GitHub App installation
   getInstallationStatus: () =>
     request<{ status: string; github_org?: string; installation_id?: number }>(
@@ -3203,4 +3223,101 @@ export interface NewSupportTicket {
   items?: SupportItemRef[];
   /** People on the ticket from the start, checked like adding them later. */
   people?: SupportPersonRef[];
+}
+
+// ── Learning ────────────────────────────────────────────────────────
+
+export type LearningAgent = "reviewer" | "coder" | "planner" | (string & {});
+export type LearningAdjustment = "suppress" | "downgrade" | "raise" | "none";
+
+export interface LearningRewardRow {
+  reward: number;
+  events: number;
+  positive: number;
+  negative: number;
+}
+
+export interface LearningEvidence {
+  kind: string;
+  at: string;
+  pr?: number;
+  run_id?: string;
+  detail?: string;
+}
+
+export interface LearningChange {
+  id: string;
+  repo: string;
+  kind: "calibration" | "variant" | "lesson" | (string & {});
+  key: string;
+  from: string;
+  to: string;
+  reason: string;
+  evidence: LearningEvidence[];
+  at: string;
+  reverted: boolean;
+  reverted_by: string;
+  reverted_at: string;
+}
+
+export interface LearningCategory {
+  repo: string;
+  category: string;
+  accepted: number;
+  dismissed: number;
+  ignored: number;
+  accept_rate: number;
+  adjustment: LearningAdjustment;
+  exempt: boolean;
+  reverted: boolean;
+  reason: string;
+}
+
+export interface LearningExemplar {
+  id: string;
+  repo: string;
+  kind: "finding" | "fix" | (string & {});
+  polarity: "good" | "avoid";
+  category: string;
+  area: string;
+  text: string;
+  reward: number;
+  uses: number;
+  created_at: string;
+  pr?: number;
+}
+
+export interface LearningArm {
+  key: string;
+  label: string;
+  pulls: number;
+  mean: number;
+  ucb: number;
+  eligible: boolean;
+}
+
+export interface LearningBandit {
+  agent: LearningAgent;
+  pinned: string;
+  default_arm: string;
+  exploration_cap: number;
+  arms: LearningArm[];
+}
+
+export interface Learning {
+  days: number;
+  repo: string;
+  min_samples: number;
+  can_manage: boolean;
+  weights: Record<string, number>;
+  default_weights: Record<string, number>;
+  signals: { kind: string; label: string; weight: number; count: number }[];
+  totals: { events: number; reward: number };
+  trend: { date: string; agent: LearningAgent; repo: string; reward: number; events: number }[];
+  agents: ({ agent: LearningAgent } & LearningRewardRow)[];
+  repos: ({ repo: string } & LearningRewardRow)[];
+  categories: LearningCategory[];
+  changes: LearningChange[];
+  exemplars: LearningExemplar[];
+  bandit: LearningBandit[];
 }
