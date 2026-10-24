@@ -80,6 +80,7 @@ async function mockApi(page: Page, opts: { repos: Row[]; role?: string }): Promi
         ],
       });
     }
+    if (p === "/api/graph/neighborhood") return json(route, hood(url.searchParams.get("path") ?? ""));
     const config = p.match(/^\/api\/graph\/config\/(.+)$/);
     if (config && method === "PUT") {
       const body = JSON.parse(req.postData() as string) as { enabled: boolean };
@@ -99,6 +100,17 @@ async function mockApi(page: Page, opts: { repos: Row[]; role?: string }): Promi
   });
   return db;
 }
+
+/** The files around one file, for the explorer. */
+const hood = (path: string) => ({
+  path,
+  imports: ["src/lib/http.ts", "src/lib/auth/session.ts", "src/lib/format.ts", "src/lib/routes.ts", "src/types/api.ts", "src/lib/errors.ts"].filter((f) => f !== path),
+  importers: ["src/app/runs/page.tsx", "src/app/plans/page.tsx", "src/app/settings/page.tsx", "src/components/top-bar.tsx", "src/app/logs/page.tsx", ...(path === "src/lib/api.ts" ? [] : ["src/lib/api.ts"])],
+  symbols: [
+    { name: "request", callers: ["src/app/runs/page.tsx", "src/hooks/use-runs.ts"] },
+    { name: "ApiError", callers: ["src/components/toast.tsx"] },
+  ],
+});
 
 const rowOf = (page: Page, repo: string) => page.locator(`[data-testid="graph-repo"][data-repo="${repo}"]`);
 
@@ -193,4 +205,114 @@ test("the list reads on a phone", async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
   await page.screenshot({ path: path.join(SHOTS_DIR, "graph-phone.png"), fullPage: true });
+});
+
+// ── The explorer ─────────────────────────────────────────────────────────────
+
+const node = (page: Page, id: string) => page.locator(`[data-testid="graph-node"][data-id="${id}"]`);
+const transforms = (page: Page) =>
+  page.getByTestId("graph-node").evaluateAll((els) =>
+    Object.fromEntries(els.map((el) => [el.getAttribute("data-id"), el.getAttribute("transform")])),
+  );
+const dot = (page: Page, id: string) => node(page, id).locator("circle").nth(1);
+const opacity = (page: Page, id: string) => node(page, id).evaluate((el) => getComputedStyle(el).opacity);
+
+async function openExplorer(page: Page) {
+  await mockApi(page, { repos: [READY] });
+  await page.goto("/graph/");
+  await page.getByRole("button", { name: /src\/lib\/api\.ts/ }).click();
+  await expect(page.getByTestId("graph-explorer")).toBeVisible();
+  await expect(node(page, "src/lib/api.ts")).toHaveAttribute("data-kind", "center");
+}
+
+test.describe("with motion allowed", () => {
+  test.use({ reducedMotion: "no-preference" });
+
+  test("the explorer is laid out before it is drawn: nothing moves after the first paint", async ({ page }) => {
+    await openExplorer(page);
+    const first = await transforms(page);
+    expect(Object.keys(first).length).toBeGreaterThan(10);
+    await page.waitForTimeout(800);
+    expect(await transforms(page)).toEqual(first);
+    await expect(page.getByTestId("graph-explorer")).toHaveAttribute("data-motion", "full");
+    await page.getByTestId("graph-explorer").screenshot({ path: path.join(SHOTS_DIR, "graph-explorer-canvas.png") });
+  });
+
+  test("moving to another file glides once and settles quickly", async ({ page }) => {
+    await openExplorer(page);
+    const svg = page.getByTestId("graph-explorer");
+    await dot(page, "src/lib/http.ts").click();
+    await expect(page.getByRole("heading", { name: /Explorer: src\/lib\/http\.ts/ })).toBeVisible();
+    await expect(node(page, "src/lib/http.ts")).toHaveAttribute("data-kind", "center");
+    // One short transition, not a long simulation.
+    await expect(svg).toHaveAttribute("data-moving", "false", { timeout: 600 });
+    const settled = await transforms(page);
+    await page.waitForTimeout(500);
+    expect(await transforms(page)).toEqual(settled);
+    // The old center stays on screen as a file that uses the new one.
+    await expect(node(page, "src/lib/api.ts")).toHaveAttribute("data-kind", "importer");
+  });
+});
+
+test("with reduced motion the explorer appears and changes at once", async ({ page }) => {
+  await openExplorer(page);
+  await expect(page.getByTestId("graph-explorer")).toHaveAttribute("data-motion", "reduced");
+  expect(await opacity(page, "src/lib/http.ts")).toBe("1");
+  const transition = await node(page, "src/lib/http.ts").evaluate((el) => getComputedStyle(el).transitionProperty);
+  expect(transition).toBe("none");
+  await dot(page, "src/lib/http.ts").click();
+  await expect(page.getByTestId("graph-explorer")).toHaveAttribute("data-moving", "false");
+  await expect(node(page, "src/lib/http.ts")).toHaveAttribute("data-kind", "center");
+});
+
+test("labels use the page's font at the same size on a laptop and a phone", async ({ page }) => {
+  await openExplorer(page);
+  const look = () =>
+    page.locator('[data-testid="graph-node"][data-kind="center"] text').evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { family: s.fontFamily, size: s.fontSize, height: Math.round(el.getBoundingClientRect().height), body: getComputedStyle(document.body).fontFamily };
+    });
+  const wide = await look();
+  expect(wide.family).toBe(wide.body);
+  expect(wide.size).toBe("12px");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(async () => (await look()).height).toBe(wide.height);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+  await page.getByTestId("graph-explorer").scrollIntoViewIfNeeded();
+  await page.getByTestId("graph-explorer").screenshot({ path: path.join(SHOTS_DIR, "graph-explorer-canvas-phone.png") });
+  await page.screenshot({ path: path.join(SHOTS_DIR, "graph-explorer-phone.png"), fullPage: true });
+});
+
+test("filtering a kind hides it without moving anything else", async ({ page }) => {
+  await openExplorer(page);
+  const before = await transforms(page);
+  const symbols = page.getByRole("button", { name: "its symbols" });
+  await expect(symbols).toHaveAttribute("aria-pressed", "true");
+  await symbols.click();
+  await expect(symbols).toHaveAttribute("aria-pressed", "false");
+  await expect(node(page, "sym:request")).toHaveAttribute("aria-hidden", "true");
+  expect(await opacity(page, "sym:request")).toBe("0");
+  expect(await transforms(page)).toEqual(before);
+  await page.getByRole("button", { name: "files it imports" }).click();
+  await expect(page.getByRole("button", { name: "Explore src/lib/http.ts" })).toHaveCount(0);
+  expect(await transforms(page)).toEqual(before);
+  await symbols.click();
+  expect(await opacity(page, "sym:request")).toBe("1");
+  await page.screenshot({ path: path.join(SHOTS_DIR, "graph-explorer.png"), fullPage: true });
+});
+
+test("hovering a node dims everything but it and its neighbours, without resizing it", async ({ page }) => {
+  await openExplorer(page);
+  const size = await dot(page, "sym:ApiError").boundingBox();
+  await dot(page, "sym:ApiError").hover();
+  await expect.poll(() => opacity(page, "src/lib/http.ts")).toBe("0.25");
+  expect(await opacity(page, "src/components/toast.tsx")).toBe("1");
+  expect(await opacity(page, "src/lib/api.ts")).toBe("1");
+  const hovered = await dot(page, "sym:ApiError").boundingBox();
+  expect(hovered?.width).toBeCloseTo(size?.width ?? 0, 0);
+  // Keyboard focus does the same.
+  await page.mouse.move(0, 0);
+  await node(page, "src/lib/http.ts").focus();
+  await expect.poll(() => opacity(page, "sym:ApiError")).toBe("0.25");
 });
