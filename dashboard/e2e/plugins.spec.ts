@@ -43,6 +43,7 @@ interface Backend {
   runForbidden: boolean;
   staleOnApprove: boolean;
   calls: { method: string; path: string; body: Json | null }[];
+  chat: Json;
 }
 
 const TOOLS = [
@@ -100,7 +101,7 @@ function refuse(route: Route, status: number, code: string, error: string) {
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = {
     me: { email: ADMIN, role: "admin" }, flag: true, admins: 2, plugins: [marketing()], drafts: [draft()], runs: [], audit: [],
-    limitReached: false, runForbidden: false, staleOnApprove: false, calls: [], ...init,
+    limitReached: false, runForbidden: false, staleOnApprove: false, calls: [], chat: { slack_team_id: "", slack_signing_secret_set: false, teams_webhook_set: false }, ...init,
   };
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   const log = (action: string, extra: Json = {}) => db.audit.unshift({ id: `e${db.audit.length + 1}`, at: NOW, actor: db.me.email, actor_kind: "person", action, result: "ok", ...extra });
@@ -131,8 +132,22 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       return json(route, { plugins: [{ id: "sentry", name: "Sentry", description: "Query error events.", category: "Monitoring", tier: 1, icon: "sentry", credential_fields: [{ key: "auth_token", label: "Auth Token", placeholder: "sntrys_...", secret: true }], docs_url: "https://docs.sentry.io", repo_url: "", default_prompt: "Investigate errors.", recommended_permissions: "Read-only" }] });
     }
     if (p === "/api/plugins" && method === "GET") return json(route, { plugins: [] });
+    if (p === "/api/integrations") {
+      const sentry = { id: "sentry", name: "Sentry", description: "Query error events.", category: "Monitoring", tier: 1, icon: "sentry", credential_fields: [{ key: "auth_token", label: "Auth Token", placeholder: "sntrys_...", secret: true }], docs_url: "https://docs.sentry.io", repo_url: "", default_prompt: "Investigate errors.", recommended_permissions: "Read-only" };
+      return json(route, {
+        can_edit: true, migrated: 0,
+        items: [{ id: "sentry", section: "other", name: "Sentry", does: "Reads error events.", status: "not_connected", reason: "", action: "connect", last_check: "", manage_href: "", detail: { plugin: sentry, enabled: false, has_credentials: false, custom_prompt: "", remote: null } }],
+      });
+    }
 
-    if (p === "/api/plugins/settings") return json(route, { autonomy_cap: "write", admins: db.admins });
+    if (p === "/api/plugins/settings" && method === "GET") return json(route, { autonomy_cap: "write", admins: db.admins, ...db.chat });
+    if (p === "/api/plugins/settings" && method === "PUT") {
+      if (body?.slack_team_id !== undefined && !/^T[A-Z0-9]+$/.test(String(body.slack_team_id))) return refuse(route, 400, "invalid", "That isn't a Slack workspace id.");
+      if (body?.slack_team_id !== undefined) db.chat.slack_team_id = body.slack_team_id;
+      if (body?.slack_signing_secret) db.chat.slack_signing_secret_set = true;
+      if (body?.teams_secret) db.chat.teams_webhook_set = true;
+      return json(route, { autonomy_cap: "write", teams_webhook_path: db.chat.teams_webhook_set ? "/webhooks/teams/plugins/t_1" : undefined });
+    }
     if (p === "/api/plugins/sources" && method === "GET") {
       return json(route, { sources: [{ id: "src_1", url: "https://github.com/example-org/plugins", repo: "example-org/plugins", access: "public", path: "", track: { kind: "branch", value: "main" }, sha: "cccccccccccc", checked_at: NOW, error: "", added_by: ADMIN, added_at: NOW, plugins: [{ path: "plugins/support", name: "Support digest", version: "0.1.0", description: "Weekly support digest." }] }] });
     }
@@ -518,6 +533,34 @@ test("a viewer reads a draft but gets no controls to change or decide it", async
   await page.goto("/plugins/draft?id=d1");
   await expect(page.getByTestId("draft-content")).toBeVisible();
   await expect(page.getByTestId("decide")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Edit" })).toHaveCount(0);
+});
+
+test("chat settings: a Slack workspace and secret, a Teams secret, and the webhook path to paste", async ({ page }) => {
+  const db = await mockApi(page);
+  await page.goto("/plugins");
+  const form = page.getByTestId("chat-settings");
+  await form.getByLabel("Slack workspace id").fill("not-an-id");
+  await form.getByRole("button", { name: "Save chat settings" }).click();
+  await expect(form.getByTestId("refusal")).toHaveAttribute("data-code", "invalid");
+  await form.getByLabel("Slack workspace id").fill("T0123ABCD");
+  await form.getByLabel("Slack signing secret").fill("slack-secret-value");
+  await form.getByLabel("Teams outgoing webhook secret").fill("teams-secret-value");
+  await form.getByRole("button", { name: "Save chat settings" }).click();
+  await expect(page.getByTestId("teams-webhook-path")).toContainText("/webhooks/teams/plugins/t_1");
+  const sent = db.calls.filter((c) => c.path === "/api/plugins/settings" && c.method === "PUT").pop();
+  expect(sent?.body).toEqual({ slack_team_id: "T0123ABCD", slack_signing_secret: "slack-secret-value", teams_secret: "teams-secret-value" });
+  // Secrets are never shown again: the boxes clear and say they are saved.
+  await expect(form.getByLabel("Slack signing secret")).toHaveValue("");
+  await expect(form.getByText("Saved. Enter a new one to replace it.").first()).toBeVisible();
+});
+
+test("a draft being published says so and offers no decisions", async ({ page }) => {
+  await mockApi(page, { me: { email: EDITOR, role: "member" }, drafts: [draft({ status: "publishing" })] });
+  await page.goto("/plugins/draft?id=d1");
+  await expect(page.getByTestId("draft-status")).toHaveAttribute("data-status", "publishing");
+  await expect(page.getByTestId("draft-status")).toHaveText("Publishing");
+  await expect(page.getByRole("button", { name: "Approve and publish now" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Edit" })).toHaveCount(0);
 });
 

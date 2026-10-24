@@ -158,6 +158,7 @@ export type DraftStatus =
   | "in_review"
   | "approved"
   | "scheduled"
+  | "publishing"
   | "published"
   | "rejected"
   | "stopped"
@@ -223,6 +224,25 @@ export interface AuditEvent {
   detail?: string;
 }
 
+/** The team's plugin settings, and how briefs and approvals arrive from chat. */
+export interface TeamPluginSettings {
+  autonomy_cap: "read" | "write";
+  admins: number;
+  /** The Slack workspace whose signed requests are accepted. */
+  slack_team_id?: string;
+  slack_signing_secret_set?: boolean;
+  teams_webhook_set?: boolean;
+  /** Where a Teams outgoing webhook posts, once its secret is saved. */
+  teams_webhook_path?: string;
+}
+
+export interface TeamPluginSettingsUpdate {
+  autonomy_cap?: "read" | "write";
+  slack_team_id?: string;
+  slack_signing_secret?: string;
+  teams_secret?: string;
+}
+
 /** A refused request: the server's sentence, its refusal code and the status. */
 export class PluginError extends Error {
   constructor(
@@ -248,7 +268,10 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     body = text ? JSON.parse(text) : {};
   } catch {}
   if (!res.ok) {
-    const code = typeof body.code === "string" ? body.code : res.status === 403 ? "forbidden" : "";
+    const code =
+      typeof body.code === "string"
+        ? body.code
+        : ({ 403: "forbidden", 404: "not_found", 400: "invalid", 429: "limit_reached" } as Record<number, string>)[res.status] ?? "";
     const msg = typeof body.error === "string" && body.error ? body.error : refusalText(code) || `The request failed (error ${res.status}).`;
     throw new PluginError(msg, code, res.status);
   }
@@ -265,12 +288,12 @@ const qs = (o: Record<string, string | undefined>) => {
 };
 
 export const pluginsApi = {
-  flag: () => call<{ enabled: boolean }>("/api/plugins/flag"),
+  flag: () => call<{ enabled: boolean; can_toggle?: boolean }>("/api/plugins/flag"),
   setTeamFlag: (teamId: string, plugins: boolean) =>
     call<{ team_id: string; flags: { plugins: boolean } }>(`/api/admin/teams/${id(teamId)}/flags`, send("PUT", { plugins })),
 
-  settings: () => call<{ autonomy_cap: "read" | "write"; admins: number }>("/api/plugins/settings"),
-  saveSettings: (autonomy_cap: "read" | "write") => call<{ autonomy_cap: "read" | "write" }>("/api/plugins/settings", send("PUT", { autonomy_cap })),
+  settings: () => call<TeamPluginSettings>("/api/plugins/settings"),
+  saveSettings: (s: TeamPluginSettingsUpdate) => call<{ autonomy_cap: "read" | "write"; teams_webhook_path?: string }>("/api/plugins/settings", send("PUT", s)),
 
   sources: () => call<{ sources: PluginSource[] }>("/api/plugins/sources"),
   addSource: (url: string, track?: Track) => call<{ source: PluginSource }>("/api/plugins/sources", send("POST", { url, track })),
@@ -331,6 +354,8 @@ export const REFUSALS: Record<string, string> = {
   needs_second_admin: "Another admin has to approve this. The admin who asked for it can't.",
   not_granted: "That tool isn't in the plugin's manifest, so it can't be used.",
   pinned: "This plugin is pinned to one commit, so updates are off.",
+  not_found: "That isn't there any more. It may have been removed.",
+  invalid: "That wasn't accepted. Check the values and try again.",
 };
 
 export function refusalText(code: string | undefined | null): string {
@@ -354,6 +379,7 @@ export const DRAFT_STATUS: Record<DraftStatus, { label: string; tone: "waiting" 
   in_review: { label: "Waiting for review", tone: "waiting" },
   approved: { label: "Approved", tone: "success" },
   scheduled: { label: "Scheduled", tone: "live" },
+  publishing: { label: "Publishing", tone: "live" },
   published: { label: "Published", tone: "success" },
   rejected: { label: "Rejected", tone: "danger" },
   stopped: { label: "Stopped", tone: "danger" },

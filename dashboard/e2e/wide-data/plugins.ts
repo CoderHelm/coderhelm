@@ -139,17 +139,17 @@ const audit = [
 
 export const pluginsData: Handler = ({ method, path }) => {
   if (method !== "GET") return undefined;
-  if (path === "/api/plugins/flag") return { enabled: true };
+  if (path === "/api/plugins/flag") return { enabled: true, can_toggle: true };
   // The MCP servers a team switched on (the Connections page).
   if (path === "/api/plugins") return { plugins: [{ plugin_id: "linear", enabled: true, has_credentials: false, enabled_at: iso(60), custom_prompt: SENTENCE }] };
-  if (path === "/api/plugins/settings") return { autonomy_cap: "write", admins: 2 };
+  if (path === "/api/plugins/settings") return { autonomy_cap: "write", admins: 2, slack_team_id: "T0123ABCDEFGHIJKLMNOPQRSTUVWXYZ", slack_signing_secret_set: true, teams_webhook_set: true, teams_webhook_path: `/webhooks/teams/plugins/${TOKEN}` };
   if (path === "/api/plugins/sources") return { sources: [source] };
   if (path === "/api/plugins/available") return { plugins: catalog };
   if (path === "/api/plugins/installed") return { plugins: [installed] };
   if (path.startsWith("/api/plugins/installed/")) return { plugin: installed, versions };
   if (path === "/api/plugins/runs") return { runs: [run, { ...run, run_id: "plugin-run-wide-2", status: "completed", code: undefined, reason: undefined }] };
   if (path.startsWith("/api/plugins/runs/")) return { run, artifacts: [draft], audit };
-  if (path === "/api/plugins/drafts") return { drafts: [draft, { ...draft, id: "draft-wide-2", status: "scheduled" }] };
+  if (path === "/api/plugins/drafts") return { drafts: [draft, { ...draft, id: "draft-wide-2", status: "scheduled" }, { ...draft, id: "draft-wide-3", status: "publishing" }] };
   if (path.startsWith("/api/plugins/drafts/")) return { draft };
   if (path === "/api/audit") return { events: audit, next: "cursor-wide-next" };
   return undefined;

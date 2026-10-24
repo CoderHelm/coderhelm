@@ -117,7 +117,7 @@ function DraftPage() {
   const canEdit = mayRun && ["draft", "in_review", "rejected"].includes(d.status);
   const canSubmit = mayRun && (d.status === "draft" || d.status === "rejected");
   const inReview = mayDecide && d.status === "in_review";
-  const canStop = (mayDecide || (isRequester && mayRun)) && !["stopped", "published", "cancelled", "failed"].includes(d.status);
+  const canStop = (mayDecide || (isRequester && mayRun)) && !["stopped", "publishing", "published", "cancelled", "failed"].includes(d.status);
   const scheduled = (mayDecide || (isRequester && mayRun)) && d.status === "scheduled";
 
   const stop = async () => {
@@ -191,6 +191,11 @@ function DraftPage() {
               See it
             </a>
           )}
+        </p>
+      )}
+      {d.status === "publishing" && (
+        <p className="mt-6 text-sm text-sky-300" data-testid="publishing-note">
+          Going out now. This page updates when it is done.
         </p>
       )}
       {d.status === "failed" && d.error && <p className="mt-6 text-sm text-red-300">It didn&apos;t go out: {d.error}</p>}
