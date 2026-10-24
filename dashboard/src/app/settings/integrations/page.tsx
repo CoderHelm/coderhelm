@@ -12,6 +12,7 @@ import {
   type KeyConnectorKind,
   type IntegrationSection,
   type IntegrationStatus,
+  type McpServer,
   type PluginDef,
 } from "@/lib/api";
 import { errorMessage, timeAgo } from "@/lib/data-sources";
@@ -30,6 +31,7 @@ import { useToast } from "@/components/toast";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { ChevronRightIcon } from "@/components/icons";
 import { BrandIcon } from "@/components/brand-icons";
+import { AddMcpServerDialog, McpServerPanel, connectCatalogServer } from "@/components/mcp-servers";
 
 // Settings → Integrations: every outside system Coderhelm connects to, as one
 // list per kind of tool. One row per integration with the same columns in the
@@ -53,17 +55,19 @@ const SECTIONS: { id: IntegrationSection; anchor: string; title: string }[] = [
   { id: "docs", anchor: "docs-and-design", title: "Docs and design" },
   { id: "chat", anchor: "chat", title: "Chat" },
   { id: "other", anchor: "other-tools", title: "Other tools" },
+  { id: "mcp", anchor: "mcp-servers", title: "MCP servers" },
 ];
 
 const STATUS: Record<IntegrationStatus, { label: string; dot: string; text: string }> = {
   connected: { label: "Connected", dot: "bg-emerald-400", text: "text-zinc-200" },
   needs_credentials: { label: "Needs credentials", dot: "bg-amber-400", text: "text-amber-300" },
+  needs_reconnect: { label: "Needs reconnect", dot: "bg-amber-400", text: "text-amber-300" },
   not_connected: { label: "Not connected", dot: "bg-zinc-600", text: "text-zinc-500" },
   error: { label: "Not working", dot: "bg-red-400", text: "text-red-300" },
 };
 
 /** Problems first, then what works, then what could be added. */
-const ORDER: Record<IntegrationStatus, number> = { needs_credentials: 0, error: 1, connected: 2, not_connected: 3 };
+const ORDER: Record<IntegrationStatus, number> = { needs_credentials: 0, needs_reconnect: 0, error: 1, connected: 2, not_connected: 3 };
 
 /** What each one is for, short enough for one line of a list. The full sentence is inside. */
 const SHORT: Record<string, string> = {
@@ -93,10 +97,17 @@ const SHORT: Record<string, string> = {
   turso: "Databases and queries",
   neon: "Postgres databases and branches",
   launchdarkly: "Feature flags and targeting",
+  atlassian: "Jira issues and Confluence pages, through Atlassian's own server",
 };
 
 function shortLine(item: Integration): string {
+  if (item.id.startsWith("mcp:")) return remoteOf(item)?.url ?? item.does;
   return SHORT[item.id.startsWith("aws") ? "aws" : item.id.split(":")[0]] ?? item.does;
+}
+
+/** The remote server behind a row: one added by address, or a catalog server connected by OAuth. */
+function remoteOf(item: Integration): McpServer | null {
+  return ((item.detail as { remote?: McpServer | null }).remote ?? null) as McpServer | null;
 }
 
 /** The anchor a row answers to (`#integration-aws` for the first AWS account). */
@@ -142,13 +153,14 @@ function IntegrationsPage() {
   }, [target, data]);
 
   const counts = useMemo(() => {
-    const c = { connected: 0, needs_credentials: 0, error: 0, not_connected: 0 };
+    const c = { connected: 0, needs_credentials: 0, needs_reconnect: 0, error: 0, not_connected: 0 };
     for (const i of data?.items ?? []) c[i.status]++;
     return c;
   }, [data]);
 
   const replace = (next: Integration) =>
     setItems((d) => (d ? d.map((i) => (i.id === next.id ? next : i)) : d));
+  const [adding, setAdding] = useState(false);
 
   return (
     <Page testId="integrations-page">
@@ -168,6 +180,7 @@ function IntegrationsPage() {
         <p className="mt-4 text-sm text-zinc-400" data-testid="integrations-summary">
           {counts.connected} connected
           {counts.needs_credentials > 0 && <span className="text-amber-300"> · {counts.needs_credentials} need credentials</span>}
+          {counts.needs_reconnect > 0 && <span className="text-amber-300"> · {counts.needs_reconnect} need reconnecting</span>}
           {counts.error > 0 && <span className="text-red-400"> · {counts.error} not working</span>}
           {!data.canEdit && <span> · Only admins can connect or change integrations.</span>}
         </p>
@@ -204,11 +217,34 @@ function IntegrationsPage() {
       {data &&
         SECTIONS.map((sec) => {
           const items = data.items.filter((i) => i.section === sec.id);
-          if (items.length === 0) return null;
+          const mcp = sec.id === "mcp";
+          if (items.length === 0 && !(mcp && data.canEdit)) return null;
           const sorted = [...items].sort((a, b) => ORDER[a.status] - ORDER[b.status]);
           let awsSeen = false;
           return (
-            <Section key={sec.id} id={sec.anchor} title={sec.title} className="!mt-8">
+            <Section
+              key={sec.id}
+              id={sec.anchor}
+              title={sec.title}
+              className="!mt-8"
+              description={
+                mcp
+                  ? "Any remote MCP server, by its address. Coderhelm finds how it signs in (OAuth, a key, or nothing), and agents get only the tools you allow."
+                  : undefined
+              }
+              actions={
+                mcp && data.canEdit ? (
+                  <button type="button" onClick={() => setAdding(true)} className={secondaryButton} data-testid="add-mcp-server-button">
+                    Add server
+                  </button>
+                ) : undefined
+              }
+            >
+              {mcp && items.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-zinc-800 px-4 py-3 text-sm text-zinc-500">
+                  None yet. Servers from the list above that offer OAuth connect from their own row.
+                </p>
+              ) : (
               <ul
                 aria-labelledby={`${sec.anchor}-heading`}
                 className="divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/40"
@@ -230,9 +266,20 @@ function IntegrationsPage() {
                   );
                 })}
               </ul>
+              )}
             </Section>
           );
         })}
+      {data?.canEdit && (
+        <AddMcpServerDialog
+          open={adding}
+          onOpenChange={setAdding}
+          onAdded={async (server) => {
+            await load();
+            window.location.hash = `integration-mcp:${server.id}`;
+          }}
+        />
+      )}
       {data && (
         <Section
           id="websites"
@@ -262,6 +309,7 @@ function actionLabel(item: Integration, canEdit: boolean, hasPage: boolean): str
   if (!canEdit) return hasPage ? "View" : "";
   if (item.status === "connected") return "Manage";
   if (item.status === "needs_credentials") return "Add credentials";
+  if (item.status === "needs_reconnect") return "Reconnect";
   if (item.status === "error") return "See why";
   return "Connect";
 }
@@ -284,9 +332,13 @@ function IntegrationRow({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const { toast } = useToast();
+  const remote = remoteOf(item);
+  // Anyone who may connect their own account opens a server each person signs in to.
+  const { can } = useCan();
+  const personal = remote?.auth === "oauth" && remote.sharing === "personal" && can("mcp_connect");
   useEffect(() => {
-    if (startOpen && canEdit) setOpen(true);
-  }, [startOpen, canEdit]);
+    if (startOpen && (canEdit || personal)) setOpen(true);
+  }, [startOpen, canEdit, personal]);
 
   const st = STATUS[item.status];
   const kind = kindOf(item);
@@ -299,8 +351,8 @@ function IntegrationRow({
   // Members can open the pages they're allowed to read; everything else is admin only.
   const memberHref = kind === "github" || kind === "aws_connect" || kind === "aws_account" ? item.manage_href : "";
   const href = canEdit ? pageHref : memberHref;
-  const opens = Boolean(href) || canEdit;
-  const action = actionLabel(item, canEdit, Boolean(href));
+  const opens = Boolean(href) || canEdit || personal;
+  const action = actionLabel(item, canEdit || personal, Boolean(href) || personal);
   const checked = item.last_check ? timeAgo(item.last_check) : "";
 
   const checkAgain = async () => {
@@ -312,6 +364,10 @@ function IntegrationRow({
       } else if (kind === "connector") {
         const r = await api.testConnector(item.id as ConnectorId);
         toast(r.connector.status === "ready" ? `${item.name} works` : `${item.name} needs attention`, r.connector.status === "ready" ? "success" : "error");
+        await onReload();
+      } else if (remote) {
+        const r = await api.checkMcpServer(remote.id);
+        toast(r.error ? r.error : `${item.name} works`, r.error ? "error" : "success");
         await onReload();
       } else if (kind === "plugin") {
         const r = await api.testPluginConnection(item.id);
@@ -405,16 +461,16 @@ function IntegrationRow({
         </div>
       )}
 
-      {open && canEdit && (
+      {open && (canEdit || personal) && (
         <div id={panelId} data-testid="integration-panel" className="border-t border-zinc-800 bg-zinc-950/40 px-4 pb-4 pt-3 sm:pl-[3.75rem]">
           <p className="text-sm text-zinc-400">{item.does}</p>
-          {item.reason && (
+          {item.reason && !remote && (
             <p className={`mt-2 text-sm ${item.status === "error" ? "text-red-300" : item.status === "needs_credentials" ? "text-amber-300" : "text-zinc-400"}`}>
               {item.reason}
             </p>
           )}
           {aws && <AwsAbilitySummary a={aws} />}
-          {item.status === "error" && kind !== "chat" && (
+          {item.status === "error" && kind !== "chat" && !remote && (
             <p className="mt-3">
               <button type="button" onClick={checkAgain} disabled={busy} className={secondaryButton}>
                 {busy ? "Checking…" : "Check again"}
@@ -436,7 +492,9 @@ function IntegrationRow({
               }}
             />
           )}
-          {kind === "plugin" && <PluginPanel item={item} onChanged={onReload} onClose={() => setOpen(false)} />}
+          {kind === "remote" && remote && <McpServerPanel server={remote} canEdit={canEdit} onChanged={onReload} onRemoved={() => setOpen(false)} />}
+          {kind === "plugin" && remote && <McpServerPanel server={remote} canEdit={canEdit} onChanged={onReload} />}
+          {kind === "plugin" && canEdit && <PluginPanel item={item} onChanged={onReload} onClose={() => setOpen(false)} />}
           {kind === "chat" && <ChatPanel channel={item.id as ChatChannel} onSaved={onReload} />}
           <p className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
             <button type="button" onClick={() => setOpen(false)} className={linkButton}>
@@ -454,7 +512,7 @@ function IntegrationRow({
   );
 }
 
-type Kind = "github" | "jira" | "aws_connect" | "aws_account" | "connector" | "chat" | "plugin";
+type Kind = "github" | "jira" | "aws_connect" | "aws_account" | "connector" | "chat" | "remote" | "plugin";
 
 function kindOf(item: Integration): Kind {
   if (item.id === "github") return "github";
@@ -463,6 +521,7 @@ function kindOf(item: Integration): Kind {
   if (item.id.startsWith("aws-")) return "aws_account";
   if (["newrelic", "confluence", "opensearch", "rest"].includes(item.id.split(":")[0])) return "connector";
   if (item.id === "teams" || item.id === "slack") return "chat";
+  if (item.id.startsWith("mcp:")) return "remote";
   return "plugin";
 }
 
@@ -514,6 +573,56 @@ function ConnectorPanel({ item, onSaved }: { item: Integration; onSaved: () => P
 
 /** An MCP server: credentials (entered here, never shown again), its test, its instructions, and turning it off. */
 function PluginPanel({ item, onChanged, onClose }: { item: Integration; onChanged: () => Promise<void>; onClose: () => void }) {
+  const d = item.detail as { plugin: PluginDef; enabled: boolean; has_credentials: boolean; custom_prompt: string; remote?: McpServer | null };
+  const p = d.plugin;
+  const keyForm = <PluginKeyPanel item={item} onChanged={onChanged} onClose={onClose} />;
+  if (!p.remote_url) return keyForm;
+  const hasKeys = p.credential_fields.length > 0;
+  return (
+    <div className="mt-4 flex flex-col gap-4">
+      {!d.remote && <OAuthOffer plugin={p} />}
+      {hasKeys && (
+        <Disclosure summary={d.remote ? "Or use a key instead" : "Use a key instead"} defaultOpen={d.has_credentials && !d.remote}>
+          {keyForm}
+        </Disclosure>
+      )}
+    </div>
+  );
+}
+
+/** Signing in through the vendor's own remote server: no key to paste, and tools allowed one by one. */
+function OAuthOffer({ plugin }: { plugin: PluginDef }) {
+  const [busy, setBusy] = useState(false);
+  const { toast } = useToast();
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3" data-testid="oauth-offer">
+      <p className="text-sm text-zinc-300">
+        Sign in with {plugin.name}: nobody pastes a key, Coderhelm renews the sign-in on its own, and you pick which of its tools agents may use.
+      </p>
+      <div>
+        <button
+          type="button"
+          disabled={busy}
+          className={primaryButton}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await connectCatalogServer(plugin.id);
+            } catch (e) {
+              toast(errorMessage(e, "Couldn't start the sign-in."), "error");
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? "Opening sign-in…" : `Connect with ${plugin.name}`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** An MCP server run with a key: credentials (entered here, never shown again), its test, its instructions, and turning it off. */
+function PluginKeyPanel({ item, onChanged, onClose }: { item: Integration; onChanged: () => Promise<void>; onClose: () => void }) {
   const d = item.detail as { plugin: PluginDef; enabled: boolean; has_credentials: boolean; custom_prompt: string };
   const p = d.plugin;
   const [creds, setCreds] = useState<Record<string, string>>(() => Object.fromEntries(p.credential_fields.map((f) => [f.key, ""])));

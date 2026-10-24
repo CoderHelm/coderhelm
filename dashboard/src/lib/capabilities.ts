@@ -31,6 +31,7 @@ const BUILT_IN_MIN: Record<string, "viewer" | "member" | "admin" | "owner"> = {
   recommendations: "member",
   view_alerts: "member",
   view_integrations: "member",
+  mcp_connect: "member",
   people: "admin",
   roles: "admin",
   delete_plans: "admin",

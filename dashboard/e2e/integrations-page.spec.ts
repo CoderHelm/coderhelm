@@ -201,7 +201,7 @@ test("one list per section, each row with its status in the same column and one 
   await page.goto("/settings/integrations");
   await expect(page.getByRole("heading", { name: "Integrations", level: 1 })).toBeVisible();
   const headings = page.getByRole("main").getByRole("heading", { level: 2 });
-  await expect(headings).toHaveText(["Code and tickets", "Cloud", "Monitoring", "Docs and design", "Chat", "Other tools", "Your websites", "Data sources"]);
+  await expect(headings).toHaveText(["Code and tickets", "Cloud", "Monitoring", "Docs and design", "Chat", "Other tools", "MCP servers", "Your websites", "Data sources"]);
   await expect(page.getByTestId("integrations-summary")).toContainText("4 connected · 3 need credentials");
   // Lists, not card grids.
   await expect(page.getByRole("main").getByRole("list", { name: "Monitoring" }).getByRole("listitem")).toHaveCount(2);
