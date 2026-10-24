@@ -1,0 +1,48 @@
+---
+title: Connections and OAuth
+description: Ask each team to connect the accounts your plugin needs, with OAuth or a key, shared or per person.
+status: coming-soon
+---
+
+<Callout type="info" title="Coming soon">Plugins are being built and are not on main yet. This page describes the design they are being built to, and will be updated when they ship.</Callout>
+
+A plugin that posts to LinkedIn or saves drafts in a CMS needs an account to do it with. Declare it as a `connection` setting:
+
+```yaml
+settings:
+  - key: linkedin
+    type: connection
+    provider: oauth2
+    scopes: [w_member_social]
+    label: LinkedIn
+  - key: sanity
+    type: connection
+    provider: mcp
+  - key: crm
+    type: connection
+    provider: api_key
+    per_user: true
+```
+
+| Provider | How the team connects |
+| --- | --- |
+| `oauth2` | A **Connect** button signs in with the service (OAuth 2.1 with PKCE). Tokens are refreshed automatically and revoked on disconnect. |
+| `mcp` | An MCP server on the team's [Connections](/concepts/connections) page, local or remote. |
+| `api_key` | A key pasted once, then sealed. |
+
+## Install and connect are separate
+
+Installing a plugin never grants it access to anything. After an admin installs it, someone connects each account:
+
+- **Shared** (default): one account for the whole team, connected by an admin.
+- **Per person** (`per_user: true`): each person connects their own, and runs they start use it.
+
+A plugin can't run until its required connections are made.
+
+## What the plugin can do with it
+
+Only what its tools allow. A connection to an MCP server exposes only the tool names in the plugin's `allow` list. A defined HTTP tool uses the connection to sign its request; the token is added after the model has chosen the call, and the model never sees it.
+
+## Scopes
+
+List the narrowest OAuth scopes the plugin needs. A new version that asks for a new scope stays on the old version until an admin approves it.

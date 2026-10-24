@@ -14,6 +14,7 @@ import * as cdk from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
 import { AppStack } from "../lib/app-stack";
 import { FrontendStack } from "../lib/frontend-stack";
+import { DocsStack } from "../lib/docs-stack";
 import { ASSET_CACHE_CONTROL, PAGE_CACHE_CONTROL, SWEEP_CODE, pageRoutes } from "../lib/static-site";
 
 const env = { account: "111111111111", region: "us-east-1" };
@@ -42,12 +43,14 @@ function fixtureOut(): string {
 
 type Resources = Record<string, { Type: string; Properties: any; DependsOn?: string[] }>;
 
-function synth(kind: "app" | "site"): Resources {
+function synth(kind: "app" | "site" | "docs"): Resources {
   const app = new cdk.App();
   const outDir = fixtureOut();
   const stack = kind === "app"
     ? new AppStack(app, "App", { env, stage: "test", webAclArn, outDir })
-    : new FrontendStack(app, "Site", { env, stage: "test", webAclArn, outDir });
+    : kind === "docs"
+      ? new DocsStack(app, "Docs", { env, stage: "test", webAclArn, outDir })
+      : new FrontendStack(app, "Site", { env, stage: "test", webAclArn, outDir });
   return Template.fromStack(stack).toJSON().Resources;
 }
 
@@ -81,7 +84,7 @@ function distribution(r: Resources) {
   return d.Properties.DistributionConfig;
 }
 
-for (const kind of ["app", "site"] as const) {
+for (const kind of ["app", "site", "docs"] as const) {
   test(`${kind}: /_next/ files are kept across deploys and cached as immutable`, () => {
     const { assets } = deployments(synth(kind));
     assert.equal(assets.props.Prune, false);
@@ -205,4 +208,35 @@ test("site: Markdown for known pages, the 404 page for unknown ones, and the hos
   assert.equal(rewrite({ request: { uri: "/nope/", headers: md } }).uri, "/errors/404.html");
   const redirect = rewrite({ request: { uri: "/x", headers: { host: { value: "www.coderhelm.ai" } } } });
   assert.equal(redirect.statusCode, 301);
+});
+
+test("docs: Markdown for known pages, the 404 page for unknown ones", () => {
+  const rewrite = cfFunction(synth("docs"), /docs-url-rewrite$/);
+  const md = { accept: { value: "text/markdown" } };
+  assert.equal(rewrite({ request: { uri: "/", headers: md } }).uri, "/index.md");
+  assert.equal(rewrite({ request: { uri: "/support/ticket/", headers: md } }).uri, "/support/ticket.md");
+  assert.equal(rewrite({ request: { uri: "/support/ticket", headers: md } }).uri, "/support/ticket.md");
+  assert.equal(rewrite({ request: { uri: "/nope/", headers: md } }).uri, "/errors/404.html");
+  assert.equal(rewrite({ request: { uri: "/schema/plugin-manifest.v1.json", headers: {} } }).uri, "/schema/plugin-manifest.v1.json");
+  assert.equal(rewrite({ request: { uri: "/llms.txt", headers: {} } }).uri, "/llms.txt");
+});
+
+test("docs: docs.coderhelm.com with its own certificate and DNS records", () => {
+  const r = synth("docs");
+  assert.deepEqual(distribution(r).Aliases, ["docs.coderhelm.com"]);
+  const [[, cert]] = ofType(r, "AWS::CertificateManager::Certificate");
+  assert.equal(cert.Properties.DomainName, "docs.coderhelm.com");
+  assert.equal(cert.Properties.ValidationMethod, "DNS");
+  const records = ofType(r, "AWS::Route53::RecordSet").map(([, v]) => `${v.Properties.Type} ${v.Properties.Name}`);
+  assert.deepEqual(records.sort(), ["A docs.coderhelm.com.", "AAAA docs.coderhelm.com."]);
+});
+
+test("docs: Markdown, llms.txt, the schema and the validator go up with their own content types", () => {
+  const { all } = deployments(synth("docs"));
+  const typeOf = (include: string) =>
+    all.find(([, d]) => JSON.stringify(d.Properties.Include) === JSON.stringify([include]))?.[1].Properties.SystemMetadata["content-type"];
+  assert.equal(typeOf("*.md"), "text/markdown; charset=utf-8");
+  assert.equal(typeOf("schema/*"), "application/schema+json; charset=utf-8");
+  assert.equal(typeOf("tools/*"), "text/javascript; charset=utf-8");
+  assert.equal(typeOf("errors/404.html"), undefined);
 });

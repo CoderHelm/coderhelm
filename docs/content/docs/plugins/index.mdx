@@ -1,0 +1,70 @@
+---
+title: What a plugin is
+description: A plugin packages instructions, agents, tools, triggers and outputs so CoderHelm can do work for any team, with the same safety it applies to code.
+status: coming-soon
+---
+
+<Callout type="info" title="Coming soon">Plugins are being built and are not on main yet. This page describes the design they are being built to, and will be updated when they ship.</Callout>
+
+A **plugin** lets a team other than engineering put CoderHelm to work: marketing, support, sales operations, anyone. It brings its own instructions, agents and tools, says what starts it and what it produces, and CoderHelm runs it with the same safety it applies to code: pinned versions, a person's approval before anything goes out, metered tokens and a full record of every step.
+
+For example, the [marketing plugin](/plugins/walkthrough) reads each release, drafts a blog post, three LinkedIn posts and an email in the team's brand voice, and waits for an editor to approve one before anything is published.
+
+## A plugin is text plus approved tools
+
+A plugin is a folder in a git repo with a small manifest, `plugin.yaml`. It contains no code that CoderHelm runs.
+
+- **Skills and agents** are Markdown, in the same format as [skill repos](/concepts/skills) and Claude Code. They are the plugin's behavior.
+- **Tools** are declared in the manifest, each with a risk level. A tool that isn't declared does not exist for the plugin.
+- **Settings** are the values each team fills in: a brand guide, an account to post from.
+- **Triggers** say what starts a run: a person's brief, a schedule, a release.
+- **Outputs** say what a run produces: drafts to review, and what may be published once approved.
+
+```yaml title="plugin.yaml"
+name: marketing
+version: 1.0.0
+description: Drafts launch posts from each release for an editor to approve.
+tools:
+  - ref: mcp:sanity
+    allow: [query_documents, create_draft]
+    risk: write
+triggers:
+  - on: github.release
+outputs:
+  - type: draft
+    kinds: [blog, social]
+```
+
+Adding a plugin needs no deploy and no code from CoderHelm. Every field is listed in the [manifest reference](/plugins/manifest-reference).
+
+## How a run works
+
+```txt
+trigger (brief, schedule, release)
+  └─► plugin run ─► agent with only the granted tools ─► drafts
+                                                           └─► approval ─► publish now or at a set time
+```
+
+1. A trigger starts a run, with the plugin's pinned version, the inputs and who asked.
+2. The plugin's agent works with exactly the tools the manifest grants. A repository is optional.
+3. What it makes is saved as **drafts** in the review queue.
+4. A person approves a specific version of a draft. Only then can a consequential tool, such as publish, run.
+
+## Words used in these docs
+
+| Word | Meaning |
+| --- | --- |
+| Plugin | The package: a repo with `plugin.yaml`. |
+| Install | An admin adds a plugin to a team, pinned to an exact version. |
+| Connection | An outside account the plugin uses (a CMS, LinkedIn). Connected separately from installing. |
+| Run | One piece of work by a plugin. |
+| Draft | Something a run made, waiting for review. |
+| Approval | A person's yes for one exact version of a draft. |
+
+The **Connections** page (today called Plugins in older screenshots) lists MCP servers. A plugin can declare which connections it needs; it is not itself a connection.
+
+## Next
+
+- [Build the marketing plugin](/plugins/walkthrough), start to finish.
+- [Repo layout](/plugins/layout) and the [manifest reference](/plugins/manifest-reference).
+- [Security rules](/plugins/security) every plugin runs under.

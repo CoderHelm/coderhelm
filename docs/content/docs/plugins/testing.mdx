@@ -1,0 +1,71 @@
+---
+title: Test a plugin locally
+description: Check plugin.yaml, your skills and your agents with the validator before you push.
+status: coming-soon
+---
+
+<Callout type="info" title="Coming soon">Plugins are being built and are not on main yet. This page describes the design they are being built to, and will be updated when they ship.</Callout>
+
+The validator checks a plugin folder the way CoderHelm will when you install it. It needs only Node.js 20 or newer.
+
+```bash
+curl -fsSLO https://docs.coderhelm.com/tools/validate-plugin.mjs
+node validate-plugin.mjs path/to/your-plugin
+```
+
+The file is a single script with its dependencies bundled in. It is built from the same [JSON Schema](/plugins/manifest-reference) this site publishes, on every build of these docs.
+
+## What it checks
+
+1. `plugin.yaml` against the manifest schema: required fields, types, allowed values, and no unknown fields (a typo fails instead of being ignored).
+2. Every `skills` and `agents` glob matches at least one file.
+3. Every file fits the limits (64,000 bytes per skill or agent; 200 items; 2,000,000 bytes in all).
+4. Each agent's `tools:` are granted in `plugin.yaml`.
+5. `{settings.key}` and `{input}` placeholders name a real setting or input, and `request.connection` names a `connection` setting.
+6. A `publish` output goes through a `consequential` tool, and a `read` tool only uses `GET`.
+
+Warnings point out things that work but are probably mistakes, such as an input that no request uses, or `allow: ["*"]`.
+
+## Output
+
+```txt
+$ node validate-plugin.mjs ./marketing
+ok       marketing 1.0.0
+```
+
+```txt
+$ node validate-plugin.mjs ./broken
+error    tools.publish_post: `{txt}` names no input
+error    agents/rogue.md: tool `delete_document` is not granted in plugin.yaml `tools`
+
+2 errors: the plugin would be refused.
+```
+
+It exits with status 1 when there are errors, so it can run in CI:
+
+```yaml title=".github/workflows/plugin.yml"
+name: Plugin
+on: [push, pull_request]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: curl -fsSLO https://docs.coderhelm.com/tools/validate-plugin.mjs
+      - run: node validate-plugin.mjs .
+```
+
+## Editor checks
+
+Point your editor at the schema for completion and inline errors as you type. With the YAML extension for VS Code, start `plugin.yaml` with:
+
+```yaml
+# yaml-language-server: $schema=https://docs.coderhelm.com/schema/plugin-manifest.v1.json
+```
+
+## Try it on a test team
+
+The validator checks the package; only a run checks the behavior. Install the plugin on a test team from a branch, start it with a manual brief, and read the run log and drafts. Nothing can be published without an approval, so a test run is safe.

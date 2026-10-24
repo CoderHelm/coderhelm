@@ -1,0 +1,44 @@
+---
+title: Connect GitHub
+description: Install the CoderHelm GitHub App, choose repositories and give each one a role.
+---
+
+CoderHelm works through a GitHub App. The app reads code, opens branches and pull requests, comments on issues and reads CI results. It acts as the `coderhelm` bot, so everything it does is visible in your repository's history.
+
+## Install the app
+
+1. In the dashboard, open **Integrations** → **GitHub** and click **Install**. This opens GitHub's install screen for the CoderHelm app.
+2. Pick the organization, then **All repositories** or **Only select repositories**.
+3. Confirm. Back in the dashboard you see "Connected to *your-org*. *N* repositories synced."
+
+If you are not an owner of the organization, GitHub sends an installation request to the owners instead. The dashboard says so, and finishes connecting once an owner approves.
+
+To add or remove repositories later, change the app's repository access in GitHub (**Settings** → **GitHub Apps** → **CoderHelm** → **Configure**). CoderHelm picks up the change automatically.
+
+## What the app can do
+
+| Permission | Access | Why |
+| --- | --- | --- |
+| Contents | Read and write | Read the code, push the `coderhelm/` branch |
+| Issues | Read and write | Read tickets, comment with progress |
+| Pull requests | Read and write | Open pull requests, post reviews |
+| Checks | Read | Read CI results to fix failures |
+| Metadata | Read | Required by GitHub for every app |
+
+It listens for issues, issue and review comments, pull requests and reviews, check runs and suites, workflow runs, pushes and installation changes. Pushes to the default branch keep [skills](/concepts/skills), [team tools](/concepts/skills#team-tools) and the [code graph](/concepts/code-graph) up to date.
+
+## Choose repositories and roles
+
+Open **Repos**. Every repository the app can see is listed. Switch on the ones CoderHelm should work on. A repository that is off is never changed.
+
+Give each repository a **role**, such as `web` or `backend`. A Jira ticket doesn't name a repository, so CoderHelm uses the roles, the ticket's text and your code to pick the right one. A ticket about a broken checkout button goes to the repository with the `web` role, not the API.
+
+## Start a run from GitHub
+
+Any of these starts a run on an issue:
+
+- Add the label `coderhelm` (any capitalization).
+- Assign the issue to the CoderHelm bot.
+- Comment `/coderhelm` at the start of a comment, or mention `@coderhelm` anywhere in one, followed by what you want.
+
+CoderHelm never starts a second run while one is already working on the same ticket. Editing a ticket whose pull request is still open sends the edit to that pull request as feedback instead of starting over.

@@ -1,0 +1,80 @@
+---
+title: Authentication
+description: How requests to the CoderHelm API are authenticated, how teams are chosen, and the short-lived tokens for streaming and CI.
+---
+
+## Sessions
+
+The dashboard signs people in with email and password, Google or GitHub (all under `/auth`). A successful sign-in sets one cookie:
+
+```http
+Set-Cookie: __Host-coderhelm_session=<token>; HttpOnly; Secure; SameSite=Strict; Path=/
+```
+
+Every route under `/api` requires it. The session lasts 7 days and slides: once it is more than halfway through, the next request gets a fresh cookie with your current role. Someone removed from the team gets no fresh cookie, so their access ends with the session.
+
+Because the cookie is `SameSite=Strict` and the API only accepts cross-origin requests from the dashboard, a page on another site can't use your session.
+
+A request without a valid session gets `401`.
+
+## Teams
+
+A person can belong to several teams. The session holds the current team, and every request acts on it; there is no team header. To switch:
+
+```http
+POST /api/teams/switch
+Content-Type: application/json
+
+{ "team_id": "<team id>" }
+```
+
+CoderHelm checks you are a member, then sets a new cookie for that team. `GET /api/teams` lists your teams.
+
+## Roles
+
+Each route checks a [capability](/concepts/roles#capabilities) against your role in the current team, on the server. A member calling an admin-only route gets `403`.
+
+## Streaming tokens
+
+Plan chat streams its answer from `stream.coderhelm.com`, which can't read the session cookie. The dashboard first asks for a short-lived token:
+
+```http
+POST /api/plans/chat/token
+```
+
+```json
+{ "token": "<token>" }
+```
+
+The token is valid for 5 minutes and is sent as a bearer token:
+
+```http
+POST /api/plans/chat/stream
+Authorization: Bearer <token>
+```
+
+## CI uploads
+
+CoderHelm reads test reports from your GitHub workflow runs by itself. A CI job whose results never reach GitHub (a device farm, say) can upload its report instead, signed with GitHub Actions' own OIDC identity token, so you don't store a CoderHelm secret in CI. Request a token with the audience `coderhelm` and send the report file as the body:
+
+```yaml title=".github/workflows/e2e.yml"
+permissions:
+  id-token: write
+  contents: read
+steps:
+  - name: Upload test results to CoderHelm
+    run: |
+      TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+        "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=coderhelm" | jq -r .value)
+      curl -sS -X POST "https://api.coderhelm.com/webhooks/ci/tests/results?name=results.json" \
+        -H "Authorization: Bearer $TOKEN" \
+        --data-binary @test-results/results.json
+```
+
+- `name` is the report's file name and must end in `.json` (Playwright or Cucumber JSON) or `.xml` (JUnit XML). One report of at most 6 MB per request.
+- CoderHelm checks the token was issued by GitHub for one run of a repository connected to your team, with E2E results turned on under **Tests**.
+- The same token can ask which tests are quarantined: `GET /webhooks/ci/tests/quarantine`.
+
+## Two-factor sign-in
+
+People can turn on two-factor authentication under **Security**. Sign-in then asks for a code (`POST /auth/mfa/verify`) before the session cookie is set.

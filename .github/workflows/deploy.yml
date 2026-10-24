@@ -20,6 +20,9 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The docs changelog is built from this repo's merged pull requests.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
@@ -28,6 +31,7 @@ jobs:
             package-lock.json
             infra/package-lock.json
             dashboard/package-lock.json
+            docs/package-lock.json
 
       - run: npm ci
       - run: npm run build
@@ -36,6 +40,11 @@ jobs:
 
       - name: Build dashboard
         working-directory: dashboard
+        run: npm ci && npm run build
+
+      # docs.coderhelm.com (infra/lib/docs-stack.ts deploys docs/out).
+      - name: Build docs
+        working-directory: docs
         run: npm ci && npm run build
 
       - uses: aws-actions/configure-aws-credentials@v4

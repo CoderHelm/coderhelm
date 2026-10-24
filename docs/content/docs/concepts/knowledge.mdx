@@ -1,0 +1,24 @@
+---
+title: Knowledge bases and brain chat
+description: Upload documents the agents can search, and ask questions answered from your team's own sources with a citation on every claim.
+status: coming-soon
+---
+
+This feature is being built and is not on main yet. This page describes it as it is being built and will change before it ships.
+
+## Knowledge bases
+
+A **knowledge base** is a set of documents your team uploads: specs, runbooks, policies, product docs. Admins create bases and upload files (PDF, Word, Markdown, text, CSV, Excel and HTML, up to 25 MB each and 500 files per base). Each file shows as uploading, processing, ready, or failed with the reason.
+
+A base can be attached to the whole team or to specific agents (planner, coder, reviewer, plan chat). Attached agents get a tool to search it, so a plan can follow your runbook instead of guessing. A base can be marked as a source of truth, and has its own read role (viewers, members or admins).
+
+## Brain chat
+
+**Brain** is a chat that answers questions from your team's own sources: knowledge bases, connections, repositories, memories, data sources and skills. You pick which sources to use.
+
+- Every claim in an answer has a numbered citation. Click it to see the passage it rests on, where it comes from, and how current it is.
+- When nothing in the chosen sources supports an answer, it says so ("Not in your sources") instead of making one up.
+- You can attach a file to a question.
+- Threads are private until their owner shares them with the team.
+
+Viewers can read shared threads, members can ask, and admins manage knowledge bases. Brain's model calls are metered under their own name on the usage page, and count toward your [token limits](/concepts/token-limits).

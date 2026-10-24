@@ -1,0 +1,49 @@
+---
+title: Triggers
+description: Start a plugin run from a person's brief, on a schedule, or when a release is published.
+status: coming-soon
+---
+
+<Callout type="info" title="Coming soon">Plugins are being built and are not on main yet. This page describes the design they are being built to, and will be updated when they ship.</Callout>
+
+`triggers` lists what starts a run. A plugin with no triggers can be started by hand with a free-text brief.
+
+## Manual brief
+
+A person starts a run from the plugin's page in the dashboard by filling in a short form.
+
+```yaml
+triggers:
+  - on: manual
+    form:
+      brief: text
+      channels: [linkedin, blog, email]
+      launch_date: date
+```
+
+Each form field is a type (`string`, `text`, `number`, `boolean`, `date`) or a list of choices. The run receives the answers and who asked. That person can never approve the run's output.
+
+## Schedule
+
+```yaml
+triggers:
+  - on: schedule
+    cron: "0 14 * * MON"        # Mondays at 14:00
+    timezone: America/New_York  # default UTC
+```
+
+`cron` has five fields: minute, hour, day of month, month, day of week. A scheduled run that finds nothing to do should say so and save nothing; write that into the agent's instructions.
+
+## Release
+
+```yaml
+triggers:
+  - on: github.release
+    repos: [your-org/web, your-org/api]   # default: every repo the team connected
+```
+
+Runs when a release is published on a connected GitHub repository. The run receives the [release notes](/getting-started/reviewer#release-notes) CoderHelm wrote for it and the merged pull requests it contains.
+
+## Adding a trigger is a change admins approve
+
+A new version that adds a trigger stays on the old version until an admin approves it. See [Versioning and updates](/plugins/versioning).

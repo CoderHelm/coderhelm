@@ -1,0 +1,31 @@
+---
+title: Private marketplace
+description: Give your teams a catalog of approved plugins from your own git repository.
+status: coming-soon
+---
+
+<Callout type="info" title="Coming soon">Plugins are being built and are not on main yet. This page describes the design they are being built to, and will be updated when they ship.</Callout>
+
+A **marketplace** is a git repository that lists plugins. Each team can add its own marketplace source, so an organization can offer its teams a vetted catalog without publishing anything publicly.
+
+```txt
+your-org/coderhelm-plugins
+├── marketing/
+│   └── plugin.yaml
+├── support-replies/
+│   └── plugin.yaml
+└── sales-notes/
+    └── plugin.yaml
+```
+
+Every folder with a `plugin.yaml` is a plugin. Names in a marketplace are namespaced by publisher, as `your-org/marketing`.
+
+## Add a source
+
+An admin adds the repository as a marketplace source in the dashboard. The source is pinned to a commit, like an install, and its plugins appear in the team's plugin list. Installing one goes through the same steps as any plugin: an admin installs, a second admin approves when there are two, and connections are made separately.
+
+## Keep it vetted
+
+- Protect the marketplace repository's default branch and require review, since merging is publishing.
+- Run the [validator](/plugins/testing) in the repository's CI for every folder.
+- Keep each plugin's team-specific values in settings, so one plugin serves every team.

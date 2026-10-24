@@ -1,0 +1,344 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.coderhelm.com/schema/plugin-manifest.v1.json",
+  "title": "CoderHelm plugin manifest",
+  "description": "The plugin.yaml file at the root of a CoderHelm plugin repo. A plugin is text plus approved tools: its behavior comes from its agents and skills, and this file declares what it may touch.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "version", "description"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional. Point editors at this schema for completion and checks."
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^([a-z0-9][a-z0-9-]{0,38}/)?[a-z0-9][a-z0-9-]{0,63}$",
+      "description": "The plugin's id. Lowercase letters, digits and `-`. A marketplace plugin is namespaced by its publisher, as `publisher/name`.",
+      "examples": ["marketing", "acme/marketing"]
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$",
+      "description": "The plugin's version, in semantic versioning (`MAJOR.MINOR.PATCH`). Installs are pinned by content hash, so the version is a label for people; raise it whenever you publish.",
+      "examples": ["1.2.0"]
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "description": "One line saying what the plugin does. Shown on the install screen and in the marketplace."
+    },
+    "skills": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "default": ["skills/*/SKILL.md"],
+      "description": "Paths or globs of the plugin's skills, relative to the repo root. Skills use the same SKILL.md format as skill repos."
+    },
+    "agents": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "default": ["agents/*.md"],
+      "description": "Paths or globs of the plugin's agents. Each agent file is Markdown with frontmatter; its body is the agent's instructions."
+    },
+    "settings": {
+      "type": "array",
+      "default": [],
+      "description": "Values a team fills in when it installs the plugin. Values live in the team's settings, never in the package.",
+      "items": { "$ref": "#/$defs/setting" }
+    },
+    "tools": {
+      "type": "array",
+      "default": [],
+      "description": "Every tool the plugin's agents may call. A tool that is not listed here does not exist for a plugin run.",
+      "items": {
+        "oneOf": [{ "$ref": "#/$defs/toolRef" }, { "$ref": "#/$defs/httpTool" }]
+      }
+    },
+    "triggers": {
+      "type": "array",
+      "default": [{ "on": "manual" }],
+      "description": "What starts a run of the plugin.",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/manualTrigger" },
+          { "$ref": "#/$defs/scheduleTrigger" },
+          { "$ref": "#/$defs/releaseTrigger" }
+        ]
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "default": [{ "type": "draft", "kinds": ["text"] }],
+      "description": "What a run produces. Drafts wait in the review queue; a publish output sends an approved draft out through a consequential tool.",
+      "items": {
+        "oneOf": [{ "$ref": "#/$defs/draftOutput" }, { "$ref": "#/$defs/publishOutput" }]
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A monthly token limit for this plugin, checked alongside the team's own limits. A team can lower it but not raise it above the team limit.",
+      "properties": {
+        "monthly_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "New tokens (input plus output) the plugin may use per calendar month (UTC). Omit for no plugin limit; the team limits still apply."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "settingKey": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+      "description": "Lowercase letters, digits and `_`, starting with a letter."
+    },
+    "setting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "type"],
+      "properties": {
+        "key": { "$ref": "#/$defs/settingKey" },
+        "type": {
+          "enum": ["string", "text", "number", "boolean", "select", "secret", "connection"],
+          "description": "`string` is one line, `text` is several. `secret` is sealed and never shown to a model. `connection` asks the team to connect an account (OAuth or a key)."
+        },
+        "label": { "type": "string", "maxLength": 80, "description": "The field's label on the install screen. Defaults to the key." },
+        "description": { "type": "string", "maxLength": 240, "description": "Help text under the field." },
+        "required": { "type": "boolean", "default": false, "description": "The plugin cannot run until this is set." },
+        "default": { "description": "The value used when the team leaves the field empty. Not allowed for `secret` and `connection`." },
+        "options": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "The choices of a `select` setting."
+        },
+        "provider": {
+          "enum": ["oauth2", "api_key", "mcp"],
+          "description": "For a `connection`: how the account is connected."
+        },
+        "scopes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "For an `oauth2` connection: the scopes asked for. Adding a scope in a new version needs an admin's approval."
+        },
+        "per_user": {
+          "type": "boolean",
+          "default": false,
+          "description": "For a `connection`: each person connects their own account instead of one shared team account."
+        },
+        "sensitive": {
+          "type": "boolean",
+          "default": false,
+          "description": "Seal the value and keep it out of every prompt. Always true for `secret` and `connection`."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "select" } } },
+          "then": { "required": ["options"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "connection" } } },
+          "then": { "required": ["provider"] }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["secret", "connection"] } } },
+          "then": { "not": { "required": ["default"] } }
+        }
+      ]
+    },
+    "risk": {
+      "enum": ["read", "write", "consequential"],
+      "description": "`read` only looks. `write` changes something that a person can still review, such as a draft in a CMS. `consequential` reaches people or money (publish, send, post, pay) and runs only after an approval."
+    },
+    "toolRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "allow"],
+      "description": "Tools from a connection the team has, such as an MCP server from Connections.",
+      "properties": {
+        "ref": {
+          "type": "string",
+          "pattern": "^(mcp|tool):[a-z0-9][a-z0-9_-]*$",
+          "description": "`mcp:<id>` for a connection's MCP server, or `tool:<name>` for one of the team's approved tools.",
+          "examples": ["mcp:sanity", "tool:release_notes"]
+        },
+        "allow": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9_*.-]+$" },
+          "minItems": 1,
+          "description": "Tool names or `*` globs from that server the plugin may call. Everything else on the server is hidden from the run."
+        },
+        "risk": {
+          "$ref": "#/$defs/risk",
+          "default": "read",
+          "description": "The highest risk among the allowed tools. CoderHelm checks each tool's own risk and refuses an install that understates it."
+        }
+      }
+    },
+    "inputSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "example"],
+      "properties": {
+        "type": { "enum": ["string", "integer", "date"] },
+        "description": { "type": "string", "maxLength": 240 },
+        "pattern": { "type": "string", "maxLength": 200, "description": "A regular expression the whole value must match." },
+        "allowed": { "type": "array", "items": { "type": ["string", "integer"] }, "description": "The only values accepted." },
+        "min": { "type": "integer" },
+        "max": { "type": "integer" },
+        "example": { "type": ["string", "integer"], "description": "A real value, used when the tool is checked before approval." }
+      }
+    },
+    "httpTool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "risk", "request"],
+      "description": "A tool the plugin defines itself: one HTTP request with typed inputs.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+          "description": "Lowercase letters, digits and `_`. Agents call the tool by this name, and it must not clash with a name in an `allow` list."
+        },
+        "kind": { "const": "http" },
+        "description": { "type": "string", "maxLength": 240, "description": "When an agent should use the tool." },
+        "risk": { "$ref": "#/$defs/risk" },
+        "request": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["method", "url"],
+          "properties": {
+            "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+            "url": {
+              "type": "string",
+              "pattern": "^https://",
+              "description": "HTTPS only. `{input}` and `{settings.key}` are filled in and URL-encoded."
+            },
+            "connection": {
+              "$ref": "#/$defs/settingKey",
+              "description": "The `connection` setting whose credentials sign the request. The model never sees them."
+            },
+            "headers": {
+              "type": "object",
+              "additionalProperties": { "type": "string" },
+              "description": "Extra headers. Values may use `{settings.key}`; `Authorization` comes from the connection."
+            },
+            "body": {
+              "description": "A JSON body template. String values may use `{input}` and `{settings.key}`."
+            }
+          }
+        },
+        "inputs": {
+          "type": "object",
+          "maxProperties": 10,
+          "propertyNames": { "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+          "additionalProperties": { "$ref": "#/$defs/inputSpec" },
+          "default": {},
+          "description": "Typed inputs the agent fills in. Values are checked against their type before the request is made."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "risk": { "const": "read" } } },
+          "then": { "properties": { "request": { "properties": { "method": { "const": "GET" } } } } }
+        }
+      ]
+    },
+    "manualTrigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["on"],
+      "description": "A person starts a run from the dashboard with a short brief.",
+      "properties": {
+        "on": { "const": "manual" },
+        "form": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+          "additionalProperties": {
+            "oneOf": [
+              { "enum": ["string", "text", "number", "boolean", "date"] },
+              { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+            ]
+          },
+          "default": { "brief": "text" },
+          "description": "The brief form: each field is a type, or a list of choices."
+        }
+      }
+    },
+    "scheduleTrigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["on", "cron"],
+      "description": "Runs on a schedule.",
+      "properties": {
+        "on": { "const": "schedule" },
+        "cron": {
+          "type": "string",
+          "pattern": "^\\S+( \\S+){4}$",
+          "description": "Five-field cron: minute, hour, day of month, month, day of week.",
+          "examples": ["0 14 * * MON"]
+        },
+        "timezone": { "type": "string", "default": "UTC", "description": "An IANA time zone, such as `America/New_York`." }
+      }
+    },
+    "releaseTrigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["on"],
+      "description": "Runs when a release is published on a connected GitHub repo. The run receives the release notes CoderHelm wrote.",
+      "properties": {
+        "on": { "const": "github.release" },
+        "repos": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+          "description": "Only these repos (`owner/name`). Omit for every repo the team connected."
+        }
+      }
+    },
+    "draftOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "kinds"],
+      "properties": {
+        "type": { "const": "draft" },
+        "kinds": {
+          "type": "array",
+          "items": { "enum": ["text", "blog", "social", "email", "image", "doc"] },
+          "minItems": 1,
+          "description": "The kinds of draft a run may save."
+        }
+      }
+    },
+    "publishOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "via"],
+      "properties": {
+        "type": { "const": "publish" },
+        "via": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+          "description": "The name of a `consequential` tool from `tools` that sends an approved draft out."
+        },
+        "approval": {
+          "type": "object",
+          "additionalProperties": false,
+          "default": { "role": "admin", "min": 1 },
+          "properties": {
+            "role": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+              "default": "admin",
+              "description": "Who may approve: a role, or an approver group the team creates for this plugin."
+            },
+            "min": { "type": "integer", "minimum": 1, "maximum": 5, "default": 1, "description": "How many different approvers are needed." }
+          },
+          "description": "The approval a draft needs before it is published. The person who asked for the run can never approve its output."
+        }
+      }
+    }
+  }
+}

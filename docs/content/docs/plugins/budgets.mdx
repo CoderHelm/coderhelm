@@ -1,0 +1,30 @@
+---
+title: Budgets and metering
+description: Every model call a plugin makes is metered and counted against its own monthly limit and the team's.
+status: coming-soon
+---
+
+<Callout type="info" title="Coming soon">Plugins are being built and are not on main yet. This page describes the design they are being built to, and will be updated when they ship.</Callout>
+
+Every model call a plugin run makes is metered, like every other call CoderHelm makes, and paid for with the team's own model key.
+
+## A limit for the plugin
+
+```yaml
+budget:
+  monthly_tokens: 2000000
+```
+
+`monthly_tokens` caps the new tokens (input plus output) the plugin may use in a calendar month (UTC). The team can lower it on the plugin's settings page. The team's own [token limits](/concepts/token-limits) still apply on top: a run stops at whichever limit is reached first, and new runs wait for the next month.
+
+Both limits are checked before a run starts and before each model call, the same places the team limit is checked today.
+
+## Where usage shows
+
+Plugin usage is tagged `plugin:<id>`, so **Analytics** shows each plugin's tokens on their own line, split into new tokens, cache reads and cache writes. Tool calls and publishes are counted too.
+
+## Keep runs cheap
+
+- Put stable text (brand guide, checklists) in skills: it is read from the prompt cache on later calls, which costs far less than new input.
+- Tell scheduled agents to stop early when there is nothing to do.
+- Allow only the tools the plugin needs; every tool's description is part of the prompt.

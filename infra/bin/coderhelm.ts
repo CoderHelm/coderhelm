@@ -4,6 +4,7 @@ import * as cdk from "aws-cdk-lib";
 import { FrontendStack } from "../lib/frontend-stack";
 import { AppStack } from "../lib/app-stack";
 import { WafStack } from "../lib/waf-stack";
+import { DocsStack } from "../lib/docs-stack";
 
 const app = new cdk.App();
 
@@ -44,5 +45,14 @@ new AppStack(app, `${prefix}-app`, {
   env,
   stage,
   webAclArn: appWaf.webAclArn,
+  crossRegionReferences: true,
+});
+
+// --- Developer docs (docs.coderhelm.com), behind the landing site's WAF ---
+
+new DocsStack(app, `${prefix}-docs`, {
+  env,
+  stage,
+  webAclArn: waf.webAclArn,
   crossRegionReferences: true,
 });

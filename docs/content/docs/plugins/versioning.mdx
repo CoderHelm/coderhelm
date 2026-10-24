@@ -1,0 +1,34 @@
+---
+title: Versioning and updates
+description: How plugins are pinned, which changes apply on push, and which wait for an admin's approval.
+status: coming-soon
+---
+
+<Callout type="info" title="Coming soon">Plugins are being built and are not on main yet. This page describes the design they are being built to, and will be updated when they ship.</Callout>
+
+## Installs are pinned
+
+When an admin installs a plugin, it is pinned to the exact content of that version (a hash of the package), not to a branch. If the team has two or more admins, a second admin approves the install.
+
+`version` in `plugin.yaml` is a label for people. Raise it whenever you publish a change; CoderHelm goes by the content.
+
+## What updates by itself, and what waits
+
+| Change in a new version | What happens |
+| --- | --- |
+| Wording: skills, agent instructions, descriptions, labels | Applies on the next push, like skill repos sync today. |
+| A new or wider tool (a new tool, a longer `allow` list, a higher `risk`) | Waits. The team stays on the old version until an admin approves. |
+| A new OAuth scope or connection | Waits for approval. |
+| A new trigger | Waits for approval. |
+| A new `publish` output, or a lower approval `min` | Waits for approval. |
+| Anything narrower (fewer tools, lower risk, removed trigger) | Applies on push. |
+
+When an update waits, the plugin's page shows exactly what widened, and the plugin keeps running on the approved version meanwhile.
+
+## Semantic versions
+
+Use `MAJOR.MINOR.PATCH`:
+
+- **Patch** for wording fixes.
+- **Minor** for new abilities (which usually need approval).
+- **Major** when settings change in a way teams must act on, such as a new required setting.

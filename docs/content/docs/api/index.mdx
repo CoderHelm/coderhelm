@@ -1,0 +1,63 @@
+---
+title: API overview
+description: What the CoderHelm API is, its hosts, how errors and pages of results look, and its limits.
+---
+
+CoderHelm's API is the one its own dashboard uses. Everything the dashboard can do goes through it, and [All routes](/api/routes) lists every route, generated from the gateway's code.
+
+<Callout type="warn" title="No API keys yet">
+The API authenticates people with a browser session; there are no API keys or personal access tokens yet. Integrations reach CoderHelm through [webhooks](/api/webhooks), which are documented and stable. Routes under `/api` can change between releases.
+</Callout>
+
+## Hosts
+
+| Host | Serves |
+| --- | --- |
+| `https://api.coderhelm.com` | Every route: the dashboard API under `/api`, sign-in under `/auth`, webhooks under `/webhooks`, email links under `/email`. |
+| `https://stream.coderhelm.com` | Streamed answers (server-sent events) for plan chat. |
+| `https://auth.coderhelm.com` | The sign-in pages for Google and GitHub. |
+
+`GET https://api.coderhelm.com/` returns `{"service":"coderhelm","status":"ok"}` and needs no authentication. Every response carries `Cache-Control: no-store`.
+
+## Requests and responses
+
+Bodies are JSON. Path parameters are written `:name` in the route list, for example `GET /api/runs/:run_id`.
+
+### Errors
+
+The status code is the error. Many errors have an empty body; others return a message:
+
+```json
+{ "error": "Plan not found" }
+```
+
+Some add a machine-readable `code`, for example `{"error": "...", "code": "already_fixing"}`. Treat any `4xx` or `5xx` as a failure and show `error` when it is there.
+
+| Status | Means |
+| --- | --- |
+| `400` | The request is malformed. |
+| `401` | Not signed in, or the session expired. |
+| `403` | Signed in, but your role can't do this (see [Roles](/concepts/roles)). |
+| `404` | Not found, or not in your team. |
+| `429` | Too many requests (sign-in and email links only). |
+
+### Pages of results
+
+Lists that can grow without end are paged with a cursor, newest first:
+
+```http
+GET /api/reviewer/reviews?repo=your-org/web&limit=50
+```
+
+```json
+{ "reviews": [ ... ], "next": "1729771200|REVIEW#..." }
+```
+
+Pass `next` back as `cursor` for the next page; it is `null` on the last page. `limit` defaults to 50 and is clamped to 1 to 200.
+
+## Limits
+
+- Sign-in routes: 20 requests per 5 minutes per IP address. Email links: 60 per 5 minutes.
+- The API as a whole is throttled at 500 requests per second with bursts to 1000.
+
+Over a limit, the API answers `429` with no body.

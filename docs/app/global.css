@@ -1,0 +1,84 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+
+/* Brand tokens from brand/BRAND.md and the dashboard: white on near-black,
+   one blue accent. Light mode is the secondary variant. */
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: var(--font-geist-mono), 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+}
+
+:root {
+  --color-fd-primary: #2563eb;
+  --color-fd-ring: #3b82f6;
+}
+
+.dark {
+  --color-fd-background: #0a0a0a;
+  --color-fd-card: #121212;
+  --color-fd-popover: #121212;
+  --color-fd-secondary: #161618;
+  --color-fd-muted: #121212;
+  --color-fd-accent: #1a1a1d;
+  --color-fd-border: #232326;
+  --color-fd-foreground: #fafafa;
+  --color-fd-muted-foreground: #a1a1aa;
+  --color-fd-primary: #6ea8ff;
+  --color-fd-primary-foreground: #0a0a0a;
+  --color-fd-ring: #3b82f6;
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}
+
+/* Long unbroken text (URLs, field paths) wraps instead of pushing a phone
+   sideways. Tables and code scroll inside their own box. */
+@layer base {
+  body {
+    overflow-wrap: anywhere;
+  }
+  table {
+    overflow-wrap: break-word;
+  }
+}
+
+::selection {
+  background: rgb(59 130 246 / 0.35);
+}
+
+/* "Coming soon" and "New" badges, in the sidebar and on the page. */
+.ch-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: 0.4rem;
+  padding: 0 0.4rem;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklab, var(--color-fd-primary) 45%, transparent);
+  color: var(--color-fd-primary);
+  font-size: 0.68rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  white-space: nowrap;
+}
+/* In a sidebar link the badge sits at the end of the row. */
+a > .ch-badge {
+  margin-inline-start: auto;
+}
+h1 > .ch-badge {
+  margin-inline-start: 0.75rem;
+  vertical-align: middle;
+}
+.ch-badge[data-status='new'] {
+  border-color: color-mix(in oklab, #4ade80 45%, transparent);
+  color: #16a34a;
+}
+.dark .ch-badge[data-status='new'] {
+  color: #4ade80;
+}

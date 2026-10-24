@@ -1,0 +1,25 @@
+---
+title: Public and private repos
+description: Install plugins from public or private repositories, and how each one stays up to date.
+status: coming-soon
+---
+
+<Callout type="info" title="Coming soon">Plugins are being built and are not on main yet. This page describes the design they are being built to, and will be updated when they ship.</Callout>
+
+A plugin is installed from a git repository, by `owner/name` (and a folder, for a repository that holds several plugins).
+
+| | Public repo | Private repo |
+| --- | --- | --- |
+| Who can install | Any team | Teams whose GitHub App installation can read the repo |
+| How it is read | Over HTTPS | Through the team's GitHub App, like [skill repos](/concepts/skills) |
+| Updates | Checked on a schedule | On every push to the default branch, plus the schedule |
+
+Only the default branch is read, so unmerged work never reaches a team.
+
+## Auto-update
+
+Updates follow the rules in [Versioning and updates](/plugins/versioning): wording changes apply when they land; anything that widens what the plugin can do waits for an admin. A team can also turn auto-update off for a plugin and approve every new version by hand.
+
+## Forking
+
+To change a public plugin for your team, fork it into your own organization and install the fork. Your team's values belong in [settings](/plugins/settings), so most teams never need to fork.

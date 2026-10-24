@@ -1,0 +1,36 @@
+---
+title: Roles and permissions
+description: The four roles, what each one can do, and the capability behind each action.
+---
+
+Everyone on a team has one role. Change roles on **Members**; the page also shows the full table of who can do what.
+
+| Role | Can |
+| --- | --- |
+| **Viewer** | Read everything on the team; change nothing but their own account. |
+| **Member** | Work with CoderHelm: plans, runs, reviews and recommendations. |
+| **Admin** | Run the workspace: repos, integrations, agent settings, the token limit and people. |
+| **Owner** | Everything, plus account-level changes and managing admins. |
+
+## Capabilities
+
+Each action in CoderHelm checks a capability, and each capability has a lowest role that has it. The check happens on the server for every request, not only in the dashboard.
+
+| Lowest role | Capabilities |
+| --- | --- |
+| Viewer | `view`, `view_team`, `own_account` |
+| Member | `plans`, `runs`, `reviews`, `recommendations`, `view_alerts`, `view_integrations` |
+| Admin | `people`, `delete_plans`, `repos`, `agent_settings`, `memory`, `integrations`, `data_sources` (includes team tools and skills), `tests`, `alerts`, `model_provider`, `system`, `budget` |
+| Owner | `manage_admins`, `team_name`, `disconnect` (removes Jira or the model key), `reset` |
+
+Invites expire after 30 days. Admins can resend them.
+
+## Approvals that need a second person
+
+Some actions need a different person than the one who started them, even an admin: approving a new version of a [team tool](/concepts/skills#team-tools) needs another admin when the team has more than one.
+
+## Custom roles
+
+<Badge status="coming-soon" />
+
+Team-made roles, built from the same capabilities and enforced on every request, are in review. When they ship, this page will describe how to create one.

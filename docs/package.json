@@ -1,0 +1,41 @@
+{
+  "name": "coderhelm-docs",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "prepare-content": "node scripts/import-platform.mjs",
+    "dev": "npm run prepare-content && next dev",
+    "build": "npm run prepare-content && next build && node scripts/postbuild.mjs",
+    "typecheck": "tsc --noEmit",
+    "check:links": "node scripts/check-links.mjs",
+    "check:output": "node scripts/check-output.mjs",
+    "test:unit": "node --test scripts/*.test.mjs",
+    "test:e2e": "playwright test",
+    "validate-plugin": "node scripts/validate-plugin.mjs",
+    "platform:bump": "node scripts/bump-platform.mjs"
+  },
+  "dependencies": {
+    "fumadocs-core": "16.17.3",
+    "fumadocs-mdx": "15.4.7",
+    "fumadocs-ui": "16.17.3",
+    "lucide-react": "1.61.0",
+    "next": "16.4.1",
+    "react": "19.2.9",
+    "react-dom": "19.2.9",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/mdx": "2.0.14",
+    "@types/node": "22.14.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "ajv": "8.20.0",
+    "esbuild": "0.28.2",
+    "postcss": "8.5.31",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.8.3",
+    "yaml": "2.9.1"
+  }
+}

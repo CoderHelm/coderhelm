@@ -39,6 +39,7 @@
     "node_modules",
     "infra",
     "dashboard",
+    "docs",
     "services"
   ]
 }

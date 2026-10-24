@@ -1,0 +1,74 @@
+---
+title: Skills, agents and tools
+description: How a plugin's agents are written, which tools they may call, and what read, write and consequential mean.
+status: coming-soon
+---
+
+<Callout type="info" title="Coming soon">Plugins are being built and are not on main yet. This page describes the design they are being built to, and will be updated when they ship.</Callout>
+
+## Skills
+
+A plugin's skills are ordinary [SKILL.md files](/concepts/skills#frontmatter): a name, a description that says when to use it, and instructions. They are scoped to the plugin: its agents read them, and other plugins and the coding agents don't.
+
+Use skills for what stays true across runs: the brand voice, a checklist, the format of a support reply.
+
+## Agents
+
+An agent file is Markdown with frontmatter. The body is the agent's instructions for a run.
+
+<include meta='title="agents/launch-writer.md"'>../../../examples/marketing/agents/launch-writer.md</include>
+
+| Field | Meaning |
+| --- | --- |
+| `name` | The agent's id. Defaults to the file name. |
+| `description` | One line saying what it does. |
+| `tools` | The tools it uses. Each must be granted in `plugin.yaml`; the [validator](/plugins/testing) refuses any that aren't. |
+
+## Tools
+
+Tools are declared in the manifest's `tools` list, in one of two shapes.
+
+**Tools from a connection**: MCP servers on the team's Connections page, or the team's own approved [team tools](/concepts/skills#team-tools). List the tool names (or `*` globs) the plugin may call; every other tool on that server is hidden from the run.
+
+```yaml
+tools:
+  - ref: mcp:sanity
+    allow: [get_document, query_documents, create_draft]
+    risk: write
+```
+
+**Tools the plugin defines**: one HTTPS request with typed inputs. The request's credentials come from a connection and are never shown to the model.
+
+```yaml
+tools:
+  - name: publish_post
+    kind: http
+    risk: consequential
+    request:
+      method: POST
+      url: https://api.linkedin.com/rest/posts
+      connection: linkedin
+      body:
+        author: "urn:li:organization:{settings.linkedin_org}"
+        commentary: "{text}"
+    inputs:
+      text:
+        type: string
+        example: We just shipped faster code reviews.
+```
+
+`{text}` is filled from the input the agent supplies, after it is checked against the input's type. `{settings.linkedin_org}` comes from the team's settings.
+
+## Risk levels
+
+Every tool has one of three risk levels. CoderHelm checks each tool's real risk; it doesn't take the manifest's word for it.
+
+| Risk | Means | Runs |
+| --- | --- | --- |
+| `read` | Only looks: search, fetch, list. | Whenever the agent calls it. Plugin-defined `read` tools may only use `GET`. |
+| `write` | Changes something a person can still review before anyone sees it: a CMS draft, a ticket comment marked internal. | Whenever the agent calls it, unless the team's autonomy cap says otherwise. |
+| `consequential` | Reaches people or money: publish, send, post, pay. | Only through a `publish` output, after a person approves the exact draft. |
+
+Each team sets an **autonomy cap**: the highest risk a plugin may use without a person. A team that sets it to `read` sees every write wait for a yes too.
+
+A tool missing from the manifest can't be called, by any agent, in any run.

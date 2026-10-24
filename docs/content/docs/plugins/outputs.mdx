@@ -1,0 +1,60 @@
+---
+title: Outputs, drafts and approvals
+description: What a plugin run produces, how drafts are reviewed, and how nothing goes out without an approval bound to the exact version.
+status: coming-soon
+---
+
+<Callout type="info" title="Coming soon">Plugins are being built and are not on main yet. This page describes the design they are being built to, and will be updated when they ship.</Callout>
+
+## Drafts
+
+A run saves what it makes as **drafts**. Declare the kinds a run may save:
+
+```yaml
+outputs:
+  - type: draft
+    kinds: [blog, social, email]
+```
+
+Kinds are `text`, `blog`, `social`, `email`, `image` and `doc`. Each draft keeps its versions, and has a status:
+
+| Status | Means |
+| --- | --- |
+| Draft | Saved by the run. |
+| In review | Waiting for an approver. |
+| Approved | An approver said yes to this exact version. |
+| Scheduled | Approved for a set time; can still be cancelled. |
+| Published | Sent out by the publish tool. |
+| Rejected | Turned down. |
+
+Drafts appear in the review queue in the dashboard. An editor can change a draft there; the change is a new version.
+
+## Publishing
+
+```yaml
+outputs:
+  - type: publish
+    via: publish_post          # a consequential tool from `tools`
+    approval:
+      role: marketing_editor   # a role, or an approver group for this plugin
+      min: 1                   # how many different people must approve
+```
+
+A `publish` output names the consequential tool that sends an approved draft out. That tool runs only:
+
+1. after the required number of approvers say yes,
+2. to the exact version they approved (a later edit needs a new approval),
+3. by people other than the one who asked for the run,
+4. now, or at the time the approver picked. A scheduled publish can be cancelled until then.
+
+A stop is sticky: once someone stops a draft, it stays stopped until a person re-arms it.
+
+## Where approvers approve
+
+- The review queue in the dashboard.
+- A card in Slack or Teams.
+- A signed link in an email.
+
+## Approver groups
+
+`approval.role` is either a team role (`admin`, `member`) or a group the team creates for the plugin, such as `marketing_editor`. Members of the group can approve the plugin's output without any rights over repositories. Behind the scenes this is the capability `plugin:<id>.approve_output`.

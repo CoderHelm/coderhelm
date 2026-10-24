@@ -1,0 +1,30 @@
+---
+title: Data sources
+description: Give agents read-only access to your databases, APIs, search and logs, so they can check facts instead of guessing.
+---
+
+A **data source** lets agents look things up in your systems while they plan, code or review: the real shape of a table, what an API returns, what an error log says. Every data source is read-only, and the setup checks that before it can be switched on.
+
+Open **Data sources** (admins only).
+
+| Kind | Examples |
+| --- | --- |
+| API | A GraphQL API |
+| REST API | Any JSON API, read with GET |
+| Database | PostgreSQL, or a Redshift warehouse |
+| Search | OpenSearch |
+| Logs | CloudWatch Logs |
+
+## Connect one
+
+**Data sources** → **Connect** walks through five steps:
+
+1. **Give read-only access**: create a read-only user or key, or for AWS, a role in your account (a CloudShell script does it for you).
+2. **Choose what to share**: tables, indexes, endpoints or log groups.
+3. **Choose what it may use**: which agents and repositories can read it.
+4. **Try it**: run a real lookup and see the answer.
+5. **Check and turn on**: CoderHelm checks, for example, that the database user can only read.
+
+Keys are encrypted with a key bound to your team, opened only for the call that needs them, and never shown again.
+
+Every lookup an agent makes is listed under **Data sources** → **Activity**. For lookups your team uses often, define a [team tool](/concepts/skills#team-tools).

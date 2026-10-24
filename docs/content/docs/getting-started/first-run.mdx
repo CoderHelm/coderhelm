@@ -1,0 +1,38 @@
+---
+title: Your first run
+description: What CoderHelm does between a ticket and a pull request, stage by stage, and where to watch it.
+---
+
+A **run** is one piece of work: one ticket turned into one pull request. Open **Runs** to see every run with its status, and click one for its live log.
+
+## The stages
+
+The run detail page shows each stage as it happens.
+
+| Stage | What happens |
+| --- | --- |
+| **Triage** | Reads the ticket and its attachments, checks the ticket is clear enough to act on, and picks the repository. |
+| **Plan** | Searches the code, the [code graph](/concepts/code-graph), [memories](/concepts/memories) and [skills](/concepts/skills), and writes a plan: which files change and how. |
+| **Build** | Writes the change on a new `coderhelm/` branch. |
+| **Test** | Runs your build, linter and tests in a sandbox with no credentials, and fixes what fails. |
+| **Security** | Checks the change for security problems, such as secrets in code or unsafe input handling. |
+| **Pull request** | Opens a draft pull request that explains the change, links the ticket, and is marked ready when the checks pass. |
+| **Review** | Reviews its own pull request the way the [PR reviewer](/getting-started/reviewer) reviews yours. |
+
+After the pull request is open, two more stages can run:
+
+- **CI fix**: if your CI fails on the pull request, CoderHelm reads the failure and pushes a fix. It gives up after 8 automatic fix pushes, so a broken pipeline can't loop forever.
+- **Feedback**: comment on the pull request (or the ticket) and CoderHelm makes the change you asked for.
+
+## When a run stops
+
+A run can end without a pull request. The run page always says why in plain words, for example "The ticket doesn't say which page to change". Answer on the ticket and the run starts again. You can also **Retry**, **Reset and re-run** from scratch, or **Cancel** from the run page.
+
+New runs also pause when your team reaches a [token limit](/concepts/token-limits).
+
+## Make runs better
+
+- Write tickets with a clear goal and a way to check it.
+- Add [skills](/concepts/skills) with your team's conventions.
+- Pin [memories](/concepts/memories) for things every change should know.
+- Set team and repository instructions in **Settings**.

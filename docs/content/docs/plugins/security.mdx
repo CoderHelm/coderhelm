@@ -1,0 +1,34 @@
+---
+title: Security rules
+description: The rules every plugin runs under, enforced in code rather than by the plugin's instructions.
+status: coming-soon
+---
+
+<Callout type="info" title="Coming soon">Plugins are being built and are not on main yet. This page describes the design they are being built to, and will be updated when they ship.</Callout>
+
+Plugins can reach outside systems and real people, so the rules below are enforced by CoderHelm itself. A plugin's instructions can't relax them, and neither can a model that has been tricked by text it read.
+
+1. **No plugin code runs.** A plugin is text plus declared tools. Scripts in a plugin repo are never executed.
+2. **Only declared tools exist.** A tool missing from `plugin.yaml` can't be called, by any agent, in any run.
+3. **Risk is checked, not trusted.** Each tool's real risk is known to CoderHelm; a manifest that understates it is refused.
+4. **Consequential actions need a person.** Publish, send, post and pay run only after an approval bound to the exact version of the draft, from someone other than the requester. A stop is sticky.
+5. **Each team caps autonomy.** The team chooses the highest risk a plugin may use without a person.
+6. **Installing grants nothing.** Connections are made separately, shared or per person.
+7. **Secrets never reach the model.** Secrets, connection tokens and sensitive settings are sealed with KMS per team and plugin, added to requests after the model chose the call, and never returned or logged.
+8. **Widening needs approval.** New tools, scopes, triggers or publish outputs wait for an admin.
+9. **Installs are pinned** to exact content, with a second admin's approval when the team has two.
+10. **HTTPS only**, and requests to private or internal network addresses are refused.
+11. **Everything is metered** and counted against the plugin's and the team's token limits.
+12. **Everything is recorded.** One audit log records who or what started each run, the plugin version, every tool call and its risk, every approval and the result.
+
+## Roles
+
+| Capability | Lowest role |
+| --- | --- |
+| `plugins.install` | Admin |
+| `plugins.run` | Member |
+| `plugin:<id>.approve_output` | Members of the plugin's approver group |
+
+## Reporting a problem
+
+If you find a way around one of these rules, email security@coderhelm.com rather than opening a public issue.
