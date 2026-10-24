@@ -71,10 +71,7 @@ export default function SharedQueuePage() {
   if (denied) {
     return (
       <Page>
-        <div className="mx-auto mt-20 max-w-md text-center">
-          <h1 className="mb-2 text-2xl font-bold text-zinc-100">Access denied</h1>
-          <p className="text-sm text-zinc-500">This page is only for Coderhelm platform administrators.</p>
-        </div>
+        <PageHeader detail crumb={false} title="Access denied" lead="This page is only for Coderhelm platform administrators." />
       </Page>
     );
   }

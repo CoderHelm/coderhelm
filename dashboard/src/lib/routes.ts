@@ -87,6 +87,7 @@ export const ROUTES: Record<string, RouteInfo> = {
 
   "/admin": { label: "Platform admin" },
   "/admin/tickets": { label: "Support queue", parent: "/admin" },
+  "/admin/queue": { label: "Shared queue", parent: "/admin", tab: "Shared failed-message queue" },
 };
 
 export interface Crumb {
