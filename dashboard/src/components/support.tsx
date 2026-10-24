@@ -299,7 +299,9 @@ export function SupportThread({
       </ol>
       <div ref={endRef} data-testid="thread-end" />
       {!endInView && entries.length > 4 && (
-        <div className="pointer-events-none sticky bottom-4 z-10 flex justify-center">
+        // Above the reply box when that box sticks to the bottom of the
+        // window (ThreadDock), so the box never covers it.
+        <div className="pointer-events-none sticky z-20 flex justify-center" style={{ bottom: "calc(var(--thread-dock, 0px) + 1rem)" }}>
           <button
             type="button"
             onClick={jump}
@@ -492,6 +494,42 @@ export interface ComposerAction {
  * send buttons on the right. The primary button stays dim until there is
  * something to send.
  */
+/**
+ * The reply box under a thread. In a wide layout it sticks to the bottom of
+ * the window, and its height is shared as `--thread-dock` with the thread
+ * beside it, so the thread's own sticky "Jump to latest" sits above it
+ * instead of underneath.
+ */
+export function ThreadDock({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    const host = el?.parentElement;
+    if (!el || !host) return;
+    const measure = () => {
+      const docked = getComputedStyle(el).position === "sticky";
+      host.style.setProperty("--thread-dock", docked ? `${Math.ceil(el.getBoundingClientRect().height)}px` : "0px");
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    ro.observe(host);
+    return () => {
+      ro.disconnect();
+      host.style.removeProperty("--thread-dock");
+    };
+  }, []);
+  return (
+    <div
+      ref={ref}
+      data-testid="thread-dock"
+      className="mt-4 pb-2 @min-[860px]:sticky @min-[860px]:bottom-0 @min-[860px]:z-10 @min-[860px]:bg-gradient-to-t @min-[860px]:from-zinc-950 @min-[860px]:from-80% @min-[860px]:to-transparent @min-[860px]:pt-4"
+    >
+      {children}
+    </div>
+  );
+}
+
 export function Composer({
   onSend,
   placeholder,

@@ -11,7 +11,7 @@ import { Page } from "@/components/page";
 import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { ListError, StatusText } from "@/components/list";
-import { AvatarStack, Composer, PanelSection, SupportThread, TicketContext, TicketHeader, TicketLayout, TicketPeople } from "@/components/support";
+import { AvatarStack, Composer, PanelSection, SupportThread, TicketContext, TicketHeader, TicketLayout, TicketPeople, ThreadDock } from "@/components/support";
 import { useToast } from "@/components/toast";
 import { focusRing, secondaryButton } from "@/components/ui";
 
@@ -219,7 +219,7 @@ function TicketPage() {
               isMine={isMine}
               onQuote={(text) => setQuote({ text, n: (quote?.n ?? 0) + 1 })}
             />
-            <div className="mt-4 pb-2 @min-[860px]:sticky @min-[860px]:bottom-0 @min-[860px]:z-10 @min-[860px]:bg-gradient-to-t @min-[860px]:from-zinc-950 @min-[860px]:from-80% @min-[860px]:to-transparent @min-[860px]:pt-4">
+            <ThreadDock>
               <Composer
                 onSend={send}
                 placeholder={t.status === "resolved" ? "Reply to open this ticket again" : "Add more detail, or answer support's question"}
@@ -229,7 +229,7 @@ function TicketPage() {
                 draftKey={`support:reply:${t.id}`}
                 inputRef={composerRef}
               />
-            </div>
+            </ThreadDock>
           </>
         }
       />

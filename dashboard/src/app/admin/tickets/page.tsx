@@ -8,7 +8,7 @@ import { adminLook, filedBy, itemHref, itemWords, PRIORITY_LABEL, queueOrder, ti
 import { Page, PageHeader } from "@/components/page";
 import { Skeleton } from "@/components/skeleton";
 import { Chip, List, ListEmpty, ListError, ListRow, ListSkeleton, ListToolbar, StatusText, useListParams } from "@/components/list";
-import { AvatarStack, Composer, PanelSection, SupportThread, TicketContext, TicketHeader, TicketLayout, TicketPeople, type ItemOpener } from "@/components/support";
+import { AvatarStack, Composer, PanelSection, SupportThread, TicketContext, TicketHeader, TicketLayout, TicketPeople, type ItemOpener, ThreadDock } from "@/components/support";
 import type { SupportItem } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { focusRing, inputClass, primaryButton, secondaryButton } from "@/components/ui";
@@ -383,7 +383,7 @@ function AdminTicket({ id }: { id: string }) {
               isMine={(m) => m.author === "support"}
               onQuote={(text) => setQuote({ text, n: (quote?.n ?? 0) + 1 })}
             />
-            <div className="mt-4 pb-2 @min-[860px]:sticky @min-[860px]:bottom-0 @min-[860px]:z-10 @min-[860px]:bg-gradient-to-t @min-[860px]:from-zinc-950 @min-[860px]:from-80% @min-[860px]:to-transparent @min-[860px]:pt-4">
+            <ThreadDock>
               <Composer
                 onSend={reply}
                 placeholder="Reply as Coderhelm support. Everyone on the ticket gets this by email."
@@ -391,7 +391,7 @@ function AdminTicket({ id }: { id: string }) {
                 quote={quote}
                 draftKey={`support-admin:reply:${t.id}`}
               />
-            </div>
+            </ThreadDock>
           </>
         }
       />
