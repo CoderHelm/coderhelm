@@ -807,6 +807,25 @@ export const api = {
       method: "POST",
     }),
 
+  // Logs: the log analyzer's findings and the fix runs started from them
+  listLogFindings: () => request<LogFindingsList>("/api/log-findings"),
+  logFindingSamples: (id: string) =>
+    request<{ samples: LogSample[]; error?: string }>(`/api/log-findings/${encodeURIComponent(id)}/samples`),
+  /** Start a fix run. `repo` empty: the repo mapped to the finding's log group. */
+  createLogFix: (id: string, body: { repo?: string; remember?: boolean }) =>
+    request<{ status: string; ticket_id: string; repo: string }>(`/api/log-findings/${encodeURIComponent(id)}/fix`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  setLogFindingStatus: (id: string, action: "ignore" | "acknowledge" | "reopen") =>
+    request<{ ok: boolean }>(`/api/log-findings/${encodeURIComponent(id)}/${action}`, { method: "POST", body: "{}" }),
+  getLogAutofix: () => request<{ autofix: LogAutofix; runs_today: number }>("/api/log-findings/autofix"),
+  saveLogAutofix: (autofix: LogAutofix) =>
+    request<{ ok: boolean; autofix: LogAutofix }>("/api/log-findings/autofix", {
+      method: "PUT",
+      body: JSON.stringify(autofix),
+    }),
+
   // Plugins
   getPluginCatalog: () =>
     request<{ plugins: PluginDef[] }>("/api/plugins/catalog"),
@@ -2005,6 +2024,72 @@ export interface Recommendation {
   plan_id?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+export type LogSeverity = "critical" | "warning" | "info";
+export type LogFindingStatus = "new" | "acknowledged" | "fixing" | "fixed" | "ignored";
+
+/** One finding on the Logs page (`GET /api/log-findings`). */
+export interface LogFinding {
+  rec_id: string;
+  title: string;
+  summary: string;
+  suggested_action: string;
+  severity: LogSeverity;
+  status: LogFindingStatus;
+  log_group: string;
+  account_id: string;
+  error_pattern: string;
+  /** Matching lines in the analysis that last saw it. */
+  error_count?: number | null;
+  /** Analyses it appeared in. */
+  seen_count?: number | null;
+  first_seen: string;
+  last_seen: string;
+  suspected_location?: string | null;
+  plan_id?: string | null;
+  /** The repo its fix went to, or the one mapped to its log group. */
+  repo?: string | null;
+  repo_mapped: boolean;
+  console_url?: string | null;
+  fix?: {
+    state: "none" | "starting" | "running" | "pr_open" | "merged" | "pr_closed" | "failed";
+    ticket_id: string;
+    run_id?: string | null;
+    run_status?: string | null;
+    pr_number?: number | null;
+    pr_url?: string | null;
+    auto: boolean;
+    started_at: string;
+  } | null;
+  /** What the automatic sweep decided, when it looked at it. */
+  auto?: { status: "started" | "skipped" | "waiting"; reason: string } | null;
+}
+
+export interface LogFindingsList {
+  findings: LogFinding[];
+  counts: Record<LogFindingStatus, number>;
+  log_groups: string[];
+  aws_connected: boolean;
+}
+
+export interface LogSample {
+  timestamp: string;
+  message: string;
+}
+
+/** The team's automatic fix PR setting. Off by default. */
+export interface LogAutofix {
+  enabled: boolean;
+  min_severity: LogSeverity;
+  daily_cap: number;
+  /** "all": every log group with a repo; "listed": only groups turned on below. */
+  scope: "all" | "listed";
+  /** UTC hours. */
+  quiet_hours: { start_hour: number; end_hour: number } | null;
+  overrides: { log_group: string; repo: string; auto: boolean | null; min_severity: LogSeverity | null }[];
+  /** Set by the server when it is turned on. */
+  enabled_at?: string;
 }
 
 export interface CredentialField {

@@ -155,6 +155,10 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       return json(r, { status: "deleted" });
     }
     if (p === "/api/recommendations") return json(r, { recommendations: db.recommendations });
+    if (p === "/api/log-findings") return json(r, { findings: [], counts: { new: 0, acknowledged: 0, fixing: 0, fixed: 0, ignored: 0 }, log_groups: [], aws_connected: true });
+    if (p === "/api/log-findings/autofix" && method === "GET") {
+      return json(r, { autofix: { enabled: false, min_severity: "critical", daily_cap: 3, scope: "all", quiet_hours: null, overrides: [] }, runs_today: 0 });
+    }
     if (p === "/api/recommendations/notify" && method === "GET") return at("admin") ? json(r, { notify_mode: "off", webhooks: NO_HOOKS }) : forbidden();
     if (p === "/api/recommendations/notify" && method === "PUT") return at("admin") ? json(r, { ok: true }) : forbidden();
     if (/^\/api\/recommendations\/[^/]+\/dismiss$/.test(p)) {
@@ -265,8 +269,6 @@ test.describe("AWS", () => {
     await expect(card.getByText("40 minutes ago")).toBeVisible();
     await expect(page.getByRole("heading", { name: "What Coderhelm can do with it" })).toBeVisible();
     await expect(page.getByText("Change, delete or write anything in your account")).toBeVisible();
-    await expect(page.getByText("Orders worker times out talking to the database")).toBeVisible();
-    await expect(page.getByText("1,204 times")).toBeVisible();
     await shot(page, "aws-connected");
 
     await card.getByRole("button", { name: "Actions" }).click();
@@ -279,8 +281,8 @@ test.describe("AWS", () => {
     await page.getByRole("region", { name: "Save changes" }).getByRole("button", { name: "Save changes" }).click();
     await expect.poll(() => callsTo(db, "PUT", new RegExp(`/api/aws-connections/${ACCOUNT}$`)).at(-1)?.body).toEqual({ log_groups: ["/ecs/api", "/ecs/worker"] });
 
-    await page.getByRole("button", { name: "Dismiss" }).click();
-    await expect(page.getByText("No open findings.")).toBeVisible();
+    // Findings moved to the Logs page; the AWS page points there.
+    await expect(page.locator("#findings").getByRole("link", { name: "Open Logs" })).toHaveAttribute("href", /^\/logs\/?$/);
 
     await card.getByRole("button", { name: "Actions" }).click();
     await page.getByRole("menuitem", { name: "Disconnect" }).click();
@@ -335,7 +337,7 @@ test.describe("AWS", () => {
     await expect(card.getByRole("button", { name: "Disconnect" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Connect another account" })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Post new findings to chat" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Create a plan" })).toBeVisible();
+    await expect(page.locator("#findings").getByRole("link", { name: "Open Logs" })).toBeVisible();
     expect(callsTo(db, "GET", /cfn-url|recommendations\/notify/)).toHaveLength(0);
     await shot(page, "aws-member");
   });
@@ -547,7 +549,8 @@ test.describe("Where alerts post", () => {
 
   test("new log findings can post to Slack", async ({ page }) => {
     const db = await mockApi(page);
-    await page.goto("/settings/integrations/aws/");
+    // The setting lives with the findings, on the Logs page.
+    await page.goto("/logs/?auto=1");
     const box = page.getByRole("complementary", { name: "Post new findings to chat" });
     await box.getByRole("group", { name: "Where to post new findings" }).getByRole("button", { name: "Own channel" }).click();
     await box.getByRole("checkbox", { name: "Slack" }).check();

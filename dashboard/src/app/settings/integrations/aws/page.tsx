@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { api, type AwsAccountAbilities, type AwsConnection, type LogGroup, type Recommendation } from "@/lib/api";
+import { api, type AwsAccountAbilities, type AwsConnection, type LogGroup } from "@/lib/api";
 import { hasRole } from "@/lib/roles";
 import { timeAgo } from "@/lib/data-sources";
 import { RoleGuard } from "@/components/role-guard";
@@ -16,11 +15,8 @@ import { Field } from "@/components/field";
 import { Segmented } from "@/components/segmented";
 import { CodeBlock } from "@/components/code-block";
 import { Skeleton } from "@/components/skeleton";
-import { Disclosure } from "@/components/disclosure";
 import { AwsIcon, ExternalLinkIcon } from "@/components/icons";
 import { Page, PageHeader, Section } from "@/components/page";
-import { ChannelPicker, channelsPayload, draftDirty, draftFrom, draftValid, NO_WEBHOOKS, type ChannelsDraft } from "@/components/chat-channels";
-import type { WebhooksView } from "@/lib/api";
 import { buttonClass, inputClass, linkButton, monoInputClass, primaryButton, secondaryButton } from "@/components/ui";
 import { Code, SaveBar, SettingsRow, Switch, useDirtyForm, type DirtyForm } from "@/components/settings";
 import { Chip, MoreMenu } from "@/components/list";
@@ -201,7 +197,7 @@ function AwsPage() {
 
       {canEdit && <SaveBar count={form.count} onSave={save} onDiscard={discard} saving={saving} problem={problem} />}
 
-      {load.state === "ready" && connections.length > 0 && <Findings canEditNotify={canEdit} />}
+      {load.state === "ready" && connections.length > 0 && <FindingsMoved />}
     </Page>
   );
 }
@@ -908,191 +904,19 @@ function ConnectPanel({ first, onCancel, onConnected }: { first: boolean; onCanc
 
 // ── Findings ─────────────────────────────────────────────────────────
 
-const SEVERITY: Record<Recommendation["severity"], { tone: "error" | "warning" | "neutral"; label: string }> = {
-  critical: { tone: "error", label: "Critical" },
-  warning: { tone: "warning", label: "Warning" },
-  info: { tone: "neutral", label: "Info" },
-};
-
-function Findings({ canEditNotify }: { canEditNotify: boolean }) {
-  const [recs, setRecs] = useState<Recommendation[] | null>(null);
-  const [error, setError] = useState(false);
-  const router = useRouter();
-  const { toast } = useToast();
-
-  const load = useCallback(() => {
-    setError(false);
-    api
-      .listRecommendations({ status: "pending" })
-      .then((r) => setRecs(r.recommendations))
-      .catch(() => {
-        setError(true);
-        setRecs((prev) => prev ?? []);
-      });
-  }, []);
-  useEffect(() => { load(); }, [load]);
-
-  const plan = (rec: Recommendation) => {
-    const parts = [`Create a plan to fix this issue found in our AWS logs:`, "", `**${rec.title}**`, "", rec.summary];
-    if (rec.source_log_group) parts.push("", `Affected service (log group: ${rec.source_log_group})`);
-    if (rec.error_pattern) parts.push("", `Error pattern: ${rec.error_pattern}`);
-    if (rec.suggested_action) parts.push("", `Suggested fix: ${rec.suggested_action}`);
-    router.push(`/plans/new?prefill=${encodeURIComponent(parts.join("\n"))}`);
-  };
-
-  const dismiss = async (rec: Recommendation) => {
-    try {
-      await api.dismissRecommendation(rec.rec_id);
-      setRecs((prev) => (prev ?? []).filter((r) => r.rec_id !== rec.rec_id));
-      toast("Finding dismissed");
-    } catch {
-      toast("Could not dismiss the finding", "error");
-    }
-  };
-
-  const count = recs?.length ?? 0;
-
+/** Findings moved to the Logs page; this anchor (#findings) points there. */
+function FindingsMoved() {
   return (
-    <Section
-      id="findings"
-      title={`Findings${count ? ` (${count})` : ""}`}
-      description="Errors Coderhelm found in your logs since the last analysis. Turn one into a plan, or dismiss it."
-    >
-      <div className="grid items-start gap-6 lg:grid-cols-3">
-        <div className="min-w-0 lg:col-span-2">
-          {recs === null ? (
-            <div className="flex flex-col gap-3" aria-busy="true">
-              <Skeleton className="h-20 w-full" />
-              <Skeleton className="h-20 w-full" />
-            </div>
-          ) : error ? (
-            <Callout variant="error" title="Could not load the findings">
-              <p>
-                <button type="button" onClick={load} className={linkButton}>Try again</button>
-              </p>
-            </Callout>
-          ) : recs.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-zinc-700 p-6 text-center text-sm text-zinc-400">
-              No open findings. New ones appear here after each analysis.
-            </div>
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {recs.map((rec) => {
-                const sev = SEVERITY[rec.severity] ?? SEVERITY.info;
-                return (
-                  <li key={rec.rec_id} className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <StatusPill tone={sev.tone}>{sev.label}</StatusPill>
-                      {typeof rec.error_count === "number" && rec.error_count > 0 && (
-                        <span className="text-xs text-zinc-500">{rec.error_count.toLocaleString()} times</span>
-                      )}
-                      {rec.created_at && <span className="text-xs text-zinc-500">found {timeAgo(rec.created_at)}</span>}
-                    </div>
-                    <h3 className="mt-2 font-semibold text-zinc-100">{rec.title}</h3>
-                    <p className="mt-1 text-sm text-zinc-400">{rec.summary}</p>
-                    {rec.source_log_group && <p className="mt-2 break-all font-mono text-xs text-zinc-500">{rec.source_log_group}</p>}
-                    {rec.suggested_action && (
-                      <div className="mt-3">
-                        <Disclosure summary="Suggested fix">
-                          <p className="text-zinc-300">{rec.suggested_action}</p>
-                        </Disclosure>
-                      </div>
-                    )}
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button type="button" onClick={() => plan(rec)} className={primaryButton}>
-                        Create a plan
-                      </button>
-                      <button type="button" onClick={() => dismiss(rec)} className={secondaryButton}>
-                        Dismiss
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-        {canEditNotify && <FindingsNotify />}
+    <Section id="findings" title="Findings" description="Errors Coderhelm finds in these accounts' logs.">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-sm">
+        <p className="min-w-0 text-zinc-400">
+          Findings, fix PRs and automatic fixes now live on the Logs page.
+        </p>
+        <Link href="/logs" className={secondaryButton}>
+          Open Logs
+        </Link>
       </div>
     </Section>
-  );
-}
-
-const NOTIFY_OPTIONS = [
-  { value: "off", label: "Off" },
-  { value: "team", label: "Team channel" },
-  { value: "custom", label: "Own channel" },
-] as const;
-
-type NotifyMode = (typeof NOTIFY_OPTIONS)[number]["value"];
-
-function FindingsNotify() {
-  const { toast } = useToast();
-  const [saved, setSaved] = useState<{ mode: NotifyMode; webhooks: WebhooksView } | null>(null);
-  const [mode, setMode] = useState<NotifyMode>("off");
-  const [draft, setDraft] = useState<ChannelsDraft>(draftFrom(NO_WEBHOOKS));
-  const [loadError, setLoadError] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  const load = useCallback(() => {
-    api
-      .getRecNotify()
-      .then((r) => {
-        setSaved({ mode: r.notify_mode, webhooks: r.webhooks });
-        setMode(r.notify_mode);
-        setDraft(draftFrom(r.webhooks));
-      })
-      .catch(() => setLoadError(true));
-  }, []);
-  useEffect(load, [load]);
-
-  const dirty = !!saved && (saved.mode !== mode || (mode === "custom" && draftDirty(draft, saved.webhooks)));
-  const valid = mode !== "custom" || draftValid(draft, saved?.webhooks, true);
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      await api.saveRecNotify(mode, mode === "custom" ? channelsPayload(draft, saved?.webhooks) : {});
-      toast("Saved where new findings are posted");
-      load();
-    } catch {
-      toast("Could not save. Check the webhook address.", "error");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <aside aria-labelledby="findings-notify-heading" className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm">
-      <h3 id="findings-notify-heading" className="font-semibold text-zinc-100">Post new findings to chat</h3>
-      <p className="mt-1 text-zinc-400">
-        After each analysis, new findings post as one message in Microsoft Teams, Slack or both. The team channel is the one set in{" "}
-        <Link href="/settings/alerts" className={linkButton}>Alert routes</Link>.
-      </p>
-      {loadError ? (
-        <div className="mt-3">
-          <Callout variant="error"><p>Could not load this setting. Reload the page to try again.</p></Callout>
-        </div>
-      ) : (
-        <div className="mt-3 flex flex-col gap-3">
-          <div className="max-w-full"><Segmented label="Where to post new findings" options={[...NOTIFY_OPTIONS]} value={mode} onChange={setMode} disabled={!saved} /></div>
-          {mode === "custom" && (
-            <ChannelPicker
-              idPrefix="findings"
-              draft={draft}
-              saved={saved?.webhooks}
-              onChange={setDraft}
-              destination={{ destination: "recommendations" }}
-            />
-          )}
-          <div>
-            <button type="button" onClick={save} disabled={!dirty || !valid || saving} className={primaryButton}>
-              {saving ? "Saving…" : "Save"}
-            </button>
-          </div>
-        </div>
-      )}
-    </aside>
   );
 }
 
