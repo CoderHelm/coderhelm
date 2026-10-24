@@ -4,22 +4,28 @@ description: Install plugins from public or private repositories, and how each o
 status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and are not on main yet. This page describes the design they are being built to, and will be updated when they ship.</Callout>
+<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
 
-A plugin is installed from a git repository, by `owner/name` (and a folder, for a repository that holds several plugins).
+Plugins come from **plugin sources**: git repositories an admin adds on the **Plugins** page. Each source is read at a pinned commit.
 
-| | Public repo | Private repo |
+| | Public repository | Private repository |
 | --- | --- | --- |
-| Who can install | Any team | Teams whose GitHub App installation can read the repo |
-| How it is read | Over HTTPS | Through the team's GitHub App, like [skill repos](/concepts/skills) |
-| Updates | Checked on a schedule | On every push to the default branch, plus the schedule |
+| How you add it | Its public GitHub address | `owner/name`, for a repository your team's GitHub App can read |
+| Who sees it | Your team | Your team only; private repositories stay private to your team |
 
-Only the default branch is read, so unmerged work never reaches a team.
+A source can hold one plugin at its root, or several in folders. Its plugins appear under **Plugins you can install**.
 
-## Auto-update
+## Following changes
 
-Updates follow the rules in [Versioning and updates](/plugins/versioning): wording changes apply when they land; anything that widens what the plugin can do waits for an admin. A team can also turn auto-update off for a plugin and approve every new version by hand.
+Each source, and each installed plugin, follows a branch, a tag or one commit. CoderHelm checks sources for changes and shows when it last checked.
+
+- **Take new versions on their own**: new versions are picked up by themselves. Wording changes apply; anything that widens what the plugin can do still waits for an admin ([Versioning and updates](/plugins/versioning)).
+- **Pin to a commit**: the plugin stays on one version until someone moves it.
+
+## Removing a source
+
+When a source is removed, its plugins stop showing in the catalog. Plugins already installed from it keep their current version.
 
 ## Forking
 
-To change a public plugin for your team, fork it into your own organization and install the fork. Your team's values belong in [settings](/plugins/settings), so most teams never need to fork.
+To change a public plugin for your team, fork it into your own organization and add the fork as a source. Your team's own values belong in [settings](/plugins/settings), so most teams never need to fork.

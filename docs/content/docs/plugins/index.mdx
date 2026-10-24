@@ -4,7 +4,7 @@ description: A plugin packages instructions, agents, tools, triggers and outputs
 status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and are not on main yet. This page describes the design they are being built to, and will be updated when they ship.</Callout>
+<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
 
 A **plugin** lets a team other than engineering put CoderHelm to work: marketing, support, sales operations, anyone. It brings its own instructions, agents and tools, says what starts it and what it produces, and CoderHelm runs it with the same safety it applies to code: pinned versions, a person's approval before anything goes out, metered tokens and a full record of every step.
 
@@ -47,7 +47,7 @@ trigger (brief, schedule, release)
 
 1. A trigger starts a run, with the plugin's pinned version, the inputs and who asked.
 2. The plugin's agent works with exactly the tools the manifest grants. A repository is optional.
-3. What it makes is saved as **drafts** in the review queue.
+3. What it makes is saved as **drafts** in the review queue (**Plugins** → **Review**).
 4. A person approves a specific version of a draft. Only then can a consequential tool, such as publish, run.
 
 ## Words used in these docs
@@ -55,13 +55,25 @@ trigger (brief, schedule, release)
 | Word | Meaning |
 | --- | --- |
 | Plugin | The package: a repo with `plugin.yaml`. |
-| Install | An admin adds a plugin to a team, pinned to an exact version. |
+| Source | A git repository plugins come from. An admin adds it on the Plugins page. |
+| Install | An admin adds a plugin from a source to the team, pinned to an exact version. |
 | Connection | An outside account the plugin uses (a CMS, LinkedIn). Connected separately from installing. |
 | Run | One piece of work by a plugin. |
 | Draft | Something a run made, waiting for review. |
 | Approval | A person's yes for one exact version of a draft. |
 
-The **Connections** page (today called Plugins in older screenshots) lists MCP servers. A plugin can declare which connections it needs; it is not itself a connection.
+## In the dashboard
+
+| Page | What it is for |
+| --- | --- |
+| **Plugins** | Installed plugins, plugins you can install, plugin sources, and what plugins may do without a person. |
+| A plugin's page | Its skills, agents and tools; settings; who approves; its monthly token limit; writing a brief. |
+| **Review** | Drafts waiting for approval. |
+| **Runs** | Every plugin run and what it produced. |
+| **Audit log** | Every plugin step in one place. |
+| **Connections** | The MCP servers your team has connected. A plugin declares which connections it needs; it is not itself a connection. |
+
+Plugins are switched on team by team. Until then these pages say "Plugins are not turned on for this team".
 
 ## Next
 

@@ -4,13 +4,11 @@ description: Start a plugin run from a person's brief, on a schedule, or when a 
 status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and are not on main yet. This page describes the design they are being built to, and will be updated when they ship.</Callout>
+<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
 
-`triggers` lists what starts a run. A plugin with no triggers can be started by hand with a free-text brief.
+Anyone who can use plugins can start a run from the plugin's page with **Write a brief**: "What should it write, for whom, and what must it mention?" They can also pick a **Repository (optional)**, for work that is about one repository's changes. `triggers` adds more ways to start a run.
 
-## Manual brief
-
-A person starts a run from the plugin's page in the dashboard by filling in a short form.
+## Manual brief form
 
 ```yaml
 triggers:
@@ -18,32 +16,31 @@ triggers:
     form:
       brief: text
       channels: [linkedin, blog, email]
-      launch_date: date
 ```
 
-Each form field is a type (`string`, `text`, `number`, `boolean`, `date`) or a list of choices. The run receives the answers and who asked. That person can never approve the run's output.
+Each form field is `text` (a box to write in) or a list of choices to pick from. The run receives the answers and who asked. That person can never approve the run's output.
 
 ## Schedule
 
 ```yaml
 triggers:
   - on: schedule
-    cron: "0 14 * * MON"        # Mondays at 14:00
-    timezone: America/New_York  # default UTC
+    cron: "0 14 * * MON"
 ```
 
-`cron` has five fields: minute, hour, day of month, month, day of week. A scheduled run that finds nothing to do should say so and save nothing; write that into the agent's instructions.
+`cron` has five fields: minute, hour, day of month, month, day of week. A scheduled run that finds nothing to do should say so and save nothing; write that into the agent's instructions. Turning a plugin off, or removing it, stops its schedules.
 
 ## Release
 
 ```yaml
 triggers:
   - on: github.release
-    repos: [your-org/web, your-org/api]   # default: every repo the team connected
 ```
 
-Runs when a release is published on a connected GitHub repository. The run receives the [release notes](/getting-started/reviewer#release-notes) CoderHelm wrote for it and the merged pull requests it contains.
+Runs when a release is published on a GitHub repository the team connected. The run gets the [release notes](/getting-started/reviewer#release-notes) CoderHelm wrote for it.
 
-## Adding a trigger is a change admins approve
+## Runs
 
-A new version that adds a trigger stays on the old version until an admin approves it. See [Versioning and updates](/plugins/versioning).
+Every run is listed under **Plugins** → **Runs**, with what started it (manual, schedule or release), the plugin version, who asked, the tokens used and the drafts it saved. A run is queued, running, completed, failed, or refused (for example when a limit is reached), with the reason.
+
+Adding a trigger in a new version waits for an admin. See [Versioning and updates](/plugins/versioning).

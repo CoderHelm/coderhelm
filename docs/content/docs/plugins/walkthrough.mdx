@@ -4,7 +4,7 @@ description: A full walkthrough, from an empty repo to a plugin that drafts laun
 status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and are not on main yet. This page describes the design they are being built to, and will be updated when they ship.</Callout>
+<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
 
 In this walkthrough you build a plugin that:
 
@@ -63,54 +63,54 @@ Now declare everything the plugin needs.
 
 Section by section:
 
-- **settings**: the brand guide and banned claims are text the agent reads. `sanity` and `linkedin` are accounts the team connects; `linkedin_org` says which company page to post as.
-- **tools**: from Sanity, only three tools, at `write` risk because drafts there are not public. `publish_post` is the plugin's own tool: one LinkedIn API call, `consequential` because it reaches the public. Its token comes from the `linkedin` connection and never reaches the model.
-- **triggers**: every release, Mondays at 10:00 New York time, and a brief form.
-- **outputs**: three kinds of draft, and publishing through `publish_post` once one `marketing_editor` approves.
-- **budget**: at most 2 million new tokens a month.
+- **settings**: the brand guide and banned claims are values the team types; the agent reads them. \`sanity\` and \`linkedin\` are accounts the team connects.
+- **tools**: \`get_release_notes\` is a built-in read tool. From Sanity, only three tools, at \`write\` risk because drafts there are not public. \`publish_post\` is the plugin's own tool, \`consequential\` because it reaches the public, and it signs in with the team's \`linkedin\` connection.
+- **triggers**: every release, Mondays at 14:00, and a brief form with a list of channels.
+- **outputs**: three kinds of draft, and publishing through \`publish_post\` once one approver says yes.
+- **budget**: at most 2 million tokens a month, unless the team changes it.
 
 </Step>
 <Step>
 
 ### Validate
 
-```bash
+\`\`\`bash
 curl -fsSLO https://docs.coderhelm.com/tools/validate-plugin.mjs
 node validate-plugin.mjs .
-```
+\`\`\`
 
-```txt
+\`\`\`txt
 ok       marketing 1.0.0
-```
+\`\`\`
 
-Try breaking it: change `publish_post`'s `risk` to `write` and the validator refuses, because a publish output must go through a consequential tool. Add `delete_document` to the agent's `tools:` and it refuses again, because the manifest doesn't grant it.
+Try breaking it: change \`publish_post\`'s \`risk\` to \`write\` and the validator refuses, because a publish output must go through a consequential tool. Add \`delete_document\` to the agent's \`tools:\` and it refuses again, because the manifest doesn't grant it.
 
 </Step>
 <Step>
 
 ### Push and install
 
-Push the repo to GitHub. In CoderHelm, an admin installs it by `owner/name`; with two admins, the second approves. Then the team:
+Push the repo to GitHub. Then, in CoderHelm:
 
-1. fills in **Brand voice**, **Claims we never make** and **LinkedIn organization id**,
-2. connects Sanity (on Connections) and LinkedIn (the **Connect** button),
-3. creates the `marketing_editor` approver group and adds the editors.
+1. An admin opens **Plugins**, adds the repository under **Plugin sources** (its public address, or \`owner/name\` if your GitHub App can read it), and picks the branch, tag or commit to follow.
+2. **marketing** appears under **Plugins you can install**. The admin installs it; with two or more admins, a second admin approves.
+3. On the plugin's page, the team fills in \`brand_voice_doc\` and \`banned_claims\`, connects Sanity (on **Connections**) and LinkedIn, and lists the editors under **Who approves what goes out**.
 
 </Step>
 <Step>
 
 ### Run it
 
-Start it by hand first: open the plugin, fill in the brief ("Announce the new export button") and pick channels. Or publish a release on a connected repository.
+Start it by hand first: on the plugin's page, under **Write a brief**, ask for "Announce the new export button", pick channels and click **Start the run**. Or publish a release on a connected repository.
 
-The run reads the release notes and merged pull requests, checks earlier posts in Sanity, and saves the drafts. A card goes to the team's Slack or Teams channel.
+The run reads the release notes, checks earlier posts in Sanity, and saves the drafts. If the team turned on Slack or Teams notices, a card goes to the channel.
 
 </Step>
 <Step>
 
 ### Approve and publish
 
-An editor (not the person who asked) opens the review queue, edits one LinkedIn variant, and approves it for Tuesday at 10:00. On Tuesday, CoderHelm calls `publish_post` with exactly the approved text. Until then, anyone can cancel. The audit log records the trigger, the plugin version, the agent's tool calls, the editor's approval and the result.
+An editor (not the person who asked) opens **Plugins** → **Review**, edits one LinkedIn variant (which saves a new version), and approves it for Tuesday at 10:00 with **Approve for that time**. On Tuesday, CoderHelm calls \`publish_post\` with exactly the approved text. Until then, anyone allowed can **Cancel publish**. The **Audit log** shows the trigger, the plugin version, each tool call and its risk, the editor's approval and the result.
 
 </Step>
 </Steps>
@@ -118,5 +118,5 @@ An editor (not the person who asked) opens the review queue, edits one LinkedIn 
 ## Where to go next
 
 - Add a `email` publish tool for your email provider, with its own approval.
-- Feed results back: a read tool for post analytics lets next week's run learn what worked.
+- Add a read tool for post analytics from your connections, so next week's run can see what worked.
 - Put the plugin in your [private marketplace](/plugins/marketplace) for other teams.

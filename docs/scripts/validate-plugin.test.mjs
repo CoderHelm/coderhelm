@@ -57,19 +57,19 @@ test('a publish output must go through a consequential tool', () => {
   assert.ok(r.errors.some((e) => e.includes('must be a `consequential` tool')), r.errors.join('\n'));
 });
 
-test('a read tool may only GET', () => {
+test('tool names must not clash with a name allowed from a connection', () => {
   const r = variant((m) => {
-    m.tools.find((t) => t.name === 'publish_post').risk = 'read';
+    m.tools.push({ name: 'create_draft', kind: 'builtin', risk: 'write' });
   });
-  assert.ok(r.errors.some((e) => e.includes('request.method')), r.errors.join('\n'));
+  assert.ok(r.errors.some((e) => e.includes('clashes')), r.errors.join('\n'));
 });
 
-test('placeholders must name a setting or an input', () => {
+test('a connection setting needs a provider; settings types are limited', () => {
   const r = variant((m) => {
-    m.tools.find((t) => t.name === 'publish_post').request.body.commentary = '{txt} {settings.nope}';
+    m.settings.push({ key: 'crm', type: 'connection' }, { key: 'tone', type: 'select' });
   });
-  assert.ok(r.errors.some((e) => e.includes('`{txt}` names no input')), r.errors.join('\n'));
-  assert.ok(r.errors.some((e) => e.includes('`{settings.nope}` names no setting')));
+  assert.ok(r.errors.some((e) => e.includes('provider')), r.errors.join('\n'));
+  assert.ok(r.errors.some((e) => e.startsWith('settings.')), r.errors.join('\n'));
 });
 
 test('an agent may only list tools the manifest grants', () => {
@@ -87,11 +87,11 @@ test('a glob that matches nothing is an error', () => {
   assert.ok(r.errors.some((e) => e.includes('matches no file')));
 });
 
-test('secrets cannot have defaults and selects need options', () => {
+test('a manual form field is text or a list of choices', () => {
   const r = variant((m) => {
-    m.settings.push({ key: 'api', type: 'secret', default: 'x' }, { key: 'tone', type: 'select' });
+    m.triggers.find((t) => t.on === 'manual').form.when = 'date';
   });
-  assert.ok(r.errors.length >= 2, r.errors.join('\n'));
+  assert.ok(r.errors.length >= 1, r.errors.join('\n'));
 });
 
 test('an item over 64,000 bytes is refused', () => {

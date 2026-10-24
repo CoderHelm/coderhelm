@@ -10,32 +10,23 @@ agents:
 
 settings:
   - key: brand_voice_doc
-    type: text
-    label: Brand voice
-    description: Paste your voice and tone guide. The launch writer follows it in every draft.
-    required: true
+    type: string
   - key: banned_claims
-    type: text
-    label: Claims we never make
-    description: One per line, for example "fastest" or "guaranteed".
+    type: string
   - key: sanity
     type: connection
     provider: mcp
-    label: Sanity
-    description: The CMS where blog drafts are saved. Connect it on the Connections page first.
   - key: linkedin
     type: connection
     provider: oauth2
     scopes: [w_member_social]
-    label: LinkedIn
-    description: The company page posts are published to.
-  - key: linkedin_org
-    type: string
-    label: LinkedIn organization id
-    description: The number at the end of your company page's admin URL.
-    required: true
+    sensitive: true
 
 tools:
+  - name: get_release_notes
+    kind: builtin
+    description: Read the release notes CoderHelm wrote for a release, with its merged pull requests.
+    risk: read
   - ref: mcp:sanity
     allow: [get_document, query_documents, create_draft]
     risk: write
@@ -43,30 +34,11 @@ tools:
     kind: http
     description: Publish an approved post to the company's LinkedIn page.
     risk: consequential
-    request:
-      method: POST
-      url: https://api.linkedin.com/rest/posts
-      connection: linkedin
-      headers:
-        LinkedIn-Version: "202409"
-      body:
-        author: "urn:li:organization:{settings.linkedin_org}"
-        commentary: "{text}"
-        visibility: PUBLIC
-        lifecycleState: PUBLISHED
-        distribution:
-          feedDistribution: MAIN_FEED
-    inputs:
-      text:
-        type: string
-        description: The approved post text.
-        example: We just shipped faster code reviews.
 
 triggers:
   - on: github.release
   - on: schedule
     cron: "0 14 * * MON"
-    timezone: America/New_York
   - on: manual
     form:
       brief: text

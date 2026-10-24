@@ -4,7 +4,7 @@ description: Every model call a plugin makes is metered and counted against its 
 status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and are not on main yet. This page describes the design they are being built to, and will be updated when they ship.</Callout>
+<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
 
 Every model call a plugin run makes is metered, like every other call CoderHelm makes, and paid for with the team's own model key.
 
@@ -15,16 +15,12 @@ budget:
   monthly_tokens: 2000000
 ```
 
-`monthly_tokens` caps the new tokens (input plus output) the plugin may use in a calendar month (UTC). The team can lower it on the plugin's settings page. The team's own [token limits](/concepts/token-limits) still apply on top: a run stops at whichever limit is reached first, and new runs wait for the next month.
+`monthly_tokens` is the plugin's own monthly limit. The team can change it on the plugin's page under **Monthly token limit**, where it also sees **Tokens used this month**; empty or 0 means no limit of its own.
 
-Both limits are checked before a run starts and before each model call, the same places the team limit is checked today.
-
-## Where usage shows
-
-Plugin usage is tagged `plugin:<id>`, so **Analytics** shows each plugin's tokens on their own line, split into new tokens, cache reads and cache writes. Tool calls and publishes are counted too.
+The plugin's usage counts toward the team's [token limits](/concepts/token-limits) too. When either is reached, the plugin stops starting runs until next month, and a run it would have started shows as refused with the reason.
 
 ## Keep runs cheap
 
-- Put stable text (brand guide, checklists) in skills: it is read from the prompt cache on later calls, which costs far less than new input.
+- Put stable text (brand guide, checklists) in skills: on later calls it is read from the prompt cache, which costs far less than new input.
 - Tell scheduled agents to stop early when there is nothing to do.
 - Allow only the tools the plugin needs; every tool's description is part of the prompt.

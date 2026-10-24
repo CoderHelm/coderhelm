@@ -1,27 +1,19 @@
 ---
 title: Settings and secrets
-description: Declare the values each team fills in when it installs your plugin, and keep secrets away from the model.
+description: Declare the values each team fills in for your plugin, and keep secrets away from the model.
 status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and are not on main yet. This page describes the design they are being built to, and will be updated when they ship.</Callout>
+<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
 
-Settings are the values that differ between teams. You declare them in the manifest; each team fills them in on the install screen. Values live in the team's settings, never in the plugin.
+Settings are the values that differ between teams: a brand guide, an account to post from. You declare them in the manifest; each team fills them in on the plugin's page. Values live with the team, never in the plugin.
 
 ```yaml
 settings:
   - key: brand_voice_doc
-    type: text
-    label: Brand voice
-    description: Paste your voice and tone guide.
-    required: true
-  - key: tone
-    type: select
-    options: [friendly, formal]
-    default: friendly
+    type: string
   - key: crm_api_key
     type: secret
-    label: CRM API key
   - key: linkedin
     type: connection
     provider: oauth2
@@ -30,24 +22,18 @@ settings:
 
 ## Types
 
-| Type | Shows as | Notes |
+| Type | What the team does | Notes |
 | --- | --- | --- |
-| `string` | One line | |
-| `text` | A text box | Brand guides, templates. |
-| `number` | A number | |
-| `boolean` | A switch | |
-| `select` | A choice | Needs `options`. |
-| `secret` | A hidden field | Sealed, never shown again, never given to a model. No `default`. |
-| `connection` | A **Connect** button | An outside account; see [Connections and OAuth](/plugins/connections). Needs `provider`. No `default`. |
+| `string` | Types a value. | Agents can read it, unless `sensitive: true`. |
+| `secret` | Pastes a value once. | Sealed, never shown again once saved, never given to a model. |
+| `connection` | Connects an account. | See [Connections and OAuth](/plugins/connections). Needs `provider`. |
 
 Every field is in the [manifest reference](/plugins/manifest-reference#settings).
 
-## Where settings reach
+## Sensitive values
 
-- **In instructions**: agents see the values of non-sensitive settings (for example the brand guide) as part of their context.
-- **In tools**: a defined tool can use `{settings.key}` in its URL, headers or body. Values are filled in after the model has chosen the call, so even non-sensitive settings used this way are not something the model can change.
-- **Never**: a `secret`, a `connection` or any setting with `sensitive: true` is never put in a prompt, never returned by the API and never logged. Like other CoderHelm keys, it is encrypted with AWS KMS with the team and plugin bound into the encryption, and opened only for the call that needs it.
+A `secret`, a `connection`, or any setting with `sensitive: true` is never put in a prompt and never sent back to the dashboard; the page only shows whether it is set ("Set. Enter a new value to replace it."). Like CoderHelm's other keys, these values are encrypted with AWS KMS with the team bound into the encryption, and opened only for the call that needs them.
 
-## Required settings
+## Missing values
 
-A plugin with an empty `required` setting is installed but can't run. The install screen says which values are missing.
+A plugin whose settings or connections are not filled in can't do the work that needs them. Name your settings so a person knows what to enter, and explain each one in your plugin's README.

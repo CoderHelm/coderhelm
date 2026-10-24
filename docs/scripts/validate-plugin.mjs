@@ -6,9 +6,9 @@
 // 1. plugin.yaml against the manifest's JSON Schema
 //    (https://docs.coderhelm.com/schema/plugin-manifest.v1.json).
 // 2. The checks a schema cannot express: every skill and agent glob finds a
-//    file, files fit the size limits, `{settings.x}` and `{input}` name things
-//    that exist, a publish output goes through a consequential tool, and each
-//    agent's `tools:` are tools the manifest grants.
+//    file, files fit the size limits, a publish output goes through a
+//    consequential tool, tool names don't clash, and each agent's `tools:`
+//    are tools the manifest grants.
 //
 // The docs site also ships this file bundled with its dependencies at
 // https://docs.coderhelm.com/tools/validate-plugin.mjs, so a plugin repo can
@@ -119,48 +119,33 @@ export function validatePlugin(dir) {
   const connections = new Set(settings.filter((s) => s.type === 'connection').map((s) => s.key));
 
   // Tools
-  const httpTools = new Map();
+  const namedTools = new Map();
   const allowPatterns = [];
   for (const t of tools) {
-    if (t.kind === 'http') {
-      if (httpTools.has(t.name)) errors.push(`tools: \`${t.name}\` is declared twice`);
-      httpTools.set(t.name, t);
-      const inputs = new Set(Object.keys(t.inputs ?? {}));
-      if (t.request.connection && !connections.has(t.request.connection)) {
-        errors.push(`tools.${t.name}: request.connection \`${t.request.connection}\` is not a \`connection\` setting`);
-      }
-      const text = JSON.stringify(t.request);
-      for (const m of text.matchAll(/\{settings\.([a-z0-9_]+)\}/g)) {
-        if (!settingKeys.has(m[1])) errors.push(`tools.${t.name}: \`{settings.${m[1]}}\` names no setting`);
-      }
-      for (const m of text.matchAll(/\{([a-z][a-z0-9_]*)\}/g)) {
-        if (!inputs.has(m[1])) errors.push(`tools.${t.name}: \`{${m[1]}}\` names no input`);
-      }
-      for (const name of inputs) {
-        if (!text.includes(`{${name}}`)) warnings.push(`tools.${t.name}: input \`${name}\` is never used in the request`);
-      }
+    if (t.kind) {
+      if (namedTools.has(t.name)) errors.push(`tools: \`${t.name}\` is declared twice`);
+      namedTools.set(t.name, t);
     } else {
       const id = t.ref.split(':')[1];
-      if (t.ref.startsWith('mcp:') && !connections.has(id)) {
+      if (!connections.has(id)) {
         warnings.push(`tools: \`${t.ref}\` has no \`connection\` setting named \`${id}\`; the team must already have it on the Connections page`);
       }
       allowPatterns.push(...t.allow.map(globToRe));
       if (t.allow.includes('*')) warnings.push(`tools: \`${t.ref}\` allows every tool on the server; list the ones the plugin needs`);
     }
   }
-
-  for (const name of httpTools.keys()) {
+  for (const name of namedTools.keys()) {
     if (allowPatterns.some((re) => re.test(name))) errors.push(`tools: \`${name}\` clashes with a tool allowed from a connection; rename it`);
   }
 
   // Outputs
   for (const o of manifest.outputs ?? []) {
     if (o.type !== 'publish') continue;
-    const tool = httpTools.get(o.via);
-    if (!tool) errors.push(`outputs: publish via \`${o.via}\` names no tool defined in \`tools\``);
+    const tool = namedTools.get(o.via);
+    if (!tool) errors.push(`outputs: publish via \`${o.via}\` names no tool in \`tools\``);
     else if (tool.risk !== 'consequential') errors.push(`outputs: publish via \`${o.via}\` must be a \`consequential\` tool (it is \`${tool.risk}\`)`);
   }
-  for (const t of httpTools.values()) {
+  for (const t of namedTools.values()) {
     if (t.risk === 'consequential' && !(manifest.outputs ?? []).some((o) => o.type === 'publish' && o.via === t.name)) {
       warnings.push(`tools.${t.name}: a consequential tool that no publish output uses can never run`);
     }
@@ -197,7 +182,7 @@ export function validatePlugin(dir) {
       const fm = checkItem('agent', f);
       if (!fm) continue;
       for (const name of toolList(fm.tools ?? fm['allowed-tools'])) {
-        const granted = httpTools.has(name) || allowPatterns.some((re) => re.test(name));
+        const granted = namedTools.has(name) || allowPatterns.some((re) => re.test(name));
         if (!granted) errors.push(`${path.relative(dir, f)}: tool \`${name}\` is not granted in plugin.yaml \`tools\``);
       }
     }

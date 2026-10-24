@@ -1,34 +1,39 @@
 ---
 title: Versioning and updates
-description: How plugins are pinned, which changes apply on push, and which wait for an admin's approval.
+description: How plugins are pinned, which changes apply by themselves, and which wait for an admin.
 status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and are not on main yet. This page describes the design they are being built to, and will be updated when they ship.</Callout>
+<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
 
 ## Installs are pinned
 
-When an admin installs a plugin, it is pinned to the exact content of that version (a hash of the package), not to a branch. If the team has two or more admins, a second admin approves the install.
+When an admin installs a plugin, it is pinned to the exact content of that version (a hash of the package) and the commit it came from. If the team has two or more admins, a second admin approves the install ("Install waiting for a second admin").
 
 `version` in `plugin.yaml` is a label for people. Raise it whenever you publish a change; CoderHelm goes by the content.
 
-## What updates by itself, and what waits
+## What applies by itself, and what waits
+
+From the plugin's page: "Wording changes apply on their own and are logged. A version that adds or widens tools, triggers, connections or outputs waits for an admin."
 
 | Change in a new version | What happens |
 | --- | --- |
-| Wording: skills, agent instructions, descriptions, labels | Applies on the next push, like skill repos sync today. |
-| A new or wider tool (a new tool, a longer `allow` list, a higher `risk`) | Waits. The team stays on the old version until an admin approves. |
-| A new OAuth scope or connection | Waits for approval. |
-| A new trigger | Waits for approval. |
-| A new `publish` output, or a lower approval `min` | Waits for approval. |
-| Anything narrower (fewer tools, lower risk, removed trigger) | Applies on push. |
+| Wording: skills, agent instructions, descriptions | Applies by itself, and is logged. |
+| A new or wider tool (a new tool, a longer `allow` list, a higher `risk`) | Waits for an admin. |
+| A new trigger | Waits for an admin. |
+| A new connection or OAuth scope | Waits for an admin. |
+| A new or wider output | Waits for an admin. |
 
-When an update waits, the plugin's page shows exactly what widened, and the plugin keeps running on the approved version meanwhile.
+While an update waits, the plugin keeps running on the version already approved. The waiting update lists exactly what widened, for example "adds tool publish_post (consequential)", with what was added, removed and changed.
+
+## Following a branch, a tag or a commit
+
+Each plugin follows a branch, a tag or one commit of its source, and **Take new versions on their own** decides whether new versions are picked up by themselves (still under the rules above). **Pin to a commit** freezes a plugin on one version. See [Public and private repos](/plugins/repos).
 
 ## Semantic versions
 
 Use `MAJOR.MINOR.PATCH`:
 
 - **Patch** for wording fixes.
-- **Minor** for new abilities (which usually need approval).
-- **Major** when settings change in a way teams must act on, such as a new required setting.
+- **Minor** for new abilities (which wait for an admin).
+- **Major** when settings change in a way teams must act on.
