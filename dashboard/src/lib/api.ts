@@ -467,12 +467,12 @@ export const api = {
   // Usage
   getUsage: () => request<UsageInfo>("/api/usage"),
 
-  // Token Limit
-  getBudget: () => request<{ max_tokens: number }>("/api/settings/budget"),
-  updateBudget: (max_tokens: number) =>
+  // Token limits: three monthly limits, each optional.
+  getBudget: () => request<BudgetInfo>("/api/settings/budget"),
+  updateBudget: (limits: TokenLimitsInput) =>
     request<void>("/api/settings/budget", {
       method: "PUT",
-      body: JSON.stringify({ max_tokens }),
+      body: JSON.stringify(limits),
     }),
 
   // Model Provider
@@ -1666,13 +1666,51 @@ export interface UsageInfo {
   cache_write_tokens?: number;
   /** Read from cache ÷ (read from cache + written to cache + new input). */
   cache_hit_rate?: number;
-  /** What the limit compares with max_tokens today. */
+  /** New input + output: what the new tokens limit counts. */
+  new_tokens?: number;
+  /** Each limit that is set, with what it counts this month. */
+  limits?: TokenLimitUse[];
+  /** True while the team still has the old single limit. */
+  limits_legacy?: boolean;
+  /** Old single limit only: what it compares with max_tokens. */
   counted_tokens?: number;
-  /** False while the limit still counts new input and output only. */
+  /** Old single limit only: whether it counts cache tokens too. */
   limit_counts_cache?: boolean;
   features?: FeatureUsage[];
   total_runs: number;
+  /** The old single limit (0 once the three limits are saved). */
   max_tokens: number;
+}
+
+/**
+ * Which tokens a limit counts: new input + output, cache reads, cache writes,
+ * or (an old single limit that counts cache too) all four kinds.
+ */
+export type TokenLimitKind = "new_tokens" | "cache_read" | "cache_write" | "all_tokens";
+
+export interface TokenLimitUse {
+  kind: TokenLimitKind;
+  /** The monthly limit, in tokens. */
+  max: number;
+  /** What it counts so far this month. */
+  used: number;
+}
+
+/** The three monthly limits; null (or 0) means no limit of that kind. */
+export interface TokenLimitsInput {
+  max_new_tokens: number | null;
+  max_cache_read_tokens: number | null;
+  max_cache_write_tokens: number | null;
+}
+
+/** GET /api/settings/budget: each limit (0 = none), plus the old single limit. */
+export interface BudgetInfo {
+  max_new_tokens: number;
+  max_cache_read_tokens: number;
+  max_cache_write_tokens: number;
+  legacy: boolean;
+  max_tokens: number;
+  limit_counts_cache: boolean;
 }
 
 export interface ModelProviderConfig {

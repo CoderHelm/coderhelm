@@ -1,19 +1,37 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api, type UsageInfo } from "@/lib/api";
+import { api, type TokenLimitKind, type TokenLimitsInput, type UsageInfo } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
 import { Callout } from "@/components/callout";
 import { StatusPill } from "@/components/status-pill";
 import { Skeleton } from "@/components/skeleton";
+import { Field } from "@/components/field";
+import { TokenMeters } from "@/components/token-meters";
 import { inputClass, primaryButton, secondaryButton } from "@/components/ui";
-import { cacheHitRate, FEATURE_LABELS, formatTokens, USAGE_CHANGED, usageBreakdown, usageParts, usageTone, usageTotal } from "@/lib/usage";
+import { cacheHitRate, FEATURE_LABELS, formatTokens, LIMIT_HELP, LIMIT_LABELS, limitsTone, USAGE_CHANGED, usageBreakdown, usageLimits, usageParts, usageTotal } from "@/lib/usage";
 import { hasRole } from "@/lib/roles";
 import { Page, PageHeader } from "@/components/page";
 
-// Who may change the limit. The gateway checks the same role on save.
+// Who may change the limits. The gateway checks the same role on save.
 const EDIT_ROLE = "admin" as const;
+
+/** The three limits a team sets, the body field each saves to, and its input id. */
+type SetKind = Exclude<TokenLimitKind, "all_tokens">;
+const LIMITS: { kind: SetKind; field: keyof TokenLimitsInput; id: string }[] = [
+  { kind: "new_tokens", field: "max_new_tokens", id: "limit-new-tokens" },
+  { kind: "cache_read", field: "max_cache_read_tokens", id: "limit-cache-read" },
+  { kind: "cache_write", field: "max_cache_write_tokens", id: "limit-cache-write" },
+];
+
+const FIELD_LABELS: Record<SetKind, string> = {
+  new_tokens: "New tokens (input + output)",
+  cache_read: "Cache read tokens",
+  cache_write: "Cache write tokens",
+};
+
+type Drafts = Record<SetKind, string>;
 
 export default function TokenLimitPageGuarded() {
   return (
@@ -25,39 +43,70 @@ export default function TokenLimitPageGuarded() {
 
 type Load = { state: "loading" } | { state: "error" } | { state: "ready"; usage: UsageInfo; canEdit: boolean };
 
+/** Millions of tokens as typed, from a limit in tokens ("" = no limit). */
+function draftsFrom(usage: UsageInfo): Drafts {
+  const limits = usageLimits(usage);
+  const of = (kind: SetKind) => {
+    const max = limits.find((l) => l.kind === kind)?.max ?? 0;
+    return max > 0 ? String(max / 1_000_000) : "";
+  };
+  return { new_tokens: of("new_tokens"), cache_read: of("cache_read"), cache_write: of("cache_write") };
+}
+
+/** A typed value in tokens: null = no limit, NaN = not a number of 0 or more. */
+function parseDraft(v: string): number | null {
+  if (v.trim() === "") return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0) return NaN;
+  const tokens = Math.round(n * 1_000_000);
+  return tokens > 0 ? tokens : null;
+}
+
 function TokenLimitPage() {
   const [load, setLoad] = useState<Load>({ state: "loading" });
-  const [value, setValue] = useState("");
+  const [drafts, setDrafts] = useState<Drafts>({ new_tokens: "", cache_read: "", cache_write: "" });
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
   const fetchAll = useCallback(() => {
     setLoad({ state: "loading" });
-    // Usage carries the stored limit too, so one read gives both numbers.
+    // Usage carries the stored limits too, so one read gives both.
     Promise.all([api.getUsage(), api.me()])
       .then(([usage, me]) => {
         setLoad({ state: "ready", usage, canEdit: hasRole(me.role, EDIT_ROLE) });
-        setValue(usage.max_tokens > 0 ? String(usage.max_tokens / 1_000_000) : "");
+        setDrafts(draftsFrom(usage));
       })
       .catch(() => setLoad({ state: "error" }));
   }, []);
 
   useEffect(fetchAll, [fetchAll]);
 
-  const parsed = value.trim() === "" ? 0 : Number(value);
-  const invalid = !Number.isFinite(parsed) || parsed < 0;
-  const tokens = invalid ? 0 : Math.round(parsed * 1_000_000);
+  const parsed = Object.fromEntries(LIMITS.map((l) => [l.kind, parseDraft(drafts[l.kind])])) as Record<SetKind, number | null>;
+  const invalid = LIMITS.some((l) => Number.isNaN(parsed[l.kind]));
+  // An old single limit that counts every kind of token: saving replaces it.
+  const allTokens = load.state === "ready" ? usageLimits(load.usage).find((l) => l.kind === "all_tokens") : undefined;
 
   const handleSave = async () => {
     if (load.state !== "ready" || invalid) return;
     setSaving(true);
+    const body: TokenLimitsInput = {
+      max_new_tokens: parsed.new_tokens,
+      max_cache_read_tokens: parsed.cache_read,
+      max_cache_write_tokens: parsed.cache_write,
+    };
     try {
-      await api.updateBudget(tokens);
-      setLoad({ ...load, usage: { ...load.usage, max_tokens: tokens } });
+      await api.updateBudget(body);
+      // Re-read so the meters show each limit against what it counts.
+      const usage = await api.getUsage().catch(() => null);
+      if (usage) {
+        setLoad({ ...load, usage });
+        setDrafts(draftsFrom(usage));
+      }
       window.dispatchEvent(new Event(USAGE_CHANGED));
-      toast(tokens > 0 ? `Token limit set to ${formatTokens(tokens)} a month` : "Token limit removed");
+      const set = LIMITS.filter((l) => parsed[l.kind] != null).length;
+      toast(set > 0 ? `Token limits saved: ${set} of 3 set` : "Token limits removed");
     } catch (e) {
-      toast(e instanceof Error && e.message ? `Could not save: ${e.message}` : "Could not save the token limit", "error");
+      toast(e instanceof Error && e.message ? `Could not save: ${e.message}` : "Could not save the token limits", "error");
     } finally {
       setSaving(false);
     }
@@ -66,7 +115,10 @@ function TokenLimitPage() {
   return (
     <Page>
       <div className="mb-6">
-        <PageHeader title="Token limit" lead="A monthly cap on the tokens your team uses. When the team reaches it, new runs pause until the next month starts." />
+        <PageHeader
+          title="Token limit"
+          lead="Monthly caps on the tokens your team uses: one for new tokens, one for cache reads and one for cache writes. When any limit is reached, new runs pause until the next month starts."
+        />
       </div>
 
       {load.state === "loading" && (
@@ -92,41 +144,57 @@ function TokenLimitPage() {
           <UsageCard usage={load.usage} />
 
           <section aria-labelledby="limit-heading" className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
-            <h2 id="limit-heading" className="text-sm font-semibold text-zinc-100">Monthly limit</h2>
+            <h2 id="limit-heading" className="text-sm font-semibold text-zinc-100">Monthly limits</h2>
+            <p className="mt-1 text-sm text-zinc-400">Each limit is checked on its own. Leave one empty for no limit of that kind.</p>
+            {allTokens && (
+              <div className="mt-3">
+                <Callout variant="info" live={false} title={`Current limit: ${formatTokens(allTokens.max)} tokens of every kind`}>
+                  <p>Your team has one limit that counts new tokens, cache reads and cache writes together. It stays in place until you save the limits below, which replace it.</p>
+                </Callout>
+              </div>
+            )}
             {load.canEdit ? (
               <form
-                className="mt-3 space-y-3"
+                className="mt-4 space-y-5"
                 onSubmit={(e) => {
                   e.preventDefault();
                   handleSave();
                 }}
               >
-                <label htmlFor="token-limit" className="block text-sm text-zinc-300">
-                  Millions of tokens a month
-                </label>
-                <div className="relative">
-                  <input
-                    id="token-limit"
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    step="0.5"
-                    placeholder="No limit"
-                    value={value}
-                    onChange={(e) => setValue(e.target.value)}
-                    aria-describedby="token-limit-help"
-                    aria-invalid={invalid || undefined}
-                    className={`${inputClass} pr-28`}
-                  />
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">M tokens</span>
-                </div>
-                <p id="token-limit-help" className={`text-xs ${invalid ? "text-red-400" : "text-zinc-500"}`}>
-                  {invalid
-                    ? "Enter a number of 0 or more."
-                    : tokens > 0
-                      ? `Runs pause after ${formatTokens(tokens)} tokens in a month.`
-                      : "Leave empty or enter 0 for no limit."}
-                </p>
+                {LIMITS.map((l) => {
+                  const v = parsed[l.kind];
+                  return (
+                    <Field
+                      key={l.kind}
+                      id={l.id}
+                      label={FIELD_LABELS[l.kind]}
+                      helper={
+                        <>
+                          {LIMIT_HELP[l.kind]}{" "}
+                          {v != null && !Number.isNaN(v) ? `Runs pause after ${formatTokens(v)} in a month.` : "Empty means no limit."}
+                        </>
+                      }
+                      error={Number.isNaN(v) ? "Enter a number of 0 or more." : undefined}
+                    >
+                      {(props) => (
+                        <div className="relative">
+                          <input
+                            {...props}
+                            type="number"
+                            inputMode="decimal"
+                            min="0"
+                            step="0.5"
+                            placeholder="No limit"
+                            value={drafts[l.kind]}
+                            onChange={(e) => setDrafts((d) => ({ ...d, [l.kind]: e.target.value }))}
+                            className={`${inputClass} pr-28`}
+                          />
+                          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">M tokens</span>
+                        </div>
+                      )}
+                    </Field>
+                  );
+                })}
                 <div className="flex justify-end pt-1">
                   <button type="submit" disabled={saving || invalid} className={primaryButton}>
                     {saving ? "Saving..." : "Save"}
@@ -135,11 +203,19 @@ function TokenLimitPage() {
               </form>
             ) : (
               <div className="mt-3 space-y-3">
-                <p className="text-2xl font-semibold text-zinc-100">
-                  {load.usage.max_tokens > 0 ? `${formatTokens(load.usage.max_tokens)} tokens a month` : "No limit"}
-                </p>
+                <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Monthly limits">
+                  {LIMITS.map((l) => {
+                    const max = usageLimits(load.usage).find((u) => u.kind === l.kind)?.max ?? 0;
+                    return (
+                      <div key={l.kind} data-testid={`limit-${l.kind}`}>
+                        <dt className="text-xs text-zinc-500">{LIMIT_LABELS[l.kind]}</dt>
+                        <dd className="mt-0.5 text-lg font-semibold text-zinc-100">{max > 0 ? `${formatTokens(max)} a month` : "No limit"}</dd>
+                      </div>
+                    );
+                  })}
+                </dl>
                 <Callout variant="info" live={false}>
-                  <p>Only admins and the owner can change the limit.</p>
+                  <p>Only admins and the owner can change the limits.</p>
                 </Callout>
               </div>
             )}
@@ -151,44 +227,34 @@ function TokenLimitPage() {
 }
 
 function UsageCard({ usage }: { usage: UsageInfo }) {
-  const limit = usage.max_tokens;
+  const limits = usageLimits(usage);
   // All four parts: new input, read from cache, written to cache, output.
   const used = usageTotal(usage);
   const parts = usageParts(usage);
   const hitRate = Math.round(cacheHitRate(usage) * 100);
   const features = (usage.features ?? []).filter((f) => f.total_tokens > 0);
-  const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
-  const tone = usageTone(used, limit);
-  const bar = tone === "error" ? "bg-red-500" : tone === "warning" ? "bg-amber-500" : "bg-emerald-500";
+  const tone = limitsTone(limits);
   const month = new Date(`${usage.month}-01T00:00:00Z`).toLocaleString(undefined, { month: "long", year: "numeric", timeZone: "UTC" });
 
   return (
     <section aria-labelledby="usage-heading" className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="usage-heading" className="text-sm font-semibold text-zinc-100">Used in {month}</h2>
-        {limit > 0 && (
-          <StatusPill tone={tone}>{tone === "error" ? "Limit reached" : tone === "warning" ? "Near the limit" : "Under the limit"}</StatusPill>
+        {limits.length > 0 && (
+          <StatusPill tone={tone}>{tone === "error" ? "Limit reached" : tone === "warning" ? "Near a limit" : "Under the limits"}</StatusPill>
         )}
       </div>
       <p className="mt-2 text-2xl font-semibold text-zinc-100">
         {formatTokens(used)}
-        <span className="text-sm font-normal text-zinc-400"> {limit > 0 ? `of ${formatTokens(limit)} tokens` : "tokens, no limit set"}</span>
+        <span className="text-sm font-normal text-zinc-400"> {limits.length > 0 ? "tokens in all" : "tokens, no limit set"}</span>
       </p>
-      {limit > 0 && (
-        <div
-          role="progressbar"
-          aria-label="Share of the monthly limit used"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={pct}
-          className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-800"
-        >
-          <div className={`h-full rounded-full ${bar}`} style={{ width: `${pct}%` }} />
+      {limits.length > 0 && (
+        <div className="mt-3">
+          <TokenMeters limits={limits} testId="usage-limits" />
         </div>
       )}
       <p className="mt-2 text-xs text-zinc-500">
         {usage.total_runs.toLocaleString()} {usage.total_runs === 1 ? "run" : "runs"} this month
-        {limit > 0 ? ` · ${pct}% of the limit` : ""}
       </p>
 
       <dl aria-label="Tokens by kind" className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-zinc-800 pt-4 sm:grid-cols-4">
@@ -220,13 +286,6 @@ function UsageCard({ usage }: { usage: UsageInfo }) {
             ))}
           </ul>
         </div>
-      )}
-
-      {limit > 0 && usage.limit_counts_cache === false && (
-        <p className="mt-4 text-xs text-zinc-500" data-testid="limit-rule">
-          Runs pause when new input and output reach the limit ({formatTokens(usage.counted_tokens ?? usage.tokens_in + usage.tokens_out)} so far).
-          Tokens read from or written to the cache are shown above but not counted toward it yet.
-        </p>
       )}
     </section>
   );

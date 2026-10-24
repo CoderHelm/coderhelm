@@ -6,7 +6,8 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { api, type UsageInfo, type Banner, type TeamInfo } from "@/lib/api";
 import { pushToDataLayer } from "@/lib/gtm";
 import { BETA_SIGNUPS_CHANGED } from "@/lib/admin";
-import { formatTokens, USAGE_CHANGED, usageBreakdown, usageTotal } from "@/lib/usage";
+import { formatTokens, limitName, reachedLimit, USAGE_CHANGED, usageBreakdown, usageLimits } from "@/lib/usage";
+import { TokenMeters } from "@/components/token-meters";
 import { ToastProvider } from "./toast";
 import { SupportViewBanner } from "./support-access";
 import { ScrollFade } from "./scroll-fade";
@@ -461,16 +462,21 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
           ))}
-          {usage && usage.max_tokens > 0 && (usage.counted_tokens ?? usage.total_tokens) >= usage.max_tokens && !dismissedBanners.has("token-limit-banner") && (
+          {(() => {
+            // Whichever limit is reached first stops new work; the banner names it.
+            const hit = usage ? reachedLimit(usage) : undefined;
+            if (!hit || dismissedBanners.has("token-limit-banner")) return null;
+            const name = limitName(hit.kind);
+            return (
               <div role="alert" className="bg-red-900/90 border-b-2 border-red-500 px-4 md:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="text-red-300 text-xl" aria-hidden="true">⚠</span>
                   <div>
                     <p className="text-sm font-bold text-red-100">
-                      Token limit reached — all runs are paused
+                      {hit.kind === "all_tokens" ? "Token limit reached" : `${name.charAt(0).toUpperCase()}${name.slice(1)} limit reached`} — all runs are paused
                     </p>
                     <p className="text-xs text-red-300 mt-0.5">
-                      You&apos;ve used {formatTokens(usageTotal(usage))} of your {formatTokens(usage.max_tokens)} token limit this month.{" "}
+                      You&apos;ve used {formatTokens(hit.used)} of your {formatTokens(hit.max)} {name} limit this month.{" "}
                       {user?.role === "owner" ? "Raise the limit or wait for next month." : "Ask the team owner to raise the limit, or wait for next month."}
                     </p>
                   </div>
@@ -482,7 +488,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                   {user?.role === "owner" ? "Raise the limit" : "See usage"}
                 </Link>
               </div>
-          )}
+            );
+          })()}
           <main className="flex-1 p-4 md:p-8">{children}</main>
         </div>
       </div>
@@ -757,45 +764,12 @@ function Sidebar({
         </Link>
       </div>
 
-      {/* Tokens remaining */}
-      {usage && usage.max_tokens > 0 && (() => {
-        // All four parts: new input, read from cache, written to cache, output.
-        const used = usageTotal(usage);
-        return (
-          <div className="mx-2 mt-3 pt-3 border-t border-zinc-800/60 shrink-0" data-testid="sidebar-token-meter">
-            <div
-              className="flex items-center justify-between text-xs"
-              title={`${usageBreakdown(usage)} · Limit ${formatTokens(usage.max_tokens)}`}
-            >
-              <span className="text-zinc-500">Tokens used</span>
-              <span
-                data-testid="sidebar-token-meter-value"
-                className={`font-medium ${
-                  used >= usage.max_tokens
-                    ? "text-red-400"
-                    : used >= usage.max_tokens * 0.8
-                      ? "text-yellow-400"
-                      : "text-zinc-300"
-                }`}
-              >
-                {formatTokens(used)} / {formatTokens(usage.max_tokens)}
-              </span>
-            </div>
-            <div className="mt-1.5 h-1 bg-zinc-800 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  used >= usage.max_tokens
-                    ? "bg-red-500"
-                    : used >= usage.max_tokens * 0.8
-                      ? "bg-yellow-500"
-                      : "bg-emerald-500"
-                }`}
-                style={{ width: `${Math.min((used / usage.max_tokens) * 100, 100)}%` }}
-              />
-            </div>
-          </div>
-        );
-      })()}
+      {/* One small bar per monthly limit that is set */}
+      {usage && usageLimits(usage).length > 0 && (
+        <div className="mx-2 mt-3 pt-3 border-t border-zinc-800/60 shrink-0" data-testid="sidebar-token-meter" title={usageBreakdown(usage)}>
+          <TokenMeters limits={usageLimits(usage)} compact />
+        </div>
+      )}
 
       {user && (
         <div className="mt-3 pt-3 border-t border-zinc-800/60 shrink-0">

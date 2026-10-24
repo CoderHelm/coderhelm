@@ -29,7 +29,7 @@ interface Backend {
   more: number;
   /** Answer every page API (not the shell) with this status; 0 = normal. */
   allFail: number;
-  usage: { total_tokens: number; max_tokens: number };
+  usage: { total_tokens: number; max_tokens: number; limits?: { kind: string; max: number; used: number }[] };
   banners: unknown[];
 }
 
@@ -248,11 +248,11 @@ test("banners are announced and the dismiss button has a name", async ({ page })
   const errors = watchConsole(page);
   await mockApi(page, {
     banners: [{ id: "b1", message: "Scheduled maintenance tonight.", type: "warning", dismissible: true }],
-    usage: { total_tokens: 2_000_000, max_tokens: 1_000_000 },
+    usage: { total_tokens: 2_000_000, max_tokens: 0, limits: [{ kind: "new_tokens", max: 1_000_000, used: 2_000_000 }] },
   });
   await page.goto("/");
   await expect(page.getByRole("status").filter({ hasText: "Scheduled maintenance tonight." })).toBeVisible();
-  const limit = page.getByRole("alert").filter({ hasText: "Token limit reached" });
+  const limit = page.getByRole("alert").filter({ hasText: "New tokens limit reached" });
   await expect(limit.getByRole("link", { name: "See usage" })).toHaveAttribute("href", /\/settings\/budget/);
   await shot(page, "shell-banners");
   await page.getByRole("button", { name: "Dismiss this message" }).click();
@@ -262,15 +262,37 @@ test("banners are announced and the dismiss button has a name", async ({ page })
 
 test("token limit banner: only the owner is told to raise it; others are told who can", async ({ page }) => {
   const errors = watchConsole(page);
-  const db = await mockApi(page, { role: "member", usage: { total_tokens: 2_000_000, max_tokens: 1_000_000 } });
+  const db = await mockApi(page, {
+    role: "member",
+    usage: {
+      total_tokens: 60_000_000,
+      max_tokens: 0,
+      // Only cache read is over its own limit; the banner names it.
+      limits: [
+        { kind: "new_tokens", max: 20_000_000, used: 1_000_000 },
+        { kind: "cache_read", max: 50_000_000, used: 51_000_000 },
+      ],
+    },
+  });
   await page.goto("/");
-  const limit = page.getByRole("alert").filter({ hasText: "Token limit reached" });
+  const limit = page.getByRole("alert").filter({ hasText: "Cache read limit reached" });
+  await expect(limit).toContainText("51M of your 50M cache read limit");
   await expect(limit.getByText(/Ask the team owner to raise the limit/)).toBeVisible();
   await expect(limit.getByRole("link", { name: "See usage" })).toBeVisible();
   db.role = "owner";
   await page.reload();
   await expect(limit.getByRole("link", { name: "Raise the limit" })).toHaveAttribute("href", /\/settings\/budget/);
   expect(errors).toEqual([]);
+});
+
+test("token limit banner: an older gateway's single limit still shows, and no banner under every limit", async ({ page }) => {
+  const db = await mockApi(page, { usage: { total_tokens: 2_000_000, max_tokens: 1_000_000 } });
+  await page.goto("/");
+  await expect(page.getByRole("alert").filter({ hasText: "limit reached" })).toBeVisible();
+  db.usage = { total_tokens: 2_000_000, max_tokens: 0, limits: [{ kind: "cache_write", max: 9_000_000, used: 2_000_000 }] };
+  await page.reload();
+  await expect(page.getByTestId("sidebar-token-meter")).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "limit reached" })).toHaveCount(0);
 });
 
 test("sign in screen: every field has a name", async ({ page }) => {

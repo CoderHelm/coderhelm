@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, type RunDetail, type Openspec, type UsageInfo, type PluginDef, type PassTrace, type AgentLogPass, errorStatus } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
-import { usageBreakdown, usageTotal } from "@/lib/usage";
+import { limitName, reachedLimit, usageBreakdown, usageTotal } from "@/lib/usage";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Callout } from "@/components/callout";
@@ -356,9 +356,9 @@ function RunDetailInner() {
   useEffect(() => { api.me().then((u) => setRole(u.role)).catch(() => {}); }, []);
   // Only the catalog is needed: it turns the run's server ids into names.
   useEffect(() => { api.getPluginCatalog().then((c) => setCatalog(c.plugins)).catch(() => {}); }, []);
-  const tokensExceeded = usage ? (
-    usage.max_tokens > 0 && usage.total_tokens >= usage.max_tokens
-  ) : false;
+  // Any one monthly limit reached stops new work.
+  const limitHit = usage ? reachedLimit(usage) : undefined;
+  const tokensExceeded = limitHit !== undefined;
   // Retry, review, start over and cancel are member-only on the gateway; a viewer
   // would only ever see them fail. Unknown role (still loading) hides them too.
   const canAct = role != null && (ROLE_LEVEL[role] ?? 0) >= 1;
@@ -509,7 +509,7 @@ function RunDetailInner() {
   const closeInMenu = closable && !closeAsButton;
   // The PR the dialog offers to close as well: open, so not merged or closed already.
   const openPrs = run.pr_number && run.status !== "merged" ? [...new Set([run.pr_number, ...(run.pr_numbers ?? [])])] : [];
-  const limitTitle = tokensExceeded ? "The monthly token limit is reached" : undefined;
+  const limitTitle = limitHit ? `The monthly ${limitName(limitHit.kind)} limit is reached` : undefined;
 
   const retry = async () => {
     setBusy("retry");

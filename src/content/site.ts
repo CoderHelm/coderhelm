@@ -21,7 +21,7 @@ export const SITE = {
     "CoderHelm is an AI coding agent for GitHub and Jira. Assign it an issue or a ticket and it opens a pull request in your repository, then it stays on the code: it answers review comments, fixes its own failing CI, reviews your team's pull requests and turns production alerts into fixes that a person approves.",
   llmsDetails: [
     "Status: closed beta. Sign in at https://app.coderhelm.com; new accounts are admitted from a waitlist.",
-    "Models: Claude, through the team's own Anthropic API key. Admins can set a monthly token limit.",
+    "Models: Claude, through the team's own Anthropic API key. Admins can set monthly token limits: one for new tokens, one for cache reads and one for cache writes.",
     "Works with: GitHub (GitHub App), Jira (Forge app), Microsoft Teams, AWS (CloudWatch alarms through SNS, CloudWatch Logs, PostgreSQL, Redshift), GraphQL APIs, Playwright, JUnit and Cucumber reports, and 17 MCP servers.",
     "Starts a run when: a GitHub issue is assigned to CoderHelm, gets the `coderhelm` label, or gets a `/coderhelm` or `@coderhelm` comment; a Jira ticket is assigned to CoderHelm or gets the `coderhelm` label.",
     "Reviews any pull request that gets the review label (`ch-review` by default) once a repository turns the reviewer on.",
