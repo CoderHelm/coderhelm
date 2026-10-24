@@ -463,6 +463,10 @@ export const runsData: Handler = ({ method, path, url }) => {
 
   // Analytics
   if (path === "/api/analytics") return analytics(url);
+  if (path === "/api/stats") {
+    const stats = (n: number) => ({ total_runs: n, completed: n, failed: n, in_progress: n, total_cost_usd: n * 1000, total_tokens_in: n * 1e6, total_tokens_out: n * 1e6, merge_rate: 0.5, estimated_calls: n, recovered_calls: n });
+    return { month: stats(1234567), all_time: stats(98765432) };
+  }
 
   // Code graph
   if (path === "/api/graph/repos") return { repos: GRAPH_REPOS };
@@ -503,6 +507,9 @@ export const runsData: Handler = ({ method, path, url }) => {
   if (adminTicket) return adminTicketDetail(decodeURIComponent(adminTicket[1]));
   if (path === "/api/admin/dlq") {
     return { messages: DLQ.map((m) => ({ ...m, team_id: "TEAM#your-team", global: false, shared_only: false })), count: 1, unretryable: 1, complete: true };
+  }
+  if (path === "/api/admin/usage-check") {
+    return { state: "ran", checked_at: iso(60), secret: `coderhelm/prod/${TOKEN}`, day: "2026-10-23", teams: 1234567, flagged_models: 12345, failed_teams: 6789 };
   }
   return undefined;
 };
