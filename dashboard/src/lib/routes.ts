@@ -30,6 +30,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/tests": { label: "Tests" },
   "/tests/run": { label: "Test run", parent: "/tests", detail: true },
   "/tests/test": { label: "Test", parent: "/tests", detail: true },
+  "/logs": { label: "Logs" },
 
   "/releases": { label: "Releases" },
   "/graph": { label: "Code graph" },
