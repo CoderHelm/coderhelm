@@ -29,7 +29,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
     keys: ["repos", "view_integrations", "integrations", "data_sources", "view_alerts", "alerts"],
   },
   { id: "agent", label: "Agent settings", keys: ["agent_settings", "memory", "model_provider"] },
-  { id: "people", label: "People & team", keys: ["view_team", "people", "manage_admins", "team_name"] },
+  { id: "people", label: "People & team", keys: ["view_team", "people", "roles", "manage_admins", "team_name"] },
   { id: "account", label: "Billing & account", keys: ["own_account", "budget", "system", "disconnect", "reset"] },
 ];
 

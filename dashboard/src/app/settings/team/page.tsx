@@ -5,7 +5,9 @@ import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState, typ
 import { api } from "@/lib/api";
 import {
   canManageInvites,
+  customRoleInfo,
   displayName,
+  isCustomRole,
   isInviteExpired,
   shortDate,
   isGithubOnly,
@@ -20,6 +22,7 @@ import {
   type Member,
   type Permissions,
   type RoleInfo,
+  type RolesInfo,
 } from "@/lib/team";
 import { Callout } from "@/components/callout";
 import { StatusPill } from "@/components/status-pill";
@@ -30,6 +33,7 @@ import { CheckIcon, GitHubIcon, MailIcon } from "@/components/icons";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
 import { RolesMatrix } from "@/components/roles-matrix";
+import { CustomRoles } from "@/components/custom-roles";
 
 const ROLE_STYLE: Record<string, string> = {
   owner: "border-amber-500/30 bg-amber-500/10 text-amber-300",
@@ -38,6 +42,8 @@ const ROLE_STYLE: Record<string, string> = {
   billing: "border-zinc-700 bg-zinc-800/60 text-zinc-200",
   viewer: "border-zinc-800 bg-zinc-900 text-zinc-400",
 };
+const CUSTOM_STYLE = "border-violet-500/30 bg-violet-500/10 text-violet-300";
+const roleStyle = (key: string) => (isCustomRole(key) ? CUSTOM_STYLE : (ROLE_STYLE[key] ?? ROLE_STYLE.member));
 
 type StatusFilter = "all" | "active" | "github";
 
@@ -54,6 +60,8 @@ function TeamPage() {
   const { confirm } = useConfirm();
   const [members, setMembers] = useState<Member[] | null>(null);
   const [perms, setPerms] = useState<Permissions | null>(null);
+  const [rolesInfo, setRolesInfo] = useState<RolesInfo | null>(null);
+  const [rolesError, setRolesError] = useState("");
   const [teamName, setTeamName] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
@@ -76,13 +84,24 @@ function TeamPage() {
     }
   }, []);
 
+  // Custom roles load on their own: the people list works without them.
+  const loadRoles = useCallback(async () => {
+    try {
+      setRolesInfo(await teamApi.roles());
+      setRolesError("");
+    } catch (e) {
+      setRolesError(e instanceof Error ? e.message : "The request failed.");
+    }
+  }, []);
+
   useEffect(() => {
     load();
+    loadRoles();
     api
       .listTeams()
       .then((t) => setTeamName(t.teams.find((x) => x.current)?.org ?? ""))
       .catch(() => {});
-  }, [load]);
+  }, [load, loadRoles]);
 
   const role = perms?.your_role ?? "viewer";
   const isOwner = role === "owner";
@@ -90,8 +109,10 @@ function TeamPage() {
   // Invites are not seats: an admin may resend or revoke every pending invite,
   // including one that offers the admin role.
   const canInvites = canManageInvites(perms);
-  const roleInfo = useCallback((key: string) => perms?.roles.find((r) => r.key === key), [perms]);
-  const roleLabel = (key: string) => roleInfo(key)?.label ?? key;
+  // Built-in roles, then the team's custom roles, as role options.
+  const allRoles = useMemo<RoleInfo[]>(() => [...(perms?.roles ?? []), ...(rolesInfo?.roles ?? []).map(customRoleInfo)], [perms, rolesInfo]);
+  const roleInfo = useCallback((key: string) => allRoles.find((r) => r.key === key), [allRoles]);
+  const roleLabel = (key: string) => roleInfo(key)?.label ?? (isCustomRole(key) ? "Custom role" : key);
 
   const active = useMemo(() => (members ?? []).filter((m) => m.status === "active"), [members]);
   const invites = useMemo(() => (members ?? []).filter((m) => m.status === "invited"), [members]);
@@ -126,6 +147,8 @@ function TeamPage() {
       await teamApi.setRole(m.user_id, next);
       setMembers((prev) => prev?.map((x) => (x.user_id === m.user_id ? { ...x, role: next } : x)) ?? null);
       toast(`${displayName(m)} is now ${articled(info?.label ?? next)}`);
+      // Custom roles show how many people hold them.
+      if (isCustomRole(next) || isCustomRole(m.role)) loadRoles();
     } catch (e) {
       toast(errorText(e), "error");
     } finally {
@@ -223,7 +246,7 @@ function TeamPage() {
 
       {canManagePeople && perms && (
         <InviteForm
-          roles={perms.roles.filter((r) => perms.grantable_roles.includes(r.key) && r.key !== "owner")}
+          roles={allRoles.filter((r) => perms.grantable_roles.includes(r.key) && r.key !== "owner")}
           onInvited={async (email, status) => {
             toast(status === "active" ? `${email} already had an account and is now on the team` : `Invite sent to ${email}`);
             await load();
@@ -277,6 +300,9 @@ function TeamPage() {
                     .reverse()
                     .filter((r) => r.assignable || active.some((m) => m.role === r.key))
                     .map((r) => ({ value: r.key, label: r.label, count: active.filter((m) => m.role === r.key).length })),
+                  ...(rolesInfo?.roles ?? [])
+                    .filter((r) => active.some((m) => m.role === r.key))
+                    .map((r) => ({ value: r.key, label: r.name, count: active.filter((m) => m.role === r.key).length })),
                 ],
               }}
               actions={
@@ -303,6 +329,7 @@ function TeamPage() {
                   key={m.user_id}
                   m={m}
                   perms={perms}
+                  roles={allRoles}
                   manageable={canManage(m)}
                   lastOwner={isLastOwner(m)}
                   busy={busy === m.user_id}
@@ -375,6 +402,20 @@ function TeamPage() {
       )}
 
       {perms && <RolesMatrix perms={perms} inUse={new Set(active.map((m) => m.role))} />}
+      {perms && (
+        <CustomRoles
+          perms={perms}
+          info={rolesInfo}
+          error={rolesError}
+          onRetry={() => {
+            setRolesError("");
+            loadRoles();
+          }}
+          onChanged={async () => {
+            await Promise.all([load(), loadRoles()]);
+          }}
+        />
+      )}
 
       {linking && members && (
         <LinkDialog
@@ -440,7 +481,7 @@ function Avatar({ m, size = 40 }: { m: Member; size?: number }) {
 
 function RoleChip({ role, label }: { role: string; label: string }) {
   return (
-    <span className={`inline-flex min-h-8 items-center rounded-lg border px-2.5 text-xs font-medium ${ROLE_STYLE[role] ?? ROLE_STYLE.member}`}>{label}</span>
+    <span className={`inline-flex min-h-8 items-center rounded-lg border px-2.5 text-xs font-medium ${roleStyle(role)}`}>{label}</span>
   );
 }
 
@@ -464,6 +505,7 @@ function GithubLink({ login }: { login: string }) {
 function MemberRow({
   m,
   perms,
+  roles,
   manageable,
   lastOwner,
   busy,
@@ -475,6 +517,7 @@ function MemberRow({
 }: {
   m: Member;
   perms: Permissions | null;
+  roles: RoleInfo[];
   manageable: boolean;
   lastOwner: boolean;
   busy: boolean;
@@ -488,7 +531,7 @@ function MemberRow({
   const seen = relativeTime(m.last_active_at);
   const grantable = perms?.grantable_roles ?? [];
   // The current role stays selectable even when it isn't grantable (e.g. billing).
-  const options = (perms?.roles ?? []).filter((r) => r.key === m.role || (r.assignable && grantable.includes(r.key)));
+  const options = roles.filter((r) => r.key === m.role || (r.assignable && grantable.includes(r.key)));
   const name = displayName(m);
   const actions: { label: string; onSelect: () => void; danger?: boolean; disabledReason?: string }[] = [];
   if (manageable && linkable) {
@@ -532,7 +575,7 @@ function MemberRow({
                 value={m.role}
                 disabled={busy}
                 onChange={(e) => onRole(e.target.value)}
-                className={`min-h-8 cursor-pointer appearance-none rounded-lg border py-1 pl-2.5 pr-7 text-xs font-medium disabled:opacity-50 ${ROLE_STYLE[m.role] ?? ROLE_STYLE.member} ${focusRing}`}
+                className={`min-h-8 cursor-pointer appearance-none rounded-lg border py-1 pl-2.5 pr-7 text-xs font-medium disabled:opacity-50 ${roleStyle(m.role)} ${focusRing}`}
               >
                 {options.map((r) => (
                   <option key={r.key} value={r.key} className="bg-zinc-900 text-zinc-100">

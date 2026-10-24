@@ -67,6 +67,66 @@ export interface Permissions {
   manageable_roles: string[];
   /** Resend or revoke any pending invite, whatever role it offers. */
   can_manage_invites?: boolean;
+  /** Built-in admins and owners only: create, change, delete and give out custom roles. */
+  can_manage_roles?: boolean;
+  /** For a custom role: the built-in role your requests run as outside its capabilities. */
+  acts_as?: string;
+  your_custom_role?: { id: string; name: string } | null;
+  /** The capability keys you hold. */
+  your_capabilities?: string[];
+}
+
+/** A team's own role, made by its admins from the capabilities above. */
+export interface CustomRole {
+  id: string;
+  /** What a member record holds: `custom:<id>`. */
+  key: string;
+  name: string;
+  description: string;
+  /** Capability keys it holds now, the baseline included. */
+  capabilities: string[];
+  acts_as: string;
+  template: string | null;
+  member_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** GET /api/roles: the team's custom roles and what the editor may offer. */
+export interface RolesInfo {
+  roles: CustomRole[];
+  can_manage: boolean;
+  max_roles: number;
+  /** Capabilities a custom role may hold (owner-only ones and role management are left out). */
+  customizable: string[];
+  /** Everyone has these; every role includes them. */
+  baseline: string[];
+  /** What you hold: you can't put more into a role. */
+  yours: string[];
+  /** A built-in role's capabilities, to start a role from. */
+  templates: Record<string, string[]>;
+}
+
+export interface RoleChange {
+  at: string;
+  actor: string;
+  action: "created" | "updated" | "deleted" | "assigned" | string;
+  role_id: string;
+  role_name: string;
+  detail: string;
+}
+
+export interface RoleInput {
+  name: string;
+  description: string;
+  capabilities: string[];
+  template?: string | null;
+}
+
+export const CUSTOM_PREFIX = "custom:";
+
+export function isCustomRole(key: string | null | undefined): boolean {
+  return !!key && key.startsWith(CUSTOM_PREFIX);
 }
 
 export const teamApi = {
@@ -87,6 +147,16 @@ export const teamApi = {
     request<{ status: string; invited_at?: string; invite_expires_at?: string }>(`/api/users/${encodeURIComponent(userId)}/resend`, {
       method: "POST",
     }),
+  roles: () => request<RolesInfo>("/api/roles"),
+  roleChanges: () => request<{ entries: RoleChange[] }>("/api/roles/audit"),
+  createRole: (input: RoleInput) => request<{ role: CustomRole }>("/api/roles", { method: "POST", body: JSON.stringify(input) }),
+  updateRole: (id: string, input: Partial<RoleInput>) =>
+    request<{ role: CustomRole; changed: boolean }>(`/api/roles/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) }),
+  deleteRole: (id: string, replacement?: string) =>
+    request<{ status: string; moved: number; replacement: string | null }>(
+      `/api/roles/${encodeURIComponent(id)}${replacement ? `?replacement=${encodeURIComponent(replacement)}` : ""}`,
+      { method: "DELETE" },
+    ),
   linkGithub: (userId: string, githubUserId: string) =>
     request<{ status: string; user_id: string; github_login: string; role: string }>(
       `/api/users/${encodeURIComponent(userId)}/link-github`,
@@ -134,6 +204,11 @@ export function isGithubOnly(m: Member): boolean {
 /** Email members a GitHub sign-in could be linked into. */
 export function isLinkTarget(m: Member): boolean {
   return m.status === "active" && !!m.email && !m.github_id && !m.github_login;
+}
+
+/** A custom role as a role option: in selectors, chips and the invite form. */
+export function customRoleInfo(r: CustomRole): RoleInfo {
+  return { key: r.key, label: r.name, level: 0, summary: r.description || "A custom role for this team.", assignable: true };
 }
 
 /** Roles a capability list is cumulative over, lowest first (assignable ones). */
