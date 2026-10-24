@@ -54,7 +54,7 @@ export function BaseForm({
         <input className={inputClass} value={v.name} maxLength={80} onChange={(e) => setV({ ...v, name: e.target.value })} placeholder="HR handbook" required />
       </label>
       <label className="block">
-        <span className="mb-1 block text-xs font-medium text-zinc-400">What's in it</span>
+        <span className="mb-1 block text-xs font-medium text-zinc-400">What&apos;s in it</span>
         <textarea
           className={inputClass}
           rows={2}
