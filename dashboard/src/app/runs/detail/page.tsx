@@ -739,7 +739,7 @@ function RunDetailInner() {
 
       {/* Stats cards */}
       {/* Tokens: the total of all four parts, then each part. */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6" title={usageBreakdown(usageOf(run))}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 mb-6" title={usageBreakdown(usageOf(run))}>
         <StatCard label="Duration" value={formatDuration(run.duration_s)} />
         <StatCard label="Total tokens" value={formatTokens(usageTotal(usageOf(run)))} />
         <StatCard label="New input" value={formatTokens(run.tokens_in)} />

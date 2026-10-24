@@ -294,7 +294,7 @@ export function SettingsView({
                     <li key={r.name}>
                       <label className="flex min-w-0 items-center gap-2.5 text-sm text-zinc-200">
                         <input type="checkbox" checked={draft.repos.includes(r.name)} onChange={() => toggleRepo(r.name)} className="h-4 w-4 accent-emerald-500" />
-                        <span className="break-all">{r.name}</span>
+                        <span className="wrap-anywhere">{r.name}</span>
                       </label>
                     </li>
                   ))}

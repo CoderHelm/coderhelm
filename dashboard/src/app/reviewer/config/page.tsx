@@ -483,7 +483,7 @@ function ReviewerConfigPage() {
             {/* What the reviewer does here, in plain words. */}
             <section aria-labelledby="rc-summary" className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4" data-testid="reviewer-summary">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 id="rc-summary" className="min-w-0 break-all text-sm font-semibold text-zinc-100">On {repo}</h2>
+                <h2 id="rc-summary" className="min-w-0 wrap-anywhere text-sm font-semibold text-zinc-100">On {repo}</h2>
                 <StatusText look={state} />
               </div>
               <ul className="mt-2 space-y-1 text-sm text-zinc-300">
@@ -779,7 +779,7 @@ function ReviewerConfigPage() {
                                           onChange={() => set("health_log_groups", on ? cfg.health_log_groups.filter((g) => g !== lg) : [...cfg.health_log_groups, lg])}
                                           className="h-4 w-4 shrink-0 accent-white"
                                         />
-                                        <span className="min-w-0 break-all font-mono text-xs">{lg}</span>
+                                        <span className="min-w-0 wrap-anywhere font-mono text-xs">{lg}</span>
                                       </label>
                                     );
                                   })

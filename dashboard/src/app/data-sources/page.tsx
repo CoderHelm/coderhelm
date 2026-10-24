@@ -724,7 +724,7 @@ function SourceRow({
             </span>
             <span
               title={open_ ? undefined : whereLabel(source)}
-              className={`mt-0.5 font-mono text-xs text-zinc-500 ${open_ ? "break-all" : "truncate"}`}
+              className={`mt-0.5 font-mono text-xs text-zinc-500 ${open_ ? "wrap-anywhere" : "truncate"}`}
             >
               {whereLabel(source)}
             </span>

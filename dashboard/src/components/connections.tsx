@@ -369,7 +369,7 @@ export function AwsAbilitiesPanel({
                           set({ airflow_environments: keep });
                         }}
                       />
-                      <span className="break-all font-mono">{env}</span>
+                      <span className="wrap-anywhere font-mono">{env}</span>
                     </label>
                   </li>
                 );

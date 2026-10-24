@@ -36,7 +36,7 @@ export function TestList({
             titleText={testName(t)}
             href={testHref(t.id)}
             meta={[
-              <span key="file" className="break-all font-mono">{t.file}</span>,
+              <span key="file" className="wrap-anywhere font-mono">{t.file}</span>,
               t.cause && t.cause.label !== "unknown" ? CAUSE_LABEL[t.cause.label] : null,
               t.fix_status ? <span key="fix" className="text-zinc-300">{FIX_LABEL[t.fix_status]}</span> : null,
               t.owner ? `Owner ${t.owner}` : null,

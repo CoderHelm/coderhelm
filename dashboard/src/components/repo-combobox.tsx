@@ -92,7 +92,7 @@ export function RepoCombobox({
                     setOpen(false);
                     setSearch("");
                   }}
-                  className={`w-full text-left px-3 py-2 text-sm transition-colors break-all ${focusRing} ${
+                  className={`w-full text-left px-3 py-2 text-sm transition-colors ${focusRing} ${
                     r.name === selected
                       ? "bg-zinc-800 text-zinc-100"
                       : "text-zinc-300 hover:bg-zinc-800/50"

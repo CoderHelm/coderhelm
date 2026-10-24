@@ -80,7 +80,7 @@ export function HiddenFieldsEditor({
               key={name}
               className="inline-flex items-center gap-1 rounded-full border border-zinc-700 bg-zinc-900 pl-3 pr-1 text-sm text-zinc-200"
             >
-              <span className="font-mono text-xs break-all">{name}</span>
+              <span className="font-mono text-xs wrap-anywhere">{name}</span>
               <button
                 type="button"
                 onClick={() => onChange(value.filter((v) => v !== name))}

@@ -124,7 +124,7 @@ function TestDetail() {
         title={testName(test)}
         lead={
           <>
-            <p className="break-all font-mono text-zinc-500">{test.file}</p>
+            <p className="wrap-anywhere font-mono text-zinc-500">{test.file}</p>
             <p className="mt-1 text-zinc-500">
               {test.repo} · {test.framework}
               {test.owner && <> · Owner {test.owner}</>}

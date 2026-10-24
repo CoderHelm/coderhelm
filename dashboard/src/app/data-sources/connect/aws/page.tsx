@@ -504,7 +504,7 @@ function ConnectDbTarget({
         {target.rows.map(([k, v]) => (
           <div key={k} className="grid gap-x-4 gap-y-1 px-5 py-3.5 sm:grid-cols-[150px_minmax(0,1fr)]">
             <dt className="text-sm text-zinc-400">{k}</dt>
-            <dd className="min-w-0 break-all font-mono text-xs text-zinc-100">{v}</dd>
+            <dd className="min-w-0 wrap-anywhere font-mono text-xs text-zinc-100">{v}</dd>
           </div>
         ))}
       </dl>

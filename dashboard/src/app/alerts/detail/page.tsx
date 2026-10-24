@@ -126,7 +126,7 @@ function AlertDetail() {
         <p className="text-zinc-300">{OUTCOMES[a.outcome]?.detail ?? a.outcome}</p>
         <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-xs">
           <dt className="text-zinc-500">Repo</dt>
-          <dd className="break-all text-zinc-300">{a.repo || "—"}</dd>
+          <dd className="wrap-anywhere text-zinc-300">{a.repo || "—"}</dd>
           <dt className="text-zinc-500">Topic</dt>
           <dd className="min-w-0 text-zinc-300">{a.topic_arn ? <Code>{a.topic_arn}</Code> : "—"}</dd>
           <dt className="text-zinc-500">Source</dt>
