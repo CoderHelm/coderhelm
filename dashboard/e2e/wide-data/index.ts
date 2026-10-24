@@ -4,6 +4,7 @@ import { runsData } from "./runs";
 import { reviewData } from "./review";
 import { settingsData } from "./settings";
 import { logsData } from "./logs";
+import { pluginsData } from "./plugins";
 
 // An invented backend whose records are full of long, unbroken strings
 // (long.ts), for the no-sideways-scroll spec. Each file answers one part of
@@ -41,7 +42,7 @@ const base: Handler = ({ method, path }) => {
   return undefined;
 };
 
-const HANDLERS: Handler[] = [base, runsData, reviewData, settingsData, logsData];
+const HANDLERS: Handler[] = [base, runsData, reviewData, settingsData, logsData, pluginsData];
 
 /** Mocks the whole API. Returns the list of GETs no handler answered. */
 export async function mockWideApi(page: Page): Promise<{ unanswered: string[] }> {

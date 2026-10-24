@@ -25,6 +25,9 @@ import { focusRing, inputClass, primaryButton, secondaryButton } from "@/compone
 import { Tabs } from "@/components/tabs";
 import { Page, PageHeader, Section, cardClass } from "@/components/page";
 import { StatusPill } from "@/components/status-pill";
+import { Switch } from "@/components/teams-webhook";
+import { pluginsApi } from "@/lib/plugins";
+import { resetPluginsFlag } from "@/hooks/use-plugins-flag";
 import {
   List,
   ListEmpty,
@@ -514,7 +517,34 @@ function TeamLine({ team: t }: { team: AdminTeam }) {
         <span aria-hidden="true">·</span>
         <span>{planWord(t.plan)}</span>
       </p>
+      <PluginsFlag team={t} />
     </li>
+  );
+}
+
+/** The team's plugins switch: plugins stay hidden and refused for a team until it is on. */
+function PluginsFlag({ team }: { team: AdminTeam }) {
+  const [on, setOn] = useState(!!team.flags?.plugins);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const flip = async (next: boolean) => {
+    setBusy(true);
+    setError("");
+    try {
+      const r = await pluginsApi.setTeamFlag(team.team_id, next);
+      setOn(!!r.flags.plugins);
+      resetPluginsFlag();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't change it.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-zinc-400" data-testid="team-plugins-flag">
+      <Switch checked={on} disabled={busy} label={`Plugins for ${teamName(team)}`} onLabel="Plugins on" offLabel="Plugins off" onChange={flip} />
+      {error && <span role="alert" className="text-red-400">{error}</span>}
+    </div>
   );
 }
 

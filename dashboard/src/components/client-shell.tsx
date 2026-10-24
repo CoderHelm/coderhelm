@@ -9,6 +9,7 @@ import { pushToDataLayer } from "@/lib/gtm";
 import { BETA_SIGNUPS_CHANGED } from "@/lib/admin";
 import { formatTokens, limitName, reachedLimit, USAGE_CHANGED, usageBreakdown, usageLimits } from "@/lib/usage";
 import { TokenMeters } from "@/components/token-meters";
+import { usePluginsFlag } from "@/hooks/use-plugins-flag";
 import { ToastProvider } from "./toast";
 import { SupportViewBanner } from "./support-access";
 import { ScrollFade } from "./scroll-fade";
@@ -51,6 +52,8 @@ interface NavItem {
   superAdminOnly?: boolean;
   /** A number shown beside the label, e.g. new beta sign-ups. */
   countKey?: "betaSignups";
+  /** Shown only while this team flag is on. */
+  flag?: "plugins";
 }
 
 interface NavGroup {
@@ -76,7 +79,17 @@ const navGroups: NavGroup[] = [
     label: "Connections",
     items: [
       { href: "/settings/integrations", label: "Integrations", icon: <PluginIcon />, need: "view_integrations" },
+      { href: "/connections", label: "Connections", icon: <PluginIcon />, need: "view_integrations" },
       { href: "/data-sources", label: "Data sources", icon: <DatabaseIcon />, need: "data_sources" },
+    ],
+  },
+  {
+    // Packages a team installs; hidden until the team's plugins flag is on.
+    label: "Plugins",
+    items: [
+      { href: "/plugins", label: "Plugins", icon: <TemplateIcon />, need: "plugins.view", flag: "plugins" },
+      { href: "/plugins/review", label: "Review", icon: <CircleDotIcon />, need: "plugins.view", flag: "plugins" },
+      { href: "/audit", label: "Audit log", icon: <ShieldIcon />, need: "plugins.audit", flag: "plugins" },
     ],
   },
   {
@@ -123,22 +136,24 @@ function isPlatformAdmin(user: User | null): boolean {
 }
 
 /** The menu items this person can open, by what their role includes. */
-function visibleItems(group: NavGroup, user: User | null): NavItem[] {
+function visibleItems(group: NavGroup, user: User | null, pluginsOn = false): NavItem[] {
   const isSuperAdmin = isPlatformAdmin(user);
   return group.items.filter((item) => {
+    if (item.flag === "plugins" && !pluginsOn) return false;
     if (item.superAdminOnly) return isSuperAdmin;
     return !item.need || can(user, item.need);
   });
 }
 
 /** Every menu page, for the ⌘K palette. */
-function palettePages(user: User | null): PalettePage[] {
-  return navGroups.flatMap((g) => visibleItems(g, user).map((i) => ({ href: i.href, label: i.label, section: g.label })));
+function palettePages(user: User | null, pluginsOn: boolean): PalettePage[] {
+  return navGroups.flatMap((g) => visibleItems(g, user, pluginsOn).map((i) => ({ href: i.href, label: i.label, section: g.label })));
 }
 
 export function ClientShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
+  const pluginsOn = usePluginsFlag() === "on";
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   // New beta sign-ups, for the Admin menu item (platform admin only).
   const [betaNew, setBetaNew] = useState(0);
@@ -369,7 +384,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
     <ConfirmProvider>
-    <CommandPaletteProvider pages={palettePages(user)} user={user}>
+    <CommandPaletteProvider pages={palettePages(user, pluginsOn)} user={user}>
     <TopBarProvider>
       <div className="flex min-h-screen bg-zinc-950">
         {menuOpen && (
@@ -385,7 +400,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           onClick={(e) => { if ((e.target as HTMLElement).closest("a")) setMenuOpen(false); }}
           className={`${menuOpen ? "fixed inset-y-0 left-0 z-50 flex shadow-2xl" : "hidden"} md:contents`}
         >
-          <Sidebar usage={usage} user={user} teams={teams} betaNew={betaNew} />
+          <Sidebar usage={usage} user={user} teams={teams} betaNew={betaNew} pluginsOn={pluginsOn} />
           <button
             type="button"
             onClick={() => setMenuOpen(false)}
@@ -591,12 +606,15 @@ function Sidebar({
   user,
   teams,
   betaNew,
+  pluginsOn,
 }: {
   usage: UsageInfo | null;
   user: User | null;
   teams: TeamInfo[];
   /** New beta sign-ups, shown on the Admin item. */
   betaNew: number;
+  /** The team's plugins flag. */
+  pluginsOn: boolean;
 }) {
   const pathname = usePathname();
   const [switching, setSwitching] = useState(false);
@@ -676,7 +694,7 @@ function Sidebar({
 
       <div className="space-y-4">
         {navGroups.map((group, index) => {
-          const items = visibleItems(group, user);
+          const items = visibleItems(group, user, pluginsOn);
           if (items.length === 0) return null;
 
           return (
