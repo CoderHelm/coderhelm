@@ -5,6 +5,7 @@ import { api, type Integration, type McpServer, type PluginDef } from "@/lib/api
 import { errorMessage } from "@/lib/data-sources";
 import { Field, SecretInput } from "./field";
 import { Disclosure } from "./disclosure";
+import { MarkdownEditor } from "./markdown-editor";
 import { useConfirm } from "./confirm-dialog";
 import { useToast } from "./toast";
 import { inputClass, linkButton, primaryButton, secondaryButton } from "./ui";
@@ -176,7 +177,17 @@ function PluginKeyPanel({ item, onChanged, onClose }: { item: Integration; onCha
       {d.enabled && (
       <Disclosure summary="Instructions agents follow with this server">
         <Field id={`${p.id}-prompt`} label="Instructions">
-          {(props) => <textarea {...props} rows={4} maxLength={4000} className={`${inputClass} font-mono`} value={prompt} onChange={(e) => setPrompt(e.target.value)} />}
+          {(props) => (
+            <MarkdownEditor
+              {...props}
+              variant="instructions"
+              minRows={4}
+              maxLength={4000}
+              value={prompt}
+              onChange={setPrompt}
+              previewNote="Agents get this text as written with the server's tools."
+            />
+          )}
         </Field>
         <p className="mt-2">
           <button type="button" onClick={savePrompt} className={secondaryButton}>
