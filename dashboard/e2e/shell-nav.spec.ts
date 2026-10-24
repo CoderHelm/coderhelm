@@ -11,7 +11,8 @@ const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots"
 
 const LINKS = [
   "Runs", "Reviewer", "Tests", "Releases", "Code Graph", "Plans", "Templates",
-  "Integrations", "Data sources",
+  "Integrations", "Connections", "Data sources",
+  "Plugins", "Review", "Audit log",
   "Analytics", "Infrastructure", "Alerts", "Health", "Memory",
   "Repos", "Settings", "Notifications", "Alert routes", "Skills", "AI Models",
   "Members",
@@ -24,7 +25,7 @@ async function mockApi(page: Page) {
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
   await page.route((url) => url.hostname === "localhost" && /^\/(api|auth)\//.test(url.pathname), async (route) => {
     const p = new URL(route.request().url()).pathname;
-    if (p === "/api/me") return json(route, { user_id: "u_1", team_id: "t_1", github_login: "an-admin", email: "admin@coderhelm.com", avatar_url: "", role: "owner" });
+    if (p === "/api/me") return json(route, { user_id: "u_1", team_id: "t_1", github_login: "an-admin", email: "admin@coderhelm.com", avatar_url: "", role: "owner", flags: { plugins: true } });
     if (p === "/api/usage") return json(route, { month: "2026-01", tokens_in: 0, tokens_out: 0, total_runs: 0, total_tokens: 400_000, max_tokens: 1_000_000 });
     if (p === "/api/banners") return json(route, { banners: [] });
     if (p === "/api/support/badge") return json(route, { waiting: 1, queue_open: 2 });

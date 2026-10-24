@@ -9,3 +9,6 @@ export const PLAN_ID = "plan-01WIDE0000000000000001";
 export const TOOL_NAME = "query_payments_reconciliation_ledger_by_customer_and_date_range";
 export const ALERT_ID = "alert-01WIDE0000000000000001";
 export const SUPPORT_TICKET_ID = "ticket-01WIDE0000000000000001";
+export const PLUGIN_ID = "example-marketing-release-announcement-writer-for-every-channel";
+export const PLUGIN_RUN_ID = "plugin-run-01WIDE0000000000000001";
+export const DRAFT_ID = "draft-01WIDE0000000000000001";

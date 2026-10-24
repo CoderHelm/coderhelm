@@ -5,6 +5,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { api, type CloseResult, type CloseRunRequest, type Run } from "@/lib/api";
 import { RUN_GROUP_STATUSES, runCanClose, runStatusLook } from "@/components/run-status";
+import { runHref } from "@/lib/plugins";
 import { CloseRunDialog } from "@/components/close-run-dialog";
 import { useToast } from "@/components/toast";
 import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
@@ -49,7 +50,8 @@ function runTitle(run: Run): string {
 function groupRunsByTicket(runs: Run[]): RunGroup[] {
   const map = new Map<string, Run[]>();
   for (const run of runs) {
-    const key = run.ticket_id || run.run_id;
+    // Each plugin run is its own row (they share a ticket id per plugin).
+    const key = run.ticket_source === "plugin" ? run.run_id : run.ticket_id || run.run_id;
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(run);
   }
@@ -293,10 +295,16 @@ function RunsPage() {
   );
 }
 
+/** Where a run opens: a plugin run has its own page. */
+function runPage(run: Run): string {
+  return run.ticket_source === "plugin" ? runHref(run.run_id) : `/runs/detail?id=${encodeURIComponent(run.run_id)}`;
+}
+
 function RunItem({ group, showRepo, select }: { group: RunGroup; showRepo: boolean; select?: RowSelect }) {
   const [latest, ...earlier] = group.attempts;
   const look = runStatusLook(latest.status);
   const title = runTitle(latest);
+  const isPlugin = latest.ticket_source === "plugin";
   return (
     <ListRow
       select={select}
@@ -305,9 +313,9 @@ function RunItem({ group, showRepo, select }: { group: RunGroup; showRepo: boole
       status={look}
       title={title}
       titleText={title}
-      href={`/runs/detail?id=${encodeURIComponent(latest.run_id)}`}
+      href={runPage(latest)}
       meta={[
-        latest.ticket_id && latest.ticket_id !== title ? latest.ticket_id : null,
+        isPlugin ? `Plugin ${latest.ticket_id?.replace(/^plugin:/, "") ?? ""}` : latest.ticket_id && latest.ticket_id !== title ? latest.ticket_id : null,
         showRepo ? latest.repo : null,
         latest.duration_s ? `took ${formatDuration(latest.duration_s)}` : null,
       ]}

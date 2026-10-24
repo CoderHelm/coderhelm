@@ -116,7 +116,7 @@ export function CompatBadge({ item }: { item: Pick<Skill, "compat"> }) {
 /** Where to connect what a step needs, when the check didn't say. GitHub
  * is never offered: every team has it connected already. */
 const CONNECT: Record<Requirement["connect"], { href: string; label: string } | null> = {
-  plugins: { href: "/settings/integrations#other-tools", label: "Integrations" },
+  plugins: { href: "/connections", label: "Connections" },
   data_sources: { href: "/data-sources", label: "Data sources" },
   github: null,
   none: null,
@@ -149,7 +149,7 @@ export function linkFor(
       text: writes ? `Set up ${c.label} writes in Integrations` : `${c.verb} ${c.label} in Integrations`,
     };
   }
-  const href = g.link || (g.connect === "plugins" && g.server ? `/settings/integrations#integration-${g.server}` : where.href);
+  const href = g.link || (g.connect === "plugins" && g.server ? `/connections#connection-${g.server}` : where.href);
   if (g.action === "credentials") return { href, text: `Add credentials in ${where.label}` };
   return { href, text: `Connect in ${where.label}` };
 }

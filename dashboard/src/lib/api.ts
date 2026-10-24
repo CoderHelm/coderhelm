@@ -100,6 +100,8 @@ export const api = {
       capabilities?: string[];
       /** Set when their role is one of the team's custom roles. */
       custom_role?: { id: string; name: string } | null;
+      /** The team's switches; `plugins` turns plugins on. */
+      flags?: { plugins?: boolean };
     }>("/api/me"),
   signup: (email: string, password: string) =>
     request<{ status: string; message: string }>("/auth/signup", {
@@ -2891,6 +2893,8 @@ export interface AdminTeam {
   /** Has runs or reviews, or (not personal) repos or a GitHub installation. */
   active: boolean;
   link: AdminTeamLink;
+  /** Team switches; only `plugins` so far. */
+  flags?: { plugins?: boolean };
 }
 
 /** Teams that belong together: the same GitHub installation, Jira site, people or company domain. */
