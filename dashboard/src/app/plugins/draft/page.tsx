@@ -8,6 +8,7 @@ import { DraftStatusChip, PluginsGate, Refusal } from "@/components/plugins";
 import { Page, PageHeader, Section, cardClass } from "@/components/page";
 import { List, ListEmpty, ListError, ListRow, ListSkeleton, Time } from "@/components/list";
 import { Field } from "@/components/field";
+import { Markdown } from "@/components/markdown";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
 import { useCan } from "@/hooks/use-can";
@@ -244,8 +245,8 @@ function DraftPage() {
             </div>
           </form>
         ) : (
-          <div className={`${cardClass} whitespace-pre-wrap text-sm text-zinc-200`} data-testid="draft-content">
-            {view.content}
+          <div className={cardClass} data-testid="draft-content">
+            {d.kind === "image" ? <p className="text-sm text-zinc-200">{view.content}</p> : <Markdown>{view.content}</Markdown>}
           </div>
         )}
       </Section>
