@@ -229,6 +229,8 @@ export const api = {
   purgeDlq: () => request<void>("/api/dlq/purge", { method: "POST" }),
   /** The whole shared DLQ, every team's and the global jobs'. Platform admin only. */
   adminDlq: () => request<AdminDlqList>("/api/admin/dlq"),
+  /** The daily check of recorded model usage against Anthropic's report. Platform admin only. */
+  adminUsageCheck: () => request<UsageCheck>("/api/admin/usage-check"),
   adminDlqDelete: (message_id: string) =>
     request<void>("/api/admin/dlq/delete", {
       method: "POST",
@@ -1584,6 +1586,27 @@ export interface Stats {
   total_tokens_in: number;
   total_tokens_out: number;
   merge_rate: number;
+  /** Calls whose reply broke off, so their output tokens are an estimate. Missing on older servers. */
+  estimated_calls?: number;
+  /** Calls whose usage was written later, from the fallback queue. Missing on older servers. */
+  recovered_calls?: number;
+}
+
+/**
+ * The last run of the daily usage check. `off`: no Anthropic admin key is set
+ * (`secret` names where it goes); `ran`: `teams` teams compared for `day`;
+ * `never`: it hasn't run since it was deployed.
+ */
+export interface UsageCheck {
+  state: "off" | "ran" | "never";
+  checked_at?: string | null;
+  secret?: string | null;
+  day?: string | null;
+  teams?: number;
+  /** Models whose recorded usage differed from the report by more than the drift limit. */
+  flagged_models?: number;
+  /** Teams whose report couldn't be read. */
+  failed_teams?: number;
 }
 
 export interface MonthStats {

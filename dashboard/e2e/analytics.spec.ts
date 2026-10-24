@@ -126,10 +126,10 @@ function analytics(period: string, repo: string | null) {
   };
 }
 
-interface Backend { calls: string[]; fail: boolean; empty: boolean; oldServer: boolean }
+interface Backend { calls: string[]; fail: boolean; empty: boolean; oldServer: boolean; estimated: number; recovered: number }
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
-  const db: Backend = { calls: [], fail: false, empty: false, oldServer: false, ...init };
+  const db: Backend = { calls: [], fail: false, empty: false, oldServer: false, estimated: 0, recovered: 0, ...init };
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
@@ -142,6 +142,10 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/banners") return json(route, { banners: [] });
     if (p === "/api/integrations") return json(route, { can_edit: false, items: [], migrated: 0 });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }] });
+    if (p === "/api/stats") {
+      const month = { total_runs: 42, completed: 30, failed: 4, in_progress: 8, total_cost_usd: 96.4, total_tokens_in: 12_000_000, total_tokens_out: 900_000, merge_rate: 0.7, estimated_calls: db.estimated, recovered_calls: db.recovered };
+      return json(route, { month, all_time: month });
+    }
     if (p === "/api/analytics") {
       if (db.fail) return json(route, { error: "boom" }, 500);
       const period = url.searchParams.get("period") === "mtd" ? "mtd" : url.searchParams.get("days") || "30";
@@ -357,4 +361,26 @@ test("the period picker doesn't move when the selection changes, by click or by 
   const ring = await focused.evaluate((el) => { const s = getComputedStyle(el); return { width: s.outlineWidth, offset: s.outlineOffset, style: s.outlineStyle }; });
   expect(ring).toEqual({ width: "2px", offset: "-3px", style: "solid" });
   expect(await boxes()).toEqual(before);
+});
+
+test("token totals note calls that were estimated or recovered late, only when there are any", async ({ page }) => {
+  await mockApi(page, { estimated: 3, recovered: 1 });
+  await page.goto("/analytics");
+  const note = page.getByTestId("usage-note");
+  await expect(note).toBeVisible();
+  await expect(note.locator("p")).toHaveText("Token totals this month include 3 calls estimated · 1 recovered late.");
+  await expect(note.getByText("3 calls estimated", { exact: true })).toHaveAttribute("title", /output tokens were estimated/);
+  await expect(note.getByText("1 recovered late", { exact: true })).toHaveAttribute("title", /added later/);
+  await shot(page, "analytics-usage-note");
+});
+
+test("the usage note shows only the count above zero, and nothing when both are zero", async ({ page }) => {
+  const db = await mockApi(page, { recovered: 2 });
+  await page.goto("/analytics");
+  await expect(page.getByTestId("usage-note").locator("p")).toHaveText("Token totals this month include 2 recovered late.");
+  db.recovered = 0;
+  await page.reload();
+  await expect(page.getByTestId("tile-merged")).toContainText("21");
+  expect(db.calls).toContain("/api/stats");
+  await expect(page.getByTestId("usage-note")).toHaveCount(0);
 });

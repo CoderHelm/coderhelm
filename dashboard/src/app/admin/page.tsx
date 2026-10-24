@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ApiError, api, type AdminOrg, type AdminTeam, type BetaSignup, type BetaSignupStatus } from "@/lib/api";
+import { ApiError, api, type AdminOrg, type AdminTeam, type BetaSignup, type BetaSignupStatus, type UsageCheck } from "@/lib/api";
 import {
   BETA_SIGNUPS_CHANGED,
   LINK_WORDS,
@@ -23,7 +23,8 @@ import { Skeleton } from "@/components/skeleton";
 import { CopyButton } from "@/components/copy-button";
 import { focusRing, inputClass, primaryButton, secondaryButton } from "@/components/ui";
 import { Tabs } from "@/components/tabs";
-import { Page, PageHeader } from "@/components/page";
+import { Page, PageHeader, Section, cardClass } from "@/components/page";
+import { StatusPill } from "@/components/status-pill";
 import {
   List,
   ListEmpty,
@@ -32,6 +33,7 @@ import {
   ListSkeleton,
   ListToolbar,
   TONES,
+  Time,
   useListParams,
   type Tone,
 } from "@/components/list";
@@ -200,6 +202,8 @@ function AdminPage() {
         }
       />
 
+      <UsageCheckPanel />
+
       <Tabs
         label="Admin views"
         value={tab}
@@ -252,6 +256,121 @@ function AdminPage() {
         />
       )}
     </Page>
+  );
+}
+
+// ── Usage check ──────────────────────────────────────────────────────
+
+interface UsageProblem {
+  key: string;
+  tone: Tone;
+  title: string;
+  summary: string;
+}
+
+/** What the last run of the usage check found wrong; none means it is OK. */
+function usageProblems(c: UsageCheck): UsageProblem[] {
+  if (c.state === "never") {
+    return [{ key: "never", tone: "waiting", title: "Not run yet", summary: "The daily check hasn't run since it was deployed. It runs once a day." }];
+  }
+  if (c.state === "off") {
+    return [
+      {
+        key: "off",
+        tone: "waiting",
+        title: "The check is off",
+        summary: `No Anthropic admin key is set, so recorded usage isn't compared with Anthropic's report.${c.secret ? ` Add the key to ${c.secret}.` : ""}`,
+      },
+    ];
+  }
+  const out: UsageProblem[] = [];
+  const flagged = c.flagged_models ?? 0;
+  const failed = c.failed_teams ?? 0;
+  if (flagged > 0) {
+    out.push({
+      key: "flagged",
+      tone: "danger",
+      title: `${plural(flagged, "model")} off from Anthropic's report`,
+      summary: "Recorded usage differs from Anthropic's own report by more than the allowed drift. The worker logs name each team and model.",
+    });
+  }
+  if (failed > 0) {
+    out.push({
+      key: "failed",
+      tone: "waiting",
+      title: `${plural(failed, "team")} not checked`,
+      summary: "Anthropic's report for these teams couldn't be read, so they weren't compared.",
+    });
+  }
+  return out;
+}
+
+function UsageCheckPanel() {
+  const [check, setCheck] = useState<UsageCheck | null>(null);
+  const [error, setError] = useState("");
+
+  const load = useCallback(() => {
+    setError("");
+    api
+      .adminUsageCheck()
+      .then(setCheck)
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "The request failed."));
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const problems = check ? usageProblems(check) : [];
+  const ok = !!check && problems.length === 0;
+  const pill = !check ? null : ok ? (
+    <StatusPill tone="success">OK</StatusPill>
+  ) : problems.some((x) => x.tone === "danger") ? (
+    <StatusPill tone="error">{plural(problems.length, "problem")}</StatusPill>
+  ) : (
+    <StatusPill tone="warning">{check.state === "ran" ? plural(problems.length, "problem") : problems[0].title}</StatusPill>
+  );
+
+  return (
+    <Section
+      title="Usage check"
+      id="usage-check"
+      description="Once a day, the model usage Coderhelm recorded for each team is compared with Anthropic's own report."
+      actions={pill}
+    >
+      <div data-testid="usage-check" data-state={check ? (ok ? "ok" : check.state === "ran" ? "problems" : check.state) : error ? "error" : "loading"}>
+        {error ? (
+          <ListError title="Couldn't load the usage check" onRetry={load}>
+            {error}
+          </ListError>
+        ) : !check ? (
+          <ListSkeleton rows={1} label="Loading the usage check" />
+        ) : (
+          <>
+            {check.state === "ran" && (
+              <p className={`${cardClass} text-sm text-zinc-300`}>
+                {ok ? "Recorded usage matches Anthropic's report: " : ""}
+                {plural(check.teams ?? 0, "team")} compared for {check.day || "the last day"}
+                {check.checked_at && (
+                  <>
+                    {", checked "}
+                    <Time iso={check.checked_at} />
+                  </>
+                )}
+                .
+              </p>
+            )}
+            {problems.length > 0 && (
+              <List label="Usage check problems" className={check.state === "ran" ? "mt-3" : ""}>
+                {problems.map((x) => (
+                  <ListRow key={x.key} testId="usage-problem" data={{ problem: x.key }} status={{ tone: x.tone }} title={x.title} summary={x.summary} summaryTone="muted" />
+                ))}
+              </List>
+            )}
+          </>
+        )}
+      </div>
+    </Section>
   );
 }
 

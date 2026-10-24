@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { api, type Analytics, type AnalyticsCiOutcomes, type AnalyticsComparison, type AnalyticsCounts, type AnalyticsPeriod } from "@/lib/api";
+import { api, type Analytics, type Stats, type AnalyticsCiOutcomes, type AnalyticsComparison, type AnalyticsCounts, type AnalyticsPeriod } from "@/lib/api";
 import { CardSkeleton, ChartSkeleton } from "@/components/skeleton";
 import { Segmented } from "@/components/segmented";
 import { Callout } from "@/components/callout";
@@ -168,6 +168,48 @@ function peopleRows(people: Analytics["people"]) {
   return [...people].sort((a, b) => order(a) - order(b) || b.runs - a.runs).map((r) => [r.person || "Not recorded (older runs)", r.runs, r.merged]);
 }
 
+/**
+ * Calls this month whose tokens are not exactly what the model reported: the
+ * reply broke off, so its output was estimated (3 bytes a token), or the usage
+ * was written later from the fallback queue. Shown only when there are any.
+ */
+function UsageNote({ stats }: { stats: Stats | null }) {
+  const estimated = stats?.estimated_calls ?? 0;
+  const recovered = stats?.recovered_calls ?? 0;
+  if (estimated <= 0 && recovered <= 0) return null;
+  const parts = [
+    estimated > 0 && {
+      key: "estimated",
+      text: `${plural(estimated, "call")} estimated`,
+      why: "The reply broke off before the model reported its usage, so its output tokens were estimated from the text received (about 3 bytes a token).",
+    },
+    recovered > 0 && {
+      key: "recovered",
+      text: `${count(recovered)} recovered late`,
+      why: "Saving the usage failed at first, so it was queued and added later. Nothing was lost.",
+    },
+  ].filter((x): x is { key: string; text: string; why: string } => !!x);
+  return (
+    <div className="mt-3 text-xs text-zinc-500" data-testid="usage-note">
+      <p>
+        Token totals this month include{" "}
+        {parts.map((x, i) => (
+          <span key={x.key}>
+            {i > 0 && <span aria-hidden="true"> · </span>}
+            <span title={x.why} className="cursor-help underline decoration-dotted underline-offset-2">{x.text}</span>
+          </span>
+        ))}
+        .
+      </p>
+      <ul className="sr-only">
+        {parts.map((x) => (
+          <li key={x.key}>{`${x.text}: ${x.why}`}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function AnalyticsPage() {
@@ -177,6 +219,15 @@ export default function AnalyticsPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [repoNames, setRepoNames] = useState<string[]>([]);
+  // This month's counters, only for the note on estimated and late calls; the page works without them.
+  const [stats, setStats] = useState<Stats | null>(null);
+
+  useEffect(() => {
+    api
+      .getStats()
+      .then((r) => setStats(r.month))
+      .catch(() => setStats(null));
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -237,13 +288,13 @@ export default function AnalyticsPage() {
           <ChartSkeleton />
         </div>
       ) : data ? (
-        <Body data={data} loading={loading} />
+        <Body data={data} loading={loading} stats={stats} />
       ) : null}
     </Page>
   );
 }
 
-function Body({ data, loading }: { data: Analytics; loading: boolean }) {
+function Body({ data, loading, stats }: { data: Analytics; loading: boolean; stats: Stats | null }) {
   const s = data.summary;
   const p = data.previous;
   const d = data.days;
@@ -275,6 +326,7 @@ function Body({ data, loading }: { data: Analytics; loading: boolean }) {
           <Tile testId="tile-findings" label="Review findings acted on" value={pct(data.reviews.acted_on_rate)} basis={data.reviews.outcomes_known_reviews ? `${count(data.reviews.findings_fixed)} fixed in code, ${count(data.reviews.findings_settled_by_person)} settled by a person` : "Counted from re-reviews from now on"} />
           <Tile testId="tile-failed" label="Failed runs" value={count(s.failed_runs)} change={delta(s.failed_runs, p.failed_runs, "count", vs)} basis={s.runs ? `${pct(s.failure_rate)} of runs${s.closed_runs ? ` · ${plural(s.closed_runs, "run")} closed by a person, not counted` : ""}` : undefined} />
         </div>
+        <UsageNote stats={stats} />
       </Section>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
