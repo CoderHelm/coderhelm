@@ -39,6 +39,4 @@ Each server runs only from an approved list of packages, isolated from CoderHelm
 
 ## Remote servers and OAuth
 
-<Badge status="coming-soon" />
-
-Connecting remote MCP servers over HTTP, with OAuth sign-in instead of a pasted key, is being built as part of [plugins](/plugins/connections). Until then, every connection uses a key.
+Any remote MCP server can be added by its address on the Integrations page. CoderHelm finds how it signs in (OAuth, a key, or nothing), and agents get only the tools an admin allows; widening that list waits for a second admin when the team has one. Catalog servers that offer it can connect by signing in with OAuth instead of a pasted key. Tokens are sealed for the team, renewed on their own, and never shown to a model. [Plugins](/plugins/connections) use these connections through their `mcp:` tools.

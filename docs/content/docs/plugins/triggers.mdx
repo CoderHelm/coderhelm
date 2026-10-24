@@ -1,10 +1,8 @@
 ---
 title: Triggers
 description: Start a plugin run from a person's brief, on a schedule, or when a release is published.
-status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
 
 Anyone who can use plugins can start a run from the plugin's page with **Write a brief**: "What should it write, for whom, and what must it mention?" They can also pick a **Repository (optional)**, for work that is about one repository's changes. `triggers` adds more ways to start a run.
 
@@ -18,7 +16,9 @@ triggers:
       channels: [linkedin, blog, email]
 ```
 
-Each form field is `text` (a box to write in) or a list of choices to pick from. The run receives the answers and who asked. That person can never approve the run's output.
+Each form field is `text` (a box to write in) or a list of choices to pick from, at most 10 fields. The run receives the answers and who asked. That person can never approve the run's output.
+
+Any trigger can name the agent that answers with `agent:` (its file's name, without `.md`); without it, the first agent answers. Only a manual trigger has a `form`, and only a schedule has a `cron`.
 
 ## Schedule
 
@@ -28,16 +28,18 @@ triggers:
     cron: "0 14 * * MON"
 ```
 
-`cron` has five fields: minute, hour, day of month, month, day of week. A scheduled run that finds nothing to do should say so and save nothing; write that into the agent's instructions. Turning a plugin off, or removing it, stops its schedules.
+`cron` has five fields, in UTC: minute, hour, day of month, month, day of week. A scheduled run that finds nothing to do should say so and save nothing; write that into the agent's instructions. Turning a plugin off, or removing it, stops its schedules.
 
 ## Release
 
 ```yaml
 triggers:
   - on: github.release
+    agent: launch-writer
+    repos: [your-org/web]      # optional: only these repositories
 ```
 
-Runs when a release is published on a GitHub repository the team connected. The run gets the [release notes](/getting-started/reviewer#release-notes) CoderHelm wrote for it.
+Runs when CoderHelm writes [release notes](/getting-started/reviewer#release-notes) for a new release tag on a repository the team connected, and the run gets those notes. `repos` limits it to some repositories (`owner/name`).
 
 ## Runs
 

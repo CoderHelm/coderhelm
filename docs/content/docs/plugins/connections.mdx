@@ -1,33 +1,51 @@
 ---
 title: Connections and OAuth
 description: Ask each team to connect the accounts your plugin needs.
-status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
+A plugin reaches outside services in two ways, and each team connects the accounts itself.
 
-A plugin that saves drafts in a CMS or posts to LinkedIn needs an account to do it with. Declare it as a `connection` setting:
+## MCP servers from the Connections page
+
+A tool with `ref: "mcp:<server>"` uses an MCP server the team has on its **Connections** page: one from CoderHelm's catalog (Sentry, Linear, Notion, Sanity and others, with a key or by signing in with OAuth where the vendor offers it), or any remote MCP server added by its address.
+
+```yaml
+tools:
+  - ref: "mcp:sanity"
+    allow: [get_*, list_*, query_*, create_draft]
+```
+
+A plugin only ever gets the tools its `allow` list names, and only those the team has allowed on that server.
+
+## Accounts for HTTP tools
+
+An [HTTP tool](/plugins/skills-agents-tools#tools) sends its request with the token of a `connection` setting:
 
 ```yaml
 settings:
   - key: linkedin
     type: connection
     provider: oauth2
-    scopes: [w_member_social]
-  - key: sanity
-    type: connection
-    provider: mcp
+    scopes: [w_member_social, w_organization_social]
+    sensitive: true
+tools:
+  - name: publish_post
+    kind: http
+    connection: linkedin
+    method: POST
+    url: "https://api.linkedin.com/rest/posts"
+    risk: consequential
 ```
 
-`provider` says how the account is connected: `oauth2` signs in with the service, and `mcp` uses an MCP server from the team's **Connections** page. With plugins on, Connections is its own page in the dashboard, listing every MCP server the team has connected and its status.
+`provider` says how the account is connected: `oauth2` signs in with the service, `mcp` uses a server from the Connections page, and `key` takes an API key the team pastes once.
 
 ## Installing grants nothing
 
-Installing a plugin never gives it access to anything. The team connects each account separately, and a plugin can only use the tools its manifest grants on that connection: an MCP connection exposes only the tool names in the plugin's `allow` list.
+Installing a plugin never gives it access to anything. The team connects each account separately on the plugin's page, and the plugin can only use what its manifest grants on that account.
 
 ## Tokens stay out of the model
 
-Connection tokens are sealed like other secrets, added to a request after the model has chosen the call, and never shown to a model or sent back to the dashboard.
+Connection tokens are sealed like other secrets, added to a request after the model has chosen the call, and never shown to a model or sent back to the dashboard. A manifest can't carry credentials: an HTTP tool's `Authorization` and `Cookie` headers are refused.
 
 ## Scopes
 

@@ -34,14 +34,15 @@ test('search finds the plugin manifest reference', async ({ page }) => {
   await expect(page).toHaveURL(/\/plugins\/manifest-reference\/?$/);
 });
 
-test('a plugin page shows its Coming soon badge, the field table and the edit link', async ({ page }) => {
+test('plugins have shipped: the manifest reference has no Coming soon badge, and shows the field table and the edit link', async ({ page }) => {
   await page.goto('/plugins/manifest-reference/');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Manifest reference');
-  await expect(page.locator('h1 .ch-badge')).toHaveText('Coming soon');
+  await expect(page.locator('h1 .ch-badge')).toHaveCount(0);
+  await expect(page.getByRole('cell', { name: 'results', exact: true }).first()).toBeVisible();
   await expect(page.getByRole('cell', { name: 'name', exact: true }).first()).toBeVisible();
   await expect(page.getByRole('link', { name: /edit on github/i })).toHaveAttribute('href', /CoderHelm\/coderhelm\/blob\/main\/docs\/schemas\/plugin-manifest\.schema\.json/);
-  // The sidebar marks unreleased pages too.
-  await expect(page.locator('aside .ch-badge').first()).toHaveText('Coming soon');
+  // No plugin page is marked unreleased in the sidebar.
+  await expect(page.locator('aside a[href*="/plugins/"] .ch-badge')).toHaveCount(0);
   await shot(page, 'plugin-manifest-desktop');
 });
 
@@ -49,7 +50,8 @@ test('the walkthrough includes the real example files', async ({ page }) => {
   await page.goto('/plugins/walkthrough/');
   await expect(page.getByText('name: marketing').first()).toBeVisible();
   await expect(page.getByText('You write launch content').first()).toBeVisible();
-  await expect(page.getByText('Never call').first()).toBeVisible();
+  await expect(page.getByText('Every claim comes from the release notes').first()).toBeVisible();
+  await expect(page.getByText('{{setting:linkedin_author}}').first()).toBeVisible();
 });
 
 test('the self-host section is served from the platform import', async ({ page }) => {

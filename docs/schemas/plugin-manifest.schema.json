@@ -2,10 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://docs.coderhelm.com/schema/plugin-manifest.v1.json",
   "title": "CoderHelm plugin manifest",
-  "description": "The plugin.yaml file at the root of a CoderHelm plugin. A plugin is text plus approved tools: its behavior comes from its agents and skills, and this file declares what it may touch.",
+  "description": "The plugin.yaml file at the root of a plugin folder (also read as plugin.yml or .coderhelm/plugin.yaml). A plugin is text plus approved tools: its behavior comes from its agents and skills, and this file declares what it may touch. Unknown fields are refused.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["name", "version", "description"],
+  "required": [
+    "name",
+    "version"
+  ],
   "properties": {
     "$schema": {
       "type": "string",
@@ -13,57 +16,106 @@
     },
     "name": {
       "type": "string",
-      "pattern": "^([a-z0-9][a-z0-9-]{0,38}/)?[a-z0-9][a-z0-9-]{0,63}$",
-      "description": "The plugin's id. Lowercase letters, digits and `-`, optionally namespaced by publisher as `publisher/name`.",
-      "examples": ["marketing", "acme/marketing"]
+      "pattern": "^[a-z0-9_-]{1,40}$",
+      "description": "The plugin's name: lowercase letters, digits, `-` and `_`, at most 40 characters. With a `namespace`, the plugin's id is `namespace-name`.",
+      "examples": [
+        "marketing"
+      ]
+    },
+    "namespace": {
+      "type": "string",
+      "pattern": "^[a-z0-9_-]{1,40}$",
+      "description": "Optional publisher name, so two sources can each have a `marketing` plugin. The id becomes `namespace-name`.",
+      "examples": [
+        "acme"
+      ]
     },
     "version": {
       "type": "string",
-      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$",
-      "description": "The plugin's version, in semantic versioning (`MAJOR.MINOR.PATCH`). Installs are pinned by content hash, so the version is a label for people; raise it whenever you publish.",
-      "examples": ["1.2.0"]
+      "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$",
+      "description": "The plugin's version, as `1.2` or `1.2.0`. Installs are pinned by content hash, so the version is a label for people; raise it whenever you publish.",
+      "examples": [
+        "1.2.0"
+      ]
     },
     "description": {
       "type": "string",
-      "minLength": 1,
-      "maxLength": 240,
-      "description": "One line saying what the plugin does. Shown in the catalog and on the plugin's page."
+      "maxLength": 500,
+      "default": "",
+      "description": "What the plugin does, in a sentence or two. Shown in the catalog and on the plugin's page."
     },
     "skills": {
       "type": "array",
-      "items": { "type": "string", "minLength": 1 },
-      "default": ["skills/*/SKILL.md"],
-      "description": "Paths or globs of the plugin's skills, relative to the plugin's folder. Skills use the same SKILL.md format as skill repos and apply only to this plugin's runs."
+      "items": {
+        "$ref": "#/$defs/mdGlob"
+      },
+      "default": [
+        "skills/*/SKILL.md"
+      ],
+      "description": "Globs of the plugin's skills, relative to the plugin's folder. Skills use the same SKILL.md format as skill repos and apply only to this plugin's runs."
     },
     "agents": {
       "type": "array",
-      "items": { "type": "string", "minLength": 1 },
-      "default": ["agents/*.md"],
-      "description": "Paths or globs of the plugin's agents. Each agent file is Markdown with frontmatter; its body is the agent's instructions."
+      "items": {
+        "$ref": "#/$defs/mdGlob"
+      },
+      "default": [
+        "agents/*.md"
+      ],
+      "description": "Globs of the plugin's agents. Each agent file is Markdown with frontmatter; its body is the agent's instructions."
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/mdGlob"
+      },
+      "default": [],
+      "description": "Globs of the plugin's commands: Markdown steps an agent can follow."
     },
     "settings": {
       "type": "array",
+      "maxItems": 30,
       "default": [],
       "description": "Values each team fills in on the plugin's page. Values live with the team, never in the plugin.",
-      "items": { "$ref": "#/$defs/setting" }
+      "items": {
+        "$ref": "#/$defs/setting"
+      }
     },
     "tools": {
       "type": "array",
+      "maxItems": 40,
       "default": [],
-      "description": "Every tool the plugin's agents may call. A tool that is not listed here does not exist for a plugin run.",
+      "description": "Every tool the plugin's agents may call. A tool that is not listed here does not exist for a plugin run. Every run also has `read_plugin_skill` and `save_draft` without asking.",
       "items": {
-        "oneOf": [{ "$ref": "#/$defs/mcpTool" }, { "$ref": "#/$defs/namedTool" }]
+        "oneOf": [
+          {
+            "$ref": "#/$defs/mcpTool"
+          },
+          {
+            "$ref": "#/$defs/httpTool"
+          },
+          {
+            "$ref": "#/$defs/builtinTool"
+          }
+        ]
       }
     },
     "triggers": {
       "type": "array",
+      "maxItems": 10,
       "default": [],
-      "description": "What starts a run of the plugin, besides a person writing a brief on the plugin's page.",
+      "description": "What starts a run of the plugin.",
       "items": {
         "oneOf": [
-          { "$ref": "#/$defs/manualTrigger" },
-          { "$ref": "#/$defs/scheduleTrigger" },
-          { "$ref": "#/$defs/releaseTrigger" }
+          {
+            "$ref": "#/$defs/manualTrigger"
+          },
+          {
+            "$ref": "#/$defs/scheduleTrigger"
+          },
+          {
+            "$ref": "#/$defs/releaseTrigger"
+          }
         ]
       }
     },
@@ -72,8 +124,18 @@
       "default": [],
       "description": "What a run produces. Drafts wait in the review queue; a publish output sends an approved draft out through a consequential tool.",
       "items": {
-        "oneOf": [{ "$ref": "#/$defs/draftOutput" }, { "$ref": "#/$defs/publishOutput" }]
+        "oneOf": [
+          {
+            "$ref": "#/$defs/draftOutput"
+          },
+          {
+            "$ref": "#/$defs/publishOutput"
+          }
+        ]
       }
+    },
+    "results": {
+      "$ref": "#/$defs/results"
     },
     "budget": {
       "type": "object",
@@ -83,165 +145,359 @@
         "monthly_tokens": {
           "type": "integer",
           "minimum": 0,
-          "description": "Tokens the plugin may use per month. Empty or 0 means no limit of its own."
+          "description": "Tokens the plugin may use per month. 0 means no limit of its own."
         }
       }
     }
   },
   "$defs": {
+    "mdGlob": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*\\.\\.).*\\.md$",
+      "description": "A relative path or glob ending in `.md`, with no `..`."
+    },
     "setting": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["key", "type"],
+      "required": [
+        "key",
+        "type"
+      ],
       "properties": {
         "key": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9_]{0,63}$",
-          "description": "The setting's name. Lowercase letters, digits and `_`, starting with a letter."
+          "pattern": "^[a-z0-9_-]{1,40}$",
+          "description": "The setting's name: lowercase letters, digits, `-` and `_`."
         },
         "type": {
-          "enum": ["string", "secret", "connection"],
+          "enum": [
+            "string",
+            "secret",
+            "connection"
+          ],
           "description": "`string` is a value the team types. `secret` is sealed, never shown again once saved, and never given to a model. `connection` asks the team to connect an account."
         },
         "provider": {
           "type": "string",
-          "description": "For a `connection`: how the account is connected, such as `oauth2`.",
-          "examples": ["oauth2"]
+          "minLength": 1,
+          "description": "For a `connection`: how it signs in, such as `oauth2`, `mcp` or `key`.",
+          "examples": [
+            "oauth2"
+          ]
         },
         "scopes": {
           "type": "array",
-          "items": { "type": "string" },
-          "description": "For an OAuth connection: the scopes asked for. Adding a scope in a new version waits for an admin."
+          "items": {
+            "type": "string",
+            "pattern": "^\\S{1,100}$"
+          },
+          "description": "For a connection: the scopes asked for. Adding a scope in a new version waits for an admin."
         },
         "sensitive": {
           "type": "boolean",
           "default": false,
-          "description": "Keep the value out of every prompt and never send it back to the dashboard. `secret` and `connection` settings are always sensitive."
+          "description": "Never shown again once saved, and never given to a model."
+        },
+        "description": {
+          "type": "string",
+          "description": "What the team should enter, shown on the plugin's page."
         }
       },
       "allOf": [
         {
-          "if": { "properties": { "type": { "const": "connection" } } },
-          "then": { "required": ["provider"] }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "connection"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "provider"
+            ]
+          }
         }
       ]
     },
     "risk": {
-      "enum": ["read", "write", "consequential"],
-      "description": "`read` only looks. `write` changes something a person can still review, such as a draft in a CMS. `consequential` reaches people or money (publish, send, post) and runs only after an approval."
+      "enum": [
+        "read",
+        "write",
+        "consequential"
+      ],
+      "description": "`read` only looks. `write` changes something a person can still review, such as a draft in a CMS or an image. `consequential` reaches people or money (publish, send, post) and runs only after a person approves the exact version. A declared risk can raise a tool's risk, never lower it below what CoderHelm works out from the tool's name and method."
     },
     "mcpTool": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["ref", "allow"],
+      "required": [
+        "ref",
+        "allow"
+      ],
       "description": "Tools from an MCP server the team has on its Connections page.",
       "properties": {
         "ref": {
           "type": "string",
-          "pattern": "^mcp:[a-z0-9][a-z0-9_-]*$",
-          "description": "`mcp:<id>`: the connection's MCP server.",
-          "examples": ["mcp:sanity"]
+          "pattern": "^mcp:[a-z0-9_-]{1,40}$",
+          "description": "`mcp:<server>`: the connection's MCP server.",
+          "examples": [
+            "mcp:sanity"
+          ]
         },
         "allow": {
           "type": "array",
-          "items": { "type": "string", "pattern": "^[A-Za-z0-9_*.-]+$" },
           "minItems": 1,
-          "description": "Tool names, or `*` globs, from that server the plugin may call. Everything else on the server is hidden from the run."
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_*-]{1,80}$",
+            "not": {
+              "const": "*"
+            }
+          },
+          "description": "Tool names, or narrow patterns such as `get_*`, the plugin may call. Never `*`: a plugin never gets every tool of a server."
         },
         "risk": {
-          "$ref": "#/$defs/risk",
-          "default": "read",
-          "description": "The highest risk among the allowed tools."
+          "$ref": "#/$defs/risk"
+        },
+        "description": {
+          "type": "string",
+          "description": "When an agent should use these tools."
         }
       }
     },
-    "namedTool": {
+    "httpTool": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "kind", "risk"],
-      "description": "A built-in CoderHelm tool, or a tool the plugin defines.",
+      "required": [
+        "name",
+        "kind",
+        "connection",
+        "method",
+        "url"
+      ],
+      "description": "A tool the plugin defines that calls an outside service over HTTPS with the team's connection. The token comes from the connection; the manifest never carries credentials.",
       "properties": {
         "name": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9_]{0,63}$",
-          "description": "Lowercase letters, digits and `_`. Agents call the tool by this name."
+          "pattern": "^(?!.*__)[a-z0-9_-]{1,40}$",
+          "description": "Lowercase letters, digits, `-` and `_`. Agents call the tool by this name."
         },
         "kind": {
-          "enum": ["builtin", "http"],
-          "description": "`builtin` is one of CoderHelm's own tools, such as reading release notes. `http` is a tool the plugin defines that calls an outside service with the team's connection."
+          "const": "http"
         },
-        "description": { "type": "string", "maxLength": 240, "description": "When an agent should use the tool." },
-        "risk": { "$ref": "#/$defs/risk" }
+        "connection": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]{1,40}$",
+          "description": "The key of a `connection` setting whose token is sent."
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
+          "description": "Anything but GET changes something, so it is at least `write`."
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https://[^/@\\s]+",
+          "description": "The https address called.",
+          "examples": [
+            "https://api.linkedin.com/rest/posts"
+          ]
+        },
+        "risk": {
+          "$ref": "#/$defs/risk"
+        },
+        "description": {
+          "type": "string",
+          "description": "When an agent should use the tool."
+        },
+        "headers": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?![Aa]uthorization$|[Cc]ookie$|[Hh]ost$|[Cc]ontent-[Ll]ength$|[Tt]ransfer-[Ee]ncoding$|[Pp]roxy-)[A-Za-z0-9-]{1,60}$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 200,
+            "pattern": "^[^\\r\\n]*$"
+          },
+          "description": "Extra request headers, such as an API version. Never credentials: Authorization, Cookie, Host, Content-Length, Transfer-Encoding and Proxy-* are refused."
+        },
+        "body": {
+          "description": "The JSON body to send. Strings may use `{{title}}`, `{{content}}`, `{{kind}}`, `{{channel}}` and `{{setting:<key>}}` (a string setting that isn't sensitive); values are inserted as text, so they can never add keys. Without it the body is `{title, content, kind, channel}`."
+        }
+      }
+    },
+    "builtinTool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "kind"
+      ],
+      "description": "One of CoderHelm's own read-only tools, such as reading release notes. A plugin can't add a built-in that writes.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^(?!.*__)[a-z0-9_-]{1,40}$",
+          "description": "The built-in tool's name."
+        },
+        "kind": {
+          "const": "builtin"
+        },
+        "risk": {
+          "$ref": "#/$defs/risk"
+        },
+        "description": {
+          "type": "string",
+          "description": "When an agent should use the tool."
+        }
       }
     },
     "manualTrigger": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["on"],
+      "required": [
+        "on"
+      ],
       "description": "A person starts a run from the plugin's page by filling in a short form.",
       "properties": {
-        "on": { "const": "manual" },
+        "on": {
+          "const": "manual"
+        },
         "form": {
           "type": "object",
-          "propertyNames": { "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+          "maxProperties": 10,
+          "propertyNames": {
+            "pattern": "^[a-z0-9_-]{1,40}$"
+          },
           "additionalProperties": {
             "oneOf": [
-              { "const": "text", "description": "A box to write in." },
-              { "type": "array", "items": { "type": "string" }, "minItems": 1, "description": "A list to pick from." }
+              {
+                "const": "text",
+                "description": "A box to write in."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "description": "A list to pick from."
+              }
             ]
           },
-          "default": { "brief": "text" },
-          "description": "The form's fields: `text` for a box to write in, or a list of choices to pick from."
+          "description": "The form's fields: `text` for a box to write in, or a list of choices to pick from. At most 10 fields."
+        },
+        "agent": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]{1,40}$",
+          "description": "The agent (its file's name, without `.md`) that answers this trigger. The first agent when unset."
         }
       }
     },
     "scheduleTrigger": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["on", "cron"],
+      "required": [
+        "on",
+        "cron"
+      ],
       "description": "Runs on a schedule.",
       "properties": {
-        "on": { "const": "schedule" },
+        "on": {
+          "const": "schedule"
+        },
         "cron": {
           "type": "string",
-          "pattern": "^\\S+( \\S+){4}$",
-          "description": "Five-field cron: minute, hour, day of month, month, day of week.",
-          "examples": ["0 14 * * MON"]
+          "pattern": "^[A-Za-z0-9*/,-]+( [A-Za-z0-9*/,-]+){4}$",
+          "description": "Five-field cron in UTC: minute, hour, day of month, month, day of week.",
+          "examples": [
+            "0 14 * * MON"
+          ]
+        },
+        "agent": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]{1,40}$",
+          "description": "The agent (its file's name, without `.md`) that answers this trigger. The first agent when unset."
         }
       }
     },
     "releaseTrigger": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["on"],
-      "description": "Runs when a release is published on a GitHub repo the team connected. The run gets the release notes CoderHelm wrote.",
+      "required": [
+        "on"
+      ],
+      "description": "Runs when CoderHelm writes release notes for a new release tag. The run gets those notes.",
       "properties": {
-        "on": { "const": "github.release" }
+        "on": {
+          "const": "github.release"
+        },
+        "repos": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+          },
+          "description": "Only releases of these repositories (`owner/name`). Every repository when unset."
+        },
+        "agent": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]{1,40}$",
+          "description": "The agent (its file's name, without `.md`) that answers this trigger. The first agent when unset."
+        }
       }
     },
     "draftOutput": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "kinds"],
+      "required": [
+        "type"
+      ],
       "properties": {
-        "type": { "const": "draft" },
+        "type": {
+          "const": "draft"
+        },
         "kinds": {
           "type": "array",
-          "items": { "enum": ["blog", "social", "email", "image", "action"] },
-          "minItems": 1,
-          "description": "The kinds of draft a run may save. `action` is a step to take, such as an update to a record, rather than something to read."
+          "items": {
+            "enum": [
+              "blog",
+              "social",
+              "email",
+              "image",
+              "post",
+              "page",
+              "note",
+              "reply",
+              "ticket",
+              "report"
+            ]
+          },
+          "description": "The kinds of draft a run may save."
         }
       }
     },
     "publishOutput": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "via"],
+      "required": [
+        "type",
+        "via"
+      ],
       "properties": {
-        "type": { "const": "publish" },
+        "type": {
+          "const": "publish"
+        },
         "via": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+          "pattern": "^(?!.*__)[a-z0-9_-]{1,40}$",
           "description": "The name of a `consequential` tool from `tools` that sends an approved draft out."
         },
         "approval": {
@@ -250,12 +506,43 @@
           "properties": {
             "role": {
               "type": "string",
-              "pattern": "^[a-z][a-z0-9_]{0,63}$",
-              "description": "Who should approve, as a short name such as `marketing_editor`. The team lists the actual approvers on the plugin's page."
+              "description": "A label for the approver group, such as `marketing_editor`. The team lists the actual approvers on the plugin's page."
             },
-            "min": { "type": "integer", "minimum": 1, "maximum": 5, "default": 1, "description": "How many different people must approve." }
+            "min": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "description": "How many different people must approve."
+            }
           },
           "description": "The approval a draft needs before it is published. The person who asked for a draft never approves it."
+        }
+      }
+    },
+    "results": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "via",
+        "tool"
+      ],
+      "description": "Reading a published item's numbers back after a while, as a lesson the plugin's next runs read.",
+      "properties": {
+        "via": {
+          "type": "string",
+          "pattern": "^mcp:[a-z0-9_-]{1,40}$",
+          "description": "An `mcp:<server>` the plugin lists in `tools`."
+        },
+        "tool": {
+          "type": "string",
+          "description": "A read-only tool on that server, such as `query_insight`."
+        },
+        "after_days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 90,
+          "default": 7,
+          "description": "Days after publishing to read the results."
         }
       }
     }
