@@ -4,11 +4,11 @@
 // the reviewer all use it). Every repo Coderhelm works in is listed with its
 // graph's status (off, not built, queued, indexing, ready, failed) and its
 // Turn off / Rebuild actions. A ready repo opens below: load-bearing files
-// (PageRank), symbol search (definitions + callers), and an interactive
-// force-directed neighborhood explorer (click a node to re-center on it).
+// (PageRank), symbol search (definitions + callers), and the neighbourhood
+// explorer (explorer.tsx; click a node to re-center on it).
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   api,
   type GraphNeighborhood,
@@ -39,197 +39,7 @@ import {
   StatusText,
   type StatusLook,
 } from "@/components/list";
-
-// ── Force layout (small, dependency-free) ───────────────────────────────────
-
-interface Node {
-  id: string;
-  label: string;
-  kind: "center" | "import" | "importer" | "symbol";
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-}
-interface Link {
-  source: string;
-  target: string;
-}
-
-function shortName(path: string): string {
-  const parts = path.split("/");
-  return parts.length > 2 ? `…/${parts.slice(-2).join("/")}` : path;
-}
-
-function buildSim(n: GraphNeighborhood): { nodes: Node[]; links: Link[] } {
-  const nodes: Node[] = [];
-  const links: Link[] = [];
-  const seen = new Set<string>();
-  const add = (id: string, kind: Node["kind"]) => {
-    if (seen.has(id)) return;
-    seen.add(id);
-    nodes.push({
-      id,
-      label: kind === "symbol" ? id.replace(/^sym:/, "") : shortName(id),
-      kind,
-      x: 400 + (Math.random() - 0.5) * 300,
-      y: 260 + (Math.random() - 0.5) * 220,
-      vx: 0,
-      vy: 0,
-    });
-  };
-  add(n.path, "center");
-  for (const f of n.imports.slice(0, 20)) {
-    add(f, "import");
-    links.push({ source: n.path, target: f });
-  }
-  for (const f of n.importers.slice(0, 20)) {
-    add(f, "importer");
-    links.push({ source: f, target: n.path });
-  }
-  for (const s of n.symbols.slice(0, 8)) {
-    const sid = `sym:${s.name}`;
-    add(sid, "symbol");
-    links.push({ source: n.path, target: sid });
-    for (const c of s.callers.slice(0, 6)) {
-      add(c, "importer");
-      links.push({ source: c, target: sid });
-    }
-  }
-  return { nodes, links };
-}
-
-function GraphCanvas({
-  data,
-  onSelect,
-}: {
-  data: GraphNeighborhood;
-  onSelect: (path: string) => void;
-}) {
-  const [nodes, setNodes] = useState<Node[]>([]);
-  const [links, setLinks] = useState<Link[]>([]);
-  const raf = useRef<number>(0);
-
-  useEffect(() => {
-    const sim = buildSim(data);
-    setLinks(sim.links);
-    let ns = sim.nodes;
-    let tick = 0;
-    const step = () => {
-      tick += 1;
-      const byId = new Map(ns.map((n) => [n.id, n]));
-      // Repulsion
-      for (const a of ns) {
-        for (const b of ns) {
-          if (a === b) continue;
-          const dx = a.x - b.x;
-          const dy = a.y - b.y;
-          const d2 = Math.max(dx * dx + dy * dy, 40);
-          const f = 1800 / d2;
-          const d = Math.sqrt(d2);
-          a.vx += (dx / d) * f;
-          a.vy += (dy / d) * f;
-        }
-      }
-      // Springs
-      for (const l of sim.links) {
-        const s = byId.get(l.source);
-        const t = byId.get(l.target);
-        if (!s || !t) continue;
-        const dx = t.x - s.x;
-        const dy = t.y - s.y;
-        const d = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-        const f = (d - 110) * 0.02;
-        s.vx += (dx / d) * f;
-        s.vy += (dy / d) * f;
-        t.vx -= (dx / d) * f;
-        t.vy -= (dy / d) * f;
-      }
-      // Center gravity + integrate
-      ns = ns.map((n) => {
-        const gx = (400 - n.x) * (n.kind === "center" ? 0.08 : 0.004);
-        const gy = (260 - n.y) * (n.kind === "center" ? 0.08 : 0.004);
-        const vx = (n.vx + gx) * 0.82;
-        const vy = (n.vy + gy) * 0.82;
-        return {
-          ...n,
-          x: Math.max(30, Math.min(770, n.x + vx)),
-          y: Math.max(24, Math.min(496, n.y + vy)),
-          vx,
-          vy,
-        };
-      });
-      setNodes([...ns]);
-      if (tick < 140) raf.current = requestAnimationFrame(step);
-    };
-    raf.current = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf.current);
-  }, [data]);
-
-  const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
-  const color = (k: Node["kind"]) =>
-    k === "center"
-      ? "#34d399"
-      : k === "symbol"
-        ? "#fbbf24"
-        : k === "importer"
-          ? "#60a5fa"
-          : "#a78bfa";
-
-  return (
-    <svg
-      viewBox="0 0 800 520"
-      role="group"
-      aria-label={`Files connected to ${data.path}`}
-      className="w-full rounded-lg border border-zinc-800 bg-zinc-950"
-    >
-      {links.map((l, i) => {
-        const s = byId.get(l.source);
-        const t = byId.get(l.target);
-        if (!s || !t) return null;
-        return (
-          <line key={i} x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke="#3f3f46" strokeWidth={1} />
-        );
-      })}
-      {nodes.map((n) => (
-        <g
-          key={n.id}
-          transform={`translate(${n.x},${n.y})`}
-          className={n.kind !== "symbol" ? "cursor-pointer outline-none [&:focus-visible>circle]:stroke-zinc-100 [&:focus-visible>circle]:stroke-2" : ""}
-          {...(n.kind !== "symbol"
-            ? {
-                role: "button",
-                tabIndex: 0,
-                "aria-label": `Explore ${n.id}`,
-                onClick: () => onSelect(n.id),
-                onKeyDown: (e: React.KeyboardEvent) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    onSelect(n.id);
-                  }
-                },
-              }
-            : {})}
-        >
-          <circle
-            r={n.kind === "center" ? 11 : n.kind === "symbol" ? 5 : 7}
-            fill={color(n.kind)}
-            fillOpacity={0.9}
-          />
-          <text
-            y={n.kind === "center" ? 26 : 18}
-            textAnchor="middle"
-            className="select-none"
-            fill="#a1a1aa"
-            fontSize={10}
-          >
-            {n.label}
-          </text>
-        </g>
-      ))}
-    </svg>
-  );
-}
+import { GraphExplorer, GraphLegend, type Filterable } from "./explorer";
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
@@ -296,6 +106,7 @@ export default function GraphPage() {
   const [searchError, setSearchError] = useState("");
   const [hood, setHood] = useState<GraphNeighborhood | null>(null);
   const [hoodError, setHoodError] = useState("");
+  const [hiddenKinds, setHiddenKinds] = useState<ReadonlySet<Filterable>>(new Set());
   const [busy, setBusy] = useState(false);
   const [acting, setActing] = useState("");
   const [canManage, setCanManage] = useState(false);
@@ -630,14 +441,18 @@ export default function GraphPage() {
             )}
             {hood ? (
               <>
-                <GraphCanvas data={hood} onSelect={explore} />
-                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-zinc-500">
-                  <span><span aria-hidden="true" className="text-emerald-400">●</span> selected file</span>
-                  <span><span aria-hidden="true" className="text-violet-400">●</span> files it imports</span>
-                  <span><span aria-hidden="true" className="text-blue-400">●</span> files that use it</span>
-                  <span><span aria-hidden="true" className="text-amber-400">●</span> its symbols</span>
-                  <span>Pick a file node to move to it.</span>
-                </div>
+                <GraphExplorer data={hood} hidden={hiddenKinds} onSelect={explore} />
+                <GraphLegend
+                  hidden={hiddenKinds}
+                  onToggle={(k) =>
+                    setHiddenKinds((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(k)) next.delete(k);
+                      else next.add(k);
+                      return next;
+                    })
+                  }
+                />
               </>
             ) : (
               <div className="border border-dashed border-zinc-800 rounded-lg h-40 flex items-center justify-center px-4 text-center text-sm text-zinc-500">
