@@ -1,10 +1,8 @@
 ---
 title: Versioning and updates
 description: How plugins are pinned, which changes apply by themselves, and which wait for an admin.
-status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
 
 ## Installs are pinned
 
@@ -23,16 +21,17 @@ From the plugin's page: "Wording changes apply on their own and are logged. A ve
 | A new trigger | Waits for an admin. |
 | A new connection or OAuth scope | Waits for an admin. |
 | A new or wider output | Waits for an admin. |
+| New `results` | Waits for an admin. |
 
 While an update waits, the plugin keeps running on the version already approved. The waiting update lists exactly what widened, for example "adds tool publish_post (consequential)", with what was added, removed and changed.
 
 ## Following a branch, a tag or a commit
 
-Each plugin follows a branch, a tag or one commit of its source, and **Take new versions on their own** decides whether new versions are picked up by themselves (still under the rules above). **Pin to a commit** freezes a plugin on one version. See [Public and private repos](/plugins/repos).
+Each plugin follows a branch, a tag or one commit of its source, and **Take new versions on their own** decides whether new versions are picked up by themselves (still under the rules above). **Pin to a commit** freezes a plugin on one version. **Roll back** returns to the previous version and turns taking new versions off. See [Public and private repos](/plugins/repos).
 
-## Semantic versions
+## Version numbers
 
-Use `MAJOR.MINOR.PATCH`:
+`version` is `1.2` or `1.2.0`. A useful habit:
 
 - **Patch** for wording fixes.
 - **Minor** for new abilities (which wait for an admin).

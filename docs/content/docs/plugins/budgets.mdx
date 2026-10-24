@@ -1,10 +1,8 @@
 ---
 title: Budgets and metering
 description: Every model call a plugin makes is metered and counted against its own monthly limit and the team's.
-status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
 
 Every model call a plugin run makes is metered, like every other call CoderHelm makes, and paid for with the team's own model key.
 
@@ -15,7 +13,7 @@ budget:
   monthly_tokens: 2000000
 ```
 
-`monthly_tokens` is the plugin's own monthly limit. The team can change it on the plugin's page under **Monthly token limit**, where it also sees **Tokens used this month**; empty or 0 means no limit of its own.
+`monthly_tokens` is the plugin's own monthly limit, as a starting value. The team can change it on the plugin's page under **Monthly token limit**, where it also sees **Tokens used this month**; empty or 0 means no limit of its own.
 
 The plugin's usage counts toward the team's [token limits](/concepts/token-limits) too. When either is reached, the plugin stops starting runs until next month, and a run it would have started shows as refused with the reason.
 

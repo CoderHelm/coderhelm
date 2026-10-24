@@ -1,41 +1,45 @@
 ---
 title: Repo layout
 description: Where each file of a plugin goes. The layout matches Claude Code plugins and CoderHelm skill repos.
-status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
+A plugin is one folder with `plugin.yaml` at its root. A source repository holds either one plugin at its top, or many plugins, each in its own `plugins/<name>/` folder (a [marketplace](/plugins/marketplace) repo). CoderHelm looks for the manifest as `plugin.yaml`, then `plugin.yml`, then `.coderhelm/plugin.yaml`.
 
-A plugin is one git repository (or one folder of a [marketplace](/plugins/marketplace) repo) with `plugin.yaml` at its root.
+This is the layout of the [marketing example](/plugins/walkthrough):
 
 <Files>
   <File name="plugin.yaml" />
-  <File name="README.md" />
   <Folder name="skills" defaultOpen>
     <Folder name="brand-voice" defaultOpen>
       <File name="SKILL.md" />
+      <File name="examples.md" />
     </Folder>
-    <Folder name="launch-checklist" defaultOpen>
+    <Folder name="claims-and-facts" defaultOpen>
       <File name="SKILL.md" />
     </Folder>
   </Folder>
   <Folder name="agents" defaultOpen>
     <File name="launch-writer.md" />
+    <File name="weekly-roundup.md" />
+  </Folder>
+  <Folder name="connectors" defaultOpen>
+    <File name="README.md" />
   </Folder>
 </Files>
 
 | Path | What it is |
 | --- | --- |
 | `plugin.yaml` | The manifest. Required. See the [manifest reference](/plugins/manifest-reference). |
-| `skills/<name>/SKILL.md` | Instructions the plugin's agents read, with optional text files next to them. Same format as [skills](/concepts/skills#frontmatter). |
-| `agents/<name>.md` | The agents that do the work. The body is the agent's instructions; `tools:` in the frontmatter lists the tools it uses. |
-| `README.md` | For people: what the plugin does and what it needs. Not read by agents. |
+| `skills/<name>/SKILL.md` | Instructions the plugin's agents read, with optional text files next to them (like `examples.md`). Same format as [skills](/concepts/skills#frontmatter). |
+| `agents/<name>.md` | The agents that do the work. The body is the agent's instructions. A trigger picks one by its file's name with `agent:`; without it, the first agent answers. |
+| `commands/<name>.md` | Optional steps an agent can follow, listed with `commands:` in the manifest. |
+| Other files | For people, such as `connectors/README.md` saying which connections the plugin expects. Not read by agents. |
 
-The `skills` and `agents` fields in the manifest default to `skills/*/SKILL.md` and `agents/*.md`. Change them if your files live elsewhere, for example to share a folder with a Claude Code plugin under `.claude/`.
+The `skills` and `agents` fields in the manifest default to `skills/*/SKILL.md` and `agents/*.md`. Each entry is a relative path or glob ending in `.md`. Change them if your files live elsewhere, for example to share a folder with a Claude Code plugin under `.claude/`.
 
 ## Limits
 
-The same limits as skill repos apply: up to 200 skills and agents, 64,000 bytes per file, 32,000 bytes per file next to a skill, and 2,000,000 bytes in total.
+The same limits as skill repos apply: up to 200 skills and agents, 64,000 bytes per file, 32,000 bytes per file next to a skill, and 2,000,000 bytes in total. The manifest itself may be up to 32,000 bytes, with at most 40 tools, 30 settings and 10 triggers.
 
 ## What doesn't go in the repo
 
