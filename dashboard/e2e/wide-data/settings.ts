@@ -1,6 +1,6 @@
 import type { Handler } from "./index";
 import { TOOL_NAME } from "./ids";
-import { ARN, BRANCH, EMAIL, FILE, iso, LOG_GROUP, LONG_URL, ORG, REPO, REPO_2, SENTENCE, SHA, TOKEN } from "./long";
+import { ARN, BRANCH, EMAIL, FILE, iso, LOG_GROUP, LONG_URL, NOTES, ORG, REPO, REPO_2, SENTENCE, SHA, TOKEN } from "./long";
 
 // Settings, integrations, data sources and team tools.
 
@@ -108,7 +108,7 @@ const SOURCES = [
   },
   {
     ...SOURCE_BASE, id: "ds_rest", kind: "rest", name: "Class schedule service REST API", url: `${API_URL}/rest`, kinds: null, schema_available: false,
-    header_name: "X-Readonly-Api-Key-For-Coderhelm", paths: ["/v1/programs/{programId}/schedule-entries-for-the-selected-location"], instructions: SENTENCE,
+    header_name: "X-Readonly-Api-Key-For-Coderhelm", paths: ["/v1/programs/{programId}/schedule-entries-for-the-selected-location"], instructions: NOTES,
   },
 ];
 
@@ -190,7 +190,7 @@ export const settingsData: Handler = ({ method, path, url }) => {
   const scoped = p.match(/^\/api\/(rules|voice|instructions|agents)\/(global|repo\/(.+))$/);
   if (scoped) {
     if (scoped[1] === "rules") return { rules: [`Never edit generated files under ${FILE}`, TOKEN, `Branch names look like ${BRANCH}`] };
-    return { content: `${SENTENCE}\n\nSee ${LONG_URL}.\n\n${TOKEN}` };
+    return { content: `${NOTES}\n\nSee ${LONG_URL}.\n\n${TOKEN}` };
   }
 
   // Data sources

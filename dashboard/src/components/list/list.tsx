@@ -116,7 +116,7 @@ export function ListRow({
   const panelId = useId();
   const dataAttrs = Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [`data-${k}`, v]));
   const metaBits = (meta ?? []).filter((m) => m !== null && m !== undefined && m !== false && m !== "");
-  const titleClass = `block line-clamp-2 sm:truncate rounded text-sm font-medium ${
+  const titleClass = `relative block line-clamp-2 sm:truncate rounded text-sm font-medium ${
     quiet ? "text-zinc-400" : "text-zinc-100"
   } ${href || externalHref ? "hover:underline" : ""} ${focusRing}`;
 

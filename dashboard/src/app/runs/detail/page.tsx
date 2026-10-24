@@ -9,7 +9,7 @@ import { limitName, reachedLimit, usageBreakdown, usageTotal } from "@/lib/usage
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Callout } from "@/components/callout";
-import { Markdown } from "@/components/markdown";
+import { InlineMarkdown, Markdown } from "@/components/markdown";
 import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
 import { RunStatusBadge, runCanClose, runCloseIsLikely, runIsLive } from "@/components/run-status";
@@ -1204,11 +1204,11 @@ function RunDetailInner() {
                             </svg>
                           )}
                         </div>
-                        <span className={`min-w-0 text-xs leading-relaxed [overflow-wrap:anywhere] ${
-                          done ? "text-zinc-500" : "text-zinc-400"
-                        }`}>
+                        <span className={`min-w-0 line-clamp-3 text-xs leading-relaxed [overflow-wrap:anywhere] ${
+                          done ? "text-zinc-400" : "text-zinc-300"
+                        }`} title={task.text}>
                           <span className="sr-only">{done ? "Done: " : "To do: "}</span>
-                          {task.text.length > 120 ? task.text.slice(0, 120) + "…" : task.text}
+                          <InlineMarkdown>{task.text}</InlineMarkdown>
                         </span>
                       </div>
                     </div>

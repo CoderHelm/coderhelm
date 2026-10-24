@@ -19,6 +19,7 @@ import { Page, PageHeader, Section } from "@/components/page";
 import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { Field, SecretInput } from "@/components/field";
+import { MarkdownEditor } from "@/components/markdown-editor";
 import { AwsAbilitiesPanel, AwsAbilitySummary, ConnectorForm, JIRA_APP } from "@/components/connections";
 import { Switch } from "@/components/teams-webhook";
 import { ChannelPicker, channelsPayload, draftDirty, draftFrom, draftValid, NO_WEBHOOKS, type ChannelsDraft } from "@/components/chat-channels";
@@ -619,7 +620,17 @@ function PluginPanel({ item, onChanged, onClose }: { item: Integration; onChange
       {d.enabled && (
       <Disclosure summary="Instructions agents follow with this server">
         <Field id={`${p.id}-prompt`} label="Instructions">
-          {(props) => <textarea {...props} rows={4} maxLength={4000} className={`${inputClass} font-mono`} value={prompt} onChange={(e) => setPrompt(e.target.value)} />}
+          {(props) => (
+            <MarkdownEditor
+              {...props}
+              variant="instructions"
+              minRows={4}
+              maxLength={4000}
+              value={prompt}
+              onChange={setPrompt}
+              previewNote="Agents get this text as written with the server's tools."
+            />
+          )}
         </Field>
         <p className="mt-2">
           <button type="button" onClick={savePrompt} className={secondaryButton}>
