@@ -3060,4 +3060,6 @@ export interface NewSupportTicket {
   page?: string;
   item?: SupportItemRef;
   items?: SupportItemRef[];
+  /** People on the ticket from the start, checked like adding them later. */
+  people?: SupportPersonRef[];
 }

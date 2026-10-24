@@ -52,6 +52,7 @@ import {
   ticketItems,
   ticketPeople,
   type HelpTarget,
+  type TicketPeopleSource,
 } from "@/lib/support";
 import { ChatMarkdown } from "./chat-markdown";
 import { MarkdownEditor, clearDraft } from "./markdown-editor";
@@ -652,7 +653,9 @@ export function Composer({
 /**
  * Who is on the ticket, with Follow / Unfollow, and, for whoever may manage
  * it, a search to add teammates or copy an outside address. `adding` opens
- * the search (the header's "Add people" sets it).
+ * the search (the header's "Add people" sets it). The new-ticket form uses
+ * it too, for a ticket not sent yet: there `onAdd` and `onRemove` change the
+ * form, and the people go with the ticket when it is sent.
  */
 export function TicketPeople({
   ticket,
@@ -664,8 +667,9 @@ export function TicketPeople({
   setAdding,
   onAdd,
   onRemove,
+  note = "Everyone here is emailed when support replies or the status changes.",
 }: {
-  ticket: SupportTicket;
+  ticket: TicketPeopleSource;
   avatars?: Record<string, string>;
   /** The viewer's user id (customer side). */
   me?: string;
@@ -673,8 +677,10 @@ export function TicketPeople({
   admin?: boolean;
   adding: boolean;
   setAdding: (v: boolean) => void;
-  onAdd: (who: SupportPersonRef) => Promise<boolean>;
+  /** `user` is the teammate picked from the list, when it was one. */
+  onAdd: (who: SupportPersonRef, user?: TeamUser) => Promise<boolean>;
   onRemove: (who: SupportPersonRef) => Promise<boolean>;
+  note?: ReactNode;
 }) {
   const people = ticketPeople(ticket);
   const mine = me ? people.find((p) => !p.outside && (p.filer ? bareUserId(ticket.opened_by_id) : bareUserId(p.p?.user_id)) === bareUserId(me)) : undefined;
@@ -727,7 +733,7 @@ export function TicketPeople({
       </div>
       {full && <p className="mt-2 text-xs text-zinc-500">A ticket can have {MAX_PARTICIPANTS} people besides the person who filed it.</p>}
       {adding && canManage && <AddPeople ticket={ticket} admin={admin} onAdd={onAdd} onClose={() => setAdding(false)} />}
-      <p className="mt-2 text-xs text-zinc-500">Everyone here is emailed when support replies or the status changes.</p>
+      <p className="mt-2 text-xs text-zinc-500">{note}</p>
     </div>
   );
 }
@@ -739,9 +745,9 @@ function AddPeople({
   onAdd,
   onClose,
 }: {
-  ticket: SupportTicket;
+  ticket: TicketPeopleSource;
   admin: boolean;
-  onAdd: (who: SupportPersonRef) => Promise<boolean>;
+  onAdd: (who: SupportPersonRef, user?: TeamUser) => Promise<boolean>;
   onClose: () => void;
 }) {
   const [q, setQ] = useState("");
@@ -772,10 +778,11 @@ function AddPeople({
   const email = cleanEmail(q);
   const emailTaken = !!email && takenEmails.has(email);
   const emailIsMember = !!email && (users ?? []).some((u) => (u.email || "").toLowerCase() === email);
-  const options: { key: string; who: SupportPersonRef; label: ReactNode }[] = [
+  const options: { key: string; who: SupportPersonRef; user?: TeamUser; label: ReactNode }[] = [
     ...matches.map((u) => ({
       key: u.user_id,
       who: { user_id: u.user_id },
+      user: u,
       label: (
         <span className="flex min-w-0 items-center gap-2">
           <Avatar name={personName(u.name || u.github_login, u.email)} email={u.email ?? ""} url={u.avatar_url ?? undefined} size="sm" />
@@ -799,10 +806,10 @@ function AddPeople({
         ]
       : []),
   ];
-  const pick = async (who: SupportPersonRef) => {
+  const pick = async (who: SupportPersonRef, user?: TeamUser) => {
     setBusy(true);
     try {
-      if (await onAdd(who)) {
+      if (await onAdd(who, user)) {
         setQ("");
         setActive(0);
         inputRef.current?.focus();
@@ -855,7 +862,7 @@ function AddPeople({
             }
             if (e.key === "Enter") {
               e.preventDefault();
-              if (options[active] && !busy) void pick(options[active].who);
+              if (options[active] && !busy) void pick(options[active].who, options[active].user);
             }
           }}
           placeholder={admin ? "name@example.com" : "Search the team, or type an email"}
@@ -879,7 +886,7 @@ function AddPeople({
               role="option"
               aria-selected={i === active}
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => !busy && void pick(o.who)}
+              onClick={() => !busy && void pick(o.who, o.user)}
               onMouseEnter={() => setActive(i)}
               data-testid="add-person-option"
               className={`flex min-w-0 cursor-pointer items-center rounded-md px-2 py-1.5 text-sm ${i === active ? "bg-zinc-800/80" : ""}`}

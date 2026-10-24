@@ -3,9 +3,19 @@
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api, type NewSupportTicket, type SupportItemKind, type SupportItemRef, type SupportPriority, type SupportTicket } from "@/lib/api";
-import { customerLook, filedBy, itemWords, MAX_ATTACHMENTS, pageWords, ticketItems } from "@/lib/support";
-import { AttachmentChips, AttachPicker } from "@/components/support";
+import {
+  api,
+  type NewSupportTicket,
+  type SupportItemKind,
+  type SupportItemRef,
+  type SupportParticipant,
+  type SupportPersonRef,
+  type SupportPriority,
+  type SupportTicket,
+  type TeamUser,
+} from "@/lib/api";
+import { bareUserId, customerLook, filedBy, itemWords, MAX_ATTACHMENTS, pageWords, ticketItems } from "@/lib/support";
+import { AttachmentChips, AttachPicker, TicketPeople } from "@/components/support";
 import { Page, PageHeader } from "@/components/page";
 import { Field } from "@/components/settings";
 import { MarkdownEditor, clearDraft } from "@/components/markdown-editor";
@@ -208,6 +218,38 @@ function NewTicket() {
   const [priority, setPriority] = useState<SupportPriority>("normal");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Who goes on the ticket besides the person filing it. Checked again by
+  // the gateway when it is sent, the same way as adding someone later.
+  const [me, setMe] = useState<{ user_id: string; email: string; name: string; avatar_url: string } | null>(null);
+  const [people, setPeople] = useState<SupportParticipant[]>([]);
+  const [avatars, setAvatars] = useState<Record<string, string>>({});
+  const [addingPeople, setAddingPeople] = useState(false);
+
+  useEffect(() => {
+    api
+      .me()
+      .then(async (u) => {
+        setMe({ user_id: u.user_id, email: u.email, name: u.github_login || "", avatar_url: u.avatar_url || "" });
+        // The name the team's member list has, as the ticket will show it.
+        const mine = (await api.listUsers().catch(() => ({ users: [] as TeamUser[] }))).users.find((x) => bareUserId(x.user_id) === bareUserId(u.user_id));
+        if (mine?.name) setMe((m) => (m ? { ...m, name: mine.name! } : m));
+      })
+      .catch(() => setMe(null));
+  }, []);
+
+  const addPerson = async (who: SupportPersonRef, user?: TeamUser) => {
+    const p: SupportParticipant = user
+      ? { user_id: user.user_id, email: (user.email || "").toLowerCase(), name: user.name || user.github_login || "", outside: false, added_by: "", added_at: "" }
+      : { user_id: "", email: (who.email || "").toLowerCase(), name: "", outside: true, added_by: "", added_at: "" };
+    if (!p.user_id && !p.email) return false;
+    setPeople((now) => (now.some((q) => (p.user_id ? bareUserId(q.user_id) === bareUserId(p.user_id) : q.email === p.email)) ? now : [...now, p]));
+    if (user?.avatar_url && p.email) setAvatars((a) => ({ ...a, [p.email]: user.avatar_url! }));
+    return true;
+  };
+  const removePerson = async (who: SupportPersonRef) => {
+    setPeople((now) => now.filter((q) => (who.user_id ? bareUserId(q.user_id) !== bareUserId(who.user_id) : q.email !== (who.email || "").toLowerCase())));
+    return true;
+  };
 
   const submit = async () => {
     if (!subject.trim() || !body.trim() || busy) return;
@@ -216,6 +258,7 @@ function NewTicket() {
     const req: NewSupportTicket = { subject: subject.trim(), body: body.trim(), priority };
     if (page) req.page = page;
     if (items.length > 0) req.items = items.map((i) => ({ kind: i.kind, id: i.id, label: i.label || undefined, repo: i.repo || undefined }));
+    if (people.length > 0) req.people = people.map((p) => (p.outside ? { email: p.email } : { user_id: p.user_id }));
     try {
       const r = await api.openSupportTicket(req);
       clearDraft(NEW_TICKET_DRAFT);
@@ -277,6 +320,30 @@ function NewTicket() {
             </span>
           </div>
         </div>
+
+        <section aria-labelledby="ticket-people-label" data-testid="new-ticket-people">
+          <h2 id="ticket-people-label" className="mb-1.5 text-sm font-medium text-zinc-200">
+            People
+          </h2>
+          <div className="rounded-lg border border-zinc-800/80 bg-zinc-900/30 px-3 py-2.5">
+            <TicketPeople
+              ticket={{
+                opened_by_id: me?.user_id ?? "",
+                opened_by_email: me?.email ?? "",
+                opened_by_name: me ? me.name : "You",
+                participants: people,
+              }}
+              avatars={me?.avatar_url && me.email ? { ...avatars, [me.email.toLowerCase()]: me.avatar_url } : avatars}
+              me={me?.user_id}
+              canManage
+              adding={addingPeople}
+              setAdding={setAddingPeople}
+              onAdd={addPerson}
+              onRemove={removePerson}
+              note="They are added when you send the ticket. Everyone here is emailed when support replies or the status changes."
+            />
+          </div>
+        </section>
 
         <section
           aria-labelledby="attached-heading"
