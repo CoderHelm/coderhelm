@@ -250,7 +250,7 @@ function GatePage() {
           <ol className="mt-2 flex flex-col divide-y divide-zinc-800/60 text-sm" data-testid="gate-history">
             {controls.map((c, i) => (
               <li key={i} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1.5 text-zinc-400">
-                <span>
+                <span className="min-w-0 wrap-anywhere">
                   <span className="text-zinc-200">
                     {c.action === "stop" ? "Stopped" : c.outcome === "recheck" ? "Checked again" : "Re-armed"}
                   </span>

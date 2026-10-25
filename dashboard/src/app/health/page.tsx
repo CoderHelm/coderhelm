@@ -174,7 +174,9 @@ function CheckCard({ check, onRefresh }: { check: HealthCheckItem; onRefresh: ()
         </div>
         {meta.description && <p className="text-xs text-zinc-500 mt-1">{meta.description}</p>}
       </div>
-      <span className="text-sm text-zinc-400 shrink-0 tabular-nums">{summary}</span>
+      {/* Wraps at its spaces in up to 45% of the row, so a long summary
+          never squeezes the description beside it to a letter a line. */}
+      <span className="min-w-0 max-w-[45%] text-right text-sm text-zinc-400 tabular-nums">{summary}</span>
     </>
   );
 

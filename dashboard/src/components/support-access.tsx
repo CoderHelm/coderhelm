@@ -175,7 +175,7 @@ export function SupportAccessLog({ access }: { access: SupportAccess }) {
             {LOG_WORDS[e.kind] ?? e.kind}
           </span>
           {e.route && (
-            <code className="min-w-0 break-all font-mono text-xs text-zinc-400">
+            <code className="min-w-0 wrap-anywhere font-mono text-xs text-zinc-400">
               {e.method} {e.route}
             </code>
           )}

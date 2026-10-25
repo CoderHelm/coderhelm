@@ -5,16 +5,26 @@ html {
   color-scheme: dark;
 }
 
-/* Long unbroken text (shas, URLs, branch names, emails, stack frames) wraps
-   instead of pushing the page sideways on a phone. `anywhere`, unlike
-   `break-word`, also lets a flex or grid item shrink below its longest word,
-   so a row of text and badges fits without a min-w-0 on every child. A table
-   keeps its columns as wide as their longest word and scrolls inside its own
-   box instead; code never wraps unless asked (white-space: pre). Checked on
-   every page by e2e/no-sideways-scroll.spec.ts. */
+/* How text wraps. A word wraps whole; one that is wider than its whole line
+   (a sha, URL, branch name or email in a narrow box) breaks where it must
+   rather than push the page sideways on a phone (`break-word`).
+
+   `break-word` keeps a flex or grid item at least as wide as its longest
+   word, so a label, button, tab or chip in a crowded row keeps its words
+   whole: the row wraps (`flex-wrap`) or the item gets `shrink-0`. Text that
+   holds long unbroken strings beside other items (ids, URLs, shas, emails,
+   paths, prose and markdown) opts in to `wrap-anywhere` on its own element,
+   which also lets that one item shrink below its longest string. Never put
+   `wrap-anywhere` on a label, button, tab or chip: it lets a squeezed row cut
+   "Route" into "Rout" and "e".
+
+   A table keeps its columns as wide as their longest word and scrolls inside
+   its own box, even inside a `wrap-anywhere` block; code never wraps unless asked (white-space: pre). Checked on
+   every page by e2e/no-sideways-scroll.spec.ts and
+   e2e/no-mid-word-breaks.spec.ts. */
 @layer base {
   body {
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
   }
   table {
     overflow-wrap: break-word;

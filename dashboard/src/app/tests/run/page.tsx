@@ -128,7 +128,7 @@ function ExecutionRow({ e, runUrl }: { e: TestRunExecution; runUrl: string }) {
           <Link href={testHref(e.test_id)} className={`text-sm font-medium text-zinc-100 hover:underline underline-offset-4 rounded ${focusRing}`}>
             {e.project ? `${e.title} (${e.project})` : e.title}
           </Link>
-          <p className="mt-0.5 break-all font-mono text-xs text-zinc-500">{e.file}</p>
+          <p className="mt-0.5 wrap-anywhere font-mono text-xs text-zinc-500">{e.file}</p>
         </div>
         <p className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
           <StatusPill tone={OUTCOME_TONE[e.outcome]}>{OUTCOME_LABEL[e.outcome]}</StatusPill>

@@ -137,10 +137,12 @@ function testSummary() {
 // ---- Alerts ----------------------------------------------------------------
 
 const TOPIC = "arn:aws:sns:us-east-1:123456789012:production-payments-reconciliation-alerts-and-nightly-import-failures";
+// A second route, so the recent-alerts list shows its route filter.
+const TOPIC_2 = "arn:aws:sns:us-east-1:123456789012:staging-checkout-service-latency-and-error-budget-alarms";
 
 function alert(i: number) {
   return {
-    id: i === 0 ? ALERT_ID : `alert-wide-${i}`, received_at: iso(30 + i * 60), topic_arn: TOPIC, repo: i % 2 ? REPO_2 : REPO,
+    id: i === 0 ? ALERT_ID : `alert-wide-${i}`, received_at: iso(30 + i * 60), topic_arn: i === 5 ? TOPIC_2 : TOPIC, repo: i % 2 ? REPO_2 : REPO,
     kind: "cloudwatch_alarm", title: `ALARM: ${TOKEN}`, outcome: ["run_started", "posted", "deduplicated"][i % 3],
     ticket_id: `ALERT-${TICKET}-${SHA}`, recovers_ticket: null,
   };
@@ -157,6 +159,7 @@ const ALERT_ROUTES = {
         { id: "r2", alarms: [], terms: [TOKEN, LOG_GROUP], repo: REPO_2, instructions: SENTENCE },
       ],
     },
+    { topic_arn: TOPIC_2, enabled: false, notify_mode: "all", post_recoveries: false, updated_at: iso(DAY * 2), webhooks: {}, rules: [] },
   ],
 };
 

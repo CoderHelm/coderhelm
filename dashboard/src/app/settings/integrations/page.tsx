@@ -899,7 +899,7 @@ function WebsitesCard({ canEdit }: { canEdit: boolean }) {
             <ul aria-label="Your websites" className="flex flex-wrap gap-2">
               {domains.map((d) => (
                 <li key={d} className="inline-flex min-w-0 items-center gap-1 rounded-full border border-zinc-700 bg-zinc-950 py-1 pl-3 pr-1 text-sm text-zinc-200">
-                  <span data-testid="website-name" className="min-w-0 break-all font-mono text-xs">{d}</span>
+                  <span data-testid="website-name" className="min-w-0 wrap-anywhere font-mono text-xs">{d}</span>
                   {canEdit ? (
                     <button
                       type="button"

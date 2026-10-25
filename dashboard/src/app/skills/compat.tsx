@@ -242,17 +242,17 @@ export function CompatOverview({
             {needs.slice(0, 6).map((n) => {
               const key = `need:${n.name.toLowerCase()}`;
               return (
-                <li key={key}>
+                <li key={key} className="min-w-0 max-w-full">
                   <button
                     type="button"
                     aria-pressed={filter === key}
                     onClick={() => onFilter(filter === key ? "" : key)}
-                    className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
+                    className={`inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border px-3 py-1 text-left text-xs ${
                       filter === key ? "border-amber-400/60 bg-amber-500/15 text-amber-100" : "border-amber-500/30 bg-amber-500/5 text-amber-200 hover:bg-amber-500/10"
                     } ${focusRing}`}
                   >
-                    <span className="font-medium">{n.name}</span>
-                    <span className="text-amber-200/70">
+                    <span className="min-w-0 font-medium wrap-anywhere">{n.name}</span>
+                    <span className="shrink-0 whitespace-nowrap text-amber-200/70">
                       needed by {n.items} item{n.items === 1 ? "" : "s"}
                     </span>
                   </button>
@@ -364,7 +364,7 @@ export function CompatSection({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <CompatBadge item={item} />
-              {c?.summary && badge !== "unchecked" && <p className="text-sm text-zinc-200" data-testid="compat-summary">{c.summary}</p>}
+              {c?.summary && badge !== "unchecked" && <p className="min-w-0 text-sm text-zinc-200 wrap-anywhere" data-testid="compat-summary">{c.summary}</p>}
             </div>
             <p className="mt-1.5 text-xs text-zinc-500">
               {!c
@@ -379,7 +379,7 @@ export function CompatSection({
         </div>
 
         {(c?.notes?.length ?? 0) > 0 && badge !== "stale" && (
-          <ul className="border-b border-zinc-800 px-5 py-3 text-xs text-zinc-400" data-testid="compat-notes">
+          <ul className="border-b border-zinc-800 px-5 py-3 text-xs text-zinc-400 wrap-anywhere" data-testid="compat-notes">
             {c!.notes!.map((n) => (
               <li key={n}>{n}</li>
             ))}

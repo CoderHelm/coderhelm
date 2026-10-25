@@ -27,6 +27,8 @@
     "shiki": "4.5.0"
   },
   "devDependencies": {
+    "@fontsource/dejavu-mono": "5.3.0",
+    "@fontsource/dejavu-sans": "5.3.0",
     "@playwright/test": "^1.64.0",
     "@tailwindcss/postcss": "^4.1.0",
     "@types/node": "^22.0.0",

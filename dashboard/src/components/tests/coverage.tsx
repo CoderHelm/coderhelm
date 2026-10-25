@@ -153,7 +153,7 @@ function AreaRow({ area }: { area: { area: string; paths: string[]; tests: { id:
         {area.covered ? <StatusPill tone="success">{plural(area.tests.length, "test")}</StatusPill> : <StatusPill tone="warning">No test</StatusPill>}
       </div>
       {area.paths.length > 0 && (
-        <p className="mt-1 break-all font-mono text-xs text-zinc-500">{area.paths.slice(0, 4).join("  ")}{area.paths.length > 4 ? `  +${area.paths.length - 4} more` : ""}</p>
+        <p className="mt-1 wrap-anywhere font-mono text-xs text-zinc-500">{area.paths.slice(0, 4).join("  ")}{area.paths.length > 4 ? `  +${area.paths.length - 4} more` : ""}</p>
       )}
       {area.tests.length > 0 && (
         <ul aria-label={`Tests for ${area.area}`} className="mt-2 flex flex-wrap gap-x-4 gap-y-1">

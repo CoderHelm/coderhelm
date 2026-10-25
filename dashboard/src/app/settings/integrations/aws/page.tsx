@@ -422,7 +422,7 @@ function AccountSettings({
                 {!arnOk && <p role="alert" className="mt-1.5 text-xs text-red-400">The role must be named {ROLE_NAME}.</p>}
               </div>
             ) : (
-              <p id={ids.inputId} className="break-all text-sm text-zinc-200">{c.role_arn}</p>
+              <p id={ids.inputId} className="wrap-anywhere text-sm text-zinc-200">{c.role_arn}</p>
             )
           }
         />
@@ -535,7 +535,7 @@ function AccountSettings({
                             }
                             className="h-4 w-4 accent-emerald-500"
                           />
-                          <span className="break-all">{env}</span>
+                          <span className="wrap-anywhere">{env}</span>
                         </label>
                       </li>
                     ))}
@@ -844,8 +844,8 @@ function ConnectPanel({ first, onCancel, onConnected }: { first: boolean; onCanc
             <Field
               id="aws-role-arn"
               label="Role ARN"
-              helper={<>Looks like <code className="break-all">arn:aws:iam::123456789012:role/{ROLE_NAME}</code>.</>}
-              error={arn && !arnOk ? <>The role must be named {ROLE_NAME}: <code className="break-all">arn:aws:iam::&lt;12 digit account&gt;:role/{ROLE_NAME}</code></> : undefined}
+              helper={<>Looks like <code className="wrap-anywhere">arn:aws:iam::123456789012:role/{ROLE_NAME}</code>.</>}
+              error={arn && !arnOk ? <>The role must be named {ROLE_NAME}: <code className="wrap-anywhere">arn:aws:iam::&lt;12 digit account&gt;:role/{ROLE_NAME}</code></> : undefined}
             >
               {(props) => (
                 <input

@@ -86,7 +86,7 @@ export function ReviewStepsSection({
       {canManage && (
         <fieldset className="mt-4 min-w-0">
           <legend className="sr-only">Review steps</legend>
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,12rem),1fr))] gap-2">
             {REVIEW_STEPS.map((s) => (
               <label key={s.id} className="flex min-w-0 items-start gap-2 rounded-md border border-zinc-800 p-3 text-sm text-zinc-300">
                 <input
