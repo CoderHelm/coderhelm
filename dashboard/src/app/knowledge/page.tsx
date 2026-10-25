@@ -59,7 +59,7 @@ function Knowledge() {
   }, [params, canManage, router]);
 
   // While something is being brought in, look again now and then.
-  const busy = (bases ?? []).some((b) => b.processing > 0 || b.sources.some((s) => s.status === "syncing" || s.status === "queued"));
+  const busy = (bases ?? []).some((b) => b.processing > 0 || (b.sources ?? []).some((s) => s.status === "syncing" || s.status === "queued"));
   useEffect(() => {
     if (!busy) return;
     const t = setInterval(load, 5000);
@@ -162,9 +162,9 @@ function Empty({ canManage, onStart }: { canManage: boolean; onStart: (k?: AddKi
 function BaseCard({ b }: { b: Base }) {
   const health = baseHealth(b);
   // Apps first, uploads last.
-  const kinds = b.kinds.length ? [...b.kinds.filter((k) => k !== "upload"), ...b.kinds.filter((k) => k === "upload")] : ["upload"];
+  const kinds = b.kinds?.length ? [...b.kinds.filter((k) => k !== "upload"), ...b.kinds.filter((k) => k === "upload")] : ["upload"];
   const apps = kinds.filter((k) => k !== "upload");
-  const size = [b.synced ? itemWord(apps.length === 1 ? apps[0] : "page", b.synced) : "", b.uploads ? itemWord("upload", b.uploads) : ""].filter(Boolean).join(" and ");
+  const size = [(b.synced ?? 0) ? itemWord(apps.length === 1 ? apps[0] : "page", b.synced) : "", b.uploads ? itemWord("upload", b.uploads) : ""].filter(Boolean).join(" and ");
   return (
     <li className="min-w-0">
       <Link

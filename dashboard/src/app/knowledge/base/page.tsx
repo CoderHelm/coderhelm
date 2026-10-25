@@ -87,8 +87,8 @@ function BaseView() {
       .get(id)
       .then((r) => {
         setBase(r.base);
-        setItems(r.files);
-        setSources(r.sources);
+        setItems(r.files ?? []);
+        setSources(r.sources ?? []);
         setLimits(r.limits);
         setError(null);
       })
