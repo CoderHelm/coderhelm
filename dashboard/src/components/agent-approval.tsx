@@ -1,0 +1,146 @@
+"use client";
+
+import { useState } from "react";
+import { api } from "@/lib/api";
+import {
+  AGENT_LABELS, RISK_LABELS, approvalHeadline, decidedByText, decisionLine, relativeTime,
+  type Approval, type ApprovalCan, type Choice, type Via,
+} from "@/lib/agent-policy";
+import { CodeBlock } from "./code-block";
+import { StatusPill } from "./status-pill";
+import { buttonClass, inputClass } from "./ui";
+
+// One approval card: what an agent wants to do, why, the exact arguments and
+// the risk, with the answers the person may give. The same card shows on the
+// run page, in the plan chat, in the approvals queue and on the page Slack,
+// Teams and email buttons open.
+
+const RISK_TONE = { read: "neutral", write: "warning", consequential: "error" } as const;
+
+export function ApprovalCard({
+  approval,
+  can,
+  via,
+  onDecided,
+  focus = false,
+}: {
+  approval: Approval;
+  can: ApprovalCan;
+  /** Where the answer is given, for the record. */
+  via: Via;
+  onDecided?: (a: Approval) => void;
+  /** Opened from a link: the card is outlined. */
+  focus?: boolean;
+}) {
+  const [a, setA] = useState(approval);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const [denying, setDenying] = useState(false);
+  const [error, setError] = useState("");
+  const pending = a.status === "pending" && Date.parse(a.expires_at) > Date.now();
+  const noteId = `approval-note-${a.id}`;
+
+  const answer = async (approve: boolean, choice: Choice = "once") => {
+    setBusy(approve ? choice : "deny");
+    setError("");
+    try {
+      const r = await api.decideApproval(a.id, { approve, choice, via, note: note.trim() || undefined });
+      setA(r.approval);
+      onDecided?.(r.approval);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The answer wasn't saved. Try again.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const args = (() => {
+    try {
+      return JSON.stringify(a.args, null, 2);
+    } catch {
+      return String(a.args);
+    }
+  })();
+
+  return (
+    <section
+      aria-label={`Approval: ${approvalHeadline(a)}`}
+      data-testid="approval-card"
+      data-status={pending ? "pending" : a.status}
+      className={`min-w-0 rounded-lg border bg-zinc-900/60 p-4 ${focus ? "border-amber-500/50" : "border-zinc-800"}`}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusPill tone={pending ? "warning" : a.status === "approved" ? "success" : a.status === "denied" ? "error" : "neutral"}>
+          {pending ? "Waiting for approval" : a.status === "pending" ? "Expired" : a.status[0].toUpperCase() + a.status.slice(1)}
+        </StatusPill>
+        {a.risk && <StatusPill tone={RISK_TONE[a.risk]}>{RISK_LABELS[a.risk]}</StatusPill>}
+        <span className="text-xs text-zinc-500">
+          {AGENT_LABELS[a.agent]}
+          {a.repo ? ` in ${a.repo}` : ""}
+        </span>
+      </div>
+      <p className="mt-2 text-sm font-semibold text-zinc-100">{approvalHeadline(a)}</p>
+      {a.why && <p className="mt-1 text-sm text-zinc-300">Why: {a.why}</p>}
+      <p className="mt-1 text-xs text-zinc-500">Asked because: {decidedByText(a.asked_because)}</p>
+      <details className="mt-2">
+        <summary className="cursor-pointer text-xs text-zinc-400 hover:text-zinc-200">Exact arguments</summary>
+        <CodeBlock code={args} lang="json" label="Arguments" wrap maxHeightClass="max-h-64" className="mt-2" />
+      </details>
+
+      {pending ? (
+        can.approve ? (
+          <div className="mt-3 space-y-2">
+            {denying && (
+              <div>
+                <label htmlFor={noteId} className="block text-xs text-zinc-400">
+                  Tell the agent why (optional)
+                </label>
+                <textarea id={noteId} rows={2} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} className={`${inputClass} mt-1`} />
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <button type="button" disabled={!!busy} onClick={() => answer(true, "once")} className={buttonClass("primary", "sm")}>
+                {busy === "once" ? "Approving…" : "Approve once"}
+              </button>
+              {can.always && a.repo && (
+                <button type="button" disabled={!!busy} onClick={() => answer(true, "always_repo")} className={buttonClass("secondary", "sm")}>
+                  Always in this repository
+                </button>
+              )}
+              {can.always && (
+                <button type="button" disabled={!!busy} onClick={() => answer(true, "always_tool")} className={buttonClass("secondary", "sm")}>
+                  Always for this tool
+                </button>
+              )}
+              {denying ? (
+                <button type="button" disabled={!!busy} onClick={() => answer(false)} className={buttonClass("danger", "sm")}>
+                  {busy === "deny" ? "Denying…" : "Deny"}
+                </button>
+              ) : (
+                <button type="button" disabled={!!busy} onClick={() => setDenying(true)} className={buttonClass("ghost", "sm")}>
+                  Deny…
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-zinc-500">
+              Answer {relativeTime(a.expires_at)}, or the agent stops without doing it.
+              {can.always ? " “Always” adds a rule you can see and remove on the Agent permissions page." : ""}
+            </p>
+          </div>
+        ) : (
+          <p className="mt-3 text-xs text-zinc-400">Someone who can approve agent actions needs to answer this.</p>
+        )
+      ) : (
+        <p className="mt-3 text-xs text-zinc-400" data-testid="approval-decision">
+          {a.status === "pending" ? "Nobody answered in time. Nothing was done." : decisionLine(a)}
+          {a.note ? ` “${a.note}”` : ""}
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="mt-2 text-xs text-red-400">
+          {error}
+        </p>
+      )}
+    </section>
+  );
+}

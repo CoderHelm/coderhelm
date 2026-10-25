@@ -1,4 +1,7 @@
 import { apiBase } from "@/lib/runtime-config";
+import type {
+  AgentEvent, AgentKey, Approval, ApprovalCan, Choice, PolicyView, Preset, Rule, TestResult, Via,
+} from "@/lib/agent-policy";
 
 /**
  * Words for a failed request when the server sent no message of its own (the
@@ -1106,6 +1109,51 @@ export const api = {
     }),
   addMcpServer: (body: McpAddRequest) =>
     request<{ server: McpServer; detected: McpDetected }>("/api/mcp-servers", { method: "POST", body: JSON.stringify(body) }),
+  // ── Agent permissions ──────────────────────────────────────────────
+  getAgentPolicy: () => request<PolicyView>("/api/agents/policy"),
+  saveAgentSettings: (body: {
+    version: number;
+    autonomy?: string;
+    ask_timeout_secs?: number;
+    limit_egress?: boolean;
+    egress?: string[];
+  }) => request<PolicyView>("/api/agents/policy", { method: "PUT", body: JSON.stringify(body) }),
+  addAgentRule: (version: number, rule: Omit<Rule, "id" | "source" | "created_by" | "created_at">) =>
+    request<PolicyView>("/api/agents/policy/rules", { method: "POST", body: JSON.stringify({ version, rule }) }),
+  removeAgentRule: (version: number, id: string) =>
+    request<PolicyView>(`/api/agents/policy/rules/${encodeURIComponent(id)}?version=${version}`, { method: "DELETE" }),
+  applyAgentPreset: (version: number, preset: Preset) =>
+    request<PolicyView>("/api/agents/policy/preset", { method: "POST", body: JSON.stringify({ version, preset }) }),
+  setAgentSwitch: (version: number, agent: AgentKey, on: boolean, repo?: string) =>
+    request<PolicyView>("/api/agents/policy/switches", { method: "PUT", body: JSON.stringify({ version, agent, on, repo }) }),
+  setSandboxCommands: (version: number, repo: string, commands: string[]) =>
+    request<PolicyView>("/api/agents/policy/commands", { method: "PUT", body: JSON.stringify({ version, repo, commands }) }),
+  decideCommandSuggestion: (version: number, repo: string, command: string, accept: boolean) =>
+    request<PolicyView>("/api/agents/policy/suggestions", { method: "POST", body: JSON.stringify({ version, repo, command, accept }) }),
+  testAgentCall: (body: { agent: AgentKey; tool?: string; repo?: string; command?: string; kind?: string }) =>
+    request<TestResult>("/api/agents/policy/test", { method: "POST", body: JSON.stringify(body) }),
+  pauseAgents: (reason: string, until?: string) =>
+    request<PolicyView>("/api/agents/pause", { method: "POST", body: JSON.stringify({ reason, until }) }),
+  resumeAgents: () => request<PolicyView>("/api/agents/pause", { method: "DELETE" }),
+  listApprovals: (q: { status?: "pending" | "all"; run_id?: string; thread_id?: string } = {}) => {
+    const p = new URLSearchParams();
+    if (q.status) p.set("status", q.status);
+    if (q.run_id) p.set("run_id", q.run_id);
+    if (q.thread_id) p.set("thread_id", q.thread_id);
+    const qs = p.toString();
+    return request<{ approvals: Approval[]; can: ApprovalCan }>(`/api/agents/approvals${qs ? `?${qs}` : ""}`);
+  },
+  getApproval: (id: string) =>
+    request<{ approval: Approval; can: ApprovalCan }>(`/api/agents/approvals/${encodeURIComponent(id)}`),
+  decideApproval: (id: string, body: { approve: boolean; choice?: Choice; via?: Via; note?: string }) =>
+    request<{ approval: Approval }>(`/api/agents/approvals/${encodeURIComponent(id)}/decide`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  agentActivity: (limit = 50) => request<{ events: AgentEvent[] }>(`/api/agents/activity?limit=${limit}`),
+  declineSignIn: (thread_id: string, server_id: string) =>
+    request<{ declined: boolean }>("/api/agents/sign-in/decline", { method: "POST", body: JSON.stringify({ thread_id, server_id }) }),
+
   /** Where to send the browser to sign in. */
   connectMcpServer: (id: string) =>
     request<{ authorize_url: string }>(`/api/mcp-servers/${encodeURIComponent(id)}/connect`, { method: "POST" }),
@@ -1584,6 +1632,11 @@ export interface BulkCloseAnswer {
 }
 
 export interface RunDetail extends Run {
+  /** Why an agent loop stopped (agents paused, an approval nobody answered). */
+  policy_note?: string | null;
+  policy_approval?: string | null;
+  /** Connections the run could have used, with a way to connect. */
+  sign_in_prompts?: import("@/lib/agent-policy").SignInPrompt[];
   ticket_source?: string;
   branch?: string;
   pr_number?: number;

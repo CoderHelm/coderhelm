@@ -19,6 +19,7 @@ import { Time } from "@/components/list";
 import { usePaletteActions, type PageAction } from "@/components/command-palette";
 import type { CloseRunRequest } from "@/lib/api";
 import { TeamAgentAsks } from "./team-asks";
+import { AgentAsks } from "./agent-asks";
 import { WorkUsedLine } from "@/components/work-used";
 import { HelpLink } from "@/components/support";
 
@@ -634,6 +635,9 @@ function RunDetailInner() {
       <div className="mb-6">
         <PassProgress currentPass={run.current_pass} status={run.status} passHistory={run.pass_history} />
       </div>
+
+      {/* What the agents needed from a person: approvals, a stop, sign-ins */}
+      <AgentAsks runId={runId} live={runIsLive(run.status)} note={run.policy_note} prompts={run.sign_in_prompts} />
 
       {/* Error / clarification */}
       {run.error && (

@@ -17,9 +17,11 @@ Choose the models on **AI Models** (admins only). The models on offer are Claude
 ## What agents can touch
 
 - **Your code**: read through the GitHub App. Changes are pushed only to `coderhelm/` branches and arrive as pull requests.
-- **The sandbox**: builds, linters and tests run in an isolated build environment with no credentials and no access to your systems.
+- **The sandbox**: builds, linters and tests run in an isolated build environment with no credentials and no access to your systems. Its commands and network are limited by your [agent permissions](/concepts/agent-permissions#the-sandbox).
 - **Your data**: only through [data sources](/concepts/data-sources) and [team tools](/concepts/skills#team-tools), which are read-only.
 - **Outside tools**: only through [connections](/concepts/connections) an admin switched on.
+
+Before each call, every agent asks your team's [agent permissions](/concepts/agent-permissions). The answer is allow, ask or deny. An ask waits for a person to approve it.
 
 ## Team agents
 

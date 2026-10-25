@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChatMarkdown } from "@/components/chat-markdown";
 import { UsedChips } from "@/components/work-used";
@@ -220,7 +221,10 @@ export const AssistantMessage = memo(function AssistantMessage({
   endedAt,
   plan,
   onViewPlan,
+  cards,
 }: {
+  /** Approval and sign-in cards this answer raised, drawn by the page. */
+  cards?: ReactNode;
   msg: StreamMessage;
   /** The newest answer is never folded. */
   latest: boolean;
@@ -238,7 +242,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   const words = text.includes("```json") ? withoutPlanJson(text) : text;
   const streaming = !!msg.streaming;
   const writingPlan = streaming && text.includes("```json") && !plan;
-  if (!words && tools.length === 0 && thinking.length === 0 && !streaming) return null;
+  if (!words && tools.length === 0 && thinking.length === 0 && !streaming && !cards) return null;
   return (
     <div className="group/msg min-w-0 animate-message-in motion-reduce:animate-none" data-testid="assistant-message">
       <WorkLine tools={tools} thinking={thinking} servers={servers} streaming={streaming} startedAt={startedAt} endedAt={endedAt} />
@@ -253,6 +257,7 @@ export const AssistantMessage = memo(function AssistantMessage({
       ) : streaming && tools.length === 0 && thinking.length === 0 ? (
         <Waiting />
       ) : null}
+      {cards && <div className="mt-3 space-y-3">{cards}</div>}
       {writingPlan && (
         <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-sky-300">
           <LoaderIcon className="animate-spin motion-reduce:animate-none" /> Writing the plan…

@@ -65,6 +65,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     id: "automation",
     label: "How Coderhelm works",
     items: [
+      { href: "/settings/agents", title: "Agent permissions", description: "What agents may do on their own, what waits for approval, agents on or off, and pause all agents.", icon: <ShieldCheckIcon />, view: "view", edit: "agents.permissions" },
       { href: "/settings/workflow", title: "Workflow", description: "Where plans go, what lands in the pull request and which tools plans may use.", icon: <PlanIcon />, view: "agent_settings", edit: "agent_settings" },
       { href: "/settings/guardrails", title: "Guardrails", description: "Rules Coderhelm always follows, for every repository or just one.", icon: <ShieldCheckIcon />, view: "agent_settings", edit: "agent_settings" },
       { href: "/settings/voice", title: "Team voice", description: "How Coderhelm writes commits, pull requests and comments.", icon: <PenIcon />, view: "agent_settings", edit: "agent_settings" },

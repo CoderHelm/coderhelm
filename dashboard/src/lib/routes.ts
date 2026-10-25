@@ -73,6 +73,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/settings/support-access": { label: "Support access", parent: "/settings" },
   "/settings/repos": { label: "Repositories", parent: "/settings" },
   "/settings/workflow": { label: "Workflow", parent: "/settings" },
+  "/settings/agents": { label: "Agent permissions", parent: "/settings" },
   "/settings/guardrails": { label: "Guardrails", parent: "/settings" },
   "/settings/voice": { label: "Team voice", parent: "/settings" },
   "/settings/instructions": { label: "Custom instructions", parent: "/settings" },

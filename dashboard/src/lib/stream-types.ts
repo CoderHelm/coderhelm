@@ -1,3 +1,5 @@
+import type { Approval, SignInPrompt } from "./agent-policy";
+
 // ---------------------------------------------------------------------------
 // Streaming chat types — multi-part message model + SSE event types
 // ---------------------------------------------------------------------------
@@ -15,7 +17,11 @@ export type StreamEvent =
   | { type: "tool_result"; id: string; status: "success" | "error"; summary: string; used?: UsedRef | null }
   | { type: "usage"; input_tokens: number; output_tokens: number; turns: number }
   | { type: "done" }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  // Agent permissions: a call that needs a person's approval, and a
+  // connection the person hasn't made.
+  | { type: "approval"; approval: Approval }
+  | { type: "sign_in"; prompt: SignInPrompt; thread_id: string };
 
 /** What a tool call used, for the chat's chips: a team skill read, a team
  * agent asked, or a data source looked up, with a link to it. */
@@ -56,7 +62,20 @@ export interface UsagePart {
   turns: number;
 }
 
-export type MessagePart = TextPart | ThinkingPart | ToolCallPart | UsagePart;
+/** An approval card in the chat. */
+export interface ApprovalPart {
+  type: "approval";
+  approval: Approval;
+}
+
+/** A sign-in card in the chat. */
+export interface SignInPart {
+  type: "sign_in";
+  prompt: SignInPrompt;
+  thread_id: string;
+}
+
+export type MessagePart = TextPart | ThinkingPart | ToolCallPart | UsagePart | ApprovalPart | SignInPart;
 
 export interface StreamMessage {
   id: string;
