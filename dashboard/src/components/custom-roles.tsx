@@ -5,7 +5,7 @@ import { CheckIcon, LockIcon } from "./icons";
 import { Callout } from "./callout";
 import { Field } from "./field";
 import { DetailBlock, List, ListEmpty, ListError, ListRow, ListSection, ListSkeleton } from "./list";
-import { Modal } from "./modal";
+import { Modal, ModalFooter } from "./modal";
 import { useToast } from "./toast";
 import { dangerButton, focusRing, inputClass, primaryButton, secondaryButton, smallSecondaryButton } from "./ui";
 import { groupCapabilities } from "@/lib/permission-groups";
@@ -291,6 +291,7 @@ function RoleEditor({
       open
       wide
       onOpenChange={(o) => !o && onClose()}
+      testId="role-editor"
       title={existing ? `Edit ${existing.name}` : "New role"}
       description={
         existing && existing.member_count > 0
@@ -298,7 +299,7 @@ function RoleEditor({
           : "Pick what people with this role can do."
       }
     >
-      <form onSubmit={save} noValidate className="space-y-5" data-testid="role-editor">
+      <form id="role-editor-form" onSubmit={save} noValidate className="space-y-5">
         <Field id="role-name" label="Name" error={nameError}>
           {(p) => (
             <input
@@ -394,14 +395,14 @@ function RoleEditor({
             {error}
           </p>
         )}
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <ModalFooter>
           <button type="button" className={secondaryButton} onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className={primaryButton} disabled={saving}>
+          <button type="submit" form="role-editor-form" className={primaryButton} disabled={saving}>
             {saving ? "Saving…" : existing ? "Save role" : "Create role"}
           </button>
-        </div>
+        </ModalFooter>
       </form>
     </Modal>
   );
@@ -459,8 +460,8 @@ function DeleteRole({
   };
 
   return (
-    <Modal open onOpenChange={(o) => !o && onClose()} title={`Delete ${role.name}?`}>
-      <form onSubmit={submit} noValidate className="space-y-4" data-testid="delete-role">
+    <Modal open onOpenChange={(o) => !o && onClose()} title={`Delete ${role.name}?`} testId="delete-role">
+      <form id="delete-role-form" onSubmit={submit} noValidate className="space-y-4">
         {count > 0 ? (
           <>
             <p className="text-sm text-zinc-300">
@@ -495,14 +496,14 @@ function DeleteRole({
             {error}
           </p>
         )}
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <ModalFooter>
           <button type="button" className={secondaryButton} onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className={dangerButton} disabled={busy || (count > 0 && !replacement)}>
+          <button type="submit" form="delete-role-form" className={dangerButton} disabled={busy || (count > 0 && !replacement)}>
             {busy ? "Deleting…" : count > 0 ? "Move them and delete" : "Delete role"}
           </button>
-        </div>
+        </ModalFooter>
       </form>
     </Modal>
   );

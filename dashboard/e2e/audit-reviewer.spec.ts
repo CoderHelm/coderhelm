@@ -777,14 +777,14 @@ test("unsaved edits can be discarded, and switching repos with them asks first",
   await page.getByRole("switch", { name: /Stop everything/ }).click();
   await expect(page.getByTestId("reviewer-summary")).toContainText("Every reviewer action on this repo is stopped");
   await page.getByRole("button", { name: /Repository: your-team\/web/ }).click();
-  await page.getByRole("button", { name: "your-team/backend" }).click();
+  await page.getByRole("option", { name: "your-team/backend" }).first().click();
   await expect(page.getByText("Leave without saving?")).toBeVisible();
   await page.getByRole("button", { name: "Keep editing" }).click();
   await expect(page).toHaveURL(/repo=your-team%2Fweb/);
   await expect(page.getByRole("switch", { name: /Stop everything/ })).toHaveAttribute("aria-checked", "true");
 
   await page.getByRole("button", { name: /Repository: your-team\/web/ }).click();
-  await page.getByRole("button", { name: "your-team/backend" }).click();
+  await page.getByRole("option", { name: "your-team/backend" }).first().click();
   await page.getByRole("button", { name: "Drop changes" }).click();
   await expect(page).toHaveURL(/repo=your-team%2Fbackend/);
   await expect(page.getByRole("heading", { name: "On your-team/backend" })).toBeVisible();
@@ -857,7 +857,7 @@ test("releases are grouped by repo, without the repo name on every row or monosp
   expect(font).not.toMatch(/mono/i);
   // One filter: picking a repo shows only its releases, without group headings.
   await filter.click();
-  await page.getByRole("option", { name: "your-team/backend" }).click();
+  await page.getByRole("option", { name: "your-team/backend" }).first().click();
   await expect(page).toHaveURL(/repo=your-team%2Fbackend/);
   await expect(page.getByTestId("release-row")).toHaveCount(1);
   await expect(page.getByRole("heading", { level: 2, name: /^web/ })).toHaveCount(0);
@@ -932,15 +932,16 @@ test("writing notes for a tag opens a small form and catches a tag the backend r
   await page.getByRole("button", { name: "Write notes for a tag" }).click();
   const form = page.locator("#write-notes");
   await expect(page.getByRole("dialog", { name: "Write notes for a tag" })).toBeVisible();
+  const writeDialog = page.getByRole("dialog", { name: "Write notes for a tag" });
   await form.getByRole("button", { name: /Pick a repo/ }).click();
-  await form.getByRole("button", { name: "your-team/web", exact: true }).click();
+  await writeDialog.getByRole("option", { name: "your-team/web", exact: true }).click();
   const tag = form.getByRole("textbox", { name: "Release tag" });
   await tag.fill("v2.3.0!");
   await expect(page.getByText("A tag can use letters, numbers and . _ - + / only.")).toBeVisible();
-  await expect(form.getByRole("button", { name: "Write notes" })).toBeDisabled();
+  await expect(writeDialog.getByRole("button", { name: "Write notes" })).toBeDisabled();
   await tag.fill("v2.3.1");
   await shot(page, "audit-releases-write");
-  await form.getByRole("button", { name: "Write notes" }).click();
+  await writeDialog.getByRole("button", { name: "Write notes" }).click();
   await expect(page.getByText("Release notes queued for your-team/web v2.3.1")).toBeVisible();
   expect(db.bodies).toContainEqual({ repo: "your-team/web", tag: "v2.3.1", resend: "" });
   await expect(page.locator("#write-notes")).toHaveCount(0);

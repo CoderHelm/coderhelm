@@ -138,7 +138,8 @@ test("turning off everything for a repository asks first", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/learning");
   await expect(page.getByRole("button", { name: "Turn off all for this repository" })).toHaveCount(0);
-  await page.getByRole("combobox", { name: "Repository" }).selectOption(REPO);
+  await page.getByTestId("repo-filter").click();
+  await page.getByTestId("combo-popover").getByRole("option", { name: REPO, exact: true }).first().click();
   await expect(page.getByText("Pick a repository above")).toHaveCount(0);
   await page.getByRole("button", { name: "Turn off all for this repository" }).click();
   const dialog = page.getByRole("alertdialog");
@@ -183,7 +184,8 @@ test("a member sees everything but cannot change it, and is told why", async ({ 
   // Weights are shown, not editable.
   await expect(page.getByRole("spinbutton")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Back to defaults" })).toHaveCount(0);
-  await page.getByRole("combobox", { name: "Repository" }).selectOption(REPO);
+  await page.getByTestId("repo-filter").click();
+  await page.getByTestId("combo-popover").getByRole("option", { name: REPO, exact: true }).first().click();
   await expect(page.getByRole("button", { name: "Turn off all for this repository" })).toBeDisabled();
   expect(db.calls.filter((c) => c.method !== "GET")).toHaveLength(0);
 });

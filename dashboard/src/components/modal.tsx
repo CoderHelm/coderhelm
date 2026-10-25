@@ -1,14 +1,50 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import type { ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { focusRing } from "./ui";
 
 /**
- * A small modal for a short form ("Review a PR…", "Write notes for a tag…").
- * Radix supplies the focus trap, Escape, scroll lock, `aria-modal` and the
- * return of focus to the button that opened it. On a phone it sits at the
- * top of the screen, full width.
+ * The element a popover inside a modal portals into. A popover portaled to
+ * <body> would sit outside the modal: the modal's scroll lock would swallow
+ * its wheel events and its outside-click check would close the modal. Inside
+ * the modal's own box it is still `position: fixed`, so the modal's scrolling
+ * body never clips it.
+ */
+const ModalLayer = createContext<HTMLElement | null>(null);
+export function useModalLayer(): HTMLElement | null {
+  return useContext(ModalLayer);
+}
+
+const FooterSlot = createContext<HTMLElement | null>(null);
+
+/**
+ * The dialog's button row, from inside a form component rendered in the
+ * body: it is drawn in the pinned footer. A submit button there sits outside
+ * the <form> element, so give the form an id and the button `form={id}`.
+ */
+export function ModalFooter({ children }: { children: ReactNode }) {
+  const slot = useContext(FooterSlot);
+  if (!slot) return <div className={`mt-4 ${modalActions}`}>{children}</div>;
+  return createPortal(<div className={modalActions}>{children}</div>, slot);
+}
+
+/** The button row every dialog ends with: Cancel first, the main action last (on top on a phone). */
+export const modalActions = "flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end";
+
+/**
+ * The one dialog. Radix supplies the focus trap, Escape, the scroll lock on
+ * the page behind (with the scrollbar gap kept, so nothing shifts),
+ * `aria-modal` and the return of focus to the button that opened it.
+ *
+ * Layout: the title row and the `footer` stay put; only the body scrolls, so
+ * the main button is always on screen however long the form is. From `sm:`
+ * up it is a centred card no taller than the screen less a margin; on a
+ * phone it fills the screen with the footer above the home indicator.
+ *
+ * Pass `onSubmit` and the body and footer become one <form>: Enter submits,
+ * and a `type="submit"` button in the footer submits it.
  */
 export function Modal({
   open,
@@ -17,32 +53,103 @@ export function Modal({
   description,
   returnFocus,
   wide = false,
+  footer,
+  onSubmit,
+  testId,
+  role,
+  initialFocus,
   children,
 }: {
-  /** Room for a longer form (a list of checkboxes): wider from `sm:` up. */
-  wide?: boolean;
-  /** Where focus goes on close when the dialog was not opened by a Radix trigger (e.g. from the address). */
-  returnFocus?: React.RefObject<HTMLElement | null>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: ReactNode;
   description?: ReactNode;
-  children: ReactNode;
+  /** Room for a longer form (a list of checkboxes): wider from `sm:` up. */
+  wide?: boolean;
+  /** Where focus goes on close when the dialog was not opened by a Radix trigger (e.g. from the address). */
+  returnFocus?: React.RefObject<HTMLElement | null>;
+  /** The button row, laid out with `modalActions`. Always visible. */
+  footer?: ReactNode;
+  onSubmit?: (e: FormEvent<HTMLFormElement>) => void;
+  testId?: string;
+  /** `alertdialog` for a yes/no question. */
+  role?: "dialog" | "alertdialog";
+  /** Selector of the element to focus on open (default: the body's first field). */
+  initialFocus?: string;
+  children?: ReactNode;
 }) {
+  const [layer, setLayer] = useState<HTMLDivElement | null>(null);
+  const box = useRef<HTMLDivElement | null>(null);
+  // The element that had focus when the dialog opened. Radix gives focus back
+  // to it on close, but not when the page unmounts the whole dialog with the
+  // close (`{editing && <Editor />}`); then focus would fall to <body>.
+  const opener = useRef<HTMLElement | null>(null);
+  if (open && !opener.current && typeof document !== "undefined") {
+    const a = document.activeElement;
+    opener.current = a instanceof HTMLElement && a !== document.body ? a : null;
+  }
+  useEffect(() => {
+    if (!open) return;
+    const ref = opener;
+    const el = returnFocus?.current ?? ref.current;
+    return () => {
+      ref.current = null;
+      window.setTimeout(() => {
+        const a = document.activeElement;
+        if (el?.isConnected && (!a || a === document.body)) el.focus();
+      }, 0);
+    };
+  }, [open, returnFocus]);
+  const [slot, setSlot] = useState<HTMLDivElement | null>(null);
+  const body = (
+    <div data-modal-body className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+      {children}
+    </div>
+  );
+  // One pinned footer: the `footer` prop, or whatever a <ModalFooter> in the
+  // body portals in. Hidden while empty.
+  const foot = (
+    <div
+      ref={setSlot}
+      data-modal-footer
+      className="shrink-0 border-t border-zinc-800 bg-zinc-900 px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] empty:hidden sm:pb-3"
+    >
+      {footer}
+    </div>
+  );
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/60" />
         <Dialog.Content
+          ref={(el) => {
+            box.current = el;
+            setLayer(el);
+          }}
+          {...(role ? { role } : {})}
+          {...(testId ? { "data-testid": testId } : {})}
+          data-modal
           {...(description ? {} : { "aria-describedby": undefined })}
+          onOpenAutoFocus={(e) => {
+            // The named element, else the first field of the body, else
+            // Radix's default (the first focusable: the close button).
+            const el = initialFocus
+              ? box.current?.querySelector<HTMLElement>(initialFocus)
+              : box.current?.querySelector<HTMLElement>(
+                  "[data-modal-body] :is(input:not([type=hidden]), select, textarea, button, [tabindex='0']):not(:disabled)",
+                );
+            if (!el) return;
+            e.preventDefault();
+            el.focus();
+          }}
           onCloseAutoFocus={(e) => {
             if (!returnFocus?.current) return;
             e.preventDefault();
             returnFocus.current.focus();
           }}
-          className={`fixed inset-x-4 top-4 z-[61] mx-auto max-h-[calc(100dvh-2rem)] ${wide ? "max-w-2xl" : "max-w-md"} overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900 p-5 shadow-2xl ${wide ? "sm:top-[8vh]" : "sm:top-[15vh]"}`}
+          className={`fixed inset-0 z-[61] flex h-[100dvh] flex-col overflow-hidden bg-zinc-900 shadow-2xl sm:inset-x-4 sm:bottom-auto sm:top-[8dvh] sm:mx-auto sm:h-auto sm:max-h-[84dvh] sm:rounded-xl sm:border sm:border-zinc-800 ${wide ? "sm:max-w-2xl" : "sm:max-w-md"}`}
         >
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-zinc-800 px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))] sm:pt-4">
             <div className="min-w-0">
               <Dialog.Title className="text-base font-semibold text-zinc-100">{title}</Dialog.Title>
               {description && <Dialog.Description className="mt-1 text-sm text-zinc-400">{description}</Dialog.Description>}
@@ -57,7 +164,21 @@ export function Modal({
               </svg>
             </Dialog.Close>
           </div>
-          <div className="mt-4">{children}</div>
+          <ModalLayer.Provider value={layer}>
+          <FooterSlot.Provider value={slot}>
+            {onSubmit ? (
+              <form onSubmit={onSubmit} noValidate className="flex min-h-0 flex-1 flex-col">
+                {body}
+                {foot}
+              </form>
+            ) : (
+              <>
+                {body}
+                {foot}
+              </>
+            )}
+          </FooterSlot.Provider>
+          </ModalLayer.Provider>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

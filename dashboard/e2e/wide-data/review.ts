@@ -270,6 +270,10 @@ export const reviewData: Handler = ({ method, path, url }) => {
   // Reviewer
   if (path === "/api/reviewer/reviews") return { reviews: Array.from({ length: 6 }, (_, i) => review(i)), next: null };
   if (path === "/api/reviewer/review") return review(0);
+  // The "Review a PR" picker: a repo's open pull requests, with long titles and logins.
+  if (path === "/api/reviewer/open-prs") {
+    return { prs: Array.from({ length: 4 }, (_, i) => ({ number: 12345 + i, title: `${TITLE} ${TOKEN}`, author: "dana-developer-with-a-long-login", draft: i === 3, updated_at: iso(30 + i) })) };
+  }
   if (path === "/api/reviewer/live") return { prs: Array.from({ length: 6 }, (_, i) => livePr(i)) };
   if (path === "/api/reviewer/gate") {
     return {

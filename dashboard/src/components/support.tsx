@@ -59,6 +59,7 @@ import { MarkdownEditor, clearDraft } from "./markdown-editor";
 import { Time } from "./list";
 import { LifeBuoyIcon } from "./icons";
 import { focusRing, inputClass, primaryButton, secondaryButton } from "./ui";
+import { usePhone } from "@/hooks/use-phone";
 
 // ── Avatars ──────────────────────────────────────────────────────────────
 
@@ -149,18 +150,6 @@ function writeSeen(ticketId: string, at: string) {
   }
 }
 
-/** True on a phone-width screen. */
-function usePhone(): boolean {
-  const [phone, setPhone] = useState(false);
-  useEffect(() => {
-    const q = window.matchMedia("(max-width: 639px)");
-    const on = () => setPhone(q.matches);
-    on();
-    q.addEventListener("change", on);
-    return () => q.removeEventListener("change", on);
-  }, []);
-  return phone;
-}
 
 const EVENT_DOT: Record<ReturnType<typeof eventKind>, string> = {
   people: "bg-violet-400",

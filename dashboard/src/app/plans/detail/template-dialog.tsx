@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { api, type Plan } from "@/lib/api";
-import { Modal } from "@/components/modal";
+import { Modal, ModalFooter } from "@/components/modal";
 import { useToast } from "@/components/toast";
-import { inputClass, primaryButton } from "@/components/ui";
+import { inputClass, primaryButton, secondaryButton } from "@/components/ui";
 
 /** "Save as template": a short form in the shared modal. */
 export function SaveTemplateDialog({
@@ -75,6 +75,7 @@ export function SaveTemplateDialog({
   return (
     <Modal open={open} onOpenChange={onOpenChange} title="Save as template" description="Start new plans from this one's tasks.">
       <form
+        id="save-template-form"
         onSubmit={(e) => {
           e.preventDefault();
           save();
@@ -85,11 +86,14 @@ export function SaveTemplateDialog({
         {field("description", "Description", { area: true })}
         {field("category", "Category (optional)", { placeholder: "e.g. backend, frontend, devops" })}
         {field("tags", "Tags (optional, separated by commas)", { placeholder: "e.g. api, auth, migration" })}
-        <div className="flex justify-end pt-2">
-          <button type="submit" disabled={saving || !form.title.trim()} className={primaryButton}>
+        <ModalFooter>
+          <button type="button" onClick={() => onOpenChange(false)} className={secondaryButton}>
+            Cancel
+          </button>
+          <button type="submit" form="save-template-form" disabled={saving || !form.title.trim()} className={primaryButton}>
             {saving ? "Saving…" : "Save template"}
           </button>
-        </div>
+        </ModalFooter>
       </form>
     </Modal>
   );

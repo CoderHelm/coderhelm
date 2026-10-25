@@ -2,7 +2,7 @@
 
 import { useCan } from "@/hooks/use-can";
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
 import {
   canManageInvites,
@@ -33,6 +33,8 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { CheckIcon, GitHubIcon, MailIcon } from "@/components/icons";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
+import { Modal, modalActions } from "@/components/modal";
+import { Menu } from "@/components/menu";
 import { RolesMatrix } from "@/components/roles-matrix";
 import { CustomRoles } from "@/components/custom-roles";
 
@@ -608,76 +610,26 @@ function ActionsMenu({
   actions: { label: string; onSelect: () => void; danger?: boolean; disabledReason?: string }[];
   disabled?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  const wrap = useRef<HTMLDivElement>(null);
-  const button = useRef<HTMLButtonElement>(null);
-  const id = useId();
-
-  useEffect(() => {
-    if (!open) return;
-    wrap.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not([disabled])')?.focus();
-    const onDown = (e: MouseEvent) => {
-      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
-
-  const onKey = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      setOpen(false);
-      button.current?.focus();
-      return;
-    }
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
-      const items = Array.from(wrap.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not([disabled])') ?? []);
-      const i = items.indexOf(document.activeElement as HTMLButtonElement);
-      const next = e.key === "ArrowDown" ? (i + 1) % items.length : (i - 1 + items.length) % items.length;
-      items[next]?.focus();
-    }
-  };
-
   return (
-    <div ref={wrap} className="relative" onKeyDown={onKey}>
-      <button
-        ref={button}
-        type="button"
-        aria-label={label}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? id : undefined}
-        disabled={disabled}
-        onClick={() => setOpen((v) => !v)}
-        className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50 ${focusRing}`}
-      >
-        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-          <circle cx="12" cy="5" r="1.6" />
-          <circle cx="12" cy="12" r="1.6" />
-          <circle cx="12" cy="19" r="1.6" />
-        </svg>
-      </button>
-      {open && (
-        <div id={id} role="menu" aria-label={label} className="absolute right-0 z-20 mt-1 w-72 max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
-          {actions.map((a) => (
-            <button
-              key={a.label}
-              type="button"
-              role="menuitem"
-              disabled={!!a.disabledReason}
-              onClick={() => {
-                setOpen(false);
-                a.onSelect();
-              }}
-              className={`block w-full px-3 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50 focus:bg-zinc-800 focus:outline-none hover:bg-zinc-800 ${a.danger ? "text-red-400" : "text-zinc-200"}`}
-            >
-              {a.label}
-              {a.disabledReason && <span className="mt-0.5 block text-xs text-zinc-500">{a.disabledReason}</span>}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <Menu
+      label={label}
+      width="w-72"
+      items={actions.map((a) => ({ label: a.label, onSelect: a.onSelect, danger: a.danger, disabled: !!a.disabledReason, note: a.disabledReason }))}
+      trigger={
+        <button
+          type="button"
+          aria-label={label}
+          disabled={disabled}
+          className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50 ${focusRing}`}
+        >
+          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="5" r="1.6" />
+            <circle cx="12" cy="12" r="1.6" />
+            <circle cx="12" cy="19" r="1.6" />
+          </svg>
+        </button>
+      }
+    />
   );
 }
 
@@ -735,101 +687,20 @@ function LinkDialog({
       .sort((a, b) => b.score - a.score || displayName(a.m).localeCompare(displayName(b.m)));
   }, [members, from, fromGithub]);
   const [picked, setPicked] = useState<string>(candidates[0]?.score >= 0.5 ? candidates[0].m.user_id : "");
-  const titleId = useId();
-  const dialog = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const first = dialog.current?.querySelector<HTMLElement>("input, button");
-    first?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onCancel]);
-
   const chosen = candidates.find((c) => c.m.user_id === picked)?.m;
   const person = fromGithub ? chosen : from;
   const github = fromGithub ? from : chosen;
 
   return (
-    <div className="fixed inset-0 z-[9997] flex items-end justify-center sm:items-center">
-      <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
-      <div
-        ref={dialog}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="relative flex max-h-[90vh] w-full max-w-lg flex-col rounded-t-xl border border-zinc-800 bg-zinc-900 shadow-2xl sm:rounded-xl"
-      >
-        <div className="border-b border-zinc-800 px-5 py-4">
-          <h2 id={titleId} className="text-base font-semibold text-zinc-100">
-            {fromGithub ? `Link ${from.github_login} to a member` : `Link a GitHub sign-in to ${displayName(from)}`}
-          </h2>
-          <p className="mt-1.5 text-sm text-zinc-400">
-            Pick the record that is the same person. They become one member who can sign in with email or GitHub. The GitHub-only record is
-            removed and the higher of the two roles is kept.
-          </p>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          {candidates.length === 0 ? (
-            <p className="text-sm text-zinc-400">
-              {fromGithub ? "No members who sign in with email are left to link to." : "There are no GitHub sign-in-only records to link."}
-            </p>
-          ) : (
-            <fieldset>
-              <legend className="sr-only">{fromGithub ? "Member who signs in with email" : "GitHub sign-in"}</legend>
-              <ul className="space-y-2">
-                {candidates.map(({ m, score, reason }) => (
-                  <li key={m.user_id}>
-                    <label
-                      className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 ${
-                        picked === m.user_id ? "border-zinc-400 bg-zinc-800/80" : "border-zinc-800 hover:bg-zinc-800/40"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="link-target"
-                        value={m.user_id}
-                        checked={picked === m.user_id}
-                        onChange={() => setPicked(m.user_id)}
-                        className="h-4 w-4 accent-zinc-100"
-                      />
-                      <Avatar m={m} size={32} />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm text-zinc-100">
-                          {fromGithub ? displayName(m) : m.github_login}
-                        </span>
-                        <span className="block truncate text-xs text-zinc-500">
-                          {fromGithub ? m.email : `GitHub sign-in only · ${m.role}`}
-                        </span>
-                        {score >= 0.5 && (
-                          <span className="mt-1 block" title={reason}>
-                            <StatusPill tone="warning">Likely match</StatusPill>
-                          </span>
-                        )}
-                      </span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </fieldset>
-          )}
-          {person && github && (
-            <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-300">
-              <p className="flex items-start gap-2">
-                <span aria-hidden="true" className="mt-0.5 text-emerald-400">
-                  <CheckIcon />
-                </span>
-                <span>
-                  <span className="text-zinc-100">{displayName(person)}</span> keeps their email sign-in and gains GitHub{" "}
-                  <span className="text-zinc-100">{github.github_login}</span>. The separate GitHub-only row disappears.
-                </span>
-              </p>
-            </div>
-          )}
-        </div>
-        <div className="flex flex-col-reverse gap-2 border-t border-zinc-800 px-5 py-4 sm:flex-row sm:justify-end">
+    <Modal
+      open
+      wide
+      onOpenChange={(v) => !v && onCancel()}
+      title={fromGithub ? `Link ${from.github_login} to a member` : `Link a GitHub sign-in to ${displayName(from)}`}
+      description="Pick the record that is the same person. They become one member who can sign in with email or GitHub. The GitHub-only record is removed and the higher of the two roles is kept."
+      testId="link-dialog"
+      footer={
+        <div className={modalActions}>
           <button type="button" className={secondaryButton} onClick={onCancel}>
             Cancel
           </button>
@@ -842,8 +713,66 @@ function LinkDialog({
             {busy ? "Linking…" : "Link accounts"}
           </button>
         </div>
-      </div>
-    </div>
+      }
+    >
+      {candidates.length === 0 ? (
+        <p className="text-sm text-zinc-400">
+          {fromGithub ? "No members who sign in with email are left to link to." : "There are no GitHub sign-in-only records to link."}
+        </p>
+      ) : (
+        <fieldset>
+          <legend className="sr-only">{fromGithub ? "Member who signs in with email" : "GitHub sign-in"}</legend>
+          <ul className="space-y-2">
+            {candidates.map(({ m, score, reason }) => (
+              <li key={m.user_id}>
+                <label
+                  className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 ${
+                    picked === m.user_id ? "border-zinc-400 bg-zinc-800/80" : "border-zinc-800 hover:bg-zinc-800/40"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="link-target"
+                    value={m.user_id}
+                    checked={picked === m.user_id}
+                    onChange={() => setPicked(m.user_id)}
+                    className="h-4 w-4 accent-zinc-100"
+                  />
+                  <Avatar m={m} size={32} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm text-zinc-100">
+                      {fromGithub ? displayName(m) : m.github_login}
+                    </span>
+                    <span className="block truncate text-xs text-zinc-500">
+                      {fromGithub ? m.email : `GitHub sign-in only · ${m.role}`}
+                    </span>
+                    {score >= 0.5 && (
+                      <span className="mt-1 block" title={reason}>
+                        <StatusPill tone="warning">Likely match</StatusPill>
+                      </span>
+                    )}
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </fieldset>
+      )}
+      {person && github && (
+        <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-300">
+          <p className="flex items-start gap-2">
+            <span aria-hidden="true" className="mt-0.5 text-emerald-400">
+              <CheckIcon />
+            </span>
+            <span>
+              <span className="text-zinc-100">{displayName(person)}</span> keeps their email sign-in and gains GitHub{" "}
+              <span className="text-zinc-100">{github.github_login}</span>. The separate GitHub-only row disappears.
+            </span>
+          </p>
+        </div>
+      )}
+    
+    </Modal>
   );
 }
 

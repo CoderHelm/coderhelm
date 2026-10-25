@@ -14,6 +14,7 @@ import { useToast } from "@/components/toast";
 import { buttonClass, inputClass, linkButton, monoInputClass, primaryButton, secondaryButton } from "@/components/ui";
 import { Code, Field as LabeledField } from "@/components/settings";
 import { Chip, useTeamRepos } from "@/components/list";
+import { RepoCombobox } from "@/components/repo-combobox";
 import { api, type DataSource } from "@/lib/api";
 import { KIND_LABEL, toolsApi, type InputType, type ToolCheck, type ToolDef, type ToolKind, type ToolRunResult } from "@/lib/tools";
 
@@ -408,19 +409,14 @@ function RepoPicker({ value, onChange }: { value: string; onChange: (v: string) 
         <p className="mb-2 text-sm text-zinc-400">Every repo. Pick some to limit it to them.</p>
       )}
       {left.length > 0 && (
-        <select
-          aria-label="Add a repo"
-          value=""
-          onChange={(e) => e.target.value && set([...picked, e.target.value])}
-          className={inputClass}
-        >
-          <option value="">{picked.length ? "Add another repo" : "Only some repos…"}</option>
-          {left.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
+        <RepoCombobox
+          label="Add a repo"
+          repos={left.map((name) => ({ name }))}
+          selected=""
+          onSelect={(name) => name && set([...picked, name])}
+          placeholder={picked.length ? "Add another repo" : "Only some repos…"}
+          className=""
+        />
       )}
       {picked.length > 0 && <p className="mt-1.5 text-xs text-zinc-500">Remove them all to let every repo use it.</p>}
     </fieldset>

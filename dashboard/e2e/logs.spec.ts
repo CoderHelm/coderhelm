@@ -221,7 +221,7 @@ test("Create fix PR starts a run in the chosen repo and the row follows it", asy
   const dialog = page.getByRole("dialog", { name: "Create a fix PR" });
   await expect(dialog).toContainText("/aws/lambda/shop-checkout");
   await dialog.getByRole("button", { name: /Repository/ }).click();
-  await dialog.getByRole("button", { name: WEB, exact: true }).click();
+  await dialog.getByRole("option", { name: WEB, exact: true }).click();
   await expect(dialog.getByRole("checkbox", { name: /Always use this repo/ })).toBeChecked();
   await dialog.getByRole("button", { name: "Start fix run" }).click();
   await expect(dialog).toBeHidden();
@@ -240,7 +240,7 @@ test("a member who isn't an admin can't remember a repo mapping", async ({ page 
   const dialog = page.getByRole("dialog", { name: "Create a fix PR" });
   await expect(dialog.getByRole("checkbox")).toHaveCount(0);
   await dialog.getByRole("button", { name: /Repository/ }).click();
-  await dialog.getByRole("button", { name: API, exact: true }).click();
+  await dialog.getByRole("option", { name: API, exact: true }).click();
   await dialog.getByRole("button", { name: "Start fix run" }).click();
   await expect(dialog).toBeHidden();
   expect(db.calls.find((c) => c.path === "/api/log-findings/rec_new/fix")?.body).toEqual({ repo: API, remember: false });
@@ -263,7 +263,7 @@ test("the automatic fix PR setting saves exactly what was chosen", async ({ page
 
   const checkout = panel.getByTestId("group-/aws/lambda/shop-checkout");
   await checkout.getByRole("button", { name: /Repo for \/aws\/lambda\/shop-checkout/ }).click();
-  await checkout.getByRole("button", { name: WEB, exact: true }).click();
+  await page.getByTestId("combo-popover").getByRole("option", { name: WEB, exact: true }).click();
   await panel.getByRole("combobox", { name: "Automatic fixes for /ecs/web" }).selectOption("off");
   await panel.getByRole("combobox", { name: "Minimum severity for /aws/lambda/shop-checkout" }).selectOption("critical");
   await shot(page, "logs-autofix-1280");

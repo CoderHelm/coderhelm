@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import type { CloseRunRequest } from "@/lib/api";
-import { Modal } from "./modal";
+import { Modal, ModalFooter } from "./modal";
 import { inputClass, primaryButton, secondaryButton } from "./ui";
 
 // The one dialog for closing runs, from the run page or for a selection on the
@@ -62,6 +62,7 @@ export function CloseRunDialog({
     <Modal
       open={open}
       onOpenChange={(v) => !busy && onOpenChange(v)}
+      testId="close-run-dialog"
       title={many ? `Close ${count} runs?` : "Close this run?"}
       description={
         many
@@ -74,8 +75,8 @@ export function CloseRunDialog({
           e.preventDefault();
           onConfirm({ reason: closeReason(preset, note) || undefined, close_pr: prNumbers.length > 0 && closePr });
         }}
+        id="close-run-form"
         className="space-y-4"
-        data-testid="close-run-dialog"
       >
         <fieldset aria-labelledby={groupId}>
           <legend id={groupId} className="mb-2 text-sm font-medium text-zinc-200">
@@ -133,14 +134,14 @@ export function CloseRunDialog({
             </span>
           </label>
         )}
-        <div className="flex flex-wrap justify-end gap-2 pt-1">
+        <ModalFooter>
           <button type="button" onClick={() => onOpenChange(false)} disabled={busy} className={secondaryButton}>
             Keep {many ? "them" : "it"} open
           </button>
-          <button type="submit" disabled={busy} className={primaryButton}>
+          <button type="submit" form="close-run-form" disabled={busy} className={primaryButton}>
             {busy ? "Closing…" : many ? `Close ${count} runs` : "Close run"}
           </button>
-        </div>
+        </ModalFooter>
       </form>
     </Modal>
   );

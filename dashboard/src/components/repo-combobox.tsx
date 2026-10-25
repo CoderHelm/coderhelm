@@ -1,115 +1,116 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { type Repo } from "@/lib/api";
-import { focusRing } from "./ui";
+import { onRecentRepos, recentRepos, rememberRepo } from "@/lib/recent-repos";
+import { Combobox, type ComboGroup, type ComboOption } from "./combobox";
+
+/** `owner/name` split; a name without a slash has no owner. */
+export function splitRepo(full: string): { owner: string; name: string } {
+  const i = full.indexOf("/");
+  return i < 0 ? { owner: "", name: full } : { owner: full.slice(0, i), name: full.slice(i + 1) };
+}
+
+/** This browser's recent repos, kept in step across pickers and tabs. */
+export function useRecentRepos(): string[] {
+  const [recent, setRecent] = useState<string[]>([]);
+  useEffect(() => {
+    const read = () => setRecent(recentRepos());
+    read();
+    return onRecentRepos(read);
+  }, []);
+  return recent;
+}
+
+/**
+ * The picker's groups. Rows show the repo name; the owner is muted beside it.
+ * When every repo has one owner, the owner is the group's heading instead of
+ * being repeated on each row.
+ */
+export function repoOptions(
+  repos: { name: string; role?: string }[],
+  { hints = {}, recent = [] }: { hints?: Record<string, ReactNode>; recent?: string[] } = {},
+): { groups: ComboGroup[]; recent: ComboOption[]; oneOwner: string } {
+  const owners = new Set(repos.map((r) => splitRepo(r.name).owner));
+  const oneOwner = owners.size === 1 ? [...owners][0] : "";
+  const option = (r: { name: string; role?: string }): ComboOption => {
+    const { owner, name } = splitRepo(r.name);
+    return {
+      value: r.name,
+      label: name,
+      sub: oneOwner ? undefined : owner || undefined,
+      hint: hints[r.name] ?? r.role ?? undefined,
+      keywords: [owner, r.role ?? ""],
+      title: r.name,
+    };
+  };
+  const sorted = [...repos].sort((a, b) => splitRepo(a.name).name.localeCompare(splitRepo(b.name).name));
+  const byName = new Map(repos.map((r) => [r.name, r]));
+  return {
+    groups: [{ heading: oneOwner || "Repositories", options: sorted.map(option) }],
+    recent: recent.flatMap((n) => {
+      const r = byName.get(n);
+      return r ? [option(r)] : [];
+    }),
+    oneOwner,
+  };
+}
 
 export function RepoCombobox({
   repos,
   selected,
   onSelect,
   label = "Repository",
-  placeholder = "Select repo...",
+  placeholder = "Pick a repo",
   id,
   className = "mb-4",
+  hints,
+  loading = false,
+  testId = "repo-picker",
 }: {
-  repos: Repo[];
+  repos: Pick<Repo, "name" | "role">[];
   selected: string;
   onSelect: (name: string) => void;
   /** Spoken name of the picker; a visible <label htmlFor={id}> also works. */
   label?: string;
-  /** What the button says while nothing is picked. */
+  /** What the trigger says while nothing is picked. */
   placeholder?: string;
   id?: string;
   /** Spacing around the picker; most pages keep the default gap below it. */
   className?: string;
+  /** A note per repo on the right of its row ("2 open"). Defaults to its role. */
+  hints?: Record<string, ReactNode>;
+  loading?: boolean;
+  testId?: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", handler);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", handler);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, []);
-
-  const filtered = repos.filter((r) =>
-    r.name.toLowerCase().includes(search.toLowerCase())
-  );
-  const display = filtered.slice(0, 50);
-
+  const recent = useRecentRepos();
+  const { groups, recent: recentOptions } = useMemo(() => repoOptions(repos, { hints, recent }), [repos, hints, recent]);
+  const { owner, name } = splitRepo(selected);
   return (
-    <div ref={ref} className={`relative ${className}`.trim()}>
-      <button
-        type="button"
-        id={id}
-        onClick={() => setOpen(!open)}
-        aria-haspopup="true"
-        aria-expanded={open}
-        className={`w-full flex items-center justify-between gap-2 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 hover:border-zinc-500 transition-colors ${focusRing}`}
-      >
-        <span className={`truncate ${selected ? "" : "text-zinc-400"}`}>
-          <span className="sr-only">{label}: </span>
-          {selected || placeholder}
-        </span>
-        <svg aria-hidden="true" className={`w-4 h-4 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="absolute z-50 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden">
-          <div className="p-2 border-b border-zinc-800">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search repos..."
-              aria-label="Search repos"
-              autoFocus
-              className="w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
-            />
-          </div>
-          <div className="max-h-60 overflow-y-auto">
-            {display.length === 0 ? (
-              <p className="px-3 py-2 text-sm text-zinc-500">No repos found</p>
-            ) : (
-              display.map((r) => (
-                <button
-                  key={r.name}
-                  type="button"
-                  aria-current={r.name === selected ? "true" : undefined}
-                  onClick={() => {
-                    onSelect(r.name);
-                    setOpen(false);
-                    setSearch("");
-                  }}
-                  className={`w-full text-left px-3 py-2 text-sm transition-colors break-all ${focusRing} ${
-                    r.name === selected
-                      ? "bg-zinc-800 text-zinc-100"
-                      : "text-zinc-300 hover:bg-zinc-800/50"
-                  }`}
-                >
-                  {r.name}
-                </button>
-              ))
-            )}
-            {filtered.length > 50 && (
-              <p className="px-3 py-2 text-xs text-zinc-600 border-t border-zinc-800">
-                {filtered.length - 50} more — type to narrow results
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+    <Combobox
+      id={id}
+      label={label}
+      placeholder={placeholder}
+      searchPlaceholder="Search repos…"
+      emptyText="No repos match"
+      value={selected}
+      valueLabel={
+        selected ? (
+          <>
+            {owner && <span className="text-zinc-500">{owner}/</span>}
+            {name}
+          </>
+        ) : undefined
+      }
+      onChange={(v) => {
+        rememberRepo(v);
+        onSelect(v);
+      }}
+      groups={groups}
+      recent={recentOptions}
+      loading={loading && repos.length === 0}
+      className={className}
+      testId={testId}
+    />
   );
 }

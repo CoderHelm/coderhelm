@@ -229,11 +229,14 @@ test("period and repository filters reload, and a chart can be read as a table",
   await page.getByRole("group", { name: "Period" }).getByRole("button", { name: "7 days" }).click();
   await expect(page.getByTestId("tile-merged")).toContainText("vs previous 7 days");
   expect(db.calls).toContain("/api/analytics?days=7");
-  await page.getByRole("combobox", { name: "Repository" }).selectOption("your-team/web");
+  await page.getByTestId("repo-filter").click();
+  await page.getByTestId("combo-popover").getByRole("option", { name: "your-team/web", exact: true }).first().click();
   await expect(page.getByTestId("tile-merged")).toContainText("11");
   expect(db.calls).toContain("/api/analytics?days=7&repo=your-team%2Fweb");
   // The repo list stays complete while one repo is shown.
-  await expect(page.getByRole("combobox", { name: "Repository" }).locator("option")).toHaveCount(3);
+  await page.getByTestId("repo-filter").click();
+  await expect(page.getByTestId("combo-popover").locator('[data-testid="combo-group"] [data-testid="combo-option"]')).toHaveCount(3);
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Show table" }).first().click();
   await expect(page.getByRole("table", { name: "PRs per day" })).toBeVisible();
 });
@@ -318,7 +321,8 @@ test("month to date compares the same days of last month and shows all of last m
   await expect(table.locator("tbody tr").first().locator("td").nth(2)).toBeVisible();
   await page.setViewportSize({ width: 1280, height: 800 });
   await expect(page.locator("#compare")).toContainText("the same time into the month");
-  await page.getByRole("combobox", { name: "Repository" }).selectOption("your-team/web");
+  await page.getByTestId("repo-filter").click();
+  await page.getByTestId("combo-popover").getByRole("option", { name: "your-team/web", exact: true }).first().click();
   expect(db.calls).toContain("/api/analytics?period=mtd&repo=your-team%2Fweb");
   await shot(page, "analytics-compare-mtd");
 });

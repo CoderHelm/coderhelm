@@ -179,7 +179,10 @@ test.describe("the list toolbar", () => {
     await page.getByRole("button", { name: "Review a PR…" }).click();
     const dialog = page.getByRole("dialog", { name: "Review a PR" });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole("textbox", { name: "Pull request number" })).toBeVisible();
+    // A repo, then one of its open pull requests (or a pasted link or number).
+    await expect(dialog.getByRole("button", { name: /Repository/ })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: /Pull request/ })).toBeDisabled();
+    await expect(dialog.getByRole("textbox", { name: "Or paste a PR link or number" })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
     await expect(page.getByRole("button", { name: "Review a PR…" })).toBeFocused();

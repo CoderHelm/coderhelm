@@ -13,6 +13,7 @@ import {
 } from "@/lib/api";
 import { CardSkeleton, ChartSkeleton } from "@/components/skeleton";
 import { Segmented } from "@/components/segmented";
+import { RepoFilter } from "@/components/list";
 import { Callout } from "@/components/callout";
 import { Disclosure } from "@/components/disclosure";
 import { StatusPill } from "@/components/status-pill";
@@ -577,20 +578,7 @@ export default function LearningPage() {
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <Segmented label="Period" options={[...DAYS]} value={days} onChange={setDays} />
-        <label className="flex min-w-0 items-center gap-2 text-sm text-zinc-400">
-          <span>Repository</span>
-          <select
-            aria-label="Repository"
-            value={repo}
-            onChange={(e) => setRepo(e.target.value)}
-            className={`min-h-8 max-w-[220px] truncate rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 ${focusRing}`}
-          >
-            <option value="">All repositories</option>
-            {repoNames.map((r) => (
-              <option key={r} value={r}>{r}</option>
-            ))}
-          </select>
-        </label>
+        <RepoFilter value={repo} onChange={setRepo} repos={repoNames} />
       </div>
 
       {error ? (

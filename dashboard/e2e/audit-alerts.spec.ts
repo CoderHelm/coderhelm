@@ -291,7 +291,7 @@ test("memory: a failed repository load says so and retries, instead of 'No repos
   await expect(page.getByText("We couldn't load your repositories")).toBeVisible();
   await expect(page.getByText("No repositories yet")).toHaveCount(0);
   await page.getByRole("button", { name: "Try again" }).click();
-  await expect(page.getByLabel("Repository", { exact: true })).toHaveValue(REPO);
+  await expect(page.getByLabel("Repository", { exact: true })).toContainText(REPO);
   // Dev mode mounts twice, so count "at least one more" rather than an exact number.
   expect(db.calls.filter((c) => c === "GET /api/repos").length).toBeGreaterThanOrEqual(2);
   expect(errors).toEqual([]);

@@ -982,6 +982,9 @@ export const api = {
     const q = params.toString();
     return request<{ prs?: LivePr[] }>(`/api/reviewer/live${q ? `?${q}` : ""}`).then((r) => r.prs ?? []);
   },
+  /** A repo's open pull requests, most recently updated first (read from GitHub through the app). */
+  listOpenPrs: (repo: string) =>
+    request<{ prs?: OpenPr[] }>(`/api/reviewer/open-prs?repo=${encodeURIComponent(repo)}`).then((r) => r.prs ?? []),
   rateReview: (sk: string, rating: "up" | "down" | "none", comment?: string) =>
     request<void>(`/api/reviewer/review/rate`, {
       method: "POST",
@@ -1646,6 +1649,15 @@ export interface SearchResults {
   reviews: { sk: string; repo: string; pr_number: number; title: string; verdict: string; created_at: string }[];
   releases: { repo: string; tag: string; headline: string; updated_at: string }[];
   plans: { plan_id: string; title: string; repo: string; status: string; created_at: string }[];
+}
+
+/** An open pull request, for the "Review a PR" picker. */
+export interface OpenPr {
+  number: number;
+  title: string;
+  author: string;
+  draft: boolean;
+  updated_at: string;
 }
 
 export interface Repo {
