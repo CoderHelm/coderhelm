@@ -3,7 +3,9 @@
 // can never drift from it. Runs before every dev server and build.
 //
 //   content/docs/self-host/**       the guides in coderhelm-platform docs/self-host/
-//   content/docs/api/routes.mdx     every gateway route, read from main.rs
+//   .generated/openapi.json         the public API's OpenAPI document, which the
+//                                   API reference pages are generated from
+//   public/openapi.json             the same document, published at /openapi.json
 //   content/docs/changelog.mdx      platform tags and merged pull requests
 //   content/docs/plugins/manifest-reference.mdx   rendered from schemas/plugin-manifest.schema.json
 //
@@ -16,7 +18,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { extractRoutes, sectionOf } from './lib/routes.mjs';
+import { SPEC_PATH, checkSpec, operationsOf } from './lib/openapi.mjs';
 import { renderManifestReference } from './lib/manifest-reference.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -209,59 +211,31 @@ Until the guides land, the platform's [README](${REPO_URL}#readme) lists the too
 `);
 }
 
-// --- API routes -------------------------------------------------------------
+// --- OpenAPI document -------------------------------------------------------
 
-const SECTION_ORDER = [
-  'Service', 'Sign-in', 'Webhooks', 'Email links',
-  'Account and teams', 'Users and roles', 'Runs', 'Search', 'Repos', 'Plans', 'Reviewer and releases',
-  'Skills', 'Team tools', 'Connections (MCP)', 'Data sources', 'Integrations', 'Memories', 'Code graph',
-  'Settings and instructions', 'Usage and analytics', 'Alerts', 'Infrastructure and logs', 'Tests',
-  'Health and failed messages', 'Support', 'Platform admin', 'Other',
-];
-
-const AUTH_NOTE = {
-  Service: 'Public.',
-  'Sign-in': 'Public, limited to 20 requests per 5 minutes per IP address.',
-  Webhooks: 'Public, but every call is verified: see [Webhooks](/api/webhooks).',
-  'Email links': 'Public; the signed `t` token in the link is the credential. Limited to 60 requests per 5 minutes per IP address.',
-  'Platform admin': 'Session cookie, and only for CoderHelm operators listed in the platform configuration.',
-};
-
-function writeRoutes(platform) {
-  const file = 'services/gateway/src/main.rs';
-  const routes = extractRoutes(fs.readFileSync(path.join(platform.dir, file), 'utf8'));
-  const bySection = new Map();
-  for (const r of routes) {
-    const s = sectionOf(r);
-    if (!bySection.has(s)) bySection.set(s, []);
-    bySection.get(s).push(r);
+/**
+ * Copies the public API's OpenAPI document from the platform checkout. It is
+ * generated from the gateway's handlers and checked there by a test, so the
+ * reference pages can't drift from the code. A missing or broken document
+ * fails the build rather than publishing an empty reference.
+ */
+function importOpenApi(platform) {
+  const from = path.join(platform.dir, SPEC_PATH);
+  if (!fs.existsSync(from)) {
+    throw new Error(`${SPEC_PATH} is not in ${lock.repo} at ${platform.ref.slice(0, 12)}. Move platform.lock.json to a commit that has it (npm run platform:bump).`);
   }
-  const sections = [...bySection.keys()].sort((a, b) => SECTION_ORDER.indexOf(a) - SECTION_ORDER.indexOf(b));
-  const src = (line) => `${REPO_URL}/blob/${platform.ref}/${file}#L${line}`;
-  const out = [
-    '---',
-    'title: All routes',
-    `description: Every route the CoderHelm gateway serves (${routes.length} in all), read from its router at build time.`,
-    `editUrl: ${yamlString(`https://github.com/CoderHelm/coderhelm/blob/main/docs/scripts/import-platform.mjs`)}`,
-    'generated: true',
-    '---',
-    '',
-    `This list is generated from [\`${file}\`](${REPO_URL}/blob/${platform.ref}/${file}) at commit \`${platform.ref.slice(0, 12)}\` each time the docs are built, so it always matches the code. All paths are on \`https://api.coderhelm.com\`. Path parameters are written \`:name\`.`,
-    '',
-    'Unless a section says otherwise, a route needs a signed-in session: see [Authentication](/api/authentication). These are the routes the dashboard itself calls; they can change between releases, and there are no API keys for them yet.',
-    '',
-  ];
-  for (const s of sections) {
-    out.push(`## ${s}`, '');
-    if (AUTH_NOTE[s]) out.push(AUTH_NOTE[s], '');
-    out.push('| Method | Path | Handler |', '| --- | --- | --- |');
-    for (const r of bySection.get(s)) {
-      out.push(`| \`${r.method}\` | \`${r.path}\` | [\`${r.handler}\`](${src(r.line)}) |`);
-    }
-    out.push('');
+  const text = fs.readFileSync(from, 'utf8');
+  const spec = JSON.parse(text);
+  const problems = checkSpec(spec);
+  if (problems.length) throw new Error(`${SPEC_PATH} is not fit to publish:\n  ${problems.join('\n  ')}`);
+  for (const rel of ['.generated/openapi.json', 'public/openapi.json']) {
+    const to = path.join(ROOT, rel);
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    fs.writeFileSync(to, text);
   }
-  write('api/routes.mdx', out.join('\n'));
-  return { routes: routes.length };
+  // The route list the reference replaced, removed so a stale copy never builds.
+  fs.rmSync(path.join(CONTENT, 'api/routes.mdx'), { force: true });
+  return { operations: operationsOf(spec).length };
 }
 
 // --- Changelog --------------------------------------------------------------
@@ -358,9 +332,9 @@ if (isMain) {
   writeManifestReference();
   const platform = platformCheckout();
   const selfHost = importSelfHost(platform);
-  const api = writeRoutes(platform);
+  const api = importOpenApi(platform);
   const log = writeChangelog(platform);
   console.log(
-    `platform ${platform.ref.slice(0, 12)}: ${selfHost.imported ? `${selfHost.imported} self-host guides` : 'no self-host guides yet (stub page)'}, ${api.routes} routes, changelog ${log.platformPrs}+${log.appPrs} PRs${log.shallow ? ' (shallow clone: dashboard PRs left out)' : ''}, ${log.tags} tags`,
+    `platform ${platform.ref.slice(0, 12)}: ${selfHost.imported ? `${selfHost.imported} self-host guides` : 'no self-host guides yet (stub page)'}, ${api.operations} API operations, changelog ${log.platformPrs}+${log.appPrs} PRs${log.shallow ? ' (shallow clone: dashboard PRs left out)' : ''}, ${log.tags} tags`,
   );
 }

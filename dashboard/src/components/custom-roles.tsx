@@ -516,6 +516,9 @@ const ACTION_LABEL: Record<string, string> = {
   updated: "Changed",
   deleted: "Deleted",
   assigned: "Role given",
+  api_key_created: "API key made",
+  api_key_revoked: "API key revoked",
+  api_key_used: "API key used",
 };
 
 function RoleChanges({ version }: { version: string }) {

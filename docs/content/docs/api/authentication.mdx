@@ -1,61 +1,80 @@
 ---
 title: Authentication
-description: How requests to the CoderHelm API are authenticated, how teams are chosen, and the short-lived tokens for streaming and CI.
+description: Team API keys, their scopes and limits, how to send and revoke them, and the OIDC tokens CI jobs use instead.
 ---
 
-## Sessions
+## API keys
 
-The dashboard signs people in with email and password, Google or GitHub (all under `/auth`). A successful sign-in sets one cookie:
-
-```http
-Set-Cookie: __Host-coderhelm_session=<token>; HttpOnly; Secure; SameSite=Strict; Path=/
-```
-
-Every route under `/api` requires it. The session lasts 7 days and slides: once it is more than halfway through, the next request gets a fresh cookie with your current role. Someone removed from the team gets no fresh cookie, so their access ends with the session.
-
-Because the cookie is `SameSite=Strict` and the API only accepts cross-origin requests from the dashboard, a page on another site can't use your session.
-
-A request without a valid session gets `401`.
-
-## Teams
-
-A person can belong to several teams. The session holds the current team, and every request acts on it; there is no team header. To switch:
+Every request to the API carries a team API key as a bearer token:
 
 ```http
-POST /api/teams/switch
-Content-Type: application/json
-
-{ "team_id": "<team id>" }
+GET /api/runs HTTP/1.1
+Host: api.coderhelm.com
+Authorization: Bearer chk_01jb8x6f4m2c9qz3t7v5w1k0ha_Zx3vQ9mK2pL7wR4tY8uB1nC6dF0gH5jA9sE2rT7yU4i
 ```
 
-CoderHelm checks you are a member, then sets a new cookie for that team. `GET /api/teams` lists your teams.
+A key looks like `chk_<id>_<secret>`. The `chk_` start makes a leaked key easy to spot in logs and for secret scanners.
 
-## Roles
+### Creating a key
 
-Each route checks a [capability](/concepts/roles#capabilities) against your role in the current team, on the server. A member calling an admin-only route gets `403`.
+Admins create keys in the dashboard under **Settings**, then **API keys**. So can anyone whose [custom role](/concepts/roles) includes **API keys**. Each key has:
 
-## Streaming tokens
+| Setting | What it does |
+| --- | --- |
+| Name | What uses it, so you can tell keys apart. |
+| Scopes | What it may do (see below). |
+| Expiry | 30, 90 or 180 days, a year, or never. |
+| Rate limit | Requests per minute, 10 to 3,000. Default 600. |
 
-Plan chat streams its answer from `stream.coderhelm.com`, which can't read the session cookie. The dashboard first asks for a short-lived token:
+The key is shown once, when it is made. CoderHelm keeps only its SHA-256 hash, so a lost key can't be shown again: revoke it and make a new one. Make one key per program, so revoking one never breaks the others.
 
-```http
-POST /api/plans/chat/token
-```
+### Scopes
 
-```json
-{ "token": "<token>" }
-```
+A scope is a capability from the team's [role table](/concepts/roles#capabilities). A key can hold the ones that some public endpoint needs:
 
-The token is valid for 5 minutes and is sent as a bearer token:
+| Scope | Lets the key | Endpoints |
+| --- | --- | --- |
+| `view` | Read runs, plans, reviews, repositories and usage. Every key has it. | All `GET` endpoints |
+| `runs` | Retry and cancel runs. | `POST /api/runs/{run_id}/retry`, `POST /api/runs/{run_id}/cancel` |
+| `plans` | Create plans and run them. | `POST /api/plans`, `POST /api/plans/{plan_id}/approve-and-execute` |
 
-```http
-POST /api/plans/chat/stream
-Authorization: Bearer <token>
-```
+Each endpoint page names the scope it needs. A key without it gets `403` with the code `missing_scope` and the scope in `scope`.
 
-## CI uploads
+### A key never does more than its maker
 
-CoderHelm reads test reports from your GitHub workflow runs by itself. A CI job whose results never reach GitHub (a device farm, say) can upload its report instead, signed with GitHub Actions' own OIDC identity token, so you don't store a CoderHelm secret in CI. Request a token with the audience `coderhelm` and send the report file as the body:
+A key acts within the access of the person who made it, checked on every request:
+
+- When the key is made, it can only get scopes its maker's own role holds.
+- On each request, its scopes are cut down to what its maker holds at that moment. If the maker becomes a viewer, the key can only read. If the maker leaves the team, the key stops working (`401`, `api_key_owner_left`).
+- Keys reach only the public endpoints. They can't manage people, roles, integrations or other keys.
+
+Requests made with a key act for the key's maker, so a run retried with a key shows the maker as the person who asked.
+
+### Revoking
+
+On the API keys page, **Revoke** stops a key at once. Expired and revoked keys stay listed under **Revoked and expired**, so you can see what used to exist. Creating and revoking keys, and a daily summary of each key's use, are written to the team's log of access changes on the **Team** page. Each key also shows when it was last used.
+
+### When a key is refused
+
+| Status | `code` | Meaning |
+| --- | --- | --- |
+| `401` | `invalid_api_key` | Missing, malformed or unknown key. Check it was copied whole. |
+| `401` | `api_key_revoked` | Someone revoked it. |
+| `401` | `api_key_expired` | Its expiry passed. |
+| `401` | `api_key_owner_left` | The person who made it is no longer on the team. |
+| `403` | `missing_scope` | The key lacks the scope this endpoint needs. |
+| `403` | `not_available_to_api_keys` | The route is for the dashboard, not the public API. |
+| `429` | `rate_limited` | Over the key's limit. See [Rate limits](/api/rate-limits). |
+
+### Keeping keys safe
+
+- Keep keys in a secrets manager or your CI's secrets, never in code or in a browser.
+- Give each key the fewest scopes and the shortest expiry that work.
+- If a key may have leaked, revoke it first, then make its replacement.
+
+## CI jobs
+
+A CI job whose test results never reach GitHub (a device farm, say) uploads its report with GitHub Actions' own OIDC identity token instead of an API key, so no CoderHelm secret is stored in CI. Request a token with the audience `coderhelm` and send the report file as the body:
 
 ```yaml title=".github/workflows/e2e.yml"
 permissions:
@@ -75,6 +94,6 @@ steps:
 - CoderHelm checks the token was issued by GitHub for one run of a repository connected to your team, with E2E results turned on under **Tests**.
 - The same token can ask which tests are quarantined: `GET /webhooks/ci/tests/quarantine`.
 
-## Two-factor sign-in
+## The dashboard's session
 
-People can turn on two-factor authentication under **Security**. Sign-in then asks for a code (`POST /auth/mfa/verify`) before the session cookie is set.
+The dashboard signs people in with a session cookie (`__Host-coderhelm_session`, `HttpOnly`, `SameSite=Strict`). It is meant for the browser only: the API accepts cross-origin requests from the dashboard alone, and the routes the dashboard calls beyond the public ones can change without notice. Programs should always use an API key.

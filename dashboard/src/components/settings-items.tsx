@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { ANY_CHANGE } from "@/lib/capabilities";
 import {
-  BellIcon, BookIcon, CpuIcon, DatabaseIcon, GitBranchIcon,
+  BellIcon, BookIcon, CpuIcon, DatabaseIcon, GitBranchIcon, KeyIcon,
   LockIcon, PenIcon, PlanIcon, PluginIcon, ShieldCheckIcon, TargetIcon, UsersIcon, WrenchIcon,
 } from "./icons";
 
@@ -50,6 +50,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     label: "Team and access",
     items: [
       { href: "/settings/team", title: "Team", description: "Who is on the team, their roles and what each role can do.", icon: <UsersIcon />, view: "view_team", edit: "people", status: "team" },
+      { href: "/settings/api-keys", title: "API keys", description: "Keys your own programs use to call the Coderhelm API, each with its scopes and rate limit.", icon: <KeyIcon />, view: "api_keys", edit: "api_keys" },
       { href: "/settings/support-access", title: "Support access", description: "Let Coderhelm support see your workspace, read only, for a while. See every page they read.", icon: <ShieldCheckIcon />, view: "support", edit: "support" },
     ],
   },

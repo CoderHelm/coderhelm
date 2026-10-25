@@ -13,6 +13,10 @@ import { getMDXComponents } from '@/components/mdx';
 import type { Metadata } from 'next';
 import { createRelativeLink } from 'fumadocs-ui/mdx';
 import { SITE, editUrl, imagePath, markdownPath } from '@/lib/shared';
+import { OpenAPIPage } from '@/components/api-page';
+
+/** Where an endpoint page is edited: the gateway code its document comes from. */
+const OPENAPI_EDIT_URL = 'https://github.com/CoderHelm/coderhelm-platform/blob/main/services/gateway/src/openapi.rs';
 
 type Props = { params: Promise<{ slug?: string[] }> };
 
@@ -20,9 +24,26 @@ export default async function Page(props: Props) {
   const params = await props.params;
   const page = source.getPage(params.slug);
   if (!page) notFound();
+  const md = markdownPath(page.slugs);
+
+  // An endpoint, generated from the OpenAPI document.
+  if (page.type === 'openapi') {
+    return (
+      <DocsPage full toc={page.data.toc}>
+        <DocsTitle>{page.data.title}</DocsTitle>
+        <div className="flex flex-row flex-wrap items-center gap-2 border-b pb-6">
+          <MarkdownCopyButton markdownUrl={md} />
+          <ViewOptionsPopover markdownUrl={md} githubUrl={OPENAPI_EDIT_URL} />
+        </div>
+        <DocsBody>
+          <OpenAPIPage {...page.data.getOpenAPIPageProps()} />
+        </DocsBody>
+        <EditOnGitHub href={OPENAPI_EDIT_URL} />
+      </DocsPage>
+    );
+  }
 
   const MDX = page.data.body;
-  const md = markdownPath(page.slugs);
   const edit = editUrl(page.path, page.data.editUrl);
 
   return (

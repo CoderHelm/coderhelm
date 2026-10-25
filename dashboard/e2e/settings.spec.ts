@@ -15,6 +15,7 @@ const ITEMS: { title: string; href: string; view: Role; edit: Role; heading: str
   { title: "Notifications", href: "/settings/notifications", view: "viewer", edit: "viewer", heading: "Notifications" },
   { title: "Security", href: "/settings/security", view: "viewer", edit: "viewer", heading: "Security" },
   { title: "Team", href: "/settings/team", view: "viewer", edit: "admin", heading: "Team" },
+  { title: "API keys", href: "/settings/api-keys", view: "admin", edit: "admin", heading: "API keys" },
   { title: "Repositories", href: "/settings/repos", view: "member", edit: "admin", heading: "Repositories" },
   { title: "Workflow", href: "/settings/workflow", view: "admin", edit: "admin", heading: "Workflow" },
   { title: "Guardrails", href: "/settings/guardrails", view: "admin", edit: "admin", heading: "Guardrails" },
@@ -118,6 +119,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/voice/global" || p === "/api/instructions/global" || p === "/api/agents/global") return json(route, { content: "" });
     if (p === "/api/skills") return json(route, { repos: [], items: [], can_manage: atLeast(db.role, "admin") });
     if (p === "/api/skills/stats") return json(route, { error: "not found" }, 404);
+    if (p === "/api/api-keys") return admin ? json(route, { keys: [], scopes: [{ key: "view", label: "See", always: true, allowed: true }], limits: { default_rate_per_minute: 600, min_rate_per_minute: 10, max_rate_per_minute: 3000, max_expiry_days: 365, max_keys: 50 } }) : forbidden(route);
     return json(route, { error: `not mocked: ${method} ${p}` }, 404);
   });
   return db;

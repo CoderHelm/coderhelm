@@ -11,7 +11,7 @@ CoderHelm receives events on four kinds of webhook. Every one is verified before
 | `POST /webhooks/jira` | The CoderHelm Jira app | The team's Jira app secret in the body |
 | `POST /webhooks/jira/:token` | A Jira webhook you create | The per-team token in the URL, and optionally `X-Hub-Signature` |
 | `POST /webhooks/alerts/sns` | An AWS SNS topic | The SNS message signature |
-| `POST /webhooks/ci/tests/results` | GitHub Actions | A GitHub OIDC token (see [Authentication](/api/authentication#ci-uploads)) |
+| `POST /webhooks/ci/tests/results` | GitHub Actions | A GitHub OIDC token (see [Authentication](/api/authentication#ci-jobs)) |
 
 All paths are on `https://api.coderhelm.com`.
 
@@ -46,7 +46,61 @@ If you can't install the Jira app, create a plain Jira webhook (see [Connect Jir
 https://api.coderhelm.com/webhooks/jira/<token>
 ```
 
-An unknown token gets `401`. If you also generated a secret, each request must carry `X-Hub-Signature: sha256=<hex>`, an HMAC-SHA256 of the body with that secret.
+An unknown token gets `401`. If you also generated a secret, each request must carry `X-Hub-Signature: sha256=<hex>`, an HMAC-SHA256 of the raw body keyed with that secret. Jira Cloud adds it when you set the secret on the webhook. If you send events from your own automation, sign them the same way:
+
+<Tabs items={['Bash', 'TypeScript', 'Python']}>
+<Tab value="Bash">
+
+```bash
+BODY='{"webhookEvent":"jira:issue_updated","issue":{"key":"WEB-42","fields":{"labels":["coderhelm"]}}}'
+SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$JIRA_WEBHOOK_SECRET" -hex | sed 's/^.* //')
+curl -X POST "https://api.coderhelm.com/webhooks/jira/$JIRA_WEBHOOK_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -H "X-Hub-Signature: sha256=$SIG" \
+  -d "$BODY"
+```
+
+</Tab>
+<Tab value="TypeScript">
+
+```ts
+import { createHmac } from 'node:crypto';
+
+const body = JSON.stringify({
+  webhookEvent: 'jira:issue_updated',
+  issue: { key: 'WEB-42', fields: { labels: ['coderhelm'] } },
+});
+const signature = createHmac('sha256', process.env.JIRA_WEBHOOK_SECRET!).update(body).digest('hex');
+await fetch(`https://api.coderhelm.com/webhooks/jira/${process.env.JIRA_WEBHOOK_TOKEN}`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'X-Hub-Signature': `sha256=${signature}` },
+  body, // send exactly the bytes you signed
+});
+```
+
+</Tab>
+<Tab value="Python">
+
+```python
+import hashlib, hmac, json, os
+import requests
+
+body = json.dumps({
+    "webhookEvent": "jira:issue_updated",
+    "issue": {"key": "WEB-42", "fields": {"labels": ["coderhelm"]}},
+}).encode()
+signature = hmac.new(os.environ["JIRA_WEBHOOK_SECRET"].encode(), body, hashlib.sha256).hexdigest()
+requests.post(
+    f"https://api.coderhelm.com/webhooks/jira/{os.environ['JIRA_WEBHOOK_TOKEN']}",
+    data=body,  # send exactly the bytes you signed
+    headers={"Content-Type": "application/json", "X-Hub-Signature": f"sha256={signature}"},
+)
+```
+
+</Tab>
+</Tabs>
+
+Sign the exact bytes you send: re-serializing the JSON after signing changes them and the signature fails.
 
 What happens with each event:
 
@@ -73,4 +127,42 @@ CoderHelm can turn an alarm into a fix. Subscribe CoderHelm to an SNS topic with
 
 A message that matches one of the route's rules becomes a run that opens a pull request. Other messages are posted to your team's Slack or Teams channel. Every alert is listed on the **Alerts** page with what CoderHelm did with it.
 
-There are no inbound webhooks for Slack or Teams; CoderHelm only sends messages to them.
+## Verifying GitHub's signature
+
+If you self-host CoderHelm, or proxy GitHub's events through your own service first, check the signature the same way CoderHelm does: an HMAC-SHA256 of the raw body keyed with the app's webhook secret, compared in constant time.
+
+<Tabs items={['TypeScript', 'Python']}>
+<Tab value="TypeScript">
+
+```ts
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
+export function verifyGithub(rawBody: Buffer, header: string | undefined, secret: string): boolean {
+  if (!header?.startsWith('sha256=')) return false;
+  const expected = Buffer.from(`sha256=${createHmac('sha256', secret).update(rawBody).digest('hex')}`);
+  const got = Buffer.from(header);
+  return got.length === expected.length && timingSafeEqual(got, expected);
+}
+```
+
+</Tab>
+<Tab value="Python">
+
+```python
+import hashlib, hmac
+
+def verify_github(raw_body: bytes, header: str | None, secret: str) -> bool:
+    if not header or not header.startswith("sha256="):
+        return False
+    expected = "sha256=" + hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(header, expected)
+```
+
+</Tab>
+</Tabs>
+
+## What CoderHelm sends
+
+CoderHelm doesn't send webhooks of its own yet. It posts messages to the Slack and Teams incoming webhooks you set up (alerts, findings, release notes), in the formats those services define, and there are no inbound webhooks for Slack or Teams. To react to CoderHelm's work from your own systems today, poll [`GET /api/runs`](/api/pagination) or a single run.
+
+Each webhook above also has a page under **Reference**, with its headers and the payload fields CoderHelm reads.

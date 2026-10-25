@@ -179,6 +179,23 @@ export const settingsData: Handler = ({ method, path, url }) => {
 
   if (p === "/api/repos") return { repos: REPOS };
   if (p === "/api/users") return { users: USERS };
+  // API keys: a long name, a long maker, and every scope.
+  if (p === "/api/api-keys") {
+    const key = (id: string, status: string, over: Record<string, unknown> = {}) => ({
+      id, name: `Nightly-release-notes-and-deploy-pipeline-${id}`, hint: "chk_01jb8x...k0ha", scopes: ["view", "plans", "runs"],
+      rate_limit_per_minute: 3000, created_at: iso(60 * 24 * 40), created_by: EMAIL, expires_at: iso(-60 * 24 * 300),
+      last_used_at: iso(4), revoked_at: null, revoked_by: null, status, ...over,
+    });
+    return {
+      keys: [key("k1", "active"), key("k2", "revoked", { revoked_at: iso(60), revoked_by: EMAIL })],
+      scopes: [
+        { key: "view", label: "See and search runs, plans, reviews, analytics, repos, tests and settings", always: true, allowed: true },
+        { key: "plans", label: "Create, edit, approve and run plans and templates", always: false, allowed: true },
+        { key: "runs", label: "Retry, re-run, re-review, cancel, close or reopen runs", always: false, allowed: true },
+      ],
+      limits: { default_rate_per_minute: 600, min_rate_per_minute: 10, max_rate_per_minute: 3000, max_expiry_days: 365, max_keys: 50 },
+    };
+  }
   // Custom roles: a long name and description, and a long log line.
   if (p === "/api/roles") {
     return {
