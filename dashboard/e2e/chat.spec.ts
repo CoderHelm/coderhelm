@@ -2,25 +2,16 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-// Chat: the question box, starter questions, the source chips, a streamed
-// answer with citations, the chat list, sharing, rating, roles and the phone
-// layout. Every API call is answered here, the answer stream included;
-// nothing reaches a real backend.
+// Chat: the question box, starter questions, @ mentions, a streamed answer
+// that reads code (one quiet activity line, numbered citations with a source
+// card, each source listed once), the chat list, sharing, rating, roles and
+// the phone layout. Every API call is answered here, the answer stream
+// included; nothing reaches a real backend.
 
 const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots");
 const now = Date.now();
 const iso = (minsAgo: number) => new Date(now - minsAgo * 60_000).toISOString();
 const NONE = { knowledge: [], connections: false, code: false, memories: false, data_sources: false, skills: false };
-
-// What `/api/brain/sources` names each kind (the gateway's SOURCE_KINDS).
-const KINDS = [
-  { key: "knowledge", label: "Files and pages", about: "Documents and pages your team added to Knowledge" },
-  { key: "connections", label: "Connected apps", about: "Apps such as Notion, Linear or Sentry, read as you ask" },
-  { key: "code", label: "Code", about: "Your team's code and how it fits together" },
-  { key: "memories", label: "Past work", about: "What Coderhelm learned from earlier work" },
-  { key: "data_sources", label: "Logs and data", about: "Logs, databases and metrics you connected, only read" },
-  { key: "skills", label: "Team know-how", about: "Your team's written skills and helpers" },
-];
 
 const LEAVE = {
   id: "S1",
@@ -33,7 +24,22 @@ const LEAVE = {
   authoritative: true,
   base: "HR handbook",
 };
-const CODE = { id: "S2", kind: "code", title: "src/policies/leave.ts", loc: "your-team/web", as_of: "2026-10-24 12:00 UTC", passage: "export const PARENTAL_LEAVE_WEEKS = 16;", authoritative: false };
+const COMMIT = "4a7c1e9d2b";
+const code = (id: string, path: string, start: number, end: number, passage: string) => ({
+  id,
+  kind: "code",
+  title: path,
+  loc: `web · lines ${start}-${end}`,
+  as_of: "",
+  passage,
+  url: `https://github.com/your-team/web/blob/${COMMIT}/${path}#L${start}-L${end}`,
+  authoritative: false,
+  code: { repo: "your-team/web", path, commit: COMMIT, start_line: start, end_line: end },
+});
+const CODE = code("S2", "src/policies/leave.ts", 1, 3, "export const PARENTAL_LEAVE_WEEKS = 16;\nexport const PAID = true;");
+// Two reads of one file: one source in the answer.
+const SERVER_A = code("S3", "src/server.ts", 1, 17, 'import express from "express";\nimport { routes } from "./routes";\n\nexport function createServer() {\n  const app = express();\n  app.use("/api", routes);\n  return app;\n}');
+const SERVER_B = code("S4", "src/server.ts", 30, 44, "createServer().listen(process.env.PORT ?? 4000);");
 
 const STARTERS = [
   { question: "What should I know from HR handbook?", why: "From HR handbook", sources: { ...NONE, knowledge: ["kb_hr"] } },
@@ -65,7 +71,10 @@ interface Backend {
   streamDelay: number;
   starters: typeof STARTERS;
   knowledge: { id: string; name: string; ready: number; authoritative: boolean }[];
+  repos: { name: string; short: string; role: string }[];
   uploads: number;
+  /** The saved answer's text. */
+  answerText: string;
 }
 
 const ev = (type: string, data: unknown) => `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -82,7 +91,41 @@ const thread = (over: Partial<Thread>): Thread => ({
   ...over,
 });
 
-const ANSWER_TEXT = "Parental leave is **sixteen weeks**, fully paid [S1]. The app reads the same number from code [S2].";
+const ANSWER_TEXT = "Parental leave is **sixteen weeks**, fully paid [S1]. The app reads the same number from code [S2]. The server loads it when it starts [S3][S4].";
+const CITED = [LEAVE, CODE, SERVER_A, SERVER_B];
+// A longer answer, the shape real ones take, for the screenshots.
+const SHOT_TEXT = [
+  "`web` is a Next.js site with a small Express server in front of it. Pages live in `app/`; everything that needs data goes through `/api` [S3].",
+  "",
+  "**How it fits together**",
+  "- **Server start:** `src/server.ts` builds the Express app and mounts every route under `/api` [S3][S4].",
+  "- **Rules:** policy numbers sit in `src/policies/leave.ts`, which sets `PARENTAL_LEAVE_WEEKS` to 16 [S2].",
+  "- **Docs:** the HR handbook says the same: sixteen weeks, fully paid [S1].",
+  "",
+  '```ts title="src/server.ts"',
+  "export function createServer() {",
+  "  const app = express();",
+  '  app.use("/api", routes);',
+  "  return app;",
+  "}",
+  "```",
+  "",
+  "To change a policy, update the file and the handbook together [S1, S2].",
+].join("\n");
+
+/** The answer stream up to its last words: knowledge, then two code reads. */
+const STREAM = (id: string, question: string, text = "Parental leave is **sixteen weeks**, fully paid [S1]. The app reads the same number from code [S2].") =>
+  ev("thread", { id, title: question }) +
+  ev("retrieved", { sources: [LEAVE] }) +
+  ev("tool_start", { id: "tu1", name: "search_knowledge", kind: "knowledge" }) +
+  ev("tool_result", { id: "tu1", name: "search_knowledge", label: "Searched knowledge for “parental leave”", kind: "knowledge", status: "success", summary: "1 passage", sources: [] }) +
+  ev("tool_start", { id: "tu2", name: "github__read_file", kind: "code" }) +
+  ev("tool_result", { id: "tu2", name: "github__read_file", repo: "web", label: "Read src/policies/leave.ts in web", kind: "code", status: "success", summary: "Lines 1-3 of 3", sources: [CODE] }) +
+  ev("text_reset", {}) +
+  ev("tool_start", { id: "tu3", name: "github__read_file", kind: "code" }) +
+  ev("tool_result", { id: "tu3", name: "github__read_file", repo: "web", label: "Read src/server.ts in web", kind: "code", status: "success", summary: "Lines 1-17 of 44", sources: [SERVER_A, SERVER_B] }) +
+  ev("text_reset", {}) +
+  ev("text_delta", { text });
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = {
@@ -101,17 +144,35 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       { id: "kb_hr", name: "HR handbook", ready: 1, authoritative: true },
       { id: "kb_eng", name: "Engineering runbooks", ready: 3, authoritative: false },
     ],
+    repos: [
+      { name: "your-team/api", short: "api", role: "backend" },
+      { name: "your-team/web", short: "web", role: "web" },
+    ],
     uploads: 0,
+    answerText: ANSWER_TEXT,
     ...init,
   };
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   const holds = (cap: string) =>
     db.capabilities ? db.capabilities.includes(cap) : cap === "brain_ask" ? db.role !== "viewer" : cap === "knowledge_manage" ? db.role === "admin" || db.role === "owner" : true;
   const exchange = (question: string) => [
-    { seq: 0, role: "user", content: question, citations: [], grounded: true, sources: { ...NONE, knowledge: ["kb_hr"] }, attachments: [], used: [], at: iso(1) },
+    { seq: 0, role: "user", content: question, citations: [], grounded: true, sources: { ...NONE, knowledge: ["kb_hr"] }, mentions: db.asks[db.asks.length - 1]?.mentions ?? [], attachments: [], used: [], at: iso(1) },
     db.answer === "none"
       ? { seq: 1, role: "assistant", content: "I couldn't find anything in the selected sources that answers this, so I won't guess.", citations: [], grounded: false, attachments: [], used: [], at: iso(1) }
-      : { seq: 1, role: "assistant", content: ANSWER_TEXT, citations: [LEAVE, CODE], grounded: true, attachments: [], used: [{ kind: "knowledge", label: 'Searched knowledge for "parental leave"' }], at: iso(1) },
+      : {
+          seq: 1,
+          role: "assistant",
+          content: db.answerText,
+          citations: CITED,
+          grounded: true,
+          attachments: [],
+          used: [
+            { kind: "knowledge", name: "search_knowledge", label: "Searched knowledge for “parental leave”", summary: "1 passage" },
+            { kind: "code", name: "github__read_file", repo: "web", label: "Read src/policies/leave.ts in web", summary: "Lines 1-3 of 3" },
+            { kind: "code", name: "github__read_file", repo: "web", label: "Read src/server.ts in web", summary: "Lines 1-17 of 44" },
+          ],
+          at: iso(1),
+        },
   ];
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
   await page.route((url) => url.hostname === "localhost" && url.pathname.startsWith("/__upload/"), async (route) => {
@@ -133,7 +194,13 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/brain/token") return holds("brain_ask") ? json(route, { token: "t" }) : json(route, { error: "Your role can't ask questions." }, 403);
     if (p === "/api/brain/starters") return json(route, { starters: db.starters });
     if (p === "/api/brain/sources") {
-      return json(route, { kinds: KINDS, knowledge: db.knowledge, connections: [{ id: "notion" }], repos: ["your-team/web", "your-team/api"], can_ask: holds("brain_ask") });
+      return json(route, {
+        knowledge: db.knowledge,
+        connections: [{ id: "notion" }],
+        repos: db.repos.map((r) => r.name),
+        repositories: db.repos,
+        can_ask: holds("brain_ask"),
+      });
     }
     if (p === "/api/brain/threads" && method === "GET") {
       const visible = db.threads.filter((t) => t.mine ? db.role !== "viewer" : true);
@@ -186,15 +253,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
             ev("done", {}),
         );
       }
-      return stream(
-        ev("thread", { id, title: body.question }) +
-          ev("retrieved", { sources: [LEAVE, CODE] }) +
-          ev("tool_start", { id: "tu1", name: "search_knowledge", kind: "knowledge" }) +
-          ev("tool_result", { id: "tu1", name: "search_knowledge", label: 'Searched knowledge for "parental leave"', status: "success", summary: "2 passages" }) +
-          ev("text_delta", { text: "Parental leave is sixteen weeks [S1]." }) +
-          ev("answer", { text: ANSWER_TEXT, citations: [LEAVE, CODE], grounded: true }) +
-          ev("done", {}),
-      );
+      return stream(STREAM(id, String(body.question)) + ev("answer", { text: ANSWER_TEXT, citations: CITED, grounded: true }) + ev("done", {}));
     }
     if (p === "/api/knowledge/kb_hr") {
       return json(route, {
@@ -228,7 +287,7 @@ async function askIt(page: Page, q = "How long is parental leave?") {
 }
 
 test.describe("chat: the empty page", () => {
-  test("opens on a focused question box with starter questions from the team's data", async ({ page }) => {
+  test("opens on a focused question box with starter questions, and no scope it wasn't given", async ({ page }) => {
     const db = await mockApi(page);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/chat");
@@ -238,10 +297,11 @@ test.describe("chat: the empty page", () => {
     const starters = page.getByTestId("starter");
     await expect(starters).toHaveCount(4);
     await expect(starters.first()).toContainText("HR handbook");
-    await expect(starters.first()).toContainText("From HR handbook");
     expect(db.calls).toContain("GET /api/brain/starters");
-    // The sources start as every knowledge source, shown as chips in the box.
-    await expect(page.getByTestId("source-chip")).toHaveText(["HR handbook", "Engineering runbooks"]);
+    // Chat decides what to read: no "Search in" step and no chips nobody chose.
+    await expect(page.getByText("Search in")).toHaveCount(0);
+    await expect(page.getByTestId("mention-chip")).toHaveCount(0);
+    await expect(page.getByTestId("mention-hint")).toContainText("Type @");
     // The chat list and the way to the knowledge.
     await expect(page.getByTestId("thread-rail")).toContainText("Previous 7 days");
     await expect(page.getByTestId("thread-rail")).toContainText("Shared with you");
@@ -249,21 +309,21 @@ test.describe("chat: the empty page", () => {
     await expect(page.getByTestId("knowledge-count")).toHaveText("2");
     // No dashed walls of text.
     expect(await page.locator(".border-dashed").count()).toBe(0);
-    await shot(page, "chat-empty");
   });
 
-  test("a starter question asks with the sources it needs", async ({ page }) => {
+  test("a starter question asks with no scope: Chat picks the sources", async ({ page }) => {
     const db = await mockApi(page);
     await page.goto("/chat");
-    await page.getByTestId("starter").nth(1).click();
+    await page.getByTestId("starter").nth(2).click();
     await expect(page.getByTestId("answer").last()).toContainText("sixteen weeks");
-    expect(db.asks[0].question).toBe("What's the latest on “Add rate limiting to login”?");
-    expect(db.asks[0].sources).toMatchObject({ code: true, repo: "your-team/web", knowledge: [] });
+    expect(db.asks[0].question).toBe("How is web put together?");
+    expect(db.asks[0].sources).toBeUndefined();
+    expect(db.asks[0].mentions).toEqual([]);
     await expect(page).toHaveURL(/\/chat\/?\?thread=th_new/);
   });
 
-  test("with nothing to suggest, an admin is pointed at adding knowledge", async ({ page }) => {
-    await mockApi(page, { starters: [], knowledge: [] });
+  test("with nothing to read yet, an admin is pointed at adding some", async ({ page }) => {
+    await mockApi(page, { starters: [], knowledge: [], repos: [] });
     await page.goto("/chat");
     await expect(page.getByTestId("no-knowledge")).toContainText("Add knowledge");
     await expect(page.getByTestId("starter")).toHaveCount(0);
@@ -271,7 +331,7 @@ test.describe("chat: the empty page", () => {
 });
 
 test.describe("chat: asking", () => {
-  test("Enter sends, the answer streams in with numbered citations, and a citation opens its passage", async ({ page }) => {
+  test("Enter sends; the answer reads code, cites with numbers, and lists each source once", async ({ page }) => {
     const db = await mockApi(page);
     await page.goto("/chat");
     // Shift+Enter is a new line, not a send.
@@ -284,28 +344,52 @@ test.describe("chat: asking", () => {
     const answer = page.getByTestId("answer").last();
     await expect(answer).toContainText("sixteen weeks, fully paid");
     expect(db.asks[0].question).toBe("How long is\nparental leave?");
-    expect((db.asks[0].sources as { knowledge: string[] }).knowledge).toEqual(["kb_hr", "kb_eng"]);
-    // What it looked up is folded once the answer is done.
-    await answer.getByRole("button", { name: "How this was found" }).click();
-    await expect(answer.getByTestId("tool-step")).toContainText("Searched knowledge");
-    // Two sources: a chip with each one's name in the text, and cards under it.
-    await expect(answer.getByTestId("cite-marker")).toHaveText(["Leave policy", "leave.ts"]);
-    const cards = answer.getByTestId("citation");
-    await expect(cards).toHaveCount(2);
-    await expect(cards.first()).toContainText("Leave policy.pdf");
-    await expect(cards.first()).toContainText("Updated May 1, 2026");
-    await expect(cards.first()).toContainText("Source of truth");
-    await answer.getByTestId("cite-marker").first().click();
+    expect(db.asks[0].sources).toBeUndefined();
+    // What it did: one quiet line, opened to the steps.
+    await expect(answer.getByTestId("activity-summary")).toHaveText("Read 2 files in web, searched knowledge");
+    await expect(answer.getByTestId("tool-step")).toHaveCount(0);
+    await answer.getByTestId("activity-toggle").click();
+    await expect(answer.getByTestId("tool-step")).toHaveCount(3);
+    await expect(answer.getByTestId("tool-step").nth(2)).toContainText("Read src/server.ts in web");
+    // Small numbers in the text: two reads of src/server.ts are one source.
+    await expect(answer.getByTestId("cite-marker")).toHaveText(["1", "2", "3"]);
+    const sources = answer.getByTestId("source");
+    await expect(sources).toHaveCount(3);
+    await expect(sources.nth(0)).toContainText("Leave policy.pdf");
+    await expect(sources.nth(0)).toContainText("HR handbook");
+    await expect(sources.nth(2)).toContainText("src/server.ts");
+    await expect(sources.nth(2)).toContainText("web · Lines 1-17, 30-44");
+    await expect(answer).not.toContainText("Code graph");
+    // A number shows its source: the real path and lines, linked on GitHub at the commit.
+    await answer.getByTestId("cite-marker").nth(2).click();
+    const card = page.getByTestId("source-card");
+    await expect(card).toContainText("src/server.ts");
+    await expect(card).toContainText("Lines 1-17, 30-44");
+    await expect(card.getByTestId("source-open")).toHaveAttribute("href", `https://github.com/your-team/web/blob/${COMMIT}/src/server.ts#L1-L17`);
+    await page.keyboard.press("Escape");
+    await expect(card).toHaveCount(0);
+    // A listed source opens in full.
+    await sources.nth(0).click();
     await expect(page.getByTestId("passage")).toContainText("sixteen weeks, fully paid, for every employee");
     await expect(page.getByRole("dialog")).toContainText("HR handbook");
     await page.keyboard.press("Escape");
-    await cards.nth(1).click();
+    await sources.nth(1).click();
     await expect(page.getByTestId("passage")).toContainText("PARENTAL_LEAVE_WEEKS");
     await page.keyboard.press("Escape");
     await expect(page).toHaveURL(/thread=th_new/);
     await expect(page.getByTestId("topbar")).toContainText("How long is parental leave?");
     await expect(box(page)).toHaveAttribute("placeholder", "Ask a follow-up");
-    await shot(page, "chat-conversation");
+  });
+
+  test("hovering a number shows its source card", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/chat?thread=th_old");
+    const answer = page.getByTestId("answer");
+    await answer.getByTestId("cite-marker").nth(1).hover();
+    await expect(page.getByTestId("source-card")).toContainText("src/policies/leave.ts");
+    await expect(page.getByTestId("source-card")).toContainText("web · Lines 1-3");
+    await page.mouse.move(0, 0);
+    await expect(page.getByTestId("source-card")).toHaveCount(0);
   });
 
   test("copy, rate and ask again on an answer", async ({ page, context }) => {
@@ -314,11 +398,11 @@ test.describe("chat: asking", () => {
     await page.goto("/chat");
     await askIt(page);
     const answer = page.getByTestId("answer").last();
-    await expect(answer.getByTestId("citation")).toHaveCount(2);
+    await expect(answer.getByTestId("source")).toHaveCount(3);
     await answer.getByTestId("answer-copy").click();
     await expect(answer.getByRole("button", { name: "Copied" })).toBeVisible();
     const copied = await page.evaluate(() => navigator.clipboard.readText());
-    expect(copied).toBe("Parental leave is **sixteen weeks**, fully paid. The app reads the same number from code.");
+    expect(copied).toBe("Parental leave is **sixteen weeks**, fully paid. The app reads the same number from code. The server loads it when it starts.");
     await answer.getByTestId("answer-up").click();
     await expect(answer.getByTestId("answer-up")).toHaveAttribute("aria-pressed", "true");
     expect(db.bodies.find((b) => String(b.call).endsWith("/messages/1/feedback"))).toMatchObject({ rating: "up" });
@@ -338,34 +422,41 @@ test.describe("chat: asking", () => {
     await expect(page.getByTestId("send-button")).toBeVisible();
   });
 
-  test("what to search: chips in the box, the picker, and only what is on is sent", async ({ page }) => {
+  test("typing @ points a question at one repository, shown as a chip that can be removed", async ({ page }) => {
     const db = await mockApi(page);
     await page.goto("/chat");
-    await page.getByTestId("sources-button").click();
-    const picker = page.getByTestId("source-picker");
-    await picker.getByRole("checkbox", { name: /Engineering runbooks/ }).uncheck();
-    await page.getByTestId("source-connections").check();
-    await page.getByTestId("source-code").check();
-    // Two repositories: pick the one code is read from.
-    await picker.getByRole("button", { name: "api" }).click();
+    await box(page).pressSequentially("Where is leave computed in @ap");
+    const menu = page.getByTestId("mention-menu");
+    await expect(menu.getByTestId("mention-option")).toHaveText([/api.*Backend code/]);
+    await box(page).press("Enter");
+    await expect(page.getByTestId("mention-chip")).toHaveText("api");
+    await expect(box(page)).toHaveValue("Where is leave computed in ");
+    await expect(menu).toHaveCount(0);
+    // The @ button lists the rest; Escape closes it.
+    await page.getByTestId("mention-button").click();
+    await expect(page.getByTestId("mention-option")).toHaveText([/web/, /HR handbook/, /Engineering runbooks/]);
     await page.keyboard.press("Escape");
-    await expect(page.getByTestId("source-chip")).toHaveText(["HR handbook", "Connected apps", "Code"]);
-    // The × on a chip turns it off.
-    await page.getByRole("button", { name: "Turn off Connected apps" }).click();
-    await expect(page.getByTestId("source-chip")).toHaveText(["HR handbook", "Code"]);
-    await askIt(page, "Where is leave computed?");
+    await expect(page.getByTestId("mention-menu")).toHaveCount(0);
+    await box(page).press("Enter");
     await expect(page.getByTestId("answer").last()).toContainText("sixteen weeks");
-    expect(db.asks[0].sources).toMatchObject({ knowledge: ["kb_hr"], connections: false, code: true, memories: false, repo: "your-team/api" });
+    expect(db.asks[0].mentions).toEqual([{ kind: "repo", id: "your-team/api" }]);
+    expect(db.asks[0].question).toBe("Where is leave computed in");
+    await expect(page.getByTestId("question").last()).toContainText("Only in api");
+    // The chip went with the question; the next one starts unscoped.
+    await expect(page.getByTestId("mention-chip")).toHaveCount(0);
   });
 
-  test("with nothing to search, sending waits for a choice", async ({ page }) => {
-    await mockApi(page);
+  test("a chosen mention can be taken off before sending", async ({ page }) => {
+    const db = await mockApi(page);
     await page.goto("/chat");
-    await page.getByRole("button", { name: "Turn off HR handbook" }).click();
-    await page.getByRole("button", { name: "Turn off Engineering runbooks" }).click();
-    await expect(page.getByTestId("sources-button")).toHaveText("Choose what to search");
-    await box(page).fill("Anything?");
-    await expect(page.getByTestId("send-button")).toBeDisabled();
+    await page.getByTestId("mention-button").click();
+    await page.getByTestId("mention-option").filter({ hasText: "HR handbook" }).click();
+    await expect(page.getByTestId("mention-chip")).toHaveText("HR handbook");
+    await page.getByRole("button", { name: "Stop pointing at HR handbook" }).click();
+    await expect(page.getByTestId("mention-chip")).toHaveCount(0);
+    await askIt(page, "Anything?");
+    await expect.poll(() => db.asks.length).toBe(1);
+    expect(db.asks[0].mentions).toEqual([]);
   });
 
   test("a file attached to a question is uploaded and sent with it", async ({ page }) => {
@@ -386,8 +477,7 @@ test.describe("chat: asking", () => {
     const none = page.getByTestId("no-source-answer");
     await expect(none).toContainText("Nothing found");
     await expect(none).toContainText("won't guess");
-    await shot(page, "chat-nothing-found", [1440]);
-    await expect(page.getByTestId("citation")).toHaveCount(0);
+    await expect(page.getByTestId("source")).toHaveCount(0);
   });
 });
 
@@ -459,7 +549,7 @@ test.describe("chat: who can do what", () => {
     await mockApi(page, { role: "viewer" });
     await page.goto("/chat?thread=th_shared");
     await expect(page.getByTestId("answer")).toContainText("Deploys stop Friday at noon");
-    await expect(page.getByTestId("citation")).toContainText("Release rules.md");
+    await expect(page.getByTestId("source")).toContainText("Release rules.md");
     await expect(page.getByTestId("read-only-note")).toContainText("Shared by dana@example.com");
     await expect(box(page)).toHaveCount(0);
     await expect(page.getByTestId("share-toggle")).toHaveCount(0);
@@ -480,7 +570,7 @@ test.describe("chat: who can do what", () => {
     await mockApi(page, { role: "custom:asker", capabilities: [...base, "brain_ask"] });
     await page.goto("/chat");
     await askIt(page);
-    await expect(page.getByTestId("citation")).toHaveCount(2);
+    await expect(page.getByTestId("source")).toHaveCount(3);
     // Knowledge reads, but its managing buttons are absent (knowledge.spec.ts covers the rest).
     await page.goto("/knowledge/base/?id=kb_hr");
     await expect(page.getByTestId("item-row").first()).toBeVisible();
@@ -526,7 +616,7 @@ test.describe("chat: on a phone", () => {
     await sheet.getByRole("link", { name: /reconciliation/ }).click();
     await expect(sheet).toBeHidden();
     await expect(page).toHaveURL(/thread=th_long/);
-    await expect(page.getByTestId("citation")).toHaveCount(2);
+    await expect(page.getByTestId("source")).toHaveCount(3);
     await noSideways(page);
   });
 
@@ -534,7 +624,7 @@ test.describe("chat: on a phone", () => {
     await mockApi(page);
     await page.goto("/chat");
     await askIt(page);
-    await expect(page.getByTestId("citation")).toHaveCount(2);
+    await expect(page.getByTestId("source")).toHaveCount(3);
     await noSideways(page);
     const broken = await page.evaluate(() => {
       const out: string[] = [];
@@ -554,4 +644,88 @@ test.describe("chat: on a phone", () => {
     });
     expect(broken, "words split across lines").toEqual([]);
   });
+});
+
+test.describe("chat: how it looks", () => {
+  // The states people see, at desktop and phone widths, in the dark theme and
+  // with the system asking for light (the app keeps its dark look).
+  const SCHEMES = ["dark", "light"] as const;
+
+  /** Keeps the answer stream open after `events`, until `window.__finish()`. */
+  async function holdStream(page: Page, events: string) {
+    await page.addInitScript((evs: string) => {
+      const real = window.fetch.bind(window);
+      window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        if (!url.endsWith("/api/brain/stream")) return real(input, init);
+        const enc = new TextEncoder();
+        const body = new ReadableStream<Uint8Array>({
+          start(c) {
+            c.enqueue(enc.encode(evs));
+            (window as unknown as { __finish: (more: string) => void }).__finish = (more: string) => {
+              c.enqueue(enc.encode(more));
+              c.close();
+            };
+          },
+        });
+        return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+      };
+    }, events);
+  }
+
+  async function snap(page: Page, name: string, scheme: string) {
+    fs.mkdirSync(SHOTS_DIR, { recursive: true });
+    await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+    await page.waitForTimeout(150);
+    await page.screenshot({ path: path.join(SHOTS_DIR, `chat-${name}-${scheme}.png`) });
+  }
+
+  for (const scheme of SCHEMES) {
+    for (const width of [1440, 390]) {
+      test(`${scheme}, ${width} wide: empty, streaming, answered, a source card and the steps`, async ({ page }) => {
+        await page.emulateMedia({ colorScheme: scheme });
+        await page.setViewportSize({ width, height: width < 640 ? 844 : 900 });
+        await mockApi(page, {
+          threads: [
+            thread({ id: "th_new", title: "How is web put together?", updated_at: iso(0) }),
+            thread({ id: "th_old", title: "Which services call the billing API?", updated_at: iso(60 * 24 * 3) }),
+            thread({ id: "th_shared", title: "What is the deploy freeze?", shared: true, mine: false, owner_email: "dana@example.com", updated_at: iso(500) }),
+          ],
+          answerText: SHOT_TEXT,
+          starters: [
+            { question: "How is web put together?", why: "From the web code", sources: { ...NONE, code: true } },
+            { question: "Where are refunds handled in api?", why: "From the api code", sources: { ...NONE, code: true } },
+            { question: "What's the latest on “Add rate limiting to login”?", why: "From recent work in web", sources: { ...NONE, code: true } },
+            { question: "What should I know from HR handbook?", why: "From HR handbook", sources: { ...NONE, knowledge: ["kb_hr"] } },
+          ],
+        });
+        await holdStream(page, STREAM("th_new", "How is web put together?", SHOT_TEXT.slice(0, SHOT_TEXT.indexOf("**How it fits"))));
+        await page.goto("/chat");
+        await expect(page.getByTestId("starter")).toHaveCount(4);
+        await snap(page, `empty-${width}`, scheme);
+
+        await askIt(page, "How is web put together?");
+        const answer = page.getByTestId("answer").last();
+        await expect(answer).toContainText("Next.js site");
+        await expect(answer.getByTestId("activity-summary")).toContainText("Read src/server.ts in web");
+        await snap(page, `streaming-${width}`, scheme);
+
+        await page.evaluate(
+          (more) => (window as unknown as { __finish: (m: string) => void }).__finish(more),
+          ev("answer", { text: SHOT_TEXT, citations: CITED, grounded: true }) + ev("done", {}),
+        );
+        await expect(page.getByTestId("answer").last().getByTestId("source")).toHaveCount(3);
+        await snap(page, `answered-${width}`, scheme);
+
+        await answer.getByTestId("cite-marker").nth(2).click();
+        await expect(page.getByTestId("source-card")).toBeVisible();
+        await snap(page, `source-card-${width}`, scheme);
+        await page.keyboard.press("Escape");
+
+        await answer.getByTestId("activity-toggle").click();
+        await expect(answer.getByTestId("tool-step")).toHaveCount(3);
+        await snap(page, `steps-${width}`, scheme);
+      });
+    }
+  }
 });

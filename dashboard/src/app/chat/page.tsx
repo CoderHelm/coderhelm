@@ -19,30 +19,33 @@ import { KNOWLEDGE_HREF } from "@/lib/routes";
 import {
   askBrain,
   brainApi,
-  NO_PICKS,
   uploadProblem,
   uploadToSignedUrl,
   type BrainMessage,
   type BrainSources,
   type BrainThread,
   type Citation,
-  type Picks,
+  type Mention,
   type Rating,
   type Starter,
 } from "@/lib/brain";
 import { AnswerView, SourceIcon, type ToolStep } from "./answer";
-import { ChatComposer, type PendingFile } from "./composer";
-import { defaultPicks, picksCount, SourcePicker } from "./source-picker";
+import { ChatComposer, type MentionOption, type PendingFile } from "./composer";
 import { ThreadList } from "./thread-list";
 
-// Chat: a question about the team's work, answered only from the sources the
-// asker turns on (knowledge, repositories, connections, memories, data
-// sources, skills), with a citation on every claim.
+// Chat: a question about the team's work, answered from the team's own code
+// and knowledge, with a citation on every claim. Chat decides what to read
+// (everything the asker can see); typing @ points a question at one
+// repository or knowledge collection.
 //
 // The page opens on the question box, focused, with starter questions built
-// from the team's own data. Chats sit in a sidebar on wide screens (it can
-// be hidden) and in a sheet on narrower screens. A chat is yours until you share it;
+// from the team's own repositories, runs and knowledge. Answers sit in one
+// readable column. Chats sit in a sidebar on wide screens (it can be hidden)
+// and in a sheet on narrower screens. A chat is yours until you share it;
 // teammates then read it but only you ask in it.
+
+/** The reading column: about 720px. */
+const COLUMN = "max-w-[40rem]";
 
 export default function ChatPage() {
   return (
@@ -56,6 +59,8 @@ interface LiveAnswer {
   text: string;
   steps: ToolStep[];
   citations: Citation[];
+  /** Every source read so far, for the numbers while the answer streams. */
+  known: Citation[];
   grounded: boolean;
   done: boolean;
   error?: string;
@@ -65,17 +70,7 @@ interface LiveAnswer {
 
 const ATTACH_LIMIT = { max_file_bytes: 10 * 1024 * 1024, extensions: ["pdf", "docx", "md", "markdown", "txt", "text", "csv", "xlsx", "html", "htm"] };
 const MAX_FILES = 3;
-const PICKS_KEY = "coderhelm:brain-sources";
 const RAIL_KEY = "coderhelm:chat-rail";
-
-function loadPicks(): Picks | null {
-  try {
-    const raw = localStorage.getItem(PICKS_KEY);
-    return raw ? { ...NO_PICKS, ...JSON.parse(raw) } : null;
-  } catch {
-    return null;
-  }
-}
 
 /** A mouse or trackpad: focusing the box there doesn't pop up a keyboard. */
 function finePointer(): boolean {
@@ -97,14 +92,14 @@ function Chat() {
   const [threads, setThreads] = useState<BrainThread[] | null>(null);
   const [sources, setSources] = useState<BrainSources | null>(null);
   const [starters, setStarters] = useState<Starter[] | null>(null);
-  const [picks, setPicks] = useState<Picks>(NO_PICKS);
+  const [mentions, setMentions] = useState<Mention[]>([]);
   const [thread, setThread] = useState<BrainThread | null>(null);
   const [messages, setMessages] = useState<BrainMessage[]>([]);
   const [threadCanAsk, setThreadCanAsk] = useState(true);
   const [loadingThread, setLoadingThread] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [input, setInput] = useState("");
-  const [live, setLive] = useState<{ question: string; answer: LiveAnswer } | null>(null);
+  const [live, setLive] = useState<{ question: string; mentions: Mention[]; answer: LiveAnswer } | null>(null);
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [ratings, setRatings] = useState<Record<number, Rating | null>>({});
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -144,26 +139,13 @@ function Chat() {
     loadThreads();
     brainApi
       .sources()
-      .then((s) => {
-        setSources(s);
-        // Last time's picks (minus knowledge that is gone), else a sensible start.
-        const saved = loadPicks();
-        const ids = new Set(s.knowledge.map((b) => b.id));
-        setPicks(saved ? { ...saved, knowledge: saved.knowledge.filter((k) => ids.has(k)) } : defaultPicks(s));
-      })
-      .catch(() => setSources({ kinds: [], knowledge: [], connections: [], repos: [], can_ask: false }));
+      .then(setSources)
+      .catch(() => setSources({ knowledge: [], connections: [], repos: [], can_ask: false }));
     brainApi
       .starters()
       .then((r) => setStarters(r.starters ?? []))
       .catch(() => setStarters([]));
   }, [loadThreads]);
-
-  const changePicks = (p: Picks) => {
-    setPicks(p);
-    try {
-      localStorage.setItem(PICKS_KEY, JSON.stringify(p));
-    } catch {}
-  };
 
   const focusBox = useCallback(() => {
     if (finePointer()) window.setTimeout(() => inputRef.current?.focus(), 0);
@@ -237,13 +219,14 @@ function Chat() {
     }
   };
 
-  const ask = async (question: string, sourcesForIt: Picks) => {
+  const ask = async (question: string, pointedAt: Mention[]) => {
     if (!question || busy || uploading) return;
     setInput("");
+    setMentions([]);
     const attachments = files.filter((f) => f.status === "ready" && f.id).map((f) => ({ id: f.id!, name: f.name }));
     setFiles([]);
-    const answer: LiveAnswer = { text: "", steps: [], citations: [], grounded: true, done: false };
-    setLive({ question, answer });
+    const answer: LiveAnswer = { text: "", steps: [], citations: [], known: [], grounded: true, done: false };
+    setLive({ question, mentions: pointedAt, answer });
     window.setTimeout(() => scrollToBottom(true), 0);
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -251,7 +234,7 @@ function Chat() {
     const update = (fn: (a: LiveAnswer) => LiveAnswer) => setLive((l) => (l ? { ...l, answer: fn(l.answer) } : l));
     try {
       await askBrain(
-        { thread_id: thread?.id, question, sources: sourcesForIt, attachments },
+        { thread_id: thread?.id, question, mentions: pointedAt, attachments },
         (e) => {
           switch (e.type) {
             case "thread":
@@ -263,11 +246,21 @@ function Chat() {
             case "text_reset":
               update((a) => ({ ...a, text: "" }));
               break;
+            case "retrieved":
+              update((a) => ({ ...a, known: [...a.known, ...e.sources] }));
+              break;
             case "tool_start":
-              update((a) => ({ ...a, steps: [...a.steps, { id: e.id, label: e.name.replace(/_/g, " "), status: "running" }] }));
+              update((a) => ({ ...a, steps: [...a.steps, { id: e.id, name: e.name, label: startLabel(e.name), status: "running" }] }));
               break;
             case "tool_result":
-              update((a) => ({ ...a, steps: a.steps.map((s) => (s.id === e.id ? { ...s, label: e.label, status: e.status, summary: e.summary } : s)) }));
+              update((a) => ({
+                ...a,
+                known: [...a.known, ...(e.sources ?? [])],
+                steps: a.steps.map((s) => (s.id === e.id ? { ...s, name: e.name, repo: e.repo, label: e.label, status: e.status, summary: e.summary } : s)),
+              }));
+              break;
+            case "step":
+              update((a) => ({ ...a, steps: [...a.steps, { id: e.id, label: e.label, status: e.status }] }));
               break;
             case "answer":
               update((a) => ({ ...a, text: e.text, citations: e.citations, grounded: e.grounded }));
@@ -301,7 +294,7 @@ function Chat() {
     }
   };
 
-  const send = () => ask(input.trim(), picks);
+  const send = () => ask(input.trim(), mentions);
   const stop = () => abortRef.current?.abort();
 
   const startNew = useCallback(() => {
@@ -384,10 +377,24 @@ function Chat() {
   const lastAnswerSeq = [...messages].reverse().find((m) => m.role === "assistant")?.seq;
   const retry = (seq: number) => {
     const q = [...messages].reverse().find((m) => m.role === "user" && m.seq < seq);
-    if (q) ask(q.content, q.sources ? { ...NO_PICKS, ...q.sources } : picks);
+    if (q) ask(q.content, q.mentions ?? []);
   };
 
-  const blocked = uploading ? "Wait for the file to finish uploading" : picksCount(picks) === 0 ? "Choose at least one place to search" : null;
+  const blocked = uploading ? "Wait for the file to finish uploading" : null;
+
+  // What a question can be pointed at with @: the team's repositories, then
+  // the knowledge this person may read.
+  const mentionOptions = useMemo<MentionOption[]>(() => {
+    if (!sources) return [];
+    const repos: MentionOption[] = (sources.repositories ?? sources.repos.map((name) => ({ name, short: name.split("/").pop() ?? name, role: null }))).map((r) => ({
+      kind: "repo",
+      id: r.name,
+      label: r.short,
+      sub: r.role ? `${r.role[0].toUpperCase()}${r.role.slice(1)} code` : "Code",
+    }));
+    const kbs: MentionOption[] = sources.knowledge.map((b) => ({ kind: "knowledge", id: b.id, label: b.name, sub: "Knowledge" }));
+    return [...repos, ...kbs];
+  }, [sources]);
   const shortcut = mac ? "⌘/" : "Ctrl+/";
 
   const paletteActions = useMemo<PageAction[] | null>(() => {
@@ -437,7 +444,9 @@ function Chat() {
       busy={busy}
       large={large}
       placeholder={thread ? "Ask a follow-up" : "Ask about your team's work"}
-      sources={<SourcePicker sources={sources} value={picks} onChange={changePicks} disabled={busy} />}
+      mentions={mentions}
+      onMentionsChange={setMentions}
+      mentionOptions={mentionOptions}
       files={files}
       onAttach={attach}
       onRemoveFile={(key) => setFiles((all) => all.filter((x) => x.key !== key))}
@@ -521,7 +530,8 @@ function Chat() {
     </div>
   );
 
-  const noData = !!sources && !!starters && starters.length === 0 && sources.knowledge.length === 0;
+  const noData = !!sources && !!starters && starters.length === 0 && sources.knowledge.length === 0 && sources.repos.length === 0;
+  const mentionName = (m: Mention) => mentionOptions.find((o) => o.kind === m.kind && o.id === m.id)?.label ?? m.id.split("/").pop() ?? m.id;
 
   return (
     <Page className="flex h-[calc(100dvh-5.25rem)] flex-col md:h-[calc(100dvh-7.25rem)]" testId="chat-page">
@@ -532,60 +542,66 @@ function Chat() {
         <section aria-label="Conversation" className="relative flex min-h-0 min-w-0 flex-1 flex-col">
           {paneBar}
           {loadError && (
-            <div className="mx-auto mb-3 w-full max-w-3xl">
+            <div className={`mx-auto mb-3 w-full ${COLUMN}`}>
               <Callout variant="error" title={loadError} />
             </div>
           )}
 
           {empty ? (
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto" data-testid="chat-empty">
-              <div className="mx-auto my-auto flex w-full max-w-2xl flex-col pb-[6vh] pt-4">
-                <h1 className="animate-chat-in text-center text-[1.75rem] font-semibold leading-tight tracking-tight text-zinc-100 sm:text-[2rem]">What would you like to know?</h1>
-                <div className="mt-8">{!capsReady ? <Skeleton className="h-28 rounded-2xl" /> : canAsk ? composer(true) : readOnlyNote}</div>
+              <div className={`mx-auto my-auto flex w-full ${COLUMN} flex-col pb-[8vh] pt-4`}>
+                <h1 className="animate-chat-in text-center text-[1.6rem] font-semibold leading-tight tracking-tight text-zinc-100 sm:text-[1.85rem]">What would you like to know?</h1>
+                <p className="animate-chat-in mx-auto mt-2 max-w-[30rem] text-center text-sm leading-relaxed text-zinc-500">
+                  Ask about your team&apos;s code, docs and work. Chat reads what it needs and shows where each answer comes from.
+                </p>
+                <div className="mt-7">{!capsReady ? <Skeleton className="h-28 rounded-2xl" /> : canAsk ? composer(true) : readOnlyNote}</div>
+                {canAsk && mentionOptions.length > 0 && (
+                  <p className="mt-2.5 text-center text-xs text-zinc-600" data-testid="mention-hint">
+                    Type @ to focus on one repository or collection.
+                  </p>
+                )}
                 {canAsk && (
-                  <div className="mt-4" data-testid="starters">
+                  <div className="mt-8" data-testid="starters">
                     {starters === null ? (
-                      <div className="grid gap-2 sm:grid-cols-2" aria-label="Loading suggestions">
-                        {[0, 1, 2, 3].map((i) => (
-                          <Skeleton key={i} className="h-[4.25rem] rounded-xl" />
+                      <div className="space-y-2" aria-label="Loading suggestions">
+                        {[0, 1, 2].map((i) => (
+                          <Skeleton key={i} className="h-10 rounded-xl" />
                         ))}
                       </div>
                     ) : starters.length > 0 ? (
-                      <ul className="grid gap-2.5 sm:grid-cols-2" aria-label="Suggested questions">
-                        {starters.map((s, i) => (
-                          <li key={s.question} className="animate-chat-in min-w-0" style={{ animationDelay: `${80 + i * 40}ms` }}>
-                            <button
-                              type="button"
-                              data-testid="starter"
-                              disabled={busy}
-                              onClick={() => {
-                                changePicks({ ...NO_PICKS, ...s.sources });
-                                ask(s.question, { ...NO_PICKS, ...s.sources });
-                              }}
-                              className={`group flex h-full w-full min-w-0 items-start gap-3 rounded-2xl border border-zinc-800/80 bg-zinc-900/30 px-4 py-3.5 text-left transition-colors hover:border-zinc-700 hover:bg-zinc-900/80 motion-reduce:transition-none ${focusRing}`}
-                            >
-                              <span aria-hidden="true" className="mt-0.5 shrink-0 text-zinc-500 transition-colors group-hover:text-zinc-300 motion-reduce:transition-none [&_svg]:h-4 [&_svg]:w-4">
-                                <SourceIcon kind={starterKind(s)} />
-                              </span>
-                              <span className="min-w-0 flex-1">
-                                <span className="block text-sm leading-snug text-zinc-200 [overflow-wrap:break-word]">{s.question}</span>
-                                <span className="mt-1 block truncate text-xs text-zinc-500">{s.why}</span>
-                              </span>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
+                      <>
+                        <p className="mb-1.5 px-3 text-xs font-medium text-zinc-500">Try asking</p>
+                        <ul className="flex flex-col" aria-label="Suggested questions">
+                          {starters.map((s, i) => (
+                            <li key={s.question} className="animate-chat-in min-w-0" style={{ animationDelay: `${60 + i * 35}ms` }}>
+                              <button
+                                type="button"
+                                data-testid="starter"
+                                disabled={busy}
+                                onClick={() => ask(s.question, [])}
+                                className={`group flex w-full min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-zinc-900 motion-reduce:transition-none ${focusRing}`}
+                              >
+                                <span aria-hidden="true" className="shrink-0 text-zinc-600 transition-colors group-hover:text-zinc-300 motion-reduce:transition-none [&_svg]:h-4 [&_svg]:w-4">
+                                  <SourceIcon kind={starterKind(s)} />
+                                </span>
+                                <span className="min-w-0 flex-1 text-sm leading-snug text-zinc-300 group-hover:text-zinc-100">{s.question}</span>
+                                <span className="hidden max-w-[11rem] truncate text-xs text-zinc-600 sm:block">{s.why}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
                     ) : noData ? (
                       <p className="text-center text-sm text-zinc-500" data-testid="no-knowledge">
                         {canManageKnowledge ? (
                           <>
-                            Add your team&apos;s documents so Chat can answer from them.{" "}
+                            Connect a repository or add your team&apos;s documents so Chat has something to read.{" "}
                             <Link href={KNOWLEDGE_HREF} className={linkButton}>
                               Add knowledge
                             </Link>
                           </>
                         ) : (
-                          "An admin can add your team's documents so Chat can answer from them."
+                          "An admin can connect repositories or add your team's documents so Chat has something to read."
                         )}
                       </p>
                     ) : null}
@@ -596,7 +612,7 @@ function Chat() {
           ) : (
             <>
               <div ref={scrollRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden" aria-live="polite" aria-busy={busy}>
-                <div className="mx-auto max-w-3xl space-y-8 pb-6 pt-2 sm:px-2">
+                <div className={`mx-auto flex ${COLUMN} flex-col pb-8 pt-2 [&>[data-testid=answer]]:mt-5 [&>[data-testid=question]:not(:first-child)]:mt-12`}>
                   {loadingThread && messages.length === 0 && !live ? (
                     <div className="space-y-4" aria-label="Loading the chat">
                       <Skeleton className="ml-auto h-10 w-1/2 rounded-2xl" />
@@ -607,14 +623,14 @@ function Chat() {
                   ) : null}
                   {messages.map((m) =>
                     m.role === "user" ? (
-                      <Question key={m.seq} text={m.content} attachments={m.attachments} />
+                      <Question key={m.seq} text={m.content} attachments={m.attachments} mentions={(m.mentions ?? []).map(mentionName)} />
                     ) : (
                       <AnswerView
                         key={m.seq}
                         text={m.content}
                         citations={m.citations}
                         grounded={m.grounded}
-                        steps={(m.used ?? []).map((u, i) => ({ id: `${m.seq}-${i}`, label: u.label, status: "success" as const }))}
+                        steps={(m.used ?? []).map((u, i) => ({ id: `${m.seq}-${i}`, label: u.label, name: u.name, repo: u.repo, summary: u.summary, status: "success" as const }))}
                         rating={m.seq in ratings ? ratings[m.seq] : m.feedback ?? null}
                         onRate={mine ? (r) => rate(m.seq, r) : undefined}
                         onRetry={mayAsk && mine && m.seq === lastAnswerSeq && !busy ? () => retry(m.seq) : undefined}
@@ -623,7 +639,7 @@ function Chat() {
                   )}
                   {live && (
                     <>
-                      <Question text={live.question} attachments={[]} />
+                      <Question text={live.question} attachments={[]} mentions={live.mentions.map(mentionName)} />
                       {live.answer.error ? (
                         <Callout variant="error" title={live.answer.error} />
                       ) : live.answer.stopped && !live.answer.text ? (
@@ -633,7 +649,7 @@ function Chat() {
                       ) : (
                         <AnswerView
                           text={live.answer.text}
-                          citations={live.answer.citations}
+                          citations={live.answer.done ? live.answer.citations : live.answer.known}
                           grounded={live.answer.grounded}
                           streaming={!live.answer.done}
                           steps={live.answer.steps}
@@ -645,7 +661,7 @@ function Chat() {
                 </div>
               </div>
               <ScrollPill visible={showPill} onClick={scrollToBottom} />
-              <div className="mx-auto w-full max-w-3xl shrink-0 pb-1 pt-2 sm:px-2">
+              <div className={`mx-auto w-full ${COLUMN} shrink-0 pb-1 pt-2`}>
                 {!capsReady ? null : mayAsk ? composer(false) : readOnlyNote}
               </div>
             </>
@@ -664,22 +680,44 @@ function Chat() {
 
 /** Which kind of source a starter question reads, for its icon. */
 function starterKind(s: Starter): string {
-  if (s.sources.knowledge?.length) return "knowledge";
-  if (s.sources.memories) return "memory";
-  if (s.sources.code) return "code";
-  if (s.sources.connections) return "connection";
-  return "knowledge";
+  const p = s.sources;
+  if (p?.knowledge?.length) return "knowledge";
+  if (p?.memories && !p.code) return "memory";
+  return "code";
 }
 
-function Question({ text, attachments }: { text: string; attachments: string[] }) {
+function Question({ text, attachments, mentions }: { text: string; attachments: string[]; mentions: string[] }) {
   return (
-    <div className="animate-chat-in flex justify-end" data-testid="question">
-      <div className="max-w-[85%] min-w-0 rounded-3xl bg-zinc-800/90 px-4 py-2.5 text-sm leading-relaxed text-zinc-100">
-        <p className="whitespace-pre-wrap [overflow-wrap:break-word]">{text}</p>
+    <div className="animate-chat-in flex flex-col items-end gap-1.5" data-testid="question">
+      <div className="max-w-[85%] min-w-0 rounded-2xl bg-zinc-800/80 px-4 py-2.5 text-sm leading-relaxed text-zinc-100">
+        <p className="whitespace-pre-wrap wrap-anywhere">{text}</p>
         {attachments.length > 0 && <p className="mt-1 truncate text-xs text-zinc-400">Attached: {attachments.join(", ")}</p>}
       </div>
+      {mentions.length > 0 && <p className="max-w-[85%] truncate text-xs text-zinc-500">Only in {mentions.join(", ")}</p>}
     </div>
   );
+}
+
+/** What a step says while it runs, before its result names what it read. */
+function startLabel(name: string): string {
+  switch (name) {
+    case "github__repo_overview":
+      return "Looking the repository over";
+    case "github__read_file":
+      return "Reading a file";
+    case "github__search_code":
+      return "Searching the code";
+    case "github__list_files":
+      return "Listing files";
+    case "github__list_repos":
+      return "Listing your repositories";
+    case "search_knowledge":
+      return "Searching knowledge";
+    case "search_memories":
+      return "Checking past work";
+    default:
+      return name.startsWith("graph_") ? "Checking the code graph" : "Looking it up";
+  }
 }
 
 function RenameDialog({ thread, onClose, onSave }: { thread: BrainThread | null; onClose: () => void; onSave: (t: BrainThread, title: string) => void }) {
