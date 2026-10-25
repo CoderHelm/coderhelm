@@ -34,6 +34,11 @@ const RUN = {
   mcp_servers: ["linear", "payments-reconciliation-ledger-readonly-production"],
   duration_s: 754,
   error: TOKEN,
+  // Agent permissions on the run: why a loop stopped, and a sign-in prompt.
+  policy_note: `Stopped: nobody answered the request to use payments-reconciliation-ledger-mcp-server__create_reconciliation_adjustment_for_customer_account in time. ${TOKEN}`,
+  sign_in_prompts: [
+    { server_id: "design-system-figma-workspace-for-the-web-platform", server_name: "Design system Figma workspace for the web platform", need: "personal", message: `Sign in to Design system Figma workspace for the web platform to let me use it in this run. ${TOKEN}`, action_label: "Connect", action_path: "/api/mcp-servers/x/connect", link_path: "/settings/integrations/#mcp-servers" },
+  ],
   created_at: iso(30),
   updated_at: iso(10),
   pass_history: [

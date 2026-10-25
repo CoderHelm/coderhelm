@@ -1,0 +1,160 @@
+---
+title: Agent permissions
+description: What agents may do on their own, what waits for a person, approval cards, sign-in prompts, and pausing every agent.
+---
+
+Every agent asks one policy before each thing it does. That covers a tool call, an MCP tool, a data source query, a command in the sandbox and a network request from the sandbox. Each one gets one of three answers:
+
+- **Allow**: it runs.
+- **Ask**: it waits until a person approves it.
+- **Deny**: it doesn't run, and the agent is told why.
+
+Every answer records the rule that gave it. Find it under **Recent decisions** on the **Agent permissions** settings page, or in the run's activity.
+
+## Which agents
+
+| Agent | What it does |
+| --- | --- |
+| **Planner** | Reads tickets and code, and writes plans. |
+| **Coder** | Writes the change on a branch and opens the pull request. |
+| **Reviewer** | Reviews pull requests. |
+| **Plan chat** | Answers questions and drafts plans on the Plans page. |
+| **Brain chat** | Answers questions from your team's knowledge. |
+| **Alert fixer** | Looks into alerts and proposes fixes. Fix runs an alert starts belong to it. |
+| **Log auto-fix** | Fixes log findings on its own when your team turns that on. |
+| **Plugin runs** | Runs your installed plugins. |
+
+You can switch any agent off for the whole team, or for one repository. An agent that is off doesn't start anything.
+
+## How a call is decided
+
+1. **Pause all agents** stops everything. The work isn't dropped; see [Pausing every agent](#pausing-every-agent).
+2. An agent that is **switched off** is denied.
+3. A tool that nothing knows the risk of is **denied**.
+4. A **locked** team rule decides, and nothing narrower can change it.
+5. Otherwise the **narrowest rule that matches** decides. From narrowest to widest: an agent in one repository, an agent, a repository, the team. Among rules at the same level, deny beats ask and ask beats allow.
+6. With **no matching rule**, the safe default for the call's risk applies.
+7. The team's **autonomy limit** is a ceiling. A rule that would allow more than the limit asks instead.
+
+### Risk and the safe defaults
+
+Every tool has a risk:
+
+| Risk | Means | Default |
+| --- | --- | --- |
+| **Read** | Looks something up and changes nothing. | Allow |
+| **Write** | Changes something a person reviews before it reaches anyone, like a file on the agent's branch or a draft. | Ask |
+| **Reaches people** | Sends, publishes, deletes, merges, deploys or pays. | Ask |
+
+Built-in tools have a fixed risk. An MCP tool gets its risk from its name. `get_issue` and `list_projects` are reads. `create_issue` is a write. `send_message`, `publish_page` and anything with `delete` in its name reach people. A name that doesn't say is never treated as a read.
+
+### The autonomy limit
+
+| Limit | Agents may do this without asking |
+| --- | --- |
+| **Read only** | Read. Every change asks. |
+| **Standard** | Read, and work on their own branch. Anything that reaches people asks. |
+| **Full** | Anything a rule allows, including what reaches people. |
+
+You can't save a rule that allows more than the limit. An "always" answer to an approval card can't go above it either; the person can still approve once.
+
+### Presets
+
+Presets give your team's rules a starting point:
+
+- **Cautious**: agents read on their own and ask before every change, including sandbox commands that aren't on a repository's allowlist.
+- **Standard**: agents work on their branch on their own, and the build and test commands CoderHelm reads from your repository's CI run in the sandbox. Anything that reaches people asks. New teams start here.
+- **Autonomous within the limit**: every change runs on its own, up to the autonomy limit.
+
+A preset only replaces the rules a preset wrote. Rules you wrote, and rules from "always" answers, stay.
+
+### Writing rules
+
+A rule matches on any of these. Leave one empty to match anything.
+
+- where it applies: the team, a repository, or an agent (in one repository or all)
+- the kind of call: built-in tool, MCP tool, data source query, sandbox command, network request or outbound action
+- the MCP server or data source, like `linear`
+- the tool name, with `*` for any run of characters, like `create_*`
+- the risk
+- for a sandbox command, the command (`npm run test*`); for a network request, the domain
+
+Some examples:
+
+- **Keep Linear read only in the web app**: in the repository `acme/web`, deny MCP tools on `linear` named `create_*`.
+- **Let the coder update issues anywhere**: for the Coder agent, allow tools named `update_issue` on `linear`.
+- **Never let anyone publish from a chat**: on the team, deny tools of risk "reaches people" for the Plan chat agent.
+- **Never touch production data**: a locked team rule that denies the data source `prod-db`.
+
+Use **Test a call** on the settings page to check a rule before you rely on it. Pick an agent and a repository, then type a tool name, a command or a domain. It shows the answer, the rule that gave it, and every rule it looked at.
+
+## Approval cards
+
+When the answer is **ask**, the agent stops and raises an approval card. The card shows:
+
+- what the agent wants to do
+- why it wants to do it, in its own words
+- the exact arguments, with keys, passwords and tokens hidden
+- the risk
+- the rule or default that said ask
+
+The card shows on the run page, in the chat that asked, in the **Waiting for approval** list on the settings page, and in your team's Slack or Teams channel.
+
+The person answering has three ways to approve, or they can deny:
+
+- **Approve once**: this exact call, this time only.
+- **Always in this repository**: a rule that allows this tool in this repository from now on.
+- **Always for this tool**: a rule that allows this tool across the team.
+- **Deny**: the call doesn't run. A note you add is passed to the agent, which carries on without it.
+
+An "always" answer writes a rule you can see, labelled "From an approval", and remove like any other. Only people who can edit agent permissions can choose "always". Anyone who can approve agent actions can approve once.
+
+### Answering from Slack, Teams or email
+
+The Approve and Deny buttons on a Slack or Teams message open the approval in CoderHelm. You sign in and answer there, so the answer is yours. A link in an approval email opens a page that shows the card with Approve once and Deny buttons. That answer is recorded as the person the email was sent to, and only if they can still approve when they click. Opening a link never answers anything, so a mail scanner or a link preview can't approve by accident.
+
+### When nobody answers
+
+A run waits for an answer up to the team's approval timeout (15 minutes unless you change it), and never past the time it has left. If nobody answers, the card expires. Nothing is done, and the run ends with a note saying what it was waiting for. The run is marked waiting for input, not failed. Approve it or add a rule, then retry the run.
+
+In a chat, the agent stops and says what it wants to do. Approving the card sends the conversation on by itself.
+
+## Sign-in prompts
+
+Some connections sign each person in, like Figma, Linear or Sanity. When an agent needs one you haven't connected, it asks you to sign in:
+
+- **In a chat**, a card says something like "Sign in to Figma to let me read this file". **Connect** opens the connection's own sign-in in a small window. When you're done, the window closes and the conversation carries on by itself. **Not now** means you won't be asked about that connection again in this conversation.
+- **On a run**, the same prompt shows on the run page and in your Slack or Teams channel, with a link. The run carries on without the connection, and the next run uses it.
+
+If a connection the whole team shares isn't set up, an admin gets a link straight to it. Anyone else is told to ask an admin.
+
+You're asked once per connection in each conversation or run.
+
+## The sandbox
+
+Each repository has an allowlist of build and test commands the sandbox may run without asking. Write one command per line. End a command with `*` to allow any arguments after it, so `npm run test*` covers `npm run test -- --ci`.
+
+- A command that chains, pipes, redirects or substitutes (`;`, `&&`, `|`, `>`, `$( )`) never matches an allowlist entry. It always goes to a person.
+- CoderHelm suggests commands it finds in your repository's CI workflows, package scripts and AGENTS.md. A suggestion allows nothing until an admin accepts it.
+
+The sandbox's network is limited to a list of domains. A domain also covers its subdomains. The list starts with the common package registries and code hosts. Requests to anything else are refused, and the run's check output names each refused domain.
+
+The limit works for every tool that honours proxy settings, such as npm, pip, cargo, go, curl and git. It isn't a firewall. An admin can turn the limit off.
+
+## Pausing every agent
+
+**Pause all agents** stops every agent from starting new work. You give a reason and, if you like, an end time.
+
+- Work that arrives while paused is kept exactly as it came.
+- A run already working stops at its next step, and is kept to start again.
+- When you resume, or the end time passes, the kept work starts again in the order it arrived. Nothing is dropped.
+
+## Who can do what
+
+| Permission | Default role | Lets you |
+| --- | --- | --- |
+| See agent permissions | Everyone | See the page, test a call, and see cards and decisions |
+| `agents.approve` | Member | Approve once, or deny, an approval card |
+| `agents.permissions` | Admin | Edit rules, presets, the autonomy limit, agent switches, the sandbox lists and the pause, and choose "always" on a card |
+
+A [custom role](/concepts/roles) can hold either permission on its own.

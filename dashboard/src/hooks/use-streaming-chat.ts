@@ -240,6 +240,16 @@ export function useStreamingChat(): UseStreamingChatReturn {
           scheduleFlush();
           break;
 
+        case "approval":
+          pendingParts.current.push({ type: "approval", approval: event.approval });
+          scheduleFlush();
+          break;
+
+        case "sign_in":
+          pendingParts.current.push({ type: "sign_in", prompt: event.prompt, thread_id: event.thread_id });
+          scheduleFlush();
+          break;
+
         case "usage":
           pendingParts.current.push({
             type: "usage",
@@ -501,6 +511,11 @@ function mergeParts(existing: MessagePart[], incoming: MessagePart[]): MessagePa
       } else {
         result.push({ ...part });
       }
+    } else if (part.type === "approval") {
+      // One card per approval, however often it's raised.
+      if (!result.some((p) => p.type === "approval" && p.approval.id === part.approval.id)) result.push({ ...part });
+    } else if (part.type === "sign_in") {
+      if (!result.some((p) => p.type === "sign_in" && p.prompt.server_id === part.prompt.server_id)) result.push({ ...part });
     } else if (part.type === "usage") {
       // Replace any existing usage part
       const usageIdx = result.findIndex((p) => p.type === "usage");

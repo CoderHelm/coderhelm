@@ -8,6 +8,7 @@ import { RoleGuard } from "@/components/role-guard";
 import { Page, PageHeader } from "@/components/page";
 import { Callout } from "@/components/callout";
 import { linkButton } from "@/components/ui";
+import { MCP_CONNECTED_MESSAGE } from "@/components/sign-in-card";
 
 // Where an MCP server's sign-in page sends the browser back. The code and
 // state are posted to the API with this person's session: the state works
@@ -50,6 +51,18 @@ function McpCallback() {
         const s = r.server;
         const row = s.catalog_id ? s.catalog_id : `mcp:${s.id}`;
         setView({ kind: "done", name: s.name, note: r.tools_error ?? "" });
+        // Opened as a popup from a sign-in card (a chat or a run): tell the
+        // page that opened it, and close. The chat carries on by itself.
+        const opener = window.opener as Window | null;
+        if (opener && !opener.closed) {
+          try {
+            opener.postMessage({ type: MCP_CONNECTED_MESSAGE, server: s.id }, window.location.origin);
+            window.close();
+            return;
+          } catch {
+            // Fall through to the integrations page.
+          }
+        }
         window.location.replace(`/settings/integrations/#integration-${row}`);
       })
       .catch((e) => setView({ kind: "failed", message: errorMessage(e, "The sign-in didn't finish.") }));

@@ -16,6 +16,11 @@ import { Composer } from "./composer";
 import { AssistantMessage, TimeDivider, UserMessage, timeDivider } from "./conversation";
 import { DraftPanel, diffPlans, parsePartialPlan, parsePlan, type DraftPlan, type PlanChange } from "./draft";
 import { Starter } from "./starter";
+import { ApprovalCard } from "@/components/agent-approval";
+import { SignInCard } from "@/components/sign-in-card";
+import { useCan } from "@/hooks/use-can";
+import { followUpAfterApproval, followUpAfterSignIn } from "@/lib/agent-policy";
+import type { ApprovalPart, SignInPart, StreamMessage } from "@/lib/stream-types";
 
 // New plan. A fresh page asks one question ("What do you want to change?")
 // with templates and the destination folded below it. Once you send, it is
@@ -52,6 +57,33 @@ function NewPlan() {
   const searchParams = useSearchParams();
   const prefillSent = useRef(false);
   const { toast } = useToast();
+  const { can } = useCan();
+  const approvalCan = { approve: can("agents.approve"), always: can("agents.permissions") };
+  // Approval and sign-in cards an answer raised. Answering one sends the
+  // conversation on by itself, so the agent picks up where it stopped.
+  const cardsFor = (m: StreamMessage) => {
+    const parts = m.parts.filter((p): p is ApprovalPart | SignInPart => p.type === "approval" || p.type === "sign_in");
+    if (parts.length === 0) return undefined;
+    return parts.map((p) =>
+      p.type === "approval" ? (
+        <ApprovalCard
+          key={p.approval.id}
+          approval={p.approval}
+          can={approvalCan}
+          via="chat"
+          onDecided={(a) => send(followUpAfterApproval(a.status === "approved"))}
+        />
+      ) : (
+        <SignInCard
+          key={p.prompt.server_id}
+          prompt={p.prompt}
+          threadId={p.thread_id}
+          onConnected={() => send(followUpAfterSignIn(p.prompt.server_name, true))}
+          onDeclined={() => send(followUpAfterSignIn(p.prompt.server_name, false))}
+        />
+      ),
+    );
+  };
 
   // Auto-send prefill message from query param (e.g. from "Create Plan" on findings)
   useEffect(() => {
@@ -321,6 +353,7 @@ function NewPlan() {
                         endedAt={timing[msg.id]?.end}
                         plan={plans[msg.id] ? { tasks: plans[msg.id].plan.tasks.length, change: plans[msg.id].change } : null}
                         onViewPlan={showPlan}
+                        cards={cardsFor(msg)}
                       />
                     )}
                   </Fragment>
