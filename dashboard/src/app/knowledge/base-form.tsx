@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { inputClass, primaryButton, secondaryButton } from "@/components/ui";
-import type { BaseInput, KnowledgeLimits } from "@/lib/brain";
+import type { BaseInput, KnowledgeLimits } from "@/lib/knowledge";
 
 // A knowledge base's settings: its name and description, who may read it,
 // which agents search it, and whether it is a source of truth.
@@ -90,7 +90,7 @@ export function BaseForm({
             ))}
           </div>
         )}
-        <p className="text-xs text-zinc-500">The brain chat can always use it for people who may read it.</p>
+        <p className="text-xs text-zinc-500">Chat can always use it for people who may read it.</p>
       </fieldset>
       <label className="flex items-start gap-2 text-sm text-zinc-200">
         <input type="checkbox" className="mt-0.5 accent-emerald-500" checked={v.authoritative} onChange={(e) => setV({ ...v, authoritative: e.target.checked })} />

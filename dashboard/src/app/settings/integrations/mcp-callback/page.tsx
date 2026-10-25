@@ -8,6 +8,7 @@ import { RoleGuard } from "@/components/role-guard";
 import { Page, PageHeader } from "@/components/page";
 import { Callout } from "@/components/callout";
 import { linkButton } from "@/components/ui";
+import { returnAddress, takeReturn } from "@/lib/knowledge";
 import { MCP_CONNECTED_MESSAGE } from "@/components/sign-in-card";
 
 // Where an MCP server's sign-in page sends the browser back. The code and
@@ -49,6 +50,12 @@ function McpCallback() {
       })
       .then((r) => {
         const s = r.server;
+        // A Knowledge app's sign-in goes back to where it was started.
+        if (s.catalog_id?.startsWith("source:")) {
+          setView({ kind: "done", name: s.name.replace(/ \(knowledge\)$/, ""), note: "" });
+          window.location.replace(returnAddress(takeReturn(), s.catalog_id.slice("source:".length)));
+          return;
+        }
         const row = s.catalog_id ? s.catalog_id : `mcp:${s.id}`;
         setView({ kind: "done", name: s.name, note: r.tools_error ?? "" });
         // Opened as a popup from a sign-in card (a chat or a run): tell the
