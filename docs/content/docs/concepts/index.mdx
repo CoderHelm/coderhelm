@@ -5,12 +5,15 @@ description: The pieces of CoderHelm and how they fit together, on one page.
 
 CoderHelm has two parts: a **gateway** that receives events (a labeled issue, a Jira comment, a new push) and serves the dashboard's API, and a **worker** that does the work. Each piece of work is a message on a queue, so a slow run never blocks anything else.
 
-```txt
-GitHub / Jira / alerts ──► gateway ──► queue ──► worker ──► agents ──► pull request
-                              ▲                     │
-          dashboard ──────────┘                     └── your code, code graph, memories,
-                                                        skills, data sources, connections
-```
+<Diagram id="how-it-works">
+
+1. GitHub (labeled issues, pushes), Jira (tickets, comments) and alerts from your AWS account send events to the gateway. The dashboard calls the same gateway's API.
+2. The gateway puts each job on a queue, one message per job.
+3. A worker takes the next job from the queue and starts the agents (planner, coder, reviewer).
+4. The agents read your code, the code graph, memories, skills, data sources and connections.
+5. The agents open a pull request on your repository, for you to review.
+
+</Diagram>
 
 | Concept | In one line |
 | --- | --- |

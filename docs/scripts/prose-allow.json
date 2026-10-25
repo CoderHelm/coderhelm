@@ -1,0 +1,7 @@
+[
+  {
+    "file": "content/docs/self-host/quick-start.md",
+    "text": "Jira: connect from Settings → Jira after sign-up",
+    "reason": "The installer's own output, shown as it prints. The wording lives in coderhelm-platform (installer/lib/wizard.mjs) and changes there."
+  }
+]

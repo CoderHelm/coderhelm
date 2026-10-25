@@ -5,7 +5,7 @@ description: Start CoderHelm runs from Jira tickets with the Jira app or a Jira 
 
 You can start runs from Jira tickets. CoderHelm reads the ticket (including screenshots attached to it), picks the repository, and posts its progress and the pull request link back on the ticket.
 
-Open **Integrations** → **Jira**. Under **How to connect** there are two ways.
+Open **Integrations**, then **Jira**. Under **How to connect** there are two ways.
 
 <Tabs items={['Jira app (recommended)', 'Jira webhook']}>
 <Tab value="Jira app (recommended)">
@@ -24,7 +24,7 @@ The app listens for tickets being created, assigned, updated and commented on.
 If you can't install apps in your Jira site, use a plain Jira webhook instead.
 
 1. On the Jira page of the dashboard, generate webhook credentials. You get a URL of the form `https://api.coderhelm.com/webhooks/jira/<token>` and, optionally, a secret.
-2. In Jira, go to **Settings** → **System** → **WebHooks** and create a webhook with that URL. Select the issue events (created, updated) and comment events (created).
+2. In Jira, open **Settings**, then **System**, then **WebHooks**, and create a webhook with that URL. Select the issue events (created, updated) and comment events (created).
 3. If you generated a secret, add it to the webhook so Jira signs each request.
 
 With a webhook, CoderHelm can't post comments back to the ticket or create tickets, so progress shows only in the dashboard.

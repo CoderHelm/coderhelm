@@ -18,6 +18,16 @@ The page opens on the question box, ready to type. Under it are a few suggested 
 
 Chat works like a teammate who opens the code: it looks a repository over (its README, the top of its folders, its manifests such as `package.json` or `Cargo.toml`, and agent notes such as `AGENTS.md`), lists folders, searches the code, reads files by line range and checks the code graph, over as many steps as the question needs. Every read is pinned to one commit, so a citation shows exactly the lines it quotes. Chat never asks you to open or paste files its tools can read; an answer that does is sent back to the tools before you see it.
 
+<Diagram id="chat-answers">
+
+1. You ask a question, and can attach files.
+2. Chat reads what the question needs from your own sources: repositories, knowledge, connections, memories, data sources and skills.
+3. It gathers the passages that bear on the question, each with its file and lines, or its page and date.
+4. If the passages support an answer, it answers with a numbered citation on every claim.
+5. If nothing supports an answer, it says "Not in your sources" instead of making one up.
+
+</Diagram>
+
 ## Answers
 
 - What Chat did shows as one quiet line above the answer ("Read 4 files in web, searched the code"). Open it to see each step.

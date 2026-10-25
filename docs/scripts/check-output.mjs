@@ -15,12 +15,16 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { files } from './lib/out.mjs';
 import { checkMoves, exportedPages, readMoves } from './lib/moves.mjs';
+import { proseProblems } from './lib/prose.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'out');
 const SITE = 'https://docs.coderhelm.com';
 const problems = [];
 const need = (cond, msg) => { if (!cond) problems.push(msg); };
+const PROSE_ALLOW = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts/prose-allow.json'), 'utf8'));
+/** content/docs/a/index.mdx and content/docs/a.md both have the twin a.md. */
+const twinOf = (file) => `${file.replace(/^content\/docs\//, '').replace(/(\/index)?\.mdx?$/, '')}.md`;
 const read = (rel) => (fs.existsSync(path.join(OUT, rel)) ? fs.readFileSync(path.join(OUT, rel), 'utf8') : null);
 
 // Pages: every index.html outside Next's own folders and the 404 copies.
@@ -49,6 +53,10 @@ for (const segs of pages) {
     need(twin.includes(`Source: ${SITE}${url === '/' ? '/' : url}`), `/${md}: no Source line`);
     need(!/<include/.test(twin), `/${md}: an <include> was not expanded`);
     if (title && full) need(full.includes(`# ${title}`), `llms-full.txt: missing "${title}"`);
+    // Diagrams reach the twin as their title and steps, never as a JSX tag.
+    need(!/<\/?Diagram\b/.test(twin), `/${md}: a <Diagram> tag was not turned into text`);
+    // Imported and generated pages follow the same rules as written ones.
+    for (const p of proseProblems(twin, { allow: PROSE_ALLOW.filter((a) => twinOf(a.file) === md) })) need(false, `/${md}:${p.line}: ${p.rule}: ${p.text}`);
   }
   if (llms) need(llms.includes(`(${SITE}/${md})`), `llms.txt: no link to /${md}`);
   if (sitemap) need(sitemap.includes(`<loc>${SITE}${url === '/' ? '/' : `${url}/`}</loc>`) || sitemap.includes(`<loc>${SITE}${url}</loc>`), `sitemap.xml: no ${url}`);
@@ -69,6 +77,7 @@ if (schemaText) {
 }
 need(fs.existsSync(path.join(OUT, 'tools/validate-plugin.mjs')), 'tools/validate-plugin.mjs is missing');
 need(fs.existsSync(path.join(OUT, '404.html')), '404.html is missing');
+need(full && !/<\/?Diagram\b/.test(full), 'llms-full.txt: a <Diagram> tag was not turned into text');
 need(fs.existsSync(path.join(OUT, 'search-index.json')), 'search-index.json is missing');
 
 // Old links keep working: every page ever published is still a page or redirects.
