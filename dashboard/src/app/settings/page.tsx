@@ -15,7 +15,7 @@ import { isSelfHosted } from "@/lib/runtime-config";
 import { ROLE_LABEL, whoCan, type Role } from "@/lib/roles";
 import { builtInRoleFor, can } from "@/lib/capabilities";
 import { useSettingsStatus, type ItemStatus, type Me } from "./use-settings-status";
-import { Page, PageHeader } from "@/components/page";
+import { Page, PageHeader, SectionHeading } from "@/components/page";
 
 export default function SettingsPage() {
   const [me, setMe] = useState<Me | null>(null);
@@ -30,6 +30,7 @@ export default function SettingsPage() {
     ? SETTINGS_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => can(me, i.view) && (!i.selfHostOnly || (isSelfHosted() && me.platform_admin === true))) })).filter((g) => g.items.length > 0)
     : [];
   const roleLabel = me ? (me.custom_role?.name ?? ROLE_LABEL[me.role as Role] ?? me.role) : null;
+  const anyReadOnly = groups.some((g) => g.items.some((i) => !can(me, i.edit)));
 
   return (
     <Page>
@@ -40,9 +41,9 @@ export default function SettingsPage() {
             <>
               <p>How Coderhelm works for your team, and the settings that are just yours.</p>
               {roleLabel && (
-                <p className="text-xs text-zinc-500 mt-3">
-                  Your role: <span className="text-zinc-300 font-medium">{roleLabel}</span>. Pages marked View only show the
-                  current setup; ask someone with a higher role to change them.
+                <p className="mt-2 text-sm text-zinc-400">
+                  Your role: <span className="font-medium text-zinc-200">{roleLabel}</span>.
+                  {anyReadOnly && " Pages marked View only show the current setup; ask someone with a higher role to change them."}
                 </p>
               )}
             </>
@@ -52,7 +53,7 @@ export default function SettingsPage() {
 
       {loadError && (
         <Callout variant="error" title="Could not load your settings">
-          <p>Reload the page to try again.</p>
+          <p>Check your connection, then reload the page.</p>
         </Callout>
       )}
 
@@ -67,15 +68,15 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <div className="space-y-8">
+      <div className="space-y-10">
         {groups.map((group) => (
           <section key={group.id} aria-labelledby={`settings-group-${group.id}`}>
-            <h2 id={`settings-group-${group.id}`} className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
+            <SectionHeading id={`settings-group-${group.id}`} className="mb-3">
               {group.label}
-            </h2>
-            <ul className="rounded-lg border border-zinc-800 bg-zinc-900/40 divide-y divide-zinc-800 overflow-hidden">
+            </SectionHeading>
+            <ul className="grid gap-3 lg:grid-cols-2">
               {group.items.map((item) => (
-                <li key={item.href}>
+                <li key={item.href} className="min-w-0">
                   <SettingsRow item={item} readOnly={!can(me, item.edit)} status={item.status ? status[item.status] : undefined} />
                 </li>
               ))}
@@ -93,7 +94,7 @@ function SettingsRow({ item, readOnly, status }: { item: SettingsItem; readOnly:
   return (
     <Link
       href={item.href}
-      className={`group flex items-start gap-3 sm:gap-4 px-4 py-4 hover:bg-zinc-800/40 transition-colors motion-reduce:transition-none ${focusRing} focus-visible:-outline-offset-2`}
+      className={`group flex h-full items-start gap-3 rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-4 transition-colors hover:border-zinc-700 hover:bg-zinc-900 motion-reduce:transition-none ${focusRing}`}
     >
       <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-300" aria-hidden="true">
         {item.icon}
@@ -110,11 +111,11 @@ function SettingsRow({ item, readOnly, status }: { item: SettingsItem; readOnly:
         <span className="block text-sm text-zinc-400 mt-0.5">{item.description}</span>
         {status && (
           <span className="mt-2 flex">
-            <span title={status.title}><StatusPill tone={status.tone}>{status.text}</StatusPill></span>
+            <span title={status.title} className="min-w-0 max-w-full"><StatusPill tone={status.tone}>{status.text}</StatusPill></span>
           </span>
         )}
       </span>
-      <span className="mt-2 shrink-0 text-zinc-600 group-hover:text-zinc-300 transition-colors motion-reduce:transition-none" aria-hidden="true">
+      <span className="mt-2 shrink-0 text-zinc-500 group-hover:text-zinc-300 transition-colors motion-reduce:transition-none" aria-hidden="true">
         <ChevronRightIcon />
       </span>
     </Link>
@@ -136,22 +137,22 @@ function DangerZone() {
       toast("All data has been cleared. Refreshing...");
       setTimeout(() => window.location.reload(), 1500);
     } catch {
-      toast("Failed to reset account", "error");
+      toast("Couldn't reset the account. Nothing was deleted. Try again.", "error");
     } finally {
       setResetting(false);
     }
   };
 
   return (
-    <section aria-labelledby="danger-zone" className="mt-12 rounded-lg border border-red-500/20 p-5">
-      <h2 id="danger-zone" className="text-sm font-semibold text-red-400 mb-1">Danger zone</h2>
-      <p className="text-sm text-zinc-400 mb-4">
+    <section aria-labelledby="danger-zone" className="mt-12 max-w-3xl rounded-lg border border-red-500/30 bg-red-500/5 p-5">
+      <SectionHeading id="danger-zone" danger className="mb-1">Danger zone</SectionHeading>
+      <p className="text-sm text-zinc-300 mb-4">
         Delete every run, plan, repository, setting and Jira connection for this team. Your sign in stays; everything else is gone for good.
       </p>
       <button
         type="button"
         onClick={() => { setOpen(true); setConfirmText(""); }}
-        className={`${secondaryButton} !bg-red-500/10 !border-red-500/30 !text-red-400 hover:!bg-red-500/20`}
+        className={dangerButton}
       >
         Reset all data
       </button>
@@ -178,7 +179,7 @@ function DangerZone() {
           </div>
         }
       >
-        <label htmlFor="reset-confirm" className="mb-1.5 block text-sm text-zinc-400">
+        <label htmlFor="reset-confirm" className="mb-1.5 block text-sm text-zinc-300">
           Type <span className="font-mono font-semibold text-red-400">DELETE</span> to confirm
         </label>
         <input

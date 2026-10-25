@@ -219,13 +219,14 @@ async function noSideScroll(page: Page) {
 }
 
 test.describe("support tickets for a team", () => {
-  test("the menu's Get help shows the team's tickets with their status and a count of the ones waiting", async ({ page }) => {
+  test("the menu's Help, then Get help, shows the team's tickets with their status and a count of the ones waiting", async ({ page }) => {
     await mockApi(page);
     await page.goto("/");
-    const help = page.getByTestId("nav-get-help");
+    const help = page.getByTestId("nav-help");
     await expect(help).toBeVisible();
     await expect(help.getByTestId("count-badge")).toHaveText(/1/);
     await help.click();
+    await page.getByRole("menu", { name: "Help" }).getByRole("menuitem", { name: /Get help/ }).click();
     await expect(page).toHaveURL(/\/support\/?$/);
     await expect(page.getByRole("heading", { level: 1, name: "Support" })).toBeVisible();
 

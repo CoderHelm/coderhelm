@@ -1,8 +1,8 @@
 "use client";
 
-import { ANY_CHANGE, can } from "@/lib/capabilities";
+import { can } from "@/lib/capabilities";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { api, type UsageInfo, type Banner, type TeamInfo } from "@/lib/api";
 import { pushToDataLayer } from "@/lib/gtm";
@@ -15,15 +15,18 @@ import { ScrollFade } from "./scroll-fade";
 import { ConfirmProvider } from "./confirm-dialog";
 import { CommandPaletteProvider, type PalettePage } from "./command-palette";
 import { Logo, TopBar, TopBarProvider } from "./top-bar";
-import { KNOWLEDGE_HREF, tabTitle as routeTabTitle } from "@/lib/routes";
+import { tabTitle as routeTabTitle } from "@/lib/routes";
 import { focusRing } from "./ui";
 import { helpHref, helpTargetFromUrl } from "@/lib/support";
-import {
-  PlayIcon, CircleDotIcon, TrendingUpIcon, HexagonIcon, HeartIcon,
-  GitBranchIcon, GearIcon, AtlassianIcon, GitHubIcon, UsersIcon,
-  BellIcon, TargetIcon, RepeatIcon, ShieldCheckIcon,
-  PluginIcon, ShieldIcon, TemplateIcon, CpuIcon, MemoryIcon,
-  LifeBuoyIcon, MailIcon, DatabaseIcon, TestTubeIcon, LogFindingsIcon, GraphIcon, PlanIcon, BookIcon, ChatIcon } from "./icons";
+import { BookIcon, ChatIcon, GearIcon, LifeBuoyIcon, PlanIcon, PlayIcon, ReviewerIcon, ShieldIcon, TrendingUpIcon } from "./icons";
+import { ADMIN_SECTIONS, NAV_SECTIONS, sectionFor, visiblePages, type NavIconKey, type NavSection } from "@/lib/nav";
+import { SETTINGS_ITEMS } from "./settings-items";
+import { isSelfHosted } from "@/lib/runtime-config";
+import { Menu } from "./menu";
+import { SectionTabs } from "./section-tabs";
+import { inSettings, SettingsNav } from "./settings-nav";
+import { buttonClass } from "./ui";
+import { AlertCircleIcon, InfoIcon, WarningIcon, XIcon } from "./icons";
 import { apiBase, runtimeConfig, siteUrl } from "@/lib/runtime-config";
 import { SetupBanner } from "@/components/setup-banner";
 
@@ -45,103 +48,54 @@ interface User {
   platform_admin?: boolean;
 }
 
-interface NavItem {
-  href: string;
-  label: string;
-  icon: ReactNode;
-  /** Shown only to someone whose role includes this capability (or `ANY_CHANGE`). */
-  need?: string;
-  superAdminOnly?: boolean;
-  /** A number shown beside the label, e.g. new beta sign-ups. */
-  countKey?: "betaSignups";
-}
-
-interface NavGroup {
-  label?: string;
-  items: NavItem[];
-}
-
-const navGroups: NavGroup[] = [
-  {
-    items: [
-      { href: "/", label: "Runs", icon: <PlayIcon /> },
-      { href: "/reviewer", label: "Reviewer", icon: <ShieldCheckIcon />, need: ANY_CHANGE },
-      { href: "/tests", label: "Tests", icon: <TestTubeIcon />, need: ANY_CHANGE },
-      { href: "/logs", label: "Logs", icon: <LogFindingsIcon />, need: "recommendations" },
-      { href: "/releases", label: "Releases", icon: <GitBranchIcon />, need: "reviews" },
-      { href: "/graph", label: "Code Graph", icon: <GraphIcon />, need: ANY_CHANGE },
-      { href: "/chat", label: "Chat", icon: <ChatIcon />, need: "brain_read" },
-      { href: "/plans", label: "Plans", icon: <PlanIcon /> },
-      { href: "/plans/templates", label: "Templates", icon: <TemplateIcon /> },
-    ],
-  },
-  {
-    // What Coderhelm is connected to, near the top so it's easy to find.
-    label: "Connections",
-    items: [
-      { href: "/settings/integrations", label: "Integrations", icon: <PluginIcon />, need: "view_integrations" },
-      { href: "/data-sources", label: "Data sources", icon: <DatabaseIcon />, need: "data_sources" },
-      { href: KNOWLEDGE_HREF, label: "Knowledge", icon: <BookIcon />, need: "brain_read" },
-    ],
-  },
-  {
-    label: "Insights",
-    items: [
-      { href: "/analytics", label: "Analytics", icon: <TrendingUpIcon />, need: ANY_CHANGE },
-      { href: "/learning", label: "Learning", icon: <TargetIcon />, need: ANY_CHANGE },
-      { href: "/infrastructure", label: "Infrastructure", icon: <HexagonIcon />, need: ANY_CHANGE },
-      { href: "/alerts", label: "Alerts", icon: <BellIcon />, need: "view_alerts" },
-      { href: "/health", label: "Health", icon: <HeartIcon />, need: "system" },
-      { href: "/memory", label: "Memory", icon: <MemoryIcon />, need: ANY_CHANGE },
-    ],
-  },
-  {
-    label: "Configure",
-    items: [
-      { href: "/settings/repos", label: "Repos", icon: <GitBranchIcon />, need: ANY_CHANGE },
-      { href: "/settings", label: "Settings", icon: <GearIcon /> },
-      { href: "/settings/notifications", label: "Notifications", icon: <BellIcon /> },
-      { href: "/settings/alerts", label: "Alert routes", icon: <BellIcon />, need: "alerts" },
-      { href: "/skills", label: "Skills", icon: <BookIcon />, need: ANY_CHANGE },
-      { href: "/settings/models", label: "AI Models", icon: <CpuIcon />, need: "model_provider" },
-    ],
-  },
-  {
-    label: "Team",
-    items: [
-      { href: "/settings/team", label: "Members", icon: <UsersIcon /> },
-    ],
-  },
-  {
-    label: "Account",
-    items: [
-      { href: "/settings/security", label: "Security", icon: <ShieldCheckIcon /> },
-      { href: "/settings/budget", label: "Token limit", icon: <TargetIcon />, need: ANY_CHANGE },
-      { href: "/admin", label: "Admin", icon: <ShieldIcon />, superAdminOnly: true, countKey: "betaSignups" },
-      { href: "/admin/tickets", label: "Support queue", icon: <LifeBuoyIcon />, superAdminOnly: true },
-    ],
-  },
-];
-
-/** Who sees the platform admin page. The server checks again on every call. */
+/** Who sees the platform admin pages. The server checks again on every call. */
 function isPlatformAdmin(user: User | null): boolean {
   if (typeof user?.platform_admin === "boolean") return user.platform_admin;
   // A gateway from before the field: the hosted admin.
   return user?.email === "admin@coderhelm.com";
 }
 
-/** The menu items this person can open, by what their role includes. */
-function visibleItems(group: NavGroup, user: User | null): NavItem[] {
-  const isSuperAdmin = isPlatformAdmin(user);
-  return group.items.filter((item) => {
-    if (item.superAdminOnly) return isSuperAdmin;
-    return !item.need || can(user, item.need);
-  });
+const NAV_ICONS: Record<NavIconKey, ReactNode> = {
+  runs: <PlayIcon />,
+  plans: <PlanIcon />,
+  reviews: <ReviewerIcon />,
+  chat: <ChatIcon />,
+  knowledge: <BookIcon />,
+  insights: <TrendingUpIcon />,
+  settings: <GearIcon />,
+  admin: <ShieldIcon />,
+  queue: <LifeBuoyIcon />,
+};
+
+/** A page's capability check, for this person. */
+function allowedFor(user: User | null) {
+  return (need?: string) => !need || can(user, need);
 }
 
-/** Every menu page, for the ⌘K palette. */
+/** The destinations this person can open, each with the first page they can open. */
+function visibleSections(user: User | null): { section: NavSection; href: string }[] {
+  const allowed = allowedFor(user);
+  const admin = isPlatformAdmin(user);
+  return [...NAV_SECTIONS, ...ADMIN_SECTIONS]
+    .filter((sec) => !sec.superAdminOnly || admin)
+    .map((section) => ({ section, href: visiblePages(section, allowed)[0]?.href }))
+    .filter((x): x is { section: NavSection; href: string } => !!x.href);
+}
+
+/** Every page someone can reach from the menu, for the ⌘K palette. */
 function palettePages(user: User | null): PalettePage[] {
-  return navGroups.flatMap((g) => visibleItems(g, user).map((i) => ({ href: i.href, label: i.label, section: g.label })));
+  const allowed = allowedFor(user);
+  const admin = isPlatformAdmin(user);
+  const pages: PalettePage[] = [];
+  for (const section of [...NAV_SECTIONS, ...ADMIN_SECTIONS]) {
+    if (section.superAdminOnly && !admin) continue;
+    for (const p of visiblePages(section, allowed)) pages.push({ href: p.href, label: p.label, section: section.label });
+  }
+  for (const item of SETTINGS_ITEMS) {
+    if (!can(user, item.view) || (item.selfHostOnly && !(isSelfHosted() && user?.platform_admin === true))) continue;
+    if (!pages.some((p) => p.href === item.href)) pages.push({ href: item.href, label: item.title, section: "Settings" });
+  }
+  return pages;
 }
 
 export function ClientShell({ children }: { children: React.ReactNode }) {
@@ -320,36 +274,42 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">
         {tabTitle}
         <div className="flex flex-col items-center gap-6 max-w-md text-center px-6">
-          <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
-            <span className="text-2xl" aria-hidden="true">⚠</span>
+          <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400" aria-hidden="true">
+            <WarningIcon />
           </div>
-          <h1 className="text-xl font-bold text-zinc-100">The GitHub app was removed</h1>
-          <p className="text-sm text-zinc-400">
-            The Coderhelm GitHub App has been removed from your organization.
-            All runs, webhooks, and automation are paused.
-          </p>
-          <p className="text-sm text-zinc-500">
-            To restore access, reinstall the GitHub App and log in again.
+          <h1 className="text-xl font-semibold text-zinc-50">The GitHub app was removed</h1>
+          <p className="text-sm text-zinc-300">
+            Coderhelm can&apos;t reach your code until someone with admin rights on your GitHub organization reinstalls the Coderhelm app.
+            Runs and reviews are paused until then.
           </p>
           <div className="flex flex-col items-center gap-3">
             <a
               href="https://github.com/apps/coderhelm/installations/new"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-200 transition-colors"
+              className={buttonClass("primary")}
             >
-              Reinstall GitHub App
+              Reinstall the GitHub app
             </a>
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard?.writeText("https://github.com/apps/coderhelm/installations/new").catch(() => {});
+              }}
+              className={buttonClass("secondary")}
+            >
+              Copy the link for your GitHub admin
+            </button>
             <a
               href={`${apiBase()}/auth/github`}
-              className={`text-sm text-zinc-400 hover:text-zinc-200 underline transition-colors rounded ${focusRing}`}
+              className={`text-sm text-zinc-300 hover:text-zinc-100 underline transition-colors rounded ${focusRing}`}
             >
               Then sign in with GitHub again
             </a>
           </div>
           {teams.filter((t) => t.status !== "deactivated").length > 0 && (
             <div className="mt-2">
-              <p className="text-xs text-zinc-600 mb-2">Or switch to an active organization:</p>
+              <p className="text-sm text-zinc-400 mb-2">Or switch to an active organization:</p>
               {teams.filter((t) => t.status !== "deactivated" && !t.current).map((t) => (
                 <button
                   key={t.team_id}
@@ -422,78 +382,28 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               </button>
             }
           />
-          {banners.filter((b) => !dismissedBanners.has(b.id)).map((banner) => (
-            <div
-              key={banner.id}
-              role={banner.type === "error" ? "alert" : "status"}
-              className={`border-b px-4 md:px-6 py-3 flex items-center justify-between ${
-                banner.type === "error"
-                  ? "bg-red-900/80 border-red-700"
-                  : banner.type === "warning"
-                    ? "bg-yellow-900/80 border-yellow-700"
-                    : "bg-blue-900/80 border-blue-700"
-              }`}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <span aria-hidden="true" className={`text-lg shrink-0 ${
-                  banner.type === "error" ? "text-red-300" : banner.type === "warning" ? "text-yellow-300" : "text-blue-300"
-                }`}>
-                  {banner.type === "error" ? "⚠" : banner.type === "warning" ? "⚡" : "ℹ"}
-                </span>
-                <p className={`min-w-0 text-sm font-medium [overflow-wrap:anywhere] ${
-                  banner.type === "error" ? "text-red-100" : banner.type === "warning" ? "text-yellow-100" : "text-blue-100"
-                }`}>
-                  {banner.message}
-                  {banner.link_url && banner.link_text && (
-                    <a href={banner.link_url} className={`ml-2 underline hover:no-underline rounded ${focusRing}`}>
-                      {banner.link_text}
-                    </a>
-                  )}
-                </p>
+          <ShellBanners
+            banners={banners.filter((b) => !dismissedBanners.has(b.id))}
+            limit={usage && !dismissedBanners.has("token-limit-banner") ? reachedLimit(usage) : undefined}
+            month={usage?.month}
+            canRaise={can(user, "budget")}
+            onLimitPage={pathname.replace(/\/+$/, "") === "/settings/budget"}
+            onDismiss={dismissBanner}
+          />
+          <main className="flex-1 p-4 md:p-8">
+            <SetupBanner />
+            {inSettings(pathname) ? (
+              <div data-settings-layout="" className="mx-auto flex w-full min-w-0 max-w-6xl flex-col xl:flex-row xl:gap-10">
+                <SettingsNav visible={(item) => can(user, item.view) && (!item.selfHostOnly || (isSelfHosted() && user.platform_admin === true))} />
+                <div className="min-w-0 flex-1">{children}</div>
               </div>
-              {banner.dismissible && (
-                <button
-                  type="button"
-                  aria-label="Dismiss this message"
-                  onClick={() => dismissBanner(banner.id)}
-                  className={`shrink-0 ml-4 text-lg leading-none opacity-60 hover:opacity-100 transition-opacity rounded ${focusRing} ${
-                    banner.type === "error" ? "text-red-300" : banner.type === "warning" ? "text-yellow-300" : "text-blue-300"
-                  }`}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          ))}
-          {(() => {
-            // Whichever limit is reached first stops new work; the banner names it.
-            const hit = usage ? reachedLimit(usage) : undefined;
-            if (!hit || dismissedBanners.has("token-limit-banner")) return null;
-            const name = limitName(hit.kind);
-            return (
-              <div role="alert" className="bg-red-900/90 border-b-2 border-red-500 px-4 md:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-red-300 text-xl" aria-hidden="true">⚠</span>
-                  <div>
-                    <p className="text-sm font-bold text-red-100">
-                      {hit.kind === "all_tokens" ? "Token limit reached" : `${name.charAt(0).toUpperCase()}${name.slice(1)} limit reached`} — all runs are paused
-                    </p>
-                    <p className="text-xs text-red-300 mt-0.5">
-                      You&apos;ve used {formatTokens(hit.used)} of your {formatTokens(hit.max)} {name} limit this month.{" "}
-                      {can(user, "budget") ? "Raise the limit or wait for next month." : "Ask an admin or the owner to raise the limit, or wait for next month."}
-                    </p>
-                  </div>
-                </div>
-                <Link
-                  href="/settings/budget"
-                  className={`shrink-0 rounded-md bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-500 transition-colors ${focusRing}`}
-                >
-                  {can(user, "budget") ? "Raise the limit" : "See usage"}
-                </Link>
-              </div>
-            );
-          })()}
-          <main className="flex-1 p-4 md:p-8"><SetupBanner />{children}</main>
+            ) : (
+              <>
+                <SectionTabs allowed={allowedFor(user)} />
+                {children}
+              </>
+            )}
+          </main>
         </div>
       </div>
     </TopBarProvider>
@@ -536,7 +446,7 @@ function TeamSwitcher({
 
   return (
     <div ref={ref} className="relative mb-3 pb-3 border-b border-zinc-800/60">
-      <p className="px-2 mb-1.5 text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">Team</p>
+      <p className="px-2 mb-1.5 text-xs font-medium text-zinc-400">Team</p>
       <button
         type="button"
         onClick={() => canSwitch && setOpen(!open)}
@@ -564,7 +474,7 @@ function TeamSwitcher({
       </button>
       {open && (
         <div className="absolute left-0 right-0 top-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl z-50 py-1 max-h-56 overflow-y-auto">
-          <p className="px-3 py-1.5 text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">Switch team</p>
+          <p className="px-3 py-1.5 text-xs font-medium text-zinc-400">Switch team</p>
           {activeTeams.map((t) => (
             <button
               type="button"
@@ -577,7 +487,7 @@ function TeamSwitcher({
                   : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
               }`}
             >
-              <span className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
+              <span className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-xs font-bold text-white shrink-0">
                 {t.org.charAt(0).toUpperCase()}
               </span>
               <span className="truncate">{t.org}</span>
@@ -617,14 +527,8 @@ function Sidebar({
     setIssueHref(`${helpHref(pathname, helpTargetFromUrl(pathname, search))}&type=issue`);
   }, [pathname]);
 
-  const isActive = (href: string) => {
-    if (href === "/") return pathname === "/";
-    if (href === "/settings") return pathname === "/settings";
-    if (href === "/admin") return pathname === "/admin" || pathname === "/admin/";
-    if (href === KNOWLEDGE_HREF) return pathname === "/knowledge" || pathname.startsWith("/knowledge/");
-    if (href === "/plans") return pathname === "/plans" || pathname.startsWith("/plans/detail") || pathname.startsWith("/plans/new");
-    return pathname.startsWith(href);
-  };
+  // The destination the page belongs to (an item's page counts for its list).
+  const currentSection = sectionFor(pathname)?.key;
 
   const currentTeam = teams.find((t) => t.current);
 
@@ -656,7 +560,6 @@ function Sidebar({
       live = false;
     };
   }, [pathname]);
-  const badgeFor = (href: string) => (href === "/admin/tickets" ? support.queue_open ?? 0 : 0);
 
   const handleSwitch = async (teamId: string) => {
     setSwitching(true);
@@ -683,96 +586,60 @@ function Sidebar({
 
       <TeamSwitcher teams={teams} currentTeam={currentTeam ?? null} switching={switching} onSwitch={handleSwitch} />
 
-      <div className="space-y-4">
-        {navGroups.map((group, index) => {
-          const items = visibleItems(group, user);
-          if (items.length === 0) return null;
+      <ul className="space-y-0.5" data-testid="main-nav">
+        {visibleSections(user).filter((x) => !x.section.superAdminOnly).map(({ section, href }) => (
+          <NavItemLink key={section.key} href={href} label={section.label} icon={NAV_ICONS[section.icon]} current={currentSection === section.key} />
+        ))}
+      </ul>
 
-          return (
-          <div key={index}>
-            {group.label && (
-              <p className="px-2 mb-1 text-xs font-semibold text-zinc-600 uppercase tracking-widest">
-                {group.label}
-              </p>
-            )}
-
-            <div className="space-y-1">
-              {items.map((item) => {
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    prefetch={false}
-                    aria-current={isActive(item.href) ? "page" : undefined}
-                    className={`flex items-center justify-between py-1.5 rounded-md text-sm transition-colors px-2 ${focusRing} ${
-                      isActive(item.href)
-                        ? "text-zinc-100 bg-zinc-800"
-                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
-                    }`}
-                  >
-                    <span className="flex items-center gap-2.5">
-                      <span className="w-4 flex items-center justify-center" aria-hidden="true">{item.icon}</span>
-                      {item.label}
-                    </span>
-                    {item.countKey === "betaSignups" ? (
-                      <CountBadge n={betaNew} label={`new beta ${betaNew === 1 ? "sign-up" : "sign-ups"}`} />
-                    ) : (
-                      <CountBadge n={badgeFor(item.href)} label="need a reply" />
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-          );
-        })}
-      </div>
+      {visibleSections(user).some((x) => x.section.superAdminOnly) && (
+        <div className="mt-5">
+          <p className="mb-1 px-2 text-xs font-medium text-zinc-400">Platform</p>
+          <ul className="space-y-0.5">
+            {visibleSections(user).filter((x) => x.section.superAdminOnly).map(({ section, href }) => (
+              <NavItemLink
+                key={section.key}
+                href={href}
+                label={section.label}
+                icon={NAV_ICONS[section.icon]}
+                current={currentSection === section.key}
+                badge={
+                  section.countKey === "betaSignups" ? (
+                    <CountBadge n={betaNew} label={`new beta ${betaNew === 1 ? "sign-up" : "sign-ups"}`} />
+                  ) : section.countKey === "supportQueue" ? (
+                    <CountBadge n={support.queue_open ?? 0} label="need a reply" />
+                  ) : null
+                }
+              />
+            ))}
+          </ul>
+        </div>
+      )}
 
       </ScrollFade>
 
       <div className="shrink-0 px-3 pb-3" data-testid="sidebar-footer">
-      {/* Support: always in view, so help is one click from any page. */}
-      <div role="group" aria-label="Support" className="pt-2 border-t border-zinc-800/60 space-y-0.5">
-        <Link
-          href="/support"
-          prefetch={false}
-          aria-current={pathname.startsWith("/support") ? "page" : undefined}
-          data-testid="nav-get-help"
-          className={`flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors ${focusRing} ${
-            pathname.startsWith("/support") ? "text-zinc-100 bg-zinc-800" : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
-          }`}
-        >
-          <span className="flex items-center gap-2.5">
-            <span className="w-4 flex items-center justify-center" aria-hidden="true"><LifeBuoyIcon /></span>
-            Get help
-          </span>
-          <CountBadge n={support.waiting} label="waiting on you" />
-        </Link>
-        <Link
-          href={issueHref}
-          prefetch={false}
-          data-testid="nav-report-issue"
-          className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 transition-colors ${focusRing}`}
-        >
-          <span className="w-4 flex items-center justify-center" aria-hidden="true"><CircleDotIcon /></span>
-          Report an issue
-        </Link>
-        <Link
-          href="/support?new=1&type=contact"
-          prefetch={false}
-          data-testid="nav-contact-us"
-          className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 transition-colors ${focusRing}`}
-        >
-          <span className="w-4 flex items-center justify-center" aria-hidden="true"><MailIcon /></span>
-          Contact us
-        </Link>
+      {/* Help: one menu, always in view, so help is one click from any page. */}
+      <div className="border-t border-zinc-800/60 pt-2">
+        <HelpMenu issueHref={issueHref} waiting={support.waiting} current={pathname.startsWith("/support")} />
       </div>
 
       {/* One small bar per monthly limit that is set */}
       {usage && usageLimits(usage).length > 0 && (
-        <div className="mx-2 mt-3 pt-3 border-t border-zinc-800/60 shrink-0" data-testid="sidebar-token-meter" title={usageBreakdown(usage)}>
+        <Link
+          href="/settings/budget"
+          prefetch={false}
+          className={`mt-2 block rounded-md border-t border-zinc-800/60 px-2 pb-1 pt-3 hover:bg-zinc-900 ${focusRing}`}
+          data-testid="sidebar-token-meter"
+          title={usageBreakdown(usage)}
+          aria-label="Token usage this month: open Token limit"
+        >
+          <span className="mb-2 flex items-baseline justify-between gap-2 text-xs" title={usage.month ? resetLabel(usage.month) : undefined}>
+            <span className="whitespace-nowrap font-medium text-zinc-300">Usage this month</span>
+            {usage.month && <span className="whitespace-nowrap text-zinc-400">{resetLabel(usage.month).replace("Resets ", "")}</span>}
+          </span>
           <TokenMeters limits={usageLimits(usage)} compact />
-        </div>
+        </Link>
       )}
 
       {user && (
@@ -791,10 +658,10 @@ function Sidebar({
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <p className="text-sm text-zinc-300 truncate">{user.github_login || user.email}</p>
-            {user.github_login && <p className="text-xs text-zinc-500 truncate">{user.email}</p>}
+            <p className="text-sm text-zinc-200 truncate" title={user.email}>{user.email || user.github_login}</p>
+            {user.github_login && <p className="text-xs text-zinc-400 truncate">@{user.github_login}</p>}
             {runtimeConfig().version && (
-              <p className="text-xs text-zinc-600 truncate" data-testid="install-version" title="This install's Coderhelm version">
+              <p className="text-xs text-zinc-400 truncate" data-testid="install-version" title="This install's Coderhelm version">
                 Coderhelm {runtimeConfig().version}
               </p>
             )}
@@ -804,7 +671,7 @@ function Sidebar({
             onClick={async () => { try { await api.logout(); } catch {} window.location.href = "/"; }}
             title="Log out"
             aria-label="Log out"
-            className={`rounded p-1 text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer ${focusRing}`}
+            className={`rounded p-1 text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer ${focusRing}`}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
@@ -859,7 +726,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
     } else if (params.get("error") === "ask_admin_invite") {
       const org = params.get("org");
       setError(
-        `${org ? `${org} already uses Coderhelm` : "Your GitHub organization already uses Coderhelm"}. Ask one of its admins to invite you from Settings → Team, then sign in with the email they invite.`,
+        `${org ? `${org} already uses Coderhelm` : "Your GitHub organization already uses Coderhelm"}. Ask one of its admins to invite you (Settings, then Team), then sign in with the email they invite.`,
       );
       window.history.replaceState({}, "", window.location.pathname);
     }
@@ -872,7 +739,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
       setMessage(result.message || "You're on the list!");
       setView("login");
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError("We couldn't add you to the waitlist. Check your connection and try again.");
     } finally { setLoading(false); }
   };
 
@@ -911,7 +778,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
         setError("Please verify your email first.");
         setView("verify");
       } else {
-        setError("Invalid email or password.");
+        setError("That email and password don't match. Check them, or reset your password.");
       }
     } finally { setLoading(false); }
   };
@@ -940,7 +807,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
       setMessage("Email verified! You can now log in.");
       setView("login");
     } catch {
-      setError("Invalid or expired code.");
+      setError("That code didn't work or has expired. Check the latest email from us, or ask for a new code.");
     } finally { setLoading(false); }
   };
 
@@ -951,7 +818,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
       setView("reset");
       setMessage("If an account exists, a reset code was sent to your email.");
     } catch {
-      setError("Something went wrong.");
+      setError("We couldn't send a reset code. Check your connection and try again.");
     } finally { setLoading(false); }
   };
 
@@ -963,7 +830,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
       setView("login");
       setCode(""); setNewPassword("");
     } catch {
-      setError("Invalid code or password too weak.");
+      setError("That didn't work. Check the code from the email, and use a password of at least 8 characters with a number and a symbol.");
     } finally { setLoading(false); }
   };
 
@@ -974,7 +841,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
       const u = await api.me();
       onAuth(u);
     } catch {
-      setError("Invalid MFA code.");
+      setError("That code didn't work. Open your authenticator app and enter the current 6-digit code.");
     } finally { setLoading(false); }
   };
 
@@ -1009,7 +876,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
               <div className="flex items-center justify-center gap-2 rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1.5">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
                 <span className="text-xs font-medium text-amber-400">Closed beta</span>
-                <span className="text-xs text-zinc-500">·</span>
+                <span className="text-xs text-zinc-400">·</span>
                 <button onClick={() => { setView("waitlist"); setError(""); setMessage(""); }} className="text-xs text-amber-400 hover:text-amber-300 underline underline-offset-2 cursor-pointer">Join waitlist</button>
               </div>
               <div className="space-y-3">
@@ -1031,7 +898,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
 
               <div className="flex items-center gap-3">
                 <div className="flex-1 h-px bg-zinc-800" />
-                <span className="text-xs text-zinc-500">or</span>
+                <span className="text-xs text-zinc-400">or</span>
                 <div className="flex-1 h-px bg-zinc-800" />
               </div>
 
@@ -1061,7 +928,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
                   <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
                   <span className="text-xs font-medium text-amber-400">Closed beta</span>
                 </div>
-                <p className="text-xs text-zinc-500">Only users with an invite can create an account.</p>
+                <p className="text-xs text-zinc-400">Only users with an invite can create an account.</p>
               </div>
               <form onSubmit={(e) => { e.preventDefault(); if (password.length >= 8 && agreedTos) handleSignup(); }} className="space-y-3">
                 <input type="email" name="email" id="signup-email" autoComplete="email" aria-label="Email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); setMessage(""); }}
@@ -1072,7 +939,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
                   <label className="flex items-start gap-2 cursor-pointer">
                     <input type="checkbox" checked={agreedTos} onChange={(e) => setAgreedTos(e.target.checked)}
                       className="mt-0.5 rounded border-zinc-700 bg-zinc-900 text-blue-600 focus:ring-0 focus:ring-offset-0 cursor-pointer" />
-                    <span className="text-xs text-zinc-500">
+                    <span className="text-xs text-zinc-400">
                       I agree to the{" "}
                       <a href={`${site}/terms`} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-200 underline">Terms of Service</a>
                       {" "}and{" "}
@@ -1096,7 +963,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
             <div className="w-full space-y-4">
               <div className="text-center">
                 <p className="text-sm text-zinc-300 font-medium">Coderhelm is in closed beta</p>
-                <p className="text-xs text-zinc-500 mt-1">Join the waitlist and we&apos;ll notify you when we open up.</p>
+                <p className="text-xs text-zinc-400 mt-1">Join the waitlist and we&apos;ll notify you when we open up.</p>
               </div>
               <div className="space-y-3">
                 <input type="email" autoComplete="email" aria-label="Email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }}
@@ -1198,7 +1065,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
           )}
 
           {site && (
-            <div className="flex gap-3 text-xs text-zinc-600 mt-4">
+            <div className="flex gap-3 text-xs text-zinc-400 mt-4">
               <a href={`${site}/terms`} className="hover:text-zinc-400 transition-colors">Terms</a>
               <span>·</span>
               <a href={`${site}/privacy`} className="hover:text-zinc-400 transition-colors">Privacy</a>
@@ -1214,9 +1081,189 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
 function CountBadge({ n, label }: { n: number; label: string }) {
   if (!n) return null;
   return (
-    <span className="min-w-5 rounded-full bg-amber-500/15 px-1.5 text-center text-[11px] font-semibold tabular-nums leading-5 text-amber-300" data-testid="count-badge">
+    <span className="min-w-5 rounded-full bg-amber-500/15 px-1.5 text-center text-xs font-semibold tabular-nums leading-5 text-amber-300" data-testid="count-badge">
       {n}
       <span className="sr-only"> {label}</span>
     </span>
+  );
+}
+
+function NavItemLink({ href, label, icon, current, badge }: { href: string; label: string; icon: ReactNode; current: boolean; badge?: ReactNode }) {
+  return (
+    <li>
+      <Link
+        href={href}
+        prefetch={false}
+        aria-current={current ? "page" : undefined}
+        className={`flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm transition-colors motion-reduce:transition-none ${focusRing} ${
+          current ? "bg-zinc-800 font-medium text-zinc-50" : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100"
+        }`}
+      >
+        <span className="flex min-w-0 items-center gap-2.5">
+          <span className="flex w-4 shrink-0 items-center justify-center" aria-hidden="true">
+            {icon}
+          </span>
+          <span className="truncate">{label}</span>
+        </span>
+        {badge}
+      </Link>
+    </li>
+  );
+}
+
+/** "Resets Nov 1": the first day of the month after the usage month ("2026-10"). */
+function resetLabel(month: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(month);
+  if (!m) return "";
+  const next = new Date(Date.UTC(Number(m[1]), Number(m[2]), 1));
+  return `Resets ${next.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" })}`;
+}
+
+/** Get help, report an issue or contact us, in one menu. */
+function HelpMenu({ issueHref, waiting, current }: { issueHref: string; waiting: number; current: boolean }) {
+  const router = useRouter();
+  return (
+    <Menu
+      label="Help"
+      align="start"
+      items={[
+        { label: "Get help", note: waiting ? `${waiting} waiting on you` : "Your requests and answers", onSelect: () => router.push("/support") },
+        { label: "Report an issue", note: "Tell us what went wrong on this page", onSelect: () => router.push(issueHref) },
+        { label: "Contact us", onSelect: () => router.push("/support?new=1&type=contact") },
+      ]}
+      trigger={
+        <button
+          type="button"
+          data-testid="nav-help"
+          className={`flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm transition-colors ${focusRing} ${
+            current ? "bg-zinc-800 text-zinc-50" : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100"
+          }`}
+        >
+          <span className="flex items-center gap-2.5">
+            <span className="flex w-4 items-center justify-center" aria-hidden="true">
+              <LifeBuoyIcon />
+            </span>
+            Help
+          </span>
+          <CountBadge n={waiting} label="waiting on you" />
+        </button>
+      }
+    />
+  );
+}
+
+const BANNER_LOOK: Record<string, { box: string; icon: ReactNode; iconClass: string }> = {
+  error: { box: "border-red-500/30 bg-red-950/60", icon: <AlertCircleIcon />, iconClass: "text-red-400" },
+  warning: { box: "border-amber-500/30 bg-amber-950/50", icon: <WarningIcon />, iconClass: "text-amber-400" },
+  info: { box: "border-blue-500/25 bg-blue-950/40", icon: <InfoIcon />, iconClass: "text-blue-300" },
+};
+
+/** A link's words: a raw URL as link text reads as "Read more". */
+function linkWords(text: string): string {
+  return /^https?:\/\//i.test(text.trim()) || text.length > 60 ? "Read more" : text;
+}
+
+/**
+ * The shell's banners, one at a time: the most urgent shows (a reached
+ * limit, then errors, warnings, notes), in one line with Details for the
+ * rest, so a page never starts half a screen down. "1 more" says others wait.
+ */
+function ShellBanners({
+  banners,
+  limit,
+  month,
+  canRaise,
+  onLimitPage,
+  onDismiss,
+}: {
+  banners: Banner[];
+  limit: ReturnType<typeof reachedLimit>;
+  month?: string;
+  canRaise: boolean;
+  onLimitPage: boolean;
+  onDismiss: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  type Item = { id: string; type: "error" | "warning" | "info"; title: ReactNode; detail?: ReactNode; action?: ReactNode; dismissible: boolean; testId: string };
+  const items: Item[] = [];
+  if (limit) {
+    const name = limitName(limit.kind);
+    const Name = limit.kind === "all_tokens" ? "Token" : `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+    const reset = month ? resetLabel(month).replace("Resets", "on") : "next month";
+    items.push({
+      id: "token-limit-banner",
+      type: "error",
+      testId: "token-limit-banner",
+      dismissible: false,
+      title: `${Name} limit reached, so new runs are paused`,
+      detail: (
+        <>
+          You&apos;ve used {formatTokens(limit.used)} of your {formatTokens(limit.max)} {name} limit this month.{" "}
+          {canRaise ? `Raise the limit to keep going, or runs resume ${reset}.` : `Ask an admin or the owner to raise the limit, or runs resume ${reset}.`}
+        </>
+      ),
+      action: onLimitPage ? null : (
+        <Link href="/settings/budget" className={buttonClass("primary", "sm")}>
+          {canRaise ? "Raise the limit" : "See usage"}
+        </Link>
+      ),
+    });
+  }
+  const rank = { error: 0, warning: 1, info: 2 } as const;
+  for (const b of [...banners].sort((x, y) => (rank[x.type as keyof typeof rank] ?? 2) - (rank[y.type as keyof typeof rank] ?? 2))) {
+    const type = b.type === "error" || b.type === "warning" ? b.type : "info";
+    items.push({
+      id: b.id,
+      type,
+      testId: "site-banner",
+      dismissible: !!b.dismissible,
+      title: b.message,
+      action:
+        b.link_url && b.link_text ? (
+          <a href={b.link_url} className={buttonClass("secondary", "sm")} title={b.link_text}>
+            {linkWords(b.link_text)}
+          </a>
+        ) : null,
+    });
+  }
+  const first = items[0];
+  if (!first) return null;
+  const look = BANNER_LOOK[first.type];
+  const more = items.length - 1;
+  return (
+    <div
+      role={first.type === "error" ? "alert" : "status"}
+      data-testid={first.testId}
+      className={`border-b px-4 py-2.5 md:px-8 ${look.box}`}
+    >
+      <div className="mx-auto flex max-w-6xl min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+        <span aria-hidden="true" className={`shrink-0 ${look.iconClass}`}>
+          {look.icon}
+        </span>
+        <div className="min-w-0 flex-1 basis-56">
+          <p className={`text-sm font-medium text-zinc-50 [overflow-wrap:anywhere] ${open ? "" : "line-clamp-1"}`}>{first.title}</p>
+          {first.detail && <p className={`mt-0.5 text-sm text-zinc-300 ${open ? "" : "line-clamp-1"}`}>{first.detail}</p>}
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {(first.detail || typeof first.title === "string") && (
+            <button
+              type="button"
+              aria-expanded={open}
+              onClick={() => setOpen((o) => !o)}
+              className={buttonClass("ghost", "sm")}
+            >
+              {open ? "Less" : "Details"}
+            </button>
+          )}
+          {first.action}
+          {more > 0 && <span className="text-xs text-zinc-300">{more} more</span>}
+          {first.dismissible && (
+            <button type="button" aria-label="Dismiss this message" onClick={() => onDismiss(first.id)} className={`inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-300 hover:bg-zinc-800 hover:text-zinc-50 ${focusRing}`}>
+              <XIcon />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

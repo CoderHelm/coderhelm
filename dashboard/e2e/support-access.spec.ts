@@ -253,7 +253,8 @@ test.describe("support access", () => {
       log: [{ id: "old", at: iso(300), kind: "read", actor_email: "helper@example.com", method: "GET", route: "/runs?status=failed", ticket_id: "", detail: "" }],
     });
     await page.goto("/settings/");
-    await page.getByRole("link", { name: /Support access/ }).click();
+    // The overview card (the same page is also in Settings' own list).
+    await page.locator("main [data-page]").getByRole("link", { name: /Support access/ }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Support access" })).toBeVisible();
     const control = page.getByTestId("support-access-control");
     await expect(control).toHaveAttribute("data-active", "false");

@@ -209,7 +209,7 @@ test("a failed load shows an error with a retry, never a blank form", async ({ p
   const db = await mockApi(page, { failGet: true });
   await page.goto("/settings/models/");
   await expect(page.getByText("Could not load your AI model settings")).toBeVisible();
-  await expect(page.locator("select")).toHaveCount(0);
+  await expect(page.locator("main [data-page] select")).toHaveCount(0);
   db.failGet = false;
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(page.getByTestId("key-status")).toContainText("Key saved");

@@ -246,7 +246,7 @@ function TopBarFrame({ teamName, menuButton, canGoBack }: { teamName?: string; m
 
 function Separator() {
   return (
-    <span aria-hidden="true" className="shrink-0 scale-75 text-zinc-600">
+    <span aria-hidden="true" className="shrink-0 scale-75 text-zinc-500">
       <ChevronRightIcon />
     </span>
   );

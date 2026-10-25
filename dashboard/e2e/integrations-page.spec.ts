@@ -427,28 +427,26 @@ test("the whole row opens it, from the mouse or the keyboard, and Close folds it
   await expect(page).toHaveURL(/\/settings\/integrations\/github\/?$/);
 });
 
-test("the menu shows Integrations and Data sources under Connections, with no AWS item and no count", async ({ page }) => {
+test("Integrations and Data sources are listed in Settings' own navigation, with no AWS item and no count", async ({ page }) => {
   await mockApi(page);
   await page.goto("/settings/integrations");
-  const nav = page.getByRole("navigation", { name: "Main" });
+  // The main menu has one Settings entry, marked current on every settings page.
+  const main = page.getByRole("navigation", { name: "Main" });
+  await expect(main.getByRole("link", { name: "Settings", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(main.getByRole("link", { name: "Integrations", exact: true })).toHaveCount(0);
+  const nav = page.getByRole("navigation", { name: "Settings" });
   const integrations = nav.getByRole("link", { name: "Integrations", exact: true });
   await expect(integrations).toHaveAttribute("href", /\/settings\/integrations\/?$/);
   await expect(integrations).toHaveAttribute("aria-current", "page");
-  await expect(integrations).toHaveText("Integrations");
   await expect(nav.getByRole("link", { name: "AWS" })).toHaveCount(0);
   await expect(nav.getByTestId("nav-integrations-attention")).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "Data sources" })).toHaveAttribute("href", /\/data-sources\/?$/);
-  // Connections comes before Insights, so it is on screen without scrolling the menu.
-  const groups = await nav.locator("p.uppercase").allInnerTexts();
-  const order = groups.map((g) => g.toLowerCase());
-  expect(order.indexOf("connections")).toBeGreaterThan(-1);
-  expect(order.indexOf("connections")).toBeLessThan(order.indexOf("insights"));
 });
 
 test("on the AWS page members see Integrations lit, and no AWS item", async ({ page }) => {
   await mockApi(page, { role: "member" });
   await page.goto("/settings/integrations/aws");
-  const nav = page.getByRole("navigation", { name: "Main" });
+  const nav = page.getByRole("navigation", { name: "Settings" });
   await expect(nav.getByRole("link", { name: "Integrations", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(nav.getByRole("link", { name: "AWS" })).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "Data sources" })).toHaveCount(0);

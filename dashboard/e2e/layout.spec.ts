@@ -91,7 +91,8 @@ test("layout: the column's left edge is the same on every page", async ({ page }
   const edges: Record<string, { x: number; width: number }> = {};
   for (const { path: route } of PAGES) {
     await page.goto(route);
-    const box = await page.locator("main [data-page]").first().boundingBox();
+    // A settings page sits beside Settings' own list: the column holding both lines up.
+    const box = await page.locator("main [data-settings-layout], main [data-page]").first().boundingBox();
     expect(box, `${route} has a page column`).not.toBeNull();
     edges[route] = { x: Math.round(box!.x), width: Math.round(box!.width) };
   }

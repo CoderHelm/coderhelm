@@ -228,8 +228,9 @@ test("menu: current page is marked, icon buttons have names, tab titles follow t
   await mockApi(page, { allFail: 500 });
   await page.goto("/plans/templates");
   const nav = page.getByRole("navigation", { name: "Main" });
-  await expect(nav.getByRole("link", { name: "Templates" })).toHaveAttribute("aria-current", "page");
-  await expect(nav.getByRole("link", { name: "Plans", exact: true })).not.toHaveAttribute("aria-current", "page");
+  // Templates is a page of Plans: the menu marks Plans, the tabs mark Templates.
+  await expect(nav.getByRole("link", { name: "Plans", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("navigation", { name: "Plans pages" }).getByRole("link", { name: "Templates" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
   await expect(page).toHaveTitle("Templates · Coderhelm");
   await page.goto("/runs/detail?id=01RUN00000000000000000003");
@@ -251,11 +252,18 @@ test("banners are announced and the dismiss button has a name", async ({ page })
     usage: { total_tokens: 2_000_000, max_tokens: 0, limits: [{ kind: "new_tokens", max: 1_000_000, used: 2_000_000 }] },
   });
   await page.goto("/");
-  await expect(page.getByRole("status").filter({ hasText: "Scheduled maintenance tonight." })).toBeVisible();
+  // One banner at a time, the most urgent first: the reached limit, with "1 more" waiting.
   const limit = page.getByRole("alert").filter({ hasText: "New tokens limit reached" });
   // An admin can set the token limit, so is told to raise it.
   await expect(limit.getByRole("link", { name: "Raise the limit" })).toHaveAttribute("href", /\/settings\/budget/);
+  await expect(limit).toContainText("1 more");
   await shot(page, "shell-banners");
+  // Without the limit, the site banner shows, announced, and can be dismissed.
+  await page.route((url) => url.pathname === "/api/usage", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ month: "2026-01", total_tokens: 0, tokens_in: 0, tokens_out: 0, total_runs: 0, max_tokens: 0 }) }),
+  );
+  await page.reload();
+  await expect(page.getByRole("status").filter({ hasText: "Scheduled maintenance tonight." })).toBeVisible();
   await page.getByRole("button", { name: "Dismiss this message" }).click();
   await expect(page.getByText("Scheduled maintenance tonight.")).toHaveCount(0);
   expect(errors).toEqual([]);
