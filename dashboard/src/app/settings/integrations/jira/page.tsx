@@ -3,13 +3,14 @@
 import { useCan } from "@/hooks/use-can";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { api, type JiraCheck, type JiraConfig, type JiraEvent, type JiraProject, type Repo } from "@/lib/api";
+import { api, type Integration, type JiraCheck, type JiraConfig, type JiraEvent, type JiraProject, type Repo } from "@/lib/api";
 import { timeAgo } from "@/lib/data-sources";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Callout } from "@/components/callout";
 import { StatusPill } from "@/components/status-pill";
+import { findCard, INTEGRATION_STATUS } from "@/lib/integration-status";
 import { Stepper } from "@/components/stepper";
 import { Segmented } from "@/components/segmented";
 import { CopyButton } from "@/components/copy-button";
@@ -42,6 +43,8 @@ function JiraPage() {
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const [check, setCheck] = useState<JiraCheck | null>(null);
   const [config, setConfig] = useState<JiraConfig | null>(null);
+  // The Integrations overview's card for Jira: its status is the one every page shows.
+  const [card, setCard] = useState<Integration | undefined>(undefined);
   const { can } = useCan();
   // Removing the integration is an owner-level capability.
   const canDisconnect = can("disconnect");
@@ -50,9 +53,10 @@ function JiraPage() {
 
   const refresh = useCallback(async () => {
     try {
-      const [c, cfg] = await Promise.all([api.getJiraCheck(), api.getJiraConfig()]);
+      const [c, cfg, integrations] = await Promise.all([api.getJiraCheck(), api.getJiraConfig(), api.getIntegrations().catch(() => undefined)]);
       setCheck(c);
       setConfig(cfg);
+      setCard(findCard(integrations?.items, "jira"));
       setLoad({ state: "ready" });
     } catch {
       setLoad((prev) => (prev.state === "ready" ? prev : { state: "error" }));
@@ -125,7 +129,7 @@ function JiraPage() {
         <>
           <div className="mt-8 grid items-start gap-6 lg:grid-cols-3">
             <div className="min-w-0 lg:col-span-2">
-              <StatusCard check={check} config={config} appLinked={appLinked} webhookOn={webhookOn} onChanged={refresh} setConfig={setConfig} />
+              <StatusCard check={check} config={config} card={card} appLinked={appLinked} webhookOn={webhookOn} onChanged={refresh} setConfig={setConfig} />
             </div>
             <HowItWorks />
           </div>
@@ -222,6 +226,7 @@ function StatusRow({ ok, children }: { ok: boolean; children: ReactNode }) {
 function StatusCard({
   check,
   config,
+  card,
   appLinked,
   webhookOn,
   onChanged,
@@ -229,6 +234,7 @@ function StatusCard({
 }: {
   check: JiraCheck;
   config: JiraConfig;
+  card?: Integration;
   appLinked: boolean;
   webhookOn: boolean;
   onChanged: () => void;
@@ -242,6 +248,8 @@ function StatusCard({
   const site = config.site_url.replace(/^https?:\/\//, "").replace(/\/$/, "");
   const connected = appLinked || webhookOn;
   const enabled = check.configured_repos.enabled;
+  // A problem the overview found (not working, needs reconnecting) wins over "Connected", so both pages agree.
+  const problem = card && card.status !== "connected" && card.status !== "not_connected" ? card : undefined;
 
   const runTest = async () => {
     setTesting(true);
@@ -283,15 +291,17 @@ function StatusCard({
         <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-sky-400">
           <AtlassianIcon />
         </span>
-        <div className="min-w-0 flex-1">
-          <h2 id="status-heading" className="font-semibold text-zinc-100">
+        <div className="min-w-0 flex-1 basis-48">
+          <h2 id="status-heading" className="font-semibold text-zinc-100 [overflow-wrap:anywhere]">
             {connected ? (site ? site : "Jira") : "Jira is not connected"}
           </h2>
           <p className="text-sm text-zinc-400">
             {appLinked ? "Through the Coderhelm Jira app" : webhookOn ? "Through a Jira webhook" : "Follow the setup below to connect."}
           </p>
         </div>
-        {connected && check.ready ? (
+        {problem ? (
+          <StatusPill tone={INTEGRATION_STATUS[problem.status].tone === "error" ? "error" : "warning"}>{INTEGRATION_STATUS[problem.status].label}</StatusPill>
+        ) : connected && check.ready ? (
           <StatusPill tone="success">Connected</StatusPill>
         ) : connected ? (
           <StatusPill tone="warning">Needs a repository</StatusPill>
@@ -299,6 +309,14 @@ function StatusCard({
           <StatusPill>Not connected</StatusPill>
         )}
       </div>
+
+      {problem?.reason && (
+        <div className="mt-4">
+          <Callout variant={INTEGRATION_STATUS[problem.status].tone === "error" ? "error" : "warning"} title="What's wrong">
+            <p className="[overflow-wrap:anywhere]">{problem.reason}</p>
+          </Callout>
+        </div>
+      )}
 
       <ul className="mt-4 flex flex-col gap-2">
         <StatusRow ok={appLinked}>{appLinked ? "Jira app linked" : "Jira app not linked"}</StatusRow>

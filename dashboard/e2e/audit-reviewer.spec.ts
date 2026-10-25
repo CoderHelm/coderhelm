@@ -477,7 +477,7 @@ test("a review page leads with the PR's title, links it on GitHub and rates once
   await expect(h1.getByRole("link")).toHaveAttribute("href", "https://github.com/your-team/web/pull/101");
   const header = page.getByTestId("review-header");
   await expect(header.getByText("web #101")).toHaveAttribute("title", "your-team/web");
-  await expect(page.getByTestId("topbar-actions").getByRole("link", { name: /Open PR on GitHub/ })).toHaveAttribute("href", "https://github.com/your-team/web/pull/101");
+  await expect(page.getByTestId("page-actions").getByRole("link", { name: /Open PR on GitHub/ })).toHaveAttribute("href", "https://github.com/your-team/web/pull/101");
   await expect(header.getByRole("link", { name: "abcdef1" })).toHaveAttribute("href", "https://github.com/your-team/web/commit/abcdef1234567");
   await expect(header.getByText("Approved")).toBeVisible();
   await expect(header.getByText("Low risk")).toBeVisible();

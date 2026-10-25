@@ -51,11 +51,13 @@ test("the trail names where you are, ending on the current page", async ({ page 
     const current = page.getByTestId("breadcrumb-current").locator('[aria-current="page"]');
     await expect(current).toHaveText(c.trail[c.trail.length - 1]);
   }
-  // A settings page is named once: by the bar, which is its heading.
+  // A settings page is named once, by its visible title in the page; the
+  // bar's last crumb marks where you are but is not a second heading.
   await page.goto("/settings/security");
   await settle(page);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Security");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("page-header").getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByTestId("breadcrumb-current").locator('[aria-current="page"]')).toHaveText("Security");
   await expect(page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Settings" })).toHaveAttribute("href", /^\/settings\/?$/);
   // An item's page shows its title under the bar; the bar's crumb is not a second heading.
   await page.goto(`/runs/detail?id=${RUN_ID}`);
@@ -64,11 +66,11 @@ test("the trail names where you are, ending on the current page", async ({ page 
   await expect(page).toHaveTitle("Show the class schedule on the details page · Coderhelm");
 });
 
-test("the page's actions sit in the bar", async ({ page }) => {
+test("the page's actions sit beside its title", async ({ page }) => {
   await mockDemoApi(page);
   await page.goto(`/reviewer/detail?sk=${encodeURIComponent(REVIEW_SK)}`);
   await settle(page);
-  const actions = page.getByTestId("topbar-actions");
+  const actions = page.getByTestId("page-header").getByTestId("page-actions");
   await expect(actions.getByRole("link", { name: /Open PR on GitHub/ })).toBeVisible();
   await expect(actions.getByRole("button", { name: /Review .* again/ })).toBeVisible();
   await expect(page.getByTestId("topbar").getByTestId("open-command-palette")).toBeVisible();
@@ -102,7 +104,7 @@ test("back goes to the page you came from, or one level up when you came from ou
   await expect(second.getByRole("link", { name: "Coderhelm home" })).toBeVisible();
 });
 
-test("on a phone the bar is a back arrow, the page's name and an actions menu", async ({ page }) => {
+test("on a phone the bar is a back arrow and the page's name; the actions stay in view under the title", async ({ page }) => {
   await page.setViewportSize(PHONE);
   await mockDemoApi(page);
   await page.goto(`/reviewer/detail?sk=${encodeURIComponent(REVIEW_SK)}`);
@@ -111,14 +113,11 @@ test("on a phone the bar is a back arrow, the page's name and an actions menu", 
   await expect(page.getByTestId("breadcrumb").getByRole("link", { name: "Reviewer" })).toBeHidden();
   await expect(page.getByTestId("breadcrumb-current")).toBeVisible();
   await expect(page.getByTestId("topbar-back")).toBeVisible();
-  // Actions wait in a menu.
-  const menu = page.locator("#topbar-actions-menu");
-  await expect(menu).toBeHidden();
-  await page.getByRole("button", { name: "Page actions" }).click();
-  await expect(menu.getByRole("link", { name: /Open PR on GitHub/ })).toBeVisible();
-  await expect(menu.getByRole("button", { name: /Review .* again/ })).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(menu).toBeHidden();
+  // The main actions are never hidden in a menu on a phone.
+  const actions = page.getByTestId("page-actions");
+  await expect(actions.getByRole("link", { name: /Open PR on GitHub/ })).toBeVisible();
+  await expect(actions.getByRole("button", { name: /Review .* again/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Page actions" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Search" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Menu" })).toBeVisible();
 

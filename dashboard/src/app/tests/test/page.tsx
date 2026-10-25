@@ -152,7 +152,7 @@ function TestDetail() {
 
       {test.cause && (
         <div className="mt-6">
-          <Callout variant="info" title={`Likely cause: ${CAUSE_LABEL[test.cause.label]}`} live={false}>
+          <Callout variant="neutral" title={`Likely cause: ${CAUSE_LABEL[test.cause.label]}`} live={false}>
             <p className="whitespace-pre-wrap">{test.cause.evidence}</p>
           </Callout>
         </div>

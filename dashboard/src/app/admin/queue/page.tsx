@@ -80,11 +80,7 @@ export default function SharedQueuePage() {
     <Page>
       <PageHeader
         title="Shared queue"
-        lead={
-          data
-            ? `Failed messages from every team. Messages the worker can't read are archived and removed after ${data.cleanup_after_days} days; the queue drops anything after ${data.retention_days}.`
-            : "Failed messages from every team."
-        }
+        lead={queueLead(data)}
         actions={
           <div className="flex gap-2">
             <Link href="/admin" className={secondaryButton}>
@@ -114,9 +110,9 @@ export default function SharedQueuePage() {
         {data && (
           <>
             <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="queue-counts">
-              <Count label="Messages" value={data.count} />
-              <Count label="For no team" value={data.shared} hint="Can't be read, global jobs, or no team" />
-              <Count label="Can't be read" value={data.unreadable} />
+              <Count label="Messages" value={data.count ?? data.messages.length} />
+              <Count label="For no team" value={data.shared ?? 0} hint="Can't be read, global jobs, or no team" />
+              <Count label="Can't be read" value={data.unreadable ?? 0} />
             </dl>
             {!data.complete && (
               <p className="text-xs text-zinc-500">The queue holds more than one listing reads; reload to see the rest.</p>
@@ -179,4 +175,19 @@ function Count({ label, value, hint }: { label: string; value: number; hint?: st
       {hint && <p className="mt-1 text-xs text-zinc-500">{hint}</p>}
     </div>
   );
+}
+
+/**
+ * The lead, with only the clauses the server answered: an older gateway
+ * leaves the retention fields out, and a missing number must never print as
+ * "undefined".
+ */
+function queueLead(data: { cleanup_after_days?: number | null; retention_days?: number | string | null } | null | undefined): string {
+  const parts = ["Failed messages from every team."];
+  const days = typeof data?.cleanup_after_days === "number" ? data.cleanup_after_days : null;
+  const kept = data?.retention_days;
+  if (days !== null) parts.push(`Messages the worker can't read are archived and removed after ${days} day${days === 1 ? "" : "s"}.`);
+  if (typeof kept === "number") parts.push(`The queue drops anything after ${kept} day${kept === 1 ? "" : "s"}.`);
+  else if (typeof kept === "string" && kept.trim()) parts.push(`The queue drops anything after ${kept}.`);
+  return parts.join(" ");
 }

@@ -22,7 +22,7 @@ export function SettingsSection({
 }) {
   return (
     <section id={id} aria-labelledby={`${id}-heading`} className="min-w-0 scroll-mt-6">
-      <h2 id={`${id}-heading`} className={`text-xs font-semibold uppercase tracking-wider ${danger ? "text-red-400" : "text-zinc-500"}`}>
+      <h2 id={`${id}-heading`} className={`text-sm font-semibold ${danger ? "text-red-300" : "text-zinc-100"}`}>
         {title}
       </h2>
       {description && <p className="mt-1 max-w-prose text-sm text-zinc-400">{description}</p>}

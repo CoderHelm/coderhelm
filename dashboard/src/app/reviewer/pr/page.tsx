@@ -164,7 +164,7 @@ function GatePage() {
       />
 
       {!gate.auto_merge && (
-        <Callout variant="info" title="Auto-merge is off for this repo">
+        <Callout variant="neutral" title="Auto-merge is off for this repo">
           <p>There is nothing to stop or re-arm. Turn it on in the repo&apos;s Reviewer settings.</p>
         </Callout>
       )}

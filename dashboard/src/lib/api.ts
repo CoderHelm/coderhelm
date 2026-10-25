@@ -2049,12 +2049,13 @@ export interface AdminDlqMessage extends DlqMessage {
 
 export interface AdminDlqList {
   messages: AdminDlqMessage[];
-  count: number;
-  shared: number;
-  unreadable: number;
+  /** An older gateway leaves the counts and retention fields out. */
+  count?: number;
+  shared?: number;
+  unreadable?: number;
   complete: boolean;
-  cleanup_after_days: number;
-  retention_days: number;
+  cleanup_after_days?: number;
+  retention_days?: number;
 }
 
 export interface JiraCheck {

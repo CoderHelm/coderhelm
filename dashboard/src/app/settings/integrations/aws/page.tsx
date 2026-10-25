@@ -143,7 +143,7 @@ function AwsPage() {
 
       {!canEdit && load.state !== "loading" && (
         <div className="mt-6">
-          <Callout variant="info" live={false}>
+          <Callout variant="neutral" live={false}>
             <p>You can see the connected accounts and act on findings. Only an admin or the owner can connect, test or remove an account.</p>
           </Callout>
         </div>

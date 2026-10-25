@@ -341,7 +341,7 @@ test.describe("the platform admin's support queue", () => {
   test("the queue lists every team's tickets; an admin answers, resolves and sees the context with links", async ({ page }) => {
     const db = await mockApi(page, { email: ADMIN_EMAIL, role: "owner" });
     await page.goto("/admin/");
-    await page.getByTestId("topbar-actions").getByRole("link", { name: "Support queue" }).click();
+    await page.getByTestId("page-actions").getByRole("link", { name: "Support queue" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Support queue" })).toBeVisible();
 
     // Needs reply by default: both open tickets, from both teams, urgent first.

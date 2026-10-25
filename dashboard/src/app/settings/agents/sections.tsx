@@ -1,5 +1,7 @@
 "use client";
 
+import { Switch } from "@/components/settings/switch";
+
 import { useEffect, useMemo, useState } from "react";
 import { api, type Repo } from "@/lib/api";
 import {
@@ -118,24 +120,6 @@ export function PauseBanner({ view, edit, onChange }: { view: PolicyView; edit: 
 }
 
 // ── Agents on and off ───────────────────────────────────────────────
-
-function Switch({ checked, label, disabled, onChange }: { checked: boolean; label: string; disabled?: boolean; onChange: (on: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 ${
-        checked ? "border-emerald-500/50 bg-emerald-500/30" : "border-zinc-700 bg-zinc-800"
-      }`}
-    >
-      <span className={`inline-block h-4 w-4 rounded-full bg-zinc-100 transition-transform ${checked ? "translate-x-6" : "translate-x-1"}`} />
-    </button>
-  );
-}
 
 export function AgentSwitches({ view, edit, repos, onChange }: { view: PolicyView; edit: boolean; repos: Repo[]; onChange: Change }) {
   const [repoFor, setRepoFor] = useState<AgentKey | null>(null);

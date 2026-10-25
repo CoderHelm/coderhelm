@@ -493,7 +493,7 @@ function KeyStep({ url, onConnected }: { url: string; onConnected: (source: Data
         </Callout>
       )}
       {ready && result && !result.schema_available && (
-        <Callout variant="info">
+        <Callout variant="neutral">
           <p>This API doesn&apos;t share its list of data, so we can&apos;t suggest example lookups. You can still write your own on the Try it step.</p>
         </Callout>
       )}

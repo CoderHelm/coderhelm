@@ -86,6 +86,39 @@ test("guardrails: your rules come first and each add or remove saves the whole l
   expect(put.body).toEqual({ rules: ["Keep bundle size under 300 KB", "Run the visual tests"] });
 });
 
+test("guardrails: a failed load never looks like an empty list, so saved rules can't be overwritten", async ({ page }) => {
+  const db = await mockApi(page);
+  db.fail.add("/api/rules/global");
+  await page.goto("/settings/guardrails/");
+  const problem = page.getByTestId("rules-error");
+  await expect(problem).toContainText("Couldn't load the rules for every repository");
+  // Nothing that reads as "no rules", and nothing to add or remove with.
+  await expect(page.getByText(/No rules for every repository yet/)).toHaveCount(0);
+  await expect(page.getByLabel("Add a rule")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Remove rule/ })).toHaveCount(0);
+  expect(callsTo(db, "PUT", /\/api\/rules\/global$/)).toHaveLength(0);
+
+  // Try again loads the real list, and editing comes back.
+  db.fail.delete("/api/rules/global");
+  await problem.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByRole("list", { name: "Rules for every repository" })).toContainText("Never edit generated files under src/gen");
+  await expect(page.getByLabel("Add a rule")).toBeVisible();
+});
+
+test("guardrails: removing a rule can be undone from the toast", async ({ page }) => {
+  const db = await mockApi(page);
+  await page.goto("/settings/guardrails/");
+  await page.getByRole("button", { name: "Remove rule: Never edit generated files under src/gen" }).click();
+  const toast = page.getByTestId("toast").filter({ hasText: "Rule removed" });
+  await expect(toast).toBeVisible();
+  await expect.poll(() => callsTo(db, "PUT", /\/api\/rules\/global$/).length).toBe(1);
+  expect(callsTo(db, "PUT", /\/api\/rules\/global$/)[0].body).toEqual({ rules: [] });
+  await toast.getByRole("button", { name: "Undo" }).click();
+  await expect.poll(() => callsTo(db, "PUT", /\/api\/rules\/global$/).length).toBe(2);
+  expect(callsTo(db, "PUT", /\/api\/rules\/global$/)[1].body).toEqual({ rules: ["Never edit generated files under src/gen"] });
+  await expect(page.getByRole("list", { name: "Rules for every repository" })).toContainText("Never edit generated files under src/gen");
+});
+
 // ── Voice and instructions ───────────────────────────────────────────
 
 test("voice: a labelled editor, one save bar, and the same request for every repository or one", async ({ page }) => {

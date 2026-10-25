@@ -1,9 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { createPortal } from "react-dom";
 import { MoreMenu, type MenuAction } from "./list/list";
-import { usePageMeta, useTopBar } from "./top-bar";
+import { usePageMeta } from "./top-bar";
 
 // Shared page layout. Every dashboard page sits in the same centered column
 // (the width Analytics uses), so left edges and widths line up page to page.
@@ -37,21 +36,18 @@ export function Page({
 }
 
 /**
- * How a page describes itself. It fills the one top bar the shell draws
- * (components/top-bar.tsx) and, under it, the page's lead line:
+ * How a page describes itself: a visible title with the page's main actions
+ * beside it, and a one-line lead under it. The shell's top bar only shows the
+ * trail (lib/routes.ts); the heading is here, in the page.
  *
- * - A section or settings page (`<PageHeader title="Security" lead="…" />`)
- *   is named by the bar's last crumb, which is the page's heading. The name
- *   comes from the route map (lib/routes.ts), so it is never repeated as a big
- *   title; `title` here only names the page if the map has no entry.
- * - An item's page (`<PageHeader detail title={run.title} status={…} />`)
- *   shows the item's title and status under the bar as the heading, and the
- *   bar's last crumb becomes the item's short name (`crumb`, default `title`).
+ * - A section or settings page: `<PageHeader title="Security" lead="…" actions={…} />`.
+ * - An item's page (`detail`): the item's title and status, with an eyebrow
+ *   (its kind) above it; the bar's last crumb becomes the item's short name
+ *   (`crumb`, default `title`).
  *
- * `actions` (the page's primary buttons) and `more` (a short list of
- * secondary ones) go to the right of the bar, or into its actions menu on a
- * phone (the same element, laid out per screen, so a resize never remounts
- * them). They are rendered through a portal, so they keep the page's state.
+ * `actions` are the page's one or two main buttons; `more` is a short list
+ * of rarely used ones behind a "More" menu. Both sit beside the title and
+ * wrap under it on a phone, so the main action is always visible.
  */
 export function PageHeader({
   title,
@@ -69,7 +65,7 @@ export function PageHeader({
   lead?: ReactNode;
   actions?: ReactNode;
   more?: MenuAction[];
-  /** One item's page: the title shows under the bar. */
+  /** One item's page: the title is the item's name. */
   detail?: boolean;
   /**
    * The last crumb: the item's short name, or an extra step (New request).
@@ -80,58 +76,39 @@ export function PageHeader({
   status?: ReactNode;
   /** Small line above an item's title, e.g. its kind. */
   eyebrow?: ReactNode;
-  /** An id for the item's title, for moving focus to it. */
+  /** An id for the title, for moving focus to it. */
   titleId?: string;
   titleClassName?: string;
 }) {
-  const bar = useTopBar();
   const moreItems = more?.filter(Boolean) ?? [];
   const hasActions = !!actions || moreItems.length > 0;
   const lastCrumb = crumb === false ? undefined : crumb ?? (detail && typeof title === "string" ? title : undefined);
-  usePageMeta({ crumb: lastCrumb, ownTitle: detail, hasActions });
-
-  const slot = bar?.slot ?? null;
-  const inBar =
-    slot && hasActions
-      ? createPortal(
-          <>
-            {actions}
-            {moreItems.length > 0 && <MoreMenu items={moreItems} />}
-          </>,
-          slot,
-        )
-      : null;
-
-  if (!detail) {
-    return (
-      <>
-        {inBar}
-        {/* Without a shell (a bare test render) the title still shows. */}
-        {!bar && <h1 className="text-2xl font-bold text-zinc-100">{title}</h1>}
-        {lead && (
-          <header className="min-w-0">
-            <div className="max-w-prose text-sm text-zinc-400">{lead}</div>
-          </header>
-        )}
-      </>
-    );
-  }
+  usePageMeta({ crumb: lastCrumb, ownTitle: true, hasActions: false });
 
   return (
-    <header className="min-w-0">
-      {inBar}
-      {eyebrow && <div className="mb-1 text-sm text-zinc-500">{eyebrow}</div>}
-      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-        <h1
-          id={titleId}
-          tabIndex={titleId ? -1 : undefined}
-          className={`min-w-0 text-2xl font-bold text-zinc-100 [overflow-wrap:anywhere] focus:outline-none ${titleClassName}`.trim()}
-        >
-          {title}
-        </h1>
-        {status && <div className="flex shrink-0 items-center gap-2">{status}</div>}
+    <header className="min-w-0" data-testid="page-header">
+      {eyebrow && <div className="mb-1 text-sm text-zinc-400">{eyebrow}</div>}
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0 flex-1 basis-72">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+            <h1
+              id={titleId}
+              tabIndex={titleId ? -1 : undefined}
+              className={`min-w-0 text-2xl font-semibold tracking-tight text-zinc-50 [overflow-wrap:anywhere] focus:outline-none ${titleClassName}`.trim()}
+            >
+              {title}
+            </h1>
+            {status && <div className="flex shrink-0 items-center gap-2">{status}</div>}
+          </div>
+          {lead && <div className="mt-1.5 max-w-prose text-sm text-zinc-400">{lead}</div>}
+        </div>
+        {hasActions && (
+          <div className="flex min-w-0 flex-wrap items-center gap-2" data-testid="page-actions">
+            {actions}
+            {moreItems.length > 0 && <MoreMenu items={moreItems} />}
+          </div>
+        )}
       </div>
-      {lead && <div className="mt-1 max-w-prose text-sm text-zinc-400">{lead}</div>}
     </header>
   );
 }
@@ -144,6 +121,34 @@ export function PageHeader({
 export function OwnTitle() {
   usePageMeta({ ownTitle: true, hasActions: false });
   return null;
+}
+
+/**
+ * A heading inside a page, in sentence case: "Recent alerts 12". Use it for
+ * every titled block instead of a hand-written grey overline.
+ */
+export function SectionHeading({
+  children,
+  count,
+  level = 2,
+  id,
+  danger = false,
+  className = "",
+}: {
+  children: ReactNode;
+  count?: ReactNode;
+  level?: 2 | 3;
+  id?: string;
+  danger?: boolean;
+  className?: string;
+}) {
+  const H = level === 3 ? "h3" : "h2";
+  return (
+    <H id={id} className={`flex min-w-0 flex-wrap items-baseline gap-x-2 text-sm font-semibold ${danger ? "text-red-300" : "text-zinc-100"} ${className}`.trim()}>
+      {children}
+      {count !== undefined && count !== null && <span className="font-normal tabular-nums text-zinc-400">{count}</span>}
+    </H>
+  );
 }
 
 /** A titled block of a page, 2.5rem below whatever comes before it. */
@@ -168,11 +173,7 @@ export function Section({
       {(title || actions) && (
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
-            {title && (
-              <h2 id={headingId} className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                {title}
-              </h2>
-            )}
+            {title && <SectionHeading id={headingId}>{title}</SectionHeading>}
             {description && <div className="mt-1 max-w-prose text-sm text-zinc-400">{description}</div>}
           </div>
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}

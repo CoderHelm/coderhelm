@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useId, useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { ChevronRightIcon } from "../icons";
 import { Skeleton } from "../skeleton";
 import { focusRing, secondaryButton } from "../ui";
 import { GROUP_TONE, StatusDot, type StatusGroup, type StatusLook, type Tone } from "./status";
 import { Time } from "./time";
 import { Menu, type MenuAction } from "../menu";
+import { EmptyState } from "../empty-state";
+import { Problem } from "../problem";
 
 // The one list look: divided rows in one box (never a stack of bordered
 // cards), the same density everywhere. A row is a status dot, a title, a meta
@@ -60,8 +62,12 @@ export interface ListRowProps {
   chips?: ReactNode;
   /** Shown last on the right. */
   time?: string | null;
-  /** Small buttons after the chips. */
+  /** The row's one visible action, after the chips. */
   actions?: ReactNode;
+  /** The rest of the row's actions, in a "⋯" menu at the end. */
+  menu?: MenuAction[];
+  /** Spoken name of the row's menu button, e.g. "Actions for web #42". */
+  menuLabel?: string;
   /** Extra reading that opens under the row. */
   details?: ReactNode;
   /** The button that opens the details, e.g. "3 reviews". Default "Details". */
@@ -96,6 +102,8 @@ export function ListRow({
   chips,
   time,
   actions,
+  menu,
+  menuLabel,
   details,
   detailsLabel = "Details",
   detailsFor,
@@ -116,6 +124,7 @@ export function ListRow({
   };
   const panelId = useId();
   const dataAttrs = Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [`data-${k}`, v]));
+  const menuItems = (menu ?? []).filter(Boolean);
   const metaBits = (meta ?? []).filter((m) => m !== null && m !== undefined && m !== false && m !== "");
   const titleClass = `relative block line-clamp-2 sm:truncate rounded text-sm font-medium ${
     quiet ? "text-zinc-400" : "text-zinc-100"
@@ -164,12 +173,18 @@ export function ListRow({
               </span>
             )}
             {metaBits.length > 0 && (
-              <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-zinc-500">
+              // The dot rides at the end of the bit before it, so a wrapped
+              // line never starts with a stray separator.
+              <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-zinc-400">
                 {metaBits.map((m, i) => (
-                  <Fragment key={i}>
-                    {i > 0 && <span aria-hidden="true">·</span>}
-                    <span className="min-w-0 [overflow-wrap:anywhere]">{m}</span>
-                  </Fragment>
+                  <span key={i} className="min-w-0 [overflow-wrap:anywhere]">
+                    <span>{m}</span>
+                    {i < metaBits.length - 1 && (
+                      <span aria-hidden="true" className="ml-1.5 text-zinc-500">
+                        ·
+                      </span>
+                    )}
+                  </span>
                 ))}
               </p>
             )}
@@ -178,10 +193,10 @@ export function ListRow({
             )}
             {children}
           </div>
-          {(chips || time || actions || details) && (
+          {(chips || time || actions || details || menuItems.length > 0) && (
             <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 sm:mt-0 sm:max-w-[50%] sm:shrink-0 sm:justify-end">
               {chips}
-              {time && <Time iso={time} className="text-xs text-zinc-500" />}
+              {time && <Time iso={time} className="text-xs text-zinc-400" />}
               {actions}
               {details && (
                 <button
@@ -198,6 +213,7 @@ export function ListRow({
                   </span>
                 </button>
               )}
+              {menuItems.length > 0 && <MoreMenu compact items={menuItems} buttonLabel={menuLabel ?? "More actions"} />}
             </div>
           )}
         </div>
@@ -230,6 +246,7 @@ function toneText(tone: Tone): string {
     success: "text-emerald-300",
     merged: "text-violet-300",
     danger: "text-red-300",
+    info: "text-blue-300",
     neutral: "text-zinc-300",
     muted: "text-zinc-400",
   }[tone];
@@ -268,10 +285,10 @@ export function ListSection({
     <section aria-labelledby={`${id}-heading`} className="min-w-0" data-testid={`list-section-${id}`}>
       <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
         <div className="min-w-0">
-          <Heading id={`${id}-heading`} className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+          <Heading id={`${id}-heading`} className="flex min-w-0 items-center gap-2 text-sm font-semibold text-zinc-100">
             {dotTone && <StatusDot tone={dotTone} live={!!live} className="!h-1.5 !w-1.5" />}
-            {title}
-            {count !== undefined && <span className="font-normal normal-case tracking-normal tabular-nums text-zinc-600">{count}</span>}
+            <span className="min-w-0 [overflow-wrap:anywhere]">{title}</span>
+            {count !== undefined && <span className="font-normal tabular-nums text-zinc-400">{count}</span>}
           </Heading>
           {description && <div className="mt-1 max-w-prose text-sm text-zinc-400">{description}</div>}
         </div>
@@ -306,51 +323,46 @@ export function ListSkeleton({ rows = 5, label = "Loading" }: { rows?: number; l
 }
 
 /**
- * Nothing to list. `filtered` says it is the filters that hide everything,
- * and offers to clear them.
+ * Nothing to list. `onClear` says it is the filters that hide everything,
+ * and offers to clear them. The shared EmptyState: a solid card, no dashes.
  */
 export function ListEmpty({
   title,
   children,
   action,
   onClear,
+  icon,
 }: {
   title: ReactNode;
   children?: ReactNode;
   action?: ReactNode;
   /** Set when filters hide every row: shows "Clear filters". */
   onClear?: () => void;
+  icon?: ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-dashed border-zinc-800 px-4 py-8 text-center" data-testid="list-empty">
-      <p className="text-sm font-medium text-zinc-200">{title}</p>
-      {children && <div className="mx-auto mt-1 max-w-prose text-sm text-zinc-500">{children}</div>}
-      {(action || onClear) && (
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-          {onClear && (
-            <button type="button" onClick={onClear} className={secondaryButton}>
-              Clear filters
-            </button>
-          )}
-          {action}
-        </div>
-      )}
-    </div>
+    <EmptyState title={title} action={action} onClear={onClear} icon={icon} testId="list-empty">
+      {children}
+    </EmptyState>
   );
 }
 
-/** The list could not be read. */
-export function ListError({ title, children, onRetry }: { title: ReactNode; children?: ReactNode; onRetry?: () => void }) {
+/** The list could not be read: a plain headline, what to do, and the raw error folded away. */
+export function ListError({
+  title,
+  children,
+  onRetry,
+  details,
+}: {
+  title: ReactNode;
+  children?: ReactNode;
+  onRetry?: () => void;
+  details?: string | null;
+}) {
   return (
-    <div role="alert" className="rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-4" data-testid="list-error">
-      <p className="text-sm font-semibold text-zinc-100">{title}</p>
-      <div className="mt-1 text-sm text-zinc-400">{children ?? "Check your connection and try again."}</div>
-      {onRetry && (
-        <button type="button" onClick={onRetry} className={`mt-3 ${secondaryButton}`}>
-          Try again
-        </button>
-      )}
-    </div>
+    <Problem title={title} onRetry={onRetry} details={details} testId="list-error">
+      {children ?? "Check your connection and try again."}
+    </Problem>
   );
 }
 

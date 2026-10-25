@@ -92,9 +92,9 @@ export function Field(props: FieldProps) {
         <RowMarks unsaved={unsaved} notDefault={notDefault} />
       </div>
       {control}
-      {help && <p id={helpId} className="mt-1.5 max-w-prose text-xs text-zinc-500">{help}</p>}
+      {help && <p id={helpId} className="mt-1.5 max-w-prose text-sm text-zinc-400">{help}</p>}
       {error && (
-        <p id={errorId} role="alert" className="mt-1.5 text-xs text-red-400">
+        <p id={errorId} role="alert" className="mt-1.5 text-sm text-red-300">
           {error}
         </p>
       )}

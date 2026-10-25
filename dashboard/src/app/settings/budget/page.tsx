@@ -147,7 +147,7 @@ function TokenLimitPage() {
             <p className="mt-1 text-sm text-zinc-400">Each limit is checked on its own. Leave one empty for no limit of that kind.</p>
             {allTokens && (
               <div className="mt-3">
-                <Callout variant="info" live={false} title={`Current limit: ${formatTokens(allTokens.max)} tokens of every kind`}>
+                <Callout variant="neutral" live={false} title={`Current limit: ${formatTokens(allTokens.max)} tokens of every kind`}>
                   <p>Your team has one limit that counts new tokens, cache reads and cache writes together. It stays in place until you save the limits below, which replace it.</p>
                 </Callout>
               </div>
@@ -213,7 +213,7 @@ function TokenLimitPage() {
                     );
                   })}
                 </dl>
-                <Callout variant="info" live={false}>
+                <Callout variant="neutral" live={false}>
                   <p>Only admins and the owner can change the limits.</p>
                 </Callout>
               </div>

@@ -216,7 +216,7 @@ export const settingsData: Handler = ({ method, path, url }) => {
     return { roles: ROLES, capabilities: CAPABILITIES, your_role: "owner", grantable_roles: ["viewer", "member", "admin", "owner"], manageable_roles: ["viewer", "member", "admin", "owner"], can_manage_invites: true };
   }
   if (p === "/api/notifications") return { email_token_warning: true, email_weekly_summary: true, email_run_complete: false, email_run_failed: true };
-  if (p === "/api/github/installation-status") return { status: "active", github_org: `${ORG}-engineering-platform-organization`, installation_id: 123456789 };
+  if (p === "/api/github/installation-status") return { status: "connected", github_org: `${ORG}-engineering-platform-organization`, installation_id: 123456789 };
 
   // Integrations
   if (p === "/api/integrations") return { can_edit: true, items: INTEGRATIONS, migrated: 0 };

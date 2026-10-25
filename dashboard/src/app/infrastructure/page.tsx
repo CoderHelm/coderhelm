@@ -1,5 +1,6 @@
 "use client";
 
+import { Time } from "@/components/list/time";
 import { useCan } from "@/hooks/use-can";
 import { CodeBlock } from "@/components/code-block";
 import Link from "next/link";
@@ -169,13 +170,16 @@ function AnalysisView({
       <div className="flex flex-wrap items-center gap-2 mb-4">
         {errorCount > 0 && <StatusPill tone="error">{errorCount} issue{errorCount !== 1 ? "s" : ""}</StatusPill>}
         {warnCount > 0 && <StatusPill tone="warning">{warnCount} warning{warnCount !== 1 ? "s" : ""}</StatusPill>}
-        {analysis.scanned_repos && analysis.scanned_repos.length > 0 && (
-          <span className="text-xs text-zinc-500">
-            {analysis.scanned_repos.length} file{analysis.scanned_repos.length !== 1 ? "s" : ""} scanned
+        {(analysis.cached_at || (analysis.scanned_repos && analysis.scanned_repos.length > 0)) && (
+          <span className="text-sm text-zinc-400" data-testid="scan-summary">
+            {analysis.cached_at ? <>Last scanned <Time iso={analysis.cached_at} mode="date" /></> : "Scanned"}
+            {analysis.scanned_repos && analysis.scanned_repos.length > 0 && (
+              <>
+                {" · "}
+                {analysis.scanned_repos.length} repo{analysis.scanned_repos.length !== 1 ? "s" : ""}
+              </>
+            )}
           </span>
-        )}
-        {analysis.cached_at && (
-          <span className="text-xs text-zinc-500">· {new Date(analysis.cached_at).toLocaleDateString()}</span>
         )}
       </div>
 

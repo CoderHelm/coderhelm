@@ -599,7 +599,7 @@ export default function LearningPage() {
         <div aria-busy={loading || busy}>
           <div className="mt-6 space-y-3">
             {!canManage && (
-              <Callout variant="info" title="You can see everything here" live={false}>
+              <Callout variant="neutral" title="You can see everything here" live={false}>
                 <p>Only an admin or the owner can pin a variant, turn a change off or on, or change how outcomes are scored. Ask one of them if something here looks wrong.</p>
               </Callout>
             )}
@@ -613,7 +613,7 @@ export default function LearningPage() {
 
           {data.totals.events === 0 ? (
             <div className="mt-6">
-              <Callout variant="info" title="Nothing learned yet">
+              <Callout variant="neutral" title="Nothing learned yet">
                 <p>
                   Coderhelm learns from what happens to its reviews and pull requests. It needs {plural(data.min_samples, "outcome")} in a repository before anything changes how it works. Try a longer period, or another repository.
                 </p>

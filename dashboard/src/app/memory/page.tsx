@@ -229,7 +229,7 @@ function MemoryPage() {
         <div className="mt-6"><Skeleton className="h-10 w-64" /></div>
       ) : repos.length === 0 ? (
         <div className="mt-6">
-          <Callout variant="info" title="No repositories yet">
+          <Callout variant="neutral" title="No repositories yet">
             <p>Turn on a repository in Settings. Coderhelm starts remembering things about it after its first finished ticket.</p>
           </Callout>
         </div>

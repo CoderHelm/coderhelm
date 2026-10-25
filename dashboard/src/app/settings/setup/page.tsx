@@ -19,7 +19,7 @@ export default function SetupPage() {
     return (
       <Page>
         <div className="max-w-xl" data-testid="setup-unavailable">
-          <Callout variant="info" title="Not available here">
+          <Callout variant="neutral" title="Not available here">
             <p>This page is for the admins of a self-hosted Coderhelm install.</p>
             <p className="pt-1"><Link href="/settings" className={linkButton}>Back to Settings</Link></p>
           </Callout>

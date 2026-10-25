@@ -1,5 +1,7 @@
 "use client";
 
+import { Switch as SharedSwitch } from "../settings/switch";
+
 import { useEffect, useState } from "react";
 import { api, type Repo, type TestSettings } from "@/lib/api";
 import { errorMessage } from "@/lib/data-sources";
@@ -8,35 +10,9 @@ import { useToast } from "@/components/toast";
 import { focusRing, inputClass } from "@/components/ui";
 import { SaveBar, SettingsRow, SettingsSection, Switch as RowSwitch, useDirtyForm } from "@/components/settings";
 
-export function Switch({
-  checked,
-  onChange,
-  label,
-  disabled,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors motion-reduce:transition-none disabled:opacity-50 ${
-        checked ? "bg-emerald-500" : "bg-zinc-700"
-      } ${focusRing}`}
-    >
-      <span
-        aria-hidden="true"
-        className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform motion-reduce:transition-none ${checked ? "translate-x-5" : ""}`}
-      />
-    </button>
-  );
+/** The shared switch, under the name this file's callers use. */
+export function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
+  return <SharedSwitch checked={checked} onChange={onChange} label={label} disabled={disabled} />;
 }
 
 /** The repositories part of the form: every repository, or only the ticked ones. */
