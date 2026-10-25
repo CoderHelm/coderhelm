@@ -318,14 +318,14 @@ export default function GraphPage() {
       {statusError && <ErrorBox title="Couldn't load the graph" message={statusError} onRetry={loadStatus} />}
 
       {repo && !status && !statusError && (repos?.length ?? 0) > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" aria-busy="true">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" aria-busy="true">
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16" />)}
         </div>
       )}
 
       {status?.indexed && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               ["Files", status.files],
               ["Symbols", status.symbols],

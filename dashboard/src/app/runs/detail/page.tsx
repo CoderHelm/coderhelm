@@ -737,9 +737,10 @@ function RunDetailInner() {
         onConfirm={closeRun}
       />
 
-      {/* Stats cards */}
+      {/* Stats cards. As many 8rem columns as the box fits, not a count per
+          screen width: the side panel takes a different share at each width. */}
       {/* Tokens: the total of all four parts, then each part. */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 mb-6" title={usageBreakdown(usageOf(run))}>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,8rem),1fr))] gap-3 mb-6" title={usageBreakdown(usageOf(run))}>
         <StatCard label="Duration" value={formatDuration(run.duration_s)} />
         <StatCard label="Total tokens" value={formatTokens(usageTotal(usageOf(run)))} />
         <StatCard label="New input" value={formatTokens(run.tokens_in)} />

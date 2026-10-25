@@ -500,7 +500,7 @@ function Rating({ review, onSaved }: { review: Review; onSaved: () => void }) {
           {review.rating_comments.map((c, i) => (
             <li key={i} className="text-sm">
               <div className="mb-0.5 flex flex-wrap items-center gap-x-2 text-xs text-zinc-500">
-                <span className="text-zinc-300">{c.by}</span>
+                <span className="min-w-0 text-zinc-300 wrap-anywhere">{c.by}</span>
                 {c.rating === "up" && <span className={TONES.success.text}>said it was right</span>}
                 {c.rating === "down" && <span className={TONES.danger.text}>said it was wrong</span>}
                 {c.at && <span>· {new Date(c.at).toLocaleDateString()}</span>}
