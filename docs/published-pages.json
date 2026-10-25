@@ -30,6 +30,7 @@
     "/api/webhooks/",
     "/changelog/",
     "/concepts/",
+    "/concepts/agent-permissions/",
     "/concepts/agents/",
     "/concepts/code-graph/",
     "/concepts/connections/",
