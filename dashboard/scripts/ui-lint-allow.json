@@ -28,5 +28,35 @@
     "file": "src/app/plans/new/starter.tsx",
     "text": "What do you want to change?",
     "why": "The plan composer opens on a question as its heading; plans/new/page.tsx renders <OwnTitle /> so the bar's crumb is not a second heading."
+  },
+  {
+    "rule": "page-header",
+    "file": "src/app/chat/page.tsx",
+    "text": "What would you like to know?",
+    "why": "Chat opens on a question as its heading, like the plan composer; the page renders <OwnTitle /> while it shows, so the bar's crumb is not a second heading."
+  },
+  {
+    "rule": "old-chat-name",
+    "file": "src/app/brain/knowledge/base-form.tsx",
+    "text": "The brain chat can always use it",
+    "why": "Temporary: the Knowledge pages are being rebuilt in their own change, which rewrites this copy. Delete this entry when that lands."
+  },
+  {
+    "rule": "old-chat-name",
+    "file": "src/app/brain/knowledge/base/page.tsx",
+    "text": "Who can read it in the brain chat",
+    "why": "Temporary: the Knowledge pages are being rebuilt in their own change, which rewrites this copy. Delete this entry when that lands."
+  },
+  {
+    "rule": "old-chat-name",
+    "file": "src/app/brain/knowledge/page.tsx",
+    "text": "Brain chat only",
+    "why": "Temporary: the Knowledge pages are being rebuilt in their own change, which rewrites this copy. Delete this entry when that lands."
+  },
+  {
+    "rule": "old-chat-name",
+    "file": "src/app/brain/knowledge/page.tsx",
+    "text": "The brain chat cites them",
+    "why": "Temporary: the Knowledge pages are being rebuilt in their own change, which rewrites this copy. Delete this entry when that lands."
   }
 ]

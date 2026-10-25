@@ -12,7 +12,7 @@ const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots"
 const RUN_ID = "01RUNAGENTS0000000000000001";
 const AGENT_ROWS = [
   ["planner", "Planner"], ["coder", "Coder"], ["reviewer", "Reviewer"], ["plan_chat", "Plan chat"],
-  ["brain_chat", "Brain chat"], ["alert_fixer", "Alert fixer"], ["log_autofix", "Log auto-fix"], ["plugin", "Plugin runs"],
+  ["brain_chat", "Chat"], ["alert_fixer", "Alert fixer"], ["log_autofix", "Log auto-fix"], ["plugin", "Plugin runs"],
 ] as const;
 
 interface Rule {

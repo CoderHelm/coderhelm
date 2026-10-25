@@ -1,7 +1,7 @@
 import type { Handler } from "./index";
 import { EMAIL, FILE, iso, LONG_URL, MARKDOWN, REPO, REPO_2, SENTENCE, TITLE, TOKEN } from "./long";
 
-// The brain chat and knowledge bases: threads, an answer with citations,
+// Chat and knowledge bases: threads, an answer with citations,
 // sources to pick, and a knowledge base whose files are in every state.
 
 export const KB_ID = "kb_wide";
@@ -84,7 +84,7 @@ export const brainData: Handler = ({ method, path }) => {
       thread: { id: THREAD_ID, title: TITLE, shared: true, mine: true, owner_email: EMAIL, created_at: iso(300), updated_at: iso(5), messages: 2 },
       messages: [
         { seq: 0, role: "user", content: `${TITLE} ${TOKEN}`, citations: [], grounded: true, attachments: [`${TOKEN}.pdf`], used: [], at: iso(6) },
-        { seq: 1, role: "assistant", content: `${MARKDOWN}\n\nIt is sixteen weeks [S1] and the code agrees [S2].`, citations: CITATIONS, grounded: true, attachments: [], used: [], at: iso(5) },
+        { seq: 1, role: "assistant", content: `${MARKDOWN}\n\nIt is sixteen weeks [S1] and the code agrees [S2].`, citations: CITATIONS, grounded: true, attachments: [], used: [{ kind: "knowledge", label: `Searched knowledge for "${TOKEN}"` }], at: iso(5), feedback: "up" },
       ],
       can_ask: true,
     };
@@ -92,17 +92,26 @@ export const brainData: Handler = ({ method, path }) => {
   if (path === "/api/brain/sources") {
     return {
       kinds: [
-        { key: "knowledge", label: "Knowledge bases", about: "Documents your team uploaded" },
-        { key: "connections", label: "Connections", about: "Connected tools, read live" },
-        { key: "code", label: "Repositories", about: "Code search, files and the code graph" },
-        { key: "memories", label: "Memories", about: "What Coderhelm learned from past work" },
-        { key: "data_sources", label: "Data sources", about: "Logs, databases, metrics and docs" },
-        { key: "skills", label: "Team skills", about: "Your written skills and team agents" },
+        { key: "knowledge", label: "Files and pages", about: "Documents and pages your team added to Knowledge" },
+        { key: "connections", label: "Connected apps", about: "Apps such as Notion, Linear or Sentry, read as you ask" },
+        { key: "code", label: "Code", about: "Your team's code and how it fits together" },
+        { key: "memories", label: "Past work", about: "What Coderhelm learned from earlier work" },
+        { key: "data_sources", label: "Logs and data", about: "Logs, databases and metrics you connected, only read" },
+        { key: "skills", label: "Team know-how", about: "Your team's written skills and helpers" },
       ],
       knowledge: [{ id: KB_ID, name: BASE.name, ready: 1, authoritative: true }],
       connections: [{ id: "notion" }],
       repos: [REPO, REPO_2],
       can_ask: true,
+    };
+  }
+  if (path === "/api/brain/starters") {
+    return {
+      starters: [
+        { question: `What should I know from ${BASE.name}?`, why: `From ${BASE.name}`, sources: { knowledge: [KB_ID], connections: false, code: false, memories: false, data_sources: false, skills: false } },
+        { question: `What's the latest on “${TITLE}”?`, why: `From recent work in ${REPO}`, sources: { knowledge: [], connections: false, code: true, memories: false, data_sources: false, skills: false, repo: REPO } },
+        { question: `What should a new teammate know about ${TOKEN}?`, why: `From past work in ${REPO_2}`, sources: { knowledge: [], connections: false, code: false, memories: true, data_sources: false, skills: false, repo: REPO_2 } },
+      ],
     };
   }
   if (path === "/api/knowledge") return { bases: [BASE], can_manage: true, limits: LIMITS };

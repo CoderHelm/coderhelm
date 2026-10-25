@@ -22,5 +22,5 @@ export const SAMPLE_QUERY: Record<string, string> = {
   "/support/ticket": `?id=${SUPPORT_TICKET_ID}`,
   "/brain/knowledge/base": "?id=kb_wide",
   // Not an item's page, but its fullest view is an open thread.
-  "/brain": "?thread=th_wide",
+  "/chat": "?thread=th_wide",
 };

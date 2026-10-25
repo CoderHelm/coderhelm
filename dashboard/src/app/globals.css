@@ -85,6 +85,48 @@ select:not([multiple]):not(.appearance-none) {
   }
 }
 
+/* Chat: a message eases in; the "looking it up" line shimmers. Both stop
+   when the person asks for less motion. */
+@keyframes chat-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility animate-chat-in {
+  animation: chat-in 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes chat-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@utility animate-chat-shimmer {
+  background-image: linear-gradient(90deg, #71717a 0%, #71717a 40%, #e4e4e7 50%, #71717a 60%, #71717a 100%);
+  background-size: 200% 100%;
+  background-clip: text;
+  color: transparent;
+  animation: chat-shimmer 1.8s linear infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    background-image: none;
+    color: #a1a1aa;
+  }
+}
+
 @keyframes toast-in {
   from {
     opacity: 0;

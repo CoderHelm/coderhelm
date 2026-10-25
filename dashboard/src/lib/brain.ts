@@ -1,5 +1,6 @@
-// The company brain and knowledge bases: types, API calls, the answer
-// stream and browser uploads.
+// Chat (answers from the team's own sources) and knowledge
+// bases: types, API calls, the answer stream and browser uploads. The API
+// keeps its original `/api/brain/*` paths; only the product name changed.
 
 import { request, ApiError } from "./api";
 import { streamBase } from "./runtime-config";
@@ -125,7 +126,7 @@ export function uploadProblem(file: { name: string; size: number }, limits: { ma
   return null;
 }
 
-// ── The brain chat ────────────────────────────────────────────────
+// ── Chat ──────────────────────────────────────────────────────────
 
 export interface Citation {
   id: string;
@@ -172,6 +173,19 @@ export interface BrainMessage {
   attachments: string[];
   used: { kind: string; label: string }[];
   at: string;
+  /** The asker's rating of an answer. */
+  feedback?: Rating | null;
+}
+
+export type Rating = "up" | "down";
+
+/** A question the empty chat offers, built from the team's own data. */
+export interface Starter {
+  question: string;
+  /** Where it comes from: "From the HR handbook knowledge". */
+  why: string;
+  /** The sources it turns on when picked. */
+  sources: Picks;
 }
 
 export interface SourceKind {
@@ -196,6 +210,12 @@ export const brainApi = {
     request<{ thread: BrainThread }>(`/api/brain/threads/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(patch) }),
   deleteThread: (id: string) => request<{ ok: boolean }>(`/api/brain/threads/${encodeURIComponent(id)}`, { method: "DELETE" }),
   sources: () => request<BrainSources>("/api/brain/sources"),
+  starters: () => request<{ starters: Starter[] }>("/api/brain/starters"),
+  rate: (threadId: string, seq: number, rating: Rating | null) =>
+    request<{ ok: boolean; feedback: Rating | null }>(
+      `/api/brain/threads/${encodeURIComponent(threadId)}/messages/${seq}/feedback`,
+      { method: "PUT", body: JSON.stringify({ rating }) },
+    ),
   attach: (file: { name: string; size: number }) =>
     request<{ id: string; name: string; upload: SignedUpload }>("/api/brain/attachments", json(file)),
 };
@@ -239,7 +259,6 @@ export function parseSse(buffer: string, onEvent: (e: BrainEvent) => void): stri
   return rest;
 }
 
-/** Asks a question; events arrive through `onEvent` until `done`. */
 /** A five-minute token for the answer stream (needs the brain_ask capability). */
 let cachedToken: { token: string; until: number } | null = null;
 async function brainToken(): Promise<string> {
@@ -249,6 +268,7 @@ async function brainToken(): Promise<string> {
   return token;
 }
 
+/** Asks a question; events arrive through `onEvent` until `done`. */
 export async function askBrain(body: AskBody, onEvent: (e: BrainEvent) => void, signal?: AbortSignal): Promise<void> {
   const token = await brainToken();
   const res = await fetch(`${streamBase()}/api/brain/stream`, {
@@ -258,7 +278,7 @@ export async function askBrain(body: AskBody, onEvent: (e: BrainEvent) => void, 
     signal,
   });
   if (!res.ok || !res.body) {
-    let message = "The brain couldn't answer right now. Try again.";
+    let message = "Couldn't get an answer right now. Try again.";
     try {
       const j = await res.json();
       if (j?.error) message = j.error;
@@ -288,13 +308,38 @@ export function linkCitations(text: string, citations: Citation[]): string {
   });
 }
 
-/** What a citation's kind is called. */
+/** An answer's text without its `[S1]` markers, for copying. */
+export function withoutCitations(text: string): string {
+  return text
+    .replace(/\s?\[(S\d+(?:\s*[,;]\s*S\d+)*)\]/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
+}
+
+/** What a citation's kind is called, in plain words. */
 export const CITATION_KIND: Record<string, string> = {
-  knowledge: "Knowledge base",
-  upload: "Attached file",
-  connection: "Connection",
-  data_source: "Data source",
-  code: "Repository",
-  memory: "Memory",
-  skill: "Team skill",
+  knowledge: "Knowledge",
+  upload: "Your file",
+  connection: "Connected app",
+  data_source: "Logs and data",
+  code: "Code",
+  memory: "Past work",
+  skill: "Team know-how",
 };
+
+/** A source's short name for a chip: "Leave policy" for "Leave policy.pdf", "leave.ts" for a path. */
+export function citationName(c: Pick<Citation, "title">): string {
+  const base = c.title.split("/").pop() || c.title;
+  return /\.(pdf|docx?|md|markdown|txt|text|csv|xlsx?|html?)$/i.test(base) ? base.replace(/\.[^.]+$/, "") : base;
+}
+
+/** "Updated May 1, 2026" for a document's date; "Checked Oct 24" for something read live. */
+export function citationWhen(asOf: string): string {
+  if (!asOf) return "";
+  const live = asOf.includes("UTC");
+  const d = new Date(live ? asOf.replace(" UTC", "Z").replace(" ", "T") : `${asOf.slice(0, 10)}T12:00:00Z`);
+  if (Number.isNaN(d.getTime())) return "";
+  const sameYear = d.getUTCFullYear() === new Date().getUTCFullYear();
+  const day = d.toLocaleDateString("en-US", { month: "short", day: "numeric", ...(sameYear && live ? {} : { year: "numeric" }), timeZone: "UTC" });
+  return live ? `Checked ${day}` : `Updated ${day}`;
+}

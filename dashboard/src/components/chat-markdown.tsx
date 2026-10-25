@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo, useMemo, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -91,12 +91,15 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   breaks = false,
   tone = "chat",
   onCite,
+  renderCite,
 }: {
   children: string;
   breaks?: boolean;
   tone?: ChatMarkdownTone;
   /** Links to `#cite-<id>` become citation buttons that call this. */
   onCite?: (id: string) => void;
+  /** Draws a citation instead of the numbered button (a chip with the source's name). */
+  renderCite?: (id: string) => ReactNode;
 }) {
   const parts = useMemo<Partial<Components>>(
     () =>
@@ -104,7 +107,9 @@ export const ChatMarkdown = memo(function ChatMarkdown({
         ? {
             ...COMPONENTS[tone],
             a: ({ href, children: label }) =>
-              href?.startsWith("#cite-") ? (
+              href?.startsWith("#cite-") && renderCite ? (
+                renderCite(href.slice(6))
+              ) : href?.startsWith("#cite-") ? (
                 <button
                   type="button"
                   onClick={() => onCite(href.slice(6))}
@@ -121,7 +126,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
               ),
           }
         : COMPONENTS[tone],
-    [onCite, tone],
+    [onCite, renderCite, tone],
   );
   return (
     <div className="chat-md overflow-hidden min-w-0 max-w-full">
