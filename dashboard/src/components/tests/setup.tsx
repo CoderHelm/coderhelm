@@ -143,7 +143,7 @@ export function CiSetup({ canEdit, repo }: { canEdit: boolean; repo?: string }) 
           <p className="mt-0.5 text-sm text-zinc-500">No workflow in these repositories runs E2E tests.</p>
           <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-400">
             {noTests.map((r) => (
-              <li key={r.repo} className="min-w-0 break-all" data-testid="ci-setup-no-tests">
+              <li key={r.repo} className="min-w-0 wrap-anywhere" data-testid="ci-setup-no-tests">
                 {r.repo}
               </li>
             ))}
@@ -174,7 +174,7 @@ function RepoCard({ r, canEdit, onOpened }: { r: TestRepoSetup; canEdit: boolean
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 id={headingId} className="break-all text-base font-semibold text-zinc-100">
+          <h3 id={headingId} className="wrap-anywhere text-base font-semibold text-zinc-100">
             {r.repo}
           </h3>
           {r.workflow && (
