@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { rememberRepo } from "@/lib/recent-repos";
+import { Combobox } from "../combobox";
+import { repoOptions, splitRepo, useRecentRepos } from "../repo-combobox";
 import { api } from "@/lib/api";
 import { focusRing, linkButton } from "../ui";
 import { StatusDot, type Tone } from "./status";
@@ -243,121 +246,43 @@ export function StatusToggles({
   );
 }
 
-/** "All repos" or one repo, picked from a searchable popover. */
+/** "All repos" or one repo, picked from the shared searchable picker. */
 export function RepoFilter({ value, onChange, repos }: { value: string; onChange: (value: string) => void; repos: string[] }) {
-  const [open, setOpen] = useState(false);
-  const [find, setFind] = useState("");
-  const [active, setActive] = useState(0);
-  const box = useRef<HTMLDivElement>(null);
-  const button = useRef<HTMLButtonElement>(null);
-  const listId = useId();
-
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", away);
-    return () => document.removeEventListener("mousedown", away);
-  }, [open]);
-
-  const needle = find.trim().toLowerCase();
-  const choices = ["", ...repos.filter((r) => !needle || r.toLowerCase().includes(needle))].slice(0, 60);
-  useEffect(() => setActive(0), [needle]);
-
-  const pick = (r: string) => {
-    onChange(r);
-    setOpen(false);
-    setFind("");
-    button.current?.focus();
-  };
-
+  const recent = useRecentRepos();
+  const { groups, recent: recentOptions } = useMemo(() => repoOptions(repos.map((name) => ({ name })), { recent }), [repos, recent]);
+  const { owner, name } = splitRepo(value);
   return (
-    <div ref={box} className="relative min-w-0">
-      <button
-        ref={button}
-        type="button"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className={`inline-flex max-w-full items-center gap-2 px-3 ${controlBox} ${value ? "border-zinc-500" : ""} ${focusRing}`}
-      >
-        <span aria-hidden="true" className="text-zinc-500">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="6" cy="6" r="2.5" />
-            <circle cx="6" cy="18" r="2.5" />
-            <circle cx="18" cy="8" r="2.5" />
-            <path d="M6 8.5v7M18 10.5c0 4-6 3-10.5 6" />
-          </svg>
-        </span>
-        <span className="min-w-0 truncate">
-          <span className="sr-only">Repository: </span>
-          {value || "All repos"}
-        </span>
-        <svg aria-hidden="true" className={`h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    <Combobox
+      label="Repository"
+      placeholder="All repos"
+      searchPlaceholder="Find a repo…"
+      emptyText="No repos match"
+      value={value}
+      valueLabel={
+        value ? (
+          <>
+            {owner && <span className="text-zinc-500">{owner}/</span>}
+            {name}
+          </>
+        ) : undefined
+      }
+      onChange={(v) => {
+        if (v) rememberRepo(v);
+        onChange(v);
+      }}
+      groups={[{ options: [{ value: "", label: "All repos" }] }, ...groups]}
+      recent={recentOptions}
+      testId="repo-filter"
+      icon={
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="6" cy="6" r="2.5" />
+          <circle cx="6" cy="18" r="2.5" />
+          <circle cx="18" cy="8" r="2.5" />
+          <path d="M6 8.5v7M18 10.5c0 4-6 3-10.5 6" />
         </svg>
-      </button>
-      {open && (
-        <div className="absolute left-0 z-40 mt-1 w-72 max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl">
-          <div className="border-b border-zinc-800 p-2">
-            <input
-              autoFocus
-              type="text"
-              role="combobox"
-              aria-label="Find a repo"
-              aria-controls={listId}
-              aria-expanded="true"
-              aria-activedescendant={`${listId}-${active}`}
-              placeholder="Find a repo"
-              value={find}
-              onChange={(e) => setFind(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "ArrowDown") {
-                  e.preventDefault();
-                  setActive((i) => Math.min(i + 1, choices.length - 1));
-                } else if (e.key === "ArrowUp") {
-                  e.preventDefault();
-                  setActive((i) => Math.max(i - 1, 0));
-                } else if (e.key === "Enter") {
-                  e.preventDefault();
-                  if (choices[active] !== undefined) pick(choices[active]);
-                } else if (e.key === "Escape") {
-                  e.preventDefault();
-                  setOpen(false);
-                  button.current?.focus();
-                }
-              }}
-              className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-zinc-500 focus:outline-none"
-            />
-          </div>
-          <ul id={listId} role="listbox" aria-label="Repositories" className="max-h-64 overflow-y-auto py-1">
-            {choices.map((r, i) => (
-              <li
-                key={r || "__all"}
-                id={`${listId}-${i}`}
-                role="option"
-                aria-selected={r === value}
-                onMouseEnter={() => setActive(i)}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => pick(r)}
-                className={`flex cursor-pointer items-center justify-between gap-2 px-3 py-1.5 text-sm break-all ${
-                  i === active ? "bg-zinc-800 text-zinc-100" : "text-zinc-300"
-                }`}
-              >
-                {r || "All repos"}
-                {r === value && (
-                  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="shrink-0 text-zinc-300">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                )}
-              </li>
-            ))}
-            {choices.length === 1 && needle && <li className="px-3 py-1.5 text-sm text-zinc-500">No repo matches</li>}
-          </ul>
-        </div>
-      )}
-    </div>
+      }
+      triggerClassName={`inline-flex max-w-full items-center gap-2 px-3 text-left ${controlBox} ${value ? "border-zinc-500" : ""}`}
+    />
   );
 }
 

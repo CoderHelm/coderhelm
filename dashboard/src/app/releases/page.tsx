@@ -16,7 +16,7 @@ import { Markdown } from "@/components/markdown";
 import { useToast } from "@/components/toast";
 import { Callout } from "@/components/callout";
 import { Segmented } from "@/components/segmented";
-import { Modal } from "@/components/modal";
+import { Modal, ModalFooter } from "@/components/modal";
 import { AtlassianIcon, ExternalLinkIcon, GitHubIcon, MailIcon } from "@/components/icons";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
@@ -281,6 +281,7 @@ function ReleasesPage() {
         description="For a tag Coderhelm didn't cut, or an older release. Publishes wherever the repo is set up to."
       >
         <WriteNotesForm
+          onCancel={() => setWriting(false)}
           repos={repos}
           initialRepo={repoFilter || (repos.length === 1 ? repos[0].name : "")}
           busy={!!busy}
@@ -400,7 +401,9 @@ function WriteNotesForm({
   initialRepo,
   busy,
   onSubmit,
+  onCancel,
 }: {
+  onCancel: () => void;
   repos: Repo[];
   initialRepo: string;
   busy: boolean;
@@ -427,9 +430,7 @@ function WriteNotesForm({
       className="flex flex-col gap-3"
     >
       {repos.length !== 1 && (
-        <div className="[&>div]:mb-0">
-          <RepoCombobox repos={repos} selected={repo} onSelect={setRepo} placeholder="Pick a repo" />
-        </div>
+        <RepoCombobox repos={repos} selected={repo} onSelect={setRepo} placeholder="Pick a repo" className="" />
       )}
       <input
         ref={tagRef}
@@ -446,11 +447,14 @@ function WriteNotesForm({
           A tag can use letters, numbers and . _ - + / only.
         </p>
       )}
-      <div className="flex justify-end">
-        <button type="submit" disabled={!ready} className={primaryButton}>
+      <ModalFooter>
+        <button type="button" onClick={onCancel} className={secondaryButton}>
+          Cancel
+        </button>
+        <button type="submit" form="write-notes" disabled={!ready} className={primaryButton}>
           Write notes
         </button>
-      </div>
+      </ModalFooter>
     </form>
   );
 }

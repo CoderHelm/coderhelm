@@ -15,7 +15,7 @@ import {
 } from "@/lib/api";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
-import { Modal } from "@/components/modal";
+import { Modal, ModalFooter } from "@/components/modal";
 import { RepoCombobox } from "@/components/repo-combobox";
 import { Segmented } from "@/components/segmented";
 import { Callout } from "@/components/callout";
@@ -361,6 +361,7 @@ function LogsPage() {
       >
         {fixing && (
           <CreateFixForm
+            onCancel={() => setFixing(null)}
             finding={fixing}
             repos={repos}
             canRemember={canRemember}
@@ -611,7 +612,9 @@ function CreateFixForm({
   repos,
   canRemember,
   onDone,
+  onCancel,
 }: {
+  onCancel: () => void;
   finding: LogFinding;
   repos: Repo[];
   canRemember: boolean;
@@ -640,7 +643,7 @@ function CreateFixForm({
   };
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
+    <form id="create-fix-form" onSubmit={submit} className="flex flex-col gap-4">
       <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm">
         <p className="font-medium text-zinc-100">{finding.title}</p>
         <p className="mt-0.5 text-xs text-zinc-500"><Code>{finding.log_group}</Code></p>
@@ -659,11 +662,14 @@ function CreateFixForm({
         </label>
       )}
       {error && <Callout variant="error">{error}</Callout>}
-      <div className="flex flex-wrap gap-2">
-        <button type="submit" disabled={!repo || sending} className={primaryButton}>
+      <ModalFooter>
+        <button type="button" onClick={onCancel} className={secondaryButton}>
+          Cancel
+        </button>
+        <button type="submit" form="create-fix-form" disabled={!repo || sending} className={primaryButton}>
           {sending ? "Starting…" : "Start fix run"}
         </button>
-      </div>
+      </ModalFooter>
     </form>
   );
 }

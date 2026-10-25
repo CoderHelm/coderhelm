@@ -12,11 +12,11 @@ import { Markdown } from "@/components/markdown";
 import { Skeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
 import { ToolSwitch } from "@/components/tools";
-import { buttonClass, focusRing, inputClass, linkButton, primaryButton } from "@/components/ui";
+import { buttonClass, focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Chip, List, ListEmpty, ListError, ListRow, ListSkeleton, ListToolbar, type Tone } from "@/components/list";
 import { Code, SettingsMore, SettingsRow } from "@/components/settings";
 import { Tabs } from "@/components/tabs";
-import { Modal } from "@/components/modal";
+import { Modal, ModalFooter } from "@/components/modal";
 import {
   ago,
   asker,
@@ -377,8 +377,8 @@ function AgentPage() {
       )}
 
       {canTry && (
-        <Modal open={tryOpen} onOpenChange={setTryOpen} title={`Try ${agent.name}`} returnFocus={tryButton}>
-          <TryIt agent={agent} triesLeft={triesLeft} triesPerDay={triesPerDay} draft={draft} onAsked={loadAsks} />
+        <Modal open={tryOpen} onOpenChange={setTryOpen} title={`Try ${agent.name}`} returnFocus={tryButton} testId="try-it" wide>
+          <TryIt onClose={() => setTryOpen(false)} agent={agent} triesLeft={triesLeft} triesPerDay={triesPerDay} draft={draft} onAsked={loadAsks} />
         </Modal>
       )}
     </Page>
@@ -601,6 +601,7 @@ function AskRow({ ask, currentSha, canAskAgain, onAskAgain }: { ask: AgentAsk; c
 }
 
 function TryIt({
+  onClose,
   agent,
   triesLeft,
   triesPerDay,
@@ -612,6 +613,7 @@ function TryIt({
   triesPerDay: number;
   draft: { question: string; key: number } | null;
   onAsked: () => void;
+  onClose: () => void;
 }) {
   const { toast } = useToast();
   const [question, setQuestion] = useState("");
@@ -705,7 +707,7 @@ function TryIt({
   const out = triesLeft !== null && triesLeft <= 0;
 
   return (
-    <div data-testid="try-it">
+    <div>
       {triesLeft !== null && (
         <p className={`text-xs ${out ? "text-amber-300" : "text-zinc-500"}`}>
           {triesLeft} of {triesPerDay} tries left today
@@ -717,7 +719,7 @@ function TryIt({
           ? "A try has no work to read, so it answers without its tools; asked during work, it reads that work's repository."
           : "It has no tools, here or during work."}
       </p>
-      <form onSubmit={submit} className="mt-4">
+      <form id="try-agent-form" onSubmit={submit} className="mt-4">
         <label className="block text-sm text-zinc-300">
           Question
           <textarea
@@ -740,14 +742,19 @@ function TryIt({
             spellCheck={false}
           />
         </label>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <button type="submit" className={primaryButton} disabled={waiting || !question.trim() || out}>
-            {waiting ? `Asking… ${Math.round((now - (startedAt ?? now)) / 1000)} s` : `Ask ${agent.name}`}
-          </button>
+        <div className="mt-3">
           <button type="button" className={`${linkButton} text-xs`} aria-expanded={showSent} onClick={() => setShowSent(!showSent)}>
             {showSent ? "Hide what gets sent" : "What gets sent"}
           </button>
         </div>
+        <ModalFooter>
+          <button type="button" className={secondaryButton} onClick={onClose}>
+            Close
+          </button>
+          <button type="submit" form="try-agent-form" className={primaryButton} disabled={waiting || !question.trim() || out}>
+            {waiting ? `Asking… ${Math.round((now - (startedAt ?? now)) / 1000)} s` : `Ask ${agent.name}`}
+          </button>
+        </ModalFooter>
         {out && <p className="mt-2 text-xs text-amber-300">No tries left today. They reset 24 hours after each one.</p>}
         {showSent && (
           <div className="mt-3">

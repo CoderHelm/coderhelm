@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Fragment, useId, useState, type ReactNode } from "react";
 import { ChevronRightIcon } from "../icons";
 import { Skeleton } from "../skeleton";
 import { focusRing, secondaryButton } from "../ui";
 import { GROUP_TONE, StatusDot, type StatusGroup, type StatusLook, type Tone } from "./status";
 import { Time } from "./time";
+import { Menu, type MenuAction } from "../menu";
 
 // The one list look: divided rows in one box (never a stack of bordered
 // cards), the same density everywhere. A row is a status dot, a title, a meta
@@ -353,15 +354,7 @@ export function ListError({ title, children, onRetry }: { title: ReactNode; chil
   );
 }
 
-export interface MenuAction {
-  label: string;
-  onSelect: () => void;
-  /** Short hint on the right, e.g. a shortcut. */
-  hint?: string;
-  disabled?: boolean;
-  /** Red text, for "Forget" and other destructive choices. */
-  danger?: boolean;
-}
+export type { MenuAction } from "../menu";
 
 /**
  * A small "More" button with a menu: the home for rarely used actions
@@ -381,140 +374,36 @@ export function MoreMenu({
   /** Spoken name of the button, e.g. "Actions for this memory". Defaults to `label`. */
   buttonLabel?: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(0);
-  const box = useRef<HTMLDivElement>(null);
-  const button = useRef<HTMLButtonElement>(null);
-  const menuId = useId();
-  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  // The menu is placed against the window, so a list box's rounded,
-  // overflow-hidden corners can't cut it off.
-  const [place, setPlace] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    itemRefs.current[active]?.focus();
-  }, [open, active]);
-
-  useEffect(() => {
-    if (!open) return;
-    const measure = () => {
-      const r = button.current?.getBoundingClientRect();
-      if (!r) return;
-      const right = Math.max(8, window.innerWidth - r.right);
-      // Opens upward when the space below can't hold it.
-      const height = items.length * 40 + 8;
-      setPlace(r.bottom + 4 + height > window.innerHeight && r.top > height ? { bottom: window.innerHeight - r.top + 4, right } : { top: r.bottom + 4, right });
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    window.addEventListener("scroll", measure, true);
-    return () => {
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure, true);
-    };
-  }, [open, items.length]);
-
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", away);
-    return () => document.removeEventListener("mousedown", away);
-  }, [open]);
-
-  const close = () => {
-    setOpen(false);
-    button.current?.focus();
-  };
-
   return (
-    <div ref={box} className="relative">
-      <button
-        ref={button}
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
-        aria-label={buttonLabel}
-        onClick={() => {
-          setActive(0);
-          setOpen((v) => !v);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "ArrowDown") {
-            e.preventDefault();
-            setActive(0);
-            setOpen(true);
+    <Menu
+      label={label}
+      items={items}
+      trigger={
+        <button
+          type="button"
+          aria-label={buttonLabel}
+          className={
+            compact
+              ? `inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 ${focusRing}`
+              : `${secondaryButton} gap-1.5 !px-3`
           }
-        }}
-        className={
-          compact
-            ? `inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 ${focusRing}`
-            : `${secondaryButton} gap-1.5 !px-3`
-        }
-      >
-        {compact ? (
-          <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="5" cy="12" r="1.75" />
-            <circle cx="12" cy="12" r="1.75" />
-            <circle cx="19" cy="12" r="1.75" />
-          </svg>
-        ) : (
-          <>
-            {label}
-            <svg aria-hidden="true" className="h-3.5 w-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </>
-        )}
-      </button>
-      {open && (
-        <div
-          id={menuId}
-          role="menu"
-          aria-label={label}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              e.preventDefault();
-              close();
-            } else if (e.key === "ArrowDown") {
-              e.preventDefault();
-              setActive((i) => (i + 1) % items.length);
-            } else if (e.key === "ArrowUp") {
-              e.preventDefault();
-              setActive((i) => (i - 1 + items.length) % items.length);
-            } else if (e.key === "Tab") {
-              setOpen(false);
-            }
-          }}
-          style={place ? { position: "fixed", top: place.top, bottom: place.bottom, right: place.right, marginTop: 0 } : undefined}
-          className="absolute right-0 z-40 mt-1 w-60 max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-xl"
         >
-          {items.map((item, i) => (
-            <button
-              key={item.label}
-              ref={(el) => {
-                itemRefs.current[i] = el;
-              }}
-              type="button"
-              role="menuitem"
-              tabIndex={i === active ? 0 : -1}
-              disabled={item.disabled}
-              onClick={() => {
-                setOpen(false);
-                item.onSelect();
-              }}
-              onMouseEnter={() => setActive(i)}
-              className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm ${item.danger ? "text-red-300" : "text-zinc-200"} hover:bg-zinc-800 focus:bg-zinc-800 focus:outline-none disabled:opacity-50`}
-            >
-              {item.label}
-              {item.hint && <span className="text-xs text-zinc-500">{item.hint}</span>}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+          {compact ? (
+            <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="5" cy="12" r="1.75" />
+              <circle cx="12" cy="12" r="1.75" />
+              <circle cx="19" cy="12" r="1.75" />
+            </svg>
+          ) : (
+            <>
+              {label}
+              <svg aria-hidden="true" className="h-3.5 w-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </>
+          )}
+        </button>
+      }
+    />
   );
 }

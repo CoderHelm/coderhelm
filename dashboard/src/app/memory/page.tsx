@@ -1,7 +1,7 @@
 "use client";
 
 import { useCan } from "@/hooks/use-can";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { InlineMarkdown, Markdown } from "@/components/markdown";
 import {
   api,
@@ -12,6 +12,8 @@ import {
   type Repo,
 } from "@/lib/api";
 import { Callout } from "@/components/callout";
+import { Modal, modalActions } from "@/components/modal";
+import { RepoCombobox } from "@/components/repo-combobox";
 import { Chip, List, ListEmpty, ListError, ListRow, ListSection, ListSkeleton, ListToolbar, MoreMenu, SortSelect, useListParams } from "@/components/list";
 import { SettingsDisclosure } from "@/components/settings";
 import { Skeleton } from "@/components/skeleton";
@@ -234,15 +236,13 @@ function MemoryPage() {
       ) : (
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <label htmlFor="memory-repo" className="text-sm text-zinc-400">Repository</label>
-          <select
+          <RepoCombobox
             id="memory-repo"
-            aria-label="Repository"
-            value={repo}
-            onChange={(e) => { setParams({ repo: e.target.value }); setOpenAgent(null); }}
-            className={`${toolbarSelect} min-w-0 max-w-full`}
-          >
-            {repos.map((r) => <option key={r.name} value={r.name}>{r.name}</option>)}
-          </select>
+            repos={repos}
+            selected={repo}
+            onSelect={(name) => { setParams({ repo: name }); setOpenAgent(null); }}
+            className="w-full sm:w-80"
+          />
         </div>
       )}
 
@@ -629,16 +629,10 @@ function TeachDialog({ repo, onClose, onSaved }: { repo: string; onClose: () => 
   const [pinned, setPinned] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const first = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    first.current?.focus();
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  const submit = async () => {
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!content.trim()) return;
     setSaving(true);
     setError("");
     try {
@@ -652,42 +646,41 @@ function TeachDialog({ repo, onClose, onSaved }: { repo: string; onClose: () => 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="teach-title"
-        className="w-full max-w-lg rounded-xl border border-zinc-700 bg-zinc-900 p-5 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 id="teach-title" className="text-lg font-semibold">Teach Coderhelm something about {repo}</h2>
-        <p className="mt-1 text-sm text-zinc-400">One fact or rule per memory works best, written the way you&apos;d tell a new teammate.</p>
-        <label htmlFor="teach-text" className="mt-4 block text-sm text-zinc-300">What should it remember?</label>
-        <textarea
-          id="teach-text"
-          ref={first}
-          rows={4}
-          maxLength={1000}
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="For example: run the unit tests with pnpm test:unit; the e2e suite needs staging."
-          className={`${inputClass} mt-2`}
-        />
-        <p className="mt-1 text-right text-xs text-zinc-500">{content.length} / 1000</p>
-        <label htmlFor="teach-topic" className="mt-2 block text-sm text-zinc-300">Topic</label>
-        <select id="teach-topic" value={topic} onChange={(e) => setTopic(e.target.value)} className={`${inputClass} mt-2`}>
-          {TOPICS.map((t) => <option key={t.value} value={t.value}>{t.label}: {t.hint}</option>)}
-        </select>
-        <label className="mt-4 flex items-start gap-2 text-sm text-zinc-300">
-          <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} className="mt-1" />
-          <span>Pin it: the planner and coding agent get it on every ticket, not only when it seems relevant.</span>
-        </label>
-        {error && <p role="alert" className="mt-3 text-sm text-red-400">{error}</p>}
-        <div className="mt-5 flex flex-wrap justify-end gap-2">
+    <Modal
+      open
+      onOpenChange={(v) => !v && onClose()}
+      title={`Teach Coderhelm something about ${repo}`}
+      description="One fact or rule per memory works best, written the way you'd tell a new teammate."
+      testId="teach-dialog"
+      onSubmit={submit}
+      footer={
+        <div className={modalActions}>
           <button type="button" onClick={onClose} className={secondaryButton}>Cancel</button>
-          <button type="button" onClick={submit} disabled={saving || !content.trim()} className={primaryButton}>{saving ? "Saving…" : "Remember this"}</button>
+          <button type="submit" disabled={saving || !content.trim()} className={primaryButton}>{saving ? "Saving…" : "Remember this"}</button>
         </div>
-      </div>
-    </div>
+      }
+    >
+      <label htmlFor="teach-text" className="block text-sm text-zinc-300">What should it remember?</label>
+      <textarea
+        id="teach-text"
+        autoFocus
+        rows={4}
+        maxLength={1000}
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        placeholder="For example: run the unit tests with pnpm test:unit; the e2e suite needs staging."
+        className={`${inputClass} mt-2`}
+      />
+      <p className="mt-1 text-right text-xs text-zinc-500">{content.length} / 1000</p>
+      <label htmlFor="teach-topic" className="mt-2 block text-sm text-zinc-300">Topic</label>
+      <select id="teach-topic" value={topic} onChange={(e) => setTopic(e.target.value)} className={`${inputClass} mt-2`}>
+        {TOPICS.map((t) => <option key={t.value} value={t.value}>{t.label}: {t.hint}</option>)}
+      </select>
+      <label className="mt-4 flex items-start gap-2 text-sm text-zinc-300">
+        <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} className="mt-1" />
+        <span>Pin it: the planner and coding agent get it on every ticket, not only when it seems relevant.</span>
+      </label>
+      {error && <p role="alert" className="mt-3 text-sm text-red-400">{error}</p>}
+    </Modal>
   );
 }

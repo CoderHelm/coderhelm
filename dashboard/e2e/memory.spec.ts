@@ -292,7 +292,8 @@ test("try it shows what a ticket would bring along", async ({ page }) => {
 test("an empty repo says how memories arrive", async ({ page }) => {
   await mockApi(page);
   await page.goto("/memory");
-  await page.getByRole("combobox", { name: "Repository" }).selectOption("your-team/api");
+  await page.getByRole("button", { name: "Repository", exact: true }).click();
+  await page.getByRole("option", { name: "your-team/api", exact: true }).click();
   await expect(page.getByText("Nothing remembered about your-team/api yet")).toBeVisible();
   await expect(page.getByText("saves up to five things it learned")).toBeVisible();
   await shot(page, "memory-empty");

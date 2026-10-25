@@ -3,12 +3,16 @@
 import { ANY_CHANGE } from "@/lib/capabilities";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { api, ApiError, type LivePr, type Repo } from "@/lib/api";
+import { api, ApiError, type LivePr, type OpenPr, type Repo } from "@/lib/api";
+import { rememberRepo } from "@/lib/recent-repos";
+import { Combobox } from "@/components/combobox";
+import { useToast } from "@/components/toast";
+import { timeAgo } from "@/components/list/time";
 import { RoleGuard } from "@/components/role-guard";
 import { RepoCombobox } from "@/components/repo-combobox";
 import { ReReviewButton } from "@/components/re-review-button";
-import { Modal } from "@/components/modal";
-import { focusRing, linkButton, secondaryButton } from "@/components/ui";
+import { Modal, modalActions } from "@/components/modal";
+import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
 import {
   DetailBlock,
@@ -209,6 +213,7 @@ function ReviewerPage() {
         onClose={() => setParams({ review: "" }, { replace: true })}
         onQueued={onQueued}
         returnFocus={reviewButton}
+        live={live}
       />
 
       <ListToolbar
@@ -281,24 +286,157 @@ function ReviewerPage() {
   );
 }
 
+/**
+ * A pasted PR link (`https://github.com/owner/repo/pull/42`, with or without
+ * the scheme or a trailing path), `owner/repo#42`, `#42` or `42`. Null when it
+ * is none of those.
+ */
+function parsePrInput(text: string): { repo?: string; pr: number } | null {
+  const t = text.trim();
+  const url = t.match(/^(?:https?:\/\/)?(?:www\.)?github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)(?:[/?#].*)?$/i);
+  if (url) return { repo: `${url[1]}/${url[2]}`, pr: Number(url[3]) };
+  const short = t.match(/^([\w.-]+\/[\w.-]+)#(\d+)$/);
+  if (short) return { repo: short[1], pr: Number(short[2]) };
+  const num = t.match(/^#?(\d{1,7})$/);
+  if (num && Number(num[1]) > 0) return { pr: Number(num[1]) };
+  return null;
+}
+
 /** "Review a PR…": any PR's latest commit, without a label or a GitHub comment. */
 function ReviewPrDialog({
   open,
   onClose,
   onQueued,
   returnFocus,
+  live,
 }: {
   open: boolean;
   onClose: () => void;
   onQueued: () => void;
   returnFocus: React.RefObject<HTMLButtonElement | null>;
+  /** The reviewer's live rows, for a per-repo note in the picker. */
+  live: LivePr[];
 }) {
+  const { toast } = useToast();
   const [repos, setRepos] = useState<Repo[]>([]);
+  const [reposLoading, setReposLoading] = useState(false);
   const [repo, setRepo] = useState("");
-  const [pr, setPr] = useState("");
+  const [pr, setPr] = useState(0);
+  const [paste, setPaste] = useState("");
+  const [prs, setPrs] = useState<OpenPr[]>([]);
+  // "idle" before a repo is picked; "none" when the backend can't list them.
+  const [prsState, setPrsState] = useState<"idle" | "loading" | "ok" | "none">("idle");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
   useEffect(() => {
-    if (open && repos.length === 0) api.listRepos().then((d) => setRepos(d.repos)).catch(() => {});
+    if (!open || repos.length) return;
+    setReposLoading(true);
+    api
+      .listRepos()
+      .then((d) => setRepos(d.repos))
+      .catch(() => {})
+      .finally(() => setReposLoading(false));
   }, [open, repos.length]);
+
+  // The picked repo's open PRs.
+  useEffect(() => {
+    if (!repo) {
+      setPrs([]);
+      setPrsState("idle");
+      return;
+    }
+    let live = true;
+    setPrsState("loading");
+    api
+      .listOpenPrs(repo)
+      .then((list) => {
+        if (!live) return;
+        setPrs(list);
+        setPrsState("ok");
+      })
+      .catch(() => {
+        if (!live) return;
+        setPrs([]);
+        setPrsState("none");
+      });
+    return () => {
+      live = false;
+    };
+  }, [repo]);
+
+  const hints = useMemo(() => {
+    const n: Record<string, number> = {};
+    for (const p of live) if (p.group !== "done") n[p.repo] = (n[p.repo] ?? 0) + 1;
+    return Object.fromEntries(Object.entries(n).map(([r, c]) => [r, `${c} in review`]));
+  }, [live]);
+
+  const prGroups = useMemo(
+    () => [
+      {
+        heading: prs.length ? `${prs.length === 100 ? "100+" : prs.length} open` : undefined,
+        options: prs.map((p) => ({
+          value: String(p.number),
+          label: p.title || `Pull request #${p.number}`,
+          sub: [p.author, p.draft ? "draft" : ""].filter(Boolean).join(" · ") || undefined,
+          hint: (
+            <span className="flex items-center gap-2">
+              <span className="tabular-nums">#{p.number}</span>
+              {p.updated_at && <span className="hidden sm:inline">{timeAgo(p.updated_at)}</span>}
+            </span>
+          ),
+          keywords: [String(p.number), `#${p.number}`, p.author],
+          title: `#${p.number} ${p.title}${p.author ? ` · ${p.author}` : ""}`,
+        })),
+      },
+    ],
+    [prs],
+  );
+
+  const reset = () => {
+    setPr(0);
+    setPaste("");
+    setError("");
+  };
+
+  const onPaste = (text: string) => {
+    setPaste(text);
+    setError("");
+    const parsed = parsePrInput(text);
+    if (!parsed) {
+      setPr(0);
+      return;
+    }
+    if (parsed.repo && parsed.repo !== repo) setRepo(parsed.repo);
+    setPr(parsed.pr);
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!repo) return setError("Pick a repo.");
+    if (!pr) return setError(paste.trim() ? "That isn't a pull request link or number." : "Pick a pull request, or paste its link or number.");
+    setBusy(true);
+    setError("");
+    try {
+      const res = await api.reReview(repo, pr);
+      if (res.status !== "queued") {
+        setError(res.reason || "The review was not queued.");
+        return;
+      }
+      rememberRepo(repo);
+      toast(`Review queued for ${repo} #${pr}`);
+      onQueued();
+      reset();
+      onClose();
+    } catch {
+      setError("Could not queue the review. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const picked = prs.find((p) => p.number === pr);
+
   return (
     <Modal
       open={open}
@@ -306,32 +444,94 @@ function ReviewPrDialog({
       returnFocus={returnFocus}
       title="Review a PR"
       description="Reviews the PR's latest commit now. No label or GitHub comment needed."
-    >
-      <div className="flex flex-col gap-3">
-        <div className="[&>div]:mb-0">
-          <RepoCombobox repos={repos} selected={repo} onSelect={setRepo} placeholder="Pick a repo" />
+      testId="review-pr-dialog"
+      onSubmit={submit}
+      footer={
+        <div className={modalActions}>
+          <button type="button" className={secondaryButton} onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className={primaryButton} disabled={busy}>
+            {busy ? "Queueing…" : "Review now"}
+          </button>
         </div>
-        <input
-          inputMode="numeric"
-          aria-label="Pull request number"
-          placeholder="PR number"
-          value={pr}
-          onChange={(e) => setPr(e.target.value.replace(/\D/g, ""))}
-          className={`w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 ${focusRing}`}
-        />
-        <div className="flex justify-end">
-          <ReReviewButton
-            repo={repo}
-            pr={Number(pr)}
-            label="Review now"
-            className="min-h-9 !px-4 !text-sm"
-            onQueued={() => {
-              onQueued();
-              setPr("");
-              onClose();
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="review-repo" className="text-sm font-medium text-zinc-200">
+            Repository
+          </label>
+          <RepoCombobox
+            id="review-repo"
+            repos={repos}
+            selected={repo}
+            loading={reposLoading}
+            hints={hints}
+            onSelect={(r) => {
+              setRepo(r);
+              reset();
             }}
+            className=""
           />
         </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="review-pr" className="text-sm font-medium text-zinc-200">
+            Pull request
+          </label>
+          {prsState === "none" ? (
+            <p className="text-sm text-zinc-500">Open pull requests can&apos;t be listed for this repo. Paste a link or number below.</p>
+          ) : (
+            <Combobox
+              id="review-pr"
+              label="Pull request"
+              placeholder={repo ? (prsState === "ok" && !prs.length ? "No open pull requests" : "Pick a pull request") : "Pick a repo first"}
+              searchPlaceholder="Search by title, number or author…"
+              emptyText={prsState === "ok" && !prs.length ? "No open pull requests" : "No pull requests match"}
+              value={picked ? String(picked.number) : ""}
+              valueLabel={
+                picked ? (
+                  <>
+                    <span className="tabular-nums text-zinc-500">#{picked.number}</span> {picked.title}
+                  </>
+                ) : undefined
+              }
+              onChange={(v) => {
+                setPr(Number(v));
+                setPaste("");
+                setError("");
+              }}
+              groups={prGroups}
+              loading={prsState === "loading"}
+              disabled={!repo}
+              testId="pr-picker"
+            />
+          )}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="review-paste" className="text-sm text-zinc-400">
+            Or paste a PR link or number
+          </label>
+          <input
+            id="review-paste"
+            value={paste}
+            onChange={(e) => onPaste(e.target.value)}
+            placeholder="https://github.com/owner/repo/pull/42"
+            autoComplete="off"
+            spellCheck={false}
+            className={inputClass}
+          />
+          {paste.trim() && pr > 0 && !picked && (
+            <p className="text-xs text-zinc-500" data-testid="review-target">
+              Reviews {repo || "the repo you pick"} #{pr}
+            </p>
+          )}
+        </div>
+        {error && (
+          <p role="alert" className="text-sm text-red-400">
+            {error}
+          </p>
+        )}
       </div>
     </Modal>
   );

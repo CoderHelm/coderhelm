@@ -8,7 +8,8 @@ import { Callout } from "@/components/callout";
 import { StatusPill } from "@/components/status-pill";
 import { Skeleton } from "@/components/skeleton";
 import { ChevronRightIcon } from "@/components/icons";
-import { focusRing, inputClass, secondaryButton } from "@/components/ui";
+import { dangerButton, focusRing, inputClass, secondaryButton } from "@/components/ui";
+import { Modal, modalActions } from "@/components/modal";
 import { SETTINGS_GROUPS, type SettingsItem } from "@/components/settings-items";
 import { isSelfHosted } from "@/lib/runtime-config";
 import { ROLE_LABEL, whoCan, type Role } from "@/lib/roles";
@@ -126,13 +127,6 @@ function DangerZone() {
   const [resetting, setResetting] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !resetting && setOpen(false);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, resetting]);
-
   const handleReset = async () => {
     if (confirmText !== "DELETE") return;
     setResetting(true);
@@ -162,43 +156,41 @@ function DangerZone() {
         Reset all data
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !resetting && setOpen(false)} />
-          <div role="dialog" aria-modal="true" aria-labelledby="reset-title" className="relative w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-900 p-6 shadow-2xl">
-            <h3 id="reset-title" className="text-lg font-semibold text-red-400 mb-2">Reset all data</h3>
-            <p className="text-sm text-zinc-400 mb-4">
-              This permanently deletes runs, plans, repositories, settings and the Jira connection. It cannot be undone.
-            </p>
-            <label htmlFor="reset-confirm" className="text-xs text-zinc-400 mb-1.5 block">
-              Type <span className="text-red-400 font-mono font-semibold">DELETE</span> to confirm
-            </label>
-            <input
-              id="reset-confirm"
-              type="text"
-              value={confirmText}
-              onChange={(e) => setConfirmText(e.target.value)}
-              placeholder="DELETE"
-              autoFocus
-              autoComplete="off"
-              className={`${inputClass} mb-4`}
-            />
-            <div className="flex justify-end gap-3">
-              <button type="button" onClick={() => setOpen(false)} disabled={resetting} className={secondaryButton}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleReset}
-                disabled={confirmText !== "DELETE" || resetting}
-                className={`inline-flex items-center justify-center min-h-9 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${focusRing}`}
-              >
-                {resetting ? "Deleting..." : "Delete everything"}
-              </button>
-            </div>
+      <Modal
+        open={open}
+        onOpenChange={(v) => !resetting && setOpen(v)}
+        title="Reset all data"
+        description="This permanently deletes runs, plans, repositories, settings and the Jira connection. It cannot be undone."
+        testId="reset-dialog"
+        initialFocus="#reset-confirm"
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleReset();
+        }}
+        footer={
+          <div className={modalActions}>
+            <button type="button" onClick={() => setOpen(false)} disabled={resetting} className={secondaryButton}>
+              Cancel
+            </button>
+            <button type="submit" disabled={confirmText !== "DELETE" || resetting} className={dangerButton}>
+              {resetting ? "Deleting…" : "Delete everything"}
+            </button>
           </div>
-        </div>
-      )}
+        }
+      >
+        <label htmlFor="reset-confirm" className="mb-1.5 block text-sm text-zinc-400">
+          Type <span className="font-mono font-semibold text-red-400">DELETE</span> to confirm
+        </label>
+        <input
+          id="reset-confirm"
+          type="text"
+          value={confirmText}
+          onChange={(e) => setConfirmText(e.target.value)}
+          placeholder="DELETE"
+          autoComplete="off"
+          className={inputClass}
+        />
+      </Modal>
     </section>
   );
 }

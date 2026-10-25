@@ -8,7 +8,7 @@ import { Code } from "./settings/code";
 import { CopyButton } from "./copy-button";
 import { Disclosure } from "./disclosure";
 import { Field, SecretInput } from "./field";
-import { Modal } from "./modal";
+import { Modal, ModalFooter } from "./modal";
 import { Segmented } from "./segmented";
 import { useConfirm } from "./confirm-dialog";
 import { useToast } from "./toast";
@@ -177,11 +177,12 @@ export function AddMcpServerDialog({
     <Modal
       open={open}
       onOpenChange={onOpenChange}
+      testId="add-mcp-server"
       title="Add an MCP server"
       description="Coderhelm asks the server how it signs in. Agents get none of its tools until you allow them."
     >
       <form
-        data-testid="add-mcp-server"
+        id="add-mcp-server-form"
         className="flex flex-col gap-4"
         onSubmit={(e) => {
           e.preventDefault();
@@ -286,22 +287,27 @@ export function AddMcpServerDialog({
             {error}
           </p>
         )}
-        <div className="flex flex-wrap items-center gap-3">
+        {detected && (
+          <p>
+            <button type="button" onClick={() => setDetected(null)} className={linkButton}>
+              Use another address
+            </button>
+          </p>
+        )}
+        <ModalFooter>
+          <button type="button" onClick={() => onOpenChange(false)} className={secondaryButton}>
+            Cancel
+          </button>
           {!detected ? (
-            <button type="submit" disabled={busy || !url.trim()} className={primaryButton}>
+            <button type="submit" form="add-mcp-server-form" disabled={busy || !url.trim()} className={primaryButton}>
               {busy ? "Checking…" : "Check address"}
             </button>
           ) : (
-            <>
-              <button type="submit" disabled={busy || !ready} className={primaryButton}>
-                {busy ? (detected.auth === "header" ? "Checking the key…" : "Adding…") : detected.auth === "oauth" ? "Add and connect" : "Add server"}
-              </button>
-              <button type="button" onClick={() => setDetected(null)} className={linkButton}>
-                Use another address
-              </button>
-            </>
+            <button type="submit" form="add-mcp-server-form" disabled={busy || !ready} className={primaryButton}>
+              {busy ? (detected.auth === "header" ? "Checking the key…" : "Adding…") : detected.auth === "oauth" ? "Add and connect" : "Add server"}
+            </button>
           )}
-        </div>
+        </ModalFooter>
       </form>
     </Modal>
   );
