@@ -66,6 +66,7 @@ export function ApprovalCard({
     <section
       aria-label={`Approval: ${approvalHeadline(a)}`}
       data-testid="approval-card"
+      data-approval-id={a.id}
       data-status={pending ? "pending" : a.status}
       className={`min-w-0 rounded-lg border bg-zinc-900/60 p-4 ${focus ? "border-amber-500/50" : "border-zinc-800"}`}
     >

@@ -349,7 +349,8 @@ test("an admin can deny with a note, or approve always from the queue", async ({
   const db = await mockApi(page, "admin", { approvals: [approval(), approval({ id: "ap_2", tool: "write_file", kind: "tool", server: undefined })] });
   await page.goto("/settings/agents?approval=ap_2");
   const queue = page.getByTestId("approval-queue");
-  const [first, second] = [queue.getByTestId("approval-card").nth(0), queue.getByTestId("approval-card").nth(1)];
+  // By id, not position: the queue reloads after each answer and drops the answered card.
+  const [first, second] = [queue.locator('[data-approval-id="ap_1"]'), queue.locator('[data-approval-id="ap_2"]')];
   await first.getByRole("button", { name: "Deny…" }).click();
   await first.getByLabel("Tell the agent why (optional)").fill("Not in this sprint");
   await first.getByRole("button", { name: "Deny", exact: true }).click();

@@ -147,7 +147,8 @@ export function AgentSwitches({ view, edit, repos, onChange }: { view: PolicyVie
       <ul className="divide-y divide-zinc-800 rounded-lg border border-zinc-800" data-testid="agent-switches">
         {view.agents.map((a) => (
           <li key={a.key} className="flex flex-wrap items-center gap-3 px-4 py-3" data-testid={`agent-${a.key}`}>
-            <div className="min-w-0 flex-1">
+            {/* basis-48: on a narrow screen the buttons wrap below the name instead of squeezing it. */}
+            <div className="min-w-0 flex-1 basis-48">
               <p className="text-sm font-medium text-zinc-100">{a.label}</p>
               <p className="text-xs text-zinc-500">{a.summary}</p>
               {a.repos_off.length > 0 && (
