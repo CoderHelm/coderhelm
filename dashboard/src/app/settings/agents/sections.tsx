@@ -719,7 +719,7 @@ export function RecentDecisions({ reload }: { reload: number }) {
             <li key={e.id} className="px-4 py-2.5">
               <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
                 <Time iso={e.at} />
-                <span>{e.actor}</span>
+                <span className="min-w-0 wrap-anywhere">{e.actor}</span>
                 {e.policy?.decision && <StatusPill tone={DECISION_TONE[e.policy.decision as Decision] ?? "neutral"}>{e.policy.decision}</StatusPill>}
               </div>
               <p className="mt-1 text-sm text-zinc-200">

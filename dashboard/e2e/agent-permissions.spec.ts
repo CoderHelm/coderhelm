@@ -274,7 +274,7 @@ test("the permissions page shows agents, presets, rules and a working test box",
   const dialog = page.getByRole("dialog", { name: "Add a rule" });
   await dialog.getByRole("button", { name: "Repository", exact: true }).click();
   await dialog.getByRole("button", { name: /Repository/ }).nth(1).click();
-  await dialog.getByRole("button", { name: "acme/web", exact: true }).click();
+  await dialog.getByRole("option", { name: "acme/web", exact: true }).click();
   await dialog.getByLabel("Server or data source").fill("linear");
   await dialog.getByLabel("Tool name").fill("create_*");
   await dialog.getByRole("button", { name: "Deny" }).click();
