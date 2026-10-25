@@ -61,7 +61,8 @@ async function mockApi(page: Page) {
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }] });
     if (p === "/api/repos") return json(route, { repos: [{ name: "your-team/web", enabled: true, ticket_source: "github" }] });
     if (p === "/api/settings/workflow") return json(route, { commit_openspec: false, default_destination: "github", allow_plan_log_analyzer: false });
-    if (p === "/api/tests/settings") return json(route, { enabled: false, auto_quarantine: false, fix_prs: false, tickets: "off", burn_in: false, repos: [], ticket_after_days: 2 });
+    if (p === "/api/tests/settings") return json(route, { enabled: true, auto_quarantine: false, fix_prs: false, tickets: "off", burn_in: false, repos: [], ticket_after_days: 2 });
+    if (p === "/api/tests/setup") return json(route, { repos: [SETUP_ROW], github: true });
     if (p === "/api/tests/summary") {
       const trend = Array.from({ length: 30 }, (_, i) => ({ day: new Date(Date.now() - (29 - i) * DAY).toISOString().slice(0, 10), runs: 0, pass_rate: 0, flake_rate: 0 }));
       return json(route, { repos: [], counts: { healthy: 0, flaky: 0, broken: 0, quarantined: 0, fixed: 0 }, prs_blocked_7d: 0, ci_minutes_lost_7d: 0, prs_rescued_7d: 0, runs_7d: 0, pass_rate_7d: 0, flake_rate_7d: 0, trend });
@@ -80,6 +81,22 @@ async function mockApi(page: Page) {
     return json(route, { error: `Not mocked: ${p}` }, 404);
   });
 }
+
+const SETUP_UPLOAD = "- name: Upload E2E results for Coderhelm\n  if: ${{ !cancelled() }}\n  uses: actions/upload-artifact@v4\n  with:\n    name: coderhelm-e2e-results\n    path: |\n      playwright-report/\n      test-results/";
+const SETUP_REPORTER = { file: "playwright.config.ts", code: 'reporter: [["html"], ["json", { outputFile: "test-results/results.json" }]],' };
+const SETUP_ROW = {
+  repo: "your-team/web", default_branch: "main", status: "needs_setup", runner: "playwright", runners: ["playwright", "jest"],
+  workflow: { path: ".github/workflows/e2e.yml", job_id: "e2e", job_name: "E2E", step_name: null, test_command: "npx playwright test" },
+  steps: {
+    upload: { state: "missing", detail: "Not found in the workflow.", paths: [] },
+    reporter: { state: "missing", detail: "No reporter that writes a results file.", file: "playwright.config.ts" },
+    quarantine: { state: "unsupported", detail: "" },
+  },
+  results: { last_at: null, run_url: null, tests: 0, empty_runs: 0 }, quarantine_fetch: null, cause: null, pr: null,
+  can_auto: { upload: true, quarantine: false, repair: false, why: null },
+  snippets: { upload: SETUP_UPLOAD, quarantine: "", reporter: SETUP_REPORTER, by_runner: { playwright: { upload: SETUP_UPLOAD, reporter: SETUP_REPORTER } } },
+  checked_at: null, error: null,
+};
 
 /** Records what the page writes to the clipboard. */
 async function mockClipboard(page: Page) {
@@ -110,8 +127,9 @@ async function shot(page: Page, name: string) {
 test("code block: the Tests setup copies the exact snippet and highlights it", async ({ page }) => {
   await mockClipboard(page);
   await mockApi(page);
-  await page.goto("/tests");
-  await expect(page.getByRole("heading", { name: "Turn on E2E tracking" })).toBeVisible();
+  await page.goto("/tests?view=setup");
+  const repo = page.getByTestId("ci-setup-repo");
+  await repo.locator('[data-step="reporter"]').getByText("Do it myself").click();
 
   const config = page.getByRole("region", { name: "playwright.config.ts" });
   await expect(config).toBeVisible();
@@ -127,19 +145,20 @@ test("code block: the Tests setup copies the exact snippet and highlights it", a
   expect(strColor).toBe("rgb(134, 239, 172)");
   expect(keyColor).not.toBe(strColor);
 
-  // The YAML steps say what they are and which language.
-  const steps = page.getByRole("region", { name: "GitHub Actions step" });
-  await expect(steps.first().locator("figcaption")).toContainText("YAML");
-
   await config.getByRole("button", { name: /^Copy/ }).click();
   await expect(config.getByRole("button", { name: "Copied" })).toBeVisible();
   expect(await copied(page)).toEqual(['reporter: [["html"], ["json", { outputFile: "test-results/results.json" }]],']);
 
+  // The workflow step is named by the repo's own workflow file.
+  await repo.locator('[data-step="upload"]').getByText("Do it myself").click();
+  const step = page.getByRole("region", { name: ".github/workflows/e2e.yml" });
+  await expect(step.locator("figcaption")).toContainText(".github/workflows/e2e.yml");
+
   // Keyboard: focus the code and press Ctrl+C with nothing selected.
-  await steps.first().locator("pre").focus();
+  await step.locator("pre").focus();
   await page.keyboard.press("Control+c");
   const last = (await copied(page)).at(-1) ?? "";
-  expect(last.startsWith("# in the workflow that runs your E2E tests")).toBe(true);
+  expect(last.startsWith("- name: Upload E2E results for Coderhelm")).toBe(true);
   expect(last).toContain("if: ${{ !cancelled() }}");
 
   await shot(page, "tests-setup");

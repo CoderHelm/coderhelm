@@ -24,6 +24,8 @@ import { Callout } from "@/components/callout";
 import { StatusPill } from "@/components/status-pill";
 import { Segmented } from "@/components/segmented";
 import { CodeBlock } from "@/components/code-block";
+import { Disclosure } from "@/components/disclosure";
+import { SetupChecklist, type SetupItem } from "@/components/setup-checklist";
 import { Skeleton } from "@/components/skeleton";
 import { Field } from "@/components/field";
 import { MarkdownEditor } from "@/components/markdown-editor";
@@ -366,7 +368,13 @@ function AlertsPage() {
             )}
           </div>
           <div className="mt-3">
-            <SetupSteps endpoint={endpoint} defaultOpen={load.state === "ready" && routes.length === 0} />
+            <SetupSteps
+              endpoint={endpoint}
+              accounts={connectedAccounts.size}
+              routes={routes.length}
+              lastEvent={(events ?? [])[0]?.received_at ?? null}
+              loaded={load.state === "ready"}
+            />
           </div>
         </section>
 
@@ -567,27 +575,57 @@ function RouteAlarms({ route }: { route: AlertRoute }) {
 
 // ── Connecting a topic ───────────────────────────────────────────────
 
-function SetupSteps({ endpoint, defaultOpen }: { endpoint: string; defaultOpen: boolean }) {
+function SetupSteps({
+  endpoint,
+  accounts,
+  routes,
+  lastEvent,
+  loaded,
+}: {
+  endpoint: string;
+  accounts: number;
+  routes: number;
+  /** When the newest alert arrived: the subscription works. */
+  lastEvent: string | null;
+  loaded: boolean;
+}) {
+  const items: SetupItem[] = [
+    {
+      id: "account",
+      label: "AWS account",
+      state: accounts > 0 ? "done" : "missing",
+      detail: accounts > 0 ? `${accounts} connected.` : (
+        <>
+          Connect the topic&apos;s account under <Link href="/settings/integrations/aws/" className={linkButton}>AWS</Link>.
+        </>
+      ),
+    },
+    {
+      id: "route",
+      label: "Route",
+      state: routes > 0 ? "done" : "missing",
+      detail: routes > 0 ? `${routes} ${routes === 1 ? "route" : "routes"} above.` : "Add a route: the topic ARN and rules for the alerts that should open a pull request.",
+    },
+    {
+      id: "subscription",
+      label: "Subscription",
+      state: lastEvent ? "done" : "missing",
+      detail: lastEvent ? `Working: the last alert arrived ${timeAgo(lastEvent)}.` : "No alert received yet. Subscribe this HTTPS endpoint to the topic; Coderhelm confirms the subscription by itself.",
+    },
+  ];
+  const allDone = items.every((i) => i.state === "done");
   return (
-    <SettingsDisclosure summary="How to connect a topic" defaultOpen={defaultOpen}>
-      <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm text-zinc-400">
-        <li>
-          Connect the topic&apos;s AWS account under <Link href="/settings/integrations/aws/" className={linkButton}>AWS</Link>.
-        </li>
-        <li>Add a route: the topic ARN, and rules for the alerts that should open a pull request.</li>
-        <li>
-          Subscribe this HTTPS endpoint to the topic. Coderhelm confirms the subscription by itself.
-          <CodeBlock code={endpoint} title="HTTPS endpoint" className="mt-1.5" testId="alerts-endpoint" />
-        </li>
-      </ol>
-      <div className="space-y-2 text-sm text-zinc-400">
-        <p className="font-medium text-zinc-300">Which alerts work</p>
+    <SettingsDisclosure summary={allDone ? "Connecting a topic: done" : "How to connect a topic"} defaultOpen={loaded && !allDone}>
+      <SetupChecklist label="Connecting a topic" items={items} />
+      {/* Every new topic subscribes the same endpoint, so it stays in view. */}
+      <CodeBlock code={endpoint} title="HTTPS endpoint" testId="alerts-endpoint" />
+      <Disclosure summary="Which alerts work">
         <p>
           CloudWatch alarm notifications (only the ALARM state opens a pull request), AWS Chatbot custom notifications, EventBridge events
           and plain messages. A plain message with a <Code>Recovers: &lt;alert title&gt;</Code> line is the recovery of that alert.
         </p>
         <p>Repeats of the same alert fold into one run, and each route starts at most 20 runs a day.</p>
-      </div>
+      </Disclosure>
     </SettingsDisclosure>
   );
 }

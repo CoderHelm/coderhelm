@@ -1201,6 +1201,16 @@ export const api = {
   updateTestSettings: (settings: TestSettings) =>
     request<TestSettings>("/api/tests/settings", { method: "PUT", body: JSON.stringify(settings) }),
   getTestSummary: (repo?: string) => request<TestSummary>(`/api/tests/summary${qs({ repo })}`),
+  /** Each tracked repo's CI setup: what is in the workflow, what has arrived, the setup PR. */
+  getTestSetup: (opts: { repo?: string; refresh?: boolean } = {}) =>
+    request<{ repos: TestRepoSetup[]; github: boolean }>(
+      `/api/tests/setup${qs({ repo: opts.repo, refresh: opts.refresh ? "1" : undefined })}`,
+    ),
+  /** The exact change a setup PR would hold. Nothing is written. */
+  previewTestSetup: (body: TestSetupAsk) =>
+    request<TestSetupPreview>("/api/tests/setup/preview", { method: "POST", body: JSON.stringify(body) }),
+  openTestSetupPr: (body: TestSetupAsk) =>
+    request<{ pr: TestSetupPr }>("/api/tests/setup/pr", { method: "POST", body: JSON.stringify(body) }),
   listTestRuns: (opts: { repo?: string; branch?: string; pr?: number; before?: string; limit?: number } = {}) =>
     request<{ runs: TestRun[]; next?: string | null }>(`/api/tests/runs${qs(opts)}`),
   getTestRun: (runKey: string) =>
@@ -2721,6 +2731,74 @@ export interface TestSettings {
   repos: string[];
   /** Days a test stays quarantined before its owner gets a ticket (1–30). */
   ticket_after_days: number;
+}
+
+export type TestRunner = "playwright" | "jest" | "vitest" | "cypress" | "junit";
+export type TestSetupStatus = "no_tests" | "needs_setup" | "in_progress" | "waiting" | "nothing_received" | "set_up";
+export type TestSetupStepState = "done" | "missing" | "partial" | "unknown" | "unsupported";
+
+export interface TestSetupPr {
+  /** queued, reading, opening, open, merged, closed, nothing_to_do or failed */
+  status: string;
+  kind: "setup" | "repair" | string;
+  quarantine: boolean;
+  number?: number | null;
+  url?: string | null;
+  head_sha?: string | null;
+  workflow_path: string;
+  error?: string | null;
+  actor: string;
+  created_at: string;
+  updated_at: string;
+  merged_at?: string | null;
+  /** The PR's checks in one word, read live: none, pending, success or failure. */
+  ci?: "none" | "pending" | "success" | "failure" | null;
+}
+
+export interface TestRepoSetup {
+  repo: string;
+  default_branch: string;
+  status: TestSetupStatus;
+  runner: TestRunner | null;
+  runners: TestRunner[];
+  workflow: { path: string; job_id: string; job_name?: string | null; step_name?: string | null; test_command?: string | null } | null;
+  steps: {
+    upload: { state: TestSetupStepState; detail: string; paths: string[] };
+    reporter: { state: TestSetupStepState; detail: string; file?: string | null };
+    quarantine: { state: TestSetupStepState; detail: string };
+  };
+  results: { last_at: string | null; run_url: string | null; tests: number; empty_runs: number };
+  quarantine_fetch: { last_at: string; run_url?: string | null } | null;
+  /** Why runs arrive without results, when the step is in place. */
+  cause: { text: string; fixable: boolean; last_run_url?: string | null } | null;
+  pr: TestSetupPr | null;
+  can_auto: { upload: boolean; quarantine: boolean; repair: boolean; why?: string | null };
+  snippets: {
+    upload: string;
+    quarantine: string;
+    reporter: { file: string; code: string };
+    by_runner?: Partial<Record<TestRunner, { upload: string; reporter: { file: string; code: string } }>>;
+  };
+  checked_at?: string | null;
+  error?: string | null;
+}
+
+export interface TestSetupAsk {
+  repo: string;
+  quarantine?: boolean;
+  repair?: boolean;
+}
+
+export interface TestSetupPreview {
+  repo: string;
+  path: string;
+  branch: string;
+  base: string;
+  title: string;
+  body: string;
+  added: string[];
+  notes: string[];
+  diff: string;
 }
 
 export interface TestSummary {

@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { mockWideApi } from "./wide-data";
 
 // The Tests area against a mocked backend. Nothing reaches a real server.
 
@@ -68,6 +69,108 @@ interface Backend {
   empty: boolean;
   calls: Call[];
   recommendations: Record<string, unknown>[];
+  setup: SetupRow[];
+}
+
+
+// ── CI setup ──────────────────────────────────────────────────────────────
+
+const API = "your-team/api";
+const DOCS = "your-team/docs";
+const WORKFLOW = ".github/workflows/e2e.yml";
+type SetupRow = Record<string, unknown> & { repo: string; status: string; pr: Record<string, unknown> | null; polls?: number };
+
+const UPLOAD_YAML = `- name: Upload E2E results for Coderhelm
+  if: \${{ !cancelled() }}
+  uses: actions/upload-artifact@v4
+  with:
+    name: coderhelm-e2e-results
+    path: |
+      playwright-report/
+      test-results/`;
+const JEST_UPLOAD = UPLOAD_YAML.replace("playwright-report/\n      test-results/", "junit.xml\n      reports/");
+
+function setupRow(repo: string, over: Partial<SetupRow> = {}): SetupRow {
+  return {
+    repo, default_branch: "main", status: "needs_setup", runner: "playwright",
+    runners: ["playwright", "jest", "vitest", "cypress", "junit"],
+    workflow: { path: WORKFLOW, job_id: "e2e", job_name: "Browser tests", step_name: "Run E2E tests", test_command: "npx playwright test" },
+    steps: {
+      upload: { state: "missing", detail: "Not found in the workflow.", paths: [] },
+      reporter: { state: "done", detail: "Writes a report Coderhelm reads.", file: "playwright.config.ts" },
+      quarantine: { state: "missing", detail: "Not found in the workflow." },
+    },
+    results: { last_at: null, run_url: null, tests: 0, empty_runs: 0 },
+    quarantine_fetch: null, cause: null, pr: null,
+    can_auto: { upload: true, quarantine: true, repair: false, why: null },
+    snippets: {
+      upload: UPLOAD_YAML,
+      quarantine: "- name: Get quarantined tests from Coderhelm\n  id: coderhelm_quarantine\n  run: |\n    echo grep",
+      reporter: { file: "playwright.config.ts", code: 'reporter: [["html"], ["json", { outputFile: "test-results/results.json" }]],' },
+      by_runner: {
+        playwright: { upload: UPLOAD_YAML, reporter: { file: "playwright.config.ts", code: 'reporter: [["html"]],' } },
+        jest: { upload: JEST_UPLOAD, reporter: { file: "jest.config.js", code: 'reporters: ["default", ["jest-junit", { outputDirectory: "test-results" }]],' } },
+      },
+    },
+    checked_at: ago(60_000), error: null, ...over,
+  };
+}
+
+const SET_UP = (repo: string) => setupRow(repo, {
+  status: "set_up",
+  steps: {
+    upload: { state: "done", detail: "In the workflow on the default branch.", paths: ["playwright-report/"] },
+    reporter: { state: "done", detail: "Writes a report Coderhelm reads.", file: "playwright.config.ts" },
+    quarantine: { state: "done", detail: "In the workflow on the default branch." },
+  },
+  results: { last_at: ago(2 * 3_600_000), run_url: `https://github.com/${repo}/actions/runs/1`, tests: 128, empty_runs: 0 },
+  quarantine_fetch: { last_at: ago(2 * 3_600_000), run_url: null },
+  can_auto: { upload: false, quarantine: false, repair: false, why: null },
+});
+
+const PARTIAL = setupRow(API, {
+  status: "waiting",
+  steps: {
+    upload: { state: "done", detail: "In the workflow on the default branch.", paths: ["test-results/"] },
+    reporter: { state: "missing", detail: "No reporter that writes a results file.", file: "playwright.config.ts" },
+    quarantine: { state: "missing", detail: "Not found in the workflow." },
+  },
+  can_auto: { upload: false, quarantine: true, repair: false, why: null },
+});
+
+const NOTHING = setupRow(API, {
+  status: "nothing_received",
+  steps: {
+    upload: { state: "partial", detail: "Found, but it uploads other files than the results.", paths: ["coverage/"] },
+    reporter: { state: "done", detail: "Writes a report Coderhelm reads.", file: "playwright.config.ts" },
+    quarantine: { state: "missing", detail: "Not found in the workflow." },
+  },
+  results: { last_at: null, run_url: null, tests: 0, empty_runs: 3 },
+  cause: { text: "The upload step keeps coverage/ but the results are written elsewhere. The artifact path doesn't match.", fixable: true, last_run_url: `https://github.com/${API}/actions/runs/77` },
+  can_auto: { upload: false, quarantine: true, repair: true, why: null },
+});
+
+const NO_TESTS = setupRow(DOCS, { status: "no_tests", workflow: null, runner: null });
+
+const DIFF = `--- a/${WORKFLOW}
++++ b/${WORKFLOW}
+@@ -20,6 +20,16 @@
+       - name: Run E2E tests
+         run: npx playwright test
++      - name: Upload E2E results for Coderhelm
++        if: \${{ !cancelled() }}
++        uses: actions/upload-artifact@v4
+       # Keep the HTML report for people.`;
+
+/** The setup PR moves along each time the page reads it, like the worker would. */
+function advance(row: SetupRow) {
+  const pr = row.pr;
+  if (!pr) return;
+  row.polls = (row.polls ?? 0) + 1;
+  const order = ["queued", "reading", "opening", "open"];
+  const at = order.indexOf(pr.status as string);
+  if (at >= 0 && at < order.length - 1) pr.status = order[at + 1];
+  if (pr.status === "open") Object.assign(pr, { number: 512, url: `https://github.com/${row.repo}/pull/512`, ci: "pending" });
 }
 
 function summary(db: Backend) {
@@ -102,6 +205,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       },
       { id: "rec_2", repo: WEB, area: "account", title: "Update the email preferences", status: "open", why: "A busy page with no test.", evidence: [{ kind: "traffic", text: "About 900 visits a day" }] },
     ],
+    setup: [setupRow(WEB), SET_UP(MOBILE), NO_TESTS],
     ...init,
   };
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -128,6 +232,25 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       return json(route, db.settings);
     }
     if (p === "/api/tests/summary") return json(route, summary(db));
+    if (p === "/api/tests/setup" && method === "GET") {
+      const only = url.searchParams.get("repo");
+      for (const r of db.setup) advance(r);
+      return json(route, { repos: db.setup.filter((r) => !only || r.repo === only), github: true });
+    }
+    if (p === "/api/tests/setup/preview" && method === "POST") {
+      return json(route, {
+        repo: body?.repo, path: WORKFLOW, branch: "coderhelm/e2e-results-setup", base: "main",
+        title: body?.repair ? "Fix the E2E results upload for Coderhelm" : "Send E2E results to Coderhelm and skip quarantined tests",
+        body: "## Summary", added: ["upload"], notes: ["Uploads playwright-report/, test-results/ after the test step, also when tests fail."], diff: DIFF,
+      });
+    }
+    if (p === "/api/tests/setup/pr" && method === "POST") {
+      const row = db.setup.find((r) => r.repo === body?.repo);
+      if (!row) return json(route, { error: "No such repo." }, 404);
+      row.pr = { status: "queued", kind: body?.repair ? "repair" : "setup", quarantine: !!body?.quarantine, workflow_path: WORKFLOW, actor: "admin@example.com", created_at: ago(0), updated_at: ago(0) };
+      row.status = "in_progress";
+      return json(route, { pr: row.pr });
+    }
     if (p === "/api/tests/runs") {
       if (db.empty) return json(route, { runs: [], next: null });
       const branch = url.searchParams.get("branch");
@@ -232,16 +355,19 @@ async function shot(page: Page, name: string) {
 
 const callsTo = (db: Backend, method: string, re: RegExp) => db.calls.filter((c) => c.method === method && re.test(c.path));
 
-test("tests: off by default, an admin turns it on and sees the reporter change", async ({ page }) => {
+test("tests: off by default, an admin turns it on and sets up each repo", async ({ page }) => {
   const db = await mockApi(page, { empty: true, settings: { enabled: false, auto_quarantine: false, fix_prs: false, tickets: "off", burn_in: false, repos: [], ticket_after_days: 2 } });
   await page.goto("/tests");
   await expect(page.getByRole("heading", { name: "Turn on E2E tracking" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "playwright.config.ts" })).toContainText('["json", { outputFile: "test-results/results.json" }]');
-  await expect(page.getByRole("region", { name: "GitHub Actions step" }).first()).toContainText("if: ${{ !cancelled() }}");
+  // No wall of YAML before anything is on.
+  await expect(page.locator("[data-code-block]:visible")).toHaveCount(0);
   await shot(page, "empty-off");
   await page.getByRole("button", { name: "Turn on E2E tracking" }).click();
   await expect(page.getByRole("heading", { name: "Waiting for the first E2E run" })).toBeVisible();
   expect(callsTo(db, "PUT", /\/api\/tests\/settings/)[0].body).toMatchObject({ enabled: true });
+  await expect(page.getByRole("heading", { name: "Set up each repository" })).toBeVisible();
+  await expect(page.getByTestId("ci-setup-repo").filter({ hasText: WEB }).getByRole("button", { name: "Create setup PR" })).toBeVisible();
+  await shot(page, "empty-on");
 });
 
 test("tests: a member sees the empty state but can't turn it on, and has no settings tab", async ({ page }) => {
@@ -421,9 +547,7 @@ test("tests: the quarantine ledger and releasing a test", async ({ page }) => {
   await expect(list.getByRole("listitem")).toHaveCount(1);
   await expect(page.getByText("1 test has been quarantined for over 2 days.")).toBeVisible();
   await expect(page.getByText(/When only quarantined tests fail, Coderhelm treats the run as passing/)).toBeVisible();
-  await page.getByText("Make quarantined tests stop failing your build").click();
-  await expect(page.getByText(/--grep-invert "\$QUARANTINED"/)).toBeVisible();
-  await expect(page.getByText(/audience=coderhelm/)).toBeVisible();
+  await expect(page.getByText(/Setup adds that step for you/)).toBeVisible();
   await expect(list.getByRole("link", { name: "Ticket" })).toHaveAttribute("href", /issues\/42/);
   await expect(list).toContainText("Proving the fix (20 runs)");
   await shot(page, "quarantine");
@@ -488,7 +612,7 @@ test("tests: settings save every choice", async ({ page }) => {
   expect(callsTo(db, "PUT", /\/api\/tests\/settings/)[0].body).toEqual({
     enabled: true, auto_quarantine: false, fix_prs: true, tickets: "jira", burn_in: true, repos: [WEB], ticket_after_days: 5,
   });
-  await expect(page.getByRole("heading", { name: "Make quarantined tests stop failing your build" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "CI setup" })).toBeVisible();
 });
 
 test("tests: a failed load says so and retries", async ({ page }) => {
@@ -503,4 +627,147 @@ test("tests: a failed load says so and retries", async ({ page }) => {
   fail = false;
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(page.getByRole("list", { name: "Tests that need attention" })).toBeVisible();
+});
+
+// ── CI setup ──────────────────────────────────────────────────────────────
+
+const card = (page: Page, repo: string) => page.getByTestId("ci-setup-repo").filter({ has: page.getByRole("heading", { name: repo, exact: true }) });
+const step = (page: Page, repo: string, id: string) => card(page, repo).locator(`[data-testid="setup-step"][data-step="${id}"]`);
+
+test("setup: a checklist per repo shows none, partial and done from real state", async ({ page }) => {
+  await mockApi(page, { setup: [setupRow(WEB), PARTIAL, SET_UP(MOBILE), NO_TESTS] });
+  await page.goto("/tests?view=setup");
+  await expect(page.getByTestId("ci-setup-summary")).toContainText("1 of 3 repositories send results.");
+  // Order: what needs doing first, finished last, nothing-to-do apart.
+  await expect(page.getByTestId("ci-setup-repo")).toHaveCount(3);
+  await expect(page.getByTestId("ci-setup-repo").first()).toHaveAttribute("data-status", "needs_setup");
+
+  // None: one primary action, its steps not found, the manual path collapsed.
+  await expect(card(page, WEB).getByRole("button", { name: "Create setup PR" })).toBeVisible();
+  await expect(card(page, WEB).getByText("Not set up")).toBeVisible();
+  await expect(step(page, WEB, "upload")).toHaveAttribute("data-state", "missing");
+  await expect(step(page, WEB, "results")).toContainText("Nothing received yet");
+  await expect(card(page, WEB).locator("[data-code-block]:visible")).toHaveCount(0);
+
+  // Partial: the step is in, the reporter isn't, and it waits for a run.
+  await expect(card(page, API).getByText("Waiting for a run")).toBeVisible();
+  await expect(step(page, API, "upload")).toHaveAttribute("data-state", "done");
+  await expect(step(page, API, "reporter")).toHaveAttribute("data-state", "missing");
+  await expect(card(page, API).getByRole("button", { name: "Create setup PR" })).toHaveCount(0);
+
+  // Done: green, collapsed to one line each, with what really arrived.
+  await expect(card(page, MOBILE).getByTestId("ci-setup-done")).toContainText("last upload 2 h ago, 128 tests read");
+  await expect(step(page, MOBILE, "quarantine")).toContainText("the last run fetched the list 2 h ago");
+  await expect(card(page, MOBILE).getByText("Do it myself")).toHaveCount(0);
+  await expect(card(page, MOBILE).getByRole("button", { name: "Create setup PR" })).toHaveCount(0);
+
+  // Nothing to do.
+  await expect(page.getByTestId("ci-setup-no-tests")).toHaveText(DOCS);
+  await shot(page, "setup");
+});
+
+test("setup: Create setup PR previews the diff, shows progress, then the PR and its checks", async ({ page }) => {
+  const db = await mockApi(page);
+  await page.goto("/tests?view=setup");
+  const web = card(page, WEB);
+  await expect(web.getByLabel("Also skip quarantined tests in this build")).toBeChecked();
+  await web.getByRole("button", { name: "Create setup PR" }).click();
+  const dialog = page.getByRole("dialog", { name: "Create setup PR" });
+  await expect(dialog.getByTestId("ci-setup-preview")).toContainText("Send E2E results to Coderhelm and skip quarantined tests");
+  await expect(dialog.getByRole("region", { name: `Change to ${WORKFLOW}` })).toContainText("Upload E2E results for Coderhelm");
+  await expect(dialog).toContainText("From coderhelm/e2e-results-setup into main");
+  expect(callsTo(db, "POST", /\/api\/tests\/setup\/preview/)[0].body).toEqual({ repo: WEB, quarantine: true });
+  await shot(page, "setup-preview");
+  // Nothing is opened until confirmed.
+  expect(callsTo(db, "POST", /\/api\/tests\/setup\/pr$/)).toHaveLength(0);
+  await dialog.getByRole("button", { name: "Create PR" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(callsTo(db, "POST", /\/api\/tests\/setup\/pr$/)[0].body).toEqual({ repo: WEB, quarantine: true });
+  await expect(web.getByTestId("ci-setup-progress")).toBeVisible();
+  // The page reads the state again by itself until the PR is open.
+  await expect(web.getByRole("link", { name: /Setup PR #512/ })).toHaveAttribute("href", `https://github.com/${WEB}/pull/512`, { timeout: 20_000 });
+  await expect(web.getByTestId("ci-setup-pr")).toContainText("Checks running");
+  await expect(web.getByText("Setup PR open")).toBeVisible();
+  await shot(page, "setup-pr-open");
+});
+
+test("setup: added but nothing received names the cause and offers a fix PR", async ({ page }) => {
+  const db = await mockApi(page, { setup: [NOTHING] });
+  await page.goto("/tests?view=setup");
+  const api = card(page, API);
+  await expect(api.getByText("Nothing received", { exact: true })).toBeVisible();
+  await expect(api.getByTestId("ci-setup-nothing")).toContainText("the last 3 runs sent no results");
+  await expect(api.getByTestId("ci-setup-nothing")).toContainText("The artifact path doesn't match.");
+  await expect(api.getByRole("link", { name: "Open the last run" })).toHaveAttribute("href", `https://github.com/${API}/actions/runs/77`);
+  await expect(step(page, API, "upload")).toHaveAttribute("data-state", "partial");
+  await expect(step(page, API, "results")).toContainText("No results in the last 3 runs.");
+  await shot(page, "setup-nothing");
+  await api.getByRole("button", { name: "Fix it with a PR" }).click();
+  await expect(page.getByRole("dialog", { name: "Fix the results upload" })).toContainText("Fix the E2E results upload for Coderhelm");
+  expect(callsTo(db, "POST", /\/api\/tests\/setup\/preview/)[0].body).toEqual({ repo: API, repair: true });
+});
+
+test("setup: do it myself shows one step's snippet, runner tabs and Copy", async ({ page }) => {
+  await page.addInitScript(() => {
+    const w = window as unknown as { __copied: string[] };
+    w.__copied = [];
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (t: string) => void w.__copied.push(t), readText: async () => "" } });
+  });
+  await mockApi(page);
+  await page.goto("/tests?view=setup");
+  const upload = step(page, WEB, "upload");
+  await upload.getByText("Do it myself").click();
+  await expect(upload).toContainText("Add it after the test step in");
+  const block = upload.getByRole("region", { name: WORKFLOW });
+  await expect(block).toContainText("playwright-report/");
+  // The runner found in the repo is picked; another can be chosen.
+  await expect(upload.getByRole("button", { name: "Playwright" })).toHaveAttribute("aria-pressed", "true");
+  await upload.getByRole("button", { name: "Jest" }).click();
+  await expect(block).toContainText("junit.xml");
+  await block.getByRole("button", { name: /Copy/ }).click();
+  const copied = await page.evaluate(() => (window as unknown as { __copied: string[] }).__copied);
+  expect(copied[copied.length - 1]).toContain("name: Upload E2E results for Coderhelm");
+  expect(copied[copied.length - 1]).toContain("junit.xml");
+  // Only that step's snippet is shown.
+  await expect(card(page, WEB).locator("[data-code-block]:visible")).toHaveCount(1);
+  // The caveats are a small note under the quarantine step, collapsed.
+  const quarantine = step(page, WEB, "quarantine");
+  await quarantine.getByText("Do it myself").click();
+  await expect(quarantine.getByText("Pull requests from forks")).toBeHidden();
+  await quarantine.getByText("Notes").click();
+  await expect(quarantine.getByText("Pull requests from forks")).toBeVisible();
+  await shot(page, "setup-manual");
+});
+
+test("setup: Check again reads the workflow again, and a member can't open PRs", async ({ page }) => {
+  const db = await mockApi(page, { role: "member" });
+  await page.goto("/tests?view=setup");
+  await expect(card(page, WEB).getByText("Ask an admin on your team to create the setup PR.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Create setup PR" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Check again" }).click();
+  await expect.poll(() => callsTo(db, "GET", /\/api\/tests\/setup\?refresh=1/).length).toBe(1);
+});
+
+test("setup: the settings and quarantine views point to setup instead of holding the YAML", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/tests?view=settings");
+  await expect(page.getByRole("heading", { name: "CI setup" })).toBeVisible();
+  await expect(page.locator("[data-code-block]:visible")).toHaveCount(0);
+  await page.getByRole("link", { name: "Open setup" }).click();
+  await expect(page).toHaveURL(/view=setup/);
+  await page.goto("/tests?view=quarantine");
+  await expect(page.locator("[data-code-block]:visible")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Open setup" })).toBeVisible();
+});
+
+test("setup: long names never push the page sideways on a phone", async ({ page }) => {
+  const { unanswered } = await mockWideApi(page);
+  await page.setViewportSize({ width: 375, height: 800 });
+  await page.goto("/tests?view=setup");
+  await expect(page.getByTestId("ci-setup-repo")).toHaveCount(2);
+  for (const d of await page.getByText("Do it myself").all()) await d.click();
+  await page.waitForTimeout(250);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow, "the setup view scrolls sideways at 375px").toBeLessThanOrEqual(0);
+  expect(unanswered.filter((u) => u.startsWith("/api/tests"))).toEqual([]);
 });
