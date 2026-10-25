@@ -58,7 +58,7 @@ export function HiddenSuggestions({
   return (
     <section aria-labelledby={`hs-${source.id}`} className="flex flex-col gap-2 rounded-lg border border-zinc-800 p-3">
       <h4 id={`hs-${source.id}`} className="text-sm font-semibold text-zinc-100">Suggested hidden fields</h4>
-      <p className="text-xs text-zinc-500">
+      <p className="text-xs text-zinc-400">
         Columns whose table and column names suggest they hold a person&apos;s details. Only names are read, never data.
         Nothing is hidden until you accept it.
       </p>

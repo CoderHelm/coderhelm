@@ -37,7 +37,7 @@ export function RolesMatrix({ perms, inUse }: { perms: Permissions; inUse: Set<s
 
   return (
     <section aria-labelledby="perms-heading" className="mt-10 min-w-0" data-testid="roles">
-      <h2 id="perms-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+      <h2 id="perms-heading" className="text-sm font-semibold text-zinc-100">
         What each role can do
       </h2>
       <p className="mt-2 max-w-prose text-sm text-zinc-400">Each role can do everything the role before it can, and more.</p>
@@ -74,8 +74,8 @@ export function RolesMatrix({ perms, inUse }: { perms: Permissions; inUse: Set<s
           </colgroup>
           <thead>
             <tr className="border-b border-zinc-800 bg-zinc-900/60">
-              <th scope="col" className="px-4 py-2.5 text-left text-xs font-medium text-zinc-500">
-                Capability
+              <th scope="col" className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400">
+                What they can do
               </th>
               {ladder.map((r) => {
                 const mine = r.key === perms.your_role;
@@ -89,7 +89,7 @@ export function RolesMatrix({ perms, inUse }: { perms: Permissions; inUse: Set<s
                   >
                     {r.label}
                     {mine && " "}
-                    {mine && <span className="mt-0.5 block text-[10px] font-normal uppercase tracking-wider text-zinc-400">You</span>}
+                    {mine && <span className="mt-0.5 block text-xs font-normal uppercase tracking-wider text-zinc-400">You</span>}
                   </th>
                 );
               })}
@@ -107,13 +107,13 @@ export function RolesMatrix({ perms, inUse }: { perms: Permissions; inUse: Set<s
                       aria-expanded={open}
                       aria-controls={rowsId}
                       onClick={() => toggle(g.id)}
-                      className={`flex w-full items-center gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-400 hover:text-zinc-200 ${focusRing} focus-visible:outline-offset-[-2px]`}
+                      className={`flex w-full items-center gap-2 px-4 py-2 text-sm font-semibold text-zinc-100 hover:text-zinc-200 ${focusRing} focus-visible:outline-offset-[-2px]`}
                     >
                       <span aria-hidden="true" className={`inline-block transition-transform motion-reduce:transition-none ${open ? "rotate-90" : ""}`}>
                         ›
                       </span>
                       {g.label}
-                      <span className="font-normal normal-case tracking-normal text-zinc-600">{g.items.length}</span>
+                      <span className="font-normal normal-case tracking-normal text-zinc-400">{g.items.length}</span>
                     </button>
                   </th>
                 </tr>
@@ -142,7 +142,7 @@ export function RolesMatrix({ perms, inUse }: { perms: Permissions; inUse: Set<s
         <PhoneList perms={perms} role={ladder.find((r) => r.key === picked) ?? ladder[0]} groups={groups} />
       </div>
 
-      {legacy.length > 0 && <p className="mt-3 text-xs text-zinc-500">{legacy.map((r) => `${r.label}: ${r.summary}`).join(" ")}</p>}
+      {legacy.length > 0 && <p className="mt-3 text-xs text-zinc-400">{legacy.map((r) => `${r.label}: ${r.summary}`).join(" ")}</p>}
     </section>
   );
 }
@@ -169,7 +169,7 @@ function PhoneList({
       </div>
       {groups.map((g) => (
         <div key={g.id} className="border-b border-zinc-800 last:border-b-0">
-          <p className="px-3 pt-2.5 text-xs font-semibold uppercase tracking-wider text-zinc-500">{g.label}</p>
+          <p className="px-3 pt-2.5 text-sm font-semibold text-zinc-100">{g.label}</p>
           <ul className="px-3 pb-2.5 pt-1.5">
             {g.items.map((c) => {
               const yes = roleCan(perms, role, c);

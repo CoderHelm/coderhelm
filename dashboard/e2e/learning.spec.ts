@@ -86,17 +86,23 @@ test("shows rewards, categories, changes with evidence, examples and variants", 
   await page.getByRole("button", { name: "Show table: Average reward per day" }).click();
   await expect(page.getByRole("table", { name: "Average reward per day" })).toContainText(REPO);
 
-  const dismissed = page.getByRole("table", { name: "Most dismissed categories" });
+  // One table, sorted by most acted on or most dismissed.
+  const categories = page.getByRole("table", { name: "Review comment categories" });
+  await expect(categories).toContainText("Looked for more");
+  await page.getByRole("group", { name: "Sort categories" }).getByRole("button", { name: "Most dismissed" }).click();
+  const dismissed = categories;
+  await expect(dismissed.locator("tbody tr").first()).toContainText(/style|security/);
   await expect(dismissed).toContainText("style");
   await expect(dismissed).toContainText("Held back");
   // Security is dismissed often but marked as always kept, never held back.
   const security = dismissed.getByRole("row").filter({ hasText: "security" });
   await expect(security).toContainText("Always kept");
   await expect(security).toContainText("No change");
-  await expect(page.getByRole("table", { name: "Most acted on categories" })).toContainText("Looked for more");
 
   const style = page.getByTestId("change-chg_style");
-  await expect(style).toContainText("style: none");
+  // A change reads as sentences, never as "key: from → to".
+  await expect(style).toContainText("Style comments: only raised when it blocks the merge.");
+  await expect(style).toContainText("Before: raised as usual.");
   await expect(style).toContainText("Dismissed 9 of 14");
   await style.getByText("Evidence (3 outcomes)").click();
   await expect(style).toContainText("Review comment dismissed or argued");
@@ -105,7 +111,25 @@ test("shows rewards, categories, changes with evidence, examples and variants", 
   await expect(page.locator("#exemplars")).toContainText("To follow");
   await expect(page.locator("#exemplars")).toContainText("Ask for a test of the retry path");
   await expect(page.getByTestId("bandit-reviewer")).toContainText("Gathering outcomes");
+  // Scoring rules fold away under Advanced.
+  await expect(page.getByRole("table", { name: "Signal weights" })).toBeHidden();
+  await page.getByText("Advanced: scoring rules").click();
   await expect(page.getByRole("table", { name: "Signal weights" })).toContainText("Merged change reverted");
+});
+
+test("the category table sorts by most acted on or most dismissed", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/learning");
+  const sort = page.getByRole("group", { name: "Sort categories" });
+  const table = page.getByRole("table", { name: "Review comment categories" });
+  await expect(sort.getByRole("button", { name: "Most acted on" })).toHaveAttribute("aria-pressed", "true");
+  const firstActed = await table.locator("tbody tr").first().textContent();
+  await sort.getByRole("button", { name: "Most dismissed" }).click();
+  await expect(sort.getByRole("button", { name: "Most dismissed" })).toHaveAttribute("aria-pressed", "true");
+  const firstDismissed = await table.locator("tbody tr").first().textContent();
+  expect(firstDismissed).not.toEqual(firstActed);
+  // Only one categories table: the two old ones repeated the same rows.
+  await expect(page.getByRole("table", { name: /categories/ })).toHaveCount(1);
 });
 
 test("an admin pins and unpins a variant", async ({ page }) => {
@@ -126,11 +150,13 @@ test("an admin turns a change off and back on", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/learning");
   const style = page.getByTestId("change-chg_style");
-  await style.getByRole("button", { name: "Turn off" }).click();
+  // Undo asks first; red only inside the dialog.
+  await style.getByRole("button", { name: "Undo this change" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Undo change" }).click();
   await expect(style).toContainText("Turned off by an-admin");
   expect(db.calls.find((c) => c.path === "/api/learning/revert")?.body).toEqual({ id: "chg_style" });
   await style.getByRole("button", { name: "Turn back on" }).click();
-  await expect(style.getByRole("button", { name: "Turn off" })).toBeVisible();
+  await expect(style.getByRole("button", { name: "Undo this change" })).toBeVisible();
   expect(db.calls.find((c) => c.path === "/api/learning/restore")?.body).toEqual({ id: "chg_style" });
 });
 
@@ -158,6 +184,7 @@ test("turning off everything for a repository asks first", async ({ page }) => {
 test("an admin changes a weight and goes back to the defaults", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/learning");
+  await page.getByText("Advanced: scoring rules").click();
   const input = page.getByRole("spinbutton", { name: "Weight for Merged change reverted" });
   await input.fill("-3");
   await expect(page.getByTestId("weights-save-bar")).toContainText("1 unsaved change");
@@ -177,7 +204,7 @@ test("a member sees everything but cannot change it, and is told why", async ({ 
   await page.goto("/learning");
   await expect(page.getByText("You can see everything here")).toBeVisible();
   await expect(page.getByText(/Only an admin or the owner can pin a variant/)).toBeVisible();
-  const off = page.getByTestId("change-chg_style").getByRole("button", { name: "Turn off" });
+  const off = page.getByTestId("change-chg_style").getByRole("button", { name: "Undo this change" });
   await expect(off).toBeDisabled();
   await expect(off).toHaveAttribute("title", /Only an admin or the owner/);
   await expect(page.getByRole("button", { name: "Pin Evidence first for Reviewer" })).toBeDisabled();
@@ -198,7 +225,7 @@ test("a custom role is gated by its capabilities, not its name", async ({ page }
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ user_id: "u_2", team_id: "t_1", github_login: "a-captain", email: "captain@example.com", avatar_url: "", role: "release-captain", capabilities: ["view", "view_team", "own_account", "learning"] }) }),
   );
   await page.goto("/learning");
-  await expect(page.getByTestId("change-chg_style").getByRole("button", { name: "Turn off" })).toBeEnabled();
+  await expect(page.getByTestId("change-chg_style").getByRole("button", { name: "Undo this change" })).toBeEnabled();
   await expect(page.getByText("You can see everything here")).toHaveCount(0);
 });
 
@@ -209,13 +236,14 @@ test("an admin without the learning capability cannot change anything", async ({
   );
   await page.goto("/learning");
   await expect(page.getByText("You can see everything here")).toBeVisible();
-  await expect(page.getByTestId("change-chg_style").getByRole("button", { name: "Turn off" })).toBeDisabled();
+  await expect(page.getByTestId("change-chg_style").getByRole("button", { name: "Undo this change" })).toBeDisabled();
 });
 
 test("a refused action is said in words and changes nothing", async ({ page }) => {
   await mockApi(page, { writeStatus: 403 });
   await page.goto("/learning");
-  await page.getByTestId("change-chg_style").getByRole("button", { name: "Turn off" }).click();
+  await page.getByTestId("change-chg_style").getByRole("button", { name: "Undo this change" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Undo change" }).click();
   const alert = page.getByRole("main").getByRole("alert");
   await expect(alert).toContainText("That was not changed");
   await expect(alert).toContainText("Only an admin or the owner can change what Coderhelm learned (error 403)");
@@ -239,7 +267,7 @@ test("a failed load offers a retry", async ({ page }) => {
     fail ? route.fulfill({ status: 500, contentType: "application/json", body: "{}" }) : route.fallback(),
   );
   await page.goto("/learning");
-  await expect(page.getByText("We couldn't load what Coderhelm learned")).toBeVisible();
+  await expect(page.getByText("Couldn't load what Coderhelm learned")).toBeVisible();
   fail = false;
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(page.getByTestId("tile-events")).toBeVisible();

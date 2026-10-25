@@ -217,9 +217,9 @@ test("the platform admin sees the whole shared queue, with each message's team",
   await expect(counts).toContainText("Can't be read2");
   const rows = page.getByTestId("queue-message");
   await expect(rows).toHaveCount(3);
-  await expect(rows.nth(0)).toContainText("TEAM#team-a");
+  await expect(rows.nth(0)).toContainText("team-a");
   await expect(rows.nth(0)).toContainText("Can't be retried: unknown message type SkillSync");
-  await expect(rows.nth(1)).toContainText("TEAM#team-b");
+  await expect(rows.nth(1)).toContainText("team-b");
   await expect(rows.nth(2)).toContainText("No team");
   await expect(page.getByText(/archived and removed after 7 days/)).toBeVisible();
   await shot(page, "admin-queue.png");

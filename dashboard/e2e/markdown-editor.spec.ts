@@ -324,7 +324,7 @@ test.describe("the markdown editor", () => {
     expect(await box.evaluate((el) => getComputedStyle(el).fontFamily)).not.toMatch(/mono/i);
     await shot(page, "md-editor-instructions-1280");
     await page.getByRole("tab", { name: "Preview" }).click();
-    await expect(page.getByTestId("md-preview")).toContainText("Agents get this text as written");
+    await expect(page.getByTestId("md-preview")).toContainText("Coderhelm reads this exactly as written");
     await expect(page.getByTestId("md-preview").getByRole("listitem")).toHaveCount(2);
     await page.getByRole("button", { name: "Save" }).click();
     await expect.poll(() => db.puts.find((p) => p.path === "/api/instructions/global")?.body).toEqual({

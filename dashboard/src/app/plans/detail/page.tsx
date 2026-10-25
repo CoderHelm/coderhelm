@@ -149,12 +149,12 @@ function PlanDetail() {
   const actions: TaskActions = {
     busy,
     approve: (id) =>
-      void taskAction(`${id}:approve`, () => api.approveTask(planId, id), "Task approved & queued", (e) =>
-        e instanceof Error ? e.message : "Failed to approve task",
+      void taskAction(`${id}:approve`, () => api.approveTask(planId, id), "Approved. Coderhelm will start it next.", (e) =>
+        e instanceof Error ? e.message : "Couldn't approve the task. Try again.",
       ),
-    reject: (id) => void taskAction(`${id}:reject`, () => api.rejectTask(planId, id), "Task rejected", "Failed to reject task"),
-    remove: (id) => void taskAction(`${id}:delete`, () => api.deleteTask(planId, id), "Task removed", "Failed to remove task"),
-    retry: (id) => void taskAction(`${id}:retry`, () => api.forceRunTask(planId, id), "Task retried", "Failed to retry task"),
+    reject: (id) => void taskAction(`${id}:reject`, () => api.rejectTask(planId, id), "Task skipped", "Couldn't skip the task. Try again."),
+    remove: (id) => void taskAction(`${id}:delete`, () => api.deleteTask(planId, id), "Task removed", "Couldn't remove the task. Try again."),
+    retry: (id) => void taskAction(`${id}:retry`, () => api.forceRunTask(planId, id), "Trying the task again", "Couldn't retry the task. Try again."),
     forceRun: async (id) => {
       setBusy(id);
       // Optimistic: move to queued immediately
@@ -174,7 +174,7 @@ function PlanDetail() {
       try {
         await api.updateTask(planId, id, { depends_on: val });
       } catch {
-        toast("Failed to update dependency", "error");
+        toast("Couldn't change the order. Try again.", "error");
         refresh();
       }
     },
@@ -196,7 +196,7 @@ function PlanDetail() {
       toast(`Destination changed to ${dest === "github" ? "GitHub Issues" : "Jira Tickets"}`);
       refresh();
     } catch {
-      toast("Failed to update destination", "error");
+      toast("Couldn't change where the tasks go. Try again.", "error");
     } finally {
       setUpdatingDest(false);
     }
@@ -340,7 +340,7 @@ function PlanDetail() {
     <Page>
       <header className="min-w-0" data-testid="plan-header">
         <PageHeader detail title={plan.title || "Untitled plan"} actions={primary} more={more} />
-        <ul className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500" aria-label="About this plan" data-testid="plan-summary">
+        <ul className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400" aria-label="About this plan" data-testid="plan-summary">
           <li>
             <StatusText look={planStatusLook(plan.status)} />
           </li>
@@ -495,7 +495,7 @@ function DocSection({
         </h2>
         {aside && <span className={`text-xs ${TONES.neutral.text}`}>{aside}</span>}
       </div>
-      {note && <p className="mb-3 max-w-prose text-xs text-zinc-500">{note}</p>}
+      {note && <p className="mb-3 max-w-prose text-xs text-zinc-400">{note}</p>}
       {children}
     </section>
   );

@@ -382,7 +382,7 @@ test.describe("people on a ticket", () => {
     await input.press("Enter");
     await expect(page.getByTestId("ticket-person")).toHaveCount(3);
     expect(db.posts.filter((x) => x.path.endsWith("/participants")).at(-1)!.body).toEqual({ email: "alex.guest@example.org" });
-    await expect(page.getByTestId("ticket-person").last()).toContainText("Copied");
+    await expect(page.getByTestId("ticket-person").last()).toContainText("CC'd");
     await expect(page.getByTestId("avatar-stack")).toContainText("3 people on this ticket");
 
     await page.getByRole("button", { name: "Remove alex.guest@example.org from this ticket" }).click();
@@ -469,7 +469,7 @@ test.describe("people on a new ticket", () => {
     await expect(form.getByTestId("add-person-option")).toContainText("they get the emails but can't sign in");
     await input.press("Enter");
     await expect(person).toHaveCount(4);
-    await expect(person.last()).toContainText("Copied");
+    await expect(person.last()).toContainText("CC'd");
     expect(creates(db)).toHaveLength(0);
 
     // Taken off before sending.
@@ -490,7 +490,7 @@ test.describe("people on a new ticket", () => {
     await expect(people).toHaveCount(3);
     await expect(people.nth(1)).toContainText("Sam Ortiz");
     await expect(people.nth(2)).toContainText("alex.guest@example.org");
-    await expect(people.nth(2)).toContainText("Copied");
+    await expect(people.nth(2)).toContainText("CC'd");
     const events = page.getByTestId("support-event");
     await expect(events).toHaveCount(2);
     await expect(events.first()).toContainText("Pat Lee added Sam Ortiz");

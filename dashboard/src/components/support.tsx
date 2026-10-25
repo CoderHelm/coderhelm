@@ -58,7 +58,7 @@ import { ChatMarkdown } from "./chat-markdown";
 import { MarkdownEditor, clearDraft } from "./markdown-editor";
 import { Time } from "./list";
 import { LifeBuoyIcon } from "./icons";
-import { focusRing, inputClass, primaryButton, secondaryButton } from "./ui";
+import { focusRing, inputClass, primaryButton, secondaryButton, smallSecondaryButton, smallPrimaryButton } from "./ui";
 import { usePhone } from "@/hooks/use-phone";
 
 // ── Avatars ──────────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ export function Avatar({
   support?: boolean;
   size?: "sm" | "md";
 }) {
-  const box = size === "sm" ? "h-6 w-6 text-[10px]" : "h-8 w-8 text-xs";
+  const box = size === "sm" ? "h-6 w-6 text-xs" : "h-8 w-8 text-xs";
   if (support) {
     return (
       <span aria-hidden="true" className={`${box} grid shrink-0 place-items-center rounded-full bg-sky-500/15 text-sky-300 ring-2 ring-zinc-950`}>
@@ -114,7 +114,7 @@ export function AvatarStack({ ticket, avatars = {}, max = 5 }: { ticket: Support
         </span>
       ))}
       {more > 0 && (
-        <span aria-hidden="true" className="-ml-2 grid h-6 min-w-6 place-items-center rounded-full bg-zinc-800 px-1 text-[10px] font-medium text-zinc-300 ring-2 ring-zinc-950">
+        <span aria-hidden="true" className="-ml-2 grid h-6 min-w-6 place-items-center rounded-full bg-zinc-800 px-1 text-xs font-medium text-zinc-300 ring-2 ring-zinc-950">
           +{more}
         </span>
       )}
@@ -229,7 +229,7 @@ export function SupportThread({
                   type="button"
                   onClick={() => setExpanded(true)}
                   data-testid="thread-show-earlier"
-                  className={`inline-flex min-h-8 items-center gap-2 rounded-full border border-dashed border-zinc-700 bg-zinc-950 px-3 text-xs text-zinc-300 hover:border-zinc-500 hover:text-zinc-100 ${focusRing}`}
+                  className={`inline-flex min-h-8 items-center gap-2 rounded-full border border-zinc-700 bg-zinc-900 px-3 text-xs text-zinc-300 hover:border-zinc-500 hover:text-zinc-100 ${focusRing}`}
                 >
                   Show {e.messages} earlier message{e.messages === 1 ? "" : "s"}
                   {others > 0 && (
@@ -254,7 +254,7 @@ export function SupportThread({
           const who = author(m, admin);
           if (e.type === "event") {
             return (
-              <li key={m.id} className="relative flex min-w-0 items-start gap-3 py-1.5 text-xs text-zinc-500" data-testid="support-event" data-event={eventKind(m.body)}>
+              <li key={m.id} className="relative flex min-w-0 items-start gap-3 py-1.5 text-xs text-zinc-400" data-testid="support-event" data-event={eventKind(m.body)}>
                 <span className="grid h-8 w-8 shrink-0 place-items-center" aria-hidden="true">
                   <span className={`h-2 w-2 rounded-full ring-4 ring-zinc-950 ${EVENT_DOT[eventKind(m.body)]}`} />
                 </span>
@@ -262,7 +262,7 @@ export function SupportThread({
                   <span className="font-medium text-zinc-400" title={who.title}>
                     {who.name}
                   </span>{" "}
-                  {eventWords(m.body)} <Time iso={m.created_at} className="text-zinc-600" />
+                  {eventWords(m.body)} <Time iso={m.created_at} className="text-zinc-400" />
                 </span>
               </li>
             );
@@ -345,7 +345,7 @@ function MessageRow({
           <Avatar name={who.name} email={m.author_email} url={avatarUrl} support={support && !admin} />
           <span className={`shrink-0 font-medium ${support ? "text-sky-300" : "text-zinc-200"}`}>{who.name}</span>
           <span className="min-w-0 flex-1 truncate text-zinc-500">{m.body || (m.attachments?.length ? "Attached items" : "")}</span>
-          <Time iso={m.created_at} className="shrink-0 text-xs text-zinc-600" />
+          <Time iso={m.created_at} className="shrink-0 text-xs text-zinc-400" />
         </button>
       </li>
     );
@@ -365,8 +365,8 @@ function MessageRow({
             <span className={`text-sm font-medium ${support ? "text-sky-300" : "text-zinc-100"}`} title={who.title} data-testid="message-author">
               {who.name}
             </span>
-            {support && admin && <span className="rounded border border-sky-500/30 px-1 text-[10px] uppercase tracking-wide text-sky-300">Support</span>}
-            <Time iso={m.created_at} className="text-xs text-zinc-500" />
+            {support && admin && <span className="rounded border border-sky-500/30 px-1 text-xs uppercase tracking-wide text-sky-300">Support</span>}
+            <Time iso={m.created_at} className="text-xs text-zinc-400" />
           </div>
         )}
         {main && (
@@ -417,7 +417,7 @@ function MessageRow({
           type="button"
           onClick={() => onQuote(quoteFor(who.name, m.body))}
           aria-label={`Quote ${who.name}`}
-          className={`absolute right-0 top-3 rounded px-1.5 py-0.5 text-xs text-zinc-500 opacity-0 hover:text-zinc-200 focus-visible:opacity-100 group-hover:opacity-100 ${focusRing}`}
+          className={`absolute right-0 top-3 rounded px-1.5 py-0.5 text-xs text-zinc-400 opacity-0 hover:text-zinc-200 focus-visible:opacity-100 group-hover:opacity-100 ${focusRing}`}
           data-testid="quote-message"
         >
           Quote
@@ -623,12 +623,12 @@ export function Composer({
             const label = !hasText && a.emptyLabel ? a.emptyLabel : a.label;
             const ok = !busy && !disabled && (hasText || items.length > 0 || !!a.emptyLabel);
             return (
-              <button key={a.key} type="button" onClick={() => void send(a.key)} disabled={!ok} className={`${secondaryButton} !min-h-8 !py-1 !px-3`} data-testid={`composer-${a.key}`}>
+              <button key={a.key} type="button" onClick={() => void send(a.key)} disabled={!ok} className={`${smallSecondaryButton}`} data-testid={`composer-${a.key}`}>
                 {label}
               </button>
             );
           })}
-          <button type="submit" disabled={!canSend} className={`${primaryButton} !min-h-8 !py-1 !px-3`} data-testid="composer-send">
+          <button type="submit" disabled={!canSend} className={`${smallPrimaryButton}`} data-testid="composer-send">
             {busy ? "Sending…" : sendLabel}
           </button>
         </div>
@@ -687,7 +687,7 @@ export function TicketPeople({
                 {p.name}
                 {self && <span className="text-zinc-500"> (you)</span>}
               </span>
-              <span className="shrink-0 text-xs text-zinc-500">{p.filer ? "Filed" : p.outside ? "Copied" : ""}</span>
+              <span className="shrink-0 text-xs text-zinc-400">{p.filer ? "Filed" : p.outside ? "CC'd" : ""}</span>
               {removable && !self && (
                 <button
                   type="button"
@@ -704,7 +704,7 @@ export function TicketPeople({
       </ul>
       <div className="mt-3 flex flex-wrap gap-2">
         {canManage && !adding && (
-          <button type="button" onClick={() => setAdding(true)} disabled={full} className={`${secondaryButton} !min-h-8 !py-1 !px-3`} data-testid="add-people">
+          <button type="button" onClick={() => setAdding(true)} disabled={full} className={`${smallSecondaryButton}`} data-testid="add-people">
             + Add people
           </button>
         )}
@@ -713,16 +713,16 @@ export function TicketPeople({
             type="button"
             onClick={() => void (mine ? onRemove({ user_id: me }) : onAdd({ user_id: me }))}
             disabled={!mine && full}
-            className={`${secondaryButton} !min-h-8 !py-1 !px-3`}
+            className={`${smallSecondaryButton}`}
             data-testid="follow-ticket"
           >
             {mine ? "Unfollow" : "Follow"}
           </button>
         )}
       </div>
-      {full && <p className="mt-2 text-xs text-zinc-500">A ticket can have {MAX_PARTICIPANTS} people besides the person who filed it.</p>}
+      {full && <p className="mt-2 text-xs text-zinc-400">A ticket can have {MAX_PARTICIPANTS} people besides the person who filed it.</p>}
       {adding && canManage && <AddPeople ticket={ticket} admin={admin} onAdd={onAdd} onClose={() => setAdding(false)} />}
-      <p className="mt-2 text-xs text-zinc-500">{note}</p>
+      <p className="mt-2 text-xs text-zinc-400">{note}</p>
     </div>
   );
 }
@@ -776,7 +776,7 @@ function AddPeople({
         <span className="flex min-w-0 items-center gap-2">
           <Avatar name={personName(u.name || u.github_login, u.email)} email={u.email ?? ""} url={u.avatar_url ?? undefined} size="sm" />
           <span className="min-w-0 truncate text-zinc-200">{personName(u.name || u.github_login, u.email)}</span>
-          {u.email && <span className="min-w-0 truncate text-xs text-zinc-500">{u.email}</span>}
+          {u.email && <span className="min-w-0 truncate text-xs text-zinc-400">{u.email}</span>}
         </span>
       ),
     })),
@@ -788,7 +788,7 @@ function AddPeople({
             label: (
               <span className="min-w-0">
                 <span className="block truncate text-zinc-200">Copy {email} by email</span>
-                <span className="block text-xs text-zinc-500">{admin ? "A team member's address adds them as a member." : "Not on the team: they get the emails but can't sign in."}</span>
+                <span className="block text-xs text-zinc-400">{admin ? "A team member's address adds them as a member." : "Not on the team: they get the emails but can't sign in."}</span>
               </span>
             ),
           },
@@ -862,7 +862,7 @@ function AddPeople({
         </button>
       </div>
       {hint && (
-        <p className="mt-1.5 px-1 text-xs text-zinc-500" role="status">
+        <p className="mt-1.5 px-1 text-xs text-zinc-400" role="status">
           {hint}
         </p>
       )}
@@ -895,7 +895,7 @@ function AddPeople({
 export function PanelSection({ title, children, testId }: { title: ReactNode; children: ReactNode; testId?: string }) {
   return (
     <section className="min-w-0 border-t border-zinc-800/80 pt-4 first:border-t-0 first:pt-0" data-testid={testId}>
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">{title}</h2>
+      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">{title}</h2>
       {children}
     </section>
   );
@@ -921,7 +921,7 @@ export function TicketContext({
     rows.push([
       "Team",
       <span key="team">
-        {ticket.team_name || "(no name)"} <span className="font-mono text-[11px] text-zinc-500">{ticket.team_id}</span>
+        {ticket.team_name || "(no name)"} <span className="font-mono text-xs text-zinc-400">{ticket.team_id}</span>
       </span>,
     ]);
   }
@@ -992,7 +992,7 @@ export function TicketLayout({
               ›
             </span>
             <span className="font-medium">Details</span>
-            <span className="min-w-0 flex-1 truncate text-xs text-zinc-500">{detailsSummary}</span>
+            <span className="min-w-0 flex-1 truncate text-xs text-zinc-400">{detailsSummary}</span>
           </button>
           <div
             id="ticket-details"
@@ -1027,7 +1027,7 @@ export function TicketHeader({
         <div className="w-full min-w-0 sm:w-auto sm:flex-1">
           {/* The page's title; the top bar above names the ticket in the trail. */}
           <PageHeader detail title={ticket.subject} titleClassName="text-xl sm:text-2xl" />
-          <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
+          <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
             {status}
             {ticket.priority !== "normal" && (
               <span className={`rounded border px-1.5 py-0.5 font-medium ${ticket.priority === "urgent" ? "border-red-500/40 text-red-300" : "border-amber-500/40 text-amber-300"}`}>
@@ -1035,7 +1035,7 @@ export function TicketHeader({
               </span>
             )}
             <span className="tabular-nums" title={ticket.id}>
-              #{ticket.id.slice(-6)}
+              {requestNumber(ticket.id)}
             </span>
             <span>
               Opened by {filedBy(ticket)} ·{" "}
@@ -1044,7 +1044,7 @@ export function TicketHeader({
               </time>
             </span>
           </div>
-          {note && <div className="mt-1 text-xs text-zinc-500">{note}</div>}
+          {note && <div className="mt-1 text-xs text-zinc-400">{note}</div>}
         </div>
         <div className="flex shrink-0 items-center gap-2">{people}</div>
       </div>
@@ -1059,7 +1059,7 @@ export function HelpLink({ item, children, className = "" }: { item: HelpTarget;
     <Link
       href={helpHref(pathname, item)}
       data-testid="help-link"
-      className={`inline-flex items-center gap-1.5 rounded text-xs text-zinc-500 hover:text-zinc-300 ${focusRing} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded text-xs text-zinc-400 hover:text-zinc-300 ${focusRing} ${className}`}
     >
       <span className="h-3.5 w-3.5" aria-hidden="true">
         <LifeBuoyIcon />
@@ -1106,11 +1106,11 @@ export function AttachmentChips({
           <>
             <span className="sr-only">{w.full}</span>
             <span aria-hidden="true" className="shrink-0 font-medium text-zinc-400">{w.kind}</span>
-            <span aria-hidden="true" className="shrink-0 text-zinc-600">·</span>
+            <span aria-hidden="true" className="shrink-0 text-zinc-400">·</span>
             <span aria-hidden="true" className="min-w-0 truncate">{w.name}</span>
             {w.status && (
               <>
-                <span aria-hidden="true" className="shrink-0 text-zinc-600">·</span>
+                <span aria-hidden="true" className="shrink-0 text-zinc-400">·</span>
                 <span aria-hidden="true" className="shrink-0 text-zinc-500">{w.status}</span>
               </>
             )}
@@ -1260,11 +1260,11 @@ export function AttachPicker({
           </button>
         )}
       </div>
-      <p className="mt-1.5 px-1 text-xs text-zinc-500">
+      <p className="mt-1.5 px-1 text-xs text-zinc-400">
         {room > 0 ? `You can attach ${room} more.` : `A ticket carries at most ${MAX_ATTACHMENTS} items.`} Only the name and a link are sent, never the contents.
       </p>
-      {busy && hits === null && <p className="mt-2 px-1 text-xs text-zinc-500">Searching…</p>}
-      {hits && hits.length === 0 && <p className="mt-2 px-1 text-xs text-zinc-500" role="status">Nothing matches.</p>}
+      {busy && hits === null && <p className="mt-2 px-1 text-xs text-zinc-400">Searching…</p>}
+      {hits && hits.length === 0 && <p className="mt-2 px-1 text-xs text-zinc-400" role="status">Nothing matches.</p>}
       {hits && hits.length > 0 && (
         <ul className="mt-2 max-h-72 space-y-1 overflow-y-auto" aria-label="Matches">
           {hits.map((h) => {
@@ -1278,12 +1278,12 @@ export function AttachPicker({
                   data-testid="attach-result"
                   className={`flex w-full min-w-0 items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-zinc-800/70 disabled:opacity-50 ${focusRing}`}
                 >
-                  <span className="mt-0.5 shrink-0 rounded border border-zinc-700 px-1 text-[10px] uppercase tracking-wide text-zinc-400">{KIND_LABEL[h.item.kind]}</span>
+                  <span className="mt-0.5 shrink-0 rounded border border-zinc-700 px-1 text-xs uppercase tracking-wide text-zinc-400">{KIND_LABEL[h.item.kind]}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-zinc-200">{h.item.label || h.item.id}</span>
-                    {h.sub && <span className="block truncate text-xs text-zinc-500">{h.sub}</span>}
+                    {h.sub && <span className="block truncate text-xs text-zinc-400">{h.sub}</span>}
                   </span>
-                  <span className="shrink-0 text-xs text-zinc-500">{already ? "Attached" : "Attach"}</span>
+                  <span className="shrink-0 text-xs text-zinc-400">{already ? "Attached" : "Attach"}</span>
                 </button>
               </li>
             );
@@ -1292,4 +1292,10 @@ export function AttachPicker({
       )}
     </div>
   );
+}
+
+/** "…000001" -> "Request 1"; an id with letters keeps its last six characters. */
+function requestNumber(id: string): string {
+  const tail = id.slice(-6);
+  return /^\d+$/.test(tail) ? `Request ${Number(tail)}` : `Request ${tail}`;
 }

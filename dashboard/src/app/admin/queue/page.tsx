@@ -1,20 +1,29 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, api, type AdminDlqList, type AdminDlqMessage } from "@/lib/api";
 import { ageWords } from "@/lib/health";
 import { DlqProblem } from "@/components/dlq-problem";
-import { CodeBlock } from "@/components/code-block";
 import { Page, PageHeader } from "@/components/page";
 import { Skeleton } from "@/components/skeleton";
 import { StatusPill } from "@/components/status-pill";
-import { Callout } from "@/components/callout";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
-import { focusRing, secondaryButton } from "@/components/ui";
+import { buttonClass, secondaryButton } from "@/components/ui";
+import { Problem, TechnicalDetails } from "@/components/problem";
+import { EmptyState } from "@/components/empty-state";
 
-const smallButton = `inline-flex min-h-8 items-center justify-center rounded-md border px-3 py-1 text-xs font-medium disabled:opacity-50 transition-colors ${focusRing}`;
+/** "TEAM#team-a" -> "team-a": the database key's readable part. */
+function teamName(id: string): string {
+  return id.replace(/^TEAM#/, "");
+}
+
+/** "SkillSync" or "ci_fix" -> "Skill sync" / "Ci fix". */
+function typeWords(t: string | null | undefined): string {
+  if (!t) return "Unknown";
+  const words = t.replace(/[_-]+/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 /**
  * The shared dead-letter queue, for the platform admin: every team's failed
@@ -82,21 +91,16 @@ export default function SharedQueuePage() {
         title="Shared queue"
         lead={queueLead(data)}
         actions={
-          <div className="flex gap-2">
-            <Link href="/admin" className={secondaryButton}>
-              Platform admin
-            </Link>
-            <button type="button" onClick={load} disabled={loading} className={secondaryButton}>
-              {loading ? "Loading..." : "Reload"}
-            </button>
-          </div>
+          <button type="button" onClick={load} disabled={loading} className={secondaryButton}>
+            {loading ? "Loading…" : "Reload"}
+          </button>
         }
       />
       <div className="mt-6 space-y-4">
         {error && (
-          <Callout variant="error" title="Couldn't read the shared queue">
-            <p>{error}</p>
-          </Callout>
+          <Problem title="Couldn't read the shared queue" onRetry={load} details={error}>
+            Check your connection and try again.
+          </Problem>
         )}
 
         {!data && loading && (
@@ -115,10 +119,10 @@ export default function SharedQueuePage() {
               <Count label="Can't be read" value={data.unreadable ?? 0} />
             </dl>
             {!data.complete && (
-              <p className="text-xs text-zinc-500">The queue holds more than one listing reads; reload to see the rest.</p>
+              <p className="text-xs text-zinc-400">The queue holds more than one listing reads; reload to see the rest.</p>
             )}
             {data.messages.length === 0 ? (
-              <p className="py-6 text-center text-sm text-zinc-500">The shared queue is empty.</p>
+              <EmptyState title="The shared queue is empty">No team has failed work waiting here.</EmptyState>
             ) : (
               <ul className="space-y-2">
                 {data.messages.map((m) => (
@@ -127,33 +131,33 @@ export default function SharedQueuePage() {
                       <div className="min-w-0 flex-1">
                         <div className="mb-1 flex flex-wrap items-center gap-2">
                           {m.retryable ? (
-                            <StatusPill>{m.type}</StatusPill>
+                            <StatusPill>{typeWords(m.type)}</StatusPill>
                           ) : (
                             <StatusPill tone="warning">Can&apos;t be retried</StatusPill>
                           )}
-                          <span className="wrap-anywhere text-xs text-zinc-400">{m.team_id ?? (m.global ? "Global job" : "No team")}</span>
-                          {m.sent_at && <span className="text-xs text-zinc-500">· sent {ageWords(m.age_secs)} ago</span>}
+                          <span className="wrap-anywhere text-sm font-medium text-zinc-200" title={m.team_id ?? undefined}>
+                            {m.team_id ? teamName(m.team_id) : m.global ? "Global job" : "No team"}
+                          </span>
+                          {m.sent_at && <span className="text-xs text-zinc-400">· sent {ageWords(m.age_secs)} ago</span>}
                         </div>
                         {m.problem && (
                           <p className="mt-1 text-sm text-amber-300/90">
                             Can&apos;t be retried: <DlqProblem problem={m.problem} />
                           </p>
                         )}
-                        <CodeBlock
-                          code={typeof m.body === "string" ? m.body : JSON.stringify(m.body, null, 2)}
+                        <TechnicalDetails
+                          summary="Message body"
+                          text={typeof m.body === "string" ? m.body : JSON.stringify(m.body, null, 2)}
                           lang={typeof m.body === "string" ? "text" : "json"}
-                          label="Message"
-                          maxHeightClass="max-h-40"
-                          className="mt-1"
                         />
                       </div>
                       <button
                         type="button"
                         onClick={() => void remove(m)}
                         disabled={!!acting}
-                        className={`${smallButton} shrink-0 border-zinc-700 bg-zinc-900 text-zinc-400 hover:bg-zinc-800`}
+                        className={`${buttonClass("ghost", "sm")} shrink-0 self-start`}
                       >
-                        {acting === m.message_id ? "Deleting..." : "Delete"}
+                        {acting === m.message_id ? "Deleting…" : "Delete"}
                       </button>
                     </div>
                   </li>
@@ -170,9 +174,9 @@ export default function SharedQueuePage() {
 function Count({ label, value, hint }: { label: string; value: number; hint?: string }) {
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
-      <dt className="text-xs text-zinc-500">{label}</dt>
+      <dt className="text-xs text-zinc-400">{label}</dt>
       <dd className="mt-1 text-2xl font-semibold tabular-nums text-zinc-100">{value}</dd>
-      {hint && <p className="mt-1 text-xs text-zinc-500">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-zinc-400">{hint}</p>}
     </div>
   );
 }

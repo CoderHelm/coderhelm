@@ -301,11 +301,20 @@ test("the reviewer list shows one row per PR: title first, verdict as a badge, w
   await expect(prLink).toHaveAttribute("href", /\/reviewer\/detail\/?\?sk=REVIEW%23your-team%2Fweb%23000101/);
   const row = page.getByTestId("reviewer-pr").filter({ has: prLink });
   await expect(row.getByText("your-team/web #101")).toBeVisible();
+  // One status and one verdict pill; the risk rides on the verdict, not a third badge.
   await expect(row.getByText("Approved")).toBeVisible();
-  await expect(row.getByText("Low risk")).toBeVisible();
-  await expect(row.getByText("Label added")).toBeVisible();
+  await expect(row.getByTitle("Low risk")).toBeVisible();
+  await expect(row.getByText("Reviewed after the label was added")).toBeVisible();
   await expect(page.getByText("labeled", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Asked again")).toBeVisible();
+  await expect(page.getByText("Reviewed on request")).toBeVisible();
+  // Row actions live in one menu, not as buttons beside the status.
+  await expect(row.getByRole("button", { name: /again$/ })).toHaveCount(0);
+  await row.getByRole("button", { name: "Actions for your-team/web #101" }).click();
+  const menu = page.getByRole("menu", { name: "More" });
+  await expect(menu.getByRole("menuitem", { name: "Review again" })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: /Stop auto-merge/ })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "Open on GitHub" })).toBeVisible();
+  await page.keyboard.press("Escape");
   // The state in short words, not the review's boilerplate.
   await expect(row.getByText("Auto-merge armed · waiting for 1 approval")).toBeVisible();
   // The earlier review of the same PR opens under it, with a named toggle.
@@ -315,7 +324,7 @@ test("the reviewer list shows one row per PR: title first, verdict as a badge, w
   await toggle.click();
   await expect(row.getByRole("button", { name: /Hide details/ })).toHaveAttribute("aria-expanded", "true");
   await expect(row.getByRole("link", { name: "New commits" })).toBeVisible();
-  await expect(row.getByText("High risk")).toBeVisible();
+  await expect(row.getByTitle("High risk")).toBeVisible();
   await expect(row.getByText("Waiting for a person's approval")).toBeVisible();
   // "Review a PR" is a small dialog behind a button, not a card on the page.
   await expect(page.getByRole("textbox", { name: "Pull request number" })).toHaveCount(0);
@@ -396,7 +405,8 @@ test("queueing a review from a row refreshes the status at once", async ({ page 
   const merged = page.getByTestId("reviewer-pr").filter({ hasText: "Explain the cache expiry" });
   await expect(merged).toHaveAttribute("data-status", "merged");
   db.live = db.live.map((p) => (p.pr_number === 55 ? { ...p, status: "queued", group: "active", review: { phase: "queued", trigger: "rerequest" } } : p));
-  await merged.getByRole("button", { name: "Review your-team/backend #55 again" }).click();
+  await merged.getByRole("button", { name: "Actions for your-team/backend #55" }).click();
+  await page.getByRole("menu", { name: "More" }).getByRole("menuitem", { name: "Review again" }).click();
   await expect(merged).toHaveAttribute("data-status", "queued");
   await expect(page.getByRole("region", { name: /^Active/ }).getByText("Explain the cache expiry")).toBeVisible();
   expect(errors).toEqual([]);
@@ -521,7 +531,7 @@ test("findings read from a review's text become cards, grouped into what to fix 
   await expect(header.getByText("Medium risk")).toBeVisible();
   await expect(header.getByText("Triggered by new commits")).toBeVisible();
   await expect(page.getByTestId("posted-note")).toHaveText(
-    "Posted as a comment because Coderhelm opened this PR. GitHub doesn't let a PR's author approve or request changes.",
+    "Posted as a comment (GitHub doesn't let Coderhelm approve or request changes on a PR it opened).",
   );
   await expect(page.getByText("COMMENT", { exact: true })).toHaveCount(0);
 
@@ -627,21 +637,27 @@ test("reviewer settings load for a repo, with labelled fields and switches", asy
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
   await expect(page.getByRole("switch", { name: /Enable reviewer for this repo/ })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("textbox", { name: "Trigger label" })).toHaveValue("ch-review");
-  await expect(page.getByRole("textbox", { name: "Review standards for every repo" })).toHaveValue("Never log secrets.");
   // The summary says what the reviewer does here in plain words.
   const summary = page.getByTestId("reviewer-summary");
   await expect(summary).toContainText("Reviews pull requests labelled “ch-review”.");
   await expect(summary).toContainText("Leaves merging to people.");
+  // Every section is one click away, and only that section shows.
+  const nav = page.getByRole("navigation", { name: "Settings sections" });
+  for (const name of ["Reviews", "Tests", "CI labels", "Auto-merge", "Tags and health check", "Release notes", "Review reminders", "Stop everything", "Every repository"]) {
+    await expect(nav.getByRole("link", { name: new RegExp(`^${name}`) })).toBeVisible();
+  }
+  await expect(page.getByRole("switch", { name: /Auto-merge on approve/ })).toHaveCount(0);
+  await nav.getByRole("link", { name: /^Auto-merge/ }).click();
+  await expect(page).toHaveURL(/section=merge/);
+  await expect(page.getByRole("textbox", { name: "Trigger label" })).toHaveCount(0);
   // Options of a switched-off setting stay folded away until it is on.
   await expect(page.getByRole("group", { name: "Merge method" })).toHaveCount(0);
   await page.getByRole("switch", { name: /Auto-merge on approve/ }).click();
   await expect(page.getByRole("group", { name: "Merge method" })).toBeVisible();
   await page.getByRole("switch", { name: /Auto-merge on approve/ }).click();
-  // Every section is one jump away.
-  const nav = page.getByRole("navigation", { name: "Settings sections" });
-  for (const name of ["Reviews", "Tests", "CI labels", "Auto-merge", "Tags and health check", "Release notes", "Review reminders", "Stop everything", "Every repository"]) {
-    await expect(nav.getByRole("link", { name: new RegExp(`^${name}`) })).toBeVisible();
-  }
+  // The shared standards are their own view.
+  await nav.getByRole("link", { name: "Every repository" }).click();
+  await expect(page.getByRole("textbox", { name: "Review standards for every repo" })).toHaveValue("Never log secrets.");
   await shot(page, "audit-reviewer-config");
   expect(errors).toEqual([]);
 });
@@ -672,7 +688,7 @@ test("a failed settings load hides the form so defaults cannot overwrite saved s
 test("a failed load of the shared review standards turns their save off", async ({ page }) => {
   const errors = watchConsole(page, true);
   const db = await mockApi(page, { failOrg: true });
-  await page.goto("/reviewer/config");
+  await page.goto("/reviewer/config?section=standards");
   await expect(page.getByText("Could not load the review standards")).toBeVisible();
   await expect(page.getByRole("button", { name: "Save standards" })).toHaveCount(0);
   db.failOrg = false;
@@ -684,7 +700,7 @@ test("a failed load of the shared review standards turns their save off", async 
 test("a reminder webhook on the wrong host is caught before saving, and Slack works too", async ({ page }) => {
   const errors = watchConsole(page);
   const db = await mockApi(page);
-  await page.goto("/reviewer/config?repo=your-team%2Fweb");
+  await page.goto("/reviewer/config?repo=your-team%2Fweb&section=reminders");
   await page.getByRole("switch", { name: /Remind reviewers in Microsoft Teams or Slack/ }).click();
   const picker = page.getByTestId("reminders-channels");
   // On with nowhere to post is caught.
@@ -715,25 +731,33 @@ test("saving sends the same settings body as before, with every edit in it", asy
   await expect(save).toBeDisabled();
   await expect(page.getByTestId("save-bar")).toContainText("All changes saved");
 
+  const nav = page.getByRole("navigation", { name: "Settings sections" });
   await page.getByRole("textbox", { name: "Trigger label" }).fill("needs-review");
+  await nav.getByRole("link", { name: /^Tests/ }).click();
   await page.getByRole("switch", { name: /Require tests/ }).click();
+  await nav.getByRole("link", { name: /^Auto-merge/ }).click();
   await page.getByRole("switch", { name: /Auto-merge on approve/ }).click();
   await page.getByRole("group", { name: "Merge method" }).getByRole("button", { name: "Rebase" }).click();
   await page.getByRole("textbox", { name: /Deploy labels/ }).fill("deploy-staging");
+  await nav.getByRole("link", { name: /^Tags and health check/ }).click();
   await page.getByRole("switch", { name: /Tag after merge/ }).click();
   await page.getByRole("group", { name: "Tag style" }).getByRole("button", { name: "Date and time" }).click();
   await page.getByRole("spinbutton", { name: /Batch window/ }).fill("30");
+  await nav.getByRole("link", { name: /^Release notes/ }).click();
   await page.getByRole("switch", { name: /Write release notes/ }).click();
   await page.getByText("Publish to Confluence").click();
   await page.getByRole("textbox", { name: "Parent page id" }).fill("12a34");
+  await nav.getByRole("link", { name: /^Review reminders/ }).click();
   await page.getByRole("switch", { name: /Remind reviewers in Microsoft Teams or Slack/ }).click();
   await page.getByTestId("reminders-channels").getByRole("checkbox", { name: "Microsoft Teams" }).check();
   await page.getByRole("textbox", { name: "Microsoft Teams webhook address" }).fill("https://acme.webhook.office.com/webhookb2/abc");
   await page.getByRole("spinbutton", { name: /Wait before reminding again/ }).fill("6");
 
-  // Unsaved edits are counted and marked where they are.
+  // Unsaved edits are counted, marked where they are, and each section with some has a dot in the nav.
   await expect(page.getByTestId("save-bar")).toContainText("13 unsaved changes on your-team/web");
   await expect(page.getByText("Unsaved", { exact: true }).first()).toBeVisible();
+  await expect(nav.getByRole("link", { name: /^Tests/ }).getByLabel("unsaved")).toBeVisible();
+  await nav.getByRole("link", { name: /^Reviews/ }).click();
   await expect(page.getByTestId("reviewer-summary")).toContainText("Merges approved pull requests (rebase) once a person has also approved.");
   await shot(page, "audit-reviewer-config-editing");
 
@@ -766,16 +790,17 @@ test("unsaved edits can be discarded, and switching repos with them asks first",
   const errors = watchConsole(page);
   const db = await mockApi(page);
   await page.goto("/reviewer/config?repo=your-team%2Fweb");
-  // Settings away from their defaults are marked (this fixture has the reviewer on and a focus).
-  await expect(page.getByTestId("not-default-count")).toContainText("2 settings differ from the defaults");
+  const nav = page.getByRole("navigation", { name: "Settings sections" });
+  await nav.getByRole("link", { name: /^Tests/ }).click();
   await page.getByRole("switch", { name: /Check the change by running tests/ }).click();
   await expect(page.getByTestId("save-bar")).toContainText("1 unsaved change on your-team/web");
   await page.getByRole("button", { name: "Discard" }).click();
   await expect(page.getByRole("switch", { name: /Check the change by running tests/ })).toHaveAttribute("aria-checked", "false");
   await expect(page.getByTestId("save-bar")).toContainText("All changes saved");
 
+  await nav.getByRole("link", { name: /^Stop everything/ }).click();
   await page.getByRole("switch", { name: /Stop everything/ }).click();
-  await expect(page.getByTestId("reviewer-summary")).toContainText("Every reviewer action on this repo is stopped");
+  await expect(nav.getByRole("link", { name: /^Stop everything/ })).toContainText("Stopped");
   await page.getByRole("button", { name: /Repository: your-team\/web/ }).click();
   await page.getByRole("option", { name: "your-team/backend" }).first().click();
   await expect(page.getByText("Leave without saving?")).toBeVisible();
@@ -787,8 +812,9 @@ test("unsaved edits can be discarded, and switching repos with them asks first",
   await page.getByRole("option", { name: "your-team/backend" }).first().click();
   await page.getByRole("button", { name: "Drop changes" }).click();
   await expect(page).toHaveURL(/repo=your-team%2Fbackend/);
-  await expect(page.getByRole("heading", { name: "On your-team/backend" })).toBeVisible();
   await expect(page.getByRole("switch", { name: /Stop everything/ })).toHaveAttribute("aria-checked", "false");
+  await nav.getByRole("link", { name: /^Reviews/ }).click();
+  await expect(page.getByRole("heading", { name: "On your-team/backend" })).toBeVisible();
   expect(db.calls.some((c) => c.startsWith("PUT /api/reviewer/config/"))).toBe(false);
   expect(errors).toEqual([]);
 });
@@ -879,6 +905,9 @@ test("each destination says its real state: published, not set up, or failed wit
   );
   await expect(backend.locator('[data-dest="email"]')).toHaveAttribute("title", "Email: not set up for this repo");
   await expect(backend).toContainText("Confluence failed");
+  // One pill says where each release went, not colour-only icons.
+  await expect(web.getByTestId("release-published")).toContainText("Published to 2 of 2");
+  await expect(backend.getByTestId("release-published")).toContainText("Confluence failed");
   await backend.getByRole("button").first().click();
   await expect(backend.getByRole("button", { name: "Post to Confluence" })).toBeVisible();
   await expect(backend.getByRole("button", { name: "Send the email again" })).toHaveCount(0);
@@ -894,7 +923,7 @@ test("a release waiting out its batch window is a slim banner with Release now",
   await page.goto("/releases");
   const banner = page.getByTestId("pending-release");
   await expect(banner).toContainText("1 merge waiting");
-  await expect(banner).toContainText(/releases from main in \d+:\d\d/);
+  await expect(banner).toContainText(/next release from main in (about \d+ min|\d+ s)/);
   await banner.getByRole("button", { name: "Release now" }).click();
   await expect(page.getByText("Releasing your-team/web now")).toBeVisible();
   expect(db.bodies).toContainEqual({ repo: "your-team/web" });

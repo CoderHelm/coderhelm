@@ -6,10 +6,11 @@ import { api, type AwsConnection, type GitConventionTemplates, type WorkflowSett
 import { preview, problem, tokens, TOKEN_HELP, TOKENS, type Kind } from "@/lib/git-conventions";
 import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
-import { Callout } from "@/components/callout";
+import { Problem } from "@/components/problem";
 import { Skeleton } from "@/components/skeleton";
 import { Page, PageHeader } from "@/components/page";
-import { inputClass, linkButton, monoInputClass, secondaryButton } from "@/components/ui";
+import { buttonClass, linkButton, monoInputClass } from "@/components/ui";
+import { Select } from "@/components/select";
 import { Code, SaveBar, SettingsDisclosure, SettingsRow, SettingsSection, Switch, useDirtyForm } from "@/components/settings";
 
 export default function WorkflowPageGuarded() {
@@ -156,10 +157,11 @@ function WorkflowPage() {
     return (
       <Page>
         {header}
-        <Callout variant="error" title="Could not load the workflow settings">
-          <p>Nothing is shown, so the saved settings cannot be overwritten by mistake.</p>
-          <button type="button" onClick={fetchAll} className={`mt-2 ${secondaryButton}`}>Try again</button>
-        </Callout>
+        <div className="max-w-3xl">
+          <Problem title="Couldn't load the workflow settings" onRetry={fetchAll}>
+            Nothing has changed. Try again; the form stays hidden until the saved settings load, so they can&apos;t be overwritten.
+          </Problem>
+        </div>
       </Page>
     );
   }
@@ -168,7 +170,7 @@ function WorkflowPage() {
     <Page>
       {header}
 
-      <div className="space-y-8">
+      <div className="max-w-3xl space-y-8">
         <SettingsSection id="pull-requests" title="Pull requests">
           <SettingsRow
             label="Add the plan to the pull request"
@@ -179,6 +181,21 @@ function WorkflowPage() {
               <Switch id={ids.inputId} checked={v.commit_openspec} onChange={(on) => form.set("commit_openspec", on)} labelledBy={ids.labelId} describedBy={ids.helpId} />
             )}
           />
+          <div className="px-4 py-4">
+            <SettingsDisclosure summary="Words you can use in the templates">
+              <p className="text-sm text-zinc-400">
+                Leave a template empty to keep the default. A pull request already open for a ticket keeps its branch. Shown for the sample
+                ticket {SAMPLE.ticket} &ldquo;{SAMPLE.title}&rdquo;:
+              </p>
+              <ul className="space-y-1 text-sm text-zinc-400">
+                {TOKENS.map((t) => (
+                  <li key={t}>
+                    <Code>{`{${t}}`}</Code> {TOKEN_HELP[t]}
+                  </li>
+                ))}
+              </ul>
+            </SettingsDisclosure>
+          </div>
           {GIT_FIELDS.map((f) => {
             const template = v[f.key].trim() || defaults[f.key];
             const err = problems[f.key] ?? (serverError?.field === f.key ? serverError.error : null);
@@ -186,7 +203,7 @@ function WorkflowPage() {
               <SettingsRow
                 key={f.key}
                 label={f.label}
-                controlClassName="sm:w-80"
+                layout="stacked"
                 unsaved={form.isDirty(f.key)}
                 help={f.what}
                 control={(ids) => (
@@ -205,11 +222,25 @@ function WorkflowPage() {
                       aria-describedby={[ids.helpId, `${ids.inputId}-note`].filter(Boolean).join(" ")}
                       className={monoInputClass}
                     />
-                    <p id={`${ids.inputId}-note`} className="mt-1.5 text-xs">
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5" role="group" aria-label="Insert a word">
+                      <span className="text-xs text-zinc-400">Add a word:</span>
+                      {TOKENS.map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          title={TOKEN_HELP[t]}
+                          className={buttonClass("ghost", "sm")}
+                          onClick={() => form.set(f.key, `${v[f.key]}{${t}}`)}
+                        >
+                          {`{${t}}`}
+                        </button>
+                      ))}
+                    </div>
+                    <p id={`${ids.inputId}-note`} className="mt-1.5 text-sm">
                       {err ? (
-                        <span role="alert" className="text-red-400">{err}</span>
+                        <span role="alert" className="text-red-300">{err}</span>
                       ) : (
-                        <span className="text-zinc-500" data-testid={`git-${f.key}-preview`}>
+                        <span className="text-zinc-400" data-testid={`git-${f.key}-preview`}>
                           Example: <Code>{preview(f.key, template, SAMPLE)}</Code>
                         </span>
                       )}
@@ -219,21 +250,6 @@ function WorkflowPage() {
               />
             );
           })}
-          <div className="px-4 py-4">
-            <SettingsDisclosure summary="Words you can use in the templates">
-              <p className="text-sm text-zinc-400">
-                Leave a template empty to keep the default. A pull request already open for a ticket keeps its branch. Shown for the sample
-                ticket {SAMPLE.ticket} &ldquo;{SAMPLE.title}&rdquo;:
-              </p>
-              <ul className="space-y-1 text-sm text-zinc-400">
-                {TOKENS.map((t) => (
-                  <li key={t}>
-                    <Code>{`{${t}}`}</Code> {TOKEN_HELP[t]}
-                  </li>
-                ))}
-              </ul>
-            </SettingsDisclosure>
-          </div>
         </SettingsSection>
 
         <SettingsSection id="plans" title="Plans">
@@ -243,16 +259,16 @@ function WorkflowPage() {
             unsaved={form.isDirty("default_destination")}
             help="Where a plan's tasks become tickets, unless you pick another place for a task."
             control={(ids) => (
-              <select
+              <Select
                 id={ids.inputId}
                 aria-describedby={ids.helpId}
                 value={v.default_destination}
                 onChange={(e) => form.set("default_destination", e.target.value as Form["default_destination"])}
-                className={inputClass}
+                className="w-full"
               >
                 <option value="github">GitHub issues</option>
                 {(jiraConnected || v.default_destination === "jira") && <option value="jira">Jira tickets</option>}
-              </select>
+              </Select>
             )}
           />
           <SettingsRow

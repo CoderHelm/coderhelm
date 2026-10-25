@@ -405,7 +405,7 @@ function NewPlan() {
               busy={isActive}
               placeholder={draft ? "Ask for a change to the plan" : "Reply to Coderhelm"}
             />
-            <p className="px-1 text-xs text-zinc-600">
+            <p className="px-1 text-xs text-zinc-400">
               <span className="hidden sm:inline">Enter to send, Shift+Enter for a new line. </span>Answers are AI-written; check them before you save.
             </p>
           </div>

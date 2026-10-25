@@ -12,6 +12,7 @@ import { linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
 import { CheckRow } from "@/components/install-checks";
 import { CodeBlock } from "@/components/code-block";
+import { Redirect } from "@/components/redirect";
 
 /** The same checks from the operator's machine. */
 const DOCTOR = "npx -y github:coderhelm/coderhelm-platform doctor";
@@ -25,13 +26,11 @@ export default function SetupPage() {
   const { ready, allowed } = useInstallAdmin();
   if (!ready) return null;
   if (!allowed) {
+    // Only a self-hosted install has this page: anyone else goes to Settings.
     return (
       <Page>
-        <div className="max-w-xl" data-testid="setup-unavailable">
-          <Callout variant="neutral" title="Not available here">
-            <p>This page is for the admins of a self-hosted Coderhelm install.</p>
-            <p className="pt-1"><Link href="/settings" className={linkButton}>Back to Settings</Link></p>
-          </Callout>
+        <div data-testid="setup-unavailable">
+          <Redirect to="/settings/" />
         </div>
       </Page>
     );
@@ -77,10 +76,10 @@ function Setup() {
         setEmail({ state: "sent", text: `Sent to ${r.to}. Check your inbox (and spam).` });
         load();
       } else {
-        setEmail({ state: "failed", text: r.reason ?? "Amazon SES refused the email." });
+        setEmail({ state: "failed", text: r.reason ?? "The email couldn't be sent. Check the email settings in your install, then try again." });
       }
     } catch (e) {
-      setEmail({ state: "failed", text: e instanceof Error ? e.message : "Could not send" });
+      setEmail({ state: "failed", text: "The email couldn't be sent. Check the email settings in your install, then try again." });
     }
   };
 
@@ -91,7 +90,7 @@ function Setup() {
       <div className="mb-6">
         <PageHeader
           title="Setup"
-          lead={progress ? `${progress.done} of ${progress.total} getting-started steps done. The install checks itself each time this page opens, and anything that needs a fix says how.` : "The install checks itself each time this page opens, and anything that needs a fix says how."}
+          lead={progress ? `${progress.done} of ${progress.total} required steps done. The install checks itself each time this page opens, and anything that needs a fix says how.` : "What is left to set up on this install. It checks itself each time this page opens, and anything that needs a fix says how."}
         />
       </div>
       <InstallChecks data={server} state={serverState} onRecheck={runChecks} />
@@ -104,18 +103,18 @@ function Setup() {
           <Skeleton className="h-16 w-full" />
         </div>
       ) : (
-        <ol className="space-y-3" data-testid="setup-checklist" aria-label="Setup checklist">
+        <ol className="max-w-3xl divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/40" data-testid="setup-checklist" aria-label="Setup checklist">
           {checks.map((c) => (
             <li
               key={c.key}
               id={c.key}
               data-done={c.done === true ? "yes" : c.done === false ? "no" : "unknown"}
-              className="flex min-w-0 flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 sm:flex-row sm:items-center sm:justify-between"
+              className="flex min-w-0 flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="flex min-w-0 items-start gap-3">
                 <span
                   aria-hidden="true"
-                  className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${c.done ? "border-emerald-400 bg-emerald-400 text-emerald-950" : "border-zinc-600"}`}
+                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${c.done ? "border-emerald-400 bg-emerald-400 text-emerald-950" : "border-zinc-600"}`}
                 >
                   {c.done && <span className="scale-75"><CheckIcon /></span>}
                 </span>
@@ -138,7 +137,7 @@ function Setup() {
                     {email.state === "sending" ? "Sending…" : c.done ? "Send again" : "Send a test email"}
                   </button>
                 ) : (
-                  !c.done && <Link href={c.href} className={linkButton}>{c.action}</Link>
+                  !c.done && <Link href={c.href} className={secondaryButton}>{c.action}</Link>
                 )}
               </div>
             </li>

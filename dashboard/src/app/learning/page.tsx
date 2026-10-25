@@ -12,16 +12,20 @@ import {
   type LearningExemplar,
 } from "@/lib/api";
 import { CardSkeleton, ChartSkeleton } from "@/components/skeleton";
+import { StatGrid, StatTile } from "@/components/stat-tile";
+import { DataTable, type Column } from "@/components/data-table";
+import { Problem } from "@/components/problem";
 import { Segmented } from "@/components/segmented";
 import { RepoFilter } from "@/components/list";
 import { Callout } from "@/components/callout";
 import { Disclosure } from "@/components/disclosure";
+import { ChevronRightIcon } from "@/components/icons";
 import { StatusPill } from "@/components/status-pill";
 import { useConfirm } from "@/components/confirm-dialog";
 import { SaveBar } from "@/components/settings";
 import { useCan } from "@/hooks/use-can";
 import { cardClass, Page, PageHeader, Section } from "@/components/page";
-import { focusRing, inputClass, smallDangerButton, smallSecondaryButton } from "@/components/ui";
+import { buttonClass, focusRing, inputClass, smallSecondaryButton } from "@/components/ui";
 
 // What Coderhelm learned from how its work was received (comments acted on
 // or dismissed, ratings, merges, reverts, CI), and every change in its
@@ -67,40 +71,34 @@ const when = (at: string) => {
 // ── Pieces ─────────────────────────────────────────────────────────────────
 
 function Tile({ label, value, basis, testId }: { label: string; value: string; basis?: string; testId?: string }) {
-  return (
-    <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4" data-testid={testId}>
-      <p className="text-xs font-medium text-zinc-400">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-100">{value}</p>
-      {basis && <p className="mt-1 text-xs text-zinc-500">{basis}</p>}
-    </div>
-  );
+  return <StatTile testId={testId} label={label} value={value} note={basis} />;
 }
 
-/** A plain table; wide ones scroll inside their box, never the page. */
+/** A table on the shared DataTable: first column wraps, numbers stay narrow, one card per row on a phone. */
 function Table({ head, rows, empty, label }: { head: string[]; rows: ReactNode[][]; empty: string; label: string }) {
-  if (rows.length === 0) {
-    return <p className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-sm text-zinc-400">{empty}</p>;
-  }
+  const columns: Column<ReactNode[]>[] = head.map((h, i) => ({
+    key: `${i}-${h}`,
+    header: h,
+    cell: (r) => <span className="[overflow-wrap:break-word]">{r[i]}</span>,
+    width: i === 0 ? "grow" : "fit",
+    align: i === 0 ? "left" : "right",
+  }));
+  const table = (
+    <DataTable
+      label={label}
+      columns={columns}
+      rows={rows}
+      rowKey={(_, i) => String(i)}
+      empty={<p className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-sm text-zinc-400">{empty}</p>}
+    />
+  );
+  // A wide table keeps a minimum width from sm: up and scrolls inside its own
+  // box, so no column squeezes a word in half; a phone gets one card per row.
+  if (head.length < 4) return table;
+  const min = head.length >= 7 ? "sm:min-w-[960px]" : head.length >= 5 ? "sm:min-w-[860px]" : "sm:min-w-[600px]";
   return (
-    <div className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/50">
-      <table className={`w-full text-sm ${head.length >= 5 ? "min-w-[640px]" : ""}`} aria-label={label}>
-        <thead>
-          <tr className="border-b border-zinc-800 text-left text-xs text-zinc-400">
-            {head.map((h, i) => (
-              <th key={h} scope="col" className={`px-3 py-2.5 font-medium sm:px-4 ${i > 0 ? "text-right" : ""}`}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-zinc-800">
-          {rows.map((r, i) => (
-            <tr key={i}>
-              {r.map((c, j) => (
-                <td key={j} className={`px-3 py-2.5 align-top sm:px-4 ${j > 0 ? "text-right tabular-nums text-zinc-300" : "min-w-0 text-zinc-100"}`}>{c}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="min-w-0 overflow-x-auto">
+      <div className={min}>{table}</div>
     </div>
   );
 }
@@ -208,7 +206,7 @@ function TrendCard({ data }: { data: Learning }) {
           </ResponsiveContainer>
         </div>
       )}
-      <p className="mt-3 text-xs text-zinc-500">
+      <p className="mt-3 text-xs text-zinc-400">
         Each outcome scores between −1 and +1 by the weights below; the line is the average for the day. Volume never raises it: more comments do not mean more reward.
       </p>
     </div>
@@ -230,8 +228,8 @@ function CategoryName({ c }: { c: LearningCategory }) {
           <StatusPill tone="success">Always kept</StatusPill>
         </span>
       )}
-      <span className="block text-xs text-zinc-500">{c.repo}</span>
-      {c.reason && <span className="block text-xs text-zinc-500">{c.reason}</span>}
+      <span className="block text-xs text-zinc-400">{c.repo}</span>
+      {c.reason && <span className="block text-xs text-zinc-400">{c.reason}</span>}
     </div>
   );
 }
@@ -248,29 +246,55 @@ function categoryRows(list: LearningCategory[]) {
 }
 
 function Categories({ data }: { data: Learning }) {
+  const [sort, setSort] = useState<"acted" | "dismissed">("acted");
   const seen = data.categories.filter((c) => c.accepted + c.dismissed + c.ignored > 0);
-  const accepted = [...seen].filter((c) => c.accepted > 0).sort((a, b) => b.accept_rate - a.accept_rate || b.accepted - a.accepted).slice(0, 8);
-  const dismissed = [...seen].filter((c) => c.dismissed > 0).sort((a, b) => a.accept_rate - b.accept_rate || b.dismissed - a.dismissed).slice(0, 8);
+  const list =
+    sort === "acted"
+      ? [...seen].sort((a, b) => b.accept_rate - a.accept_rate || b.accepted - a.accepted)
+      : [...seen].sort((a, b) => a.accept_rate - b.accept_rate || b.dismissed - a.dismissed);
   const head = ["Category", "Acted on", "Dismissed", "Left open", "Accept rate", "Change"];
   return (
     <Section
       title="Review comments by category"
       id="categories"
       description={`How people answered the reviewer's comments, per repository. A category changes the reviewer's behavior only after ${plural(data.min_samples, "answer")}. Security and correctness comments are always kept, however often they are dismissed.`}
+      actions={
+        <Segmented
+          label="Sort categories"
+          options={[
+            { value: "acted", label: "Most acted on" },
+            { value: "dismissed", label: "Most dismissed" },
+          ]}
+          value={sort}
+          onChange={setSort}
+        />
+      }
     >
-      {/* Six columns each: stacked, so neither table scrolls inside a half-width box. */}
-      <div className="min-w-0 space-y-6">
-        <div className="min-w-0">
-          <h3 className="mb-2 text-sm font-medium text-zinc-200">Most acted on</h3>
-          <Table label="Most acted on categories" head={head} rows={categoryRows(accepted)} empty="No comments acted on yet." />
-        </div>
-        <div className="min-w-0">
-          <h3 className="mb-2 text-sm font-medium text-zinc-200">Most dismissed</h3>
-          <Table label="Most dismissed categories" head={head} rows={categoryRows(dismissed)} empty="No comments dismissed yet." />
-        </div>
-      </div>
+      <Table label="Review comment categories" head={head} rows={categoryRows(list.slice(0, 12))} empty="No answered comments yet." />
     </Section>
   );
+}
+
+/** "style" becomes "Style comments"; other keys are read as words. */
+function keyWords(key: string): string {
+  const words = key.replace(/[_:]/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** A change in plain sentences: what Coderhelm does now, and what it did before. */
+function changeSentence(change: LearningChange): { now: string; before: string } {
+  const to = ADJUST[change.to];
+  const from = ADJUST[change.from || "none"];
+  if (change.kind === "calibration" && to) {
+    const subject = `${keyWords(change.key)} comments`;
+    const now = to.says ? `${subject}: ${to.says.charAt(0).toLowerCase()}${to.says.slice(1)}.` : `${subject}: back to the default.`;
+    const before = from && change.from && change.from !== "none" ? `Before: ${from.label.toLowerCase()}.` : "Before: raised as usual.";
+    return { now, before };
+  }
+  return {
+    now: `${keyWords(change.key)} is now ${change.to || "off"}.`,
+    before: `Before: ${change.from || "not set"}.`,
+  };
 }
 
 function ChangeItem({
@@ -293,17 +317,15 @@ function ChangeItem({
   return (
     <li className={cardClass} data-testid={`change-${change.id}`}>
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs text-zinc-500">
+        <div className="min-w-0 flex-1 basis-64">
+          <p className="text-xs text-zinc-400">
             {KIND_LABEL[change.kind] ?? change.kind} · {change.repo || "All repositories"} · {when(change.at)}
           </p>
-          <p className="mt-1 text-sm font-medium text-zinc-100">
-            {change.key}: {change.from || "none"} <span aria-hidden="true">→</span>
-            <span className="sr-only"> to </span> {change.to}
-          </p>
+          <p className="mt-1 text-sm font-medium text-zinc-100">{changeSentence(change).now}</p>
+          <p className="mt-0.5 text-xs text-zinc-400">{changeSentence(change).before}</p>
           <p className="mt-1 text-sm text-zinc-400">{change.reason}</p>
           {change.reverted && (
-            <p className="mt-1 text-xs text-zinc-500">
+            <p className="mt-1 text-xs text-zinc-400">
               Turned off{change.reverted_by ? ` by ${change.reverted_by}` : ""}{change.reverted_at ? ` on ${when(change.reverted_at)}` : ""}.
             </p>
           )}
@@ -315,8 +337,8 @@ function ChangeItem({
               Turn back on
             </button>
           ) : (
-            <button type="button" className={smallDangerButton} disabled={!canManage || busy} title={refusal} onClick={() => onRevert(change)}>
-              Turn off
+            <button type="button" className={buttonClass("ghost", "sm")} disabled={!canManage || busy} title={refusal} onClick={() => onRevert(change)}>
+              Undo this change
             </button>
           )}
         </div>
@@ -329,7 +351,7 @@ function ChangeItem({
                 <li key={i} className="min-w-0 text-xs text-zinc-400">
                   <span className="text-zinc-300">{labels[e.kind] ?? e.kind.replace(/_/g, " ")}</span>
                   {e.pr ? ` · PR #${e.pr}` : ""} · {when(e.at)}
-                  {e.detail && <span className="block text-zinc-500">{e.detail}</span>}
+                  {e.detail && <span className="block text-zinc-400">{e.detail}</span>}
                 </li>
               ))}
             </ul>
@@ -344,13 +366,13 @@ function ChangeItem({
 function Exemplar({ e }: { e: LearningExemplar }) {
   return (
     <li className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
-      <p className="text-xs text-zinc-500">
+      <p className="text-xs text-zinc-400">
         {e.kind === "fix" ? "Code change" : "Review comment"}
         {e.category ? ` · ${e.category}` : ""}
         {e.area ? ` · ${e.area}` : ""}
       </p>
       <p className="mt-1 text-sm text-zinc-200">{e.text}</p>
-      <p className="mt-1 text-xs text-zinc-500">
+      <p className="mt-1 text-xs text-zinc-400">
         {e.repo}
         {e.pr ? ` · PR #${e.pr}` : ""} · reward {signed(e.reward)} · {e.uses === 0 ? "not used yet" : `used ${plural(e.uses, "time")}`}
       </p>
@@ -388,7 +410,7 @@ function BanditCard({ b, canManage, busy, minSamples, onPin }: { b: LearningBand
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-sm font-medium text-zinc-200">{agentLabel(b.agent)}</h3>
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-zinc-400">
             {b.pinned
               ? `Pinned to ${b.arms.find((a) => a.key === b.pinned)?.label ?? b.pinned}: no trying others.`
               : `Tries other variants on at most ${pct(b.exploration_cap)} of its work; a variant needs ${plural(minSamples, "outcome")} before it can win.`}
@@ -424,7 +446,20 @@ function BanditCard({ b, canManage, busy, minSamples, onPin }: { b: LearningBand
   );
 }
 
-function Weights({ data, canManage, onSaved }: { data: Learning; canManage: boolean; onSaved: (w: Record<string, number>) => void }) {
+function Weights({
+  data,
+  canManage,
+  onSaved,
+  open,
+  onOpenChange,
+}: {
+  data: Learning;
+  canManage: boolean;
+  onSaved: (w: Record<string, number>) => void;
+  /** Kept by the page, so saving (which remounts this with the new weights) leaves it open. */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState("");
@@ -444,18 +479,29 @@ function Weights({ data, canManage, onSaved }: { data: Learning; canManage: bool
   };
   const invalid = changed.some(([, v]) => v.trim() === "" || Number.isNaN(Number(v)) || Number(v) < -3 || Number(v) > 3);
   return (
-    <Section
-      title="How outcomes are scored"
-      id="weights"
-      description="Each signal's weight, between −3 and 3. Reverts, dismissed comments and fixes that broke CI count against; the number of comments never counts for anything."
-      actions={
-        canManage ? (
+    <Section title="Scoring" id="weights">
+      <details
+        open={open}
+        onToggle={(e) => onOpenChange(e.currentTarget.open)}
+        className="group rounded-lg border border-zinc-800 text-sm text-zinc-400"
+      >
+        <summary className={`flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-lg px-4 py-2 text-zinc-300 hover:text-zinc-100 [&::-webkit-details-marker]:hidden ${focusRing}`}>
+          <span aria-hidden="true" className="shrink-0 transition-transform group-open:rotate-90 motion-reduce:transition-none">
+            <ChevronRightIcon />
+          </span>
+          Advanced: scoring rules
+        </summary>
+        <div className="flex flex-col gap-3 px-4 pb-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="max-w-prose text-sm text-zinc-400">
+          What counts as good or bad: each signal&apos;s weight, between −3 and 3. Reverts, dismissed comments and fixes that broke CI count against; the number of comments never counts for anything.
+        </p>
+        {canManage && (
           <button type="button" className={smallSecondaryButton} disabled={saving} onClick={() => void save({})}>
             Back to defaults
           </button>
-        ) : undefined
-      }
-    >
+        )}
+      </div>
       <Table
         label="Signal weights"
         head={["Signal", "Seen", "Weight", "Default"]}
@@ -497,6 +543,8 @@ function Weights({ data, canManage, onSaved }: { data: Learning; canManage: bool
           testId="weights-save-bar"
         />
       )}
+        </div>
+      </details>
     </Section>
   );
 }
@@ -513,6 +561,7 @@ export default function LearningPage() {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
   const [notice, setNotice] = useState("");
+  const [weightsOpen, setWeightsOpen] = useState(false);
   const { confirm } = useConfirm();
 
   const load = useCallback(async () => {
@@ -583,10 +632,9 @@ export default function LearningPage() {
 
       {error ? (
         <div className="mt-6">
-          <Callout variant="error" title="We couldn't load what Coderhelm learned">
-            <p>{error}</p>
-            <button type="button" onClick={() => void load()} className={`mt-2 rounded text-sm font-medium underline ${focusRing}`}>Try again</button>
-          </Callout>
+          <Problem title="Couldn't load what Coderhelm learned" onRetry={() => void load()} details={error}>
+            Nothing has changed. Check your connection and try again.
+          </Problem>
         </div>
       ) : loading && !data ? (
         <div className="mt-6 space-y-4" aria-busy="true">
@@ -621,12 +669,12 @@ export default function LearningPage() {
             </div>
           ) : (
             <>
-              <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <StatGrid className="mt-6">
                 <Tile label="Outcomes" value={count(data.totals.events)} basis={`in the last ${data.days} days`} testId="tile-events" />
-                <Tile label="Average reward" value={signed(data.totals.reward)} basis="from −1 to +1 per outcome" testId="tile-reward" />
+                <Tile label="Average reward" value={signed(data.totals.reward)} basis="How well work landed, from −1 to +1" testId="tile-reward" />
                 <Tile label="Changes in use" value={count(active)} basis="each with its evidence below" />
                 <Tile label="Examples in use" value={count(data.exemplars.length)} basis="to follow or to avoid" />
-              </div>
+              </StatGrid>
 
               <Section title="Reward over time" id="trend">
                 <TrendCard data={data} />
@@ -656,13 +704,13 @@ export default function LearningPage() {
             description="Every change in behavior that came from outcomes. Turning one off puts that repository back on the default; the outcomes are kept."
             actions={
               repo ? (
-                <button type="button" className={smallDangerButton} disabled={!canManage || busy || active === 0} title={canManage ? undefined : "Only an admin or the owner can turn changes off"} onClick={() => void revertRepo()}>
+                <button type="button" className={buttonClass("secondary", "sm")} disabled={!canManage || busy || active === 0} title={canManage ? undefined : "Only an admin or the owner can turn changes off"} onClick={() => void revertRepo()}>
                   Turn off all for this repository
                 </button>
               ) : undefined
             }
           >
-            {!repo && data.changes.length > 0 && <p className="mb-3 text-xs text-zinc-500">Pick a repository above to turn off all of its changes at once.</p>}
+            {!repo && data.changes.length > 0 && <p className="mb-3 text-sm text-zinc-400">To undo every change for one repository at once, pick it in the repository filter at the top.</p>}
             {data.changes.length === 0 ? (
               <p className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-sm text-zinc-400">
                 No changes yet. Nothing changes until a repository has {plural(data.min_samples, "outcome")} pointing the same way.
@@ -676,7 +724,15 @@ export default function LearningPage() {
                     labels={labels}
                     canManage={canManage}
                     busy={busy}
-                    onRevert={(x) => void act(() => api.revertChange(x.id), `Turned off: ${x.key} on ${x.repo || "all repositories"}.`)}
+                    onRevert={async (x) => {
+                      const ok = await confirm({
+                        title: "Undo this change?",
+                        message: `Coderhelm goes back to its default for ${keyWords(x.key).toLowerCase()} on ${x.repo || "all repositories"}. The outcomes are kept, and you can turn it back on.`,
+                        confirmLabel: "Undo change",
+                        destructive: true,
+                      });
+                      if (ok === "primary") await act(() => api.revertChange(x.id), `Turned off: ${keyWords(x.key)} on ${x.repo || "all repositories"}.`);
+                    }}
                     onRestore={(x) => void act(() => api.restoreChange(x.id), `Turned back on: ${x.key} on ${x.repo || "all repositories"}.`)}
                   />
                 ))}
@@ -714,7 +770,7 @@ export default function LearningPage() {
             )}
           </Section>
 
-          <Weights key={JSON.stringify(data.weights)} data={data} canManage={canManage} onSaved={(w) => setData((d) => (d ? { ...d, weights: w } : d))} />
+          <Weights key={JSON.stringify(data.weights)} open={weightsOpen} onOpenChange={setWeightsOpen} data={data} canManage={canManage} onSaved={(w) => setData((d) => (d ? { ...d, weights: w } : d))} />
         </div>
       ) : null}
     </Page>

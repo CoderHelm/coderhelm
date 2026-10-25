@@ -9,7 +9,15 @@ import { Page, PageHeader } from "@/components/page";
 import { buttonClass, inputClass } from "@/components/ui";
 import { SettingsSection } from "@/components/settings";
 import { Problem } from "@/components/problem";
+import { LockIcon } from "@/components/icons";
 import { ScopeBar, type Scope } from "../scope-bar";
+
+/** The rules Coderhelm keeps on every run, whatever the team sets. */
+const BUILT_IN = [
+  "Never push to your default branch",
+  "Never commit secrets or keys",
+  "Check the change for security problems before opening a pull request",
+];
 
 export default function GuardrailsPageGuarded() {
   return <RoleGuard need="agent_settings"><GuardrailsPage /></RoleGuard>;
@@ -203,6 +211,21 @@ function GuardrailsPage() {
         <PageHeader title="Guardrails" lead="Rules every Coderhelm run must follow. A repository's own rules add to the ones for every repository." />
       </div>
 
+      <div className="max-w-3xl space-y-8">
+      <SettingsSection id="always-on" title="Always on" description="Coderhelm keeps these on every run. They can't be turned off.">
+        <ul aria-label="Rules Coderhelm always follows" data-testid="built-in-rules" className="divide-y divide-zinc-800">
+          {BUILT_IN.map((rule) => (
+            <li key={rule} className="flex min-w-0 items-center gap-3 px-4 py-2.5 text-sm text-zinc-300">
+              <span aria-hidden="true" className="shrink-0 text-zinc-400">
+                <LockIcon />
+              </span>
+              <span className="min-w-0">{rule}</span>
+            </li>
+          ))}
+        </ul>
+      </SettingsSection>
+
+      <div>
       <ScopeBar label="Whose rules" scope={scope} onScope={setScope} repos={repos} repo={selectedRepo} onRepo={setSelectedRepo} />
 
       <SettingsSection
@@ -236,11 +259,10 @@ function GuardrailsPage() {
           />
         )}
       </SettingsSection>
+      </div>
+      </div>
 
-      <p className="mt-4 max-w-prose text-sm text-zinc-500" data-testid="built-in-rules">
-        Coderhelm also keeps its own rules on every run, such as never pushing to your default branch and never committing secrets, and it
-        checks the change for security problems before it opens a pull request.
-      </p>
+
     </Page>
   );
 }

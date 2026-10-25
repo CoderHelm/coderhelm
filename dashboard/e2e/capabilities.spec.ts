@@ -47,7 +47,7 @@ test("a member-plus-repos custom role sees the repo settings controls and can us
   await page.goto("/settings/repos");
   await expect(page.getByRole("heading", { name: "Repositories" })).toBeVisible();
   await expect(page.getByTestId("repos-read-only")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Sync repos" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Refresh from GitHub" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Role of acme/web" })).toBeVisible();
   const toggle = page.getByRole("switch", { name: "Let Coderhelm work on acme/api" });
   await expect(toggle).toBeEnabled();
@@ -68,9 +68,9 @@ test("a custom role without repos sees the repos read-only", async ({ page }) =>
   const calls = await mockApi(page, { role: "member", capabilities: MEMBER, custom_role: { id: "r2", name: "Planner" } });
   await page.goto("/settings/repos");
   await expect(page.getByTestId("repos-read-only")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sync repos" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Refresh from GitHub" })).toHaveCount(0);
   await expect(page.getByRole("combobox", { name: "Role of acme/web" })).toHaveCount(0);
-  await expect(page.getByText("Web", { exact: true })).toBeVisible();
+  await expect(page.getByText("Website", { exact: true })).toBeVisible();
   const toggle = page.getByRole("switch", { name: "Let Coderhelm work on acme/api" });
   await expect(toggle).toBeDisabled();
   expect(calls.some((c) => c.path.startsWith("/api/repos/"))).toBe(false);
@@ -107,7 +107,7 @@ test("viewers are unchanged: member pages stay closed and out of the menu", asyn
 test("an admin with the built-in role still sees every admin control", async ({ page }) => {
   await mockApi(page, { role: "admin" });
   await page.goto("/settings/repos");
-  await expect(page.getByRole("button", { name: "Sync repos" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Refresh from GitHub" })).toBeVisible();
   await expect(nav(page).getByRole("link", { name: "AI Models" })).toBeVisible();
   await expect(nav(page).getByRole("link", { name: "Health" })).toBeVisible();
 });

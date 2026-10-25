@@ -22,7 +22,7 @@ function Tip({ active, payload, label, percent }: { active?: boolean; payload?: 
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-950/95 px-3 py-2 shadow-xl">
-      <p className="mb-1 text-xs text-zinc-500">{label}</p>
+      <p className="mb-1 text-xs text-zinc-400">{label}</p>
       {payload.map((e) => (
         <p key={e.name} className="flex items-center gap-2 text-xs">
           <span className="h-2 w-2 rounded-full" style={{ background: e.color }} />

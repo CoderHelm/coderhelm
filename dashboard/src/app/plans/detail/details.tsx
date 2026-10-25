@@ -34,7 +34,7 @@ export function PlanDetails({
   const dest = plan.destination ?? "github";
   const tokens = (plan.tokens_in ?? 0) + (plan.tokens_out ?? 0);
   const row = "flex min-w-0 flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-3";
-  const label = "shrink-0 text-xs text-zinc-500 sm:w-32";
+  const label = "shrink-0 text-xs text-zinc-400 sm:w-32";
   return (
     <details
       open={open}
@@ -78,7 +78,7 @@ export function PlanDetails({
                 );
               })}
             </div>
-            <p className="mt-1.5 text-xs text-zinc-500">
+            <p className="mt-1.5 text-xs text-zinc-400">
               {!draft ? (
                 "Locked once the plan starts."
               ) : !jiraReady ? (

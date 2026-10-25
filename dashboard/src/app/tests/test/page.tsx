@@ -3,22 +3,28 @@
 import { useCan } from "@/hooks/use-can";
 import { ANY_CHANGE } from "@/lib/capabilities";
 import Link from "next/link";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, type TestCase, type TestHistoryRun } from "@/lib/api";
 import {
   CAUSE_LABEL, FIX_LABEL, OUTCOME_LABEL, OUTCOME_TONE, STATE_HELP, STATE_LABEL, githubPrUrl, pct, plural, runHref, shortSha, testName,
 } from "@/lib/tests";
-import { errorMessage, formatDuration, timeAgo } from "@/lib/data-sources";
+import { errorMessage, formatDuration } from "@/lib/data-sources";
+import { Time, formatDate } from "@/components/list/time";
+import { ChevronRightIcon, ExternalLinkIcon } from "@/components/icons";
 import { RoleGuard } from "@/components/role-guard";
 import { StatusPill } from "@/components/status-pill";
 import { Callout } from "@/components/callout";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
-import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { buttonClass, focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+
+function capitalize(s?: string): string | undefined {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
 import { Page, PageHeader } from "@/components/page";
 import {
-  ArtifactLinks, AttemptSquares, EmptyBox, LoadError, Loading, SectionHeading, StatCard, StatePill, firstError,
+  ArtifactLinks, AttemptSquares, EmptyBox, ErrorSummary, LoadError, Loading, SectionHeading, StatCard, StatePill, firstError,
 } from "@/components/tests/common";
 import { Switch } from "@/components/tests/settings";
 import { useLoad } from "@/components/tests/use-load";
@@ -42,9 +48,6 @@ function TestDetail() {
   const isAdmin = can("tests");
   const [busy, setBusy] = useState("");
   const { data, setData, error, loading, reload } = useLoad(() => (id ? api.getTest(id) : Promise.resolve(null)), `test:${id}`);
-
-  useEffect(() => {
-  }, []);
 
   if (!id) return <Page><EmptyBox>No test was named. Go back to <Link href="/tests" className={linkButton}>Tests</Link>.</EmptyBox></Page>;
   if (error) return <Page><LoadError what="this test" message={error} onRetry={reload} /></Page>;
@@ -122,17 +125,7 @@ function TestDetail() {
       <PageHeader
         detail
         title={testName(test)}
-        lead={
-          <>
-            <p className="wrap-anywhere font-mono text-zinc-500">{test.file}</p>
-            <p className="mt-1 text-zinc-500">
-              {test.repo} · {test.framework}
-              {test.owner && <> · Owner {test.owner}</>}
-              {test.last_seen && <> · Last run {timeAgo(test.last_seen)}</>}
-            </p>
-          </>
-        }
-        actions={
+        status={
           <>
             <StatePill state={test.state} />
             {test.flags.filter((f) => f !== test.state).map((f) => (
@@ -140,8 +133,29 @@ function TestDetail() {
             ))}
           </>
         }
+        lead={STATE_HELP[test.state]}
       />
-      <p className="mt-3 max-w-prose text-sm text-zinc-300">{STATE_HELP[test.state]}</p>
+      <dl className="mt-4 grid max-w-3xl grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-sm" data-testid="test-facts">
+        <dt className="text-zinc-400">File</dt>
+        <dd className="min-w-0 text-zinc-200 [overflow-wrap:anywhere]">{test.file}</dd>
+        <dt className="text-zinc-400">Repository</dt>
+        <dd className="min-w-0 text-zinc-200 [overflow-wrap:anywhere]">
+          {test.repo}
+          {test.framework && <span className="text-zinc-400"> · {capitalize(test.framework)}</span>}
+        </dd>
+        {test.owner && (
+          <>
+            <dt className="text-zinc-400">Owner</dt>
+            <dd className="min-w-0 text-zinc-200">{test.owner}</dd>
+          </>
+        )}
+        {test.last_seen && (
+          <>
+            <dt className="text-zinc-400">Last run</dt>
+            <dd className="text-zinc-200"><Time iso={test.last_seen} /></dd>
+          </>
+        )}
+      </dl>
 
       <section aria-label="Numbers" className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Fails (30 days)" value={pct(test.fail_rate_30d)} hint={plural(test.runs_30d, "run")} tone={test.state === "broken" ? "error" : undefined} />
@@ -159,17 +173,30 @@ function TestDetail() {
       )}
 
       {(test.fix_status || test.ticket_url) && (
-        <section aria-labelledby="fix-heading" className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-          <SectionHeading id="fix-heading">Fix</SectionHeading>
-          <p className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-            {test.fix_status && (
-              <StatusPill tone={test.fix_status === "merged" ? "success" : test.fix_status === "failed" ? "error" : "neutral"}>
-                {FIX_LABEL[test.fix_status]}
-              </StatusPill>
-            )}
-            {test.fix_pr_url && <a href={test.fix_pr_url} target="_blank" rel="noreferrer" className={linkButton}>Open the fix PR</a>}
-            {test.ticket_url && <a href={test.ticket_url} target="_blank" rel="noreferrer" className={linkButton}>Open the ticket</a>}
-          </p>
+        <section aria-label="Fix" className="mt-6" data-testid="test-fix">
+          <Callout
+            variant={test.fix_status === "merged" ? "success" : test.fix_status === "failed" ? "error" : "info"}
+            title={test.fix_status ? FIX_LABEL[test.fix_status] : "A ticket is open for this test"}
+            live={false}
+            actions={
+              test.fix_pr_url || test.ticket_url ? (
+                <>
+                  {test.fix_pr_url && (
+                    <a href={test.fix_pr_url} target="_blank" rel="noreferrer" className={`${buttonClass("secondary", "sm")} gap-1.5`}>
+                      Open the fix PR
+                      <ExternalLinkIcon />
+                    </a>
+                  )}
+                  {test.ticket_url && (
+                    <a href={test.ticket_url} target="_blank" rel="noreferrer" className={`${buttonClass("secondary", "sm")} gap-1.5`}>
+                      Open the ticket
+                      <ExternalLinkIcon />
+                    </a>
+                  )}
+                </>
+              ) : undefined
+            }
+          />
         </section>
       )}
 
@@ -196,6 +223,9 @@ function TestDetail() {
               Never quarantine
             </label>
           </div>
+          <p className="mt-2 max-w-prose text-sm text-zinc-400">
+            A quarantined test keeps running and is still recorded, but its failures don&apos;t block pull requests.
+          </p>
           {test.state === "broken" && (
             <p className="mt-2 max-w-prose text-sm text-zinc-400">
               Broken tests can&apos;t be quarantined: they fail because something is really wrong, and hiding that would let it ship.
@@ -211,9 +241,7 @@ function TestDetail() {
         ) : (
           <>
             <HistoryStrip history={history} />
-            <ul aria-label="Recent runs of this test" className="mt-3 divide-y divide-zinc-800 rounded-lg border border-zinc-800 bg-zinc-900/50">
-              {history.map((h) => <HistoryRow key={h.run_key} run={h} repo={test.repo} />)}
-            </ul>
+            <HistoryList history={history} repo={test.repo} />
           </>
         )}
       </section>
@@ -227,11 +255,11 @@ function TestDetail() {
             {events.map((ev, i) => (
               <li key={`${ev.at}-${i}`} className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-sm">
                 <p className="text-zinc-100">
-                  {STATE_LABEL[ev.from]} <span aria-hidden="true">→</span><span className="sr-only">to</span> {STATE_LABEL[ev.to]}
+                  Changed from {STATE_LABEL[ev.from]} to {STATE_LABEL[ev.to]}
                 </p>
                 <p className="mt-0.5 text-zinc-400">{ev.reason}</p>
-                <p className="mt-1 text-xs text-zinc-500">
-                  {ev.actor} · <time dateTime={ev.at} title={new Date(ev.at).toLocaleString()}>{timeAgo(ev.at)}</time>
+                <p className="mt-1 text-xs text-zinc-400">
+                  {ev.actor} · <Time iso={ev.at} />
                 </p>
               </li>
             ))}
@@ -257,7 +285,7 @@ function HistoryStrip({ history }: { history: TestHistoryRun[] }) {
     <div>
       <div role="img" aria-label={label} className="flex flex-wrap gap-1">
         {runs.map((r) => (
-          <span key={r.run_key} title={`${OUTCOME_LABEL[r.outcome]} · ${r.branch} · ${new Date(r.at).toLocaleString()}`} className={`h-5 w-2.5 rounded-sm ${color[r.outcome]}`} />
+          <span key={r.run_key} title={`${OUTCOME_LABEL[r.outcome]} · ${r.branch} · ${formatDate(r.at, { time: true })}`} className={`h-5 w-2.5 rounded-sm ${color[r.outcome]}`} />
         ))}
       </div>
       <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-400" aria-hidden="true">
@@ -270,26 +298,68 @@ function HistoryStrip({ history }: { history: TestHistoryRun[] }) {
   );
 }
 
-function HistoryRow({ run, repo }: { run: TestHistoryRun; repo: string }) {
-  const err = firstError(run.attempts);
+/** Ten runs at first; the rest one click away. */
+function HistoryList({ history, repo }: { history: TestHistoryRun[]; repo: string }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? history : history.slice(0, 10);
   return (
-    <li className="px-4 py-3 sm:px-5">
+    <>
+      <ul aria-label="Recent runs of this test" className="mt-3 divide-y divide-zinc-800 rounded-lg border border-zinc-800 bg-zinc-900/50">
+        {shown.map((h) => (
+          <HistoryRow key={h.run_key} run={h} repo={repo} />
+        ))}
+      </ul>
+      {history.length > shown.length && (
+        <button type="button" onClick={() => setAll(true)} className={`mt-3 ${secondaryButton}`}>
+          Show all {history.length} runs
+        </button>
+      )}
+    </>
+  );
+}
+
+/** One line per run; the error and its links open under it. */
+function HistoryRow({ run, repo }: { run: TestHistoryRun; repo: string }) {
+  const [open, setOpen] = useState(false);
+  const err = firstError(run.attempts);
+  const hasMore = !!err || run.attempts.some((a) => a.trace_url || a.video_url || a.screenshot_url);
+  return (
+    <li className="px-4 py-2.5 sm:px-5" data-testid="history-row">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400">
           <StatusPill tone={OUTCOME_TONE[run.outcome]}>{OUTCOME_LABEL[run.outcome]}</StatusPill>
           <AttemptSquares attempts={run.attempts} />
-          <Link href={runHref(run.run_key)} className={`font-mono text-zinc-300 underline underline-offset-2 hover:text-zinc-100 rounded ${focusRing}`}>
+          <Link href={runHref(run.run_key)} className={`text-zinc-300 underline underline-offset-2 hover:text-zinc-100 rounded [overflow-wrap:anywhere] ${focusRing}`}>
             {run.branch}
           </Link>
           {run.pr ? (
             <a href={githubPrUrl(repo, run.pr)} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-zinc-200">PR #{run.pr}</a>
           ) : null}
-          <span className="font-mono">{shortSha(run.sha)}</span>
-          <time dateTime={run.at} title={new Date(run.at).toLocaleString()}>{timeAgo(run.at)}</time>
+          <span className="sr-only">commit {shortSha(run.sha)}</span>
+          <Time iso={run.at} />
         </p>
-        <ArtifactLinks attempts={run.attempts} />
+        {hasMore && (
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            aria-expanded={open}
+            className={`inline-flex min-h-7 items-center gap-1 rounded-md px-1.5 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 ${focusRing}`}
+          >
+            {err ? "Error" : "Details"}
+            <span aria-hidden="true" className={`transition-transform motion-reduce:transition-none ${open ? "rotate-90" : ""}`}>
+              <ChevronRightIcon />
+            </span>
+          </button>
+        )}
       </div>
-      {err && <p className="mt-1.5 max-h-48 overflow-y-auto overscroll-contain whitespace-pre-wrap font-mono text-xs leading-relaxed text-red-200 [scrollbar-width:thin]" tabIndex={0}>{err}</p>}
+      {open && (
+        <div className="mt-2 border-l border-zinc-800 pl-3">
+          {err && <ErrorSummary message={err} />}
+          <p className="mt-2 text-xs">
+            <ArtifactLinks attempts={run.attempts} />
+          </p>
+        </div>
+      )}
     </li>
   );
 }

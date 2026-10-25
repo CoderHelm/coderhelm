@@ -20,34 +20,41 @@ import {
   type Tone,
 } from "@/components/list";
 import { useToast } from "@/components/toast";
-import { ToolSwitch } from "@/components/tools";
-import { inputClass, linkButton, primaryButton, secondaryButton, focusRing } from "@/components/ui";
-import Link from "next/link";
-import { KIND_LABEL, agentHref, ago, handle, pageHref, skillsApi, thinDescription, type Skill, type SkillKind, type SkillRepo, type SkillStats } from "@/lib/skills";
+import { Switch } from "@/components/settings/switch";
+import { Code } from "@/components/settings";
+import { Disclosure } from "@/components/disclosure";
+import { Modal, modalActions } from "@/components/modal";
+import { RepoCombobox } from "@/components/repo-combobox";
+import { useConfirm } from "@/components/confirm-dialog";
+import { api, type Repo } from "@/lib/api";
+import { linkButton, primaryButton, secondaryButton, smallSecondaryButton, focusRing } from "@/components/ui";
+import { KIND_LABEL, agentHref, ago, handle, pageHref, skillsApi, type Skill, type SkillKind, type SkillRepo, type SkillStats } from "@/lib/skills";
 import { Page, PageHeader } from "@/components/page";
 import { CompatBadge, CompatOverview, matchesCompatFilter } from "./compat";
-import { AlwaysApplyBadge, SuggestionHint } from "./always-apply";
-import { ReviewStepsBadge } from "./review-steps";
 import { UsageStats } from "./usage-stats";
+import { AlwaysApplyBadge } from "./always-apply";
+import { ReviewStepsBadge } from "./review-steps";
 import { NO_FILTERS, SkillActivity, type ActivityFilters } from "./skill-activity";
 import { RANGES, type Range } from "@/lib/activity";
 
-/** The tools an item asks for in its front matter that it won't get. */
-function MissingTools({ item }: { item: Skill }) {
-  const tools = item.missing_tools ?? [];
-  return (
-    <div role="note" className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-      <p>
-        {item.kind === "agent" ? "Lists tools it won't get" : "Asks for tools Coderhelm doesn't have"}:{" "}
-        <span className="font-mono [overflow-wrap:anywhere]">{tools.join(", ")}</span>.
-      </p>
-      <p className="mt-0.5 text-amber-200/80">
-        {item.kind === "agent"
-          ? "Team agents answer without tools, so Coderhelm will run it without those tools."
-          : "Coderhelm will run it without those tools."}
-      </p>
-    </div>
-  );
+/** "schedule-table-conventions" reads as "Schedule table conventions". */
+function readableName(name: string): string {
+  const words = name.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : name;
+}
+
+/** The one status chip a row shows: its check, or the tools it asks for that it won't get. */
+function ItemChip({ item }: { item: Skill }) {
+  const missing = item.missing_tools ?? [];
+  if (!item.compat && missing.length > 0) {
+    const why = item.kind === "agent" ? "Lists tools it won't get" : "Asks for tools Coderhelm doesn't have";
+    return (
+      <span data-testid="missing-tools" title={`${why}: ${missing.join(", ")}. Coderhelm runs it without them.`}>
+        <StatusPill tone="warning">Needs tools</StatusPill>
+      </span>
+    );
+  }
+  return <CompatBadge item={item} />;
 }
 
 export default function SkillsPageGuarded() {
@@ -187,6 +194,13 @@ function SkillsPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [newRepo, setNewRepo] = useState("");
+  const [connectOpen, setConnectOpen] = useState(false);
+  const [teamRepos, setTeamRepos] = useState<Repo[] | null>(null);
+  const { confirm } = useConfirm();
+  useEffect(() => {
+    if (!connectOpen || teamRepos) return;
+    api.listRepos().then((r) => setTeamRepos(r.repos), () => setTeamRepos([]));
+  }, [connectOpen, teamRepos]);
   const [stats, setStats] = useState<SkillStats | null>(null);
   const [compatFilter, setCompatFilter] = useState("");
   // The library's toolbar: ?q=, ?status=, ?repo= (only read on the Library tab).
@@ -240,6 +254,7 @@ function SkillsPage() {
     run("connect", async () => {
       await skillsApi.connect(repo);
       setNewRepo("");
+      setConnectOpen(false);
       toast(`Connected ${repo}. Reading it now.`);
       await load();
     });
@@ -252,8 +267,14 @@ function SkillsPage() {
       setTimeout(load, 4_000);
     });
 
-  const disconnect = (repo: string) => {
-    if (!window.confirm(`Disconnect ${repo}? Coderhelm forgets every skill read from it.`)) return;
+  const disconnect = async (repo: string) => {
+    const ok = await confirm({
+      title: `Disconnect ${repo}?`,
+      message: "Coderhelm forgets every skill, agent and command read from it. You can connect it again any time.",
+      confirmLabel: "Disconnect",
+      destructive: true,
+    });
+    if (ok !== "primary") return;
     run(`disconnect:${repo}`, async () => {
       await skillsApi.disconnect(repo);
       toast(`Disconnected ${repo}`);
@@ -301,29 +322,32 @@ function SkillsPage() {
   const clearLib = () => setLib({ q: "", status: "all", repo: "" });
   const on = items.filter((i) => i.enabled).length;
 
+  const connectedNames = new Set((repos ?? []).map((r) => r.repo));
+  const pickable = (teamRepos ?? []).filter((r) => !connectedNames.has(r.name));
+
   return (
     <Page>
       <PageHeader
         title="Skills"
-        lead={
-          <>
-            Keep your team&apos;s skills, agent briefs and commands in a repository, and Coderhelm&apos;s planner, coder and reviewer read
-            the ones that fit the work, and can ask your agents a question. Coderhelm reads the default branch, so only merged changes
-            count, and reads it again on every push. Nothing in them is ever run, and they can&apos;t give Coderhelm any access it
-            doesn&apos;t already have: an agent that&apos;s asked gets only the read-only tools its own file lists, its brief and what it&apos;s sent.
-          </>
+        lead="Write down how your team works, in skills, agent briefs and commands kept in a repository, and Coderhelm follows them on every task."
+        actions={
+          canManage ? (
+            <button type="button" className={primaryButton} onClick={() => setConnectOpen(true)}>
+              Connect repository
+            </button>
+          ) : undefined
         }
       />
 
+      <Tabs tab={tab} onChange={(t) => go(t, t === "activity" ? filters : NO_FILTERS)} />
+
       {error && (
         <div className="mt-6">
-          <ListError title="We couldn't load your skills" onRetry={load}>
-            {error}
+          <ListError title="Couldn't load your skills" onRetry={load} details={error}>
+            Nothing has changed. Check your connection and try again.
           </ListError>
         </div>
       )}
-
-      <Tabs tab={tab} onChange={(t) => go(t, t === "activity" ? filters : NO_FILTERS)} />
 
       {tab === "activity" ? (
         <div role="tabpanel" id="panel-activity" aria-labelledby="tab-activity">
@@ -332,118 +356,29 @@ function SkillsPage() {
             question: who, during which pull request or ticket, the reason it gave, and how it went. Only that is kept, never the text
             read or the answer, for 180 days.
           </p>
+          {stats && items.length > 0 && <UsageStats stats={stats} />}
           <ActivitySummaryStrip />
           <SkillActivity items={items} filters={filters} onFiltersChange={setFilters} heading="Reads and asks" />
         </div>
       ) : (
         <div role="tabpanel" id="panel-library" aria-labelledby="tab-library">
-        <CompatOverview items={items} filter={compatFilter} onFilter={setCompatFilter} />
-        {stats && items.length > 0 && <UsageStats stats={stats} />}
-
-        <div className="mt-8">
-          <ListSection id="repos" title="Repositories" count={repos?.length || undefined}>
-            {repos === null ? (
-              <ListSkeleton rows={2} label="Loading your repositories" />
-            ) : (
-              <div className="space-y-3">
-                {repos.length === 0 && (
-                  <ListEmpty title="No repository connected.">
-                    Coderhelm reads <code className="text-zinc-300">skills/&lt;name&gt;/SKILL.md</code>,{" "}
-                    <code className="text-zinc-300">agents/&lt;name&gt;.md</code> and <code className="text-zinc-300">commands/&lt;name&gt;.md</code>,
-                    also under <code className="text-zinc-300">.claude/</code>.
-                  </ListEmpty>
-                )}
-                {repos.length > 0 && (
-                  <List label="Connected repositories">
-                    {repos.map((r) => (
-                      <ListRow
-                        key={r.repo}
-                        testId="skills-repo"
-                        status={{ tone: repoTone(r) }}
-                        title={r.repo}
-                        meta={[
-                          `${r.items} item${r.items === 1 ? "" : "s"}`,
-                          r.sha ? <>commit <span className="font-mono">{r.sha.slice(0, 7)}</span></> : null,
-                          r.synced_at ? <>checked <Time iso={r.synced_at} /></> : null,
-                          r.added_by ? `added by ${r.added_by}` : null,
-                        ]}
-                        chips={
-                          !r.synced_at ? (
-                            <StatusPill tone="warning">Reading…</StatusPill>
-                          ) : r.error ? (
-                            <StatusPill tone="error">Last sync failed</StatusPill>
-                          ) : (
-                            <StatusPill tone="success">In step</StatusPill>
-                          )
-                        }
-                        actions={
-                          canManage ? (
-                            <>
-                              <button type="button" className={secondaryButton} disabled={busy === `sync:${r.repo}`} onClick={() => sync(r.repo)}>
-                                {busy === `sync:${r.repo}` ? "Starting…" : "Sync now"}
-                              </button>
-                              {r.items > 0 && (
-                                <button
-                                  type="button"
-                                  className={secondaryButton}
-                                  disabled={busy === `recheck:${r.repo}`}
-                                  onClick={() => recheck(r.repo)}
-                                  title="Check every item again against what your team has connected"
-                                >
-                                  {busy === `recheck:${r.repo}` ? "Starting…" : "Re-check all"}
-                                </button>
-                              )}
-                              <button type="button" className={secondaryButton} disabled={busy === `disconnect:${r.repo}`} onClick={() => disconnect(r.repo)}>
-                                Disconnect
-                              </button>
-                            </>
-                          ) : undefined
-                        }
-                      >
-                        {r.error && <p className="mt-2 text-sm text-red-300">{r.error}</p>}
-                        {r.skipped.length > 0 && (
-                          <details className="mt-2 text-xs text-zinc-500">
-                            <summary className={`cursor-pointer rounded ${focusRing}`}>{r.skipped.length} file{r.skipped.length === 1 ? "" : "s"} left out</summary>
-                            <ul className="mt-1 list-disc pl-5 space-y-0.5">
-                              {r.skipped.map((s) => (
-                                <li key={s} className="[overflow-wrap:anywhere]">{s}</li>
-                              ))}
-                            </ul>
-                          </details>
-                        )}
-                      </ListRow>
-                    ))}
-                  </List>
-                )}
-                {canManage && (
-                  <form onSubmit={connect} className="flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-zinc-800 px-4 py-4">
-                    <label className="min-w-0 flex-1 basis-64 text-sm text-zinc-300">
-                      Connect a repository
-                      <input
-                        className={`${inputClass} mt-1.5 font-mono`}
-                        placeholder="owner/name"
-                        value={newRepo}
-                        onChange={(e) => setNewRepo(e.target.value)}
-                        autoComplete="off"
-                        spellCheck={false}
-                      />
-                      <span className="mt-1.5 block text-xs text-zinc-500">
-                        Coderhelm&apos;s GitHub App must be installed on it. Every item starts switched on; switch off any you don&apos;t want used.
-                      </span>
-                    </label>
-                    <button type="submit" className={primaryButton} disabled={busy === "connect" || !newRepo.trim()}>
-                      {busy === "connect" ? "Connecting…" : "Connect"}
-                    </button>
-                  </form>
-                )}
-              </div>
-            )}
-          </ListSection>
+        <div className="mt-4 max-w-prose">
+          <Disclosure summary="How it works">
+            <p>
+              Coderhelm reads the default branch, so only merged changes count, and reads it again on every push. It looks for{" "}
+              <Code>skills/&lt;name&gt;/SKILL.md</Code>, <Code>agents/&lt;name&gt;.md</Code> and <Code>commands/&lt;name&gt;.md</Code>, also under <Code>.claude/</Code>.
+            </p>
+            <p>
+              Nothing in them is ever run, and they can&apos;t give Coderhelm any access it doesn&apos;t already have: an agent that&apos;s asked gets
+              only the read-only tools its own file lists, its brief and what it&apos;s sent. Coderhelm uses up to 20 per task; ones set to always
+              apply are given in full to matching work.
+            </p>
+          </Disclosure>
         </div>
 
         {items.length >= 2 && (
           <ListToolbar
-            className="mt-8"
+            className="mt-6"
             search={{
               value: lib.q,
               onChange: (v) => setLib({ q: v }, { replace: true }),
@@ -465,6 +400,9 @@ function SkillsPage() {
             onClear={libFiltered ? clearLib : undefined}
           />
         )}
+
+        <CompatOverview items={items} filter={compatFilter} onFilter={setCompatFilter} />
+
         {libFiltered && items.length > 0 && grouped.length === 0 && (
           <div className="mt-6">
             <ListEmpty title="Nothing matches these filters." onClear={clearLib} />
@@ -489,57 +427,38 @@ function SkillsPage() {
                     <ListRow
                       key={key}
                       testId="skill-item"
+                      data={{ handle: handle(s, items) }}
                       status={{ tone: !s.enabled ? "muted" : needsALook(s) ? "waiting" : "success" }}
-                      title={<span className="font-mono">{handle(s, items)}</span>}
-                      href={pageHref(s)}
+                      title={readableName(s.name)}
+                      titleText={handle(s, items)}
+                      href={s.kind === "agent" ? agentHref(s) : pageHref(s)}
+                      quiet={!s.enabled}
                       meta={[
-                        <span key="where" className="[overflow-wrap:anywhere]">{s.repo} · {s.path}</span>,
-                        s.files.length > 0 ? `${s.files.length} file${s.files.length === 1 ? "" : "s"} with it` : null,
+                        <span key="where" className="[overflow-wrap:anywhere]">{s.repo}</span>,
                         s.kind === "agent"
                           ? s.asks > 0
                             ? `asked ${s.asks} time${s.asks === 1 ? "" : "s"}, last ${ago(s.last_asked_at)}`
                             : "not asked yet"
                           : s.uses > 0
-                            ? `read ${s.uses} time${s.uses === 1 ? "" : "s"}, last by the ${s.last_used_by} ${ago(s.last_used_at)}`
+                            ? `read ${s.uses} time${s.uses === 1 ? "" : "s"}, last ${ago(s.last_used_at)}`
                             : "not read yet",
                       ]}
                       chips={
                         <>
-                          <CompatBadge item={s} />
+                          <ItemChip item={s} />
                           <AlwaysApplyBadge item={s} short />
                           <ReviewStepsBadge item={s} />
-                          {s.kind === "agent" && <StatusPill tone="success">Agent · can be asked</StatusPill>}
                         </>
                       }
                       actions={
                         canManage ? (
-                          <ToolSwitch on={s.enabled} label={`Let Coderhelm read ${s.name}`} busy={busy === key} onToggle={() => toggle(s)} />
+                          <Switch checked={s.enabled} label={`Let Coderhelm read ${s.name}`} disabled={busy === key} onChange={() => toggle(s)} />
                         ) : (
                           <StatusPill tone={s.enabled ? "success" : "neutral"}>{s.enabled ? "On" : "Off"}</StatusPill>
                         )
                       }
                     >
-                      {s.description && <p className="mt-1 text-sm text-zinc-400">{s.description}</p>}
-                      {s.kind === "agent" && (
-                        <Link href={agentHref(s)} className={`${linkButton} mt-1 text-xs`}>
-                          {canManage ? "Open, see asks, try it" : "Open, see asks"}
-                        </Link>
-                      )}
-                      <SuggestionHint item={s} />
-                      {s.kind === "agent" && thinDescription(s.description) && (
-                        <p className="mt-1 text-xs text-amber-300">
-                          {s.description ? "Short description" : "No description"}: Coderhelm&apos;s agents decide when to ask it from this line.
-                        </p>
-                      )}
-                      {s.compat?.summary && s.compat.current && (
-                        <p className="mt-1 text-xs text-zinc-400">
-                          <Link href={pageHref(s)} className={`hover:text-zinc-200 hover:underline rounded ${focusRing}`}>
-                            {s.compat.summary}
-                          </Link>
-                          {s.use_translated && <span className="text-sky-300"> · agents read the translated version</span>}
-                        </p>
-                      )}
-                      {!s.compat && (s.missing_tools?.length ?? 0) > 0 && <MissingTools item={s} />}
+                      {s.description && <p className="mt-1 line-clamp-1 text-sm text-zinc-400" title={s.description}>{s.description}</p>}
                     </ListRow>
                   );
                 })}
@@ -548,14 +467,116 @@ function SkillsPage() {
           </div>
         ))}
 
+        <div className="mt-10">
+          <ListSection id="repos" title="Repositories" count={repos?.length || undefined}>
+            {repos === null ? (
+              <ListSkeleton rows={2} label="Loading your repositories" />
+            ) : repos.length === 0 ? (
+              <ListEmpty
+                title="No repository connected."
+                action={
+                  canManage ? (
+                    <button type="button" className={primaryButton} onClick={() => setConnectOpen(true)}>
+                      Connect a repository
+                    </button>
+                  ) : undefined
+                }
+              >
+                Connect the repository where your team keeps its skills, agent briefs and commands.
+              </ListEmpty>
+            ) : (
+              <List label="Connected repositories">
+                {repos.map((r) => (
+                  <ListRow
+                    key={r.repo}
+                    testId="skills-repo"
+                    status={{ tone: repoTone(r) }}
+                    title={r.repo}
+                    meta={[
+                      `${r.items} item${r.items === 1 ? "" : "s"}`,
+                      r.synced_at ? <>checked <Time iso={r.synced_at} /></> : null,
+                      r.added_by ? `added by ${r.added_by}` : null,
+                    ]}
+                    chips={
+                      !r.synced_at ? (
+                        <StatusPill tone="warning">Reading…</StatusPill>
+                      ) : r.error ? (
+                        <StatusPill tone="error">Last sync failed</StatusPill>
+                      ) : (
+                        <StatusPill tone="success">In step</StatusPill>
+                      )
+                    }
+                    actions={
+                      canManage ? (
+                        <button type="button" className={smallSecondaryButton} disabled={busy === `sync:${r.repo}`} onClick={() => sync(r.repo)}>
+                          {busy === `sync:${r.repo}` ? "Starting…" : "Sync now"}
+                        </button>
+                      ) : undefined
+                    }
+                    menuLabel={`More for ${r.repo}`}
+                    menu={
+                      canManage
+                        ? [
+                            ...(r.items > 0
+                              ? [{ label: "Re-check all", note: "Check every item again against what your team has connected", disabled: busy === `recheck:${r.repo}`, onSelect: () => recheck(r.repo) }]
+                              : []),
+                            { label: "Disconnect", danger: true, disabled: busy === `disconnect:${r.repo}`, onSelect: () => void disconnect(r.repo) },
+                          ]
+                        : undefined
+                    }
+                  >
+                    {r.error && <p className="mt-2 text-sm text-red-300">{r.error}</p>}
+                    {r.skipped.length > 0 && (
+                      <details className="mt-2 text-xs text-zinc-400">
+                        <summary className={`cursor-pointer rounded ${focusRing}`}>{r.skipped.length} file{r.skipped.length === 1 ? "" : "s"} left out</summary>
+                        <ul className="mt-1 list-disc pl-5 space-y-0.5">
+                          {r.skipped.map((x) => (
+                            <li key={x} className="[overflow-wrap:anywhere]">{x}</li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                  </ListRow>
+                ))}
+              </List>
+            )}
+          </ListSection>
+        </div>
+
         {items.length > 0 && (
-          <p className="mt-8 text-xs text-zinc-500">
-            {on} of {items.length} switched on. Coderhelm lists the ones that are on to its agents, and each agent reads at most 20 in one
-            run. Ones set to always apply are given in full to matching work instead.
+          <p className="mt-6 text-sm text-zinc-400">
+            {on} of {items.length} switched on.
           </p>
         )}
         </div>
       )}
+
+      <Modal
+        open={connectOpen}
+        onOpenChange={setConnectOpen}
+        title="Connect a repository"
+        description="Pick the repository where your team keeps its skills. Coderhelm's GitHub App must be installed on it. Every item starts switched on; switch off any you don't want used."
+        onSubmit={connect}
+        testId="connect-skills-repo"
+        footer={
+          <div className={modalActions}>
+            <button type="button" className={secondaryButton} onClick={() => setConnectOpen(false)}>
+              Cancel
+            </button>
+            <button type="submit" className={primaryButton} disabled={busy === "connect" || !newRepo.trim()}>
+              {busy === "connect" ? "Connecting…" : "Connect"}
+            </button>
+          </div>
+        }
+      >
+        {teamRepos === null ? (
+          <ListSkeleton rows={1} label="Loading your repositories" />
+        ) : pickable.length === 0 ? (
+          <p className="text-sm text-zinc-400">Every repository the GitHub App can see is connected already.</p>
+        ) : (
+          <RepoCombobox id="skills-connect-repo" label="Repository" repos={pickable} selected={newRepo} onSelect={setNewRepo} className="" />
+        )}
+      </Modal>
     </Page>
   );
 }

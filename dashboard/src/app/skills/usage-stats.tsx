@@ -20,9 +20,9 @@ function shortDate(d: string): string {
 function Tile({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-      <p className="text-xs text-zinc-500">{label}</p>
+      <p className="text-xs text-zinc-400">{label}</p>
       <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-100">{value}</p>
-      {note && <p className="mt-0.5 text-xs text-zinc-500">{note}</p>}
+      {note && <p className="mt-0.5 text-xs text-zinc-400">{note}</p>}
     </div>
   );
 }
@@ -47,7 +47,7 @@ function DayChart({ days }: { days: SkillStats["days"] }) {
       : "No reads or asks in this period.";
   return (
     <figure className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-      <figcaption className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500">
+      <figcaption className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-400">
         <span>Per day</span>
         <span className="flex items-center gap-3">
           <span className="flex items-center gap-1.5">
@@ -79,11 +79,11 @@ function DayChart({ days }: { days: SkillStats["days"] }) {
           );
         })}
       </div>
-      <div className="mt-1.5 flex justify-between text-[11px] text-zinc-600">
+      <div className="mt-1.5 flex justify-between text-xs text-zinc-400">
         <span>{days[0] && shortDate(days[0].date)}</span>
         <span>Today</span>
       </div>
-      <p className="mt-2 text-xs text-zinc-500">{summary}</p>
+      <p className="mt-2 text-xs text-zinc-400">{summary}</p>
     </figure>
   );
 }
@@ -93,7 +93,7 @@ export function UsageStats({ stats }: { stats: SkillStats }) {
   const readerPeak = Math.max(1, ...stats.by_reader.map((r) => r.reads + r.asks));
   return (
     <section aria-labelledby="usage-heading" className="mt-8">
-      <h2 id="usage-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+      <h2 id="usage-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-400">
         Use in the last {stats.days_covered} days
       </h2>
       {nothing ? (
@@ -124,7 +124,7 @@ export function UsageStats({ stats }: { stats: SkillStats }) {
                   <li key={r.reader}>
                     <div className="flex items-baseline justify-between gap-2 text-sm">
                       <span className="text-zinc-300">{READER_LABEL[r.reader]}</span>
-                      <span className="text-xs tabular-nums text-zinc-500">
+                      <span className="text-xs tabular-nums text-zinc-400">
                         {plural(r.reads, "read")} · {plural(r.asks, "ask")}
                       </span>
                     </div>
@@ -146,7 +146,7 @@ export function UsageStats({ stats }: { stats: SkillStats }) {
                   {stats.top.map((s) => (
                     <li key={`${s.repo}#${s.path}`} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-sm">
                       <ItemName s={s} />
-                      <span className="text-xs tabular-nums text-zinc-500">
+                      <span className="text-xs tabular-nums text-zinc-400">
                         {[
                           s.reads ? plural(s.reads, "read") : "",
                           s.asks ? `${plural(s.asks, "ask")}${s.answered !== s.asks ? `, ${s.answered} answered` : ""}` : "",
@@ -164,7 +164,7 @@ export function UsageStats({ stats }: { stats: SkillStats }) {
           {stats.unused_count > 0 && (
             <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
               <h3 className="text-sm font-medium text-zinc-200">Switched on but not used</h3>
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="mt-1 text-xs text-zinc-400">
                 Nothing read or asked these in {stats.days_covered} days. A sharper description helps the agents pick them;
                 otherwise switch them off.
               </p>
@@ -175,13 +175,13 @@ export function UsageStats({ stats }: { stats: SkillStats }) {
                   </li>
                 ))}
                 {stats.unused_count > stats.unused.length && (
-                  <li className="px-2 py-1 text-xs text-zinc-500">and {stats.unused_count - stats.unused.length} more</li>
+                  <li className="px-2 py-1 text-xs text-zinc-400">and {stats.unused_count - stats.unused.length} more</li>
                 )}
               </ul>
             </div>
           )}
 
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-zinc-400">
             {stats.asks > 0 && <>Asks used {(stats.input_tokens + stats.output_tokens).toLocaleString()} tokens. </>}
             {stats.tries > 0 && <>Tries from agent pages ({stats.tries}) aren&apos;t counted here.</>}
           </p>

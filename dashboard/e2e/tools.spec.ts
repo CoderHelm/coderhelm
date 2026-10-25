@@ -292,7 +292,8 @@ test("ask me first: a waiting call can be approved or declined", async ({ page }
   });
   await page.goto("/data-sources/tools");
   await expect(page.getByRole("heading", { name: /Waiting for your yes/ })).toHaveText("Waiting for your yes2");
-  await expect(page.getByText("planner on your-team/web #41 · 9 min left")).toBeVisible();
+  await expect(page.getByText("planner on your-team/web #41", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("tool-ask").first().getByText("9 min left")).toBeVisible();
   await shot(page, "tools-inbox");
   await page.getByRole("button", { name: "Approve this call" }).first().click();
   await expect(page.getByRole("heading", { name: /Waiting for your yes/ })).toHaveText("Waiting for your yes1");

@@ -34,7 +34,7 @@ function Group({ label, chips }: { label: string; chips: Chip[] }) {
   const shared = sharedCount(chips);
   return (
     <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-baseline sm:gap-3">
-      <dt className="shrink-0 text-xs text-zinc-500 sm:w-32">
+      <dt className="shrink-0 text-xs text-zinc-400 sm:w-32">
         {label}
       </dt>
       <dd className="min-w-0">
@@ -64,7 +64,7 @@ function Group({ label, chips }: { label: string; chips: Chip[] }) {
               </li>
             );
           })}
-          {shared && <li className="self-center text-xs text-zinc-500">each {timesWord(shared)}</li>}
+          {shared && <li className="self-center text-xs text-zinc-400">each {timesWord(shared)}</li>}
         </ul>
       </dd>
     </div>

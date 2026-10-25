@@ -19,12 +19,13 @@ import { Modal, ModalFooter } from "@/components/modal";
 import { RepoCombobox } from "@/components/repo-combobox";
 import { Segmented } from "@/components/segmented";
 import { Callout } from "@/components/callout";
-import { ExternalLinkIcon } from "@/components/icons";
+import { ChevronRightIcon, ExternalLinkIcon } from "@/components/icons";
 import { FindingsNotify } from "@/components/findings-notify";
 import { CodeBlock } from "@/components/code-block";
 import { Code } from "@/components/settings/code";
 import { Page, PageHeader } from "@/components/page";
-import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { buttonClass, focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { selectClass } from "@/components/select";
 import {
   Chip,
   DetailBlock,
@@ -66,9 +67,14 @@ const SEVERITY_OPTIONS: { value: LogSeverity; label: string }[] = [
   { value: "info", label: "Everything" },
 ];
 
-/** A compact button for rows. */
-const smallButton = `inline-flex min-h-8 items-center justify-center gap-1 rounded-md border border-zinc-700 bg-zinc-800 px-2.5 text-xs font-medium text-zinc-200 hover:bg-zinc-700 disabled:opacity-50 transition-colors motion-reduce:transition-none ${focusRing}`;
-const selectClass = `min-h-9 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 py-1.5 pl-3 pr-8 text-sm text-zinc-100 hover:border-zinc-500 ${focusRing}`;
+const rowActionClass = `${buttonClass("secondary", "sm")} gap-1`;
+const selectBox = selectClass("md");
+
+/** "/aws/lambda/shop-checkout" -> "shop-checkout": the part of a log group people recognise. */
+function serviceName(group: string): string {
+  const parts = group.split("/").filter(Boolean);
+  return parts[parts.length - 1] || group;
+}
 
 function plural(n: number, one: string, many = `${one}s`): string {
   return `${n.toLocaleString()} ${n === 1 ? one : many}`;
@@ -228,8 +234,16 @@ function LogsPage() {
               className={secondaryButton}
               data-testid="autofix-toggle"
             >
-              <span className={`mr-2 inline-block h-2 w-2 rounded-full ${on ? "bg-emerald-400" : "bg-zinc-600"}`} aria-hidden="true" />
+              <span
+                aria-hidden="true"
+                className={`relative mr-2 inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${on ? "bg-emerald-600" : "bg-zinc-700"}`}
+              >
+                <span className={`absolute left-0.5 h-3 w-3 rounded-full bg-white transition-transform ${on ? "translate-x-3" : ""}`} />
+              </span>
               Automatic fix PRs: {on ? "On" : "Off"}
+              <span aria-hidden="true" className={`ml-1.5 text-zinc-400 transition-transform ${params.auto ? "rotate-90" : ""}`}>
+                <ChevronRightIcon />
+              </span>
             </button>
             <Link href="/settings/integrations/aws" className={secondaryButton}>
               AWS settings
@@ -288,14 +302,14 @@ function LogsPage() {
             }}
             onClear={filtered ? clear : undefined}
           />
-          {/* Severity and log group sit on their own row so the bar never runs off a phone screen. */}
+          {/* Severity and log group: the list's second row of filters, right under the toolbar. */}
           <div className="-mt-2 mb-4" data-testid="logs-filters">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <select
                 aria-label="Severity"
                 value={severity}
                 onChange={(e) => setParams({ severity: e.target.value })}
-                className={selectClass}
+                className={selectBox}
               >
                 <option value="">All severities</option>
                 <option value="critical">Critical</option>
@@ -307,7 +321,7 @@ function LogsPage() {
                   aria-label="Log group"
                   value={params.group}
                   onChange={(e) => setParams({ group: e.target.value })}
-                  className={`${selectClass} sm:max-w-[20rem]`}
+                  className={`${selectBox} sm:max-w-[20rem]`}
                 >
                   <option value="">All log groups</option>
                   {groups.map((g) => (
@@ -459,8 +473,8 @@ function FindingRow({
       titleText={f.title}
       quiet={f.status === "ignored"}
       meta={[
-        <span key="g" title={f.log_group}>
-          <Code>{f.log_group}</Code>
+        <span key="g" title={f.log_group} className="font-medium text-zinc-300">
+          {serviceName(f.log_group)}
         </span>,
         typeof f.error_count === "number" && f.error_count > 0 ? plural(f.error_count, "line") : null,
         f.first_seen ? `first seen ${timeAgo(f.first_seen)}` : null,
@@ -473,34 +487,32 @@ function FindingRow({
         <>
           <Chip tone={sev.tone}>{sev.label}</Chip>
           <StatusText look={look} />
-          {f.fix?.auto && <Chip tone="neutral" title="Started automatically from this finding">Auto</Chip>}
+          {f.fix?.auto && <Chip tone="info" title="Started automatically from this finding">Auto</Chip>}
           {link}
         </>
       }
+      // One visible action; the rest in the row's menu.
       actions={
-        <>
-          {canFix && (
-            <button type="button" onClick={onFix} className={smallButton} aria-label={`Create fix PR for ${f.title}`}>
-              Create fix PR
-            </button>
-          )}
-          {canAct && f.status === "ignored" ? (
-            <button type="button" onClick={() => onStatus("reopen")} disabled={!!busy} className={smallButton}>
-              Reopen
-            </button>
-          ) : canAct && f.status !== "fixing" && f.status !== "fixed" ? (
-            <button type="button" onClick={() => onStatus("ignore")} disabled={!!busy} className={smallButton} aria-label={`Ignore ${f.title}`}>
-              Ignore
-            </button>
-          ) : null}
-          {f.console_url && (
-            <a href={f.console_url} target="_blank" rel="noreferrer" className={smallButton} aria-label={`Open logs for ${f.log_group} in CloudWatch (opens in a new tab)`}>
-              Open logs
-              <ExternalLinkIcon />
-            </a>
-          )}
-        </>
+        canFix ? (
+          <button type="button" onClick={onFix} className={rowActionClass} aria-label={`Create fix PR for ${f.title}`}>
+            Create fix PR
+          </button>
+        ) : canAct && f.status === "ignored" ? (
+          <button type="button" onClick={() => onStatus("reopen")} disabled={!!busy} className={rowActionClass}>
+            Reopen
+          </button>
+        ) : undefined
       }
+      menu={[
+        ...(canAct && f.status === "new" ? [{ label: "Acknowledge", onSelect: () => onStatus("acknowledge"), disabled: !!busy }] : []),
+        ...(canAct && f.status !== "ignored" && f.status !== "fixing" && f.status !== "fixed"
+          ? [{ label: "Ignore", onSelect: () => onStatus("ignore"), disabled: !!busy }]
+          : []),
+        ...(f.console_url
+          ? [{ label: "Open logs in CloudWatch", hint: "New tab", onSelect: () => window.open(f.console_url ?? undefined, "_blank", "noopener,noreferrer") }]
+          : []),
+      ]}
+      menuLabel={`More actions for ${f.title}`}
       details={<FindingDetail f={f} canAct={canAct} onStatus={onStatus} busy={busy} />}
       detailsFor={`details of ${f.title}`}
       open={open}
@@ -524,6 +536,23 @@ function FindingDetail({
     <>
       <DetailBlock title="What's wrong">
         <p className="text-zinc-300">{f.summary}</p>
+      </DetailBlock>
+      <DetailBlock title="Log group">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <Code>{f.log_group}</Code>
+          {f.console_url && (
+            <a
+              href={f.console_url}
+              target="_blank"
+              rel="noreferrer"
+              className={`${linkButton} !text-xs gap-1`}
+              aria-label={`Open logs for ${f.log_group} in CloudWatch (opens in a new tab)`}
+            >
+              Open logs
+              <ExternalLinkIcon />
+            </a>
+          )}
+        </div>
       </DetailBlock>
       {f.suggested_action && (
         <DetailBlock title="Recommendation">
@@ -598,7 +627,7 @@ function Samples({ id }: { id: string }) {
             wrap
             maxHeightClass="max-h-56"
           />
-          <p className="mt-1 text-[11px] text-zinc-500">Secrets, emails and card numbers are hidden. These lines are read live and not stored.</p>
+          <p className="mt-1 text-xs text-zinc-400">Secrets, emails and card numbers are hidden. These lines are read live and not stored.</p>
         </>
       )}
     </DetailBlock>
@@ -646,14 +675,14 @@ function CreateFixForm({
     <form id="create-fix-form" onSubmit={submit} className="flex flex-col gap-4">
       <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm">
         <p className="font-medium text-zinc-100">{finding.title}</p>
-        <p className="mt-0.5 text-xs text-zinc-500"><Code>{finding.log_group}</Code></p>
+        <p className="mt-0.5 text-xs text-zinc-400"><Code>{finding.log_group}</Code></p>
       </div>
       <div>
         <label htmlFor="fix-repo" className="mb-1 block text-sm font-medium text-zinc-300">
           Repository
         </label>
         <RepoCombobox id="fix-repo" repos={repos} selected={repo} onSelect={setRepo} label="Repository" className="" />
-        {!finding.repo_mapped && <p className="mt-1 text-xs text-zinc-500">The repo this log group&apos;s code lives in.</p>}
+        {!finding.repo_mapped && <p className="mt-1 text-xs text-zinc-400">The repo this log group&apos;s code lives in.</p>}
       </div>
       {canRemember && !finding.repo_mapped && (
         <label className="flex items-start gap-2 text-sm text-zinc-300">
@@ -782,7 +811,7 @@ function AutofixPanel({
             />
             <span>
               <span className="font-medium">Automatically create a fix PR for new findings</span>
-              <span className="block text-xs text-zinc-500">Only findings made after this is turned on. Off by default.</span>
+              <span className="block text-xs text-zinc-400">Only findings made after this is turned on. Off by default.</span>
             </span>
           </label>
 
@@ -826,7 +855,7 @@ function AutofixPanel({
               aria-describedby="autofix-cap-help"
               className={`${inputClass} !w-28`}
             />
-            <p id="autofix-cap-help" className="mt-1 text-xs text-zinc-500">
+            <p id="autofix-cap-help" className="mt-1 text-xs text-zinc-400">
               {runsToday > 0 ? `${plural(runsToday, "run")} started today (UTC). ` : ""}Never more than one open run or PR for the same error.
               Runs count toward the team&apos;s token limit.
             </p>
@@ -849,7 +878,7 @@ function AutofixPanel({
                   value={a.quiet_hours.start_hour}
                   disabled={disabled}
                   onChange={(e) => set({ quiet_hours: { ...a.quiet_hours!, start_hour: Number(e.target.value) } })}
-                  className={selectClass}
+                  className={selectBox}
                 >
                   {Array.from({ length: 24 }, (_, h) => (
                     <option key={h} value={h}>
@@ -863,7 +892,7 @@ function AutofixPanel({
                   value={a.quiet_hours.end_hour}
                   disabled={disabled}
                   onChange={(e) => set({ quiet_hours: { ...a.quiet_hours!, end_hour: Number(e.target.value) } })}
-                  className={selectClass}
+                  className={selectBox}
                 >
                   {Array.from({ length: 24 }, (_, h) => (
                     <option key={h} value={h}>
@@ -871,7 +900,7 @@ function AutofixPanel({
                     </option>
                   ))}
                 </select>
-                <p className="w-full text-xs text-zinc-500">Findings that arrive then start when the quiet hours end.</p>
+                <p className="w-full text-xs text-zinc-400">Findings that arrive then start when the quiet hours end.</p>
               </div>
             )}
           </div>
@@ -880,7 +909,7 @@ function AutofixPanel({
 
       <div className="mt-6 min-w-0">
         <h3 className="text-sm font-medium text-zinc-300">Log groups</h3>
-        <p className="mt-0.5 text-xs text-zinc-500">
+        <p className="mt-0.5 text-xs text-zinc-400">
           The repo each log group&apos;s code lives in ({mapped} of {rows.length} set). A group without a repo is never fixed automatically.
         </p>
         {rows.length === 0 ? (
@@ -909,7 +938,7 @@ function AutofixPanel({
                   value={r.auto === null ? "" : r.auto ? "on" : "off"}
                   disabled={disabled}
                   onChange={(e) => setRow(r.log_group, { auto: e.target.value === "" ? null : e.target.value === "on" })}
-                  className={selectClass}
+                  className={selectBox}
                 >
                   <option value="">Team default</option>
                   <option value="on">On</option>
@@ -920,7 +949,7 @@ function AutofixPanel({
                   value={r.min_severity ?? ""}
                   disabled={disabled}
                   onChange={(e) => setRow(r.log_group, { min_severity: (e.target.value || null) as LogSeverity | null })}
-                  className={selectClass}
+                  className={selectBox}
                 >
                   <option value="">Team severity</option>
                   <option value="critical">Critical</option>

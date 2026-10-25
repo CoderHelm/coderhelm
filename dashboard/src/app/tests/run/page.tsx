@@ -6,15 +6,21 @@ import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, type RunOutcome, type TestRunExecution } from "@/lib/api";
 import { OUTCOME_LABEL, OUTCOME_TONE, githubPrUrl, plural, shortSha, testHref } from "@/lib/tests";
-import { formatDuration, timeAgo } from "@/lib/data-sources";
+import { formatDuration } from "@/lib/data-sources";
+import { Time } from "@/components/list/time";
+import { ExternalLinkIcon } from "@/components/icons";
 import { RoleGuard } from "@/components/role-guard";
 import { StatusPill } from "@/components/status-pill";
 import { Callout } from "@/components/callout";
 import { Segmented } from "@/components/segmented";
-import { focusRing, linkButton } from "@/components/ui";
+import { focusRing, linkButton, secondaryButton } from "@/components/ui";
+
+function capitalize(s?: string): string | undefined {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
 import { Page, PageHeader } from "@/components/page";
 import {
-  ArtifactLinks, AttemptSquares, EmptyBox, LoadError, Loading, SectionHeading, StatCard, firstError, totalDuration,
+  ArtifactLinks, AttemptLegend, AttemptSquares, EmptyBox, ErrorSummary, LoadError, Loading, SectionHeading, StatCard, firstError, totalDuration,
 } from "@/components/tests/common";
 import { useLoad } from "@/components/tests/use-load";
 
@@ -54,24 +60,34 @@ function RunDetail() {
       <PageHeader
         detail
         title={run.workflow}
+        status={
+          <StatusPill tone={run.bad_run ? "warning" : run.status === "passed" ? "success" : "error"}>
+            {run.bad_run ? "Bad run" : run.status === "passed" ? "Passed" : "Failed"}
+          </StatusPill>
+        }
         lead={
           <p>
-            {run.repo} · <span className="font-mono">{run.branch}</span>
             {run.pr ? (
-              <> · <a href={githubPrUrl(run.repo, run.pr)} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-zinc-300">PR #{run.pr}</a></>
-            ) : null}
-            {" "}· <span className="font-mono">{shortSha(run.sha)}</span>
-            {run.run_attempt > 1 && <> · re-run {run.run_attempt}</>}
-            {" "}· <time dateTime={run.started_at} title={new Date(run.started_at).toLocaleString()}>{timeAgo(run.started_at)}</time>
+              <>
+                On <a href={githubPrUrl(run.repo, run.pr)} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-zinc-300">PR #{run.pr}</a> in {run.repo}
+              </>
+            ) : (
+              <>
+                On <span title={run.branch}>{run.branch}</span> in {run.repo}
+              </>
+            )}
+            {run.run_attempt > 1 && <> · attempt {run.run_attempt}</>}
+            {" "}· <Time iso={run.started_at} />
+            <span className="sr-only"> · commit {shortSha(run.sha)}</span>
           </p>
         }
         actions={
-          <>
-            <StatusPill tone={run.bad_run ? "warning" : run.status === "passed" ? "success" : "error"}>
-              {run.bad_run ? "Bad run" : run.status === "passed" ? "Passed" : "Failed"}
-            </StatusPill>
-            {run.url && <a href={run.url} target="_blank" rel="noreferrer" className={linkButton}>Open on GitHub</a>}
-          </>
+          run.url ? (
+            <a href={run.url} target="_blank" rel="noreferrer" className={`${secondaryButton} gap-1.5`}>
+              Open on GitHub
+              <ExternalLinkIcon />
+            </a>
+          ) : undefined
         }
       />
 
@@ -87,7 +103,7 @@ function RunDetail() {
         <StatCard label="Passed" value={run.passed} tone="success" />
         <StatCard label="Failed" value={run.failed} tone={run.failed > 0 ? "error" : undefined} />
         <StatCard label="Passed on retry" value={run.flaky} tone={run.flaky > 0 ? "warning" : undefined} />
-        <StatCard label="Duration" value={formatDuration(run.duration_ms)} hint={run.skipped > 0 ? `${plural(run.skipped, "test")} skipped` : run.framework} />
+        <StatCard label="Duration" value={formatDuration(run.duration_ms)} hint={run.skipped > 0 ? `${plural(run.skipped, "test")} skipped` : capitalize(run.framework)} />
       </section>
 
       <section aria-labelledby="tests-heading" className="mt-8">
@@ -107,6 +123,9 @@ function RunDetail() {
         >
           Tests in this run
         </SectionHeading>
+        <div className="mb-3">
+          <AttemptLegend />
+        </div>
         {executions.length === 0 ? (
           <EmptyBox>{filter === "problems" ? "Every test passed on the first try." : "No tests were recorded for this run."}</EmptyBox>
         ) : (
@@ -128,7 +147,7 @@ function ExecutionRow({ e, runUrl }: { e: TestRunExecution; runUrl: string }) {
           <Link href={testHref(e.test_id)} className={`text-sm font-medium text-zinc-100 hover:underline underline-offset-4 rounded ${focusRing}`}>
             {e.project ? `${e.title} (${e.project})` : e.title}
           </Link>
-          <p className="mt-0.5 wrap-anywhere font-mono text-xs text-zinc-500">{e.file}</p>
+          <p className="mt-0.5 wrap-anywhere text-xs text-zinc-400">{e.file}</p>
         </div>
         <p className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
           <StatusPill tone={OUTCOME_TONE[e.outcome]}>{OUTCOME_LABEL[e.outcome]}</StatusPill>
@@ -136,7 +155,7 @@ function ExecutionRow({ e, runUrl }: { e: TestRunExecution; runUrl: string }) {
           <span className="tabular-nums">{totalDuration(e)}</span>
         </p>
       </div>
-      {err && <p className="mt-1.5 max-h-48 overflow-y-auto overscroll-contain whitespace-pre-wrap font-mono text-xs leading-relaxed text-red-200 [scrollbar-width:thin]" tabIndex={0}>{err}</p>}
+      {err && <ErrorSummary message={err} />}
       {(e.outcome === "failed" || e.outcome === "flaky") && (
         <p className="mt-1.5 text-xs"><ArtifactLinks attempts={e.attempts} runUrl={runUrl} /></p>
       )}

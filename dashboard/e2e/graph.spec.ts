@@ -113,12 +113,19 @@ const hood = (path: string) => ({
 });
 
 const rowOf = (page: Page, repo: string) => page.locator(`[data-testid="graph-repo"][data-repo="${repo}"]`);
+/** A row's rarely used actions sit in its "⋯" menu. */
+async function rowAction(page: Page, repo: string, action: RegExp) {
+  await page.getByRole("button", { name: `Code graph actions for ${repo}` }).click();
+  return page.getByRole("menuitem", { name: action });
+}
 
 test("every repo is listed with its graph's status, and admins can turn it off or rebuild it", async ({ page }) => {
   const db = await mockApi(page, { repos: ALL });
   await page.goto("/graph/");
 
-  await expect(page.getByText("The planner, the coding agent, the reviewer and CI fixes all use it.")).toBeVisible();
+  await expect(page.getByText(/The planner, the coding agent, the reviewer and CI fixes all use it/)).toBeVisible();
+  // One plain status line for every repo's map.
+  await expect(page.getByTestId("graph-summary")).toContainText("Coderhelm has mapped 1 of 5 repositories.");
   await expect(page.getByText(/once the reviewer is set up/)).toHaveCount(0);
 
   // One row per repo, each with its state.
@@ -145,24 +152,27 @@ test("every repo is listed with its graph's status, and admins can turn it off o
   await page.screenshot({ path: path.join(SHOTS_DIR, "graph-states.png"), fullPage: true });
 
   // A build in progress can't be rebuilt again.
-  await expect(page.getByRole("button", { name: "Rebuild the code graph for acme/api" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Rebuild the code graph for acme/legacy" })).toHaveCount(0);
+  await expect(await rowAction(page, "acme/api", /^Rebuild/)).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await rowAction(page, "acme/legacy", /^Turn on/);
+  await expect(page.getByRole("menuitem", { name: /^Rebuild/ })).toHaveCount(0);
+  await page.keyboard.press("Escape");
 
   // Rebuild a failed repo.
-  await page.getByRole("button", { name: "Rebuild the code graph for acme/data" }).click();
+  await (await rowAction(page, "acme/data", /^Rebuild/)).click();
   await expect(page.getByText("Rebuilding the code graph for acme/data.")).toBeVisible();
   expect(db.rebuilds).toEqual(["acme/data"]);
   await expect(rowOf(page, "acme/data")).toContainText("Queued");
 
   // Turning one off asks first.
-  await page.getByRole("button", { name: "Turn off the code graph for acme/web" }).click();
+  await (await rowAction(page, "acme/web", /^Turn off/)).click();
   await expect(page.getByRole("alertdialog")).toContainText("stop using it for this repo");
   await page.getByRole("alertdialog").getByRole("button", { name: "Turn off" }).click();
   await expect(rowOf(page, "acme/web")).toContainText("Off");
   expect(db.puts).toEqual([{ repo: "acme/web", body: { enabled: false } }]);
 
   // And back on without asking.
-  await page.getByRole("button", { name: "Turn on the code graph for acme/legacy" }).click();
+  await (await rowAction(page, "acme/legacy", /^Turn on/)).click();
   await expect(rowOf(page, "acme/legacy")).toContainText("Queued");
   expect(db.puts.at(-1)).toEqual({ repo: "acme/legacy", body: { enabled: true } });
 });
@@ -183,9 +193,8 @@ test("a member sees each repo's status but no Turn off or Rebuild", async ({ pag
   await page.goto("/graph/");
   await expect(page.getByTestId("graph-repo")).toHaveCount(6);
   await expect(rowOf(page, "acme/data")).toContainText("Failed");
-  await expect(page.getByRole("button", { name: /Rebuild the code graph/ })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /Turn (off|on) the code graph/ })).toHaveCount(0);
-  await expect(rowOf(page, "acme/web").getByRole("button", { name: "Exploring" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Code graph actions/ })).toHaveCount(0);
+  await expect(rowOf(page, "acme/web").getByText("Exploring", { exact: true })).toBeVisible();
 });
 
 test("an older gateway without states still reads right", async ({ page }) => {

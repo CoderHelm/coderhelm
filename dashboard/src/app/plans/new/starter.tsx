@@ -68,15 +68,14 @@ export function Starter({
           sendLabel="Draft a plan"
           placeholder="e.g. Add a page that shows the class schedule by day, with the API it needs"
         />
-        <p className="mt-2 px-1 text-xs text-zinc-500">
+        <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-1 text-xs text-zinc-400">
           {repoLine ? (
-            <>
-              Reads <span className="text-zinc-400" title={repos.map((r) => r.name).join(", ")}>{repoLine}</span> ·{" "}
-            </>
+            <p>
+              Reads <span className="text-zinc-300" title={repos.map((r) => r.name).join(", ")}>{repoLine}</span>
+            </p>
           ) : null}
-          Each task becomes {where} ·{" "}
-          <span className="hidden sm:inline">Enter to send · </span>Answers are AI-written; check them
-        </p>
+          <p>AI can make mistakes: review the plan before it runs.</p>
+        </div>
       </div>
 
       {!input.trim() && (
@@ -99,14 +98,14 @@ export function Starter({
       )}
 
       <section aria-labelledby="next-heading" className="mt-10">
-        <h2 id="next-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+        <h2 id="next-heading" className="text-sm font-semibold text-zinc-100">
           What happens next
         </h2>
         <ol className="mt-3 grid gap-3 sm:grid-cols-3">
           {[
             ["Draft", "Coderhelm reads your repos and writes a plan of small tasks."],
             ["Refine", "Ask for changes here. Save it when it looks right."],
-            ["Approve", `Approve tasks on the plan's page. Each becomes ${where} and a PR.`],
+            ["Approve", `Approve the steps on the plan's page. Each step becomes ${where}, and a change your developers review before it goes live.`],
           ].map(([title, body], i) => (
             <li key={title} className="flex gap-3 sm:block">
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-zinc-700 text-xs tabular-nums text-zinc-400">
@@ -114,7 +113,7 @@ export function Starter({
               </span>
               <div className="min-w-0 sm:mt-2">
                 <p className="text-sm font-medium text-zinc-200">{title}</p>
-                <p className="mt-0.5 text-sm text-zinc-500">{body}</p>
+                <p className="mt-0.5 text-sm text-zinc-400">{body}</p>
               </div>
             </li>
           ))}
@@ -129,11 +128,11 @@ export function Starter({
             <ChevronRightIcon />
           </span>
           More options
-          <span className="text-xs text-zinc-500">Destination{templates && templates.length > 0 ? ", templates" : ""}</span>
+          <span className="text-xs text-zinc-400">Destination{templates && templates.length > 0 ? ", templates" : ""}</span>
         </summary>
         <div className="space-y-5 border-t border-zinc-800/80 px-3 py-4">
           <div>
-            <p className="mb-1.5 text-xs text-zinc-500">Each task becomes</p>
+            <p className="mb-1.5 text-xs text-zinc-400">Each task becomes</p>
             <div className="flex flex-wrap gap-2" role="group" aria-label="Destination">
               {(["github", "jira"] as const).map((d) => (
                 <button
@@ -155,7 +154,7 @@ export function Starter({
               ))}
             </div>
             {!jiraReady && (
-              <p className="mt-1.5 text-xs text-zinc-500">
+              <p className="mt-1.5 text-xs text-zinc-400">
                 Connect Jira in{" "}
                 <Link href="/settings/integrations/jira/" className={`rounded underline hover:text-zinc-300 ${focusRing}`}>
                   settings
@@ -167,9 +166,12 @@ export function Starter({
 
           <div>
             <div className="mb-1.5 flex items-center justify-between gap-3">
-              <p className="text-xs text-zinc-500">Start from a template</p>
-              <Link href="/plans/templates" className={`rounded text-xs text-zinc-500 hover:text-zinc-300 ${focusRing}`}>
-                All templates →
+              <p className="text-xs text-zinc-400">Start from a template</p>
+              <Link href="/plans/templates" className={`inline-flex items-center gap-0.5 rounded text-xs text-zinc-400 hover:text-zinc-200 ${focusRing}`}>
+                All templates
+                <span aria-hidden="true">
+                  <ChevronRightIcon />
+                </span>
               </Link>
             </div>
             {templates === null ? (

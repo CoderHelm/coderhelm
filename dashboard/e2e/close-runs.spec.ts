@@ -239,9 +239,10 @@ test.describe("closing several runs", () => {
     const rows = page.getByTestId("run-row");
     await expect(rows).toHaveCount(5);
 
-    // Labelled checkboxes; runs that are over already can't be picked.
-    await expect(page.getByRole("checkbox", { name: "Select Shipped already" })).toBeDisabled();
-    await expect(page.getByRole("checkbox", { name: "Select Closed before" })).toBeDisabled();
+    // Labelled checkboxes; runs that are over already have none. Select all waits until a row is picked.
+    await expect(page.getByRole("checkbox", { name: "Select Shipped already" })).toHaveCount(0);
+    await expect(page.getByRole("checkbox", { name: "Select Closed before" })).toHaveCount(0);
+    await expect(page.getByRole("checkbox", { name: /Select all/ })).toHaveCount(0);
     await page.getByRole("checkbox", { name: "Select Fix the login page" }).click();
     await page.getByRole("checkbox", { name: "Select Move nightly jobs" }).click({ modifiers: ["Shift"] });
     const bar = page.getByRole("region", { name: "Selected runs" });
@@ -275,6 +276,7 @@ test.describe("closing several runs", () => {
     await mockApi(page);
     await page.goto("/");
     await expect(page.getByTestId("run-row")).toHaveCount(5);
+    await page.getByRole("checkbox", { name: "Select Move nightly jobs" }).click();
     const all = page.getByRole("checkbox", { name: /Select all 3 that can be closed/ });
     await all.check();
     await expect(page.getByRole("region", { name: "Selected runs" }).getByRole("status")).toHaveText("3 selected");

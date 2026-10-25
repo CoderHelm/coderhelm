@@ -11,7 +11,8 @@ import { Chip, List, ListEmpty, ListError, ListRow, ListSkeleton, ListToolbar, S
 import { AvatarStack, Composer, PanelSection, SupportThread, TicketContext, TicketHeader, TicketLayout, TicketPeople, type ItemOpener, ThreadDock } from "@/components/support";
 import type { SupportItem } from "@/lib/api";
 import { useToast } from "@/components/toast";
-import { focusRing, inputClass, primaryButton, secondaryButton } from "@/components/ui";
+import { focusRing, inputClass, primaryButton, secondaryButton, smallSecondaryButton } from "@/components/ui";
+import { selectClass } from "@/components/select";
 
 /**
  * Opens a read-only support view of the team (leaving any other one first),
@@ -251,7 +252,7 @@ function AdminTicket({ id }: { id: string }) {
   const openItem: ItemOpener = (item: SupportItem) =>
     accessUntil
       ? { onClick: () => void open(itemHref(item)) }
-      : { reason: "Opens in the team's workspace. Ask the team to let support look (on the ticket or in Settings → Support access)." };
+      : { reason: "Opens in the team's workspace. Ask the team to let support look (on the ticket or in Settings, under Support access)." };
   const reply = async (body: string, key?: string) => {
     try {
       setDetail(await api.adminReplySupportTicket(t.id, body, key === "resolve" ? "resolved" : undefined));
@@ -300,7 +301,7 @@ function AdminTicket({ id }: { id: string }) {
                 setDetailsOpen(true);
                 setAdding(true);
               }}
-              className={`${secondaryButton} !min-h-8 !py-1 !px-3`}
+              className={`${smallSecondaryButton}`}
               data-testid="header-add-people"
             >
               + Add people
@@ -323,7 +324,7 @@ function AdminTicket({ id }: { id: string }) {
                     value={t.status}
                     disabled={busy}
                     onChange={(e) => void change({ status: e.target.value as SupportStatus })}
-                    className={inputClass}
+                    className={`${selectClass("md")} w-full`}
                     data-testid="ticket-status"
                   >
                     <option value="open">Needs reply</option>
@@ -338,7 +339,7 @@ function AdminTicket({ id }: { id: string }) {
                     value={t.priority}
                     disabled={busy}
                     onChange={(e) => void change({ priority: e.target.value as SupportPriority })}
-                    className={inputClass}
+                    className={`${selectClass("md")} w-full`}
                   >
                     <option value="normal">Normal</option>
                     <option value="high">High</option>
@@ -362,8 +363,8 @@ function AdminTicket({ id }: { id: string }) {
                   </button>
                 </>
               ) : (
-                <p className="text-xs text-zinc-500">
-                  Off. Ask the team to choose &quot;Let support look at this&quot; on the ticket, or turn it on in Settings → Support access.
+                <p className="text-xs text-zinc-400">
+                  Off. Ask the team to choose &quot;Let support look at this&quot; on the ticket, or turn it on in Settings, under Support access.
                 </p>
               )}
             </PanelSection>

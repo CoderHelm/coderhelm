@@ -276,7 +276,7 @@ test("try it shows what a ticket would bring along", async ({ page }) => {
   await page.goto("/memory");
   // The preview folds away under the list.
   await expect(page.getByLabel("Describe a ticket, the way someone would write it")).toBeHidden();
-  await page.getByText("Preview what a ticket would bring along").click();
+  await page.getByText("Test it: see what Coderhelm would remember for a ticket").click();
   await page.getByLabel("Describe a ticket, the way someone would write it").fill("The checkout total is wrong after a coupon");
   await page.getByRole("button", { name: "Show what it would remember" }).click();
   const section = page.getByRole("region", { name: "What would it remember for a ticket?" }).or(page.locator("section[aria-labelledby=try-heading]"));
@@ -310,7 +310,7 @@ test("a member sees memories but can't change them", async ({ page }) => {
 test("a failed load says so", async ({ page }) => {
   await mockApi(page, { fail: true });
   await page.goto("/memory");
-  await expect(page.getByText("We couldn't load the agents")).toBeVisible();
+  await expect(page.getByText("Couldn't load the agents")).toBeVisible();
   await expect(page.getByText("We couldn't load the memories")).toBeVisible();
 });
 

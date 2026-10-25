@@ -11,7 +11,7 @@ const LOOKS: Record<string, RunLook> = {
   pending: { label: "Waiting to start", tone: "queued", group: "active" },
   queued: { label: "Queued", tone: "queued", group: "active" },
   running: { label: "Running", tone: "live", live: true, group: "active" },
-  awaiting_ci: { label: "Waiting on CI", tone: "waiting", live: true, group: "waiting" },
+  awaiting_ci: { label: "Waiting for checks", tone: "waiting", live: true, group: "waiting" },
   needs_input: { label: "Needs your answer", tone: "waiting", group: "waiting" },
   // The code works as designed; the fix is a change in another system's data or settings.
   needs_outside_change: { label: "Needs a change outside the code", tone: "attention", group: "waiting" },

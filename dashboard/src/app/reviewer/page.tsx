@@ -3,6 +3,7 @@
 import { ANY_CHANGE } from "@/lib/capabilities";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { api, ApiError, type LivePr, type OpenPr, type Repo } from "@/lib/api";
 import { rememberRepo } from "@/lib/recent-repos";
 import { Combobox } from "@/components/combobox";
@@ -10,7 +11,7 @@ import { useToast } from "@/components/toast";
 import { timeAgo } from "@/components/list/time";
 import { RoleGuard } from "@/components/role-guard";
 import { RepoCombobox } from "@/components/repo-combobox";
-import { ReReviewButton } from "@/components/re-review-button";
+import { useReReview } from "@/components/re-review-button";
 import { Modal, modalActions } from "@/components/modal";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
@@ -32,9 +33,10 @@ import {
   useTeamRepos,
 } from "@/components/list";
 import type { Review } from "@/lib/api";
-import { RiskText, VerdictPill, riskLabel, triggerLabel } from "./labels";
+import { VerdictPill, triggerLabel, triggerMeta } from "./labels";
 import { buildRows, gateAction, gateHref, statusLook, summaryLine, type Group, type PrRow } from "./status";
-import { GateControlButton } from "./gate-control";
+import { GATE_ACTION_LABEL, useGateControl } from "./gate-control";
+import { Disclosure } from "@/components/disclosure";
 import { Markdown } from "@/components/markdown";
 
 export default function ReviewerPageGuarded() {
@@ -189,13 +191,7 @@ function ReviewerPage() {
     <Page>
       <PageHeader
         title="Reviewer"
-        lead={
-          <>
-            What the reviewer is working on and the reviews it posted. Add the review label (default{" "}
-            <code className="text-zinc-300">ch-review</code>) to a PR to trigger one, or reply{" "}
-            <code className="text-zinc-300">@coderhelm re-review</code>.
-          </>
-        }
+        lead="What the reviewer is working on, what waits on CI or people, and the reviews it posted."
         actions={
           <>
             <button ref={reviewButton} type="button" onClick={() => setParams({ review: "1" })} className={secondaryButton}>
@@ -215,6 +211,19 @@ function ReviewerPage() {
         returnFocus={reviewButton}
         live={live}
       />
+
+      <div className="mt-4 max-w-2xl">
+        <Disclosure summary="Start a review from GitHub">
+          <p>
+            Add the review label (default <code className="text-zinc-200">ch-review</code>) to a PR, or reply{" "}
+            <code className="text-zinc-200">@coderhelm re-review</code> on it. Labels and triggers are set in{" "}
+            <Link href="/reviewer/config" className={linkButton}>
+              Configure
+            </Link>
+            .
+          </p>
+        </Disclosure>
+      </div>
 
       <ListToolbar
         className="mt-6 mb-4"
@@ -271,7 +280,7 @@ function ReviewerPage() {
                 group={s.group}
                 live={s.group === "active" && list.length > 0}
               >
-                {list.length ? renderList(list) : <p className="text-sm text-zinc-500">{s.empty}</p>}
+                {list.length ? renderList(list) : <p className="text-sm text-zinc-400">{s.empty}</p>}
               </ListSection>
             );
           })}
@@ -480,7 +489,7 @@ function ReviewPrDialog({
             Pull request
           </label>
           {prsState === "none" ? (
-            <p className="text-sm text-zinc-500">Open pull requests can&apos;t be listed for this repo. Paste a link or number below.</p>
+            <p className="text-sm text-zinc-400">Open pull requests can&apos;t be listed for this repo. Paste a link or number below.</p>
           ) : (
             <Combobox
               id="review-pr"
@@ -492,7 +501,7 @@ function ReviewPrDialog({
               valueLabel={
                 picked ? (
                   <>
-                    <span className="tabular-nums text-zinc-500">#{picked.number}</span> {picked.title}
+                    <span className="tabular-nums text-zinc-400">#{picked.number}</span> {picked.title}
                   </>
                 ) : undefined
               }
@@ -522,7 +531,7 @@ function ReviewPrDialog({
             className={inputClass}
           />
           {paste.trim() && pr > 0 && !picked && (
-            <p className="text-xs text-zinc-500" data-testid="review-target">
+            <p className="text-xs text-zinc-400" data-testid="review-target">
               Reviews {repo || "the repo you pick"} #{pr}
             </p>
           )}
@@ -566,19 +575,35 @@ function PrItem({
   const gateState = row.live?.gate?.state;
   const control = gateAction(gateState, row.status);
   const hasDetails = row.reviews.length > 0 || checklist.length > 0 || !!reason || !!gateState;
+  const router = useRouter();
+  const reReview = useReReview(onQueued);
+  const gate = useGateControl(onQueued);
+  // One menu for everything a row can do, so the row itself stays one status
+  // and one verdict. A review already queued or running needs no second one.
+  const menu = [
+    row.group !== "active" && { label: reReview.busy ? "Queueing…" : "Review again", onSelect: () => reReview.run(row.repo, row.pr_number), disabled: reReview.busy },
+    control && {
+      label: GATE_ACTION_LABEL[control],
+      note: control === "stop" ? "Holds until someone re-arms it" : "Every check runs again before it merges",
+      onSelect: () => gate.run(row.repo, row.pr_number, control),
+      disabled: gate.busy,
+      danger: control === "stop",
+    },
+    gateState && { label: "Auto-merge details and history", onSelect: () => router.push(gateHref(row.repo, row.pr_number)) },
+    { label: "Open on GitHub", onSelect: () => window.open(`https://github.com/${row.repo}/pull/${row.pr_number}`, "_blank", "noopener") },
+  ].filter(Boolean) as { label: string; onSelect: () => void; note?: string; disabled?: boolean; danger?: boolean }[];
 
   return (
     <ListRow
       testId="reviewer-pr"
       data={{ status: row.status }}
-      status={look}
       title={title}
       titleText={title}
       href={latest ? `/reviewer/detail?sk=${encodeURIComponent(latest.sk)}` : undefined}
       externalHref={latest ? undefined : `https://github.com/${row.repo}/pull/${row.pr_number}`}
       meta={[
         <span key="ref">{showRepo ? ref : `#${row.pr_number}`}</span>,
-        latest?.trigger ? triggerLabel(latest.trigger) : null,
+        latest?.trigger ? triggerMeta(latest.trigger) : null,
         row.at ? <Time key="at" iso={row.at} /> : null,
       ]}
       summary={summary || undefined}
@@ -586,23 +611,11 @@ function PrItem({
       chips={
         <>
           {row.status !== "reviewed" && <StatusText look={look} />}
-          {latest && (
-            <span title={row.group === "active" ? "Verdict of the last review" : undefined}>
-              <VerdictPill verdict={latest.verdict} />
-            </span>
-          )}
-          {latest && riskLabel(latest.risk) && <RiskText risk={latest.risk} />}
+          {latest && <VerdictPill verdict={latest.verdict} risk={latest.risk} />}
         </>
       }
-      // A review already queued or running needs no second one.
-      actions={
-        row.group !== "active" || control ? (
-          <>
-            {control && <GateControlButton repo={row.repo} pr={row.pr_number} action={control} onDone={onQueued} />}
-            {row.group !== "active" && <ReReviewButton repo={row.repo} pr={row.pr_number} onQueued={onQueued} />}
-          </>
-        ) : undefined
-      }
+      menu={menu}
+      menuLabel={`Actions for ${ref}`}
       details={
         hasDetails ? (
           <>
@@ -640,18 +653,17 @@ function PrItem({
                 <ol className="flex flex-col divide-y divide-zinc-800/60">
                   {row.reviews.map((rev, i) => (
                     <li key={rev.sk} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
-                      <span className="w-6 shrink-0 tabular-nums text-zinc-600">#{row.reviews.length - i}</span>
+                      <span className="w-6 shrink-0 tabular-nums text-zinc-400">#{row.reviews.length - i}</span>
                       <Link
                         href={`/reviewer/detail?sk=${encodeURIComponent(rev.sk)}`}
                         className={`min-w-0 rounded text-zinc-300 hover:text-zinc-100 hover:underline ${focusRing}`}
                       >
                         {triggerLabel(rev.trigger) || "Review"}
                       </Link>
-                      <VerdictPill verdict={rev.verdict} />
-                      <RiskText risk={rev.risk} />
-                      <Time iso={rev.created_at} className="text-zinc-500" />
+                      <VerdictPill verdict={rev.verdict} risk={rev.risk} />
+                      <Time iso={rev.created_at} className="text-zinc-400" />
                       {(rev.thumbs_up > 0 || rev.thumbs_down > 0) && (
-                        <span className="text-zinc-500">
+                        <span className="text-zinc-400">
                           {rev.thumbs_up > 0 && (
                             <span className="text-emerald-400" title={`${rev.thumbs_up} marked helpful`}>
                               <span aria-hidden="true">👍</span> {rev.thumbs_up}<span className="sr-only"> marked helpful</span>

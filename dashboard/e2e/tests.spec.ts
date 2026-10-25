@@ -376,6 +376,7 @@ test("tests: a member sees the empty state but can't turn it on, and has no sett
   await expect(page.getByText("Ask an admin on your team to turn it on.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Turn on E2E tracking" })).toHaveCount(0);
   await expect(page.locator('nav[aria-label="Tests views"]').getByRole("link", { name: "Settings" })).toHaveCount(0);
+  await expect(page.getByTestId("tests-settings-link")).toHaveCount(0);
 });
 
 test("tests: needs attention ranks by impact and links to the test", async ({ page }) => {
@@ -429,8 +430,14 @@ test("tests: a flaky test's history, quarantine, never-quarantine and fix", asyn
   await expect(page.getByText("Likely cause: Animation or loader")).toBeVisible();
   await expect(page.getByRole("img", { name: /Last 24 runs, oldest first/ })).toBeVisible();
   const runs = page.getByRole("list", { name: "Recent runs of this test" });
+  // One line per run, ten at first; errors and links open per row.
+  await expect(runs.getByRole("listitem")).toHaveCount(10);
+  await expect(runs.getByTestId("test-error")).toHaveCount(0);
+  await page.getByRole("button", { name: "Show all 24 runs" }).click();
   await expect(runs.getByRole("listitem")).toHaveCount(24);
   await expect(runs.getByRole("img", { name: "Attempt 1: Failed, Attempt 2: Passed" }).first()).toBeVisible();
+  const withLinks = runs.getByTestId("history-row").filter({ has: page.getByRole("img", { name: "Attempt 1: Failed, Attempt 2: Passed" }) }).first();
+  await withLinks.getByRole("button", { name: /Error|Details/ }).click();
   await expect(runs.getByRole("link", { name: "Trace" }).first()).toHaveAttribute("href", /actions\/runs\/9001/);
   await expect(page.getByText("Passed and failed on the same commit twice in 14 days.")).toBeVisible();
   await shot(page, "test-history");

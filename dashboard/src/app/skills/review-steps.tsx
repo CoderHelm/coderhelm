@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDate } from "@/components/list/time";
+
 // Which review steps a team agent runs in: reading the draft plan before
 // it's kept, the pull request's code, or its description. Worked out by
 // the agent's check from its name and description; an admin can set it
@@ -66,18 +68,18 @@ export function ReviewStepsSection({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1 basis-64">
           <h2 id="reviews-heading" className="text-sm font-medium text-zinc-200">
-            Reviews: plan / code / prose
+            Ask it to review
           </h2>
-          <p className="mt-1 text-xs text-zinc-500">
+          <p className="mt-1 text-xs text-zinc-400">
             In a review step Coderhelm runs this agent on every matching run, not only when an agent thinks to ask it (at most two agents a step). Its
             answer is advice: the planner, reviewer or writer weighs each gap.
           </p>
           <p className="mt-2 text-sm text-zinc-200">
             Runs in: <span className="font-medium">{reviewsLabel(effective)}</span>
           </p>
-          <p className="mt-0.5 text-xs text-zinc-500">
+          <p className="mt-0.5 text-xs text-zinc-400">
             {saved.set
-              ? `Set by ${saved.by || "an admin"}${saved.at ? ` ${new Date(saved.at).toLocaleDateString()}` : ""}. The check says: ${reviewsLabel(saved.auto)}.`
+              ? `Set by ${saved.by || "an admin"}${saved.at ? ` ${formatDate(saved.at)}` : ""}. The check says: ${reviewsLabel(saved.auto)}.`
               : "Worked out by its check from its name and description."}
           </p>
         </div>
@@ -97,7 +99,7 @@ export function ReviewStepsSection({
                 />
                 <span className="min-w-0">
                   <span className="block font-medium text-zinc-200">{s.label}</span>
-                  <span className="block text-xs text-zinc-500">{s.means}</span>
+                  <span className="block text-xs text-zinc-400">{s.means}</span>
                 </span>
               </label>
             ))}

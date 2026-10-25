@@ -3,7 +3,7 @@
 import { Suspense, useMemo } from "react";
 import Link from "next/link";
 import { api, type Plan } from "@/lib/api";
-import { linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { primaryButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
 import {
   GROUP_LABEL,
@@ -58,10 +58,12 @@ function PlansPage() {
     [],
   );
 
-  const executingPlan = plans.find((p) => p.status === "executing");
   // Search and repo first, so the toggle counts say what each would show.
   const matched = useMemo(() => plans.filter((p) => planMatches(p, q) && (!repo || p.repo === repo)), [plans, q, repo]);
-  const shown = tab.status ? matched.filter((p) => p.status === tab.status) : matched;
+  // A running plan is pinned to the top: it is the one people come back to.
+  const shown = (tab.status ? matched.filter((p) => p.status === tab.status) : matched)
+    .slice()
+    .sort((a, b) => Number(b.status === "executing") - Number(a.status === "executing"));
   const filtered = !!(q || repo || tab.value !== "all");
   const clear = () => setParams({ q: "", status: "all", repo: "" });
 
@@ -69,18 +71,11 @@ function PlansPage() {
     <Page>
       <PageHeader
         title="Plans"
-        lead="Chat with Coderhelm to break work into ordered tasks, then approve them and let it build each one."
+        lead="Describe a bigger change and Coderhelm splits it into small steps. You approve them, and it builds them one at a time."
         actions={
-          <>
-            {executingPlan && (
-              <Link href={`/plans/detail?id=${executingPlan.plan_id}`} className={secondaryButton}>
-                Continue running plan
-              </Link>
-            )}
-            <Link href="/plans/new" className={primaryButton}>
-              New plan
-            </Link>
-          </>
+          <Link href="/plans/new" className={primaryButton}>
+            New plan
+          </Link>
         }
       />
 
@@ -90,7 +85,7 @@ function PlansPage() {
           search={{
             value: params.q,
             onChange: (v) => setParams({ q: v }, { replace: true }),
-            placeholder: "Search by title, description or repo",
+            placeholder: "Search plans by name, description or project",
             label: "Search plans",
           }}
           status={{
@@ -118,12 +113,12 @@ function PlansPage() {
           <ListEmpty
             title="No plans yet"
             action={
-              <Link href="/plans/new" className={linkButton}>
-                Create your first plan
+              <Link href="/plans/new" className={primaryButton}>
+                Write your first plan
               </Link>
             }
           >
-            A plan breaks a feature into ordered GitHub issues or Jira tickets that Coderhelm builds one by one.
+            A plan splits a bigger change into small steps. Coderhelm builds them one at a time, and you approve each one.
           </ListEmpty>
         ) : shown.length === 0 ? (
           <ListEmpty title={q ? `No plans match “${q}”` : "No plans here"} onClear={clear}>
@@ -138,7 +133,6 @@ function PlansPage() {
                   key={plan.plan_id}
                   testId="plan-row"
                   data={{ status: plan.status }}
-                  status={look}
                   title={plan.title || "Untitled plan"}
                   titleText={plan.title || undefined}
                   href={`/plans/detail?id=${plan.plan_id}`}
@@ -146,7 +140,7 @@ function PlansPage() {
                     !repo ? plan.repo || null : null,
                     plan.task_count ? `${plan.task_count} task${plan.task_count === 1 ? "" : "s"}` : null,
                   ]}
-                  summary={plan.description || undefined}
+                  summary={plainSummary(plan.description)}
                   chips={<StatusText look={look} />}
                   time={plan.created_at}
                 />
@@ -158,4 +152,10 @@ function PlansPage() {
       </div>
     </Page>
   );
+}
+
+/** A plan's description as one plain line: links become "link" so a row never shows a raw URL. */
+function plainSummary(text: string | null | undefined): string | undefined {
+  if (!text) return undefined;
+  return text.replace(/https?:\/\/\S+/g, "(link)").replace(/[#*`>]/g, "").replace(/\s+/g, " ").trim() || undefined;
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { CodeBlock } from "@/components/code-block";
-import { Time } from "@/components/list";
+import { ListSkeleton, Time } from "@/components/list";
+import { Problem, TechnicalDetails } from "@/components/problem";
 import Link from "next/link";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { api, type HealthCheck, type HealthCheckItem, type DlqMessage } from "@/lib/api";
@@ -11,10 +11,9 @@ import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RoleGuard } from "@/components/role-guard";
 import { StatusPill } from "@/components/status-pill";
-import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { ChevronRightIcon } from "@/components/icons";
-import { focusRing, secondaryButton } from "@/components/ui";
+import { buttonClass, focusRing, secondaryButton, smallDangerButton, smallSecondaryButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
 
 type Tone = "success" | "warning" | "error" | "neutral";
@@ -99,7 +98,7 @@ function HealthPage() {
     <Page>
       <PageHeader
         title="System health"
-        lead={<>Checks again every {unhealthy ? "5" : "30"} seconds.</>}
+        lead="Whether Coderhelm's work for your team is flowing normally: runs, queues and failed messages."
         actions={
           <button type="button" onClick={() => refresh()} disabled={checking} className={secondaryButton}>
             {checking ? "Checking..." : "Check now"}
@@ -110,12 +109,9 @@ function HealthPage() {
 
       {error && (
         <div className="mb-6">
-          <Callout variant="error" title="Couldn't run the health check">
-            <p>{error}</p>
-            <button type="button" onClick={() => refresh()} className={`mt-2 text-sm font-medium underline rounded ${focusRing}`}>
-              Try again
-            </button>
-          </Callout>
+          <Problem title="Couldn't run the health check" onRetry={() => refresh()} details={error}>
+            Check your connection and try again. Nothing about your runs changed.
+          </Problem>
         </div>
       )}
 
@@ -128,10 +124,11 @@ function HealthPage() {
 
       {health && overall && (
         <>
-          <div className={`flex flex-wrap items-center gap-3 p-4 mb-8 rounded-lg border ${overall.box}`} data-testid="health-overall">
+          <div className={`mb-8 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border p-4 ${overall.box}`} data-testid="health-overall">
             <StatusPill tone={overall.tone}>{overall.word}</StatusPill>
-            <span className="text-sm text-zinc-500 ml-auto">
-              Checked at {new Date(health.checked_at).toLocaleTimeString()}
+            <p className="min-w-0 flex-1 basis-60 text-sm text-zinc-200">{overallSentence(health.checks)}</p>
+            <span className="text-xs text-zinc-400">
+              Checked at {new Date(health.checked_at).toLocaleTimeString()} · again every {unhealthy ? "5" : "30"} seconds
             </span>
           </div>
 
@@ -147,6 +144,15 @@ function HealthPage() {
   );
 }
 
+/** One sentence that names what needs a look, so the banner says what to do. */
+function overallSentence(checks: HealthCheckItem[]): string {
+  const bad = checks.filter((c) => c.status === "warning" || c.status === "critical");
+  if (bad.length === 0) return "Everything is running normally.";
+  const names = bad.map((c) => (CHECK_META[c.name]?.label ?? c.name.replace(/_/g, " ")).toLowerCase());
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  return `${bad.length === 1 ? "1 thing needs" : `${bad.length} things need`} a look: ${list}. Open ${bad.length === 1 ? "it" : "them"} below to review.`;
+}
+
 function CheckCard({ check, onRefresh }: { check: HealthCheckItem; onRefresh: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const meta = CHECK_META[check.name] || { label: check.name.replace(/_/g, " "), description: "" };
@@ -156,6 +162,7 @@ function CheckCard({ check, onRefresh }: { check: HealthCheckItem; onRefresh: ()
   const unretryable = check.unretryable ?? 0;
   const clickable = hasItems || (isDlq && ((check.count ?? 0) > 0 || unretryable > 0));
   const panelId = `check-${check.name}`;
+  const needsLook = clickable && (check.status === "warning" || check.status === "critical");
 
   const summary = isDlq
     ? dlqSummary(check.count ?? 0, check.oldest_age_secs, unretryable)
@@ -172,11 +179,15 @@ function CheckCard({ check, onRefresh }: { check: HealthCheckItem; onRefresh: ()
           <span className="text-sm font-semibold text-zinc-100">{meta.label}</span>
           <StatusPill tone={tone.tone}>{tone.word}</StatusPill>
         </div>
-        {meta.description && <p className="text-xs text-zinc-500 mt-1">{meta.description}</p>}
+        {meta.description && <p className="text-xs text-zinc-400 mt-1">{meta.description}</p>}
       </div>
-      {/* Wraps at its spaces in up to 45% of the row, so a long summary
-          never squeezes the description beside it to a letter a line. */}
-      <span className="min-w-0 max-w-[45%] text-right text-sm text-zinc-400 tabular-nums">{summary}</span>
+      {/* Under the description on a phone; beside it, in up to 45% of the row, from sm: up. */}
+      <span className="min-w-0 basis-full text-sm tabular-nums text-zinc-400 sm:max-w-[45%] sm:basis-auto sm:text-right">{summary}</span>
+      {needsLook && (
+        <span aria-hidden="true" className="text-sm font-medium text-zinc-100 underline underline-offset-4">
+          Review
+        </span>
+      )}
     </>
   );
 
@@ -188,7 +199,7 @@ function CheckCard({ check, onRefresh }: { check: HealthCheckItem; onRefresh: ()
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
           aria-controls={panelId}
-          className={`w-full flex items-center gap-3 p-4 text-left rounded-lg hover:bg-zinc-800/30 ${focusRing}`}
+          className={`flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-lg p-4 text-left hover:bg-zinc-800/30 sm:flex-nowrap ${focusRing}`}
         >
           {header}
           <span aria-hidden="true" className={`text-zinc-500 transition-transform motion-reduce:transition-none ${expanded ? "rotate-90" : ""}`}>
@@ -196,7 +207,7 @@ function CheckCard({ check, onRefresh }: { check: HealthCheckItem; onRefresh: ()
           </span>
         </button>
       ) : (
-        <div className="flex items-center gap-3 p-4">{header}</div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 p-4 sm:flex-nowrap">{header}</div>
       )}
 
       {expanded && isDlq && (
@@ -227,7 +238,7 @@ function CheckCard({ check, onRefresh }: { check: HealthCheckItem; onRefresh: ()
                 )}
                 {item.error && <p className="mt-1 text-xs text-zinc-400">{item.error}</p>}
                 {item.created_at && (
-                  <p className="text-zinc-500 text-xs mt-1">Started <Time iso={item.created_at} /></p>
+                  <p className="text-zinc-400 text-xs mt-1">Started <Time iso={item.created_at} /></p>
                 )}
               </div>
             </li>
@@ -247,7 +258,6 @@ function dlqSummary(count: number, oldestAge: number | null | undefined, unretry
   return "None";
 }
 
-const smallButton = `inline-flex min-h-8 items-center justify-center rounded-md border px-3 py-1 text-xs font-medium disabled:opacity-50 transition-colors ${focusRing}`;
 
 function DlqPanel({ onRefresh }: { onRefresh: () => void }) {
   const [messages, setMessages] = useState<DlqMessage[]>([]);
@@ -275,7 +285,7 @@ function DlqPanel({ onRefresh }: { onRefresh: () => void }) {
     setActing(msg.message_id);
     try {
       await api.redriveDlqMessage(msg.message_id);
-      toast("Sent back to its queue to try again", "success");
+      toast("Sent back to try again", "success");
       loadMessages();
       onRefresh();
     } catch (e: unknown) {
@@ -327,6 +337,18 @@ function DlqPanel({ onRefresh }: { onRefresh: () => void }) {
     }
   };
 
+  /** What the work was, in a line: "Ticket WEB-123 for web". */
+  const messageSummary = (msg: DlqMessage): string => {
+    const body = typeof msg.body === "object" && msg.body ? (msg.body as Record<string, unknown>) : null;
+    const str = (k: string) => (body && typeof body[k] === "string" ? (body[k] as string) : "");
+    const kind = inferSource(msg);
+    const ticket = str("ticket_id") || str("ticket") || str("issue_key");
+    const repo = str("repo") || str("repository");
+    const title = str("title");
+    const parts = [kind, ticket, title && `“${title}”`, repo && `for ${repo}`].filter(Boolean);
+    return parts.length > 1 ? parts.join(" ") : `${kind} work${msg.type ? ` (${msg.type})` : ""}`;
+  };
+
   const inferSource = (msg: DlqMessage) => {
     if (msg.type === "resume" || msg.source_queue.endsWith("-ci-fix")) return "CI fix";
     if (msg.type === "feedback" || msg.source_queue.endsWith("-feedback")) return "Feedback";
@@ -335,8 +357,8 @@ function DlqPanel({ onRefresh }: { onRefresh: () => void }) {
 
   if (loading) {
     return (
-      <div className="border-t border-zinc-800 px-4 py-6 text-center text-sm text-zinc-500" aria-busy="true">
-        Loading failed messages...
+      <div className="border-t border-zinc-800 p-4">
+        <ListSkeleton rows={2} label="Loading failed messages" />
       </div>
     );
   }
@@ -344,12 +366,9 @@ function DlqPanel({ onRefresh }: { onRefresh: () => void }) {
   if (loadError) {
     return (
       <div className="border-t border-zinc-800 p-4">
-        <Callout variant="error" title="Couldn't load failed messages">
-          <p>{loadError}</p>
-          <button type="button" onClick={loadMessages} className={`mt-2 text-sm font-medium underline rounded ${focusRing}`}>
-            Try again
-          </button>
-        </Callout>
+        <Problem title="Couldn't load failed messages" onRetry={loadMessages} details={loadError}>
+          Check your connection and try again.
+        </Problem>
       </div>
     );
   }
@@ -358,14 +377,14 @@ function DlqPanel({ onRefresh }: { onRefresh: () => void }) {
     <div className="border-t border-zinc-800">
       {messages.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b border-zinc-800">
-          <span className="text-xs text-zinc-500">
+          <span className="text-xs text-zinc-400">
             {messages.length} message{messages.length !== 1 ? "s" : ""} for your team
           </span>
           <div className="flex gap-2">
-            <button type="button" onClick={loadMessages} disabled={!!acting} className={`${smallButton} border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700`}>
+            <button type="button" onClick={loadMessages} disabled={!!acting} className={smallSecondaryButton}>
               Reload
             </button>
-            <button type="button" onClick={() => void handlePurge()} disabled={!!acting} className={`${smallButton} border-red-500/30 bg-red-900/30 text-red-400 hover:bg-red-900/50`}>
+            <button type="button" onClick={() => void handlePurge()} disabled={!!acting} className={smallDangerButton}>
               {acting === "purge" ? "Deleting..." : "Delete all"}
             </button>
           </div>
@@ -373,7 +392,7 @@ function DlqPanel({ onRefresh }: { onRefresh: () => void }) {
       )}
       <div className="px-4 py-3 space-y-2 max-h-96 overflow-y-auto">
         {messages.length === 0 ? (
-          <p className="text-sm text-zinc-500 text-center py-3">No failed messages for your team.</p>
+          <p className="py-3 text-center text-sm text-zinc-400">No failed messages for your team.</p>
         ) : (
           messages.map((msg) => (
             <div key={msg.message_id} data-testid="dlq-message" className="bg-zinc-950/50 border border-zinc-800 rounded-lg px-4 py-3">
@@ -386,7 +405,7 @@ function DlqPanel({ onRefresh }: { onRefresh: () => void }) {
                       <StatusPill tone="warning">Can&apos;t be retried</StatusPill>
                     )}
                     {msg.sent_at && (
-                      <span className="text-xs text-zinc-500" title={new Date(msg.sent_at).toLocaleString()}>
+                      <span className="text-xs text-zinc-400" title={new Date(msg.sent_at).toLocaleString()}>
                         Sent {ageWords(msg.age_secs)} ago
                       </span>
                     )}
@@ -396,21 +415,22 @@ function DlqPanel({ onRefresh }: { onRefresh: () => void }) {
                       Can&apos;t be retried: <DlqProblem problem={msg.problem} />. Delete it; old ones are archived and removed automatically.
                     </p>
                   )}
-                  <CodeBlock
-                    code={typeof msg.body === "string" ? msg.body : JSON.stringify(msg.body, null, 2)}
+                  <p className="mt-1 text-sm text-zinc-200 [overflow-wrap:anywhere]" data-testid="dlq-summary">
+                    {messageSummary(msg)}
+                  </p>
+                  <TechnicalDetails
+                    summary="Message body"
+                    text={typeof msg.body === "string" ? msg.body : JSON.stringify(msg.body, null, 2)}
                     lang={typeof msg.body === "string" ? "text" : "json"}
-                    label="Message"
-                    maxHeightClass="max-h-40"
-                    className="mt-1"
                   />
                 </div>
                 <div className="flex gap-2 sm:flex-col shrink-0">
                   {msg.retryable && (
-                    <button type="button" onClick={() => void handleRedrive(msg)} disabled={!!acting} className={`${smallButton} border-zinc-600 bg-zinc-800 text-zinc-200 hover:bg-zinc-700`}>
+                    <button type="button" onClick={() => void handleRedrive(msg)} disabled={!!acting} className={smallSecondaryButton}>
                       {acting === msg.message_id ? "Working..." : "Try again"}
                     </button>
                   )}
-                  <button type="button" onClick={() => void handleDelete(msg)} disabled={!!acting} className={`${smallButton} border-zinc-700 bg-zinc-900 text-zinc-400 hover:bg-zinc-800`}>
+                  <button type="button" onClick={() => void handleDelete(msg)} disabled={!!acting} className={buttonClass("ghost", "sm")}>
                     Delete
                   </button>
                 </div>

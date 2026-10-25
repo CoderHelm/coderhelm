@@ -27,7 +27,9 @@ import {
 import { Page, PageHeader, Section } from "@/components/page";
 import { LogGroupPicker } from "@/components/log-group-picker";
 import { ActivityFeed } from "@/components/data-source-activity";
-import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { KindPicker } from "@/components/data-source-kinds";
+import { buttonClass, focusRing, inputClass, linkButton, monoInputClass, primaryButton, secondaryButton } from "@/components/ui";
+import { Problem, firstLine } from "@/components/problem";
 import { ListEmpty, ListError, ListSection, ListSkeleton, ListToolbar, StatusDot, useListParams, type Tone } from "@/components/list";
 
 export default function DataSourcesPageGuarded() {
@@ -165,11 +167,20 @@ function DataSourcesPage() {
     <Page>
       <PageHeader
         title="Data sources"
-        lead="Let Coderhelm check facts against your real systems. Connect a source and it can look things up while it plans, writes code and reviews, like whether a field really exists or a setting is live."
+        lead={
+          <>
+            Let Coderhelm check facts against your real systems. Connect a source and it can look things up while it plans, writes code and reviews, like
+            whether a field really exists or a setting is live.
+            {anyOn && (
+              <span className="mt-2 flex items-center gap-1.5 text-emerald-300" data-testid="fact-checking-on">
+                <StatusDot tone="success" /> Fact-checking is on.
+              </span>
+            )}
+          </>
+        }
         actions={
           <>
-            {anyOn && <StatusPill tone="success">Fact-checking is on</StatusPill>}
-            <Link href="/data-sources/activity" className={secondaryButton}>Every lookup</Link>
+            <Link href="/data-sources/activity" className={secondaryButton}>Activity log</Link>
             {list.length > 0 && (
               <button
                 ref={addButton}
@@ -302,7 +313,7 @@ function DataSourcesPage() {
 
       {sources !== null && list.length === 0 && !loadError && (
         <Section id="add" title="Add a source">
-          <div className="rounded-lg border border-dashed border-zinc-700 p-5 sm:p-6">
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5 sm:p-6">
             <p className="font-semibold text-zinc-100">No data sources yet</p>
             <p className="mt-1 max-w-prose text-sm text-zinc-400">
               Connect the systems your code reads from. Each one takes a few minutes and ends with a check that Coderhelm can only read.
@@ -318,9 +329,9 @@ function DataSourcesPage() {
       {sources !== null && showProgress && <ProgressList sources={list} events={events} />}
 
       <p className="mt-6 text-sm text-zinc-400" data-testid="integrations-pointer">
-        New Relic, Confluence, CloudWatch metrics, Airflow and MCP servers are set up in{" "}
+        Other tools, like New Relic, Confluence, CloudWatch metrics, Airflow and MCP servers, are connected in{" "}
         <Link href="/settings/integrations" className={linkButton}>
-          Settings → Integrations
+          Settings, then Integrations
         </Link>
         .
       </p>
@@ -375,45 +386,6 @@ function SourceIcon({ children, small = false }: { children: ReactNode; small?: 
   );
 }
 
-/** Every kind of source that can be added, in the same order the list groups them. */
-const KINDS: { href: string; icon: ReactNode; title: string; time: string; text: string }[] = [
-  { href: `${CONNECT}?step=address`, icon: <CodeIcon />, title: "A GraphQL API", time: "About 2 minutes",
-    text: "The web address your apps already talk to. Coderhelm asks it questions." },
-  { href: "/data-sources/connect/reader?kind=rest", icon: <CloudIcon />, title: "A REST API", time: "About 2 minutes",
-    text: "A booking, payments or vendor API, read with GET requests under the paths you allow." },
-  { href: `${CONNECT_AWS}?for=database`, icon: <DatabaseIcon />, title: "A database in your AWS account", time: "About 5 minutes",
-    text: "Read only access to a PostgreSQL database or a Redshift warehouse, to check the records a ticket names." },
-  { href: "/data-sources/connect/reader?kind=search", icon: <ScanIcon />, title: "An OpenSearch cluster", time: "About 2 minutes",
-    text: "The search indexes your app reads, searched read only. Only the indexes you list." },
-  { href: `${CONNECT_AWS}?for=logs`, icon: <LogsIcon />, title: "Logs in your AWS account", time: "About 3 minutes",
-    text: "Coderhelm searches your logs for the errors behind a bug report. Only the log groups you choose." },
-  { href: "/data-sources/tools", icon: <WrenchIcon />, title: "Your own tools", time: "About 5 minutes",
-    text: "Named lookups your engineers already trust, like “find order by number”. Approved by another admin." },
-];
-
-/** The kinds to pick from: a list of links, one per kind. */
-function KindPicker({ compact = false }: { compact?: boolean }) {
-  return (
-    <ul className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-      {KINDS.map((k) => (
-        <li key={k.href} className="min-w-0">
-          <Link
-            href={k.href}
-            className={`flex h-full gap-3 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3.5 text-left hover:border-zinc-600 hover:bg-zinc-900 transition-colors motion-reduce:transition-none ${focusRing}`}
-          >
-            <SourceIcon small>{k.icon}</SourceIcon>
-            <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="text-sm font-semibold text-zinc-100">{k.title}</span>
-              <span className="text-sm text-zinc-400">{k.text}</span>
-              {!compact && <span className="mt-1 text-xs text-zinc-500">{k.time}</span>}
-            </span>
-          </Link>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 /** Split a typed list ("a, b" or one per line) into its entries. */
 const entries = (s: string) =>
   s
@@ -441,7 +413,7 @@ function HealthDot({ ok }: { ok: boolean }) {
 function SourceFact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-xs text-zinc-500">{label}</dt>
+      <dt className="text-xs text-zinc-400">{label}</dt>
       <dd className="mt-0.5 text-sm text-zinc-200">{children}</dd>
     </div>
   );
@@ -722,11 +694,11 @@ function SourceRow({
               >
                 {source.name}
               </span>
-              <span className="shrink-0 rounded border border-zinc-700 px-1.5 py-px text-[11px] font-medium text-zinc-400">{engineLabel(source)}</span>
+              <span className="shrink-0 rounded border border-zinc-700 px-1.5 py-px text-xs font-medium text-zinc-400">{engineLabel(source)}</span>
             </span>
             <span
               title={open_ ? undefined : whereLabel(source)}
-              className={`mt-0.5 font-mono text-xs text-zinc-500 ${open_ ? "wrap-anywhere" : "truncate"}`}
+              className={`mt-0.5 text-xs text-zinc-400 ${open_ ? "wrap-anywhere" : "truncate"}`}
             >
               {whereLabel(source)}
             </span>
@@ -749,7 +721,7 @@ function SourceRow({
             <span className={`whitespace-nowrap text-zinc-400 sm:w-32 sm:text-right ${week?.last ? "" : "hidden sm:inline-block"}`}>
               {week?.last && (
                 <>
-                  <span className="text-zinc-500">Last lookup </span>
+                  <span className="text-zinc-400">Last lookup </span>
                   <span title={new Date(week.last).toLocaleString()}>{shortAgo(week.last)}</span>
                 </>
               )}
@@ -767,7 +739,7 @@ function SourceRow({
           <div className="flex items-center pl-5 sm:pl-0">
             <Link
               href={`${CONNECT}?step=${hint?.stage ?? "choose"}&id=${encodeURIComponent(source.id)}`}
-              className={`${primaryButton} !min-h-8 !px-3 !py-1.5`}
+              className={buttonClass("primary", "sm")}
             >
               Continue setup
             </Link>
@@ -775,20 +747,26 @@ function SourceRow({
         ) : (
           <div className="mt-1.5 flex shrink-0 items-center gap-2 sm:mt-0">
             <Switch checked={source.enabled} label={`Let Coderhelm use ${source.name}`} disabled={busy === "toggle"} onChange={toggle} />
-            <span aria-hidden="true" className="hidden w-14 text-sm text-zinc-300 sm:inline">
-              {busy === "toggle" ? "Saving…" : source.enabled ? "On" : "Paused"}
+            <span aria-hidden="true" className="hidden whitespace-nowrap text-sm text-zinc-300 sm:inline sm:min-w-14">
+              {busy === "toggle" ? "Saving…" : !source.enabled ? "Paused" : source.status === "error" ? "Paused until fixed" : "On"}
             </span>
           </div>
         )}
       </div>
 
       {source.status === "error" && (
-        <div className="mx-3 mb-3 flex gap-2.5 rounded-md border border-red-500/25 bg-red-500/5 px-3 py-2 text-sm sm:mx-4">
-          <span aria-hidden="true" className="mt-0.5 shrink-0 text-red-400"><WarningIcon /></span>
-          <div className="min-w-0">
-            <p className="font-medium text-zinc-100">Coderhelm is not using this source until the problem is fixed.</p>
-            <p className="text-zinc-400">{source.status_message || "The last check failed."} Press Test again to see which check fails and what to do.</p>
-          </div>
+        <div className="mx-3 mb-3 sm:mx-4">
+          <Problem
+            title="Coderhelm is not using this source until the problem is fixed."
+            details={source.status_message && firstLine(source.status_message) !== source.status_message.trim() ? source.status_message : undefined}
+            action={
+              <button type="button" onClick={test} disabled={busy === "test"} aria-label={`Test ${source.name} again`} className={buttonClass("secondary", "sm")}>
+                {busy === "test" ? "Testing…" : "Test again"}
+              </button>
+            }
+          >
+            {firstLine(source.status_message) || "The last check failed."} Test again to see which check fails and what to do.
+          </Problem>
         </div>
       )}
 
@@ -958,24 +936,24 @@ function SourceRow({
                 onSubmit={(e) => { e.preventDefault(); if (busy !== "settings") saveSettings(); }}
               >
                 <Field id={`url-${source.id}`} label={source.kind === "rest" ? "API address" : "Cluster address"}>
-                  {(props) => <input {...props} value={url} onChange={(e) => setUrl(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" />}
+                  {(props) => <input {...props} value={url} onChange={(e) => setUrl(e.target.value)} className={inputClass} />}
                 </Field>
                 {source.kind === "rest" ? (
                   <>
                     <Field id={`header-${source.id}`} label="Key header" helper="The header the API expects the key in, like X-Api-Key or Authorization.">
-                      {(props) => <input {...props} value={headerName} onChange={(e) => setHeaderName(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" />}
+                      {(props) => <input {...props} value={headerName} onChange={(e) => setHeaderName(e.target.value)} className={inputClass} />}
                     </Field>
                     <Field id={`paths-${source.id}`} label="Paths agents may read" helper="Path prefixes, like /v1/orders. Agents can GET these and anything under them, nothing else.">
-                      {(props) => <input {...props} value={paths} onChange={(e) => setPaths(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-sm text-zinc-100" />}
+                      {(props) => <input {...props} value={paths} onChange={(e) => setPaths(e.target.value)} className={monoInputClass} />}
                     </Field>
                   </>
                 ) : (
                   <>
                     <Field id={`user-${source.id}`} label="User" helper="A user with read-only access. Coderhelm sees what it can see.">
-                      {(props) => <input {...props} value={user} onChange={(e) => setUser(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" />}
+                      {(props) => <input {...props} value={user} onChange={(e) => setUser(e.target.value)} className={inputClass} />}
                     </Field>
                     <Field id={`indexes-${source.id}`} label="Indexes" helper="Index names or patterns agents may read, like orders or logs-*. Leave empty for every index the user sees.">
-                      {(props) => <input {...props} value={indexes} onChange={(e) => setIndexes(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-sm text-zinc-100" />}
+                      {(props) => <input {...props} value={indexes} onChange={(e) => setIndexes(e.target.value)} className={monoInputClass} />}
                     </Field>
                   </>
                 )}
