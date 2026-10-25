@@ -58,8 +58,11 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/memory": { label: "Memory" },
 
   "/chat": { label: "Chat" },
+  "/knowledge": { label: "Knowledge" },
+  "/knowledge/base": { label: "Knowledge base", parent: "/knowledge", detail: true },
+  // Knowledge's old addresses, which redirect to it.
   "/brain/knowledge": { label: "Knowledge" },
-  "/brain/knowledge/base": { label: "Knowledge base", parent: "/brain/knowledge", detail: true },
+  "/brain/knowledge/base": { label: "Knowledge base", parent: "/knowledge", detail: true },
 
   "/skills": { label: "Skills" },
   "/skills/item": { label: "Skill", parent: "/skills", detail: true },
@@ -106,7 +109,7 @@ export const ROUTES: Record<string, RouteInfo> = {
  * Where the team's knowledge lives (the sources Chat answers from). Every link
  * to it goes through this one constant, so the page can move without a hunt.
  */
-export const KNOWLEDGE_HREF = "/brain/knowledge";
+export const KNOWLEDGE_HREF = "/knowledge/";
 
 export interface Crumb {
   label: string;

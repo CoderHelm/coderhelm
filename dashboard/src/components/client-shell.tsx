@@ -621,6 +621,7 @@ function Sidebar({
     if (href === "/") return pathname === "/";
     if (href === "/settings") return pathname === "/settings";
     if (href === "/admin") return pathname === "/admin" || pathname === "/admin/";
+    if (href === KNOWLEDGE_HREF) return pathname === "/knowledge" || pathname.startsWith("/knowledge/");
     if (href === "/plans") return pathname === "/plans" || pathname.startsWith("/plans/detail") || pathname.startsWith("/plans/new");
     return pathname.startsWith(href);
   };

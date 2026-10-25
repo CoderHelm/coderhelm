@@ -226,3 +226,25 @@ input[data-autocompleted] {
   -webkit-text-fill-color: #e4e4e7 !important;
   background-color: #18181b !important;
 }
+
+/* Knowledge: a step of the add flow fades in; an import with no count yet
+   shows a bar that slides. Both stop with reduced motion (motion-reduce:). */
+@keyframes kn-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes kn-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}

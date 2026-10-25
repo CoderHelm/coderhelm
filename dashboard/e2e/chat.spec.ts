@@ -245,7 +245,7 @@ test.describe("chat: the empty page", () => {
     // The chat list and the way to the knowledge.
     await expect(page.getByTestId("thread-rail")).toContainText("Previous 7 days");
     await expect(page.getByTestId("thread-rail")).toContainText("Shared with you");
-    await expect(page.getByTestId("thread-rail").getByRole("link", { name: /Knowledge/ })).toHaveAttribute("href", /\/brain\/knowledge\/?$/);
+    await expect(page.getByTestId("thread-rail").getByRole("link", { name: /Knowledge/ })).toHaveAttribute("href", /\/knowledge\/?$/);
     await expect(page.getByTestId("knowledge-count")).toHaveText("2");
     // No dashed walls of text.
     expect(await page.locator(".border-dashed").count()).toBe(0);
@@ -481,9 +481,11 @@ test.describe("chat: who can do what", () => {
     await page.goto("/chat");
     await askIt(page);
     await expect(page.getByTestId("citation")).toHaveCount(2);
-    await page.goto("/brain/knowledge/base?id=kb_hr");
-    await expect(page.getByTestId("file-row").first()).toBeVisible();
-    await expect(page.getByRole("button", { name: "Upload files" })).toHaveCount(0);
+    // Knowledge reads, but its managing buttons are absent (knowledge.spec.ts covers the rest).
+    await page.goto("/knowledge/base/?id=kb_hr");
+    await expect(page.getByTestId("item-row").first()).toBeVisible();
+    await expect(page.getByTestId("add-source")).toHaveCount(0);
+    await expect(page.getByTestId("upload-button")).toHaveCount(0);
   });
 
   test("custom roles: a role that manages knowledge but can't ask", async ({ page }) => {
