@@ -46,3 +46,13 @@ Runs at `http://localhost:3000`. Requires the platform API to be running (or use
 ## Deployment
 
 Pushing to `main` triggers CI — the dashboard is built and deployed to S3 + CloudFront automatically.
+
+## License
+
+CoderHelm is licensed under the [Functional Source License, Version 1.1, with Apache 2.0 as the future license](LICENSE.md) (FSL-1.1-ALv2). In plain words:
+
+- You can run it, change it and self-host it for your own company.
+- You can't offer it, or something built from it, as a competing hosted product.
+- Each release becomes Apache 2.0 two years after it ships.
+
+The full terms are in [LICENSE.md](LICENSE.md).
