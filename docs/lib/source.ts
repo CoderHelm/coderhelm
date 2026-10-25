@@ -7,6 +7,7 @@ import { createElement } from 'react';
 import { SITE, docsRoute, markdownPath } from './shared';
 import { openapi } from './openapi';
 import { operationMarkdown } from './api-markdown';
+import { INSTALL_GUIDE } from './install/page-info';
 
 /**
  * Page frontmatter. `status: coming-soon` marks a page that documents work not
@@ -134,6 +135,11 @@ export function llmsIndex(): string {
   const pushPage = (url: string) => {
     if (seen.has(url)) return;
     seen.add(url);
+    if (url.replace(/\/$/, '') === INSTALL_GUIDE.url) {
+      // The sidebar's link to the browser install guide (an app page, not MDX).
+      lines.push(`- [${INSTALL_GUIDE.title}](${SITE.url}${INSTALL_GUIDE.url}.md): ${INSTALL_GUIDE.description}`);
+      return;
+    }
     const page = source.getPages().find((p) => p.url === url);
     if (!page) return;
     const desc = page.data.description ? `: ${page.data.description}` : '';

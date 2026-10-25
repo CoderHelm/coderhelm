@@ -72,6 +72,8 @@ const plain = (s) =>
 // --- Self-hosting guides ----------------------------------------------------
 
 const SELF_HOST_SRC = 'docs/self-host';
+/** The install guide's sidebar entry (a Fumadocs link item). */
+export const INSTALL_GUIDE_LINK = '[Install from your browser](/self-host/install/)';
 
 function importSelfHost(platform) {
   const out = path.join(CONTENT, 'self-host');
@@ -115,7 +117,10 @@ function importSelfHost(platform) {
     if (!fs.existsSync(path.join(out, rel, 'index.md'))) {
       write(path.posix.join('self-host', rel, 'index.md'), `---\ntitle: ${yamlString(rel === '' ? 'Self-hosting' : titleCase(path.basename(rel)))}\neditUrl: ${yamlString(`${REPO_URL}/tree/main/${path.posix.join(SELF_HOST_SRC, rel)}`)}\n---\n\nThe guides in this section:\n\n${pages.map((p) => `- [${titleCase(p)}](./${p})`).join('\n')}\n`);
     }
-    fs.writeFileSync(path.join(out, rel, 'meta.json'), JSON.stringify({ ...(metaTitle ? { title: metaTitle } : {}), pages: ['index', ...pages] }, null, 2) + '\n');
+    // The browser install guide (app/self-host/install) sits right under the
+    // section's overview: it is the fastest way in.
+    const lead = rel === '' ? ['index', INSTALL_GUIDE_LINK] : ['index'];
+    fs.writeFileSync(path.join(out, rel, 'meta.json'), JSON.stringify({ ...(metaTitle ? { title: metaTitle } : {}), pages: [...lead, ...pages] }, null, 2) + '\n');
   };
   walk(src, '');
   return { imported };
