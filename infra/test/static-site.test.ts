@@ -14,7 +14,7 @@ import * as cdk from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
 import { AppStack } from "../lib/app-stack";
 import { FrontendStack } from "../lib/frontend-stack";
-import { DocsStack } from "../lib/docs-stack";
+import { DocsStack, docsRedirects } from "../lib/docs-stack";
 import { ASSET_CACHE_CONTROL, PAGE_CACHE_CONTROL, SWEEP_CODE, pageRoutes } from "../lib/static-site";
 
 const env = { account: "111111111111", region: "us-east-1" };
@@ -49,7 +49,7 @@ function synth(kind: "app" | "site" | "docs"): Resources {
   const stack = kind === "app"
     ? new AppStack(app, "App", { env, stage: "test", webAclArn, outDir })
     : kind === "docs"
-      ? new DocsStack(app, "Docs", { env, stage: "test", webAclArn, outDir })
+      ? new DocsStack(app, "Docs", { env, stage: "test", webAclArn, outDir, redirects: { "/api/routes/": "/support/ticket/" } })
       : new FrontendStack(app, "Site", { env, stage: "test", webAclArn, outDir });
   return Template.fromStack(stack).toJSON().Resources;
 }
@@ -219,6 +219,33 @@ test("docs: Markdown for known pages, the 404 page for unknown ones", () => {
   assert.equal(rewrite({ request: { uri: "/nope/", headers: md } }).uri, "/errors/404.html");
   assert.equal(rewrite({ request: { uri: "/schema/plugin-manifest.v1.json", headers: {} } }).uri, "/schema/plugin-manifest.v1.json");
   assert.equal(rewrite({ request: { uri: "/llms.txt", headers: {} } }).uri, "/llms.txt");
+});
+
+test("docs: a page that moved answers 301 to where it went, its Markdown twin too", () => {
+  const rewrite = cfFunction(synth("docs"), /docs-url-rewrite$/);
+  for (const uri of ["/api/routes/", "/api/routes"]) {
+    const r = rewrite({ request: { uri, headers: {} } });
+    assert.equal(r.statusCode, 301, uri);
+    assert.equal(r.headers.location.value, "/support/ticket/");
+  }
+  const md = rewrite({ request: { uri: "/api/routes.md", headers: {} } });
+  assert.equal(md.statusCode, 301);
+  assert.equal(md.headers.location.value, "/support/ticket.md");
+  // Pages that didn't move are served as before.
+  assert.equal(rewrite({ request: { uri: "/support/ticket/", headers: {} } }).uri, "/support/ticket/index.html");
+});
+
+test("docs: a redirect must leave a real page and land on one", () => {
+  const pages = ["/", "/api/"];
+  assert.deepEqual(docsRedirects(pages, { "/api/routes/": "/api/" }), { "/api/routes/": "/api/" });
+  assert.throws(() => docsRedirects(pages, { "/api/routes/": "/nowhere/" }), /not a page/);
+  assert.throws(() => docsRedirects(pages, { "/api/": "/" }), /still exists/);
+  assert.throws(() => docsRedirects(pages, { "api/routes": "/api/" }), /page paths/);
+});
+
+test("docs: the committed redirect map covers the old API routes page", () => {
+  const map = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "..", "docs", "redirects.json"), "utf8")).redirects;
+  assert.equal(map["/api/routes/"], "/api/");
 });
 
 test("docs: docs.coderhelm.com with its own certificate and DNS records", () => {

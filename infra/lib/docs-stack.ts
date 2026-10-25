@@ -6,6 +6,8 @@ import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as targets from "aws-cdk-lib/aws-route53-targets";
+import * as fs from "fs";
+import * as path from "path";
 import { Construct } from "constructs";
 import {
   NextExportDeployment,
@@ -21,6 +23,24 @@ interface DocsStackProps extends cdk.StackProps {
   webAclArn: string;
   /** The docs site's static export. Defaults to ../docs/out. */
   outDir?: string;
+  /**
+   * Pages that moved or were removed, and where they went (page paths ending
+   * in /). Defaults to ../docs/redirects.json.
+   */
+  redirects?: Record<string, string>;
+}
+
+/** The docs' redirect map, checked against the pages of the build. */
+export function docsRedirects(pages: string[], redirects: Record<string, string>): Record<string, string> {
+  const live = new Set(pages);
+  for (const [from, to] of Object.entries(redirects)) {
+    if (!/^\/(.+\/)?$/.test(from) || !to.startsWith("/") || !to.endsWith("/")) {
+      throw new Error(`Docs redirect ${from} -> ${to}: both must be page paths ending in /.`);
+    }
+    if (live.has(from)) throw new Error(`Docs redirect ${from}: that page still exists.`);
+    if (!live.has(to)) throw new Error(`Docs redirect ${from}: its target ${to} is not a page.`);
+  }
+  return redirects;
 }
 
 /** docs.coderhelm.com: the developer docs (docs/), a static Next.js export. */
@@ -31,6 +51,12 @@ export class DocsStack extends cdk.Stack {
     const prefix = `coderhelm-${props.stage}`;
     const domainName = "docs.coderhelm.com";
     const outDir = props.outDir ?? "../docs/out";
+    const pages = pageRoutes(outDir);
+    const redirects = docsRedirects(
+      pages,
+      props.redirects ??
+        JSON.parse(fs.readFileSync(path.join(outDir, "..", "redirects.json"), "utf8")).redirects,
+    );
 
     // Route53 hosted zone (in this account, like the site and the app)
     const hostedZone = route53.HostedZone.fromLookup(this, "Zone", {
@@ -102,17 +128,28 @@ export class DocsStack extends cdk.Stack {
     // 404 page right here (no distribution-wide 404 response, which would
     // also answer a missing /_next/ script with HTML). Agents that send
     // `Accept: text/markdown` get the page's Markdown twin (/<page>.md, and
-    // /index.md for the home page). Files pass through untouched.
+    // /index.md for the home page). A page that moved (docs/redirects.json)
+    // answers 301 to where it went, and so does its old Markdown twin. Files
+    // pass through untouched.
     const urlRewrite = new cloudfront.Function(this, "UrlRewrite", {
       functionName: `${prefix}-docs-url-rewrite`,
       code: cloudfront.FunctionCode.fromInline(checkFunctionSize("UrlRewrite", `
-var PAGES = ${routeTable(pageRoutes(outDir))};
+var PAGES = ${routeTable(pages)};
+var MOVED = ${JSON.stringify(redirects)};
+function moved(to) {
+  return { statusCode: 301, statusDescription: 'Moved Permanently', headers: { location: { value: to } } };
+}
 function handler(event) {
   var request = event.request;
   var uri = request.uri;
   if (uri.startsWith('/errors/') || uri.startsWith('/_next/')) return request;
+  if (uri.endsWith('.md') && MOVED[uri.slice(0, -3) + '/']) {
+    var md = MOVED[uri.slice(0, -3) + '/'];
+    return moved(md === '/' ? '/index.md' : md.slice(0, -1) + '.md');
+  }
   if (uri.endsWith('/') || uri.indexOf('.') === -1) {
     var page = uri.endsWith('/') ? uri : uri + '/';
+    if (MOVED[page]) return moved(MOVED[page]);
     if (!PAGES[page]) {
       request.uri = ${JSON.stringify(NOT_FOUND_PAGE)};
       return request;

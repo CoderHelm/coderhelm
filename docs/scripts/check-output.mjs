@@ -7,11 +7,14 @@
 //   - sitemap.xml lists every page; robots.txt points at it
 //   - the plugin manifest schema and the bundled validator are published
 //   - a 404 page exists
+//   - every page ever published (published-pages.json) is still a page or
+//     has a redirect (redirects.json), and new pages are recorded
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { files } from './lib/out.mjs';
+import { checkMoves, exportedPages, readMoves } from './lib/moves.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'out');
@@ -67,6 +70,9 @@ if (schemaText) {
 need(fs.existsSync(path.join(OUT, 'tools/validate-plugin.mjs')), 'tools/validate-plugin.mjs is missing');
 need(fs.existsSync(path.join(OUT, '404.html')), '404.html is missing');
 need(fs.existsSync(path.join(OUT, 'search-index.json')), 'search-index.json is missing');
+
+// Old links keep working: every page ever published is still a page or redirects.
+problems.push(...checkMoves({ pages: exportedPages(OUT), ...readMoves(ROOT) }));
 
 if (problems.length) {
   console.error(`${problems.length} problem${problems.length === 1 ? '' : 's'} in the export:`);

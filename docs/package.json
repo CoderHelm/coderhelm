@@ -12,7 +12,8 @@
     "test:unit": "node --test scripts/*.test.mjs",
     "test:e2e": "playwright test",
     "validate-plugin": "node scripts/validate-plugin.mjs",
-    "platform:bump": "node scripts/bump-platform.mjs"
+    "platform:bump": "node scripts/bump-platform.mjs",
+    "pages:record": "node scripts/record-pages.mjs"
   },
   "dependencies": {
     "fumadocs-core": "16.17.3",
