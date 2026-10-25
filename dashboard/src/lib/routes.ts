@@ -57,8 +57,8 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/health": { label: "System health" },
   "/memory": { label: "Memory" },
 
-  "/brain": { label: "Brain", tab: "Company brain" },
-  "/brain/knowledge": { label: "Knowledge bases", parent: "/brain" },
+  "/chat": { label: "Chat" },
+  "/brain/knowledge": { label: "Knowledge" },
   "/brain/knowledge/base": { label: "Knowledge base", parent: "/brain/knowledge", detail: true },
 
   "/skills": { label: "Skills" },
@@ -92,6 +92,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/settings/github": { label: "GitHub", parent: "/settings/integrations" },
   "/settings/jira": { label: "Jira", parent: "/settings/integrations" },
   "/settings/plugins": { label: "Integrations", parent: "/settings" },
+  "/brain": { label: "Chat" },
 
   "/support": { label: "Support" },
   "/support/ticket": { label: "Request", parent: "/support", detail: true },
@@ -100,6 +101,12 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/admin/tickets": { label: "Support queue", parent: "/admin" },
   "/admin/queue": { label: "Shared queue", parent: "/admin", tab: "Shared failed-message queue" },
 };
+
+/**
+ * Where the team's knowledge lives (the sources Chat answers from). Every link
+ * to it goes through this one constant, so the page can move without a hunt.
+ */
+export const KNOWLEDGE_HREF = "/brain/knowledge";
 
 export interface Crumb {
   label: string;

@@ -123,6 +123,7 @@ function actionsFor(who: PaletteUser): (Entry & { need?: string })[] {
     { id: "act:review-pr", group: "actions", label: "Review a PR…", sub: "Review any pull request's latest commit now", href: "/reviewer?review=1", need: "reviews", keywords: ["re-review", "pull request"] },
     { id: "act:write-notes", group: "actions", label: "Write release notes for a tag…", sub: "Releases", href: "/releases?write=1", need: "reviews", keywords: ["release", "changelog", "tag"] },
     { id: "act:release-now", group: "actions", label: "Release now…", sub: "Releases waiting to go out", href: "/releases", need: "reviews", keywords: ["release", "ship", "deploy"] },
+    { id: "act:chat", group: "actions", label: "New chat…", sub: "Ask about your team's knowledge, code and tools", href: "/chat", need: "brain_ask", keywords: ["ask", "question", "chat", "search", "knowledge", "brain", "docs"] },
     { id: "act:new-plan", group: "actions", label: "New plan", sub: "Break work into tasks Coderhelm builds", href: "/plans/new", need: "plans", keywords: ["new run", "start", "create", "task"] },
     { id: "act:add-source", group: "actions", label: "Add a data source", sub: "Connect an API, logs or a database", href: "/data-sources/connect", need: "data_sources", keywords: ["connect", "database", "api"] },
     { id: "act:new-tool", group: "actions", label: "Write a tool", sub: "A named lookup Coderhelm can call", href: "/data-sources/tools/new", need: "data_sources", keywords: ["lookup", "query"] },

@@ -2,8 +2,8 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-// The company brain and knowledge bases. Every API call is answered here,
-// the answer stream included; nothing reaches a real backend.
+// Knowledge bases (Chat itself is chat.spec.ts). Every API call is answered
+// here; nothing reaches a real backend.
 
 const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots");
 const now = Date.now();
@@ -287,123 +287,5 @@ test.describe("knowledge bases", () => {
     await page.getByRole("button", { name: "Delete", exact: true }).last().click();
     await expect(page.getByTestId("file-row")).toHaveCount(1);
     expect(db.calls).toContain("DELETE /api/knowledge/kb_hr/files/f_failed");
-  });
-});
-
-test.describe("brain chat", () => {
-  test("an answer cites its sources, and a citation opens the passage", async ({ page }) => {
-    const db = await mockApi(page);
-    await page.goto("/brain");
-    await expect(page.getByTestId("brain-empty")).toBeVisible();
-    await page.getByRole("textbox", { name: "Message" }).fill("How long is parental leave?");
-    await page.getByRole("button", { name: "Ask" }).click();
-    const answer = page.getByTestId("answer").last();
-    await expect(answer).toContainText("sixteen weeks, fully paid");
-    await expect(answer.getByTestId("tool-step")).toContainText("Searched knowledge");
-    const cite = answer.getByTestId("citation");
-    await expect(cite).toHaveCount(1);
-    await expect(cite).toContainText("Leave policy.pdf");
-    await expect(cite).toContainText("Page 4");
-    await expect(cite).toContainText("as of 2026-05-01");
-    await expect(cite).toContainText("Source of truth");
-    // The inline marker opens the same passage.
-    await answer.getByTestId("cite-marker").first().click();
-    const passage = page.getByTestId("passage");
-    await expect(passage).toContainText("sixteen weeks, fully paid, for every employee");
-    await expect(page.getByRole("dialog")).toContainText("HR handbook");
-    await shot(page, "brain-passage");
-    await page.keyboard.press("Escape");
-    expect(db.asks[0].question).toBe("How long is parental leave?");
-    await expect(page).toHaveURL(/thread=th_new/);
-  });
-
-  test("source picking: only the picked sources are sent", async ({ page }) => {
-    const db = await mockApi(page);
-    await page.goto("/brain");
-    await page.getByTestId("sources-button").click();
-    const picker = page.getByTestId("source-picker");
-    // Every knowledge base starts on; turn one off, and turn connections and memories on.
-    await picker.getByRole("checkbox", { name: /Engineering runbooks/ }).uncheck();
-    await page.getByTestId("source-connections").check();
-    await page.getByTestId("source-memories").check();
-    await expect(page.getByTestId("source-data_sources")).not.toBeChecked();
-    await picker.getByRole("button", { name: "Done" }).click();
-    await expect(page.getByTestId("sources-button")).toContainText("3");
-    await page.getByRole("textbox", { name: "Message" }).fill("What changed in the leave policy?");
-    await page.getByRole("button", { name: "Ask" }).click();
-    await expect(page.getByTestId("answer").last()).toContainText("sixteen weeks");
-    const sent = db.asks[0].sources as Record<string, unknown>;
-    expect(sent.knowledge).toEqual(["kb_hr"]);
-    expect(sent.connections).toBe(true);
-    expect(sent.memories).toBe(true);
-    expect(sent.code).toBe(false);
-    expect(sent.data_sources).toBe(false);
-  });
-
-  test("a file attached to a question is uploaded and sent with it", async ({ page }) => {
-    const db = await mockApi(page);
-    await page.goto("/brain");
-    await page.getByTestId("attach-input").setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("Leave is sixteen weeks.") });
-    await expect(page.getByTestId("attachment-chip")).toHaveAttribute("data-status", "ready");
-    await page.getByRole("textbox", { name: "Message" }).fill("Does my note match the policy?");
-    await page.getByRole("button", { name: "Ask" }).click();
-    await expect(page.getByTestId("answer").last()).toContainText("sixteen weeks");
-    expect(db.uploads).toBe(1);
-    expect(db.asks[0].attachments).toEqual([{ id: "att_1", name: "notes.txt" }]);
-  });
-
-  test("the empty answer: nothing in the sources says so plainly, with no citations", async ({ page }) => {
-    await mockApi(page, { answer: "none" });
-    await page.goto("/brain");
-    await page.getByRole("textbox", { name: "Message" }).fill("What is our office wifi password?");
-    await page.getByRole("button", { name: "Ask" }).click();
-    const none = page.getByTestId("no-source-answer");
-    await expect(none).toContainText("Not in your sources");
-    await expect(none).toContainText("won't guess");
-    await expect(page.getByTestId("citation")).toHaveCount(0);
-    await shot(page, "brain-no-source");
-  });
-
-  test("roles: a viewer reads a shared thread but can't ask", async ({ page }) => {
-    await mockApi(page, { role: "viewer" });
-    await page.goto("/brain?thread=th_shared");
-    await expect(page.getByTestId("answer")).toContainText("Deploys stop Friday at noon");
-    await expect(page.getByTestId("citation")).toContainText("Release rules.md");
-    await expect(page.getByTestId("read-only-note")).toBeVisible();
-    await expect(page.getByRole("textbox", { name: "Message" })).toHaveCount(0);
-    await expect(page.getByTestId("share-toggle")).toHaveCount(0);
-  });
-
-  test("custom roles: the brain follows the capabilities a role holds", async ({ page }) => {
-    const base = ["view", "brain_read", "view_team", "own_account"];
-    // A role that may ask but not manage knowledge bases.
-    await mockApi(page, { role: "custom:asker", capabilities: [...base, "brain_ask"] });
-    await page.goto("/brain");
-    await page.getByRole("textbox", { name: "Message" }).fill("How long is parental leave?");
-    await page.getByRole("button", { name: "Ask" }).click();
-    await expect(page.getByTestId("citation")).toHaveCount(1);
-    await page.goto("/brain/knowledge/base?id=kb_hr");
-    await expect(page.getByTestId("file-row").first()).toBeVisible();
-    await expect(page.getByRole("button", { name: "Upload files" })).toHaveCount(0);
-  });
-
-  test("custom roles: a role that manages knowledge bases but can't ask", async ({ page }) => {
-    const base = ["view", "brain_read", "view_team", "own_account"];
-    await mockApi(page, { role: "custom:librarian", capabilities: [...base, "knowledge_manage"] });
-    await page.goto("/brain/knowledge/base?id=kb_hr");
-    await expect(page.getByRole("button", { name: "Upload files" })).toBeVisible();
-    await expect(page.getByTestId("base-form")).toBeVisible();
-    await page.goto("/brain");
-    await expect(page.getByTestId("read-only-note")).toBeVisible();
-    await expect(page.getByRole("textbox", { name: "Message" })).toHaveCount(0);
-  });
-
-  test("screenshots of a thread at desktop and phone width", async ({ page }) => {
-    await mockApi(page);
-    await page.goto("/brain");
-    await page.getByRole("textbox", { name: "Message" }).fill("How long is parental leave?");
-    await page.getByRole("button", { name: "Ask" }).click();
-    await expect(page.getByTestId("citation")).toHaveCount(1);
-    await shot(page, "brain-thread");
   });
 });

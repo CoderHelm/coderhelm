@@ -56,6 +56,13 @@ const JARGON = [
   { re: /\bHMAC\b/, say: "HMAC: say \"signed\" or \"signature\"" },
   { re: /\bLog\s+Analy[sz]er\b/i, say: "Log Analyzer: say what it reads (\"your AWS logs\")" },
 ];
+/**
+ * The chat's old name. The page is Chat and its sources are Knowledge; the old
+ * word survives only in identifiers (API paths, keys, file and module names).
+ * A string is copy here even without a space, so a one-word label is caught;
+ * a word joined to a path, key or name character (/ _ # : . -) is an identifier.
+ */
+const OLD_CHAT_NAME = /(^|[^A-Za-z0-9_/#:.\-])brain([^A-Za-z0-9_/#:.\-]|$)/i;
 /** Strings in these attributes are not copy. */
 const NOT_COPY_ATTRS = new Set(["className", "href", "src", "id", "key", "htmlFor", "data-testid", "testId", "type", "name", "role", "rel", "target", "autoComplete", "inputMode", "d", "viewBox"]);
 /** Files allowed to use font-mono: the Code component and the shared mono input. */
@@ -203,6 +210,24 @@ for (const file of walk(SRC)) {
       const before = source.slice(0, m.index);
       reports.fontMono.push({ rule: "font-mono", file: rel, line: before.split("\n").length, col: 1, message: "font-mono outside <Code>" });
     }
+  }
+
+  // old-chat-name: every string and JSX text, in .ts files too (route labels,
+  // usage names), whatever its attribute, except imports and bare keys.
+  {
+    const any = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, tsx ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    any.forEachChild(function words(node) {
+      const literal =
+        ts.isJsxText(node) || ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node);
+      if (literal && !inImport(node)) {
+        const text = ts.isJsxText(node) ? node.getText() : node.text;
+        const key = /^brain$/i.test(text.trim()) && !ts.isJsxText(node);
+        if (!key && OLD_CHAT_NAME.test(text)) {
+          hit(errors, "old-chat-name", rel, any, node.getStart(), `"${text.trim().slice(0, 60)}": the chat is called Chat and its sources Knowledge`, text);
+        }
+      }
+      node.forEachChild(words);
+    });
   }
 
   if (!tsx) continue;

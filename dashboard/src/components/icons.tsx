@@ -77,3 +77,21 @@ export const EyeOffIcon = () => <svg {...s}><path d="M17.94 17.94A10.9 10.9 0 01
 /** Thumbs up and down: a yes or no on something the app did. */
 export const ThumbsUpIcon = () => <svg {...s}><path d="M7 10v11" /><path d="M15 5.88L14 10h5.83a2 2 0 011.92 2.56l-2.33 8A2 2 0 0117.5 22H4a2 2 0 01-2-2v-8a2 2 0 012-2h2.76a2 2 0 001.79-1.11L12 2a3.13 3.13 0 013 3.88z" /></svg>;
 export const ThumbsDownIcon = () => <svg {...s}><path d="M17 14V3" /><path d="M9 18.12L10 14H4.17a2 2 0 01-1.92-2.56l2.33-8A2 2 0 016.5 2H20a2 2 0 012 2v8a2 2 0 01-2 2h-2.76a2 2 0 00-1.79 1.11L12 22a3.13 3.13 0 01-3-3.88z" /></svg>;
+
+// Chat icons
+/** A paperclip: attach a file. */
+export const PaperclipIcon = () => <svg {...s}><path d="M21 11.5l-8.6 8.6a5.5 5.5 0 01-7.8-7.8l8.6-8.6a3.7 3.7 0 015.2 5.2l-8.6 8.6a1.8 1.8 0 01-2.6-2.6l7.9-7.9" /></svg>;
+/** An upward stroke in a button: send the message. */
+export const SendIcon = () => <svg {...s} strokeWidth={2}><path d="M12 19V5" /><path d="M6 11l6-6 6 6" /></svg>;
+/** A panel with a sidebar: show or hide the list of chats. */
+export const SidebarIcon = () => <svg {...s}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></svg>;
+/** Three dots: more actions. */
+export const MoreIcon = () => <svg {...s} strokeWidth={2.5}><circle cx="5" cy="12" r="0.6" /><circle cx="12" cy="12" r="0.6" /><circle cx="19" cy="12" r="0.6" /></svg>;
+/** A square with a pencil: start a new chat. */
+export const ComposeIcon = () => <svg {...s}><path d="M12 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2v-6" /><path d="M17.5 3.5a2.1 2.1 0 013 3L13 14l-4 1 1-4z" /></svg>;
+/** Stacked layers: the sources an answer may read. */
+export const LayersIcon = () => <svg {...s}><path d="M12 3l9 5-9 5-9-5z" /><path d="M3 13l9 5 9-5" /></svg>;
+/** A magnifier. */
+export const SearchIcon = () => <svg {...s}><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>;
+/** A circular stroke: try again. */
+export const RetryIcon = () => <svg {...s}><path d="M3 12a9 9 0 0115.5-6.2L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 01-15.5 6.2L3 16" /><path d="M3 21v-5h5" /></svg>;

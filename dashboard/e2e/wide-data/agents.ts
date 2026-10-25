@@ -35,7 +35,7 @@ export function widePolicy() {
       { key: "coder", label: "Coder", summary: "Writes changes on a branch and opens pull requests.", on: true, repos_off: [] },
       { key: "reviewer", label: "Reviewer", summary: "Reviews pull requests and leaves comments.", on: true, repos_off: [] },
       { key: "plan_chat", label: "Plan chat", summary: "Answers questions and drafts plans in the plan chat.", on: true, repos_off: [] },
-      { key: "brain_chat", label: "Brain chat", summary: "Answers questions from the team's knowledge.", on: true, repos_off: [] },
+      { key: "brain_chat", label: "Chat", summary: "Answers questions from the team's knowledge.", on: true, repos_off: [] },
       { key: "alert_fixer", label: "Alert fixer", summary: "Looks into alerts and proposes fixes.", on: true, repos_off: [REPO] },
       { key: "log_autofix", label: "Log auto-fix", summary: "Fixes log findings on its own when turned on.", on: true, repos_off: [REPO] },
       { key: "plugin", label: "Plugin runs", summary: "Runs the team's installed plugins.", on: false, repos_off: [] },

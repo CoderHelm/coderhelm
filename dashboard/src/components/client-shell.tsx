@@ -15,7 +15,7 @@ import { ScrollFade } from "./scroll-fade";
 import { ConfirmProvider } from "./confirm-dialog";
 import { CommandPaletteProvider, type PalettePage } from "./command-palette";
 import { Logo, TopBar, TopBarProvider } from "./top-bar";
-import { tabTitle as routeTabTitle } from "@/lib/routes";
+import { KNOWLEDGE_HREF, tabTitle as routeTabTitle } from "@/lib/routes";
 import { focusRing } from "./ui";
 import { helpHref, helpTargetFromUrl } from "@/lib/support";
 import {
@@ -70,7 +70,7 @@ const navGroups: NavGroup[] = [
       { href: "/logs", label: "Logs", icon: <LogFindingsIcon />, need: "recommendations" },
       { href: "/releases", label: "Releases", icon: <GitBranchIcon />, need: "reviews" },
       { href: "/graph", label: "Code Graph", icon: <GraphIcon />, need: ANY_CHANGE },
-      { href: "/brain", label: "Brain", icon: <ChatIcon />, need: "brain_read" },
+      { href: "/chat", label: "Chat", icon: <ChatIcon />, need: "brain_read" },
       { href: "/plans", label: "Plans", icon: <PlanIcon /> },
       { href: "/plans/templates", label: "Templates", icon: <TemplateIcon /> },
     ],
@@ -81,7 +81,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/settings/integrations", label: "Integrations", icon: <PluginIcon />, need: "view_integrations" },
       { href: "/data-sources", label: "Data sources", icon: <DatabaseIcon />, need: "data_sources" },
-      { href: "/brain/knowledge", label: "Knowledge bases", icon: <BookIcon />, need: "brain_read" },
+      { href: KNOWLEDGE_HREF, label: "Knowledge", icon: <BookIcon />, need: "brain_read" },
     ],
   },
   {

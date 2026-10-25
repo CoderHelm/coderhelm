@@ -185,7 +185,7 @@ export const AGENT_LABELS: Record<AgentKey, string> = {
   coder: "Coder",
   reviewer: "Reviewer",
   plan_chat: "Plan chat",
-  brain_chat: "Brain chat",
+  brain_chat: "Chat",
   alert_fixer: "Alert fixer",
   log_autofix: "Log auto-fix",
   plugin: "Plugin runs",
