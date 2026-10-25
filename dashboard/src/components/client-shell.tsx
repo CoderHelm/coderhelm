@@ -23,7 +23,7 @@ import {
   GitBranchIcon, GearIcon, AtlassianIcon, GitHubIcon, UsersIcon,
   BellIcon, TargetIcon, RepeatIcon, ShieldCheckIcon,
   PluginIcon, ShieldIcon, TemplateIcon, CpuIcon, MemoryIcon,
-  LifeBuoyIcon, MailIcon, DatabaseIcon, TestTubeIcon, LogFindingsIcon, GraphIcon, PlanIcon, BookIcon } from "./icons";
+  LifeBuoyIcon, MailIcon, DatabaseIcon, TestTubeIcon, LogFindingsIcon, GraphIcon, PlanIcon, BookIcon, ChatIcon } from "./icons";
 import { apiBase, runtimeConfig, siteUrl } from "@/lib/runtime-config";
 import { SetupBanner } from "@/components/setup-banner";
 
@@ -70,6 +70,7 @@ const navGroups: NavGroup[] = [
       { href: "/logs", label: "Logs", icon: <LogFindingsIcon />, need: "recommendations" },
       { href: "/releases", label: "Releases", icon: <GitBranchIcon />, need: "reviews" },
       { href: "/graph", label: "Code Graph", icon: <GraphIcon />, need: ANY_CHANGE },
+      { href: "/brain", label: "Brain", icon: <ChatIcon />, need: "brain_read" },
       { href: "/plans", label: "Plans", icon: <PlanIcon /> },
       { href: "/plans/templates", label: "Templates", icon: <TemplateIcon /> },
     ],
@@ -80,6 +81,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/settings/integrations", label: "Integrations", icon: <PluginIcon />, need: "view_integrations" },
       { href: "/data-sources", label: "Data sources", icon: <DatabaseIcon />, need: "data_sources" },
+      { href: "/brain/knowledge", label: "Knowledge bases", icon: <BookIcon />, need: "brain_read" },
     ],
   },
   {
