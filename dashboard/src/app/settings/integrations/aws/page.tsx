@@ -20,6 +20,7 @@ import { Page, PageHeader, Section } from "@/components/page";
 import { buttonClass, inputClass, linkButton, monoInputClass, primaryButton, secondaryButton } from "@/components/ui";
 import { Code, SaveBar, SettingsRow, Switch, useDirtyForm, type DirtyForm } from "@/components/settings";
 import { Chip, MoreMenu } from "@/components/list";
+import { securityEmail } from "@/lib/runtime-config";
 
 export default function AwsPageGuarded() {
   return (
@@ -685,8 +686,8 @@ function ScopeCard() {
       </ul>
       <p className="mt-4 text-zinc-500">
         Questions? Write to{" "}
-        <a href="mailto:security@coderhelm.com" className={`${linkButton} text-zinc-300`}>
-          security@coderhelm.com
+        <a href={`mailto:${securityEmail()}`} className={`${linkButton} text-zinc-300`}>
+          {securityEmail()}
         </a>
         .
       </p>

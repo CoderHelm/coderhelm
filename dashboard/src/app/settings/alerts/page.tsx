@@ -1,11 +1,11 @@
 "use client";
 
 import { useCan } from "@/hooks/use-can";
+import { apiOrigin } from "@/lib/runtime-config";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   api,
-  API_BASE_URL,
   type AlertBudget,
   type AlertEvent,
   type AlertNotifySettings,
@@ -230,7 +230,7 @@ function AlertsPage() {
     api.listAwsConnections().then((r) => setConnections(r.connections)).catch(() => {});
   }, [loadRoutes, loadEvents]);
 
-  const endpoint = `${API_BASE_URL}${endpointPath}`;
+  const endpoint = `${apiOrigin()}${endpointPath}`;
   const connectedAccounts = useMemo(() => new Set(connections.map((c) => c.connection_id)), [connections]);
   const pairs = useMemo(() => pairRecoveries(events ?? []), [events]);
 

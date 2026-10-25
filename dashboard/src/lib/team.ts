@@ -1,10 +1,10 @@
+import { apiBase } from "@/lib/runtime-config";
 // The team page: who is on the team, what each role can do, and the people
 // actions (invite, role change, remove, link a GitHub sign-in to a member).
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${apiBase()}${path}`, {
     ...options,
     credentials: "include",
     cache: "no-store",

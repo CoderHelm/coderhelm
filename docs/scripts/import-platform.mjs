@@ -83,6 +83,7 @@ function importSelfHost(platform) {
   const walk = (dir, rel) => {
     const entries = fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
     const pages = [];
+    const order = new Map();
     for (const entry of entries) {
       const from = path.join(dir, entry.name);
       const relPath = path.posix.join(rel, entry.name);
@@ -92,8 +93,13 @@ function importSelfHost(platform) {
       } else if (/\.mdx?$/i.test(entry.name)) {
         const isIndex = /^(readme|index)\.mdx?$/i.test(entry.name);
         const name = isIndex ? 'index' : entry.name.replace(/\.mdx?$/i, '');
-        write(path.posix.join('self-host', rel, `${name}.md`), convertGuide(fs.readFileSync(from, 'utf8'), path.posix.join(SELF_HOST_SRC, relPath), platform.ref));
-        if (!isIndex) pages.push(name);
+        const raw = fs.readFileSync(from, 'utf8');
+        write(path.posix.join('self-host', rel, `${name}.md`), convertGuide(raw, path.posix.join(SELF_HOST_SRC, relPath), platform.ref));
+        if (!isIndex) {
+          pages.push(name);
+          const o = guideOrder(raw);
+          if (o !== undefined) order.set(name, o);
+        }
         imported++;
       } else {
         // Images and other files the guides link to sit next to them.
@@ -101,6 +107,7 @@ function importSelfHost(platform) {
         fs.copyFileSync(from, path.join(out, rel, entry.name));
       }
     }
+    sortByOrder(pages, order);
     const metaTitle = rel === '' ? 'Self-hosting' : undefined;
     fs.mkdirSync(path.join(out, rel), { recursive: true });
     if (!fs.existsSync(path.join(out, rel, 'index.md'))) {
@@ -110,6 +117,23 @@ function importSelfHost(platform) {
   };
   walk(src, '');
   return { imported };
+}
+
+/** A guide's `order:` front matter, when it has one. */
+export function guideOrder(raw) {
+  const fm = raw.replace(/^\uFEFF/, '').match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  const m = fm?.[1].match(/^order:\s*(-?\d+(?:\.\d+)?)\s*$/m);
+  return m ? Number(m[1]) : undefined;
+}
+
+/** Pages with an `order` first, by it; the rest after, by name. */
+export function sortByOrder(pages, order) {
+  pages.sort((a, b) => {
+    const oa = order.get(a) ?? Infinity;
+    const ob = order.get(b) ?? Infinity;
+    return oa === ob ? a.localeCompare(b) : oa - ob;
+  });
+  return pages;
 }
 
 const titleCase = (s) => s.replace(/^\d+[-_]/, '').replace(/[-_]/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
@@ -163,8 +187,7 @@ export function convertGuide(raw, srcPath, ref) {
 function writeSelfHostStub(ref) {
   write('self-host/index.mdx', `---
 title: Self-hosting
-description: Run CoderHelm in your own AWS account. The guides are being written and will appear here.
-status: coming-soon
+description: Run CoderHelm in your own AWS account.
 editUrl: ${yamlString(`${REPO_URL}/tree/main/${SELF_HOST_SRC}`)}
 generated: true
 ---

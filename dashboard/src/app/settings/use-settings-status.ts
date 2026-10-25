@@ -22,6 +22,8 @@ export interface Me {
   auth_provider?: string;
   github_login: string | null;
   mfa_enabled?: boolean;
+  /** An admin of the whole install (self-hosted installs). */
+  platform_admin?: boolean;
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -71,6 +73,7 @@ const LOADERS: Record<SettingsStatusKey, (me: Me) => Promise<ItemStatus | null>>
   },
   models: async () => {
     const m = await api.getModelProvider();
+    if (m.deployment_provider === "bedrock") return { text: "Amazon Bedrock", tone: "success" };
     return m.api_key_masked ? { text: "Your own API key", tone: "success" } : { text: "Coderhelm's key", tone: "neutral" };
   },
   security: async (me) => {

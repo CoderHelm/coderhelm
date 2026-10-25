@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, type Repo, type TestSettings } from "@/lib/api";
 import { errorMessage } from "@/lib/data-sources";
+import { apiOrigin } from "@/lib/runtime-config";
 import { CodeBlock } from "@/components/code-block";
 import { Code } from "@/components/settings/code";
 import { useToast } from "@/components/toast";
@@ -11,7 +12,8 @@ import { SaveBar, SettingsRow, SettingsSection, Switch as RowSwitch, useDirtyFor
 
 export const REPORTER_SNIPPET = `reporter: [["html"], ["json", { outputFile: "test-results/results.json" }]],`;
 
-export const QUARANTINE_SNIPPET = `# in the job that runs your Playwright tests
+/** The quarantine step, with this install's API address (read when shown). */
+export const quarantineSnippet = () => `# in the job that runs your Playwright tests
 permissions:
   id-token: write # lets the job ask GitHub for a signed token Coderhelm checks
   contents: read
@@ -23,7 +25,7 @@ steps:
       TOKEN=$(curl -sf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \\
         "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=coderhelm" | jq -r .value) || TOKEN=""
       GREP=$(curl -sf -H "Authorization: Bearer $TOKEN" \\
-        https://api.coderhelm.com/webhooks/ci/tests/quarantine | jq -r '.playwright_grep_invert // ""') || GREP=""
+        ${apiOrigin()}/webhooks/ci/tests/quarantine | jq -r '.playwright_grep_invert // ""') || GREP=""
       echo "grep=$GREP" >> "$GITHUB_OUTPUT"
   - name: Run E2E tests
     env:
@@ -45,7 +47,7 @@ export function QuarantineCiStep() {
         auto-merge. GitHub&apos;s check still turns red, because your workflow decides that. To skip quarantined tests in the build,
         add this step before your test step. If Coderhelm can&apos;t be reached, every test runs as before.
       </p>
-      <CodeBlock code={QUARANTINE_SNIPPET} lang="yaml" title="GitHub Actions step" className="mt-2" />
+      <CodeBlock code={quarantineSnippet()} lang="yaml" title="GitHub Actions step" className="mt-2" />
       <p className="max-w-prose text-zinc-400">
         Skipped tests aren&apos;t recorded from that run. To keep recording them, run{" "}
         <Code>npx playwright test --grep &quot;$QUARANTINED&quot;</Code> in a separate job with{" "}

@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/skeleton";
 import { ChevronRightIcon } from "@/components/icons";
 import { focusRing, inputClass, secondaryButton } from "@/components/ui";
 import { SETTINGS_GROUPS, type SettingsItem } from "@/components/settings-items";
+import { isSelfHosted } from "@/lib/runtime-config";
 import { ROLE_LABEL, whoCan, type Role } from "@/lib/roles";
 import { builtInRoleFor, can } from "@/lib/capabilities";
 import { useSettingsStatus, type ItemStatus, type Me } from "./use-settings-status";
@@ -25,7 +26,7 @@ export default function SettingsPage() {
   }, []);
 
   const groups = me
-    ? SETTINGS_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => can(me, i.view)) })).filter((g) => g.items.length > 0)
+    ? SETTINGS_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => can(me, i.view) && (!i.selfHostOnly || (isSelfHosted() && me.platform_admin === true))) })).filter((g) => g.items.length > 0)
     : [];
   const roleLabel = me ? (me.custom_role?.name ?? ROLE_LABEL[me.role as Role] ?? me.role) : null;
 
