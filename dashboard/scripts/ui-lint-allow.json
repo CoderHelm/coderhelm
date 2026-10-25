@@ -1,11 +1,5 @@
 [
   {
-    "rule": "brand",
-    "file": "src/app/settings/integrations/github/page.tsx",
-    "text": "CoderHelm GitHub App",
-    "why": "The GitHub App's own name is \"CoderHelm\" (github.com/apps/coderhelm); the install screen people see on GitHub says it that way."
-  },
-  {
     "rule": "wide-button",
     "file": "src/components/client-shell.tsx",
     "text": "w-full rounded-lg bg-blue-600 px-4 py-2.5",

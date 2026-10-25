@@ -1,5 +1,7 @@
 "use client";
 
+import { Switch } from "@/components/settings/switch";
+
 import { Callout } from "@/components/callout";
 import { useCan } from "@/hooks/use-can";
 import { ANY_CHANGE } from "@/lib/capabilities";
@@ -217,23 +219,12 @@ function ReposPage() {
                   testId="repo-row"
                   data={{ enabled: String(repo.enabled) }}
                   leading={
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={repo.enabled}
-                      aria-label={`Let Coderhelm work on ${repo.name}`}
-                      onClick={() => handleToggle(repo)}
+                    <Switch
+                      checked={repo.enabled}
+                      label={`Let Coderhelm work on ${repo.name}`}
+                      onChange={() => handleToggle(repo)}
                       disabled={!canManage || toggling === repo.name}
-                      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                        repo.enabled ? "bg-green-500" : "bg-zinc-700"
-                      } ${toggling === repo.name ? "opacity-50" : canManage ? "cursor-pointer" : "cursor-not-allowed"} ${focusRing}`}
-                    >
-                      <span
-                        className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                          repo.enabled ? "translate-x-4.5" : "translate-x-0.5"
-                        }`}
-                      />
-                    </button>
+                    />
                   }
                   title={repo.name}
                   titleText={repo.name}

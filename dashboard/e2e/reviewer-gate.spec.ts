@@ -217,3 +217,24 @@ test("Reviewer rows stop a waiting auto-merge and re-arm a stopped one", async (
   );
   expect(errors).toEqual([]);
 });
+
+test("a merged or closed PR offers no auto-merge control, whatever the gate last recorded", async ({ page }) => {
+  const db = await mockApi(page, {
+    gates: {
+      "your-team/web#90": { pr_title: "Merged by auto-merge", auto_merge: true, status: "merged", gate: structuredClone(STOPPED_GATE) },
+      "your-team/web#91": { pr_title: "Closed without merging", auto_merge: true, status: "closed", gate: { ...structuredClone(WAITING_GATE), state: "paused" } },
+      "your-team/web#96": { pr_title: "Upgrade the image pipeline", auto_merge: true, status: "stopped", gate: structuredClone(STOPPED_GATE) },
+    },
+  });
+  await page.goto("/reviewer");
+  const merged = page.getByTestId("reviewer-pr").filter({ hasText: "Merged by auto-merge" });
+  const closed = page.getByTestId("reviewer-pr").filter({ hasText: "Closed without merging" });
+  const stopped = page.getByTestId("reviewer-pr").filter({ hasText: "Upgrade the image pipeline" });
+  await expect(merged).toBeVisible();
+  await expect(closed).toBeVisible();
+  // The open, stopped PR still offers its way back.
+  await expect(stopped.getByRole("button", { name: /Re-arm auto-merge/ })).toBeVisible();
+  await expect(merged.getByRole("button", { name: /Re-arm auto-merge|Stop auto-merge/ })).toHaveCount(0);
+  await expect(closed.getByRole("button", { name: /Re-arm auto-merge|Stop auto-merge/ })).toHaveCount(0);
+  expect(db.posts).toEqual([]);
+});

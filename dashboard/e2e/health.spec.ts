@@ -229,6 +229,27 @@ test("the platform admin sees the whole shared queue, with each message's team",
   await expect.poll(() => db.posts).toEqual([{ path: "/api/admin/dlq/delete", body: { message_id: "m4" } }]);
 });
 
+test("the shared queue leaves out what an older gateway doesn't send, never printing undefined", async ({ page }) => {
+  await mockApi(page, { platformAdmin: true });
+  // An older gateway: no retention fields and no counts, only the messages.
+  await page.route(
+    (url) => url.pathname === "/api/admin/dlq",
+    (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ complete: true, messages: [{ message_id: "m9", type: "ticket", sent_at: new Date().toISOString(), age_secs: 60, source_queue: "", retryable: false, problem: "", body: { type: "ticket" }, team_id: null, global: false, shared_only: true }] }),
+      }),
+  );
+  await page.goto("/admin/queue/");
+  await expect(page.getByRole("heading", { name: "Shared queue", level: 1 })).toBeVisible();
+  await expect(page.getByText("Failed messages from every team.")).toBeVisible();
+  await expect(page.getByText(/undefined/)).toHaveCount(0);
+  const counts = page.getByTestId("queue-counts");
+  await expect(counts).toContainText("Messages1");
+  await expect(counts).toContainText("For no team0");
+  await expect(counts).toContainText("Can't be read0");
+});
+
 test("anyone else is refused the shared queue", async ({ page }) => {
   await mockApi(page, { platformAdmin: false });
   await page.goto("/admin/queue/");

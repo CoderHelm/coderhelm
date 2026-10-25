@@ -41,7 +41,7 @@ export default function SystemPage() {
     return (
       <Page>
         <div className="max-w-xl" data-testid="system-unavailable">
-          <Callout variant="info" title="Not available here">
+          <Callout variant="neutral" title="Not available here">
             <p>This page is for the admins of a self-hosted Coderhelm install.</p>
             <p className="pt-1"><Link href="/settings" className={linkButton}>Back to Settings</Link></p>
           </Callout>
@@ -165,7 +165,7 @@ function System() {
           />
           {data.running && (
             <div className="px-4 py-3">
-              <Callout variant="info" title="An update is running">
+              <Callout variant="neutral" title="An update is running">
                 <p>Coderhelm stays available while it runs. This page shows the result when it finishes.</p>
               </Callout>
             </div>

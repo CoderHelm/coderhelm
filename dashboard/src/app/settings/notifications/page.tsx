@@ -1,5 +1,7 @@
 "use client";
 
+import { Switch } from "@/components/settings/switch";
+
 import { useCallback, useEffect, useState } from "react";
 import { api, type NotificationPrefs } from "@/lib/api";
 import { useToast } from "@/components/toast";
@@ -72,21 +74,13 @@ export default function NotificationsPage() {
                   <p id={`${t.key}-label`} className="text-sm font-medium text-zinc-100">{t.label}</p>
                   <p id={`${t.key}-desc`} className="text-sm text-zinc-400 mt-0.5">{t.description}</p>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={on}
-                  aria-labelledby={`${t.key}-label`}
-                  aria-describedby={`${t.key}-desc`}
-                  onClick={() => toggle(t.key)}
+                <Switch
+                  checked={on}
+                  labelledBy={`${t.key}-label`}
+                  describedBy={`${t.key}-desc`}
+                  onChange={() => toggle(t.key)}
                   disabled={saving !== null}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors motion-reduce:transition-none disabled:opacity-50 ${focusRing} ${on ? "bg-emerald-500" : "bg-zinc-700"}`}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform motion-reduce:transition-none ${on ? "translate-x-5" : "translate-x-0"}`}
-                  />
-                </button>
+                />
               </li>
             );
           })}

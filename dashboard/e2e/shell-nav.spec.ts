@@ -116,7 +116,7 @@ test("390 wide: the menu drawer reaches every link and keeps help and the person
   await expect(page.getByRole("dialog", { name: "Menu" })).toHaveCount(0);
 });
 
-test("390 wide: more than five tabs become a select; chips that don't fit scroll with a fade", async ({ page }) => {
+test("390 wide: more than five tabs become a select; chips that don't fit wrap", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockApi(page);
   await page.goto("/tests");
@@ -129,20 +129,14 @@ test("390 wide: more than five tabs become a select; chips that don't fit scroll
   await expect(select).toHaveValue("trends");
   await shot(page, "tabs-390-select");
 
-  // Filter chips wider than a phone scroll sideways inside their strip, with a
-  // fade on the edge that has more, and never push the page sideways.
+  // Filter chips wider than a phone wrap onto a second line: every option
+  // stays in view, and nothing pushes the page sideways.
   await page.goto("/");
   const chips = page.getByRole("group", { name: "Show runs" });
   await expect(chips).toBeVisible();
-  const strip = page.locator("[data-scroll-fade='x']").filter({ has: chips });
-  const wider = await strip.evaluate((el) => el.scrollWidth > el.clientWidth);
-  if (wider) {
-    await expect(strip).toHaveAttribute("data-more-end", "true");
-    await strip.evaluate((el) => el.scrollTo({ left: el.scrollWidth }));
-    await expect(strip).toHaveAttribute("data-more-start", "true");
-    await expect(strip).not.toHaveAttribute("data-more-end", "true");
-  } else {
-    await expect(strip).not.toHaveAttribute("data-more-end", "true");
+  for (const b of await chips.getByRole("button").all()) {
+    const box = await b.boundingBox();
+    expect(box && box.x >= 0 && box.x + box.width <= 390).toBe(true);
   }
   await expect(chips.getByRole("button", { name: /^Failed/ })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

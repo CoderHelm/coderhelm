@@ -1,5 +1,7 @@
 "use client";
 
+import { Switch as SharedSwitch } from "./settings/switch";
+
 import { focusRing } from "./ui";
 
 /** Teams webhook hosts the API accepts (Workflows and older incoming webhooks). */
@@ -48,22 +50,7 @@ export function Switch({
 }) {
   return (
     <span className="inline-flex items-center gap-2.5">
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        disabled={disabled}
-        onClick={() => onChange(!checked)}
-        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors motion-reduce:transition-none disabled:opacity-50 ${
-          checked ? "bg-emerald-500" : "bg-zinc-700"
-        } ${focusRing}`}
-      >
-        <span
-          aria-hidden="true"
-          className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform motion-reduce:transition-none ${checked ? "translate-x-5" : ""}`}
-        />
-      </button>
+      <SharedSwitch checked={checked} label={label} disabled={disabled} onChange={onChange} />
       <span aria-hidden="true" className="text-sm text-zinc-300">
         {checked ? onLabel : offLabel}
       </span>

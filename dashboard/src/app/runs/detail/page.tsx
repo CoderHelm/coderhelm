@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDuration as sharedDuration } from "@/components/list/time";
+
 import { useCan } from "@/hooks/use-can";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -149,10 +151,7 @@ function formatTokens(n?: number): string {
 }
 
 function formatDuration(seconds?: number): string {
-  if (!seconds) return "—";
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  return seconds ? sharedDuration(seconds) : "—";
 }
 
 export default function RunDetailPage() {
@@ -441,7 +440,7 @@ function RunDetailInner() {
   if (!runId) {
     return (
       <Page className="space-y-4">
-        <Callout variant="info" title="No run picked">
+        <Callout variant="neutral" title="No run picked">
           <p>This link has no run in it. Open a run from the runs list.</p>
         </Callout>
       </Page>
@@ -467,7 +466,7 @@ function RunDetailInner() {
     return (
       <Page className="space-y-4">
         {loadError === "missing" ? (
-          <Callout variant="info" title="Run not found">
+          <Callout variant="neutral" title="Run not found">
             <p>No run with this id exists for your team. It may belong to another team you are in.</p>
           </Callout>
         ) : (

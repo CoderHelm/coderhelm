@@ -311,7 +311,7 @@ function AlertsPage() {
 
       {!canEdit && load.state === "ready" && (
         <div className="mt-6">
-          <Callout variant="info" live={false}>
+          <Callout variant="neutral" live={false}>
             <p>You can see the routes, their rules and the alerts they received. Only an admin or the owner can change them.</p>
           </Callout>
         </div>

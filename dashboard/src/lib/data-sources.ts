@@ -1,3 +1,4 @@
+import { formatMs } from "@/components/list/time";
 import type { DataSource, DataSourceCheck, DataSourceKind } from "./api";
 import type { CheckItem } from "@/components/check-list";
 
@@ -286,9 +287,9 @@ export function shortAgo(iso: string): string {
   return `${Math.round(h / 24)}d ago`;
 }
 
+/** A duration in milliseconds, in the one shared format ("10m 10s"). */
 export function formatDuration(ms: number): string {
-  if (!Number.isFinite(ms)) return "";
-  return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`;
+  return formatMs(ms);
 }
 
 export function prettyJson(text: string): string {

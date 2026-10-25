@@ -564,7 +564,7 @@ function PrItem({
   const ref = `${row.repo} #${row.pr_number}`;
   const title = row.title || `Pull request #${row.pr_number}`;
   const gateState = row.live?.gate?.state;
-  const control = gateAction(gateState);
+  const control = gateAction(gateState, row.status);
   const hasDetails = row.reviews.length > 0 || checklist.length > 0 || !!reason || !!gateState;
 
   return (

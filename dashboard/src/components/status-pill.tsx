@@ -1,13 +1,14 @@
 import type { ReactNode } from "react";
-import { CheckIcon, WarningIcon, XIcon } from "./icons";
+import { CheckIcon, InfoIcon, WarningIcon, XIcon } from "./icons";
 import { TONES } from "./list/status";
 
-type Tone = "neutral" | "success" | "warning" | "error";
+type Tone = "neutral" | "info" | "success" | "warning" | "error";
 
 // The shared list tones (./list/status), so a pill and a list chip of the
 // same meaning are the same colour.
 const TONE_CLASS: Record<Tone, string> = {
   neutral: TONES.neutral.chip,
+  info: TONES.info.chip,
   success: TONES.success.chip,
   warning: TONES.waiting.chip,
   error: TONES.danger.chip,
@@ -15,6 +16,7 @@ const TONE_CLASS: Record<Tone, string> = {
 
 const ICONS: Record<Tone, ReactNode> = {
   neutral: null,
+  info: <InfoIcon />,
   success: <CheckIcon />,
   warning: <WarningIcon />,
   error: <XIcon />,

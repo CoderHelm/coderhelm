@@ -72,8 +72,17 @@ export function stopperName(st: { by: string; is_login?: boolean }): string {
 /** Gate states a person can stop (the gate may still merge on its own). */
 const STOPPABLE = new Set(["waiting_approval", "waiting_ci", "blocked_ci", "declined", "paused", "head_moved"]);
 
-/** What a person can do with a PR's auto-merge now: stop it, re-arm it, or nothing. */
-export function gateAction(state: string | undefined): "stop" | "rearm" | null {
+/** A PR that is merged or closed has nothing left to stop or re-arm. */
+const PR_FINISHED = new Set(["merged", "closed"]);
+
+/**
+ * What a person can do with a PR's auto-merge now: stop it, re-arm it, or
+ * nothing. `prStatus` is the PR's own status (the row's): a merged or closed
+ * PR offers neither, whatever the gate last recorded.
+ */
+export function gateAction(state: string | undefined, prStatus?: string): "stop" | "rearm" | null {
+  if (prStatus && PR_FINISHED.has(prStatus)) return null;
+  if (state === "merged" || state === "closed") return null;
   if (state === "stopped") return "rearm";
   return state && STOPPABLE.has(state) ? "stop" : null;
 }

@@ -5,14 +5,12 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   createContext,
   type ReactNode,
-  type Ref,
   useCallback,
   useContext,
   useEffect,
   useId,
   useLayoutEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import { CommandPaletteButton } from "./command-palette";
@@ -20,14 +18,14 @@ import { ChevronRightIcon } from "./icons";
 import { focusRing } from "./ui";
 import { parentHref, tabTitle, trailFor, type Crumb } from "@/lib/routes";
 
-// The one bar at the top of every page (see components/page.tsx for how a
-// page fills it). Left: where you are, as a trail of links ending on the
-// current page. Right: the page's actions, its "More" menu and search. On a
-// phone: a back arrow, the current page's name, and the actions in a menu.
+// The one bar at the top of every page. Left: where you are, as a trail of
+// links ending on the current page. Right: search. On a phone: a back arrow
+// and the current page's name.
 //
 // The shell renders exactly one TopBar; pages never render one themselves.
-// They describe themselves with <PageHeader>, which hands its actions to the
-// bar through a portal, so the buttons keep the page's state and handlers.
+// A page names itself with <PageHeader> (components/page.tsx): a visible
+// title with its actions beside it, in the page. The bar's last crumb can be
+// the item's short name, which PageHeader hands over through usePageMeta.
 
 /** What the page on screen says about itself. */
 export interface PageMeta {
@@ -42,13 +40,6 @@ export interface PageMeta {
 interface TopBarState {
   meta: PageMeta | null;
   setMeta: (owner: string, meta: PageMeta | null) => void;
-  /**
-   * Where the page's actions go: one element, a row in the bar on a wide
-   * screen and the actions menu under it on a phone. One slot for both, so a
-   * resize across the breakpoint never remounts the page's buttons.
-   */
-  slot: HTMLElement | null;
-  closeActions: () => void;
 }
 
 const TopBarContext = createContext<TopBarState | null>(null);
@@ -128,8 +119,6 @@ function useInAppHistory(): { canGoBack: boolean } {
 
 export function TopBarProvider({ children }: { children: ReactNode }) {
   const [metas, setMetas] = useState<{ owner: string; meta: PageMeta }[]>([]);
-  const [slot, setSlot] = useState<HTMLElement | null>(null);
-  const [actionsOpen, setActionsOpen] = useState(false);
 
   const setMeta = useCallback((owner: string, meta: PageMeta | null) => {
     setMetas((prev) => {
@@ -138,28 +127,12 @@ export function TopBarProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const closeActions = useCallback(() => setActionsOpen(false), []);
   // The most recently mounted header speaks for the page.
   const meta = metas.length ? metas[metas.length - 1].meta : null;
 
-  const state = useMemo<TopBarState>(
-    () => ({ meta, setMeta, slot, closeActions }),
-    [meta, setMeta, slot, closeActions],
-  );
-  return (
-    <TopBarContext.Provider value={state}>
-      <TopBarSlotsContext.Provider value={{ setSlot, actionsOpen, setActionsOpen }}>
-        {children}
-      </TopBarSlotsContext.Provider>
-    </TopBarContext.Provider>
-  );
+  const state = useMemo<TopBarState>(() => ({ meta, setMeta }), [meta, setMeta]);
+  return <TopBarContext.Provider value={state}>{children}</TopBarContext.Provider>;
 }
-
-const TopBarSlotsContext = createContext<{
-  setSlot: (el: HTMLElement | null) => void;
-  actionsOpen: boolean;
-  setActionsOpen: (open: boolean | ((o: boolean) => boolean)) => void;
-} | null>(null);
 
 // ── The bar ────────────────────────────────────────────────────────
 
@@ -172,7 +145,6 @@ function TopBarFrame({ teamName, menuButton, canGoBack }: { teamName?: string; m
   const pathname = usePathname();
   const router = useRouter();
   const bar = useContext(TopBarContext);
-  const slots = useContext(TopBarSlotsContext);
   const meta = bar?.meta ?? null;
   const crumb = meta?.crumb || null;
   const trail = trailFor(pathname, crumb);
@@ -190,11 +162,6 @@ function TopBarFrame({ teamName, menuButton, canGoBack }: { teamName?: string; m
     else if (up) router.push(up);
   };
 
-  const actionsOpen = slots?.actionsOpen ?? false;
-  const setActionsOpen = slots?.setActionsOpen;
-  const hasActions = !!meta?.hasActions;
-  // Close the phone's actions menu on navigation.
-  useEffect(() => setActionsOpen?.(false), [pathname, setActionsOpen]);
 
   return (
     <div
@@ -233,7 +200,7 @@ function TopBarFrame({ teamName, menuButton, canGoBack }: { teamName?: string; m
                   className={`flex items-center gap-1.5 rounded px-1 py-0.5 text-zinc-400 hover:text-zinc-100 ${focusRing}`}
                   title={`${teamName}: go to runs`}
                 >
-                  <span aria-hidden="true" className="flex h-5 w-5 items-center justify-center rounded bg-gradient-to-br from-blue-500 to-blue-700 text-[10px] font-bold text-white">
+                  <span aria-hidden="true" className="flex h-5 w-5 items-center justify-center rounded bg-gradient-to-br from-blue-500 to-blue-700 text-xs font-bold text-white">
                     {teamName.charAt(0).toUpperCase()}
                   </span>
                   <span className="max-w-40 truncate">{teamName}</span>
@@ -242,14 +209,14 @@ function TopBarFrame({ teamName, menuButton, canGoBack }: { teamName?: string; m
               </li>
             )}
             {ancestors.map((c) => (
-              <li key={c.href ?? c.label} className="hidden min-w-0 shrink items-center gap-1 md:flex">
-                <Link href={c.href ?? "/"} className={`truncate rounded px-1 py-0.5 text-zinc-400 hover:text-zinc-100 ${focusRing}`}>
+              <li key={c.href ?? c.label} className="hidden min-w-0 shrink-0 items-center gap-1 md:flex">
+                <Link href={c.href ?? "/"} title={c.label} className={`block max-w-48 truncate rounded px-1 py-0.5 text-zinc-400 hover:text-zinc-100 ${focusRing}`}>
                   {c.label}
                 </Link>
                 <Separator />
               </li>
             ))}
-            <li className="flex min-w-0 items-center" data-testid="breadcrumb-current">
+            <li className="flex min-w-0 flex-1 items-center" data-testid="breadcrumb-current">
               {isHeading ? (
                 <h1 aria-current="page" className="truncate px-1 text-sm font-semibold text-zinc-100" title={current.label}>
                   {current.label}
@@ -263,24 +230,7 @@ function TopBarFrame({ teamName, menuButton, canGoBack }: { teamName?: string; m
           </ol>
         </nav>
 
-        {/* The page's actions: in the bar from md up, the actions menu below it on a phone. */}
-        <PageActions open={actionsOpen && hasActions} onClose={() => setActionsOpen?.(false)} setSlot={slots?.setSlot} />
-
         <div className="flex shrink-0 items-center gap-2">
-          {hasActions && (
-            <div className="relative md:hidden">
-              <button
-                type="button"
-                aria-label="Page actions"
-                aria-expanded={actionsOpen}
-                aria-controls="topbar-actions-menu"
-                onClick={() => setActionsOpen?.((o) => !o)}
-                className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 ${focusRing}`}
-              >
-                <DotsIcon />
-              </button>
-            </div>
-          )}
           <div className="md:hidden">
             <CommandPaletteButton compact />
           </div>
@@ -294,62 +244,11 @@ function TopBarFrame({ teamName, menuButton, canGoBack }: { teamName?: string; m
   );
 }
 
-function PageActions({ open, onClose, setSlot }: { open: boolean; onClose: () => void; setSlot?: (el: HTMLElement | null) => void }) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  // A stable ref callback: an inline one would hand the slot over (null, then
-  // the element) on every render and remount the page's actions each time.
-  const setRef = useCallback(
-    (el: HTMLDivElement | null) => {
-      ref.current = el;
-      setSlot?.(el);
-    },
-    [setSlot],
-  );
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    const onDown = (e: MouseEvent) => {
-      const t = e.target as HTMLElement;
-      if (ref.current?.contains(t) || t.closest('[aria-controls="topbar-actions-menu"]')) return;
-      onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    document.addEventListener("mousedown", onDown);
-    ref.current?.querySelector<HTMLElement>("a[href], button:not([disabled]), select, input")?.focus();
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("mousedown", onDown);
-    };
-  }, [open, onClose]);
-  return (
-    <div
-      id="topbar-actions-menu"
-      ref={setRef}
-      data-testid="topbar-actions"
-      // On a phone, a button or link inside closes the menu once it has done its job.
-      onClick={(e) => {
-        if (open && (e.target as HTMLElement).closest("a[href], button")) onClose();
-      }}
-      className={`${open ? "max-md:flex" : "max-md:hidden"} shrink-0 items-center gap-2 md:flex max-md:absolute max-md:inset-x-0 max-md:top-full max-md:flex-col max-md:items-stretch max-md:border-b max-md:border-zinc-800/60 max-md:bg-zinc-950 max-md:px-4 max-md:py-3 max-md:[&>*]:w-full max-md:[&_a]:justify-center max-md:[&_button]:justify-center`}
-    />
-  );
-}
-
 function Separator() {
   return (
     <span aria-hidden="true" className="shrink-0 scale-75 text-zinc-600">
       <ChevronRightIcon />
     </span>
-  );
-}
-
-function DotsIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <circle cx="5" cy="12" r="1.8" />
-      <circle cx="12" cy="12" r="1.8" />
-      <circle cx="19" cy="12" r="1.8" />
-    </svg>
   );
 }
 

@@ -7,7 +7,7 @@ import { repoOptions, splitRepo, useRecentRepos } from "../repo-combobox";
 import { api } from "@/lib/api";
 import { focusRing, linkButton } from "../ui";
 import { StatusDot, type Tone } from "./status";
-import { ScrollFade } from "../scroll-fade";
+import { Select } from "../select";
 
 // The one toolbar above every list: search (press / to focus), status
 // toggles with counts, a repo filter once the team has more than one repo,
@@ -195,7 +195,7 @@ export function SearchField({
       ) : (
         <kbd
           aria-hidden="true"
-          className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-zinc-700 px-1.5 text-[11px] leading-5 text-zinc-500 sm:block"
+          className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-zinc-700 px-1.5 text-xs leading-5 text-zinc-400 sm:block"
         >
           /
         </kbd>
@@ -217,10 +217,9 @@ export function StatusToggles({
   label: string;
 }) {
   return (
-    // On a phone the toggles scroll sideways inside their own strip, with a
-    // fade on the edge that has more.
-    <ScrollFade axis="x" className="max-w-full" innerClassName="[scrollbar-width:none]">
-      <div role="group" aria-label={label} className="inline-flex shrink-0 rounded-lg border border-zinc-700 bg-zinc-900 p-0.5">
+    // On a phone the toggles wrap onto a second line rather than hiding off
+    // the edge of the screen.
+    <div role="group" aria-label={label} className="inline-flex max-w-full flex-wrap gap-0.5 rounded-lg border border-zinc-700 bg-zinc-900 p-0.5">
         {options.map((o) => {
           const on = o.value === value;
           return (
@@ -236,13 +235,12 @@ export function StatusToggles({
               {o.tone && !on && <StatusDot tone={o.tone} live={false} className="!h-1.5 !w-1.5" />}
               {o.label}
               {o.count !== undefined && (
-                <span className={`tabular-nums text-xs ${on ? "text-zinc-600" : "text-zinc-500"}`}>{o.count}</span>
+                <span className={`tabular-nums text-xs ${on ? "text-zinc-600" : "text-zinc-400"}`}>{o.count}</span>
               )}
             </button>
           );
         })}
-      </div>
-    </ScrollFade>
+    </div>
   );
 }
 
@@ -296,18 +294,13 @@ export function SortSelect({
   options: { value: string; label: string }[];
 }) {
   return (
-    <select
-      aria-label="Sort"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`${controlBox} max-w-full py-1.5 pl-3 ${focusRing}`}
-    >
+    <Select aria-label="Sort" value={value} onChange={(e) => onChange(e.target.value)} className="bg-zinc-900">
       {options.map((o) => (
         <option key={o.value} value={o.value}>
           {o.label}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }
 

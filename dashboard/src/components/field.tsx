@@ -3,6 +3,7 @@
 import { useState, type InputHTMLAttributes, type ReactNode } from "react";
 import { EyeIcon, EyeOffIcon } from "./icons";
 import { focusRing, inputClass } from "./ui";
+import { Field as SettingsField } from "./settings/field";
 
 export interface FieldControlProps {
   id: string;
@@ -11,8 +12,9 @@ export interface FieldControlProps {
 }
 
 /**
- * Label + control + helper + inline error. The control is a render prop so the
- * ids that tie the label, helper and error to it are always wired up.
+ * Label + control + helper + inline error, in the one field look (the
+ * settings Field). The control is a render prop so the ids that tie the
+ * label, helper and error to it are always wired up.
  */
 export function Field({
   id,
@@ -27,26 +29,10 @@ export function Field({
   error?: ReactNode;
   children: (props: FieldControlProps) => ReactNode;
 }) {
-  const helperId = helper ? `${id}-helper` : undefined;
-  const errorId = error ? `${id}-error` : undefined;
-  const describedBy = [errorId, helperId].filter(Boolean).join(" ") || undefined;
   return (
-    <div>
-      <label htmlFor={id} className="block mb-1.5 text-sm font-semibold text-zinc-100">
-        {label}
-      </label>
-      {children({ id, "aria-describedby": describedBy, "aria-invalid": error ? true : undefined })}
-      {helper && (
-        <p id={helperId} className="mt-2 text-sm text-zinc-400 max-w-prose">
-          {helper}
-        </p>
-      )}
-      {error && (
-        <p id={errorId} role="alert" className="mt-2 text-sm text-red-400">
-          {error}
-        </p>
-      )}
-    </div>
+    <SettingsField as="custom" id={id} label={label} help={helper} error={error}>
+      {(ids) => children(ids)}
+    </SettingsField>
   );
 }
 

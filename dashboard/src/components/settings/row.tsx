@@ -36,7 +36,7 @@ export function RowMarks({ unsaved, notDefault, recommended }: { unsaved?: boole
 export function SettingsMore({ children, summary = "How it works" }: { children: ReactNode; summary?: string }) {
   return (
     <details className="group mt-1">
-      <summary className={`inline-flex cursor-pointer list-none items-center gap-1 rounded text-xs text-zinc-500 hover:text-zinc-300 [&::-webkit-details-marker]:hidden ${focusRing}`}>
+      <summary className={`inline-flex cursor-pointer list-none items-center gap-1 rounded text-xs text-zinc-400 hover:text-zinc-200 [&::-webkit-details-marker]:hidden ${focusRing}`}>
         <span aria-hidden="true" className="transition-transform group-open:rotate-90 motion-reduce:transition-none"><ChevronRightIcon /></span>
         {summary}
       </summary>

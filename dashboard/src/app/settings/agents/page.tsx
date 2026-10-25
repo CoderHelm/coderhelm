@@ -117,7 +117,7 @@ function AgentPermissions() {
         <PauseBanner view={view} edit={edit} onChange={change} />
 
         {!edit && (
-          <Callout variant="info" live={false}>
+          <Callout variant="neutral" live={false}>
             <p>You can see these settings and test a call. Changing them needs permission to edit agent permissions.</p>
           </Callout>
         )}

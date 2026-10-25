@@ -243,7 +243,7 @@ function AgentPage() {
       )}
       {!agent.enabled && (
         <div className="mt-4">
-          <Callout variant="info" title="Switched off">
+          <Callout variant="neutral" title="Switched off">
             <p>Coderhelm&apos;s agents can&apos;t read or ask {agent.name} until an admin switches it on.</p>
           </Callout>
         </div>

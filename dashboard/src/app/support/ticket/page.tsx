@@ -88,7 +88,7 @@ function TicketPage() {
             {error}
           </ListError>
         ) : (
-          <Callout variant="info" title="Ticket not found">
+          <Callout variant="neutral" title="Ticket not found">
             <p>It may belong to another team. Switch teams, or open a new ticket.</p>
           </Callout>
         )}

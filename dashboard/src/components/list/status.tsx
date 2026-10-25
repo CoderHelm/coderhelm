@@ -12,6 +12,7 @@ export type Tone =
   | "success" // finished well
   | "merged" // landed
   | "danger" // failed, blocked
+  | "info" // something to know, not a problem (Notified, Posted)
   | "neutral" // finished, nothing to say
   | "muted"; // left out, archived, skipped
 
@@ -34,6 +35,7 @@ export const TONES: Record<Tone, ToneLook> = {
   success: { dot: "bg-emerald-400", text: "text-emerald-300", chip: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" },
   merged: { dot: "bg-violet-400", text: "text-violet-300", chip: "border-violet-500/30 bg-violet-500/10 text-violet-300" },
   danger: { dot: "bg-red-400", text: "text-red-300", chip: "border-red-500/30 bg-red-500/10 text-red-300" },
+  info: { dot: "bg-blue-400", text: "text-blue-300", chip: "border-blue-500/30 bg-blue-500/10 text-blue-200" },
   neutral: { dot: "bg-zinc-400", text: "text-zinc-300", chip: "border-zinc-700 bg-zinc-800/60 text-zinc-300" },
   muted: { dot: "bg-zinc-600", text: "text-zinc-400", chip: "border-zinc-800 bg-transparent text-zinc-400" },
 };
@@ -99,14 +101,19 @@ export function StatusText({ look }: { look: StatusLook }) {
   );
 }
 
-/** A short word in a box: verdicts, steps, "Ask me first". */
+/**
+ * A tag: a short word in a pill (a verdict, a category, "Ask me first"). The
+ * one tag look; a status is `StatusText` (dot and word). A tag never grows
+ * past its row: a long one is cut with an ellipsis and shown whole on hover.
+ */
 export function Chip({ tone = "neutral", children, title }: { tone?: Tone; children: React.ReactNode; title?: string }) {
+  const hover = title ?? (typeof children === "string" ? children : undefined);
   return (
     <span
-      title={title}
-      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-xs font-medium ${TONES[tone].chip}`}
+      title={hover}
+      className={`inline-flex min-w-0 max-w-full items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${TONES[tone].chip}`}
     >
-      {children}
+      <span className="min-w-0 truncate">{children}</span>
     </span>
   );
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { Switch } from "@/components/settings/switch";
+
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, type AwsLogGroup, type DataSource, type DataSourceActivityEvent } from "@/lib/api";
@@ -772,24 +774,7 @@ function SourceRow({
           </div>
         ) : (
           <div className="mt-1.5 flex shrink-0 items-center gap-2 sm:mt-0">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={source.enabled}
-              aria-label={`Let Coderhelm use ${source.name}`}
-              disabled={busy === "toggle"}
-              onClick={toggle}
-              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors motion-reduce:transition-none disabled:opacity-50 ${
-                source.enabled ? "bg-emerald-500" : "bg-zinc-700"
-              } ${focusRing}`}
-            >
-              <span
-                aria-hidden="true"
-                className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform motion-reduce:transition-none ${
-                  source.enabled ? "translate-x-5" : ""
-                }`}
-              />
-            </button>
+            <Switch checked={source.enabled} label={`Let Coderhelm use ${source.name}`} disabled={busy === "toggle"} onChange={toggle} />
             <span aria-hidden="true" className="hidden w-14 text-sm text-zinc-300 sm:inline">
               {busy === "toggle" ? "Saving…" : source.enabled ? "On" : "Paused"}
             </span>

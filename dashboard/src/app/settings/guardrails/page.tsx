@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, type Repo } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/skeleton";
 import { Page, PageHeader } from "@/components/page";
 import { buttonClass, inputClass } from "@/components/ui";
 import { SettingsSection } from "@/components/settings";
+import { Problem } from "@/components/problem";
 import { ScopeBar, type Scope } from "../scope-bar";
 
 export default function GuardrailsPageGuarded() {
@@ -22,14 +23,21 @@ function RuleList({
   scope,
   rules,
   loading,
+  error,
+  onRetry,
   saving,
   onChange,
+  onRemove,
 }: {
   scope: string;
   rules: string[];
   loading: boolean;
+  /** The rules could not be read: nothing is shown or editable, so a save can't replace them. */
+  error: string | null;
+  onRetry: () => void;
   saving: boolean;
   onChange: (next: string[]) => void;
+  onRemove: (index: number) => void;
 }) {
   const [draft, setDraft] = useState("");
   const trimmed = draft.trim();
@@ -40,6 +48,16 @@ function RuleList({
     onChange([...rules, trimmed]);
     setDraft("");
   };
+
+  if (error !== null) {
+    return (
+      <div className="p-4">
+        <Problem title={`Couldn't load the rules for ${scope}`} onRetry={onRetry} details={error || undefined} testId="rules-error">
+          Nothing has been changed. Try again; until the rules load, you can&apos;t add or remove any, so the saved ones are safe.
+        </Problem>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -54,11 +72,11 @@ function RuleList({
     <>
       <ul aria-label={`Rules for ${scope}`} className="divide-y divide-zinc-800">
         {rules.map((rule, i) => (
-          <li key={`${i}-${rule}`} className="flex min-w-0 items-start justify-between gap-4 px-4 py-3">
-            <span className="min-w-0 text-sm text-zinc-200">{rule}</span>
+          <li key={`${i}-${rule}`} className="flex min-w-0 items-center justify-between gap-4 px-4 py-2.5">
+            <span className="min-w-0 text-sm text-zinc-200 [overflow-wrap:anywhere]">{rule}</span>
             <button
               type="button"
-              onClick={() => onChange(rules.filter((_, k) => k !== i))}
+              onClick={() => onRemove(i)}
               disabled={saving}
               aria-label={`Remove rule: ${rule}`}
               className={buttonClass("ghost", "sm")}
@@ -67,7 +85,7 @@ function RuleList({
             </button>
           </li>
         ))}
-        {rules.length === 0 && <li className="px-4 py-3 text-sm text-zinc-500">No rules for {scope} yet.</li>}
+        {rules.length === 0 && <li className="px-4 py-3 text-sm text-zinc-400">No rules for {scope} yet.</li>}
       </ul>
       <form
         className="border-t border-zinc-800 px-4 py-4"
@@ -91,7 +109,7 @@ function RuleList({
             {saving ? "Saving…" : "Add rule"}
           </button>
         </div>
-        <p id="new-rule-help" className="mt-1.5 text-xs text-zinc-500">
+        <p id="new-rule-help" className="mt-1.5 text-sm text-zinc-400">
           {duplicate ? "That rule is already on the list." : "One plain sentence. It saves as soon as you add it."}
         </p>
       </form>
@@ -105,61 +123,76 @@ function GuardrailsPage() {
 
   const [globalRules, setGlobalRules] = useState<string[]>([]);
   const [globalLoading, setGlobalLoading] = useState(true);
+  const [globalError, setGlobalError] = useState<string | null>(null);
   const [globalSaving, setGlobalSaving] = useState(false);
 
   const [repos, setRepos] = useState<Repo[]>([]);
   const [selectedRepo, setSelectedRepo] = useState("");
   const [repoRules, setRepoRules] = useState<string[]>([]);
   const [repoLoading, setRepoLoading] = useState(false);
+  const [repoError, setRepoError] = useState<string | null>(null);
   const [repoSaving, setRepoSaving] = useState(false);
 
-  useEffect(() => {
+  const loadGlobal = useCallback(() => {
+    setGlobalLoading(true);
+    setGlobalError(null);
     api.getGlobalRules()
       .then((data) => setGlobalRules(data.rules))
-      .catch(() => {})
+      .catch((e) => setGlobalError(e instanceof Error ? e.message : ""))
       .finally(() => setGlobalLoading(false));
+  }, []);
 
+  const loadRepo = useCallback((repo: string) => {
+    setRepoLoading(true);
+    setRepoError(null);
+    api.getRepoRules(repo)
+      .then((data) => setRepoRules(data.rules))
+      .catch((e) => setRepoError(e instanceof Error ? e.message : ""))
+      .finally(() => setRepoLoading(false));
+  }, []);
+
+  useEffect(() => {
+    loadGlobal();
     api.listRepos().then((data) => {
       const enabled = data.repos.filter((r) => r.enabled);
       setRepos(enabled);
       if (enabled.length > 0) setSelectedRepo(enabled[0].name);
     }).catch(() => {});
-  }, []);
+
+  }, [loadGlobal]);
 
   useEffect(() => {
-    if (!selectedRepo) return;
-    setRepoLoading(true);
-    api.getRepoRules(selectedRepo)
-      .then((data) => setRepoRules(data.rules))
-      .catch(() => setRepoRules([]))
-      .finally(() => setRepoLoading(false));
-  }, [selectedRepo]);
+    if (selectedRepo) loadRepo(selectedRepo);
+  }, [selectedRepo, loadRepo]);
 
-  const saveGlobal = async (updated: string[]) => {
+  // Each change saves at once. A removal offers Undo, which saves the list
+  // as it was before.
+  const saveGlobal = async (updated: string[], message = "Rule saved", undo?: string[]) => {
     const before = globalRules;
     setGlobalRules(updated);
     setGlobalSaving(true);
     try {
       await api.updateGlobalRules(updated);
-      toast("Rule saved");
+      toast(message, "success", undo ? { action: { label: "Undo", onClick: () => void saveGlobal(undo, "Rule put back") } } : undefined);
     } catch {
       setGlobalRules(before);
-      toast("Failed to save rules", "error");
+      toast("Couldn't save the rules. Check your connection and try again.", "error");
     }
     setGlobalSaving(false);
   };
 
-  const saveRepo = async (updated: string[]) => {
+  const saveRepo = async (updated: string[], message = "Rule saved", undo?: string[]) => {
     if (!selectedRepo) return;
+    const repo = selectedRepo;
     const before = repoRules;
     setRepoRules(updated);
     setRepoSaving(true);
     try {
-      await api.updateRepoRules(selectedRepo, updated);
-      toast("Rule saved");
+      await api.updateRepoRules(repo, updated);
+      toast(message, "success", undo ? { action: { label: "Undo", onClick: () => void saveRepo(undo, "Rule put back") } } : undefined);
     } catch {
       setRepoRules(before);
-      toast("Failed to save rules", "error");
+      toast("Couldn't save the rules. Check your connection and try again.", "error");
     }
     setRepoSaving(false);
   };
@@ -178,11 +211,29 @@ function GuardrailsPage() {
         description={scope === "global" ? "Followed in every repository." : selectedRepo ? `Followed in ${selectedRepo}, after the rules for every repository.` : undefined}
       >
         {scope === "global" ? (
-          <RuleList scope="every repository" rules={globalRules} loading={globalLoading} saving={globalSaving} onChange={saveGlobal} />
+          <RuleList
+            scope="every repository"
+            rules={globalRules}
+            loading={globalLoading}
+            error={globalError}
+            onRetry={loadGlobal}
+            saving={globalSaving}
+            onChange={(next) => saveGlobal(next)}
+            onRemove={(i) => saveGlobal(globalRules.filter((_, k) => k !== i), "Rule removed", globalRules)}
+          />
         ) : repos.length === 0 ? (
-          <p className="px-4 py-4 text-sm text-zinc-500">No repositories are turned on. Turn one on under Settings, Repositories first.</p>
+          <p className="px-4 py-4 text-sm text-zinc-400">No repositories are turned on. Turn one on under Settings, Repositories first.</p>
         ) : (
-          <RuleList scope={selectedRepo} rules={repoRules} loading={repoLoading} saving={repoSaving} onChange={saveRepo} />
+          <RuleList
+            scope={selectedRepo}
+            rules={repoRules}
+            loading={repoLoading}
+            error={repoError}
+            onRetry={() => loadRepo(selectedRepo)}
+            saving={repoSaving}
+            onChange={(next) => saveRepo(next)}
+            onRemove={(i) => saveRepo(repoRules.filter((_, k) => k !== i), "Rule removed", repoRules)}
+          />
         )}
       </SettingsSection>
 

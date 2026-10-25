@@ -306,7 +306,7 @@ test("plan detail reads as a document: one summary line, one action, the plan, t
   await expect(summary).toContainText("4 tasks, 1 to review");
   await expect(summary).toContainText("Sends to GitHub issues");
   // One primary action in the top bar; the rarely used ones sit in More.
-  const header = page.getByTestId("topbar-actions");
+  const header = page.getByTestId("page-actions");
   await expect(header.getByRole("button", { name: "Approve all and start" })).toBeVisible();
   await expect(header.getByRole("button", { name: "Save as template" })).toHaveCount(0);
   await expect(header.getByRole("button", { name: "Delete" })).toHaveCount(0);
@@ -432,7 +432,7 @@ test("a finished plan leads with its PR and lists its runs and PRs as rows", asy
     ],
   });
   await page.goto("/plans/detail/?id=PLANA");
-  const header = page.getByTestId("topbar-actions");
+  const header = page.getByTestId("page-actions");
   await expect(header.getByRole("link", { name: /Open PR/ })).toHaveAttribute("href", "https://github.com/your-team/web/pull/41");
   await expect(page.getByRole("list", { name: "About this plan" })).toContainText("1 of 2 done");
   await expect(page.getByRole("progressbar", { name: "Tasks done" })).toHaveAttribute("aria-valuenow", "1");

@@ -1,5 +1,7 @@
 "use client";
 
+import { Switch } from "./settings/switch";
+
 import { CodeBlock, jsonOrText } from "./code-block";
 import { StatusPill } from "./status-pill";
 import { Callout } from "./callout";
@@ -10,20 +12,7 @@ import { diffLines, type Tool, type ToolRunResult } from "@/lib/tools";
 export function ToolSwitch({ on, label, busy, onToggle }: { on: boolean; label: string; busy?: boolean; onToggle: () => void }) {
   return (
     <div className="flex items-center gap-2.5">
-      <button
-        type="button"
-        role="switch"
-        aria-checked={on}
-        aria-label={label}
-        disabled={busy}
-        onClick={onToggle}
-        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors motion-reduce:transition-none disabled:opacity-50 ${on ? "bg-emerald-500" : "bg-zinc-700"} ${focusRing}`}
-      >
-        <span
-          aria-hidden="true"
-          className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform motion-reduce:transition-none ${on ? "translate-x-5" : ""}`}
-        />
-      </button>
+      <Switch checked={on} label={label} disabled={busy} onChange={onToggle} />
       <span className="w-14 text-sm text-zinc-300">{busy ? "Saving…" : on ? "On" : "Off"}</span>
     </div>
   );

@@ -417,7 +417,7 @@ function ReviewerConfigPage() {
 
       {readOnly && (
         <div className="mt-4">
-          <Callout variant="info" title="You can view these settings">
+          <Callout variant="neutral" title="You can view these settings">
             <p>Only admins can change them. Ask an admin on your team if something should be different.</p>
           </Callout>
         </div>
