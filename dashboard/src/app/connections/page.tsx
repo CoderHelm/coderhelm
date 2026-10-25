@@ -77,7 +77,8 @@ function ConnectionsPage() {
       <li key={item.id} id={`connection-${item.id}`} className="min-w-0 scroll-mt-4" data-testid={`connection-${item.id}`} data-status={item.status}>
         <div className="flex min-w-0 flex-wrap items-center gap-3 px-4 py-3">
           <BrandIcon id={item.id} name={item.name} />
-          <div className="min-w-0 flex-1">
+          {/* A floor on the name's width: the buttons wrap below before a word would. */}
+          <div className="min-w-0 flex-1 basis-48">
             <p className="text-sm font-medium text-zinc-100">{item.name}</p>
             <p className="text-sm text-zinc-500">{added && remote ? remote.url : item.does}</p>
           </div>
