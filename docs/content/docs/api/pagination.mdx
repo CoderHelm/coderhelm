@@ -1,0 +1,95 @@
+---
+title: Pagination
+description: Lists that can grow are read one page at a time with a cursor, newest first.
+---
+
+Runs, plans and reviews are listed newest first, one page at a time. Each page carries a cursor for the next one:
+
+1. Call the list endpoint, optionally with `limit`.
+2. If `next` in the answer is not null, call it again with `cursor` set to that value.
+3. Stop when `next` is null.
+
+```http
+GET /api/runs?limit=20
+```
+
+```json
+{
+  "runs": [ { "run_id": "01JB8X6F4M2C9QZ3T7V5W1K0HA", "status": "completed" } ],
+  "next": "01JB8W2Q7N4D6R8S0T2V4X6Z8A",
+  "scanned": 20
+}
+```
+
+```http
+GET /api/runs?limit=20&cursor=01JB8W2Q7N4D6R8S0T2V4X6Z8A
+```
+
+Cursors are opaque: pass them back as you got them, and don't build your own. They don't expire.
+
+| Endpoint | Items | `limit` | Default |
+| --- | --- | --- | --- |
+| `GET /api/runs` | `runs` | 1 to 100 | 50 |
+| `GET /api/plans` | `plans` | 1 to 100 | 20 |
+| `GET /api/reviewer/reviews` | `reviews` | 1 to 200 | 50 |
+
+`GET /api/repos` is not paged: a team's repositories come back in one answer.
+
+## Short pages when searching runs
+
+`GET /api/runs` with a search (`q`) or filters (`status`, `source`, `repo`) reads a few hundred runs per request and keeps the ones that match. A page can then hold fewer than `limit` runs, or none, while `next` is still set: older runs are unread. Keep reading until `next` is null. `scanned` says how many runs the page read.
+
+## Reading every page
+
+<Tabs items={['TypeScript', 'Python']}>
+<Tab value="TypeScript">
+
+```ts
+async function* allRuns(query: Record<string, string> = {}) {
+  let cursor: string | null = null;
+  do {
+    const params = new URLSearchParams({ ...query, limit: '100', ...(cursor ? { cursor } : {}) });
+    const res = await fetch(`https://api.coderhelm.com/api/runs?${params}`, {
+      headers: { Authorization: `Bearer ${process.env.CODERHELM_API_KEY}` },
+    });
+    if (!res.ok) throw new Error((await res.json()).error);
+    const page = await res.json();
+    yield* page.runs;
+    cursor = page.next;
+  } while (cursor);
+}
+
+for await (const run of allRuns({ status: 'failed' })) console.log(run.run_id, run.title);
+```
+
+</Tab>
+<Tab value="Python">
+
+```python
+import os
+import requests
+
+def all_runs(**query):
+    cursor = None
+    while True:
+        params = {**query, "limit": 100, **({"cursor": cursor} if cursor else {})}
+        res = requests.get(
+            "https://api.coderhelm.com/api/runs",
+            params=params,
+            headers={"Authorization": f"Bearer {os.environ['CODERHELM_API_KEY']}"},
+        )
+        res.raise_for_status()
+        page = res.json()
+        yield from page["runs"]
+        cursor = page["next"]
+        if not cursor:
+            break
+
+for run in all_runs(status="failed"):
+    print(run["run_id"], run["title"])
+```
+
+</Tab>
+</Tabs>
+
+`GET /api/plans` also returns its cursor as `next_cursor`, kept for older clients; use `next`.

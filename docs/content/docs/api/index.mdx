@@ -1,63 +1,150 @@
 ---
-title: API overview
-description: What the CoderHelm API is, its hosts, how errors and pages of results look, and its limits.
+title: API introduction
+description: Call CoderHelm from your own programs with a team API key. Base URL, a first request, and how requests and responses look.
 ---
 
-CoderHelm's API is the one its own dashboard uses. Everything the dashboard can do goes through it, and [All routes](/api/routes) lists every route, generated from the gateway's code.
+The CoderHelm API lets your scripts, CI jobs and internal tools start and follow CoderHelm's work:
 
-<Callout type="warn" title="No API keys yet">
-The API authenticates people with a browser session; there are no API keys or personal access tokens yet. Integrations reach CoderHelm through [webhooks](/api/webhooks), which are documented and stable. Routes under `/api` can change between releases.
-</Callout>
+- list runs, follow one as it works, and retry or cancel it
+- create a plan with tasks and run it
+- read the reviewer's pull request reviews and their findings
+- check the team's token usage against its limits
+- upload test reports from CI and read which tests are quarantined
 
-## Hosts
+Every endpoint is listed under **Reference** in the sidebar, grouped by resource, with its parameters, request and response fields, errors, and example requests in cURL, TypeScript and Python.
 
-| Host | Serves |
-| --- | --- |
-| `https://api.coderhelm.com` | Every route: the dashboard API under `/api`, sign-in under `/auth`, webhooks under `/webhooks`, email links under `/email`. |
-| `https://stream.coderhelm.com` | Streamed answers (server-sent events) for plan chat. |
-| `https://auth.coderhelm.com` | The sign-in pages for Google and GitHub. |
+## Base URL
 
-`GET https://api.coderhelm.com/` returns `{"service":"coderhelm","status":"ok"}` and needs no authentication. Every response carries `Cache-Control: no-store`.
+```txt
+https://api.coderhelm.com
+```
+
+All requests use HTTPS. Bodies are JSON (`Content-Type: application/json`), except the CI report upload, which takes the report file as it is.
+
+## Your first request
+
+<Steps>
+<Step>
+
+### Create a key
+
+An admin opens **Settings**, then **API keys**, and chooses **Create key**. Give it a name, the scopes it needs, an expiry and a rate limit. The key is shown once; copy it into your secrets manager or CI secrets. See [Authentication](/api/authentication).
+
+</Step>
+<Step>
+
+### Call `GET /api/me`
+
+It answers with the key itself, so it is the quickest way to check a key works.
+
+<Tabs items={['cURL', 'TypeScript', 'Python']}>
+<Tab value="cURL">
+
+```bash
+curl https://api.coderhelm.com/api/me \
+  -H "Authorization: Bearer $CODERHELM_API_KEY"
+```
+
+</Tab>
+<Tab value="TypeScript">
+
+```ts
+const res = await fetch('https://api.coderhelm.com/api/me', {
+  headers: { Authorization: `Bearer ${process.env.CODERHELM_API_KEY}` },
+});
+if (!res.ok) throw new Error((await res.json()).error);
+const me = await res.json();
+console.log(me.api_key.name, me.capabilities);
+```
+
+</Tab>
+<Tab value="Python">
+
+```python
+import os
+import requests
+
+res = requests.get(
+    "https://api.coderhelm.com/api/me",
+    headers={"Authorization": f"Bearer {os.environ['CODERHELM_API_KEY']}"},
+)
+res.raise_for_status()
+me = res.json()
+print(me["api_key"]["name"], me["capabilities"])
+```
+
+</Tab>
+</Tabs>
+
+</Step>
+<Step>
+
+### Read the answer
+
+```json
+{
+  "user_id": "APIKEY#01jb8x6f4m2c9qz3t7v5w1k0ha",
+  "team_id": "TEAM#4817263",
+  "github_login": "octocat",
+  "email": "dev@example.com",
+  "avatar_url": null,
+  "role": "viewer",
+  "custom_role": null,
+  "capabilities": ["view", "runs"],
+  "status": "active",
+  "auth_provider": "api_key",
+  "mfa_enabled": false,
+  "api_key": {
+    "id": "01jb8x6f4m2c9qz3t7v5w1k0ha",
+    "name": "Deploy pipeline",
+    "created_by": "dev@example.com",
+    "expires_at": "2027-01-01T00:00:00Z",
+    "rate_limit_per_minute": 600
+  }
+}
+```
+
+`capabilities` lists the scopes the key holds right now. They never go past what the admin who made it holds.
+
+</Step>
+</Steps>
+
+## What you can call
+
+| Resource | Endpoints | Scope to change things |
+| --- | --- | --- |
+| Account | Get the caller | |
+| Runs | List runs, get a run, retry a run, cancel a run | `runs` |
+| Plans | List plans, create a plan, get a plan, approve and run a plan | `plans` |
+| Repositories | List repositories | |
+| Reviews | List reviews, get a review | |
+| Usage | Get this month's usage | |
+| CI | Upload a test report, list quarantined tests | GitHub Actions OIDC token, no key |
+| Webhooks | GitHub, Jira and AWS SNS events CoderHelm receives | Verified by signature |
+
+Reading needs only the `view` scope, which every key has.
+
+Everything else the dashboard does goes through routes that are not part of this API. They can change at any time, and an API key that calls one gets `403` with the code `not_available_to_api_keys`.
 
 ## Requests and responses
 
-Bodies are JSON. Path parameters are written `:name` in the route list, for example `GET /api/runs/:run_id`.
+- **Times** are RFC 3339 strings in UTC, such as `2026-10-22T14:03:11Z`.
+- **Ids** are strings. Run, plan and task ids are ULIDs: newer ones sort after older ones.
+- **Missing values** are `null`. A field documented as nullable is always present.
+- **New fields** can appear in responses at any time. Ignore the ones you don't know. See [Versioning](/api/versioning).
+- **Errors** always have a JSON body with `error` and `code`. See [Errors](/api/errors).
+- **Lists** that can grow are paged with a cursor. See [Pagination](/api/pagination).
+- **Rate limits** are per key, and every answer says where you stand. See [Rate limits](/api/rate-limits).
 
-### Errors
+## OpenAPI document and Markdown
 
-The status code is the error. Many errors have an empty body; others return a message:
+The whole API is described by an OpenAPI 3.1 document, generated from the gateway's code so it always matches it:
 
-```json
-{ "error": "Plan not found" }
-```
+- [`https://docs.coderhelm.com/openapi.json`](/openapi.json), published with these docs
+- `https://api.coderhelm.com/openapi.json`, served by the API itself
 
-Some add a machine-readable `code`, for example `{"error": "...", "code": "already_fixing"}`. Treat any `4xx` or `5xx` as a failure and show `error` when it is there.
+Load it into Postman, Insomnia, an SDK generator or your own tooling. Every page here, endpoints included, also has a Markdown version (add `.md` to its address), and [`/llms.txt`](/llms.txt) lists them all for AI assistants.
 
-| Status | Means |
-| --- | --- |
-| `400` | The request is malformed. |
-| `401` | Not signed in, or the session expired. |
-| `403` | Signed in, but your role can't do this (see [Roles](/concepts/roles)). |
-| `404` | Not found, or not in your team. |
-| `429` | Too many requests (sign-in and email links only). |
+## No try-it console
 
-### Pages of results
-
-Lists that can grow without end are paged with a cursor, newest first:
-
-```http
-GET /api/reviewer/reviews?repo=your-org/web&limit=50
-```
-
-```json
-{ "reviews": [ ... ], "next": "1729771200|REVIEW#..." }
-```
-
-Pass `next` back as `cursor` for the next page; it is `null` on the last page. `limit` defaults to 50 and is clamped to 1 to 200.
-
-## Limits
-
-- Sign-in routes: 20 requests per 5 minutes per IP address. Email links: 60 per 5 minutes.
-- The API as a whole is throttled at 500 requests per second with bursts to 1000.
-
-Over a limit, the API answers `429` with no body.
+The reference has no in-browser console. The API accepts browser requests only from the dashboard, so a console on this site would need your key to pass through a proxy. Every endpoint page shows copyable requests instead, which you can run from a terminal with your key in `CODERHELM_API_KEY`.

@@ -1,0 +1,34 @@
+---
+title: Versioning and idempotency
+description: What can change in the API without notice, how breaking changes are handled, and which requests are safe to repeat.
+---
+
+## Versioning
+
+The public API has one version, described by the [OpenAPI document](/openapi.json). It is generated from the gateway's code, and a test fails the build when the two differ, so the document and these pages always match what runs.
+
+Changes that can happen at any time:
+
+- new endpoints
+- new optional request fields and query parameters
+- new response fields
+- new values in fields documented as open lists (a run's `status`, an error's `code`)
+
+Write clients that ignore fields they don't know and treat unknown values sensibly.
+
+A breaking change, such as removing or renaming a field or changing what an endpoint does, is announced in the [Changelog](/changelog) before it happens, and the old form stays for a transition period. Fields on their way out are marked deprecated in the OpenAPI document and on the endpoint pages, with what to use instead. Today that is `next_cursor` on `GET /api/plans` (use `next`).
+
+Routes the dashboard calls that are not in this reference are not part of the API and change without notice.
+
+## Idempotency
+
+The API doesn't take an `Idempotency-Key` header yet. Here is what repeating each request does:
+
+| Request | Repeating it |
+| --- | --- |
+| Any `GET` | Safe. |
+| `POST /api/plans` | Makes another plan. If a request times out, list plans before sending it again. |
+| `POST /api/plans/{plan_id}/approve-and-execute` | Safe. Once the plan runs, its tasks are queued, so a repeat finds nothing to run and answers `400`. |
+| `POST /api/runs/{run_id}/retry` | Safe. The old run becomes `retried`, so a repeat answers `400` and starts nothing. |
+| `POST /api/runs/{run_id}/cancel` | Safe. A run that is no longer running answers `400`. |
+| `POST /webhooks/ci/tests/results` | Stores the report again and reads it again for the same workflow run. |

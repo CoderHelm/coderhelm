@@ -1,0 +1,92 @@
+---
+title: Errors
+description: Every error the API returns has a status code and a JSON body with a message and a machine-readable code.
+---
+
+A failed request answers with a `4xx` or `5xx` status and a JSON body:
+
+```json
+{
+  "error": "This API key doesn't have the \"runs\" scope (Retry, re-run, re-review, cancel, close or reopen runs).",
+  "code": "missing_scope",
+  "scope": "runs"
+}
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `error` | string | A sentence to show a person. Its wording can change. |
+| `code` | string | What went wrong, for programs. Branch on this, not on `error`. |
+| `scope` | string | Only with `missing_scope`: the scope the key would need. |
+
+## Codes
+
+| Status | `code` | Meaning | Retry? |
+| --- | --- | --- | --- |
+| `400` | `bad_request` | The request is malformed: bad JSON, a missing field, or an action the resource's state doesn't allow (retrying a run that didn't fail, cancelling one that isn't running). | No. Fix the request. |
+| `401` | `invalid_api_key` | No key, a malformed key, or an unknown one. | No. |
+| `401` | `api_key_revoked` | The key was revoked. | No. |
+| `401` | `api_key_expired` | The key expired. | No. |
+| `401` | `api_key_owner_left` | The key's maker left the team. | No. |
+| `401` | `unauthorized` | A CI token or webhook signature didn't verify. | No. |
+| `403` | `missing_scope` | The key lacks the scope the endpoint needs. | No. |
+| `403` | `not_available_to_api_keys` | The route is for the dashboard only. | No. |
+| `403` | `forbidden` | Not allowed for another reason, such as a repository that isn't connected. | No. |
+| `404` | `not_found` | Not found in your team. Another team's ids look the same as missing ones. | No. |
+| `409` | `conflict` | The change conflicts with the current state. | After re-reading the resource. |
+| `413` | `payload_too_large` | A CI report is empty or over 6 MB. | No. |
+| `429` | `rate_limited` | Over the key's rate limit. | Yes, after `Retry-After` seconds. |
+| `429` | `token_limit_reached` | The team reached its monthly token limit, so no new work starts. | When the month turns or an admin raises the limit. |
+| `500` | `internal_error` | Something failed on CoderHelm's side. | Reads, yes, with backoff. |
+| `503` | `unavailable` | CoderHelm couldn't check the key just now. | Yes, with backoff. |
+
+New codes can be added. Treat an unknown code by its status.
+
+## Handling errors
+
+<Tabs items={['TypeScript', 'Python']}>
+<Tab value="TypeScript">
+
+```ts
+async function coderhelm(path: string, init: RequestInit = {}) {
+  const res = await fetch(`https://api.coderhelm.com${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${process.env.CODERHELM_API_KEY}`,
+      'Content-Type': 'application/json',
+      ...init.headers,
+    },
+  });
+  if (res.ok) return res.json();
+  const { error, code } = await res.json();
+  throw Object.assign(new Error(error), { status: res.status, code });
+}
+```
+
+</Tab>
+<Tab value="Python">
+
+```python
+import os
+import requests
+
+class CoderHelmError(Exception):
+    def __init__(self, status, code, message):
+        super().__init__(message)
+        self.status, self.code = status, code
+
+def coderhelm(method, path, **kwargs):
+    res = requests.request(
+        method,
+        f"https://api.coderhelm.com{path}",
+        headers={"Authorization": f"Bearer {os.environ['CODERHELM_API_KEY']}"},
+        **kwargs,
+    )
+    if res.ok:
+        return res.json()
+    body = res.json()
+    raise CoderHelmError(res.status_code, body.get("code"), body.get("error"))
+```
+
+</Tab>
+</Tabs>

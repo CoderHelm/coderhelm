@@ -69,6 +69,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/settings/notifications": { label: "Notifications", parent: "/settings" },
   "/settings/security": { label: "Security", parent: "/settings" },
   "/settings/team": { label: "Team", parent: "/settings" },
+  "/settings/api-keys": { label: "API keys", parent: "/settings" },
   "/settings/support-access": { label: "Support access", parent: "/settings" },
   "/settings/repos": { label: "Repositories", parent: "/settings" },
   "/settings/workflow": { label: "Workflow", parent: "/settings" },

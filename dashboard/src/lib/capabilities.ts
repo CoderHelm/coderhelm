@@ -37,6 +37,7 @@ const BUILT_IN_MIN: Record<string, "viewer" | "member" | "admin" | "owner"> = {
   knowledge_manage: "admin",
   people: "admin",
   roles: "admin",
+  api_keys: "admin",
   delete_plans: "admin",
   repos: "admin",
   agent_settings: "admin",

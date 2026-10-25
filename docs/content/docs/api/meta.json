@@ -1,4 +1,4 @@
 {
   "title": "API",
-  "pages": ["index", "authentication", "webhooks", "routes"]
+  "pages": ["index", "authentication", "errors", "pagination", "rate-limits", "versioning", "webhooks", "---Reference---", "...reference"]
 }

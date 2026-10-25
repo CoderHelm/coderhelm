@@ -1,0 +1,50 @@
+---
+title: Rate limits
+description: Each API key has its own limit of requests per minute, and every answer says how many are left.
+---
+
+Each key may make a set number of requests per minute: 600 unless the admin who made it chose another number (10 to 3,000). The count starts over at the top of each minute, and is shared by everything using the same key, wherever it runs. Keys never share a limit, so one busy key doesn't slow another.
+
+## Headers
+
+Every answer to a request made with a key carries:
+
+| Header | Meaning |
+| --- | --- |
+| `RateLimit-Limit` | Requests the key may make in a minute. |
+| `RateLimit-Remaining` | Requests left in the current minute. |
+| `RateLimit-Reset` | Seconds until the minute ends and the count starts over. |
+
+## Going over
+
+Past the limit, the API answers `429` with the code `rate_limited`, and a `Retry-After` header with the seconds to wait:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 23
+RateLimit-Limit: 600
+RateLimit-Remaining: 0
+RateLimit-Reset: 23
+
+{"error":"This API key may make 600 requests a minute. Try again in 23 seconds.","code":"rate_limited"}
+```
+
+Wait that long, then try again. Requests refused this way still count toward the minute, so retrying in a tight loop keeps you limited.
+
+```ts
+async function withRetry(call: () => Promise<Response>, tries = 5): Promise<Response> {
+  for (let i = 0; ; i++) {
+    const res = await call();
+    if (res.status !== 429 || i === tries - 1) return res;
+    const { code } = await res.clone().json();
+    if (code !== 'rate_limited') return res; // the monthly token limit: waiting won't help
+    const wait = Number(res.headers.get('Retry-After') ?? 1);
+    await new Promise((r) => setTimeout(r, wait * 1000));
+  }
+}
+```
+
+## Other limits
+
+- **The team's token limit.** Endpoints that start work (retrying a run, running a plan) answer `429` with `token_limit_reached` once the team reaches its monthly token limit. Waiting a minute won't help; see `GET /api/usage` for where the team stands.
+- **The whole API** is throttled at 500 requests per second, with bursts to 1,000, across all callers.

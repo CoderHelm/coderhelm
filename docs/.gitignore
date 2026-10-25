@@ -1,7 +1,8 @@
 # Written by scripts/import-platform.mjs at build time from a pinned ref of
 # CoderHelm/coderhelm-platform. Never edit or commit these.
 /content/docs/self-host/
-/content/docs/api/routes.mdx
+/.generated/
+/public/openapi.json
 /content/docs/changelog.mdx
 # Rendered from schemas/plugin-manifest.schema.json.
 /content/docs/plugins/manifest-reference.mdx
