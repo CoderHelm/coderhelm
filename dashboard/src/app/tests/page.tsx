@@ -18,7 +18,8 @@ import { RepoFilter, useListParams } from "@/components/list";
 import { FailureGroupsView, NeedsAttention, QuarantineView, RunsView, SlowestView } from "@/components/tests/views";
 import { TrendsView } from "@/components/tests/trends";
 import { CoverageView } from "@/components/tests/coverage";
-import { SettingsView, SetupSteps } from "@/components/tests/settings";
+import { SettingsView } from "@/components/tests/settings";
+import { CiSetup } from "@/components/tests/setup";
 
 export default function TestsPageGuarded() {
   return (
@@ -30,7 +31,7 @@ export default function TestsPageGuarded() {
   );
 }
 
-type View = "attention" | "runs" | "groups" | "trends" | "slowest" | "quarantine" | "coverage" | "settings";
+type View = "attention" | "runs" | "groups" | "trends" | "slowest" | "quarantine" | "coverage" | "setup" | "settings";
 
 const VIEWS: { value: View; label: string; adminOnly?: boolean }[] = [
   { value: "attention", label: "Needs attention" },
@@ -40,6 +41,7 @@ const VIEWS: { value: View; label: string; adminOnly?: boolean }[] = [
   { value: "slowest", label: "Slowest" },
   { value: "quarantine", label: "Quarantine" },
   { value: "coverage", label: "Coverage" },
+  { value: "setup", label: "Setup" },
   { value: "settings", label: "Settings", adminOnly: true },
 ];
 
@@ -106,7 +108,7 @@ function TestsPage() {
     summary.trend.every((d) => d.runs === 0) &&
     Object.values(summary.counts).every((n) => n === 0);
   const off = settings !== null && !settings.enabled;
-  const showEmpty = loaded && !error && (off || noData) && view !== "settings";
+  const showEmpty = loaded && !error && view !== "settings" && (off || (noData && view !== "setup"));
 
   return (
     <Page>
@@ -128,7 +130,7 @@ function TestsPage() {
       <div className="mt-6">
         {!loaded ? (
           <Loading what="your tests" />
-        ) : error && view !== "settings" ? (
+        ) : error && view !== "settings" && view !== "setup" ? (
           <LoadError what="your tests" message={error} onRetry={load} />
         ) : showEmpty ? (
           <EmptyState off={off} isAdmin={isAdmin} turningOn={turningOn} onTurnOn={turnOn} />
@@ -144,6 +146,8 @@ function TestsPage() {
           <SlowestView repo={repo} />
         ) : view === "quarantine" ? (
           <QuarantineView repo={repo} canEdit={isAdmin} ticketDays={settings?.ticket_after_days} />
+        ) : view === "setup" ? (
+          <CiSetup canEdit={isAdmin} repo={repo} />
         ) : view === "coverage" ? (
           <CoverageView repo={repo} canEdit={isAdmin} />
         ) : settings ? (
@@ -165,7 +169,7 @@ function EmptyState({ off, isAdmin, turningOn, onTurnOn }: { off: boolean; isAdm
       <p className="mt-2 max-w-prose text-sm text-zinc-400">
         {off
           ? "Coderhelm reads the results of every E2E run your CI finishes. It tells flaky tests from broken ones, keeps flaky tests from blocking pull requests, and opens PRs that fix them."
-          : "Tracking is on. Runs show up here a few minutes after a workflow that uploads test results finishes."}
+          : "Tracking is on. Runs show up here a few minutes after a workflow that uploads test results finishes. Coderhelm can add that upload step for you."}
       </p>
       {off && (
         <div className="mt-4">
@@ -178,11 +182,12 @@ function EmptyState({ off, isAdmin, turningOn, onTurnOn }: { off: boolean; isAdm
           )}
         </div>
       )}
-      <h3 className="mt-7 text-sm font-semibold text-zinc-100">Two small changes to each repo</h3>
-      <p className="mb-4 mt-1 max-w-prose text-sm text-zinc-400">
-        Coderhelm reads results from your workflow&apos;s uploaded files. If your tests already upload a JSON or JUnit report, you can skip this.
-      </p>
-      <SetupSteps />
+      {!off && (
+        <div className="mt-6">
+          <h3 className="mb-3 text-sm font-semibold text-zinc-100">Set up each repository</h3>
+          <CiSetup canEdit={isAdmin} />
+        </div>
+      )}
     </section>
   );
 }

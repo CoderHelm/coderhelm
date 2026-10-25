@@ -188,9 +188,15 @@ test("alerts: routes are list rows; the team channel and budget are rows saved b
   await expect(row.getByRole("list", { name: "Rules, first match wins" })).toContainText("prod-api-5xx");
   await shot(page, "settings-alerts");
 
-  // The endpoint to copy is in "How to connect", in monospace.
-  await page.getByText("How to connect a topic").click();
+  // Connecting a topic is a live checklist: each step says what is really in place.
+  await page.getByText(/^(Connecting a topic: done|How to connect a topic)$/).click();
+  const steps = page.getByRole("list", { name: "Connecting a topic" });
+  await expect(steps.locator('[data-step="route"]')).toHaveAttribute("data-state", "done");
+  await expect(steps.locator('[data-step="subscription"]')).toContainText("the last alert arrived");
+  // The endpoint to copy stays in view for the next topic, in monospace.
   await expect(page.locator("code", { hasText: "/webhooks/alerts/sns" })).toBeVisible();
+  // What kinds of alerts work is a small note, collapsed.
+  await expect(page.getByText(/CloudWatch alarm notifications/)).toBeHidden();
 
   const picker = page.getByTestId("team-channels");
   await picker.getByRole("checkbox", { name: "Slack" }).check();

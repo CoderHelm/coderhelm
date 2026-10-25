@@ -3,88 +3,10 @@
 import { useEffect, useState } from "react";
 import { api, type Repo, type TestSettings } from "@/lib/api";
 import { errorMessage } from "@/lib/data-sources";
-import { apiOrigin } from "@/lib/runtime-config";
-import { CodeBlock } from "@/components/code-block";
-import { Code } from "@/components/settings/code";
+import { SetupPointer } from "./setup";
 import { useToast } from "@/components/toast";
 import { focusRing, inputClass } from "@/components/ui";
 import { SaveBar, SettingsRow, SettingsSection, Switch as RowSwitch, useDirtyForm } from "@/components/settings";
-
-export const REPORTER_SNIPPET = `reporter: [["html"], ["json", { outputFile: "test-results/results.json" }]],`;
-
-/** The quarantine step, with this install's API address (read when shown). */
-export const quarantineSnippet = () => `# in the job that runs your Playwright tests
-permissions:
-  id-token: write # lets the job ask GitHub for a signed token Coderhelm checks
-  contents: read
-steps:
-  # ...your checkout and install steps...
-  - name: Get quarantined tests from Coderhelm
-    id: quarantine
-    run: |
-      TOKEN=$(curl -sf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \\
-        "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=coderhelm" | jq -r .value) || TOKEN=""
-      GREP=$(curl -sf -H "Authorization: Bearer $TOKEN" \\
-        ${apiOrigin()}/webhooks/ci/tests/quarantine | jq -r '.playwright_grep_invert // ""') || GREP=""
-      echo "grep=$GREP" >> "$GITHUB_OUTPUT"
-  - name: Run E2E tests
-    env:
-      QUARANTINED: \${{ steps.quarantine.outputs.grep }}
-    run: |
-      if [ -n "$QUARANTINED" ]; then
-        npx playwright test --grep-invert "$QUARANTINED"
-      else
-        npx playwright test
-      fi
-  # ...your upload-artifact step...`;
-
-/** The CI step that keeps quarantined tests from failing a build. Nothing in a repo changes until a team adds it. */
-export function QuarantineCiStep() {
-  return (
-    <div className="space-y-2 text-sm text-zinc-300">
-      <p className="max-w-prose text-zinc-400">
-        Coderhelm already treats a run where only quarantined tests failed as passing: it won&apos;t try to fix it or hold back
-        auto-merge. GitHub&apos;s check still turns red, because your workflow decides that. To skip quarantined tests in the build,
-        add this step before your test step. If Coderhelm can&apos;t be reached, every test runs as before.
-      </p>
-      <CodeBlock code={quarantineSnippet()} lang="yaml" title="GitHub Actions step" className="mt-2" />
-      <p className="max-w-prose text-zinc-400">
-        Skipped tests aren&apos;t recorded from that run. To keep recording them, run{" "}
-        <Code>npx playwright test --grep &quot;$QUARANTINED&quot;</Code> in a separate job with{" "}
-        <Code>continue-on-error: true</Code> that uploads its results the same way.
-      </p>
-    </div>
-  );
-}
-
-export const UPLOAD_SNIPPET = `# in the workflow that runs your E2E tests, after the test step
-- uses: actions/upload-artifact@v4
-  if: \${{ !cancelled() }}
-  with:
-    name: e2e-results
-    path: test-results/`;
-
-/** The two small changes that make a repo's results complete. Shown in the empty state and in settings. */
-export function SetupSteps() {
-  return (
-    <ol className="space-y-4 text-sm text-zinc-300">
-      <li>
-        <p>
-          <span className="font-medium text-zinc-100">1. Write a results file.</span> Add Playwright&apos;s JSON reporter next to the one you
-          have. JUnit XML and Cucumber JSON work too.
-        </p>
-        <CodeBlock code={REPORTER_SNIPPET} lang="ts" filename="playwright.config.ts" className="mt-2" />
-      </li>
-      <li>
-        <p>
-          <span className="font-medium text-zinc-100">2. Keep it, even when tests fail.</span> Upload the results folder at the end of the
-          job. <Code>if: !cancelled()</Code> keeps failed runs, which are the ones that matter.
-        </p>
-        <CodeBlock code={UPLOAD_SNIPPET} lang="yaml" title="GitHub Actions step" className="mt-2" />
-      </li>
-    </ol>
-  );
-}
 
 export function Switch({
   checked,
@@ -317,15 +239,10 @@ export function SettingsView({
       <SaveBar count={count} onSave={save} onDiscard={discard} saving={saving} problem={problem} />
 
       <section aria-labelledby="setup-heading">
-        <h2 id="setup-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">Make results complete</h2>
-        <SetupSteps />
-      </section>
-
-      <section aria-labelledby="quarantine-ci-heading">
-        <h2 id="quarantine-ci-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-          Make quarantined tests stop failing your build
-        </h2>
-        <QuarantineCiStep />
+        <h2 id="setup-heading" className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">CI setup</h2>
+        <SetupPointer>
+          Each repository&apos;s workflow, the results arriving and a one-click setup PR are in Setup.
+        </SetupPointer>
       </section>
     </div>
   );

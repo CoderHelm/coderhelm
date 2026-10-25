@@ -126,6 +126,33 @@ function testRun(i: number) {
   };
 }
 
+const WIDE_WORKFLOW = ".github/workflows/end-to-end-browser-tests-for-every-pull-request-and-nightly-on-main.yml";
+const WIDE_STEP = `- name: Upload E2E results for Coderhelm\n  uses: actions/upload-artifact@v4\n  with:\n    path: ${FILE}`;
+
+function testSetup(repo: string, status: string) {
+  return {
+    repo, default_branch: BRANCH, status, runner: "playwright", runners: ["playwright", "jest", "vitest", "cypress", "junit"],
+    workflow: { path: WIDE_WORKFLOW, job_id: "end-to-end-browser-tests-with-sharding-and-retries", job_name: TITLE, step_name: TITLE, test_command: `npx playwright test ${FILE}` },
+    steps: {
+      upload: { state: "partial", detail: `Found, but it uploads ${FILE} instead of the results.`, paths: [FILE] },
+      reporter: { state: "missing", detail: SENTENCE, file: FILE_2 },
+      quarantine: { state: "done", detail: SENTENCE },
+    },
+    results: { last_at: iso(90), run_url: LONG_URL, tests: 1234, empty_runs: 4 },
+    quarantine_fetch: { last_at: iso(30), run_url: LONG_URL },
+    cause: status === "nothing_received" ? { text: `${SENTENCE} ${TOKEN}`, fixable: true, last_run_url: LONG_URL } : null,
+    pr: status === "in_progress"
+      ? { status: "open", kind: "setup", quarantine: true, number: 12345, url: PR_URL, workflow_path: WIDE_WORKFLOW, actor: EMAIL, created_at: iso(10), updated_at: iso(5), ci: "failure" }
+      : null,
+    can_auto: { upload: true, quarantine: true, repair: true, why: TOKEN },
+    snippets: {
+      upload: WIDE_STEP, quarantine: `${WIDE_STEP}\n  run: ${TOKEN}`, reporter: { file: FILE_2, code: TOKEN },
+      by_runner: { playwright: { upload: WIDE_STEP, reporter: { file: FILE_2, code: TOKEN } } },
+    },
+    checked_at: iso(1), error: SENTENCE,
+  };
+}
+
 function testSummary() {
   return {
     repos: [REPO, REPO_2], counts: { healthy: 1, flaky: 1, broken: 1, quarantined: 1, fixed: 1 },
@@ -287,6 +314,7 @@ export const reviewData: Handler = ({ method, path, url }) => {
   // Tests
   if (path === "/api/tests/settings") return { enabled: true, auto_quarantine: true, fix_prs: true, tickets: "github", burn_in: true, repos: [REPO, REPO_2], ticket_after_days: 2 };
   if (path === "/api/tests/summary") return testSummary();
+  if (path === "/api/tests/setup") return { repos: [testSetup(REPO, "nothing_received"), testSetup(REPO_2, "in_progress")], github: true };
   if (path === "/api/tests/runs") return { runs: Array.from({ length: 6 }, (_, i) => testRun(i)), next: null };
   if (path.startsWith("/api/tests/runs/")) {
     return {

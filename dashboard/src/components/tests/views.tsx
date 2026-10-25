@@ -22,7 +22,7 @@ import {
   type StatusLook,
 } from "@/components/list";
 import { EmptyBox, LoadError, Loading, StatCard } from "./common";
-import { QuarantineCiStep } from "./settings";
+import { SetupPointer } from "./setup";
 import { TestList, impactFacts, quarantineFacts, slowFacts, testMatches } from "./test-list";
 import { useLoad } from "./use-load";
 
@@ -349,12 +349,9 @@ export function QuarantineView({ repo, canEdit, ticketDays = 2 }: { repo: string
         </>
       }
     >
-      <details className="mb-4 mt-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-        <summary className="cursor-pointer text-sm font-medium text-zinc-100">Make quarantined tests stop failing your build</summary>
-        <div className="mt-3">
-          <QuarantineCiStep />
-        </div>
-      </details>
+      <div className="mb-4 mt-3">
+        <SetupPointer>GitHub still fails the build on a quarantined test until the workflow skips it. Setup adds that step for you.</SetupPointer>
+      </div>
       {error ? (
         <LoadError what="the quarantine list" message={error} onRetry={reload} />
       ) : loading && !data ? (
