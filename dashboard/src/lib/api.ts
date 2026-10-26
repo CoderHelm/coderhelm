@@ -144,6 +144,8 @@ export const api = {
       custom_role?: { id: string; name: string } | null;
       /** The team's switches; `plugins` turns plugins on. */
       flags?: { plugins?: boolean };
+      /** An admin of the whole install (the server's PLATFORM_ADMIN_EMAILS). */
+      platform_admin?: boolean;
     }>("/api/me"),
   signup: (email: string, password: string) =>
     request<{ status: string; message: string }>("/auth/signup", {
@@ -3896,6 +3898,8 @@ export interface HybridIntegration {
   stays_with_you: string;
   reason?: string;
   uses_coderhelm: boolean;
+  /** False when Coderhelm's own app for it isn't set up, so it can't be chosen now. Missing from older gateways. */
+  offered?: boolean;
 }
 
 export interface HybridCheck {

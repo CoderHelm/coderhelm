@@ -263,15 +263,37 @@ test.describe("connecting without the app's sign-in", () => {
     });
   });
 
-  test("Google Drive says plainly that it needs Google sign-in", async ({ page }) => {
-    await mockApi(page);
+  test("Google Drive without its sign-in app says so and who can set it up", async ({ page }) => {
+    const db = await mockApi(page);
     await page.goto("/knowledge/");
     await page.getByTestId("start-google_drive").click();
     const step = page.getByTestId("connect-step");
     await expect(step).toHaveAttribute("data-state", "no-way");
-    await expect(step.getByTestId("no-token-path")).toContainText("connects only through Google sign-in");
+    const box = step.getByTestId("no-token-path");
+    await expect(box).toContainText("Google Drive sign-in isn't set up on this Coderhelm yet.");
+    await expect(box).toContainText("Ask whoever runs Coderhelm to set up Google Drive sign-in.");
+    // Not a platform admin: no steps, and never a sign-in button.
+    await expect(box.getByTestId("sign-in-steps")).toHaveCount(0);
+    await expect(step.getByTestId("connect-button")).toHaveCount(0);
     await expect(step.getByTestId("token-form")).toHaveCount(0);
     await expect(step.getByTestId("integrations-link")).toHaveCount(0);
+    expect(db.calls.some((c) => c.endsWith("/connect"))).toBe(false);
     await shot(page, "drive-no-oauth");
+  });
+
+  test("a platform admin also gets the steps to set up Google Drive sign-in", async ({ page }) => {
+    await mockApi(page, { me: { platform_admin: true } });
+    await page.goto("/knowledge/");
+    await page.getByTestId("start-google_drive").click();
+    const box = page.getByTestId("connect-step").getByTestId("no-token-path");
+    await expect(box).toHaveAttribute("data-admin", "yes");
+    await expect(box).toContainText("Ask whoever runs Coderhelm to set up Google Drive sign-in.");
+    const steps = box.getByTestId("sign-in-steps");
+    await expect(steps.getByRole("link", { name: "Steps to set up Google Drive sign-in" })).toHaveAttribute(
+      "href",
+      "https://docs.coderhelm.com/self-host/knowledge-sources/#google-drive",
+    );
+    await expect(steps.getByRole("link", { name: "Open Sign-in apps" })).toHaveAttribute("href", "/admin/#sign-in-apps");
+    await shot(page, "drive-no-oauth-admin");
   });
 });

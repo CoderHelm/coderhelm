@@ -49,7 +49,8 @@ import { AskAdmin, ConfluenceSteps, ConnectLoading, IntegrationsLink, NoTokenPat
 // has loaded the app's step shows a placeholder and decides when it arrives:
 // the list of apps never shows again in between. Without the app's sign-in
 // on this install, Notion and Confluence connect with a pasted token right
-// here (admins and owners), and Google Drive says it needs sign-in.
+// here (admins and owners), and Google Drive says its sign-in isn't set up
+// and who can set it up (with the steps for a platform admin).
 
 type Step = "choose" | "connect" | "pick" | "upload" | "name" | "progress";
 
@@ -114,8 +115,9 @@ export function AddFlow({
   /** An app was chosen before the connections loaded: decide its step when they arrive. */
   const [deciding, setDeciding] = useState(false);
   const [tokenNote, setTokenNote] = useState("");
-  const { can } = useCan();
+  const { can, me } = useCan();
   const canSaveToken = can("integrations");
+  const installAdmin = me?.platform_admin === true;
 
   // Fresh each time it opens, set during render (not in an effect) so the
   // first frame is already the right step: never the previous run's, and
@@ -401,7 +403,7 @@ export function AddFlow({
         )}
 
         {step === "connect" && kind && kind !== "upload" && !deciding && !conn?.member_sign_in && (
-          <ConnectStep kind={kind} conn={conn} busy={busy} error={error} onConnect={signIn} canSaveToken={canSaveToken} onTokenSaved={tokenSaved} />
+          <ConnectStep kind={kind} conn={conn} busy={busy} error={error} onConnect={signIn} canSaveToken={canSaveToken} installAdmin={installAdmin} onTokenSaved={tokenSaved} />
         )}
 
         {step === "pick" && kind && kind !== "upload" && tokenNote && (
@@ -669,6 +671,7 @@ function ConnectStep({
   error,
   onConnect,
   canSaveToken,
+  installAdmin,
   onTokenSaved,
 }: {
   kind: SourceKind;
@@ -677,6 +680,7 @@ function ConnectStep({
   error: string | null;
   onConnect: () => void;
   canSaveToken: boolean;
+  installAdmin: boolean;
   onTokenSaved: (warning: string) => void;
 }) {
   const label = KIND_LABEL[kind];
@@ -728,7 +732,7 @@ function ConnectStep({
           <AskAdmin kind={kind} />
         ) : !tokenKind && !signIn ? (
           kind === "google_drive" ? (
-            <NoTokenPath kind={kind} />
+            <NoTokenPath kind={kind} installAdmin={installAdmin} />
           ) : (
             <p className="text-sm text-zinc-400">{conn?.hint}</p>
           )

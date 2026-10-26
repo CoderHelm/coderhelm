@@ -4,7 +4,7 @@
 // the System page, the integration pages and the tests agree.
 
 import { useCallback, useEffect, useState } from "react";
-import { api, errorStatus, type HybridStatus, type HybridSettingsPatch } from "./api";
+import { api, errorStatus, type HybridIntegration, type HybridStatus, type HybridSettingsPatch } from "./api";
 import { apiBase, isSelfHosted } from "./runtime-config";
 
 /** Where the trust model is written down. */
@@ -212,9 +212,14 @@ export function useHybrid(opts: { deep?: boolean } = {}): HybridState {
   return { status, loading, error, reload, set: setStatus, save };
 }
 
+/** Can this integration use Coderhelm's app now? Hosted, and Coderhelm's app for it is set up. */
+export function canUseCoderhelm(i: HybridIntegration | undefined): boolean {
+  return i?.mode === "hosted" && i.offered !== false;
+}
+
 /** The hosted-app integrations after switching `id` on or off (GitHub follows its own mode). */
 export function hostedIntegrations(status: HybridStatus, id: string, useCoderhelm: boolean): string[] {
-  const now = new Set(status.integrations.filter((i) => i.id !== "github" && i.mode === "hosted" && i.uses_coderhelm).map((i) => i.id));
+  const now = new Set(status.integrations.filter((i) => i.id !== "github" && canUseCoderhelm(i) && i.uses_coderhelm).map((i) => i.id));
   if (useCoderhelm) now.add(id);
   else now.delete(id);
   return [...now];

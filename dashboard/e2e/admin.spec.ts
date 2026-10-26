@@ -170,8 +170,8 @@ async function mockApi(page: Page, email = ADMIN_EMAIL, usageCheck: Record<strin
         secret_name: "coderhelm/prod/secrets",
         apps: [
           { kind: "notion", name: "Notion", app: "Notion public connection (OAuth)", configured: false, source: "", id_key: "notion_client_id", secret_key: "notion_client_secret", console: "https://www.notion.so/profile/integrations", scopes: [], redirect_uri: redirect },
-          { kind: "confluence", name: "Atlassian (Confluence)", app: "Atlassian OAuth 2.0 (3LO) app", configured: false, source: "", id_key: "atlassian_client_id", secret_key: "atlassian_client_secret", console: "https://developer.atlassian.com/console/myapps/", scopes: ["read:page:confluence", "offline_access"], redirect_uri: redirect },
-          { kind: "google_drive", name: "Google Drive", app: "Google OAuth client (Web application)", configured: true, source: "google_client_id", id_key: "google_drive_client_id", secret_key: "google_drive_client_secret", console: "https://console.cloud.google.com/apis/credentials", scopes: ["https://www.googleapis.com/auth/drive.readonly"], redirect_uri: redirect },
+          { kind: "confluence", name: "Atlassian (Confluence)", app: "Atlassian OAuth 2.0 (3LO) app", configured: true, source: "atlassian_client_id", id_key: "atlassian_client_id", secret_key: "atlassian_client_secret", console: "https://developer.atlassian.com/console/myapps/", scopes: ["read:page:confluence", "offline_access"], redirect_uri: redirect },
+          { kind: "google_drive", name: "Google Drive", app: "Google OAuth client (Web application)", configured: false, source: "", id_key: "google_drive_client_id", secret_key: "google_drive_client_secret", console: "https://console.cloud.google.com/apis/credentials", scopes: ["https://www.googleapis.com/auth/drive.readonly"], redirect_uri: redirect },
         ],
       });
     }
@@ -299,7 +299,13 @@ test("sign-in apps: which are set up, and what to register for the rest, never a
   await expect(rows).toHaveCount(3);
   await expect(rows.nth(0)).toHaveAttribute("data-configured", "no");
   await expect(rows.nth(0)).toContainText("Not set up. App to register: Notion public connection (OAuth)");
-  await expect(rows.nth(2)).toContainText("Set up, from google_client_id");
+  await expect(rows.nth(1)).toContainText("Set up, from atlassian_client_id");
+  // Google Drive with only the Google sign-in client in the secret: not set up.
+  await expect(rows.nth(2)).toHaveAttribute("data-configured", "no");
+  await expect(rows.nth(2)).toContainText("Not set up. App to register: Google OAuth client (Web application)");
+  await rows.nth(2).getByRole("button", { name: /Details/ }).click();
+  await expect(rows.nth(2)).toContainText("google_drive_client_id and google_drive_client_secret in coderhelm/prod/secrets");
+  await expect(rows.nth(2).getByTestId("sign-in-app-steps")).toHaveAttribute("href", "https://docs.coderhelm.com/self-host/knowledge-sources/#google-drive");
   await rows.nth(0).getByRole("button", { name: /Details/ }).click();
   await expect(rows.nth(0)).toContainText("https://app.coderhelm.com/settings/integrations/mcp-callback/");
   await expect(rows.nth(0)).toContainText("notion_client_secret in coderhelm/prod/secrets");

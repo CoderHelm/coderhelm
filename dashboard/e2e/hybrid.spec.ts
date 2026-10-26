@@ -19,6 +19,8 @@ interface State {
   links: { installation_id: number; account: string; repositories: string[] }[];
   hosted: Set<string>;
   sharing: { enabled: boolean; payloads: boolean };
+  /** Whether Coderhelm's own Google Drive app is set up (the hosted side's `offered`). */
+  driveOffered?: boolean;
 }
 
 interface Call {
@@ -48,7 +50,7 @@ function status(s: State) {
       { id: "jira", name: "Jira (Forge app)", mode: "hosted", through_coderhelm: "Ticket events and the sign-in.", stays_with_you: "Ticket contents Coderhelm reads later.", uses_coderhelm: s.hosted.has("jira") },
       { id: "notion", name: "Notion", mode: "hosted", through_coderhelm: "The sign-in only.", stays_with_you: "Every page Coderhelm reads.", uses_coderhelm: s.hosted.has("notion") },
       { id: "confluence", name: "Confluence (Atlassian)", mode: "hosted", through_coderhelm: "The sign-in only.", stays_with_you: "Every page Coderhelm reads.", uses_coderhelm: s.hosted.has("confluence") },
-      { id: "google_drive", name: "Google Drive", mode: "hosted", through_coderhelm: "The sign-in only.", stays_with_you: "Every file Coderhelm reads.", uses_coderhelm: s.hosted.has("google_drive") },
+      { id: "google_drive", name: "Google Drive", mode: "hosted", through_coderhelm: "The sign-in only.", stays_with_you: "Every file Coderhelm reads.", uses_coderhelm: s.hosted.has("google_drive"), offered: s.driveOffered !== false },
       { id: "slack_notifications", name: "Slack and Teams notifications", mode: "direct", through_coderhelm: "", stays_with_you: "", uses_coderhelm: false },
       { id: "mcp_apps", name: "Figma, Linear, Sentry, Sanity and other sign-in apps", mode: "direct", through_coderhelm: "", stays_with_you: "", uses_coderhelm: false },
       { id: "slack_commands", name: "Slack and Teams commands", mode: "unavailable", through_coderhelm: "", stays_with_you: "", reason: "CoderHelm has no shared Slack or Teams app: each team connects its own app's signing secret in Plugins settings, so there is nothing to relay. That keeps working the same way on a hybrid install.", uses_coderhelm: false },
@@ -292,6 +294,17 @@ test("other apps: each choice sends the hosted list; direct and unavailable say 
   await expect(page.getByTestId("hybrid-integration-github_sign_in")).toContainText("needs your own GitHub App");
   // GitHub has its own row above, so it isn't listed again.
   await expect(page.getByTestId("hybrid-integration-github")).toHaveCount(0);
+});
+
+test("other apps: Google Drive can't use Coderhelm's app while Coderhelm's Drive app isn't set up", async ({ page }) => {
+  await setup(page, SELF, { registered: true, verified: true, driveOffered: false });
+  await page.goto("/settings/system/");
+  const drive = page.getByTestId("hybrid-integration-google_drive");
+  await expect(drive).toContainText("Coderhelm's app isn't set up yet");
+  await expect(drive).toContainText("Use your own Google Drive app for now.");
+  await expect(drive.getByRole("button", { name: "Use Coderhelm's app (easiest)" })).toHaveCount(0);
+  // The others still offer the choice.
+  await expect(page.getByTestId("hybrid-integration-notion").getByRole("button", { name: "Use Coderhelm's app (easiest)" })).toBeVisible();
 });
 
 test("sharing with support: off by default, exactly what is sent, payloads only when asked", async ({ page }) => {
