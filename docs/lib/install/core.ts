@@ -14,13 +14,19 @@ export const LATEST_URL = `https://${PUBLIC_BUCKET}.s3.amazonaws.com/launch/late
 export const REPO = 'CoderHelm/coderhelm-platform';
 
 export type Provider = 'bedrock' | 'anthropic';
-export type StepId = 'start' | 'aws' | 'github' | 'models' | 'ready';
+export type StepId = 'start' | 'aws' | 'domain' | 'github' | 'models' | 'ready';
 export const STEPS: { id: StepId; label: string }[] = [
   { id: 'aws', label: 'AWS' },
   { id: 'github', label: 'GitHub' },
   { id: 'models', label: 'Models' },
   { id: 'ready', label: 'Ready' },
 ];
+
+/** The steps for this install: a Domain step after AWS when the person chose their own domain. */
+export function stepsFor(s: Pick<InstallState, 'domainChoice'>): { id: StepId; label: string }[] {
+  if (s.domainChoice !== 'own') return STEPS;
+  return [STEPS[0], { id: 'domain', label: 'Domain' }, ...STEPS.slice(1)];
+}
 
 /** Regions with Claude on Amazon Bedrock, by the names people know them by. */
 export const REGIONS: { id: string; name: string }[] = [
@@ -56,12 +62,33 @@ export interface InstallState {
   attempt: number;
   /** The GitHub App's slug, from GitHub's return (the shared status has none). */
   appSlug: string;
+  /** The AWS address (default) or the person's own domain. */
+  domainChoice: 'aws' | 'own';
+  /** Their domain, e.g. coderhelm.example.com (only with domainChoice 'own'). */
+  hostname: string;
+  /** They chose to finish on the AWS address and add the domain later. */
+  domainSkipped: boolean;
+  /** Who sends CoderHelm's email; empty uses their own address. */
+  emailFrom: string;
+  /** An email domain anyone may sign up from; empty for only them (they invite people later). */
+  signupDomain: string;
+  /** Install new releases by themselves, in the window. */
+  autoUpdate: boolean;
+  updateWindow: string;
+  updateTimezone: string;
+  /** The domain part of the progress file, kept so a refresh still shows the records. */
+  domainDoc: DomainDoc | null;
 }
 
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const STAGE_RE = /^[a-z][a-z0-9-]{0,19}$/;
 export const STATUS_ID_RE = /^[a-z0-9]{16}$/;
 export const TAG_RE = /^v\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/;
+/** A hostname people type: lowercase labels, a dot, a real top-level domain. */
+export const HOST_RE = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+export const WINDOW_RE = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun|daily) ([01]\d|2[0-3]):00$/;
+export const TIMEZONE_RE = /^(UTC|[A-Za-z_]+(\/[A-Za-z0-9_+-]+)+)$/;
+export const DEFAULT_WINDOW = 'Sun 03:00';
 
 /** Random lowercase letters and digits from the browser's crypto. */
 export function randomId(length: number, alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'): string {
@@ -86,16 +113,39 @@ export function newState(over: Partial<InstallState> = {}): InstallState {
     launchedAt: null,
     attempt: 1,
     appSlug: '',
+    domainChoice: 'aws',
+    hostname: '',
+    domainSkipped: false,
+    emailFrom: '',
+    signupDomain: '',
+    autoUpdate: false,
+    updateWindow: DEFAULT_WINDOW,
+    updateTimezone: 'UTC',
+    domainDoc: null,
     ...over,
   };
 }
 
+/** What someone typed as a domain, as a bare lowercase hostname. */
+export function cleanHostname(raw: string): string {
+  return raw.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0].replace(/\.$/, '');
+}
+
 /** Problems with what the person typed, as one plain sentence each. */
-export function validate(s: Pick<InstallState, 'email' | 'stage' | 'region'>): Record<string, string> {
+export function validate(s: Pick<InstallState, 'email' | 'stage' | 'region'> & Partial<InstallState>): Record<string, string> {
   const p: Record<string, string> = {};
   if (!EMAIL_RE.test(s.email.trim())) p.email = 'Enter the email you will sign in with.';
   if (!STAGE_RE.test(s.stage)) p.stage = 'Use lowercase letters, digits and hyphens, starting with a letter.';
   if (!REGIONS.some((r) => r.id === s.region)) p.region = 'Pick a region from the list.';
+  if (s.domainChoice === 'own') {
+    const h = cleanHostname(s.hostname ?? '');
+    if (!HOST_RE.test(h)) p.hostname = 'Enter a hostname such as coderhelm.example.com.';
+    else if (/\.(cloudfront\.net|amazonaws\.com)$/.test(h)) p.hostname = 'Enter a domain you own, not an AWS address.';
+  }
+  if (s.emailFrom && !EMAIL_RE.test(s.emailFrom.trim())) p.emailFrom = 'Enter an email address, or leave it empty to use yours.';
+  if (s.signupDomain && !HOST_RE.test(s.signupDomain.trim().toLowerCase().replace(/^@/, ''))) p.signupDomain = 'Enter an email domain such as example.com, or leave it empty.';
+  if (s.autoUpdate && s.updateWindow && !WINDOW_RE.test(s.updateWindow)) p.updateWindow = 'Pick a day and an hour.';
+  if (s.autoUpdate && s.updateTimezone && !TIMEZONE_RE.test(s.updateTimezone)) p.updateTimezone = 'Enter a time zone such as Europe/Berlin, or UTC.';
   return p;
 }
 
@@ -133,6 +183,15 @@ export function quickCreateUrl(s: InstallState): string {
     ['param_StatusId', s.statusId],
     ['param_SetupToken', s.setupToken],
   ];
+  // The optional ones only when set, so the link stays short and older templates still open.
+  if (s.domainChoice === 'own' && s.hostname) params.push(['param_Hostname', cleanHostname(s.hostname)]);
+  if (s.emailFrom?.trim()) params.push(['param_EmailFrom', s.emailFrom.trim().toLowerCase()]);
+  if (s.signupDomain?.trim()) params.push(['param_SignupDomain', s.signupDomain.trim().toLowerCase().replace(/^@/, '')]);
+  if (s.autoUpdate) {
+    params.push(['param_AutoUpdate', 'on']);
+    if (s.updateWindow && s.updateWindow !== DEFAULT_WINDOW) params.push(['param_UpdateWindow', s.updateWindow]);
+    if (s.updateTimezone && s.updateTimezone !== 'UTC') params.push(['param_UpdateTimezone', s.updateTimezone]);
+  }
   const q = params.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
   return `https://${s.region}.console.aws.amazon.com/cloudformation/home?region=${s.region}#/stacks/create/review?${q}`;
 }
@@ -243,9 +302,26 @@ export function cliGithubCommand(s: Pick<InstallState, 'stage' | 'region'>): str
 
 export type Phase = 'starting' | 'preparing' | 'deploying' | 'finishing' | 'done' | 'failed';
 
+/** One DNS record to add, as the installer lists it in the progress file. */
+export interface DnsRecord {
+  purpose: 'certificate' | 'address';
+  name: string;
+  type: string;
+  value: string;
+}
+
+/** The domain part of the progress file: how it is set up and the records to add. */
+export interface DomainDoc {
+  hostname: string;
+  mode: 'route53' | 'external';
+  state: string;
+  records: DnsRecord[];
+}
+
 export interface StatusDoc {
   schema: number;
   phase: Phase;
+  domain?: DomainDoc | null;
   message?: string;
   step?: number | null;
   steps?: number | null;
@@ -279,7 +355,12 @@ export function parseStatusDoc(v: unknown): StatusDoc | null {
   const d = v as StatusDoc | null;
   if (!d || typeof d !== 'object' || d.schema !== 1) return null;
   if (!['starting', 'preparing', 'deploying', 'finishing', 'done', 'failed'].includes(d.phase)) return null;
-  return d;
+  const dom = d.domain as DomainDoc | null | undefined;
+  const okDomain = !!dom && typeof dom === 'object' && typeof dom.hostname === 'string' && HOST_RE.test(dom.hostname);
+  const records = okDomain && Array.isArray(dom.records)
+    ? dom.records.filter((r) => r && typeof r.name === 'string' && typeof r.value === 'string' && HOST_RE.test(r.name.replace(/^_/, 'x')) && /^[a-z0-9._-]+$/i.test(r.value))
+    : [];
+  return { ...d, domain: okDomain ? { hostname: dom.hostname, mode: dom.mode === 'route53' ? 'route53' : 'external', state: String(dom.state ?? ''), records } : null };
 }
 
 export function findCheck(s: SetupStatus | null, id: string): Check | undefined {
@@ -315,9 +396,13 @@ export function progressRows(doc: StatusDoc | null, answering: boolean, launched
 }
 
 /** Which screen to show, from what is known. The install's own answers win over memory. */
-export function deriveStep(s: Pick<InstallState, 'launchedAt' | 'url'>, setup: SetupStatus | null): StepId {
+export function deriveStep(s: Pick<InstallState, 'launchedAt' | 'url'> & Partial<Pick<InstallState, 'domainChoice' | 'domainSkipped'>>, setup: SetupStatus | null): StepId {
   if (!s.launchedAt && !s.url) return 'start';
   if (!setup) return 'aws';
+  // Their own domain first, so the GitHub App gets the domain's URLs. An
+  // install too old to report the domain doesn't hold anyone up.
+  const domain = findCheck(setup, 'domain');
+  if (s.domainChoice === 'own' && !s.domainSkipped && domain && domain.status !== 'pass' && domain.code !== 'none') return 'domain';
   const app = findCheck(setup, 'github_app');
   const installed = findCheck(setup, 'github_installed');
   if (app?.status !== 'pass' || (installed && installed.status !== 'pass')) return 'github';
@@ -361,6 +446,34 @@ export const CHECK_TEXT: Record<string, Record<string, { title: string; fix?: st
     identity_unverified: { title: 'Confirm the sender address', fix: 'AWS emailed a link to the sender address. Click it to let CoderHelm send email.' },
     sandbox: { title: 'Email only reaches confirmed addresses for now', fix: 'New AWS accounts start in the SES sandbox. Request production access when your team joins.' },
     unknown: { title: 'Email could not be checked', fix: 'You can check it later in Settings.' },
+  },
+  domain: {
+    ok: { title: 'CoderHelm answers on your domain' },
+    none: { title: 'CoderHelm uses its AWS address', fix: 'Add your own domain any time in CoderHelm: Settings, System, Domain.' },
+    validating: { title: 'Waiting for the certificate record', fix: 'Add the records below where your domain’s DNS is hosted. New records can take up to an hour to show up; this page checks by itself.' },
+    zone_not_delegated: { title: 'Your domain doesn’t use its Route 53 zone yet', fix: 'At the company you bought the domain from, set the name servers to the four in your Route 53 zone (Route 53, Hosted zones, your zone, the NS record). It can take up to a day.' },
+    validation_wrong_value: { title: 'The certificate record has a different value', fix: 'Edit the record and paste the value below exactly, then save.' },
+    caa_blocked: { title: 'Your domain doesn’t allow Amazon certificates', fix: 'Add a CAA record with the value 0 issue "amazon.com" next to your existing ones, then press Try again in CoderHelm: Settings, System, Domain.' },
+    certificate_failed: { title: 'AWS could not issue the certificate', fix: 'Check the records below, then press Try again in CoderHelm: Settings, System, Domain.' },
+    attaching: { title: 'Moving CoderHelm to your domain', fix: 'The certificate is issued. This takes about 10 minutes; this page follows along.' },
+    attach_failed: { title: 'Moving to your domain failed', fix: 'Usually the hostname is still on another CloudFront distribution: remove it there, then press Try again in CoderHelm: Settings, System, Domain.' },
+    dns_missing: { title: 'Waiting for the address record', fix: 'Add the address record below. New records can take up to an hour to show up; this page checks by itself.' },
+    dns_wrong_value: { title: 'Your domain points somewhere else', fix: 'Edit the address record so its value is the CloudFront address below, then save.' },
+    cname_at_apex: { title: 'The root of a domain can’t have a CNAME record', fix: 'Use a subdomain such as coderhelm.yourdomain.com instead, or an ALIAS or ANAME record if your DNS provider has one.' },
+    https_failed: { title: 'Something else answers on your domain', fix: 'Point the record at the CloudFront address only, with no proxy in front. With Cloudflare, set the record to DNS only.' },
+    api_unreachable: { title: 'The page loads but CoderHelm’s API doesn’t answer there', fix: 'Wait a few minutes and press Check again. If it stays, run the doctor command from Check your install.' },
+    removing: { title: 'Moving back to the AWS address', fix: 'This takes about 10 minutes; this page follows along.' },
+    unknown: { title: 'The domain could not be checked', fix: 'This usually passes on its own. Press Check again in a minute.' },
+  },
+  google_sign_in: {
+    ok: { title: 'Sign in with Google is on' },
+    off: { title: 'Sign in with Google', fix: 'Optional, and it needs your own domain: create a Google OAuth client and add its keys to your install.' },
+    missing_keys: { title: 'Sign in with Google is missing its keys', fix: 'Add google_client_id and google_client_secret to your install’s secret, then deploy again.' },
+  },
+  updates: {
+    ok: { title: 'Automatic updates are on' },
+    auto_off: { title: 'Automatic updates', fix: 'Optional: turn them on in CoderHelm, Settings, System, and pick a maintenance window.' },
+    unknown: { title: 'Updates could not be checked', fix: 'Open Settings, System in CoderHelm after you sign in.' },
   },
   admin: {
     ok: { title: 'You are signed up' },
@@ -495,4 +608,160 @@ export function parseSetupStatus(v: unknown, region: string): SetupStatus | null
       return { ...c };
     });
   return { schema: 1, ready: !!(d as { ready?: boolean }).ready, version: d.version ?? null, github_manifest_ready: d.github_manifest_ready, checks };
+}
+
+// ── Your own domain ──────────────────────────────────────────────────────
+
+/** Domains with a two-part public suffix people commonly use (co.uk and the like). */
+const TWO_PART_SUFFIXES = ['co.uk', 'org.uk', 'ac.uk', 'com.au', 'net.au', 'org.au', 'co.nz', 'co.jp', 'com.br', 'co.in', 'co.za', 'com.mx', 'com.sg'];
+
+/** The registrable domain of a hostname (example.com for coderhelm.example.com), best effort. */
+export function baseDomain(hostname: string): string {
+  const labels = hostname.split('.');
+  const two = labels.slice(-2).join('.');
+  const n = TWO_PART_SUFFIXES.includes(two) ? 3 : 2;
+  return labels.slice(-n).join('.');
+}
+
+/** What to type in a provider's Name box when it adds the domain itself ("@" for the root). */
+export function relativeName(name: string, hostname: string): string {
+  const base = baseDomain(hostname);
+  if (name === base) return '@';
+  return name.endsWith(`.${base}`) ? name.slice(0, -(base.length + 1)) : name;
+}
+
+/** Where people add DNS records, for the providers most people use. */
+export const DNS_PROVIDERS: { id: string; name: string; where: string; url?: string }[] = [
+  { id: 'cloudflare', name: 'Cloudflare', where: 'DNS, Records, Add record. Set Proxy status to DNS only (the grey cloud).', url: 'https://dash.cloudflare.com/' },
+  { id: 'godaddy', name: 'GoDaddy', where: 'My Products, your domain, DNS, Add New Record. Type only the short name.', url: 'https://dcc.godaddy.com/control/portfolio' },
+  { id: 'namecheap', name: 'Namecheap', where: 'Domain List, Manage, Advanced DNS, Add New Record. The Host is the short name.', url: 'https://ap.www.namecheap.com/domains/list/' },
+  { id: 'squarespace', name: 'Squarespace (formerly Google Domains)', where: 'Domains, your domain, DNS, Custom records.', url: 'https://account.squarespace.com/domains' },
+  { id: 'porkbun', name: 'Porkbun', where: 'Domain Management, your domain, DNS. The Host is the short name.', url: 'https://porkbun.com/account/domainsSpeedy' },
+  { id: 'route53', name: 'Route 53 in another AWS account', where: 'Hosted zones, your zone, Create record. Record type CNAME.', url: 'https://console.aws.amazon.com/route53/v2/hostedzones' },
+  { id: 'azure', name: 'Azure DNS', where: 'DNS zones, your zone, Record set. Type CNAME.', url: 'https://portal.azure.com/#browse/Microsoft.Network%2FdnsZones' },
+  { id: 'other', name: 'Somewhere else', where: 'Open the DNS or zone settings where you bought the domain (or wherever its name servers are run) and add a CNAME record for each line.' },
+];
+
+export type DomainRow = { id: string; label: string; status: RowStatus };
+
+/** The domain step's progress, from the install's domain code. */
+export function domainRows(code: string | undefined, mode: 'route53' | 'external'): DomainRow[] {
+  const at = (() => {
+    switch (code) {
+      case 'validating': case 'zone_not_delegated': case 'validation_wrong_value': case 'caa_blocked': case 'certificate_failed': return 0;
+      case 'attaching': case 'attach_failed': return 1;
+      case 'dns_missing': case 'dns_wrong_value': case 'cname_at_apex': return 2;
+      case 'https_failed': case 'api_unreachable': return 3;
+      case 'ok': return 4;
+      default: return -1;
+    }
+  })();
+  const failed = ['zone_not_delegated', 'validation_wrong_value', 'caa_blocked', 'certificate_failed', 'attach_failed', 'dns_wrong_value', 'cname_at_apex', 'https_failed', 'api_unreachable'].includes(code ?? '');
+  const row = (i: number): RowStatus => (at > i ? 'pass' : at === i ? (failed ? 'fail' : 'active') : 'pending');
+  const rows: DomainRow[] = [
+    { id: 'certificate', label: mode === 'route53' ? 'Certificate checked through your Route 53 zone' : 'Certificate record found, certificate issued', status: row(0) },
+    { id: 'move', label: 'CoderHelm moved to your domain', status: row(1) },
+    { id: 'address', label: mode === 'route53' ? 'Address records made in your zone' : 'Address record found', status: row(2) },
+    { id: 'https', label: 'CoderHelm answers on your domain over HTTPS', status: row(3) },
+  ];
+  return rows;
+}
+
+/** Once the domain answers, the guide follows the install there (the GitHub App then gets its URLs). */
+export function domainUrl(s: Pick<InstallState, 'domainChoice' | 'hostname' | 'url'>, setup: SetupStatus | null): string | null {
+  if (s.domainChoice !== 'own' || !s.hostname) return null;
+  if (findCheck(setup, 'domain')?.status !== 'pass') return null;
+  const want = `https://${cleanHostname(s.hostname)}`;
+  return s.url === want ? null : want;
+}
+
+// ── Optional setup (after Ready) ─────────────────────────────────────────
+
+export interface OptionalItem {
+  id: string;
+  title: string;
+  why: string;
+  /** done: the install says so; todo: it says not yet; auto: the install did it; unknown: no check before sign-in. */
+  state: 'done' | 'todo' | 'auto' | 'unknown';
+  /** One primary link, pre-filled where it can be. */
+  action?: { label: string; href: string };
+  fix?: string;
+  doc: string;
+}
+
+/** Everything else a person can set up, each with its check (when the install reports one) and one action. */
+export function optionalSetup(s: Pick<InstallState, 'url' | 'region' | 'provider' | 'domainChoice'>, setup: SetupStatus | null): OptionalItem[] {
+  const url = s.url.replace(/\/+$/, '');
+  const at = (path: string) => (url ? `${url}${path}` : path);
+  const check = (id: string) => findCheck(setup, id);
+  const state = (id: string): OptionalItem['state'] => {
+    const c = check(id);
+    if (!c) return 'unknown';
+    return c.status === 'pass' ? 'done' : 'todo';
+  };
+  const email = check('email');
+  const items: OptionalItem[] = [];
+  const domain = check('domain');
+  if (!(s.domainChoice === 'own' && domain?.status === 'pass')) {
+    items.push({
+      id: 'domain', title: 'Use your own domain', why: 'An address that’s easy to share, and Google sign-in needs one.',
+      state: domain ? (domain.status === 'pass' ? 'done' : 'todo') : 'unknown',
+      action: { label: 'Open Settings, System', href: at('/settings/system/#domain') },
+      fix: domain && domain.code !== 'none' ? checkText(domain).fix : undefined,
+      doc: '/self-host/domains/',
+    });
+  }
+  items.push({
+    id: 'email', title: 'Email reaches your whole team', why: 'So invites and run results reach everyone on your team, not only confirmed addresses.',
+    state: email ? (email.status === 'pass' ? 'done' : 'todo') : 'unknown',
+    action: email?.code === 'identity_unverified'
+      ? { label: 'Open SES identities', href: `https://${s.region}.console.aws.amazon.com/ses/home?region=${s.region}#/identities` }
+      : { label: 'Request production access', href: sesConsoleUrl(s.region) },
+    fix: email && email.status !== 'pass' ? checkText(email).fix : undefined,
+    doc: '/self-host/email/',
+  });
+  items.push({
+    id: 'invite', title: 'Invite your team', why: 'Only you can sign in until you invite people or allow an email domain.',
+    state: 'unknown', action: { label: 'Open Settings, People', href: at('/settings/people/') }, doc: '/self-host/',
+  });
+  if (s.provider === 'anthropic') {
+    items.push({
+      id: 'anthropic', title: 'Add your Anthropic API key', why: 'Each team calls Claude with its own key.',
+      state: 'unknown', action: { label: 'Open Settings, AI models', href: at('/settings/models/') }, doc: '/self-host/model-providers/',
+    });
+  }
+  items.push({
+    id: 'chat', title: 'Slack or Teams notices', why: 'Pull requests, reviews and alerts in the channel your team already reads.',
+    state: 'unknown', action: { label: 'Open Settings, Alerts', href: at('/settings/alerts/') }, doc: '/self-host/integrations/',
+  });
+  items.push({
+    id: 'jira', title: 'Start work from Jira tickets', why: 'Assign a ticket to CoderHelm instead of a GitHub issue.',
+    state: 'unknown', action: { label: 'Open Settings, Integrations', href: at('/settings/integrations/jira/') }, doc: '/self-host/integrations/',
+  });
+  const google = check('google_sign_in');
+  items.push({
+    id: 'google_sign_in', title: 'Sign in with Google', why: 'Your team signs in with the Google account they already have. Needs your own domain.',
+    state: state('google_sign_in'), fix: google && google.status === 'fail' ? checkText(google).fix : undefined,
+    action: { label: 'Open Google Cloud credentials', href: 'https://console.cloud.google.com/apis/credentials' },
+    doc: '/self-host/integrations/',
+  });
+  const updates = check('updates');
+  items.push({
+    id: 'updates', title: 'Automatic updates', why: 'New releases install by themselves in your maintenance window, health checked and rolled back if unhealthy.',
+    state: updates ? (updates.status === 'pass' ? 'done' : 'todo') : 'unknown',
+    action: { label: 'Open Settings, System', href: at('/settings/system/') }, doc: '/self-host/updates/',
+  });
+  items.push({
+    id: 'backups', title: 'Backups', why: 'Point-in-time recovery (35 days) on every table and a versioned bucket, from the install itself.',
+    state: 'auto', doc: '/self-host/backups/',
+  });
+  return items;
+}
+
+/** What the progress file says about the domain, merged into what this browser remembers. */
+export function withDomainDoc(s: InstallState, doc: StatusDoc | null): InstallState | null {
+  const d = doc?.domain;
+  if (!d) return null;
+  if (s.domainDoc && JSON.stringify(s.domainDoc) === JSON.stringify(d) && s.domainChoice === 'own' && s.hostname === d.hostname) return null;
+  return { ...s, domainChoice: 'own', hostname: d.hostname, domainDoc: d };
 }

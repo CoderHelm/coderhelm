@@ -23,7 +23,7 @@ export function useInstallAdmin(): { ready: boolean; allowed: boolean } {
   return state;
 }
 
-export type SetupKey = "github" | "repos" | "models" | "email" | "chat" | "updates" | "run";
+export type SetupKey = "github" | "repos" | "models" | "email" | "domain" | "chat" | "updates" | "run";
 
 export interface SetupCheck {
   key: SetupKey;
@@ -49,13 +49,15 @@ function emailOk(): boolean {
 /** Every setup item, each from its own live call; one failing leaves its item unknown. */
 export async function loadSetupChecks(): Promise<SetupCheck[]> {
   const settle = async <T,>(p: Promise<T>): Promise<T | null> => p.catch(() => null);
-  const [integrations, repos, model, system, runs] = await Promise.all([
+  const [integrations, repos, model, system, runs, domain] = await Promise.all([
     settle(api.getIntegrations()),
     settle(api.listRepos()),
     settle(api.getModelProvider()),
     settle(api.getSystemVersion()),
     settle(api.listRuns()),
+    settle(api.getSystemDomain()),
   ]);
+  const domainLive = domain?.available ? domain.code === "ok" : null;
   const item = (id: string) => integrations?.items.find((i) => i.id === id);
   const github = item("github");
   const chat = integrations?.items.filter((i) => ["jira", "teams", "slack"].includes(i.id) && i.status === "connected") ?? [];
@@ -93,6 +95,19 @@ export async function loadSetupChecks(): Promise<SetupCheck[]> {
       detail: emailOk() ? "A test email went out." : "Send yourself a test email (new AWS accounts start in the SES sandbox).",
       href: "/settings/setup#email",
       action: "Send a test email",
+    },
+    {
+      key: "domain",
+      label: "Your own domain",
+      optional: true,
+      done: domain && !domain.available ? null : domainLive,
+      detail: domainLive
+        ? `Coderhelm answers on ${domain?.domain?.hostname}.`
+        : domain?.domain?.hostname
+          ? `${domain.domain.hostname}: ${domain.check?.detail ?? "waiting"}`
+          : "Optional: an address that's easy to share; Google sign-in needs one.",
+      href: "/settings/system#domain",
+      action: domain?.domain?.hostname ? "See its records" : "Add a domain",
     },
     {
       key: "chat",
