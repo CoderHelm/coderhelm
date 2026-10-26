@@ -614,11 +614,11 @@ test.describe("roles, addresses and phones", () => {
     await page.goto("/knowledge/base/?id=kb_eng");
     await expect(page.getByTestId("source-card").first()).toBeVisible();
     await noSideways(page);
-    // On a phone the page's buttons sit in the bar's actions menu.
+    // On a phone the page's buttons stay in view under the title (never in a menu).
     await page.goto("/knowledge/");
     await expect(page.getByTestId("knowledge-card")).toBeVisible();
-    await page.getByRole("button", { name: "Page actions" }).click();
-    await page.getByTestId("new-knowledge").click();
+    await expect(page.getByRole("button", { name: "Page actions" })).toHaveCount(0);
+    await page.getByTestId("page-actions").getByTestId("new-knowledge").click();
     await expect(page.getByTestId("choose-step")).toBeVisible();
     await noSideways(page);
     await page.getByTestId("tile-notion").click();

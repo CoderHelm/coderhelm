@@ -73,6 +73,7 @@
     "/self-host/email/",
     "/self-host/faq/",
     "/self-host/github-app/",
+    "/self-host/install/",
     "/self-host/integrations/",
     "/self-host/knowledge-sources/",
     "/self-host/model-providers/",

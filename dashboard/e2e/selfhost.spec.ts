@@ -25,8 +25,52 @@ const ME = {
   platform_admin: true,
 };
 
-async function setup(page: Page, cfg: RuntimeConfig | null, opts: { signedIn?: boolean; provider?: "anthropic" | "bedrock" } = {}) {
+const CHECK_PASS = (key: string, group: string, label: string, detail: string) => ({ key, group, label, status: "pass", detail });
+
+/** The install's checks: failing until `fixed`, then passing. */
+function installChecks(fixed: boolean) {
+  const checks = [
+    CHECK_PASS("url", "Install", "Web address answers", "https://helm.example.org answers over HTTPS."),
+    CHECK_PASS("github_keys", "GitHub", "GitHub App keys stored", "App 123456."),
+    CHECK_PASS("github_app", "GitHub", "GitHub accepts the app's keys", "GitHub answered as the app."),
+    fixed
+      ? CHECK_PASS("github_permissions", "GitHub", "GitHub App permissions and events", "Every permission and event CoderHelm uses is granted.")
+      : {
+          key: "github_permissions", group: "GitHub", label: "GitHub App permissions and events", status: "fail",
+          detail: "Permissions to change: Workflows: write (now read). Events to subscribe to: workflow_run.",
+          why: "Without them CoderHelm can't push some changes or misses the events that start work.",
+          fix: { text: "Open the app's Permissions and events page, set the values listed, save, then accept the new permissions on each installation.", url: "https://github.com/organizations/acme-platform-engineering/settings/apps/coderhelm-production-install/permissions" },
+        },
+    CHECK_PASS("github_webhook", "GitHub", "GitHub webhook reaches this install", "The last event (issues) arrived at 2026-10-25T09:00:00Z."),
+    fixed
+      ? CHECK_PASS("email_identity", "Email", "Email sender verified", "example.org is verified, with DKIM.")
+      : {
+          key: "email_identity", group: "Email", label: "Email sender verified", status: "fail",
+          detail: "example.org isn't verified yet (DKIM pending).",
+          why: "Mail without DKIM lands in spam, and SES won't send at all from an unverified domain.",
+          fix: {
+            text: "Add these DNS records for example.org at your DNS provider; SES checks them within an hour:",
+            command: ["abcdefghijklmnopqrstuvwxyz012345", "bcdefghijklmnopqrstuvwxyz0123456", "cdefghijklmnopqrstuvwxyz01234567"].map((t) => `${t}._domainkey.example.org CNAME ${t}.dkim.amazonses.com`).join("\n"),
+            url: "https://console.aws.amazon.com/ses/home?region=us-east-1#/identities/example.org",
+          },
+        },
+    {
+      key: "email_sandbox", group: "Email", label: "Email can reach anyone", status: "warn",
+      detail: "This AWS account is in the SES sandbox: email only reaches verified addresses, 200 a day.",
+      why: "Invites and run results won't reach your teammates until production access is granted.",
+      fix: { text: "Request production access (Account dashboard, Request production access); AWS usually answers within a day.", url: "https://console.aws.amazon.com/ses/home?region=us-east-1#/account" },
+    },
+    CHECK_PASS("model", "Claude", "Claude answers a test call", "us.anthropic.claude-sonnet-5-5 answered through Amazon Bedrock."),
+    CHECK_PASS("dlq", "Install", "No failed events waiting", "The dead-letter queue is empty."),
+    { key: "slack", group: "Integrations", label: "Slack", status: "skip", detail: "Not connected (optional).", why: "Connect Slack to get alerts there.", fix: { text: "Paste a Slack incoming webhook URL in Settings, Alerts.", href: "/settings/alerts" } },
+  ];
+  const n = (st: string) => checks.filter((c) => c.status === st).length;
+  return { checked_at: "2026-10-25T10:00:00Z", summary: { pass: n("pass"), warn: n("warn"), fail: n("fail"), skip: n("skip"), ready: n("fail") === 0 }, checks };
+}
+
+async function setup(page: Page, cfg: RuntimeConfig | null, opts: { signedIn?: boolean; provider?: "anthropic" | "bedrock"; blocked?: boolean } = {}) {
   const calls: string[] = [];
+  const checksState = { fixed: false, runs: 0 };
   const puts: Record<string, unknown>[] = [];
   const systemCalls: { path: string; body: Record<string, unknown> }[] = [];
   const json = (route: Route, body: unknown, status = 200) =>
@@ -77,6 +121,26 @@ async function setup(page: Page, cfg: RuntimeConfig | null, opts: { signedIn?: b
       systemCalls.push({ path: p, body: JSON.parse(req.postData() || "{}") });
       return json(route, { version: p.endsWith("update") ? "v2.0.0" : "v1.1.0", actor: "owner@example.org", status: "running" });
     }
+    if (p === "/api/system/checks") {
+      checksState.runs += 1;
+      return json(route, installChecks(checksState.fixed));
+    }
+    if (p === "/api/system/preflight") {
+      const c = installChecks(!opts.blocked);
+      return json(route, {
+        checked_at: c.checked_at,
+        ready: !opts.blocked,
+        current: "v1.2.0",
+        latest: "v2.0.0",
+        blockers: opts.blocked
+          ? [
+              { key: "email_identity", severity: "block", detail: "example.org isn't verified yet (DKIM pending). The update's health check would fail, so it wouldn't start.", fix: (installChecks(false).checks.find((x) => x.key === "email_identity") as { fix: unknown }).fix },
+              { key: "migration", severity: "warn", detail: "v2.0.0 is a major release whose notes ask you to do something before or after updating.", fix: { text: "Read the release notes below and do what they say, then update.", href: "/settings/system#version", url: "https://github.com/CoderHelm/coderhelm-platform/releases" } },
+            ]
+          : [{ key: "migration", severity: "warn", detail: "v2.0.0 is a major release whose notes ask you to do something before or after updating.", fix: { text: "Read the release notes below and do what they say, then update.", href: "/settings/system#version" } }],
+        checks: c.checks,
+      });
+    }
     if (p === "/api/system/test-email") {
       systemCalls.push({ path: p, body: {} });
       return json(route, { sent: true, to: "owner@example.org" });
@@ -95,7 +159,7 @@ async function setup(page: Page, cfg: RuntimeConfig | null, opts: { signedIn?: b
     }
     return json(route, {}, 200);
   });
-  return { calls, puts, systemCalls };
+  return { calls, puts, systemCalls, checksState };
 }
 
 test("API calls go where the runtime config says, not where the build said", async ({ page, baseURL }) => {
@@ -226,3 +290,69 @@ test("hosted: no System or Setup, no banner, and no install calls", async ({ pag
   await expect(page.getByTestId("setup-unavailable")).toBeVisible();
   expect(calls.filter((c) => c.includes("/api/system/"))).toEqual([]);
 });
+
+const SHOTS = "test-results/selfhost-checks";
+
+for (const [name, viewport] of [["1440", { width: 1440, height: 1000 }], ["390", { width: 390, height: 844 }]] as const) {
+  test.describe(`install checks at ${name}px`, () => {
+    test.use({ viewport });
+
+    test("Setup: failing checks say what, why and how to fix; Check again after the fix shows them passing", async ({ page }) => {
+      const { checksState } = await setup(page, SELF, { signedIn: true, provider: "bedrock" });
+      await page.goto("/settings/setup/");
+      const checks = page.getByTestId("install-checks");
+      await expect(checks.getByTestId("install-checks-summary")).toContainText("2 need a fix");
+      await expect(checks).toContainText("2 checks need a fix");
+      const perms = checks.locator("#check-github_permissions");
+      await expect(perms).toHaveAttribute("data-status", "fail");
+      await expect(perms).toContainText("Workflows: write (now read)");
+      await expect(perms).toContainText("Why it matters:");
+      await expect(perms.getByRole("link", { name: "Open on GitHub" })).toHaveAttribute("href", /settings\/apps\/coderhelm-production-install\/permissions$/);
+      const email = checks.locator("#check-email_identity");
+      await expect(email.getByTestId("fix-command")).toContainText("._domainkey.example.org CNAME");
+      await expect(email.getByRole("button", { name: "Copy" })).toBeVisible();
+      await expect(checks.locator("#check-email_sandbox")).toHaveAttribute("data-status", "warn");
+      await expect(checks.locator("#check-slack")).toContainText("Not set up");
+      await expect(checks.locator("#check-slack").getByRole("link", { name: "Open in Coderhelm" })).toHaveAttribute("href", /\/settings\/alerts\/?$/);
+      const width = await page.evaluate(() => document.documentElement.scrollWidth);
+      expect(width).toBeLessThanOrEqual(viewport.width);
+      await page.screenshot({ path: `${SHOTS}/setup-failing-${name}.png`, fullPage: true });
+
+      // The person fixes both, then checks again: no reload.
+      checksState.fixed = true;
+      await checks.getByRole("button", { name: "Check again" }).click();
+      await expect(checks.getByTestId("install-checks-summary")).toContainText("0 need a fix");
+      await expect(checks).toContainText("Nothing needs a fix");
+      await expect(perms).toHaveAttribute("data-status", "pass");
+      await expect(perms).not.toContainText("Why it matters");
+      expect(checksState.runs).toBe(2);
+      await page.screenshot({ path: `${SHOTS}/setup-passing-${name}.png`, fullPage: true });
+    });
+
+    test("System: update readiness lists what blocks an update, with its fix, and holds Update now", async ({ page }) => {
+      await setup(page, SELF, { signedIn: true, blocked: true });
+      await page.goto("/settings/system/");
+      const r = page.getByTestId("update-readiness");
+      await expect(r.locator('[data-severity="block"]')).toContainText("Blocks the update");
+      await expect(r.locator('[data-severity="block"]')).toContainText("isn't verified yet");
+      await expect(r.locator('[data-severity="block"]').getByTestId("fix-command")).toContainText("dkim.amazonses.com");
+      await expect(r.locator('[data-severity="warn"]')).toContainText("Read first");
+      await expect(page.getByRole("button", { name: "Update now to v2.0.0" })).toBeDisabled();
+      await expect(page.locator("#update-blocked")).toContainText("Fix what blocks the update");
+      await expect(page.getByTestId("history-next-step")).toContainText("Back on v1.1.0; your data is untouched");
+      const width = await page.evaluate(() => document.documentElement.scrollWidth);
+      expect(width).toBeLessThanOrEqual(viewport.width);
+      await page.screenshot({ path: `${SHOTS}/system-preflight-blocked-${name}.png`, fullPage: true });
+    });
+
+    test("System: ready to update when nothing blocks", async ({ page }) => {
+      await setup(page, SELF, { signedIn: true });
+      await page.goto("/settings/system/");
+      const r = page.getByTestId("update-readiness");
+      await expect(r.locator('[data-severity="block"]')).toHaveCount(0);
+      await expect(r.getByTestId("doctor-summary")).toContainText("0 failing");
+      await expect(page.getByRole("button", { name: "Update now to v2.0.0" })).toBeEnabled();
+      await page.screenshot({ path: `${SHOTS}/system-preflight-ready-${name}.png`, fullPage: true });
+    });
+  });
+}

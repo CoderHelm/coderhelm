@@ -1097,6 +1097,9 @@ export const api = {
   updateNow: (version?: string) =>
     request<UpdateEntry>("/api/system/update", { method: "POST", body: JSON.stringify(version ? { version } : {}) }),
   rollbackInstall: () => request<UpdateEntry>("/api/system/rollback", { method: "POST", body: "{}" }),
+  // Setup checks and update readiness (install admins), each with its fix.
+  getSystemChecks: () => request<SystemChecks>("/api/system/checks"),
+  getSystemPreflight: () => request<SystemPreflight>("/api/system/preflight"),
   sendTestEmail: () => request<{ sent: boolean; to?: string; reason?: string }>("/api/system/test-email", { method: "POST", body: "{}" }),
 
   // Remote MCP servers
@@ -3499,6 +3502,50 @@ export interface UpdateEntry {
   reason?: string;
   started_at?: string;
   finished_at?: string;
+}
+
+/** How to fix a check: plain words, and any of a command, a link out, or a dashboard page. */
+export interface CheckFix {
+  text: string;
+  command?: string;
+  url?: string;
+  href?: string;
+}
+
+export type CheckStatus = "pass" | "warn" | "fail" | "skip";
+
+/** One server-side setup check (GET /api/system/checks). */
+export interface InstallCheck {
+  key: string;
+  group: string;
+  label: string;
+  status: CheckStatus;
+  detail: string;
+  why?: string;
+  fix?: CheckFix;
+}
+
+export interface SystemChecks {
+  checked_at: string;
+  summary: { pass: number; warn: number; fail: number; skip: number; ready: boolean };
+  checks: InstallCheck[];
+}
+
+/** Something that would stop (block) or should pause (warn) an update. */
+export interface UpdateBlocker {
+  key: string;
+  severity: "block" | "warn";
+  detail: string;
+  fix: CheckFix;
+}
+
+export interface SystemPreflight {
+  checked_at: string;
+  ready: boolean;
+  current: string | null;
+  latest: string | null;
+  blockers: UpdateBlocker[];
+  checks: InstallCheck[];
 }
 
 export interface SystemVersion {

@@ -270,6 +270,18 @@ export const settingsData: Handler = ({ method, path, url }) => {
   if (p === "/api/activity/summary") {
     return { days: Number(url.searchParams.get("days") || 7), since: iso(60 * 24 * 7), skills: { reads: 1204, asks: 12, read_problems: 3, ask_problems: 1, applies: 4 }, lookups: { total: 980, ok: 960, refused: 12, failed: 8 } };
   }
+  // The install's setup checks and update readiness: long ids, URLs and
+  // commands, so Settings, then Setup and System keep to the screen.
+  if (p === "/api/system/checks" || p === "/api/system/preflight") {
+    const check = {
+      key: "email_identity", group: "Email", label: "Email sender verified", status: "fail",
+      detail: `${LONG_URL} isn't verified yet (DKIM pending).`,
+      why: "Mail without DKIM lands in spam.",
+      fix: { text: `Add these DNS records for ${ORG}:`, command: `${TOKEN}._domainkey.${ORG}.example CNAME ${TOKEN}.dkim.amazonses.com`, url: LONG_URL, href: "/settings/alerts" },
+    };
+    if (p === "/api/system/checks") return { checked_at: "2026-01-01T00:00:00Z", summary: { pass: 0, warn: 0, fail: 1, skip: 0, ready: false }, checks: [check] };
+    return { checked_at: "2026-01-01T00:00:00Z", ready: false, current: "v0.7.0", latest: "v0.8.0", blockers: [{ key: "email_identity", severity: "block", detail: check.detail, fix: check.fix }], checks: [check] };
+  }
   if (p === "/api/data-sources/aws/setup") {
     return {
       script: `coderhelm_setup() (\n  aws iam create-role --role-name ${ROLE} --assume-role-policy-document file://coderhelm-trust-policy-with-external-id.json --tags Key=managed-by,Value=coderhelm\n)\ncoderhelm_setup\n`,
