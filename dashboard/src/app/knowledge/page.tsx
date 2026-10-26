@@ -153,7 +153,7 @@ function Empty({ canManage, onStart }: { canManage: boolean; onStart: (k?: AddKi
           </ul>
         </>
       ) : (
-        <p className="mt-6 text-sm text-zinc-500">Someone who manages Knowledge on your team can add the first one.</p>
+        <p className="mt-6 text-sm text-zinc-500">Ask an admin to add the first one: admins and owners connect Notion, Confluence and the other apps.</p>
       )}
     </section>
   );

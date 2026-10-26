@@ -29,9 +29,11 @@ import {
   type Via,
   type WebhookSetup,
 } from "@/lib/knowledge";
+import { useCan } from "@/hooks/use-can";
 import { SourceLogo } from "./logos";
 import { HybridAppChoice } from "@/components/hybrid-app-choice";
 import { Picker } from "./picker";
+import { AskAdmin, ConfluenceSteps, ConnectLoading, IntegrationsLink, NoTokenPath, NotionSteps, TokenForm } from "./token-connect";
 
 // The one way to add to Knowledge, for a new knowledge base or an existing
 // one: pick an app (or files), connect it with one click if it isn't yet,
@@ -41,6 +43,13 @@ import { Picker } from "./picker";
 // Sanity connects by signing in with your own Sanity account, in a small
 // window that hands back to the flow (nothing to set up, no key to paste).
 // The team's API token is the second choice; it adds instant updates.
+//
+// Choosing an app goes straight to that app's step. Which step that is
+// (connect or pick) depends on what the team has connected, so until that
+// has loaded the app's step shows a placeholder and decides when it arrives:
+// the list of apps never shows again in between. Without the app's sign-in
+// on this install, Notion and Confluence connect with a pasted token right
+// here (admins and owners), and Google Drive says it needs sign-in.
 
 type Step = "choose" | "connect" | "pick" | "upload" | "name" | "progress";
 
@@ -102,7 +111,40 @@ export function AddFlow({
   const [finished, setFinished] = useState(false);
   const [via, setVia] = useState<Via>("team");
   const [waiting, setWaiting] = useState(false);
-  const started = useRef<string | null>(null);
+  /** An app was chosen before the connections loaded: decide its step when they arrive. */
+  const [deciding, setDeciding] = useState(false);
+  const [tokenNote, setTokenNote] = useState("");
+  const { can } = useCan();
+  const canSaveToken = can("integrations");
+
+  // Fresh each time it opens, set during render (not in an effect) so the
+  // first frame is already the right step: never the previous run's, and
+  // never the list of apps when it opens at one app.
+  const openKey = open ? `${startWith ?? ""}` : null;
+  const [seenKey, setSeenKey] = useState<string | null>(null);
+  if (openKey !== seenKey) {
+    setSeenKey(openKey);
+    if (openKey !== null) {
+      const first = startWith ?? null;
+      setStep(first === null ? "choose" : first === "upload" ? "upload" : "connect");
+      setKind(first);
+      setDeciding(first !== null && first !== "upload");
+      setConnectors(null);
+      setLoadError(null);
+      setPicked([]);
+      setFiles([]);
+      setName("");
+      setNamed(false);
+      setReadRole("viewer");
+      setChangingRead(false);
+      setError(null);
+      setMade(null);
+      setFinished(false);
+      setVia("team");
+      setWaiting(false);
+      setTokenNote("");
+    }
+  }
 
   const conn = useMemo(() => connectors?.find((c) => c.kind === kind) ?? null, [connectors, kind]);
   const label = kind ? KIND_LABEL[kind] : "";
@@ -123,47 +165,50 @@ export function AddFlow({
       });
   }, []);
 
-  // Fresh each time it opens.
+  // What the team has connected, loaded once per opening.
   useEffect(() => {
-    if (!open) {
-      started.current = null;
-      return;
-    }
-    const key = `${startWith ?? ""}`;
-    if (started.current === key) return;
-    started.current = key;
-    setStep("choose");
-    setKind(null);
-    setPicked([]);
-    setFiles([]);
-    setName("");
-    setNamed(false);
-    setReadRole("viewer");
-    setChangingRead(false);
-    setError(null);
-    setMade(null);
-    setFinished(false);
-    setVia("team");
-    setWaiting(false);
-    loadConnectors().then((list) => {
-      if (startWith) choose(startWith, list ?? []);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, startWith]);
+    if (openKey === null) return;
+    loadConnectors();
+  }, [openKey, loadConnectors]);
 
-  const choose = (k: AddKind, list: Connector[] = connectors ?? []) => {
+  /** The step an app starts at, from what the team has connected. */
+  const stepFor = (c: Connector | undefined): Step =>
+    // An app you sign in to with your own account always asks first: your
+    // sign-in, or the team's token.
+    c?.member_sign_in ? "connect" : c?.connected ? "pick" : "connect";
+
+  // Chosen while loading: go on once the connections are here.
+  useEffect(() => {
+    if (!deciding || !connectors || !kind || kind === "upload") return;
+    setDeciding(false);
+    setStep(stepFor(connectors.find((x) => x.kind === kind)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deciding, connectors, kind]);
+
+  const choose = (k: AddKind) => {
     setKind(k);
     setPicked([]);
     setError(null);
+    setTokenNote("");
     if (k === "upload") {
       setStep("upload");
       return;
     }
-    const c = list.find((x) => x.kind === k);
     setVia("team");
-    // An app you sign in to with your own account always asks first: your
-    // sign-in, or the team's token.
-    setStep(c?.member_sign_in ? "connect" : c?.connected ? "pick" : "connect");
+    // The app's own step at once; a placeholder there until we know which.
+    if (!connectors) {
+      setDeciding(true);
+      setStep("connect");
+      return;
+    }
+    setStep(stepFor(connectors.find((x) => x.kind === k)));
+  };
+
+  // A token was checked and saved: on to the pages.
+  const tokenSaved = async (warning: string) => {
+    setTokenNote(warning);
+    await loadConnectors();
+    continueWith("team");
   };
 
   // Signs in with your own account in a small window, then shows who you're
@@ -282,7 +327,9 @@ export function AddFlow({
         ? "New knowledge base"
         : `Add to ${mode.kind === "add" ? mode.base.name : "Knowledge"}`
       : step === "connect"
-        ? `Connect ${label}`
+        ? deciding
+          ? label
+          : `Connect ${label}`
         : step === "pick" && kind && kind !== "upload"
           ? PICK_TITLE[kind]
           : step === "upload"
@@ -301,6 +348,7 @@ export function AddFlow({
 
   const back = () => {
     setError(null);
+    setDeciding(false);
     if (step === "name") setStep(kind === "upload" ? "upload" : "pick");
     else if (step === "pick" && conn?.member_sign_in) setStep("connect");
     else setStep("choose");
@@ -337,7 +385,9 @@ export function AddFlow({
           <ChooseStep connectors={connectors} loadError={loadError} onRetry={loadConnectors} onChoose={(k) => choose(k)} />
         )}
 
-        {step === "connect" && kind && kind !== "upload" && conn?.member_sign_in && (
+        {step === "connect" && kind && kind !== "upload" && deciding && <ConnectLoading kind={kind} error={loadError} onRetry={loadConnectors} />}
+
+        {step === "connect" && kind && kind !== "upload" && !deciding && conn?.member_sign_in && (
           <SignInStep
             kind={kind}
             conn={conn}
@@ -350,10 +400,15 @@ export function AddFlow({
           />
         )}
 
-        {step === "connect" && kind && kind !== "upload" && !conn?.member_sign_in && (
-          <ConnectStep kind={kind} conn={conn} busy={busy} error={error} onConnect={signIn} />
+        {step === "connect" && kind && kind !== "upload" && !deciding && !conn?.member_sign_in && (
+          <ConnectStep kind={kind} conn={conn} busy={busy} error={error} onConnect={signIn} canSaveToken={canSaveToken} onTokenSaved={tokenSaved} />
         )}
 
+        {step === "pick" && kind && kind !== "upload" && tokenNote && (
+          <p className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm leading-relaxed text-amber-200" role="status" data-testid="token-note">
+            {tokenNote}
+          </p>
+        )}
         {step === "pick" && kind && kind !== "upload" && <Picker kind={kind} value={picked} onChange={setPicked} via={via} />}
 
         {step === "upload" && <UploadStep limits={limits} files={files} onAdd={addFiles} onRemove={(k) => setFiles((f) => f.filter((x) => x.key !== k))} error={error} />}
@@ -613,47 +668,84 @@ function ConnectStep({
   busy,
   error,
   onConnect,
+  canSaveToken,
+  onTokenSaved,
 }: {
   kind: SourceKind;
   conn: Connector | null;
   busy: boolean;
   error: string | null;
   onConnect: () => void;
+  canSaveToken: boolean;
+  onTokenSaved: (warning: string) => void;
 }) {
   const label = KIND_LABEL[kind];
+  const tokenKind = conn?.token_path && (kind === "notion" || kind === "confluence") ? kind : null;
+  const [showToken, setShowToken] = useState(false);
+  const signIn = !!conn?.can_sign_in;
+  // Without sign-in, the token is the way in: shown at once.
+  const tokenOpen = !!tokenKind && canSaveToken && (!signIn || showToken);
+  const state = signIn ? "sign-in" : tokenKind ? (canSaveToken ? "token" : "ask-admin") : "no-way";
   return (
-    <div className="flex flex-col items-center py-6 text-center" data-testid="connect-step">
+    <div className="flex flex-col items-center py-4 text-center" data-testid="connect-step" data-state={state}>
       <SourceLogo kind={kind} size="lg" />
       <h3 className="mt-5 text-lg font-semibold text-zinc-100">
         {conn?.reconnect_reason ? `Reconnect ${label}` : `Connect ${label} to Coderhelm`}
       </h3>
-      <p className="mt-2 max-w-sm text-sm leading-relaxed text-zinc-400">
+      <p className="mt-2 max-w-md text-sm leading-relaxed text-zinc-400">
         {conn?.reconnect_reason
-          ? `Your ${label} connection stopped working. Sign in again and everything picks up where it left off.`
-          : kind === "notion"
-            ? "You'll sign in to Notion and choose which pages Coderhelm can see. Nothing is changed in Notion."
-            : `You'll sign in to ${label} and allow Coderhelm to read it. Nothing is changed in ${label}.`}
+          ? `Your ${label} connection stopped working. ${signIn ? "Sign in again" : "Connect it again"} and everything picks up where it left off.`
+          : signIn
+            ? kind === "notion"
+              ? "You'll sign in to Notion and choose which pages Coderhelm can see. Nothing is changed in Notion."
+              : `You'll sign in to ${label} and allow Coderhelm to read it. Nothing is changed in ${label}.`
+            : tokenKind && !canSaveToken
+              ? `${label} sign-in isn't set up on this Coderhelm, so ${label} connects with a token that an admin or owner saves.`
+              : tokenKind
+              ? kind === "notion"
+                ? "Create a read-only Notion connection, share the pages you want with it, and paste its token. It takes about two minutes, and nothing is changed in Notion."
+                : "Paste an Atlassian API token for an account that can read the spaces you want. Nothing is changed in Confluence."
+              : `Coderhelm reads the folders and files you pick. Nothing is changed in ${label}.`}
       </p>
       {HYBRID_KINDS.has(kind) && <HybridAppChoice id={kind} name={label} className="mt-5 w-full max-w-md text-left" />}
-      {conn?.can_sign_in ? (
+      {signIn && (
         <button type="button" onClick={onConnect} className={`${buttonClass("primary", "lg")} mt-6`} disabled={busy} data-testid="connect-button">
           {busy ? "Opening…" : `Connect ${label}`}
         </button>
-      ) : (
-        <div className="mt-6 max-w-sm rounded-xl border border-zinc-800 bg-zinc-950/40 p-4 text-left text-sm text-zinc-300" data-testid="connect-hint">
-          <p>{conn?.hint || `${label} isn't connected yet.`}</p>
-          <p className="mt-3">
-            <Link href="/settings/integrations/" className={linkButton}>
-              Open Connected apps
-            </Link>
-          </p>
-        </div>
       )}
       {error && (
-        <p className="mt-4 text-sm text-red-300" role="alert">
+        <p className="mt-4 max-w-md text-sm text-red-300" role="alert">
           {error}
         </p>
       )}
+      <div className="mt-6 w-full max-w-md text-left">
+        {tokenOpen && tokenKind ? (
+          <div className="space-y-5 rounded-xl border border-zinc-800 bg-zinc-950/40 p-4 sm:p-5" data-testid="token-path">
+            {tokenKind === "notion" ? <NotionSteps /> : <ConfluenceSteps />}
+            <TokenForm kind={tokenKind} onConnected={onTokenSaved} />
+          </div>
+        ) : tokenKind && !canSaveToken && !signIn ? (
+          <AskAdmin kind={kind} />
+        ) : !tokenKind && !signIn ? (
+          kind === "google_drive" ? (
+            <NoTokenPath kind={kind} />
+          ) : (
+            <p className="text-sm text-zinc-400">{conn?.hint}</p>
+          )
+        ) : null}
+        {signIn && tokenKind && canSaveToken && !showToken && (
+          <div className="border-t border-zinc-800 pt-5">
+            <button type="button" className={`${linkButton} text-sm`} onClick={() => setShowToken(true)} data-testid="use-token">
+              Use a {label} token instead
+            </button>
+          </div>
+        )}
+        {tokenOpen && (
+          <p className="mt-5 text-sm text-zinc-400">
+            Saved tokens are also on the Integrations page. <IntegrationsLink kind={kind} />
+          </p>
+        )}
+      </div>
     </div>
   );
 }

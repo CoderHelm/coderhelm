@@ -121,6 +121,15 @@ export interface Connector {
   signed_in_as?: string;
   /** The team also has an API token saved for it. */
   has_saved_key?: boolean;
+  /** It can also connect with a token pasted in the add flow (Notion, Confluence). */
+  token_path?: boolean;
+}
+
+/** What the add flow sends to connect with a token. Confluence needs all three. */
+export interface TokenInput {
+  token: string;
+  site?: string;
+  email?: string;
 }
 
 /** How a new source connects: your own sign-in, or the team's saved token or sign-in. */
@@ -177,6 +186,9 @@ export const knowledge = {
   /** Your own sign-in for an app (Sanity): already signed in, or where to send the sign-in window. */
   signIn: (kind: SourceKind) =>
     request<{ signed_in: boolean; authorize_url?: string }>(`/api/knowledge/connectors/${e(kind)}/signin`, { method: "POST" }),
+  /** Checks a pasted token with the app and saves it the way Integrations does (admins and owners). */
+  saveToken: (kind: SourceKind, input: TokenInput) =>
+    request<{ connected: boolean; shared: number | null; warning: string }>(`/api/knowledge/connectors/${e(kind)}/token`, post(input)),
   disconnect: (kind: SourceKind) => request<{ ok: boolean }>(`/api/knowledge/connectors/${e(kind)}`, { method: "DELETE" }),
   browse: (kind: SourceKind, parent: string | null, q: string, via: Via = "team") => {
     const qs = new URLSearchParams();

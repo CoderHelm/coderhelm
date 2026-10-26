@@ -164,6 +164,17 @@ async function mockApi(page: Page, email = ADMIN_EMAIL, usageCheck: Record<strin
       return json(route, { status: "invited", email: target.email, invited_at: target.invited_at });
     }
     if (p === "/api/admin/usage-check") return json(route, db.usageCheck);
+    if (p === "/api/admin/sign-in-apps") {
+      const redirect = "https://app.coderhelm.com/settings/integrations/mcp-callback/";
+      return json(route, {
+        secret_name: "coderhelm/prod/secrets",
+        apps: [
+          { kind: "notion", name: "Notion", app: "Notion public connection (OAuth)", configured: false, source: "", id_key: "notion_client_id", secret_key: "notion_client_secret", console: "https://www.notion.so/profile/integrations", scopes: [], redirect_uri: redirect },
+          { kind: "confluence", name: "Atlassian (Confluence)", app: "Atlassian OAuth 2.0 (3LO) app", configured: false, source: "", id_key: "atlassian_client_id", secret_key: "atlassian_client_secret", console: "https://developer.atlassian.com/console/myapps/", scopes: ["read:page:confluence", "offline_access"], redirect_uri: redirect },
+          { kind: "google_drive", name: "Google Drive", app: "Google OAuth client (Web application)", configured: true, source: "google_client_id", id_key: "google_drive_client_id", secret_key: "google_drive_client_secret", console: "https://console.cloud.google.com/apis/credentials", scopes: ["https://www.googleapis.com/auth/drive.readonly"], redirect_uri: redirect },
+        ],
+      });
+    }
     if (p === "/api/allowlist" && method === "GET") return json(route, { emails: db.allowlist });
     return json(route, { error: `Not mocked: ${p}` }, 404);
   });
@@ -276,6 +287,24 @@ test("anyone but the platform admin is refused and sees no Admin menu item", asy
   await page.goto("/admin");
   await expect(page.getByRole("heading", { name: "Access denied" })).toBeVisible();
   await expect(page.getByRole("link", { name: /^Admin/ })).toHaveCount(0);
+});
+
+test("sign-in apps: which are set up, and what to register for the rest, never a secret", async ({ page }) => {
+  const db = await mockApi(page);
+  await page.goto("/admin");
+  const panel = page.getByTestId("sign-in-apps");
+  await expect(panel).toHaveAttribute("data-state", "ready");
+  await expect(page.getByRole("region", { name: "Sign-in apps" })).toContainText("2 not set up");
+  const rows = panel.getByTestId("sign-in-app");
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0)).toHaveAttribute("data-configured", "no");
+  await expect(rows.nth(0)).toContainText("Not set up. App to register: Notion public connection (OAuth)");
+  await expect(rows.nth(2)).toContainText("Set up, from google_client_id");
+  await rows.nth(0).getByRole("button", { name: /Details/ }).click();
+  await expect(rows.nth(0)).toContainText("https://app.coderhelm.com/settings/integrations/mcp-callback/");
+  await expect(rows.nth(0)).toContainText("notion_client_secret in coderhelm/prod/secrets");
+  expect(db.calls.filter((c) => c.path === "/api/admin/sign-in-apps").every((c) => c.method === "GET")).toBe(true);
+  await shot(page, "admin-sign-in-apps");
 });
 
 test("the usage check reads OK when recorded usage matches the report", async ({ page }) => {
