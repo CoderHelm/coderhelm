@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "node scripts/ui-lint.mjs",
     "typecheck": "tsc --noEmit",
+    "openapi:fields": "node scripts/openapi-fields.mjs",
+    "check:openapi": "node scripts/openapi-fields.mjs --check",
     "test:e2e": "playwright test"
   },
   "dependencies": {
