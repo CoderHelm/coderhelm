@@ -13,11 +13,12 @@ A failed request answers with a `4xx` or `5xx` status and a JSON body:
 }
 ```
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `error` | string | A sentence to show a person. Its wording can change. |
-| `code` | string | What went wrong, for programs. Branch on this, not on `error`. |
-| `scope` | string | Only with `missing_scope`: the scope the key would need. |
+- **`error`** *string*\
+  A sentence to show a person. Its wording can change.
+- **`code`** *string*\
+  What went wrong, for programs. Branch on this, not on `error`.
+- **`scope`** *string*\
+  Only with `missing_scope`: the scope the key would need.
 
 ## Codes
 

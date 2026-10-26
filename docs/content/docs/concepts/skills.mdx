@@ -48,12 +48,14 @@ description: How to write a database migration in this codebase. Read before cha
 - Every migration has a down step...
 ```
 
-| Field | Type | Default | Notes |
-| --- | --- | --- | --- |
-| `name` | string | The folder name (skills) or file name (agents, commands) | Lowercased; characters other than `a-z 0-9 - _ .` become `-`; up to 64 characters. |
-| `description` | string | The first line of the body that is not a heading | Up to 240 characters. Agents choose skills by their description, so make it say when to use the skill. |
-| `tools` or `allowed-tools` | list, or one string split by commas | none | Claude Code tool names, mapped to CoderHelm's own (below). |
-| `model` | string | none | Agents only. A hint for which model answers. |
+- **`name`** *string, default the folder name (skills) or file name (agents, commands)*\
+  Lowercased; characters other than `a-z 0-9 - _ .` become `-`; up to 64 characters.
+- **`description`** *string, default the first line of the body that is not a heading*\
+  Up to 240 characters. Agents choose skills by their description, so make it say when to use the skill.
+- **`tools`** or **`allowed-tools`** *list, or one string split by commas*\
+  Claude Code tool names, mapped to CoderHelm's own (below).
+- **`model`** *string*\
+  Agents only. A hint for which model answers.
 
 Claude Code tool names map to these abilities: `Read` to read files, `Edit` and `MultiEdit` to edit files, `Write` to write files, `Grep` to search code, and `Glob` and `LS` to list files. Others (shell, web, notebooks, sub-agents) have no equivalent and are reported as missing.
 

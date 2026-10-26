@@ -2,7 +2,13 @@
 // page, the schema at /schema/plugin-manifest.v1.json and the validator are
 // one source.
 
-const esc = (s) => String(s ?? '').replace(/\|/g, '\\|').replace(/[<>{}]/g, (c) => `\\${c}`).replace(/\n/g, ' ');
+/** MDX-safe text: braces and angle brackets escaped outside inline code (inside it they are literal). */
+const esc = (s) =>
+  String(s ?? '')
+    .replace(/\n/g, ' ')
+    .split(/(`[^`]*`)/)
+    .map((part, i) => (i % 2 ? part : part.replace(/[<>{}]/g, (c) => `\\${c}`)))
+    .join('');
 
 function resolve(schema, node) {
   if (node && node.$ref) {
@@ -18,7 +24,7 @@ function resolve(schema, node) {
 function typeOf(schema, node) {
   node = resolve(schema, node);
   if (node.const !== undefined) return `\`${JSON.stringify(node.const)}\``;
-  if (node.enum) return node.enum.map((v) => `\`${v}\``).join(' \\| ');
+  if (node.enum) return node.enum.map((v) => `\`${v}\``).join(' or ');
   if (node.oneOf) return node.oneOf.map((n) => typeOf(schema, n)).join(' or ');
   if (node.type === 'array') {
     const items = resolve(schema, node.items);
@@ -32,10 +38,15 @@ function typeOf(schema, node) {
 
 const fmtDefault = (v) => (v === undefined ? '' : `\`${JSON.stringify(v)}\``);
 
+/**
+ * A field list, one item per field: the name, then its type, whether it is
+ * required and its default (muted), then what it does. A parameter list reads
+ * better than a five-column table, on a phone most of all.
+ */
 function table(schema, node, prefix = '') {
   node = resolve(schema, node);
   const required = new Set(node.required ?? []);
-  const rows = ['| Field | Type | Required | Default | Description |', '| --- | --- | --- | --- | --- |'];
+  const items = [];
   for (const [key, raw] of Object.entries(node.properties ?? {})) {
     if (key === '$schema') continue;
     const prop = resolve(schema, raw);
@@ -43,9 +54,13 @@ function table(schema, node, prefix = '') {
     if (prop.pattern) desc += ` Must match \`${prop.pattern}\`.`;
     if (prop.maxLength) desc += ` At most ${prop.maxLength} characters.`;
     if (prop.examples) desc += ` Example: ${prop.examples.map((e) => `\`${e}\``).join(', ')}.`;
-    rows.push(`| \`${prefix}${key}\` | ${typeOf(schema, raw)} | ${required.has(key) ? 'yes' : 'no'} | ${esc(fmtDefault(prop.default))} | ${esc(desc)} |`);
+    const meta = [typeOf(schema, raw), required.has(key) ? 'required' : null, prop.default === undefined ? null : `default ${fmtDefault(prop.default)}`]
+      .filter(Boolean)
+      .join(', ');
+    const head = `- **\`${prefix}${key}\`** *${esc(meta)}*`;
+    items.push(desc.trim() ? `${head}\\\n  ${esc(desc.trim())}` : head);
   }
-  return rows.join('\n');
+  return items.join('\n');
 }
 
 export function renderManifestReference(schema) {
@@ -75,7 +90,7 @@ export function renderManifestReference(schema) {
     '',
     '## Top-level fields',
     '',
-    esc(schema.description).replace(/\\\|/g, '|'),
+    esc(schema.description),
     '',
     table(schema, schema),
     '',

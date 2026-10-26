@@ -45,9 +45,91 @@ html > body[data-scroll-locked] {
   body {
     overflow-wrap: anywhere;
   }
-  table {
-    overflow-wrap: break-word;
-  }
+}
+
+/* Tables (components/table.tsx). One rounded box, a quiet header, a hairline
+   between rows and no lines between columns. Columns of short keys stay on
+   one line; columns of text get a minimum width from the component, so a
+   wide table scrolls inside its box (with a fade on the side that has more)
+   and the page never scrolls sideways. */
+.ch-table {
+  --tbl-bg: var(--color-fd-background);
+  --tbl-fade: color-mix(in oklab, var(--color-fd-foreground) 14%, transparent);
+  position: relative;
+  max-width: 100%;
+  margin: 1.5rem 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border: 1px solid var(--color-fd-border);
+  border-radius: 0.75rem;
+  /* Shadows at the edges that only show while there is more to scroll: the
+     covers move with the content, the shadows stay with the box. */
+  background:
+    linear-gradient(to right, var(--tbl-bg) 30%, transparent) left / 2.5rem 100% no-repeat local,
+    linear-gradient(to left, var(--tbl-bg) 30%, transparent) right / 2.5rem 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, var(--tbl-fade), transparent) left / 0.875rem 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, var(--tbl-fade), transparent) right / 0.875rem 100% no-repeat scroll,
+    var(--tbl-bg);
+}
+.ch-table:focus-visible {
+  outline: 2px solid var(--color-fd-ring);
+  outline-offset: 2px;
+}
+.ch-table table {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: transparent;
+  overflow: visible;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  overflow-wrap: break-word;
+}
+.ch-table th,
+.ch-table td {
+  padding: 0.625rem 0.875rem;
+  border-inline-start: 0;
+  text-align: start;
+  vertical-align: top;
+}
+.ch-table th {
+  background: color-mix(in oklab, var(--color-fd-muted) 70%, transparent);
+  border-bottom: 1px solid var(--color-fd-border);
+  color: var(--color-fd-muted-foreground);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ch-table tbody tr:not(:last-child) td {
+  border-bottom: 1px solid color-mix(in oklab, var(--color-fd-border) 75%, transparent);
+}
+/* The first column names the row: a little heavier than the cells beside it. */
+.ch-table td:first-child {
+  color: var(--color-fd-foreground);
+  font-weight: 500;
+}
+.ch-table td:not(:first-child) {
+  color: color-mix(in oklab, var(--color-fd-foreground) 86%, var(--color-fd-muted-foreground));
+}
+.ch-table [data-fit='key'] {
+  white-space: nowrap;
+}
+/* Code in a cell is a chip that wraps at its separators (components/table.tsx
+   puts break points after . / - _ and the like), never mid-word. */
+.ch-table code {
+  font-size: 0.8125em;
+  padding: 0.0625rem 0.3rem;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.ch-table [data-fit='key'] code {
+  white-space: nowrap;
 }
 
 ::selection {
@@ -249,4 +331,42 @@ h1 > .ch-badge {
 }
 .ch-dg-text[open] summary {
   margin-bottom: 0.25rem;
+}
+
+/* Definition lists: a list whose items open with a bold term and a line
+   break (a setting, a check, an error code, then what it means). Written in
+   plain Markdown, so the self-host guides read the same on GitHub:
+     - **`retainData`** *boolean, default `true`*\
+       Keep tables ... when stacks are deleted.
+   Here they lose the bullets and get a hairline between items, like a
+   parameter list. The italic part is muted metadata (a type, a default, a
+   label such as "Fix:"). */
+.prose ul:has(> li > strong:first-child ~ br) {
+  list-style: none;
+  padding-inline-start: 0;
+  margin-block: 1.25rem 1.5rem;
+  border-top: 1px solid var(--color-fd-border);
+}
+.prose ul:has(> li > strong:first-child ~ br) > li {
+  margin: 0;
+  padding: 0.75rem 0 0.8rem;
+  padding-inline-start: 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--color-fd-border) 75%, transparent);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+}
+.prose ul:has(> li > strong:first-child ~ br) > li > strong:first-child {
+  color: var(--color-fd-foreground);
+  font-weight: 600;
+}
+.prose ul:has(> li > strong:first-child ~ br) > li > em {
+  font-style: normal;
+  font-size: 0.875em;
+  color: var(--color-fd-muted-foreground);
+}
+.prose ul:has(> li > strong:first-child ~ br) > li > strong:first-child {
+  font-size: 1rem;
+}
+.prose ul:has(> li > strong:first-child ~ br) > li > strong:first-child + em {
+  margin-inline-start: 0.35rem;
 }

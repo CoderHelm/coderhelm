@@ -48,8 +48,9 @@ test('plugins have shipped: the manifest reference has no Coming soon badge, and
   await page.goto('/plugins/manifest-reference/');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Manifest reference');
   await expect(page.locator('h1 .ch-badge')).toHaveCount(0);
-  await expect(page.getByRole('cell', { name: 'results', exact: true }).first()).toBeVisible();
-  await expect(page.getByRole('cell', { name: 'name', exact: true }).first()).toBeVisible();
+  // Every field is a definition list item: its name, then its type and what it does.
+  await expect(page.locator('#nd-page li > strong > code', { hasText: /^results$/ }).first()).toBeVisible();
+  await expect(page.locator('#nd-page li > strong > code', { hasText: /^name$/ }).first()).toBeVisible();
   await expect(page.getByRole('link', { name: /edit on github/i })).toHaveAttribute('href', /CoderHelm\/coderhelm\/blob\/main\/docs\/schemas\/plugin-manifest\.schema\.json/);
   // No plugin page is marked unreleased in the sidebar.
   await expect(page.locator('aside a[href*="/plugins/"] .ch-badge')).toHaveCount(0);
