@@ -109,6 +109,10 @@ async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
     }
     if (p === "/auth/2fa/verify") {
       const code = body().code;
+      if (code === "999999") {
+        return json(route, { error: "Too many wrong codes. To keep your account safe, sign-in with a code is paused for 15 minutes. If this wasn't you, tell an admin.", code: "locked_out", retry_after: 900 }, 429);
+      }
+      if (code === "555555") return json(route, { error: "Too many wrong codes for this sign-in. Sign in again.", code: "second_step_expired" }, 401);
       if (code !== "123456") return json(route, { error: "wrong", code: "wrong_code" }, 401);
       state.verified.push(code);
       state.me = { ...ME, email: "bo@example.org", role: "member", github_login: "bo-codes" as unknown as null, auth_provider: "github" };
@@ -248,6 +252,24 @@ for (const width of WIDTHS) {
       await form.getByRole("button", { name: "Sign in", exact: true }).click();
       await expect.poll(() => state.verified).toEqual(["123456"]);
       await expect(page.getByRole("heading", { name: "Security", level: 1 })).toBeVisible();
+    });
+
+    test("too many wrong codes: the pause is said plainly, and a spent sign-in starts over", async ({ page }) => {
+      await mock(page, { me: null });
+      await page.goto("/settings/security?two_factor=1");
+      const form = page.getByTestId("second-step");
+      await form.getByLabel("Six digit code").fill("999999");
+      await form.getByRole("button", { name: "Sign in", exact: true }).click();
+      await expect(page.getByRole("alert").filter({ hasText: "paused for 15 minutes" })).toBeVisible();
+      // Back on the sign-in screen, not the code box.
+      await expect(page.getByTestId("second-step")).toHaveCount(0);
+      await expect(page.getByLabel("Email")).toBeVisible();
+      await noSidewaysScroll(page);
+      await shot(page, "locked-out", width);
+      await page.goto("/settings/security?two_factor=1");
+      await page.getByTestId("second-step").getByLabel("Six digit code").fill("555555");
+      await page.getByTestId("second-step").getByRole("button", { name: "Sign in", exact: true }).click();
+      await expect(page.getByRole("alert").filter({ hasText: "Too many wrong codes for this sign-in" })).toBeVisible();
     });
 
     test("someone who isn't invited reads why, with no waitlist or closed beta", async ({ page }) => {

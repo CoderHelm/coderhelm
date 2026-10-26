@@ -1038,8 +1038,14 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
       const u = await api.me();
       onAuth(u);
     } catch (e: unknown) {
-      if (e instanceof ApiError && e.code === "second_step_expired") {
-        setError("That took too long. Sign in again.");
+      if (e instanceof ApiError && e.code === "locked_out") {
+        // Too many wrong codes: the server's sentence says how long the pause is.
+        setError(e.message);
+        setCode("");
+        setView("login");
+      } else if (e instanceof ApiError && e.code === "second_step_expired") {
+        setError(e.message || "That took too long. Sign in again.");
+        setCode("");
         setView("login");
       } else {
         setError("That code didn't work. Open your authenticator app and enter the current 6-digit code.");
@@ -1053,7 +1059,13 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
       await api.mfaVerify(mfaSession, code, email);
       const u = await api.me();
       onAuth(u);
-    } catch {
+    } catch (e: unknown) {
+      if (e instanceof ApiError && e.code === "locked_out") {
+        setError(e.message);
+        setCode("");
+        setView("login");
+        return;
+      }
       setError("That code didn't work. Open your authenticator app and enter the current 6-digit code.");
     } finally { setLoading(false); }
   };
