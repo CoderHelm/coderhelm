@@ -1,24 +1,25 @@
 ---
 title: Private marketplace
 description: Give your team a catalog of approved plugins from your own git repository.
-status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
 
-A private marketplace is a plugin source with several plugins in it: one repository, one folder per plugin, each folder with its own `plugin.yaml`.
+A private marketplace is a plugin source with several plugins in it: one repository, one `plugins/<name>/` folder per plugin, each folder with its own `plugin.yaml`.
 
 ```txt
 your-org/coderhelm-plugins
-├── marketing/
-│   └── plugin.yaml
-├── support-replies/
-│   └── plugin.yaml
-└── sales-notes/
-    └── plugin.yaml
+└── plugins/
+    ├── marketing/
+    │   └── plugin.yaml
+    ├── support-replies/
+    │   └── plugin.yaml
+    └── sales-notes/
+        └── plugin.yaml
 ```
 
-Make the repository private and readable by your team's GitHub App, then add it as a source on the **Plugins** page as `your-org/coderhelm-plugins`. Its plugins appear under **Plugins you can install**, and installing one goes through the usual steps: an admin installs, a second admin approves when there are two, and connections are made separately.
+Each source is read at a pinned commit. A private source is read only through your team's own GitHub App installation, so no other team can read it.
+
+Make the repository private and readable by your team's GitHub App, then add it as a source on the **Plugins** page as `your-org/coderhelm-plugins`. Its plugins appear in the catalog on the **Plugins** page, and installing one goes through the usual steps: an admin installs, a second admin approves when there are two, and connections are made separately.
 
 ## Keep it vetted
 

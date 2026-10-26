@@ -1,10 +1,8 @@
 ---
 title: What a plugin is
 description: A plugin packages instructions, agents, tools, triggers and outputs so CoderHelm can do work for any team, with the same safety it applies to code.
-status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
 
 A **plugin** lets a team other than engineering put CoderHelm to work: marketing, support, sales operations, anyone. It brings its own instructions, agents and tools, says what starts it and what it produces, and CoderHelm runs it with the same safety it applies to code: pinned versions, a person's approval before anything goes out, metered tokens and a full record of every step.
 
@@ -12,13 +10,14 @@ For example, the [marketing plugin](/plugins/walkthrough) reads each release, dr
 
 ## A plugin is text plus approved tools
 
-A plugin is a folder in a git repo with a small manifest, `plugin.yaml`. It contains no code that CoderHelm runs.
+A plugin is a folder in a git repo with a small manifest, `plugin.yaml`. It contains no code that CoderHelm runs, and unknown fields in the manifest are refused.
 
 - **Skills and agents** are Markdown, in the same format as [skill repos](/concepts/skills) and Claude Code. They are the plugin's behavior.
 - **Tools** are declared in the manifest, each with a risk level. A tool that isn't declared does not exist for the plugin.
 - **Settings** are the values each team fills in: a brand guide, an account to post from.
 - **Triggers** say what starts a run: a person's brief, a schedule, a release.
 - **Outputs** say what a run produces: drafts to review, and what may be published once approved.
+- **Results** (optional) read a published item's numbers back a few days later, as a lesson the next runs read.
 
 ```yaml title="plugin.yaml"
 name: marketing
@@ -26,8 +25,7 @@ version: 1.0.0
 description: Drafts launch posts from each release for an editor to approve.
 tools:
   - ref: mcp:sanity
-    allow: [query_documents, create_draft]
-    risk: write
+    allow: [get_*, query_*, create_draft]
 triggers:
   - on: github.release
 outputs:

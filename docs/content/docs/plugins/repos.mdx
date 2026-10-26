@@ -1,10 +1,8 @@
 ---
 title: Public and private repos
 description: Install plugins from public or private repositories, and how each one stays up to date.
-status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
 
 Plugins come from **plugin sources**: git repositories an admin adds on the **Plugins** page. Each source is read at a pinned commit.
 
@@ -13,14 +11,15 @@ Plugins come from **plugin sources**: git repositories an admin adds on the **Pl
 | How you add it | Its public GitHub address | `owner/name`, for a repository your team's GitHub App can read |
 | Who sees it | Your team | Your team only; private repositories stay private to your team |
 
-A source can hold one plugin at its root, or several in folders. Its plugins appear under **Plugins you can install**.
+A source holds one plugin at its top, or several under `plugins/<name>/`. Its plugins appear in the catalog on the **Plugins** page.
 
 ## Following changes
 
-Each source, and each installed plugin, follows a branch, a tag or one commit. CoderHelm checks sources for changes and shows when it last checked.
+Each source, and each installed plugin, follows a branch, a tag or one commit. A push to a repository on your team's GitHub App installation is picked up right away; other sources are checked every 15 minutes. The page shows when each source was last checked, and **Check now** checks at once.
 
 - **Take new versions on their own**: new versions are picked up by themselves. Wording changes apply; anything that widens what the plugin can do still waits for an admin ([Versioning and updates](/plugins/versioning)).
 - **Pin to a commit**: the plugin stays on one version until someone moves it.
+- **Roll back** returns to the previous version in one step, and turns taking new versions off so the next check doesn't undo it.
 
 ## Removing a source
 

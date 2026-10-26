@@ -1,10 +1,8 @@
 ---
 title: Skills, agents and tools
 description: How a plugin's agents are written, which tools they may call, and what read, write and consequential mean.
-status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
 
 ## Skills
 
@@ -20,7 +18,7 @@ An agent file is Markdown with frontmatter. The body is the agent's instructions
 
 | Field | Meaning |
 | --- | --- |
-| `name` | The agent's id. Defaults to the file name. |
+| `name` | The agent's id. Defaults to the file name. A trigger's `agent:` names it. |
 | `description` | One line saying what it does. |
 | `tools` | The tools it uses. Each must be granted in `plugin.yaml`; the [validator](/plugins/testing) refuses any that aren't. |
 
@@ -30,33 +28,44 @@ The plugin's page in the dashboard lists its skills and agents under **Skills an
 
 Tools are declared in the manifest's `tools` list, in one of two shapes.
 
-**Tools from an MCP server** on the team's Connections page. List the tool names (or `*` globs) the plugin may call; every other tool on that server is hidden from the run.
+**Tools from an MCP server** on the team's [Connections](/concepts/connections) page. List the tool names, or narrow patterns such as `get_*`, the plugin may call; every other tool on that server is hidden from the run. `allow` is required and may never be `*`: a plugin never gets every tool of a server.
 
 ```yaml
 tools:
-  - ref: mcp:sanity
-    allow: [get_document, query_documents, create_draft]
-    risk: write
+  - ref: "mcp:sanity"
+    allow: [get_*, list_*, query_*, create_draft]
 ```
 
-**Named tools**: one of CoderHelm's built-in tools (`kind: builtin`), or a tool the plugin defines to call an outside service with the team's connection (`kind: http`).
+**HTTP tools** the plugin defines to call an outside service over HTTPS with one of the team's [connections](/plugins/connections). The token comes from the connection; the manifest never carries credentials.
 
 ```yaml
 tools:
-  - name: get_release_notes
-    kind: builtin
-    risk: read
   - name: publish_post
     kind: http
-    description: Publish an approved post to the company's LinkedIn page.
+    connection: linkedin            # a `connection` setting
+    method: POST
+    url: "https://api.linkedin.com/rest/posts"
     risk: consequential
+    description: Publish an approved post on LinkedIn.
+    headers:
+      LinkedIn-Version: "202406"
+    body:
+      author: "{{setting:linkedin_author}}"
+      commentary: "{{content}}"
 ```
+
+- `headers` are extra request headers, such as an API version. `Authorization`, `Cookie`, `Host`, `Content-Length`, `Transfer-Encoding` and `Proxy-*` are refused.
+- `body` is the JSON to send. Strings may use `{{title}}`, `{{content}}`, `{{kind}}` and `{{channel}}` from the approved draft, and `{{setting:<key>}}` for a `string` setting that isn't sensitive. Values are inserted as text inside JSON strings, so a draft can never add keys or change the shape. Without `body`, CoderHelm sends `{title, content, kind, channel}`.
+
+**Built-in tools** (`kind: builtin`): one of CoderHelm's own read-only tools, by name, such as `search_code`. A plugin can't add a built-in that writes.
+
+Every run also has two tools without asking: `read_plugin_skill` (its own skills) and `save_draft` (drafts kept in CoderHelm until a person approves them).
 
 The plugin's page shows every tool and its risk under **What it can do**.
 
 ## Risk levels
 
-Every tool has one of three risk levels.
+Every tool has one of three risk levels. CoderHelm works a tool's risk out from its name and method: a name starting with a read verb (`get`, `list`, `search`, `query`…) is `read`; one with a word like `publish`, `send`, `post` or `delete` is `consequential`; anything else, and any HTTP call that isn't a `GET`, is at least `write`. A `risk:` in the manifest can raise a tool's risk, never lower it.
 
 | Risk | Means | Runs |
 | --- | --- | --- |

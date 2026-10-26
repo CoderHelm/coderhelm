@@ -68,6 +68,15 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/skills/item": { label: "Skill", parent: "/skills", detail: true },
   "/skills/agent": { label: "Agent", parent: "/skills", detail: true },
 
+  "/connections": { label: "Connections" },
+
+  "/plugins": { label: "Plugins" },
+  "/plugins/plugin": { label: "Plugin", parent: "/plugins", detail: true },
+  "/plugins/review": { label: "Review", parent: "/plugins", tab: "Drafts waiting for review" },
+  "/plugins/draft": { label: "Draft", parent: "/plugins/review", detail: true },
+  "/plugins/runs": { label: "Plugin run", parent: "/plugins", detail: true },
+  "/audit": { label: "Audit log" },
+
   "/settings": { label: "Settings" },
   "/settings/notifications": { label: "Notifications", parent: "/settings" },
   "/settings/security": { label: "Security", parent: "/settings" },

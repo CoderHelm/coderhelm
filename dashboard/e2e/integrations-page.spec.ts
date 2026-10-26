@@ -489,11 +489,11 @@ test("a failed load offers a retry", async ({ page }) => {
   await expect(page.getByTestId("integration-github")).toBeVisible();
 });
 
-test("old addresses lead to Integrations", async ({ page }) => {
+test("the old Plugins address leads to Connections", async ({ page }) => {
   await mockApi(page);
   await page.goto("/settings/plugins");
-  await expect(page).toHaveURL(/\/settings\/integrations\/?#other-tools$/);
-  await expect(page.getByTestId("integration-linear")).toBeVisible();
+  await expect(page).toHaveURL(/\/connections\/?$/);
+  await expect(page.getByTestId("topbar")).toContainText("Connections");
 });
 
 test("your websites: an admin adds and removes domains, and a bad entry says why", async ({ page }) => {

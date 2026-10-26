@@ -8,6 +8,7 @@ import { learningData } from "./learning";
 import { brainData } from "./brain";
 import { knowledgeData } from "./knowledge";
 import { agentsData } from "./agents";
+import { pluginsData } from "./plugins";
 
 // An invented backend whose records are full of long, unbroken strings
 // (long.ts), for the no-sideways-scroll spec. Each file answers one part of
@@ -25,7 +26,7 @@ export type Handler = (req: Req) => unknown | undefined;
 
 const base: Handler = ({ method, path }) => {
   if (method !== "GET") return undefined;
-  if (path === "/api/me") return { user_id: "u_self", team_id: "t_1", github_login: "dana-developer-with-a-long-login", email: EMAIL, avatar_url: "", role: "owner", mfa_enabled: false, platform_admin: true };
+  if (path === "/api/me") return { user_id: "u_self", team_id: "t_1", github_login: "dana-developer-with-a-long-login", email: EMAIL, avatar_url: "", role: "owner", mfa_enabled: false, platform_admin: true, flags: { plugins: true } };
   // All three limits set, so the sidebar draws its three bars.
   if (path === "/api/usage") {
     return {
@@ -46,7 +47,7 @@ const base: Handler = ({ method, path }) => {
 };
 
 // Knowledge answers /api/knowledge before the chat's file does.
-const HANDLERS: Handler[] = [base, runsData, reviewData, settingsData, logsData, learningData, knowledgeData, brainData, agentsData];
+const HANDLERS: Handler[] = [base, runsData, reviewData, settingsData, logsData, learningData, knowledgeData, brainData, agentsData, pluginsData];
 
 /** Mocks the whole API. Returns the list of GETs no handler answered. */
 export async function mockWideApi(page: Page): Promise<{ unanswered: string[] }> {

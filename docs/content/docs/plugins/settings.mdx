@@ -1,10 +1,8 @@
 ---
 title: Settings and secrets
 description: Declare the values each team fills in for your plugin, and keep secrets away from the model.
-status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
 
 Settings are the values that differ between teams: a brand guide, an account to post from. You declare them in the manifest; each team fills them in on the plugin's page. Values live with the team, never in the plugin.
 
@@ -12,6 +10,7 @@ Settings are the values that differ between teams: a brand guide, an account to 
 settings:
   - key: brand_voice_doc
     type: string
+    description: A link to your brand voice document.
   - key: crm_api_key
     type: secret
   - key: linkedin
@@ -26,7 +25,9 @@ settings:
 | --- | --- | --- |
 | `string` | Types a value. | Agents can read it, unless `sensitive: true`. |
 | `secret` | Pastes a value once. | Sealed, never shown again once saved, never given to a model. |
-| `connection` | Connects an account. | See [Connections and OAuth](/plugins/connections). Needs `provider`. |
+| `connection` | Connects an account. | See [Connections and OAuth](/plugins/connections). Needs `provider` (`oauth2`, `mcp` or `key`); `scopes` lists what it asks for. |
+
+Keys are lowercase letters, digits, `-` and `_`. `description` is shown on the plugin's page, next to the box the team fills in. A `string` setting that isn't sensitive can also be used in an [HTTP tool's body](/plugins/skills-agents-tools#tools) as `{{setting:<key>}}`.
 
 Every field is in the [manifest reference](/plugins/manifest-reference#settings).
 

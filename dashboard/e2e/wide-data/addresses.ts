@@ -1,5 +1,5 @@
 import { REPO } from "./long";
-import { ALERT_ID, PLAN_ID, REVIEW_SK, RUN_ID, SUPPORT_TICKET_ID, TEST_ID, TEST_RUN_KEY, TOOL_NAME } from "./ids";
+import { ALERT_ID, DRAFT_ID, PLAN_ID, PLUGIN_ID, PLUGIN_RUN_ID, REVIEW_SK, RUN_ID, SUPPORT_TICKET_ID, TEST_ID, TEST_RUN_KEY, TOOL_NAME } from "./ids";
 
 /**
  * The query an item's page (`detail: true` in lib/routes.ts) is opened with,
@@ -24,4 +24,7 @@ export const SAMPLE_QUERY: Record<string, string> = {
   "/knowledge/base": "?id=kb_wide",
   // Not an item's page, but its fullest view is an open thread.
   "/chat": "?thread=th_wide",
+  "/plugins/plugin": `?id=${encodeURIComponent(PLUGIN_ID)}`,
+  "/plugins/draft": `?id=${DRAFT_ID}`,
+  "/plugins/runs": `?id=${PLUGIN_RUN_ID}`,
 };

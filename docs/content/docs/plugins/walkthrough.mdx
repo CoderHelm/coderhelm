@@ -1,10 +1,8 @@
 ---
 title: Build the marketing plugin
 description: A full walkthrough, from an empty repo to a plugin that drafts launch posts from each release and publishes after an editor approves.
-status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
 
 In this walkthrough you build a plugin that:
 
@@ -22,7 +20,7 @@ The finished plugin is in the docs repository at [`docs/examples/marketing`](htt
 ```bash
 mkdir marketing-plugin && cd marketing-plugin
 git init
-mkdir -p skills/brand-voice skills/launch-checklist agents
+mkdir -p skills/brand-voice skills/claims-and-facts agents connectors
 ```
 
 </Step>
@@ -30,25 +28,25 @@ mkdir -p skills/brand-voice skills/launch-checklist agents
 
 ### Write the brand voice skill
 
-The skill holds what is true for every draft. It refers to the team's own guide, a setting, rather than containing any brand's text.
+The skill holds what is true for every draft. It refers to the team's own guide, a setting, rather than containing any brand's text. A text file next to it (`examples.md`) shows the shape of a good post.
 
 <include meta='title="skills/brand-voice/SKILL.md"'>../../../examples/marketing/skills/brand-voice/SKILL.md</include>
 
 </Step>
 <Step>
 
-### Add a checklist skill
+### Add a claims and facts skill
 
-A second skill the agent runs over each draft before saving it.
+A second skill that keeps every draft to what the release notes, the merged changes or the brief actually say.
 
-<include meta='title="skills/launch-checklist/SKILL.md"'>../../../examples/marketing/skills/launch-checklist/SKILL.md</include>
+<include meta='title="skills/claims-and-facts/SKILL.md"'>../../../examples/marketing/skills/claims-and-facts/SKILL.md</include>
 
 </Step>
 <Step>
 
-### Write the agent
+### Write the agents
 
-The agent's instructions say what it gets for each trigger, what to produce, and what it must never do. Its `tools:` list names only tools the manifest will grant.
+The agent's instructions say what it gets, what to produce, and what it must never do. It saves drafts with `save_draft`, which every plugin run has. A second agent, `agents/weekly-roundup.md`, answers the weekly schedule.
 
 <include meta='title="agents/launch-writer.md"'>../../../examples/marketing/agents/launch-writer.md</include>
 
@@ -63,10 +61,11 @@ Now declare everything the plugin needs.
 
 Section by section:
 
-- **settings**: the brand guide and banned claims are values the team types; the agent reads them. \`sanity\` and \`linkedin\` are accounts the team connects.
-- **tools**: \`get_release_notes\` is a built-in read tool. From Sanity, only three tools, at \`write\` risk because drafts there are not public. \`publish_post\` is the plugin's own tool, \`consequential\` because it reaches the public, and it signs in with the team's \`linkedin\` connection.
-- **triggers**: every release, Mondays at 14:00, and a brief form with a list of channels.
-- **outputs**: three kinds of draft, and publishing through \`publish_post\` once one approver says yes.
+- **settings**: the brand voice document, the product's name and the LinkedIn author are values the team types. `linkedin`, `email` and `images` are accounts the team connects; they are sensitive, so they never reach the model.
+- **tools**: from Sanity, only reads and `create_draft`; from PostHog, only reads. `publish_post` and `send_email` are the plugin's own HTTP tools, `consequential` because they reach people, each sending with one of the team's connections. `publish_post` adds LinkedIn's version headers and builds its body from the approved draft (`{{content}}`) and a setting (`{{setting:linkedin_author}}`). `generate_image` makes a header image: `write`, since it publishes nothing.
+- **triggers**: every release (answered by `launch-writer`), Mondays at 14:00 UTC (answered by `weekly-roundup`), and a brief form with a list of channels.
+- **outputs**: four kinds of draft, and publishing through `publish_post` once one approver says yes.
+- **results**: a week after a post goes out, its numbers are read back through PostHog as a lesson the next runs read.
 - **budget**: at most 2 million tokens a month, unless the team changes it.
 
 </Step>
@@ -74,16 +73,16 @@ Section by section:
 
 ### Validate
 
-\`\`\`bash
+```bash
 curl -fsSLO https://docs.coderhelm.com/tools/validate-plugin.mjs
 node validate-plugin.mjs .
-\`\`\`
+```
 
-\`\`\`txt
+```txt
 ok       marketing 1.0.0
-\`\`\`
+```
 
-Try breaking it: change \`publish_post\`'s \`risk\` to \`write\` and the validator refuses, because a publish output must go through a consequential tool. Add \`delete_document\` to the agent's \`tools:\` and it refuses again, because the manifest doesn't grant it.
+Try breaking it: point the publish output at `generate_image` and the validator refuses, because a publish output must go through a consequential tool. Add `delete_document` to an agent's `tools:` and it refuses again, because the manifest doesn't grant it.
 
 </Step>
 <Step>
@@ -92,31 +91,31 @@ Try breaking it: change \`publish_post\`'s \`risk\` to \`write\` and the validat
 
 Push the repo to GitHub. Then, in CoderHelm:
 
-1. An admin opens **Plugins**, adds the repository under **Plugin sources** (its public address, or \`owner/name\` if your GitHub App can read it), and picks the branch, tag or commit to follow.
-2. **marketing** appears under **Plugins you can install**. The admin installs it; with two or more admins, a second admin approves.
-3. On the plugin's page, the team fills in \`brand_voice_doc\` and \`banned_claims\`, connects Sanity (on **Connections**) and LinkedIn, and lists the editors under **Who approves what goes out**.
+1. An admin opens **Plugins** and adds the repository as a source (its public address, or `owner/name` if your GitHub App can read it), following a branch, a tag or one commit.
+2. **marketing** appears in the catalog. The admin installs it; with two or more admins, a second admin approves.
+3. On the plugin's page, the team fills in `brand_voice_doc`, `product_name` and `linkedin_author`, connects LinkedIn, the email service and the image service, makes sure Sanity and PostHog are on the **Connections** page, and lists the editors under **Who approves what goes out**.
 
 </Step>
 <Step>
 
 ### Run it
 
-Start it by hand first: on the plugin's page, under **Write a brief**, ask for "Announce the new export button", pick channels and click **Start the run**. Or publish a release on a connected repository.
+Start it by hand first: on the plugin's page, under **Write a brief**, ask for "Announce the new export button", pick channels and click **Start the run**. Or cut a release on a connected repository.
 
-The run reads the release notes, checks earlier posts in Sanity, and saves the drafts. If the team turned on Slack or Teams notices, a card goes to the channel.
+The run reads the release notes, checks earlier posts in Sanity, and saves the drafts. If the team set up Slack or Teams, a card goes to the channel.
 
 </Step>
 <Step>
 
 ### Approve and publish
 
-An editor (not the person who asked) opens **Plugins** → **Review**, edits one LinkedIn variant (which saves a new version), and approves it for Tuesday at 10:00 with **Approve for that time**. On Tuesday, CoderHelm calls \`publish_post\` with exactly the approved text. Until then, anyone allowed can **Cancel publish**. The **Audit log** shows the trigger, the plugin version, each tool call and its risk, the editor's approval and the result.
+An editor (not the person who asked) opens **Plugins** → **Review**, edits one LinkedIn variant (which saves a new version), and approves it for Tuesday at 10:00 with **Approve for that time**. On Tuesday, CoderHelm calls `publish_post` with exactly the approved text. Until then, anyone allowed can **Cancel publish**. The **Audit log** shows the trigger, the plugin version, each tool call and its risk, the editor's approval and the result.
 
 </Step>
 </Steps>
 
 ## Where to go next
 
-- Add a `email` publish tool for your email provider, with its own approval.
-- Add a read tool for post analytics from your connections, so next week's run can see what worked.
+- Add a publish output for `send_email`, with its own approval.
+- Change the HTTP tools' addresses and bodies to use the services your team already has.
 - Put the plugin in your [private marketplace](/plugins/marketplace) for other teams.

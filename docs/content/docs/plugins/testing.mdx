@@ -1,10 +1,8 @@
 ---
 title: Test a plugin locally
 description: Check plugin.yaml, your skills and your agents with the validator before you push.
-status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
 
 The validator checks a plugin folder the way CoderHelm will when you install it. It needs only Node.js 20 or newer.
 
@@ -17,14 +15,15 @@ The file is a single script with its dependencies bundled in. It is built from t
 
 ## What it checks
 
-1. `plugin.yaml` against the manifest schema: required fields, types, allowed values, and no unknown fields (a typo fails instead of being ignored).
-2. Every `skills` and `agents` glob matches at least one file.
-3. Every file fits the limits (64,000 bytes per skill or agent; 200 items; 2,000,000 bytes in all).
-4. Each agent's `tools:` are granted in `plugin.yaml`.
-5. `{settings.key}` and `{input}` placeholders name a real setting or input, and `request.connection` names a `connection` setting.
-6. A `publish` output goes through a `consequential` tool, and a `read` tool only uses `GET`.
+The same checks CoderHelm makes when it reads a plugin:
 
-Warnings point out things that work but are probably mistakes, such as an input that no request uses, or `allow: ["*"]`.
+1. `plugin.yaml` (or `plugin.yml`, or `.coderhelm/plugin.yaml`) against the manifest schema: required fields, types, allowed values, and no unknown fields (a typo fails instead of being ignored).
+2. Every `skills` and `agents` glob matches at least one file, and every file fits the limits (64,000 bytes per skill or agent; 200 items; 2,000,000 bytes in all).
+3. Each agent's `tools:` are granted in `plugin.yaml`, and no named tool clashes with one allowed from a connection.
+4. A connection's `allow` list is never `*`.
+5. An HTTP tool names a `connection` setting, calls an `https` address, sends no credential headers, and its `body` only uses `{{setting:<key>}}` for string settings that aren't sensitive.
+6. A `publish` output goes through a tool that works out as `consequential`.
+7. `results` reads through an `mcp:` server the plugin lists, with a read-only tool.
 
 ## Output
 
@@ -35,7 +34,7 @@ ok       marketing 1.0.0
 
 ```txt
 $ node validate-plugin.mjs ./broken
-error    tools.publish_post: `{txt}` names no input
+error    tools.publish_post: the body uses setting `linkedin`, which must be a string setting that isn't sensitive
 error    agents/rogue.md: tool `delete_document` is not granted in plugin.yaml `tools`
 
 2 errors: the plugin would be refused.

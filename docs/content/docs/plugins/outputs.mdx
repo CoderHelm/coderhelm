@@ -1,10 +1,8 @@
 ---
 title: Outputs, drafts and approvals
 description: What a plugin run produces, how drafts are reviewed, and how nothing goes out without an approval of the exact version.
-status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
 
 ## Drafts
 
@@ -16,7 +14,7 @@ outputs:
     kinds: [blog, social, email]
 ```
 
-Kinds are `blog`, `social`, `email`, `image` and `action` (a step to take, such as an update to a record). Drafts wait in **Plugins** → **Review**: "Read one, edit it if needed, then approve it to go out now or at a time you pick."
+Kinds are `blog`, `social`, `email`, `image`, `post`, `page`, `note`, `reply`, `ticket` and `report`. Without `kinds`, a run may save any of them. Drafts wait in **Plugins** → **Review**: "Read one, edit it if needed, then approve it to go out now or at a time you pick."
 
 | Status | Means |
 | --- | --- |
@@ -24,6 +22,7 @@ Kinds are `blog`, `social`, `email`, `image` and `action` (a step to take, such 
 | In review | Waiting for an approver. |
 | Approved | An approver said yes to this exact version. |
 | Scheduled | Approved for a set time; it can be cancelled until then. |
+| Publishing | Going out now through the publish tool. |
 | Published | Sent out by the publish tool, with a link to the result. |
 | Rejected | Turned down. |
 | Stopped | Stopped for good: nothing from this draft can go out. |
@@ -43,7 +42,7 @@ outputs:
       min: 1                   # how many different people
 ```
 
-A `publish` output names the consequential tool that sends an approved draft out. That tool runs only:
+A `publish` output names the consequential tool that sends an approved draft out. It must be one of the plugin's named tools and work out as `consequential` (declare `risk: consequential` if its name doesn't say so). `min` is at least 1. That tool runs only:
 
 1. after the required number of approvers say yes,
 2. with the exact version they approved,
@@ -59,3 +58,16 @@ A scheduled publish can be cancelled until its time (**Cancel publish**); the dr
 The team lists the approvers on the plugin's page, under **Who approves what goes out**: one email per line, and how many approvals are needed. With nobody listed, admins approve. The person who asked for a draft never approves it.
 
 Approvers can approve from the review queue, from a card in Slack or Teams, or from a link in an email.
+
+## Results
+
+A plugin can read a published item's numbers back after a while, so its next runs learn what worked:
+
+```yaml
+results:
+  via: "mcp:posthog"       # an mcp: server listed in `tools`
+  tool: query_insight      # a read-only tool on that server
+  after_days: 7            # 1 to 90, default 7
+```
+
+What comes back is kept as a lesson the plugin's next runs read.

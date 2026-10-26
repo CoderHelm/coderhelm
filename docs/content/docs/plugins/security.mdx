@@ -1,10 +1,8 @@
 ---
 title: Security rules
 description: The rules every plugin runs under, enforced in code rather than by the plugin's instructions.
-status: coming-soon
 ---
 
-<Callout type="info" title="Coming soon">Plugins are being built and switched on team by team; they are not on main yet. This page follows the work in progress and will be updated when plugins ship.</Callout>
 
 Plugins can reach outside systems and real people, so the rules below are enforced by CoderHelm itself. A plugin's instructions can't relax them, and neither can a model that has been tricked by text it read.
 
@@ -22,11 +20,15 @@ Plugins can reach outside systems and real people, so the rules below are enforc
 
 ## Roles
 
-| Capability | Lowest role |
-| --- | --- |
-| `plugins.install` | Admin |
-| `plugins.run` | Member |
-| Approving a plugin's drafts | The people listed on the plugin's page (admins when nobody is listed) |
+These are capabilities in the team's role table, so [custom roles](/concepts/roles) can include them too.
+
+| Capability | Lowest built-in role | Covers |
+| --- | --- | --- |
+| `plugins.view` | Viewer | Seeing plugins, runs and drafts |
+| `plugins.run` | Member | Starting runs from a brief, editing and sending drafts for review |
+| `plugins.approve` | Member | Approving, rejecting, stopping and cancelling drafts, for the people listed on the plugin's page (admins when nobody is listed) |
+| `plugins.install` | Admin | Sources, installing, approving updates, options, rollback, settings, limits, approvers and uninstalling |
+| `plugins.audit` | Admin | The audit log |
 
 ## Reporting a problem
 

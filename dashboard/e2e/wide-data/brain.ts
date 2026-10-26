@@ -98,10 +98,12 @@ export const brainData: Handler = ({ method, path }) => {
         { key: "memories", label: "Past work", about: "What Coderhelm learned from earlier work" },
         { key: "data_sources", label: "Logs and data", about: "Logs, databases and metrics you connected, only read" },
         { key: "skills", label: "Team know-how", about: "Your team's written skills and helpers" },
+        { key: "plugins", label: "Plugins", about: "Installed plugins answer from their own skills" },
       ],
       knowledge: [{ id: KB_ID, name: BASE.name, ready: 1, authoritative: true }],
       connections: [{ id: "notion" }],
       repos: [REPO, REPO_2],
+      plugins: [{ id: "plugin_wide", name: `${TITLE} ${TOKEN}`, description: `${SENTENCE} ${TOKEN}` }],
       can_ask: true,
     };
   }

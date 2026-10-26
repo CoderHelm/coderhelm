@@ -7,7 +7,7 @@
 import { ANY_CHANGE } from "./capabilities";
 import { KNOWLEDGE_HREF, normalizePath } from "./routes";
 
-export type NavIconKey = "runs" | "plans" | "reviews" | "chat" | "knowledge" | "insights" | "settings" | "admin" | "queue";
+export type NavIconKey = "runs" | "plans" | "reviews" | "chat" | "knowledge" | "plugins" | "insights" | "settings" | "admin" | "queue";
 
 export interface NavPage {
   href: string;
@@ -27,6 +27,8 @@ export interface NavSection {
   superAdminOnly?: boolean;
   /** A count beside the label. */
   countKey?: "betaSignups" | "supportQueue";
+  /** Shown only while this team flag is on. */
+  flag?: "plugins";
 }
 
 export const NAV_SECTIONS: NavSection[] = [
@@ -54,6 +56,18 @@ export const NAV_SECTIONS: NavSection[] = [
   { key: "chat", label: "Chat", icon: "chat", pages: [{ href: "/chat", label: "Chat", need: "brain_read" }] },
   { key: "knowledge", label: "Knowledge", icon: "knowledge", pages: [{ href: KNOWLEDGE_HREF, label: "Knowledge", need: "brain_read" }] },
   {
+    // Packages a team installs; hidden until the team's plugins flag is on.
+    key: "plugins",
+    label: "Plugins",
+    icon: "plugins",
+    flag: "plugins",
+    pages: [
+      { href: "/plugins", label: "Plugins", need: "plugins.view" },
+      { href: "/plugins/review", label: "Review", need: "plugins.view" },
+      { href: "/audit", label: "Audit log", need: "plugins.audit" },
+    ],
+  },
+  {
     key: "insights",
     label: "Insights",
     icon: "insights",
@@ -72,8 +86,8 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Settings",
     icon: "settings",
     pages: [{ href: "/settings", label: "Settings" }],
-    // Data sources and Skills are configured from Settings too.
-    alsoUnder: ["/settings", "/data-sources", "/skills"],
+    // Data sources, Skills and Connections are configured from Settings too.
+    alsoUnder: ["/settings", "/data-sources", "/skills", "/connections"],
   },
 ];
 

@@ -9,6 +9,7 @@ import { pushToDataLayer } from "@/lib/gtm";
 import { BETA_SIGNUPS_CHANGED } from "@/lib/admin";
 import { formatTokens, limitName, reachedLimit, USAGE_CHANGED, usageBreakdown, usageLimits } from "@/lib/usage";
 import { TokenMeters } from "@/components/token-meters";
+import { usePluginsFlag } from "@/hooks/use-plugins-flag";
 import { ToastProvider } from "./toast";
 import { SupportViewBanner } from "./support-access";
 import { ScrollFade } from "./scroll-fade";
@@ -18,7 +19,7 @@ import { Logo, TopBar, TopBarProvider } from "./top-bar";
 import { tabTitle as routeTabTitle } from "@/lib/routes";
 import { focusRing } from "./ui";
 import { helpHref, helpTargetFromUrl } from "@/lib/support";
-import { BookIcon, ChatIcon, GearIcon, LifeBuoyIcon, PlanIcon, PlayIcon, ReviewerIcon, ShieldIcon, TrendingUpIcon } from "./icons";
+import { BookIcon, ChatIcon, GearIcon, LifeBuoyIcon, PlanIcon, PlayIcon, ReviewerIcon, ShieldIcon, TemplateIcon, TrendingUpIcon } from "./icons";
 import { ADMIN_SECTIONS, NAV_SECTIONS, sectionFor, visiblePages, type NavIconKey, type NavSection } from "@/lib/nav";
 import { SETTINGS_ITEMS } from "./settings-items";
 import { isSelfHosted } from "@/lib/runtime-config";
@@ -77,6 +78,7 @@ const NAV_ICONS: Record<NavIconKey, ReactNode> = {
   settings: <GearIcon />,
   admin: <ShieldIcon />,
   queue: <LifeBuoyIcon />,
+  plugins: <TemplateIcon />,
 };
 
 /** A page's capability check, for this person. */
@@ -85,22 +87,24 @@ function allowedFor(user: User | null) {
 }
 
 /** The destinations this person can open, each with the first page they can open. */
-function visibleSections(user: User | null): { section: NavSection; href: string }[] {
+function visibleSections(user: User | null, pluginsOn = false): { section: NavSection; href: string }[] {
   const allowed = allowedFor(user);
   const admin = isPlatformAdmin(user);
   return [...NAV_SECTIONS, ...ADMIN_SECTIONS]
     .filter((sec) => !sec.superAdminOnly || admin)
+    .filter((sec) => sec.flag !== "plugins" || pluginsOn)
     .map((section) => ({ section, href: visiblePages(section, allowed)[0]?.href }))
     .filter((x): x is { section: NavSection; href: string } => !!x.href);
 }
 
 /** Every page someone can reach from the menu, for the ⌘K palette. */
-function palettePages(user: User | null): PalettePage[] {
+function palettePages(user: User | null, pluginsOn = false): PalettePage[] {
   const allowed = allowedFor(user);
   const admin = isPlatformAdmin(user);
   const pages: PalettePage[] = [];
   for (const section of [...NAV_SECTIONS, ...ADMIN_SECTIONS]) {
     if (section.superAdminOnly && !admin) continue;
+    if (section.flag === "plugins" && !pluginsOn) continue;
     for (const p of visiblePages(section, allowed)) pages.push({ href: p.href, label: p.label, section: section.label });
   }
   for (const item of SETTINGS_ITEMS) {
@@ -113,6 +117,7 @@ function palettePages(user: User | null): PalettePage[] {
 export function ClientShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
+  const pluginsOn = usePluginsFlag() === "on";
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   // New beta sign-ups, for the Admin menu item (platform admin only).
   const [betaNew, setBetaNew] = useState(0);
@@ -349,7 +354,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
     <ConfirmProvider>
-    <CommandPaletteProvider pages={palettePages(user)} user={user}>
+    <CommandPaletteProvider pages={palettePages(user, pluginsOn)} user={user}>
     <TopBarProvider>
       <div className="flex min-h-screen bg-zinc-950">
         {menuOpen && (
@@ -365,7 +370,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           onClick={(e) => { if ((e.target as HTMLElement).closest("a")) setMenuOpen(false); }}
           className={`${menuOpen ? "fixed inset-y-0 left-0 z-50 flex shadow-2xl" : "hidden"} md:contents`}
         >
-          <Sidebar usage={usage} user={user} teams={teams} betaNew={betaNew} />
+          <Sidebar usage={usage} user={user} teams={teams} betaNew={betaNew} pluginsOn={pluginsOn} />
           <button
             type="button"
             onClick={() => setMenuOpen(false)}
@@ -521,12 +526,15 @@ function Sidebar({
   user,
   teams,
   betaNew,
+  pluginsOn,
 }: {
   usage: UsageInfo | null;
   user: User | null;
   teams: TeamInfo[];
   /** New beta sign-ups, shown on the Admin item. */
   betaNew: number;
+  /** The team's plugins flag. */
+  pluginsOn: boolean;
 }) {
   const pathname = usePathname();
   const [switching, setSwitching] = useState(false);
@@ -602,7 +610,7 @@ function Sidebar({
       <TeamSwitcher teams={teams} currentTeam={currentTeam ?? null} switching={switching} onSwitch={handleSwitch} />
 
       <ul className="space-y-0.5" data-testid="main-nav">
-        {visibleSections(user).filter((x) => !x.section.superAdminOnly).map(({ section, href }) => (
+        {visibleSections(user, pluginsOn).filter((x) => !x.section.superAdminOnly).map(({ section, href }) => (
           <NavItemLink key={section.key} href={href} label={section.label} icon={NAV_ICONS[section.icon]} current={currentSection === section.key} />
         ))}
       </ul>

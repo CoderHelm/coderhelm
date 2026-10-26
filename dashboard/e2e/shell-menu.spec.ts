@@ -11,7 +11,8 @@ test("the main menu is a handful of destinations with one Settings entry, Chat a
   await page.goto("/");
   const main = page.getByTestId("main-nav");
   const labels = (await main.getByRole("link").allInnerTexts()).map((t) => t.trim());
-  expect(labels).toEqual(["Runs", "Plans", "Code review", "Chat", "Knowledge", "Insights", "Settings"]);
+  // Plugins shows only while the team's plugins flag is on (the wide data turns it on).
+  expect(labels).toEqual(["Runs", "Plans", "Code review", "Chat", "Knowledge", "Plugins", "Insights", "Settings"]);
   await expect(main.getByRole("link", { name: "Runs" })).toHaveAttribute("aria-current", "page");
   // "Brain" is never a word people see in the menu.
   await expect(page.getByRole("navigation", { name: "Main" })).not.toContainText("Brain");
