@@ -38,6 +38,7 @@ const BUILT_IN_MIN: Record<string, "viewer" | "member" | "admin" | "owner"> = {
   "agents.approve": "member",
   people: "admin",
   roles: "admin",
+  sign_in: "admin",
   api_keys: "admin",
   delete_plans: "admin",
   repos: "admin",

@@ -13,6 +13,9 @@ import { Problem } from "@/components/problem";
 import { ExternalLinkIcon } from "@/components/icons";
 import { buttonClass, dangerButton, ghostButton, primaryButton } from "@/components/ui";
 import { Code, Field, SettingsSection } from "@/components/settings";
+import { TwoFactorSetup } from "@/components/two-factor-setup";
+import { isSelfHosted } from "@/lib/runtime-config";
+import type { MyTwoFactor } from "@/lib/api";
 
 /** The one name for it on this page and in Settings. */
 const TWO_STEP = "Two step sign in";
@@ -47,6 +50,16 @@ export default function SecurityPage() {
   const [mfaCode, setMfaCode] = useState("");
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [mfaLoading, setMfaLoading] = useState(false);
+
+  // A self-hosted install: Google and GitHub sign-ins get Coderhelm's own
+  // authenticator-app codes.
+  const [mine, setMine] = useState<MyTwoFactor | null>(null);
+  const [appStep, setAppStep] = useState<"idle" | "setup" | "off">("idle");
+  const [offCode, setOffCode] = useState("");
+  const loadMine = useCallback(() => {
+    if (isSelfHosted()) api.myTwoFactor().then(setMine, () => setMine(null));
+  }, []);
+  useEffect(loadMine, [loadMine]);
 
   const loadMe = useCallback(() => {
     setLoadFailed(false);
@@ -217,6 +230,77 @@ export default function SecurityPage() {
               )}
             </div>
           </SettingsSection>
+          {mine?.self_hosted && (
+            <div className="mt-8">
+              <SettingsSection
+                id="app-two-step"
+                title="Two-factor sign-in"
+                description={`After ${provider.name}, Coderhelm asks for a code from an authenticator app on your phone.${mine.required ? " Your organization requires it." : ""}`}
+              >
+                <div className="space-y-4 px-4 py-4">
+                  <p className="flex items-center gap-2 text-sm" data-testid="app-two-step-status">
+                    <StatusDot tone={mine.set_up === "app" ? "success" : "muted"} />
+                    <span className={mine.set_up === "app" ? "text-zinc-200" : "text-zinc-400"}>
+                      {mine.set_up === "app" ? "Two-factor sign-in is on" : "Two-factor sign-in is off"}
+                    </span>
+                  </p>
+                  {mine.set_up !== "app" && appStep === "idle" && (
+                    <button type="button" onClick={() => setAppStep("setup")} className={primaryButton}>
+                      Turn on two-factor sign-in
+                    </button>
+                  )}
+                  {mine.set_up !== "app" && appStep === "setup" && (
+                    <TwoFactorSetup
+                      kind="app"
+                      onCancel={() => setAppStep("idle")}
+                      onDone={() => {
+                        setAppStep("idle");
+                        toast("Two-factor sign-in is on");
+                        loadMine();
+                      }}
+                    />
+                  )}
+                  {mine.set_up === "app" && !mine.required && appStep !== "off" && (
+                    <button type="button" onClick={() => setAppStep("off")} className={dangerButton}>
+                      Turn off two-factor sign-in
+                    </button>
+                  )}
+                  {mine.set_up === "app" && appStep === "off" && (
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        try {
+                          await api.appTwoFactorDisable(offCode);
+                          setAppStep("idle");
+                          setOffCode("");
+                          toast("Two-factor sign-in is off");
+                          loadMine();
+                        } catch (err) {
+                          toast(err instanceof Error ? err.message : "That didn't work. Try again.", "error");
+                        }
+                      }}
+                      className="space-y-4"
+                    >
+                      <Field
+                        id="app-off-code"
+                        label="A code from the app, to check it's you"
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        controlClassName="!w-40 text-center text-lg tracking-widest"
+                        value={offCode}
+                        onChange={(e) => setOffCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <button type="submit" disabled={offCode.length < 6} className={dangerButton}>Turn off</button>
+                        <button type="button" onClick={() => setAppStep("idle")} className={ghostButton}>Cancel</button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              </SettingsSection>
+            </div>
+          )}
         </div>
       </Page>
     );
@@ -293,7 +377,11 @@ export default function SecurityPage() {
               </button>
             )}
 
-            {mfaStep === "idle" && mfaEnabled && (
+            {mfaStep === "idle" && mfaEnabled && mine?.required && (
+              <p className="text-sm text-zinc-400">Your organization requires it, so it stays on.</p>
+            )}
+
+            {mfaStep === "idle" && mfaEnabled && !mine?.required && (
               <button type="button" onClick={handleMfaDisable} disabled={mfaLoading} className={dangerButton}>
                 {mfaLoading ? "Turning off…" : `Turn off ${TWO_STEP.toLowerCase()}`}
               </button>

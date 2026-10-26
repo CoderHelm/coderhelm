@@ -4,7 +4,7 @@ import { can } from "@/lib/capabilities";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { api, type UsageInfo, type Banner, type TeamInfo } from "@/lib/api";
+import { api, ApiError, type UsageInfo, type Banner, type TeamInfo } from "@/lib/api";
 import { pushToDataLayer } from "@/lib/gtm";
 import { BETA_SIGNUPS_CHANGED } from "@/lib/admin";
 import { formatTokens, limitName, reachedLimit, USAGE_CHANGED, usageBreakdown, usageLimits } from "@/lib/usage";
@@ -21,7 +21,7 @@ import { focusRing } from "./ui";
 import { helpHref, helpTargetFromUrl } from "@/lib/support";
 import { BookIcon, ChatIcon, GearIcon, LifeBuoyIcon, PlanIcon, PlayIcon, ReviewerIcon, ShieldIcon, TemplateIcon, TrendingUpIcon } from "./icons";
 import { ADMIN_SECTIONS, NAV_SECTIONS, sectionFor, visiblePages, type NavIconKey, type NavSection } from "@/lib/nav";
-import { SETTINGS_ITEMS } from "./settings-items";
+import { SETTINGS_ITEMS, offered } from "./settings-items";
 import { isSelfHosted } from "@/lib/runtime-config";
 import { hybridGithubSetupTarget, hybridOAuthHandoff, maybeHybridOAuthCallback } from "@/lib/hybrid";
 import { Menu } from "./menu";
@@ -33,6 +33,8 @@ import { apiBase, runtimeConfig, siteUrl } from "@/lib/runtime-config";
 import { SetupBanner } from "@/components/setup-banner";
 import { CopyButton } from "./copy-button";
 import { openInChromeHref, signInProblem, type SignInProblem } from "@/lib/sign-in-errors";
+import { TwoFactorSetup } from "./two-factor-setup";
+import type { MyTwoFactor } from "@/lib/api";
 
 /** Sign out everywhere the same way: end the session, then the sign-in screen. */
 async function signOut() {
@@ -110,7 +112,7 @@ function palettePages(user: User | null, pluginsOn = false): PalettePage[] {
     for (const p of visiblePages(section, allowed)) pages.push({ href: p.href, label: p.label, section: section.label });
   }
   for (const item of SETTINGS_ITEMS) {
-    if (!can(user, item.view) || (item.selfHostOnly && !(isSelfHosted() && user?.platform_admin === true))) continue;
+    if (!can(user, item.view) || !offered(item, isSelfHosted(), user?.platform_admin === true)) continue;
     if (!pages.some((p) => p.href === item.href)) pages.push({ href: item.href, label: item.title, section: "Settings" });
   }
   return pages;
@@ -154,6 +156,13 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     });
   };
   const [authChecked, setAuthChecked] = useState(false);
+  // A self-hosted install that requires two-factor sign-in: a session
+  // without a second factor sees only the setup screen.
+  const [twoFactor, setTwoFactor] = useState<MyTwoFactor | null>(null);
+  const loadTwoFactor = () => {
+    if (!isSelfHosted()) return Promise.resolve();
+    return api.myTwoFactor().then(setTwoFactor, () => setTwoFactor(null));
+  };
   // A self-hosted install's callback from Coderhelm's GitHub App or an OAuth
   // sign-in (lib/hybrid.ts): passed on before sign-in, since the person here
   // usually has no hosted account.
@@ -237,9 +246,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     api.me()
-      .then((u) => {
+      .then(async (u) => {
         setUser(u);
         pushToDataLayer({ event: "identify", user_id: u.user_id, team_id: u.team_id });
+        await loadTwoFactor();
         setAuthChecked(true);
         api.getUsage().then(setUsage).catch(() => {});
         api.getBanners().then((r) => setBanners(r.banners)).catch(() => {});
@@ -309,13 +319,23 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    return <><title>Sign in · Coderhelm</title><AuthScreen onAuth={(u) => {
+    return <><title>Sign in · Coderhelm</title><AuthScreen onAuth={async (u) => {
+      await loadTwoFactor();
       setUser(u);
       pushToDataLayer({ event: "identify", user_id: u.user_id, team_id: u.team_id });
       api.getUsage().then(setUsage).catch(() => {});
       api.getBanners().then((r) => setBanners(r.banners)).catch(() => {});
       api.listTeams().then((r) => setTeams(r.teams)).catch(() => {});
     }} /></>;
+  }
+
+  if (twoFactor?.held) {
+    return (
+      <>
+        <title>Two-factor sign-in · Coderhelm</title>
+        <TwoFactorGate status={twoFactor} email={user.email || user.github_login || ""} onDone={() => window.location.reload()} />
+      </>
+    );
   }
 
   if (user.status === "deactivated") {
@@ -443,7 +463,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             <SetupBanner />
             {inSettings(pathname) ? (
               <div data-settings-layout="" className="mx-auto flex w-full min-w-0 max-w-6xl flex-col xl:flex-row xl:gap-10">
-                <SettingsNav visible={(item) => can(user, item.view) && (!item.selfHostOnly || (isSelfHosted() && user.platform_admin === true))} />
+                <SettingsNav visible={(item) => can(user, item.view) && offered(item, isSelfHosted(), user.platform_admin === true)} />
                 <div className="min-w-0 flex-1">{children}</div>
               </div>
             ) : (
@@ -794,9 +814,57 @@ function SignInProblemNotice({ problem }: { problem: SignInProblem }) {
   );
 }
 
+/**
+ * The organization requires two-factor sign-in and this session has none:
+ * set it up (or, when it is set up already, sign in again with the code).
+ * The server refuses everything else until then.
+ */
+function TwoFactorGate({ status, email, onDone }: { status: MyTwoFactor; email: string; onDone: () => void }) {
+  const fits = status.fits ?? "cognito";
+  const hasIt = status.set_up === fits;
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-zinc-950 px-4 py-10">
+      <main className="w-full max-w-md space-y-6" data-testid="two-factor-gate">
+        <div className="flex items-center gap-2.5">
+          <Logo />
+          <span className="text-sm font-semibold text-zinc-100">Coderhelm</span>
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-xl font-semibold text-zinc-50">
+            {hasIt ? "Sign in again with your code" : "Set up two-factor sign-in"}
+          </h1>
+          <p className="text-sm text-zinc-300">
+            Your organization requires two-factor sign-in. {hasIt
+              ? "You have it set up, but this session started without your code. Sign out, then sign in again and enter the code from your authenticator app."
+              : "Before you go on, set up an authenticator app: every sign-in will then ask for the 6-digit code it shows."}
+          </p>
+          {email && <p className="text-sm text-zinc-400 [overflow-wrap:anywhere]">Signed in as {email}</p>}
+        </div>
+        {!hasIt && (
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+            <TwoFactorSetup kind={fits} onDone={onDone} />
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={signOut}
+          className={hasIt ? buttonClass("primary") : `text-sm text-zinc-400 underline underline-offset-4 hover:text-zinc-100 rounded ${focusRing}`}
+        >
+          {hasIt ? "Sign out and sign in again" : "Sign out"}
+        </button>
+        <p className="text-sm text-zinc-400">Lost your phone? Ask an admin to reset your two-factor sign-in.</p>
+      </main>
+    </div>
+  );
+}
+
 // ── Auth Screen (login / signup / verify / forgot password) ────────
 
-type AuthView = "login" | "signup" | "waitlist" | "verify" | "forgot" | "reset" | "mfa";
+type AuthView = "login" | "signup" | "waitlist" | "verify" | "forgot" | "reset" | "mfa" | "second_step";
+
+/** What a self-hosted install says to someone it won't let in. */
+const NOT_INVITED =
+  "This Coderhelm is private to one organization. Ask one of its admins to invite you, or sign in with your work email if your company's domain is allowed.";
 
 function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const [view, setView] = useState<AuthView>("login");
@@ -815,6 +883,8 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
 
   // The hosted site's terms; a self-hosted install has none unless it names a site.
   const site = siteUrl();
+  // A self-hosted install: one organization, no waitlist and no closed beta.
+  const selfHosted = isSelfHosted();
   // A self-hosted install has no terms to agree to (no site): the box is pre-ticked and hidden.
   useEffect(() => {
     if (!site) setAgreedTos(true);
@@ -826,6 +896,15 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
     const failed = signInProblem(window.location.search);
     if (failed) {
       setProblem(failed);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    // Google or GitHub sign-in waiting for the authenticator-app code.
+    if (params.get("two_factor") === "1") {
+      setView("second_step");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    if (params.get("error") === "not_invited") {
+      setError(NOT_INVITED);
       window.history.replaceState({}, "", window.location.pathname);
     }
     // The installer's first-admin link opens the sign-up form.
@@ -865,7 +944,9 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
       setMessage("Check your email for a verification code.");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";
-      if (msg.includes("403")) {
+      if (e instanceof ApiError && e.code === "not_invited") {
+        setError(NOT_INVITED);
+      } else if (msg.includes("403") && !selfHosted) {
         setError("Coderhelm is in closed beta. Join the waitlist to get notified.");
         setView("waitlist");
       } else if (msg.includes("409")) {
@@ -888,7 +969,9 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
         onAuth(u);
       }
     } catch (e: unknown) {
-      if (e instanceof Error && e.message.includes("403")) {
+      if (e instanceof ApiError && e.code === "not_invited") {
+        setError(NOT_INVITED);
+      } else if (e instanceof Error && e.message.includes("403")) {
         setError("Please verify your email first.");
         setView("verify");
       } else {
@@ -948,13 +1031,41 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
     } finally { setLoading(false); }
   };
 
+  const handleSecondStep = async () => {
+    setError(""); setLoading(true);
+    try {
+      await api.verifySecondStep(code);
+      const u = await api.me();
+      onAuth(u);
+    } catch (e: unknown) {
+      if (e instanceof ApiError && e.code === "locked_out") {
+        // Too many wrong codes: the server's sentence says how long the pause is.
+        setError(e.message);
+        setCode("");
+        setView("login");
+      } else if (e instanceof ApiError && e.code === "second_step_expired") {
+        setError(e.message || "That took too long. Sign in again.");
+        setCode("");
+        setView("login");
+      } else {
+        setError("That code didn't work. Open your authenticator app and enter the current 6-digit code.");
+      }
+    } finally { setLoading(false); }
+  };
+
   const handleMfa = async () => {
     setError(""); setLoading(true);
     try {
       await api.mfaVerify(mfaSession, code, email);
       const u = await api.me();
       onAuth(u);
-    } catch {
+    } catch (e: unknown) {
+      if (e instanceof ApiError && e.code === "locked_out") {
+        setError(e.message);
+        setCode("");
+        setView("login");
+        return;
+      }
       setError("That code didn't work. Open your authenticator app and enter the current 6-digit code.");
     } finally { setLoading(false); }
   };
@@ -989,12 +1100,14 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
           {/* ── Login ── */}
           {view === "login" && (
             <div className="w-full space-y-4">
+              {!selfHosted && (
               <div className="flex items-center justify-center gap-2 rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1.5">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
                 <span className="text-xs font-medium text-amber-400">Closed beta</span>
                 <span className="text-xs text-zinc-400">·</span>
                 <button onClick={() => { setView("waitlist"); setError(""); setMessage(""); }} className="text-xs text-amber-400 hover:text-amber-300 underline underline-offset-2 cursor-pointer">Join waitlist</button>
               </div>
+              )}
               <div className="space-y-3">
                 <a
                   href={`${apiBase()}/auth/google`}
@@ -1040,11 +1153,19 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
           {view === "signup" && (
             <div className="w-full space-y-4">
               <div className="text-center">
-                <div className="inline-flex items-center gap-2 rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 mb-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                  <span className="text-xs font-medium text-amber-400">Closed beta</span>
-                </div>
-                <p className="text-xs text-zinc-400">Only users with an invite can create an account.</p>
+                {selfHosted ? (
+                  <p className="text-sm text-zinc-400" data-testid="signup-one-org">
+                    This Coderhelm is for one organization. Create an account with the email an admin invited, or your work email if your company&apos;s domain is allowed.
+                  </p>
+                ) : (
+                  <>
+                    <div className="inline-flex items-center gap-2 rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 mb-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                      <span className="text-xs font-medium text-amber-400">Closed beta</span>
+                    </div>
+                    <p className="text-xs text-zinc-400">Only users with an invite can create an account.</p>
+                  </>
+                )}
               </div>
               <form onSubmit={(e) => { e.preventDefault(); if (password.length >= 8 && agreedTos) handleSignup(); }} className="space-y-3">
                 <input type="email" name="email" id="signup-email" autoComplete="email" aria-label="Email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); setMessage(""); }}
@@ -1159,6 +1280,24 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
                 Back to sign in
               </button>
             </div>
+          )}
+
+          {/* ── The code after Google or GitHub ── */}
+          {view === "second_step" && (
+            <form onSubmit={(e) => { e.preventDefault(); if (code.length === 6) handleSecondStep(); }} className="w-full space-y-4" data-testid="second-step">
+              <p className="text-sm text-zinc-300 text-center">Enter the code from your authenticator app to finish signing in.</p>
+              <input type="text" inputMode="numeric" autoComplete="one-time-code" aria-label="Six digit code" placeholder="6-digit code" value={code}
+                onChange={(e) => { setCode(e.target.value.replace(/\D/g, "").slice(0, 6)); setError(""); }}
+                className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600 text-center tracking-widest text-lg" />
+              <button type="submit" disabled={loading || code.length < 6}
+                className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed">
+                {loading ? "Checking..." : "Sign in"}
+              </button>
+              <button type="button" onClick={() => { setView("login"); setError(""); setCode(""); }} className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">
+                Back to sign in
+              </button>
+              <p className="text-xs text-zinc-400 text-center">Lost your phone? Ask an admin to reset your two-factor sign-in.</p>
+            </form>
           )}
 
           {/* ── MFA ── */}
