@@ -65,7 +65,7 @@ test("1280×800: the whole menu fits without scrolling, and help and the person 
   await expect(area).not.toHaveAttribute("data-more-end", "true");
   await shot(page, "shell-1280x800-top");
   await expectReachable(page, nav.getByTestId("nav-help"), "Help");
-  await expect(nav.getByRole("button", { name: "Log out" })).toBeInViewport();
+  await expect(nav.getByRole("button", { name: "Sign out" })).toBeInViewport();
   for (const name of LINKS) await expect(menuLink(nav, name), name).toBeInViewport();
 
   // A settings page marks Settings in the menu and itself in Settings' own list.
@@ -84,7 +84,7 @@ test("390 wide: the menu drawer reaches every link and keeps help and the person
   await shot(page, "shell-390-menu");
 
   await expectReachable(page, nav.getByTestId("nav-help"), "Help");
-  await expect(nav.getByRole("button", { name: "Log out" })).toBeInViewport();
+  await expect(nav.getByRole("button", { name: "Sign out" })).toBeInViewport();
   for (const name of LINKS) await expectReachable(page, menuLink(nav, name), name);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

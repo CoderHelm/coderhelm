@@ -55,8 +55,8 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://localhost:3111
           NEXT_PUBLIC_STREAM_URL: http://localhost:3111
-      - name: Install Playwright's Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install Playwright's Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
       - name: End-to-end tests
         run: npm run test:e2e
         env:

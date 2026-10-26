@@ -22,7 +22,11 @@ export default defineConfig({
     trace: "retain-on-failure",
     reducedMotion: "reduce",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } } },
+    // Signing in and out on an iPhone: Safari's engine, screen and user agent.
+    { name: "iphone-webkit", testMatch: /mobile-sign-in\.spec\.ts$/, use: { ...devices["iPhone 15"] } },
+  ],
   webServer: {
     command: STATIC ? `node scripts/serve-out.mjs ${PORT}` : `npx next dev -p ${PORT}`,
     url: BASE_URL,

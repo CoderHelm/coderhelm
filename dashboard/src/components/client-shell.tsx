@@ -29,6 +29,18 @@ import { buttonClass } from "./ui";
 import { AlertCircleIcon, InfoIcon, WarningIcon, XIcon } from "./icons";
 import { apiBase, runtimeConfig, siteUrl } from "@/lib/runtime-config";
 import { SetupBanner } from "@/components/setup-banner";
+import { CopyButton } from "./copy-button";
+import { openInChromeHref, signInProblem, type SignInProblem } from "@/lib/sign-in-errors";
+
+/** Sign out everywhere the same way: end the session, then the sign-in screen. */
+async function signOut() {
+  try {
+    await api.logout();
+  } catch {
+    // The session may already be gone; the sign-in screen shows either way.
+  }
+  window.location.href = "/";
+}
 
 
 
@@ -574,7 +586,10 @@ function Sidebar({
   return (
     // One scroll area for the brand, team, search and every menu group, with a
     // fade at whichever edge has more; help and the person stay pinned below.
-    <nav ref={navRef} aria-label="Main" className="w-56 border-r border-zinc-800/60 bg-zinc-950 flex flex-col h-screen sticky top-0">
+    // h-dvh, not h-screen: on a phone 100vh is taller than the visible window,
+    // so the pinned footer (help, the person, Sign out) sat under the
+    // browser's toolbar.
+    <nav ref={navRef} aria-label="Main" className="w-56 border-r border-zinc-800/60 bg-zinc-950 flex flex-col h-dvh sticky top-0">
       <ScrollFade axis="y" className="flex-1" innerClassName="px-3 pt-3 pb-2" testId="sidebar-scroll">
       <Link
         href="/"
@@ -668,22 +683,74 @@ function Sidebar({
           </div>
           <button
             type="button"
-            onClick={async () => { try { await api.logout(); } catch {} window.location.href = "/"; }}
-            title="Log out"
-            aria-label="Log out"
-            className={`rounded p-1 text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer ${focusRing}`}
+            onClick={signOut}
+            title="Sign out"
+            aria-label="Sign out"
+            data-testid="sign-out-icon"
+            className={`hidden md:inline-flex rounded p-1 text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer ${focusRing}`}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
+            <SignOutIcon />
           </button>
           </div>
+          {/* On a phone the menu is a sheet: Sign out is a full row with its
+              name, where people look for it, not a small icon. */}
+          <button
+            type="button"
+            onClick={signOut}
+            data-testid="sign-out"
+            className={`md:hidden mt-2 flex w-full min-h-11 items-center gap-2.5 rounded-md px-2 text-sm text-zinc-300 hover:bg-zinc-900 hover:text-zinc-100 cursor-pointer ${focusRing}`}
+          >
+            <span className="w-4 flex items-center justify-center" aria-hidden="true"><SignOutIcon /></span>
+            Sign out
+          </button>
         </div>
       )}
       </div>
     </nav>
+  );
+}
+
+function SignOutIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  );
+}
+
+/**
+ * Why Google or GitHub sign-in did not finish, in one sentence, with what to
+ * do next: Try again, or, inside another app's browser, open the page in a
+ * real browser.
+ */
+function SignInProblemNotice({ problem }: { problem: SignInProblem }) {
+  const [chromeHref, setChromeHref] = useState<string | null>(null);
+  useEffect(() => {
+    setChromeHref(openInChromeHref(window.location.origin + "/", navigator.userAgent));
+  }, []);
+  return (
+    <div role="alert" data-testid="sign-in-problem" className="w-full rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-300">
+      <p className="wrap-anywhere">{problem.sentence}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+        {problem.canRetry && problem.provider && (
+          <a href={`${apiBase()}/auth/${problem.provider}`} className={`font-medium text-zinc-100 underline underline-offset-4 rounded ${focusRing}`}>
+            Try again
+          </a>
+        )}
+        {!problem.canRetry && (
+          <>
+            <CopyButton text={() => window.location.origin + "/"} label="Copy the link" copiedLabel="Link copied" variant="link" />
+            {chromeHref && (
+              <a href={chromeHref} className={`font-medium text-zinc-100 underline underline-offset-4 rounded ${focusRing}`}>
+                Open in Chrome
+              </a>
+            )}
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -704,6 +771,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [problem, setProblem] = useState<SignInProblem | null>(null);
 
   // The hosted site's terms; a self-hosted install has none unless it names a site.
   const site = siteUrl();
@@ -714,6 +782,12 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    // Google or GitHub sign-in came back without finishing (the API's callback).
+    const failed = signInProblem(window.location.search);
+    if (failed) {
+      setProblem(failed);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
     // The installer's first-admin link opens the sign-up form.
     if (params.get("signup") === "1") {
       setView("signup");
@@ -857,6 +931,8 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
             </svg>
             <span className="text-2xl font-bold text-white tracking-tight">coderhelm</span>
           </div>
+
+          {problem && view === "login" && <SignInProblemNotice problem={problem} />}
 
           {error && (
             <div role="alert" className="mt-2 w-full rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2.5 text-sm text-red-400">

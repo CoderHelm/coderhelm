@@ -234,7 +234,7 @@ test("menu: current page is marked, icon buttons have names, tab titles follow t
   // Templates is a page of Plans: the menu marks Plans, the tabs mark Templates.
   await expect(nav.getByRole("link", { name: "Plans", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("navigation", { name: "Plans pages" }).getByRole("link", { name: "Templates" })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
   await expect(page).toHaveTitle("Templates · Coderhelm");
   await page.goto("/runs/detail?id=01RUN00000000000000000003");
   await expect(page).toHaveTitle("Run · Coderhelm");
