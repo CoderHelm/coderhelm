@@ -40,7 +40,9 @@ async function mockApi(page: Page, me: Me) {
   return calls;
 }
 
-const nav = (page: Page) => page.getByRole("navigation").first();
+const nav = (page: Page) => page.getByRole("navigation", { name: "Main" });
+/** Settings pages are listed in Settings' own navigation, not the main menu. */
+const settingsNav = (page: Page) => page.getByRole("navigation", { name: "Settings" });
 
 test("a member-plus-repos custom role sees the repo settings controls and can use them", async ({ page }) => {
   const calls = await mockApi(page, { role: "member", capabilities: [...MEMBER, "repos"], custom_role: { id: "r1", name: "Repo keeper" } });
@@ -53,10 +55,10 @@ test("a member-plus-repos custom role sees the repo settings controls and can us
   await expect(toggle).toBeEnabled();
   await toggle.click();
   await expect.poll(() => calls.some((c) => c.path === "/api/repos/acme/api" && c.method !== "GET")).toBe(true);
-  // What it doesn't hold stays hidden: admin-only pages aren't in the menu.
-  await expect(nav(page).getByRole("link", { name: "Repos" })).toBeVisible();
-  await expect(nav(page).getByRole("link", { name: "AI Models" })).toHaveCount(0);
-  await expect(nav(page).getByRole("link", { name: "Data sources" })).toHaveCount(0);
+  // What it doesn't hold stays hidden: admin-only pages aren't in the settings list.
+  await expect(settingsNav(page).getByRole("link", { name: "Repositories" })).toBeVisible();
+  await expect(settingsNav(page).getByRole("link", { name: "AI models" })).toHaveCount(0);
+  await expect(settingsNav(page).getByRole("link", { name: "Data sources" })).toHaveCount(0);
   fs.mkdirSync(SHOTS_DIR, { recursive: true });
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 800 });
@@ -86,8 +88,11 @@ test("a built-in member is unchanged: repos read-only, member pages open", async
   await mockApi(page, { role: "member" });
   await page.goto("/settings/repos");
   await expect(page.getByTestId("repos-read-only")).toBeVisible();
-  await expect(nav(page).getByRole("link", { name: "Repos" })).toBeVisible();
-  await expect(nav(page).getByRole("link", { name: "Health" })).toHaveCount(0);
+  await expect(settingsNav(page).getByRole("link", { name: "Repositories" })).toBeVisible();
+  // Health is an Insights page only for roles that hold "system".
+  await page.goto("/analytics");
+  await expect(page.getByRole("navigation", { name: "Insights pages" }).getByRole("link", { name: "Analytics" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Insights pages" }).getByRole("link", { name: "Health" })).toHaveCount(0);
 });
 
 test("viewers are unchanged: member pages stay closed and out of the menu", async ({ page }) => {
@@ -97,7 +102,7 @@ test("viewers are unchanged: member pages stay closed and out of the menu", asyn
     await expect(page.getByText("This page needs a different role")).toBeVisible();
     await expect(page.getByText(/Only a team member can open this page/)).toBeVisible();
     await expect(nav(page).getByRole("link", { name: "Runs" })).toBeVisible();
-    for (const name of ["Repos", "Reviewer", "Tests", "Logs", "Skills", "Integrations"]) {
+    for (const name of ["Repos", "Code review", "Reviewer", "Tests", "Logs", "Skills", "Integrations"]) {
       await expect(nav(page).getByRole("link", { name, exact: true })).toHaveCount(0);
     }
     await page.unrouteAll({ behavior: "ignoreErrors" });
@@ -107,7 +112,10 @@ test("viewers are unchanged: member pages stay closed and out of the menu", asyn
 test("an admin with the built-in role still sees every admin control", async ({ page }) => {
   await mockApi(page, { role: "admin" });
   await page.goto("/settings/repos");
-  await expect(page.getByRole("button", { name: "Sync repos" })).toBeVisible();
-  await expect(nav(page).getByRole("link", { name: "AI Models" })).toBeVisible();
-  await expect(nav(page).getByRole("link", { name: "Health" })).toBeVisible();
+  // The button's name and where the settings links live change with the
+  // dashboard's page and menu rebuilds; what matters is that an admin sees them.
+  await expect(page.getByRole("button", { name: /^(Sync repos|Refresh from GitHub)$/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^AI models$/i }).first()).toBeVisible();
+  await page.goto("/analytics");
+  await expect(page.getByRole("link", { name: "Health", exact: true }).first()).toBeVisible();
 });

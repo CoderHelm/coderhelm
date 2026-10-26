@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { ANY_CHANGE } from "@/lib/capabilities";
 import {
-  BellIcon, BookIcon, CpuIcon, DatabaseIcon, GitBranchIcon, KeyIcon,
-  LockIcon, PenIcon, PlanIcon, PluginIcon, ShieldCheckIcon, TargetIcon, UsersIcon, WrenchIcon,
+  BellIcon, BookIcon, CpuIcon, DatabaseIcon, GitBranchIcon, KeyIcon, LifeBuoyIcon,
+  LockIcon, PenIcon, PlanIcon, PluginIcon, ShieldCheckIcon, ShieldIcon, TargetIcon, UsersIcon, WrenchIcon,
 } from "./icons";
 
 /** Keys for the small "current value" line some items show on the hub. */
@@ -39,7 +39,7 @@ export interface SettingsGroup {
 export const SETTINGS_GROUPS: SettingsGroup[] = [
   {
     id: "account",
-    label: "Your account",
+    label: "You",
     items: [
       { href: "/settings/notifications", title: "Notifications", description: "Choose which emails Coderhelm sends you.", icon: <BellIcon />, view: "own_account", edit: "own_account" },
       { href: "/settings/security", title: "Security", description: "Change your password and turn on two step sign in.", icon: <LockIcon />, view: "own_account", edit: "own_account", status: "security" },
@@ -47,52 +47,35 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   },
   {
     id: "team",
-    label: "Team and access",
+    label: "Team",
     items: [
       { href: "/settings/team", title: "Team", description: "Who is on the team, their roles and what each role can do.", icon: <UsersIcon />, view: "view_team", edit: "people", status: "team" },
-      { href: "/settings/api-keys", title: "API keys", description: "Keys your own programs use to call the Coderhelm API, each with its scopes and rate limit.", icon: <KeyIcon />, view: "api_keys", edit: "api_keys" },
-      { href: "/settings/support-access", title: "Support access", description: "Let Coderhelm support see your workspace, read only, for a while. See every page they read.", icon: <ShieldCheckIcon />, view: "support", edit: "support" },
-    ],
-  },
-  {
-    id: "code",
-    label: "Repositories",
-    items: [
-      { href: "/settings/repos", title: "Repositories", description: "Turn Coderhelm on or off for each repository.", icon: <GitBranchIcon />, view: ANY_CHANGE, edit: "repos", status: "repos" },
+      { href: "/settings/support-access", title: "Support access", description: "Let Coderhelm support look at your workspace for a while, without changing anything. See every page they open.", icon: <LifeBuoyIcon />, view: "support", edit: "support" },
+      { href: "/settings/api-keys", title: "API keys", description: "Let your own scripts and tools use Coderhelm. For developers.", icon: <KeyIcon />, view: "api_keys", edit: "api_keys" },
     ],
   },
   {
     id: "automation",
     label: "How Coderhelm works",
     items: [
-      { href: "/settings/agents", title: "Agent permissions", description: "What agents may do on their own, what waits for approval, agents on or off, and pause all agents.", icon: <ShieldCheckIcon />, view: "view", edit: "agents.permissions" },
+      { href: "/settings/repos", title: "Repositories", description: "Turn Coderhelm on or off for each repository.", icon: <GitBranchIcon />, view: ANY_CHANGE, edit: "repos", status: "repos" },
+      { href: "/settings/agents", title: "Agent permissions", description: "What agents may do on their own, what waits for approval, and pausing all agents.", icon: <ShieldCheckIcon />, view: "view", edit: "agents.permissions" },
       { href: "/settings/workflow", title: "Workflow", description: "Where plans go, what lands in the pull request and which tools plans may use.", icon: <PlanIcon />, view: "agent_settings", edit: "agent_settings" },
-      { href: "/settings/guardrails", title: "Guardrails", description: "Rules Coderhelm always follows, for every repository or just one.", icon: <ShieldCheckIcon />, view: "agent_settings", edit: "agent_settings" },
+      { href: "/settings/guardrails", title: "Guardrails", description: "Rules Coderhelm always follows, for every repository or just one.", icon: <ShieldIcon />, view: "agent_settings", edit: "agent_settings" },
       { href: "/settings/voice", title: "Team voice", description: "How Coderhelm writes commits, pull requests and comments.", icon: <PenIcon />, view: "agent_settings", edit: "agent_settings" },
       { href: "/settings/instructions", title: "Custom instructions", description: "Conventions and preferences Coderhelm reads before it starts work.", icon: <WrenchIcon />, view: "agent_settings", edit: "agent_settings" },
-      { href: "/settings/models", title: "AI models", description: "Your Anthropic API key and which Claude models do the work.", icon: <CpuIcon />, view: "model_provider", edit: "model_provider", status: "models" },
+      { href: "/settings/models", title: "AI models", description: "Which AI does the work, and whose account pays for it.", icon: <CpuIcon />, view: "model_provider", edit: "model_provider", status: "models" },
     ],
   },
   {
-    id: "alerts",
-    label: "Alerts",
+    id: "connections",
+    label: "Connections and usage",
     items: [
-      { href: "/settings/alerts", title: "Alert routes", description: "Turn monitoring alerts into pull requests or Teams cards.", icon: <BellIcon />, view: "view_alerts", edit: "alerts", status: "alerts" },
-    ],
-  },
-  {
-    id: "data",
-    label: "Data sources",
-    items: [
+      { href: "/settings/integrations", title: "Integrations", description: "GitHub, Jira, AWS and the other tools Coderhelm works with, and whether each one is working.", icon: <PluginIcon />, view: "view_integrations", edit: "integrations", status: "integrations" },
       { href: "/data-sources", title: "Data sources", description: "Live systems the reviewer may read to check facts. Read only.", icon: <DatabaseIcon />, view: "data_sources", edit: "data_sources", status: "dataSources" },
-      { href: "/skills", title: "Skills", description: "Written know how from a repository that Coderhelm can follow.", icon: <BookIcon />, view: ANY_CHANGE, edit: ANY_CHANGE },
-    ],
-  },
-  {
-    id: "integrations",
-    label: "Integrations",
-    items: [
-      { href: "/settings/integrations", title: "Integrations", description: "GitHub, Jira, AWS, New Relic, Sentry, Confluence, Teams and other tools: what each can do and whether it works.", icon: <PluginIcon />, view: "view_integrations", edit: "integrations", status: "integrations" },
+      { href: "/skills", title: "Skills", description: "Step by step guides from a repository that Coderhelm follows for common jobs.", icon: <BookIcon />, view: ANY_CHANGE, edit: ANY_CHANGE },
+      { href: "/settings/alerts", title: "Alert routes", description: "Turn monitoring alerts into pull requests or chat messages.", icon: <BellIcon />, view: "view_alerts", edit: "alerts", status: "alerts" },
+      { href: "/settings/budget", title: "Token limit", description: "Monthly limits for new tokens, cache reads and cache writes. Work pauses when the team reaches one.", icon: <TargetIcon />, view: ANY_CHANGE, edit: "budget", status: "usage" },
     ],
   },
   {
@@ -101,13 +84,6 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     items: [
       { href: "/settings/setup", title: "Setup", description: "What is left to set up, checked live: GitHub, repositories, models, email, updates.", icon: <WrenchIcon />, view: "system", edit: "system", selfHostOnly: true },
       { href: "/settings/system", title: "System", description: "Which version runs, updates and their history, automatic updates and roll back.", icon: <CpuIcon />, view: "system", edit: "system", selfHostOnly: true },
-    ],
-  },
-  {
-    id: "usage",
-    label: "Usage and limits",
-    items: [
-      { href: "/settings/budget", title: "Token limit", description: "A monthly cap on tokens. Runs pause when the team reaches it.", icon: <TargetIcon />, view: ANY_CHANGE, edit: "budget", status: "usage" },
     ],
   },
 ];

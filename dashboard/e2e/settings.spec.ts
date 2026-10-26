@@ -130,7 +130,8 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
 const hubLink = (page: Page, title: string) => {
   const item = ITEMS.find((i) => i.title === title);
   if (!item) throw new Error(`no hub item ${title}`);
-  return page.getByRole("main").locator(`a[href="${item.href}"], a[href="${item.href}/"]`);
+  // The overview's card, not the same page in Settings' own list beside it.
+  return page.locator("main [data-page]").locator(`a[href="${item.href}"], a[href="${item.href}/"]`);
 };
 
 async function shot(page: Page, name: string) {

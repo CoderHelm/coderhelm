@@ -9,14 +9,7 @@ import path from "node:path";
 
 const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots");
 
-const LINKS = [
-  "Runs", "Reviewer", "Tests", "Releases", "Code Graph", "Plans", "Templates",
-  "Integrations", "Data sources",
-  "Analytics", "Learning", "Infrastructure", "Alerts", "Health", "Memory",
-  "Repos", "Settings", "Notifications", "Alert routes", "Skills", "AI Models",
-  "Members",
-  "Security", "Token limit", "Admin", "Support queue",
-];
+const LINKS = ["Runs", "Plans", "Code review", "Insights", "Settings", "Admin", "Support queue"];
 
 async function mockApi(page: Page) {
   const json = (route: Route, body: unknown, status = 200) =>
@@ -61,36 +54,24 @@ async function shot(page: Page, name: string) {
   await page.screenshot({ path: path.join(SHOTS_DIR, `${name}.png`) });
 }
 
-test("1280×800: every menu link is reachable, the menu shows it scrolls, and help stays pinned", async ({ page }) => {
+test("1280×800: the whole menu fits without scrolling, and help and the person stay in view", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await mockApi(page);
   await page.goto("/");
   const nav = page.getByRole("navigation", { name: "Main" });
   await expect(nav.getByRole("link", { name: "Runs", exact: true })).toBeVisible();
   const area = nav.locator("[data-scroll-fade]");
-
-  // The menu is longer than the window: it scrolls, and the fade at the bottom says so.
-  await expect(area).toHaveAttribute("data-more-end", "true");
-  await expect(area).not.toHaveAttribute("data-more-start", "true");
-  await expect(nav.getByTestId("sidebar-scroll-more")).toHaveCSS("opacity", "1");
-  await shot(page, "shell-1280x800-top");
-
-  // Help and the person are pinned below the scroll area, in view without scrolling.
-  for (const id of ["nav-get-help", "nav-report-issue", "nav-contact-us"]) await expectReachable(page, nav.getByTestId(id), id);
-  await expect(nav.getByRole("button", { name: "Log out" })).toBeInViewport();
-
-  for (const name of LINKS) await expectReachable(page, menuLink(nav, name), name);
-
-  // Scrolled to the end: the bottom fade is gone and the top one shows.
-  await area.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  // A short menu: nothing hides below the fold.
   await expect(area).not.toHaveAttribute("data-more-end", "true");
-  await expect(area).toHaveAttribute("data-more-start", "true");
-  await shot(page, "shell-1280x800-bottom");
+  await shot(page, "shell-1280x800-top");
+  await expectReachable(page, nav.getByTestId("nav-help"), "Help");
+  await expect(nav.getByRole("button", { name: "Log out" })).toBeInViewport();
+  for (const name of LINKS) await expect(menuLink(nav, name), name).toBeInViewport();
 
-  // A page low in the menu opens with its item in view.
+  // A settings page marks Settings in the menu and itself in Settings' own list.
   await page.goto("/settings/budget");
-  await expect(nav.getByRole("link", { name: "Token limit", exact: true })).toHaveAttribute("aria-current", "page");
-  await expect(nav.getByRole("link", { name: "Token limit", exact: true })).toBeInViewport();
+  await expect(nav.getByRole("link", { name: "Settings", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("navigation", { name: "Settings" }).getByRole("link", { name: "Token limit", exact: true })).toHaveAttribute("aria-current", "page");
 });
 
 test("390 wide: the menu drawer reaches every link and keeps help and the person in view", async ({ page }) => {
@@ -100,19 +81,18 @@ test("390 wide: the menu drawer reaches every link and keeps help and the person
   await page.getByRole("button", { name: "Menu" }).click();
   const nav = page.getByRole("dialog", { name: "Menu" }).getByRole("navigation", { name: "Main" });
   await expect(nav.getByRole("link", { name: "Runs", exact: true })).toBeVisible();
-  await expect(nav.locator("[data-scroll-fade]")).toHaveAttribute("data-more-end", "true");
   await shot(page, "shell-390-menu");
 
-  for (const id of ["nav-get-help", "nav-report-issue", "nav-contact-us"]) await expectReachable(page, nav.getByTestId(id), id);
+  await expectReachable(page, nav.getByTestId("nav-help"), "Help");
   await expect(nav.getByRole("button", { name: "Log out" })).toBeInViewport();
   for (const name of LINKS) await expectReachable(page, menuLink(nav, name), name);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 
-  // Following a link low in the menu closes the drawer and opens the page.
-  await nav.getByRole("link", { name: "Memory", exact: true }).click();
-  await expect(page).toHaveURL(/\/memory\/?$/);
+  // Following a link closes the drawer and opens the page.
+  await nav.getByRole("link", { name: "Insights", exact: true }).click();
+  await expect(page).toHaveURL(/\/analytics\/?$/);
   await expect(page.getByRole("dialog", { name: "Menu" })).toHaveCount(0);
 });
 

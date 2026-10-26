@@ -25,11 +25,11 @@ export function TokenMeters({
         return (
           <li key={l.kind} data-testid={`token-meter-${l.kind}`} title={`${label}: ${LIMIT_HELP[l.kind]} ${formatTokens(l.used)} of ${formatTokens(l.max)} this month.`}>
             <div className={`flex items-center justify-between gap-2 ${compact ? "text-xs" : "text-sm"}`}>
-              <span className={compact ? "text-zinc-500" : "text-zinc-300"}>{label}</span>
+              <span className={compact ? "text-zinc-400" : "text-zinc-300"}>{label}</span>
               <span
                 data-testid="token-meter-value"
                 className={`tabular-nums font-medium ${
-                  tone === "error" ? "text-red-400" : tone === "warning" ? "text-yellow-400" : compact ? "text-zinc-300" : "text-zinc-100"
+                  tone === "error" ? "text-red-300" : tone === "warning" ? "text-amber-300" : compact ? "text-zinc-200" : "text-zinc-100"
                 }`}
               >
                 {formatTokens(l.used)} / {formatTokens(l.max)}
@@ -41,7 +41,7 @@ export function TokenMeters({
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={pct}
-              className={`${compact ? "mt-1 h-1" : "mt-1.5 h-2"} overflow-hidden rounded-full bg-zinc-800`}
+              className={`${compact ? "mt-1 h-1.5" : "mt-1.5 h-2"} overflow-hidden rounded-full bg-zinc-800`}
             >
               <div className={`h-full rounded-full transition-all ${limitBarClass(l)}`} style={{ width: `${pct}%` }} />
             </div>

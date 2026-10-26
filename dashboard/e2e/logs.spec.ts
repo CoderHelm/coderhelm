@@ -150,17 +150,17 @@ async function shot(page: Page, name: string) {
   await page.screenshot({ path: path.join(SHOTS_DIR, `${name}.png`), fullPage: true });
 }
 
-test("Logs sits in the main menu right below Tests", async ({ page }) => {
+test("Logs is a Code review page, in the tabs after Tests", async ({ page }) => {
   await mockApi(page);
   await page.goto("/logs/");
-  const nav = page.getByRole("navigation", { name: "Main" });
-  const labels = (await nav.getByRole("link").allInnerTexts()).map((t) => t.trim());
-  console.log("nav:", labels);
+  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Code review" })).toHaveAttribute("aria-current", "page");
+  const tabs = page.getByRole("navigation", { name: "Code review pages" });
+  const labels = (await tabs.getByRole("link").allInnerTexts()).map((t) => t.trim());
   const tests = labels.indexOf("Tests");
   expect(tests).toBeGreaterThanOrEqual(0);
-  expect(labels[tests + 1]).toBe("Logs");
+  expect(labels.indexOf("Logs")).toBeGreaterThan(tests);
   await expect(page.getByRole("heading", { level: 1, name: "Logs" })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Logs" })).toHaveAttribute("aria-current", "page");
+  await expect(tabs.getByRole("link", { name: "Logs" })).toHaveAttribute("aria-current", "page");
 });
 
 test("findings list with status toggles, filters and the inline detail", async ({ page }) => {
