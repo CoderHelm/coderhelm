@@ -227,11 +227,14 @@ test("GitHub: switch to Coderhelm's app, install on GitHub, edit repositories, u
   await expect(row).toHaveAttribute("data-mode", "hosted");
   expect(puts()).toContainEqual({ github_mode: "hosted" });
 
+  // Read before the click: once the browser is on its way to GitHub the
+  // page's address can already be the next one.
+  const origin = new URL(page.url()).origin;
   const toGithub = page.waitForRequest((r) => r.url().startsWith("https://github.com/apps/coderhelm/installations/new?state=hyb_abc123"));
   await row.getByTestId("hybrid-github-install").click();
   await toGithub;
   const link = calls.find((c) => c.method === "POST" && c.path === "/api/system/hybrid/github/link");
-  expect(link?.body).toEqual({ return_url: `${new URL(page.url()).origin}/settings/system/` });
+  expect(link?.body).toEqual({ return_url: `${origin}/settings/system/` });
 });
 
 test("GitHub links: repositories are edited and saved, and a link is removed", async ({ page }) => {
