@@ -9,7 +9,7 @@ import { SourceLogo } from "./logos";
 
 // One connected app of a knowledge base: what it is, how many pages it
 // brought in, whether it is up to date (in plain words), and the one thing
-// to do when it isn't.
+// to do when it isn't. A source read through someone's sign-in says whose.
 
 export function SourceCard({
   source,
@@ -49,6 +49,11 @@ export function SourceCard({
           <p className="mt-0.5 truncate text-xs text-zinc-500">
             {label} · {itemWord(source.kind, source.items)}
           </p>
+          {source.connection === "sign_in" && source.signin && (
+            <p className="mt-1 text-xs text-zinc-400 wrap-anywhere" data-testid="source-signin" title={source.signin.account ? `${label} account: ${source.signin.account}` : undefined}>
+              Synced with {source.signin.name}&apos;s {label} sign-in
+            </p>
+          )}
         </div>
         {canManage && (
           <MoreMenu

@@ -250,9 +250,13 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
           can_sign_in: !!db.canSignIn[k],
           reconnect_reason: "",
           connected_by: "",
-          hint: k === "sanity" ? "Add a Sanity API token (Viewer is enough) and the project id." : "",
+          hint: "",
           live_updates: true,
           picker: k === "web" ? "address" : "tree",
+          member_sign_in: k === "sanity",
+          signed_in: false,
+          signed_in_as: "admin@example.com",
+          has_saved_key: false,
         })),
         visibility_note: "Everyone who can read this knowledge base can read what you add, even if they can't open it in the app it comes from.",
       });
@@ -411,13 +415,14 @@ test.describe("creating a knowledge base", () => {
     await expect(page.getByTestId("picker-tree").getByTestId("picker-row").first()).toBeVisible();
   });
 
-  test("an app that needs a saved key says what to do, with a link", async ({ page }) => {
+  test("Sanity starts with signing in, not a key (the sign-in flow is in knowledge-signin.spec.ts)", async ({ page }) => {
     await mockApi(page);
     await page.goto("/knowledge/");
     await page.getByTestId("start-sanity").click();
-    const hint = page.getByTestId("connect-hint");
-    await expect(hint).toContainText("Add a Sanity API token");
-    await expect(hint.getByRole("link", { name: "Open Connected apps" })).toHaveAttribute("href", "/settings/integrations/");
+    const step = page.getByTestId("signin-step");
+    await expect(step.getByTestId("signin-button")).toHaveText("Sign in with Sanity");
+    await expect(step.getByTestId("use-token")).toContainText("Use an API token instead");
+    await expect(page.getByTestId("connect-hint")).toHaveCount(0);
   });
 
   test("files: drop them in, name it, and they upload one by one", async ({ page }) => {

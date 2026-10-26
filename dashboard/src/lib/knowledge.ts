@@ -25,9 +25,20 @@ export interface Selected {
 export interface SourceError {
   message: string;
   fix: string;
-  /** `reconnect`, `edit`, `retry`, or empty. */
+  /** `reconnect`, `sign_in`, `edit`, `retry`, or empty. */
   action: string;
   at: string;
+}
+
+/** How a source reads its app: `sign_in` (a member's own sign-in) or the team's connection (empty). */
+export type SourceConnection = "sign_in" | "";
+
+/** Whose sign-in a source syncs with. */
+export interface SourceSignIn {
+  name: string;
+  email: string;
+  /** The account in the app ("Connected as"), when the app says. */
+  account: string;
 }
 
 export interface Source {
@@ -50,6 +61,8 @@ export interface Source {
   live_updates: boolean;
   created_at: string;
   created_by: string;
+  connection?: SourceConnection;
+  signin?: SourceSignIn | null;
 }
 
 export interface SourceSummary {
@@ -93,14 +106,25 @@ export interface Connector {
   label: string;
   blurb: string;
   connected: boolean;
-  via: "oauth" | "saved_key" | "github_app" | "public" | "";
+  via: "oauth" | "sign_in" | "saved_key" | "github_app" | "public" | "";
   can_sign_in: boolean;
   reconnect_reason: string;
   connected_by: string;
   hint: string;
   live_updates: boolean;
   picker: "tree" | "address";
+  /** You can sign in with your own account for this app, nothing to set up. */
+  member_sign_in?: boolean;
+  /** You have such a sign-in now. */
+  signed_in?: boolean;
+  /** The account you're signed in as (or your email when the app doesn't say). */
+  signed_in_as?: string;
+  /** The team also has an API token saved for it. */
+  has_saved_key?: boolean;
 }
+
+/** How a new source connects: your own sign-in, or the team's saved token or sign-in. */
+export type Via = "sign_in" | "team";
 
 export interface PickerNode {
   id: string;
@@ -118,6 +142,8 @@ export interface SourceInput {
   name?: string;
   selection: Selected[];
   options?: Record<string, unknown>;
+  /** `sign_in`: sync through your own sign-in (Sanity). */
+  via?: "sign_in";
 }
 
 export interface WebhookSetup {
@@ -148,11 +174,15 @@ export const knowledge = {
 
   connectors: () => request<{ connectors: Connector[]; visibility_note: string }>("/api/knowledge/connectors"),
   connect: (kind: SourceKind) => request<{ authorize_url: string }>(`/api/knowledge/connectors/${e(kind)}/connect`, { method: "POST" }),
+  /** Your own sign-in for an app (Sanity): already signed in, or where to send the sign-in window. */
+  signIn: (kind: SourceKind) =>
+    request<{ signed_in: boolean; authorize_url?: string }>(`/api/knowledge/connectors/${e(kind)}/signin`, { method: "POST" }),
   disconnect: (kind: SourceKind) => request<{ ok: boolean }>(`/api/knowledge/connectors/${e(kind)}`, { method: "DELETE" }),
-  browse: (kind: SourceKind, parent: string | null, q: string) => {
+  browse: (kind: SourceKind, parent: string | null, q: string, via: Via = "team") => {
     const qs = new URLSearchParams();
     if (parent) qs.set("parent", parent);
     if (q) qs.set("q", q);
+    if (via === "sign_in") qs.set("via", "sign_in");
     const s = qs.toString();
     return request<{ nodes: PickerNode[]; options: Record<string, unknown> }>(`/api/knowledge/connectors/${e(kind)}/browse${s ? `?${s}` : ""}`);
   },
@@ -162,6 +192,9 @@ export const knowledge = {
   updateSource: (kbId: string, id: string, patch: { name?: string; selection?: Selected[]; options?: Record<string, unknown>; paused?: boolean }) =>
     request<{ source: Source }>(`/api/knowledge/${e(kbId)}/sources/${e(id)}`, put(patch)),
   syncSource: (kbId: string, id: string) => request<{ source: Source }>(`/api/knowledge/${e(kbId)}/sources/${e(id)}/sync`, { method: "POST" }),
+  /** "Sign in again": switches the source to your sign-in, or answers where to send the sign-in window first. */
+  signInSource: (kbId: string, id: string) =>
+    request<{ source?: Source; authorize_url?: string }>(`/api/knowledge/${e(kbId)}/sources/${e(id)}/signin`, { method: "POST" }),
   removeSource: (kbId: string, id: string) => request<{ ok: boolean; removed: number }>(`/api/knowledge/${e(kbId)}/sources/${e(id)}`, { method: "DELETE" }),
 };
 
@@ -249,6 +282,8 @@ export function fixLabel(s: Pick<Source, "error" | "kind">): string | null {
   switch (s.error?.action) {
     case "reconnect":
       return `Reconnect ${label}`;
+    case "sign_in":
+      return "Sign in again";
     case "edit":
       return "Choose pages again";
     case "retry":
@@ -306,4 +341,58 @@ export function returnAddress(r: FlowReturn | null, kind: string): string {
   const base = r?.path && r.path.startsWith("/knowledge") ? r.path : "/knowledge/";
   const sep = base.includes("?") ? "&" : "?";
   return `${base}${sep}connected=${encodeURIComponent(r?.kind ?? kind)}`;
+}
+
+// ── Signing in without leaving the page ──────────────────────────────
+
+/** What the sign-in callback page posts to the window that opened it. */
+export const SIGNED_IN_MESSAGE = "coderhelm:mcp-connected";
+
+/**
+ * Opens an app's sign-in in a small window and waits for it: resolves true
+ * once the callback page says it finished, false when the window is closed
+ * first. `start` gets the sign-in address; it runs after the window opens,
+ * inside the click, so popup blockers allow it.
+ */
+export function signInWindow(start: () => Promise<string | null>): Promise<boolean> {
+  const w = window.open("about:blank", "coderhelm-sign-in", "width=520,height=720");
+  return new Promise<boolean>((resolve, reject) => {
+    let done = false;
+    const finish = (ok: boolean) => {
+      if (done) return;
+      done = true;
+      window.removeEventListener("message", onMessage);
+      clearInterval(poll);
+      resolve(ok);
+    };
+    const onMessage = (ev: MessageEvent) => {
+      if (ev.origin !== window.location.origin) return;
+      const d = ev.data as { type?: string } | null;
+      if (d?.type === SIGNED_IN_MESSAGE) finish(true);
+    };
+    window.addEventListener("message", onMessage);
+    const poll = setInterval(() => {
+      if (w && w.closed) finish(false);
+    }, 500);
+    start()
+      .then((url) => {
+        if (!url) {
+          w?.close();
+          finish(true);
+          return;
+        }
+        if (w) w.location.href = url;
+        else {
+          // No window (blocked): sign in in this tab and come back.
+          window.location.assign(url);
+        }
+      })
+      .catch((e) => {
+        w?.close();
+        done = true;
+        window.removeEventListener("message", onMessage);
+        clearInterval(poll);
+        reject(e);
+      });
+  });
 }

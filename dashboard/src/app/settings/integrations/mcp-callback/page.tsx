@@ -50,26 +50,27 @@ function McpCallback() {
       })
       .then((r) => {
         const s = r.server;
-        // A Knowledge app's sign-in goes back to where it was started.
-        if (s.catalog_id?.startsWith("source:")) {
-          setView({ kind: "done", name: s.name.replace(/ \(knowledge\)$/, ""), note: "" });
-          window.location.replace(returnAddress(takeReturn(), s.catalog_id.slice("source:".length)));
-          return;
-        }
-        const row = s.catalog_id ? s.catalog_id : `mcp:${s.id}`;
-        setView({ kind: "done", name: s.name, note: r.tools_error ?? "" });
-        // Opened as a popup from a sign-in card (a chat or a run): tell the
-        // page that opened it, and close. The chat carries on by itself.
+        const knowledgeApp = s.catalog_id?.startsWith("source:");
+        setView({ kind: "done", name: knowledgeApp ? s.name.replace(/ \(knowledge\)$/, "") : s.name, note: knowledgeApp ? "" : (r.tools_error ?? "") });
+        // Opened as a popup (a sign-in card in a chat or a run, or Knowledge
+        // signing in without leaving its page): tell the page that opened
+        // it, and close. That page carries on by itself.
         const opener = window.opener as Window | null;
         if (opener && !opener.closed) {
           try {
-            opener.postMessage({ type: MCP_CONNECTED_MESSAGE, server: s.id }, window.location.origin);
+            opener.postMessage({ type: MCP_CONNECTED_MESSAGE, server: s.id, catalog_id: s.catalog_id ?? "" }, window.location.origin);
             window.close();
             return;
           } catch {
-            // Fall through to the integrations page.
+            // Fall through to the page it was started from.
           }
         }
+        // A Knowledge app's sign-in goes back to where it was started.
+        if (knowledgeApp) {
+          window.location.replace(returnAddress(takeReturn(), s.catalog_id!.slice("source:".length)));
+          return;
+        }
+        const row = s.catalog_id ? s.catalog_id : `mcp:${s.id}`;
         window.location.replace(`/settings/integrations/#integration-${row}`);
       })
       .catch((e) => setView({ kind: "failed", message: errorMessage(e, "The sign-in didn't finish.") }));

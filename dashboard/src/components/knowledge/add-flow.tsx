@@ -13,6 +13,7 @@ import {
   itemWord,
   knowledge,
   rememberReturn,
+  signInWindow,
   sourceHealth,
   suggestName,
   uploadProblem,
@@ -25,6 +26,7 @@ import {
   type Selected,
   type Source,
   type SourceKind,
+  type Via,
   type WebhookSetup,
 } from "@/lib/knowledge";
 import { SourceLogo } from "./logos";
@@ -34,6 +36,10 @@ import { Picker } from "./picker";
 // one: pick an app (or files), connect it with one click if it isn't yet,
 // tick what to bring in, then watch it arrive. A new knowledge base is named
 // from what was picked, and who can read it is one plain sentence.
+//
+// Sanity connects by signing in with your own Sanity account, in a small
+// window that hands back to the flow (nothing to set up, no key to paste).
+// The team's API token is the second choice; it adds instant updates.
 
 type Step = "choose" | "connect" | "pick" | "upload" | "name" | "progress";
 
@@ -90,6 +96,8 @@ export function AddFlow({
   const [error, setError] = useState<string | null>(null);
   const [made, setMade] = useState<{ baseId: string; sourceId: string | null; setup: WebhookSetup | null } | null>(null);
   const [finished, setFinished] = useState(false);
+  const [via, setVia] = useState<Via>("team");
+  const [waiting, setWaiting] = useState(false);
   const started = useRef<string | null>(null);
 
   const conn = useMemo(() => connectors?.find((c) => c.kind === kind) ?? null, [connectors, kind]);
@@ -131,6 +139,8 @@ export function AddFlow({
     setError(null);
     setMade(null);
     setFinished(false);
+    setVia("team");
+    setWaiting(false);
     loadConnectors().then((list) => {
       if (startWith) choose(startWith, list ?? []);
     });
@@ -146,7 +156,38 @@ export function AddFlow({
       return;
     }
     const c = list.find((x) => x.kind === k);
-    setStep(c?.connected ? "pick" : "connect");
+    setVia("team");
+    // An app you sign in to with your own account always asks first: your
+    // sign-in, or the team's token.
+    setStep(c?.member_sign_in ? "connect" : c?.connected ? "pick" : "connect");
+  };
+
+  // Signs in with your own account in a small window, then shows who you're
+  // connected as. The flow stays where it is.
+  const memberSignIn = async () => {
+    if (!kind || kind === "upload") return;
+    setError(null);
+    setWaiting(true);
+    try {
+      const ok = await signInWindow(async () => {
+        const path = mode.kind === "add" ? `/knowledge/base/?id=${encodeURIComponent(mode.base.id)}` : "/knowledge/";
+        rememberReturn({ path, kind, kbId: mode.kind === "add" ? mode.base.id : undefined });
+        const r = await knowledge.signIn(kind);
+        return r.signed_in ? null : (r.authorize_url ?? null);
+      });
+      if (ok) await loadConnectors();
+    } catch (e) {
+      setError(errorMessage(e, `Couldn't start the ${label} sign-in.`));
+    } finally {
+      setWaiting(false);
+    }
+  };
+
+  const continueWith = (v: Via) => {
+    setVia(v);
+    setPicked([]);
+    setError(null);
+    setStep("pick");
   };
 
   const signIn = async () => {
@@ -200,7 +241,7 @@ export function AddFlow({
     setBusy(true);
     setError(null);
     try {
-      const source = kind === "upload" ? undefined : { kind, selection: picked };
+      const source = kind === "upload" ? undefined : { kind, selection: picked, ...(via === "sign_in" ? { via: "sign_in" as const } : {}) };
       if (mode.kind === "create") {
         const r = await knowledge.create({
           name: name.trim() || suggestName(kind, picked, files.map((f) => f.file)),
@@ -257,6 +298,7 @@ export function AddFlow({
   const back = () => {
     setError(null);
     if (step === "name") setStep(kind === "upload" ? "upload" : "pick");
+    else if (step === "pick" && conn?.member_sign_in) setStep("connect");
     else setStep("choose");
   };
 
@@ -291,11 +333,24 @@ export function AddFlow({
           <ChooseStep connectors={connectors} loadError={loadError} onRetry={loadConnectors} onChoose={(k) => choose(k)} />
         )}
 
-        {step === "connect" && kind && kind !== "upload" && (
+        {step === "connect" && kind && kind !== "upload" && conn?.member_sign_in && (
+          <SignInStep
+            kind={kind}
+            conn={conn}
+            waiting={waiting}
+            error={error}
+            onSignIn={memberSignIn}
+            onCancel={() => setWaiting(false)}
+            onContinue={() => continueWith("sign_in")}
+            onUseToken={() => continueWith("team")}
+          />
+        )}
+
+        {step === "connect" && kind && kind !== "upload" && !conn?.member_sign_in && (
           <ConnectStep kind={kind} conn={conn} busy={busy} error={error} onConnect={signIn} />
         )}
 
-        {step === "pick" && kind && kind !== "upload" && <Picker kind={kind} value={picked} onChange={setPicked} />}
+        {step === "pick" && kind && kind !== "upload" && <Picker kind={kind} value={picked} onChange={setPicked} via={via} />}
 
         {step === "upload" && <UploadStep limits={limits} files={files} onAdd={addFiles} onRemove={(k) => setFiles((f) => f.filter((x) => x.key !== k))} error={error} />}
 
@@ -345,6 +400,11 @@ export function AddFlow({
                   </label>
                 )}
               </div>
+            )}
+            {via === "sign_in" && kind !== "upload" && (
+              <p className="text-sm leading-relaxed text-zinc-400" data-testid="signin-note">
+                It stays up to date through your {label} sign-in, checking for changes every 15 minutes. If your sign-in stops working, any admin can sign in again.
+              </p>
             )}
             {kind !== "upload" && (
               <p className="flex gap-2.5 text-sm leading-relaxed text-zinc-400" data-testid="visibility-note">
@@ -441,6 +501,103 @@ function ChooseStep({
           <span className="block text-xs text-zinc-500">PDF, Word, Markdown, text, spreadsheets or web pages</span>
         </span>
       </button>
+    </div>
+  );
+}
+
+function SignInStep({
+  kind,
+  conn,
+  waiting,
+  error,
+  onSignIn,
+  onCancel,
+  onContinue,
+  onUseToken,
+}: {
+  kind: SourceKind;
+  conn: Connector;
+  waiting: boolean;
+  error: string | null;
+  onSignIn: () => void;
+  onCancel: () => void;
+  onContinue: () => void;
+  onUseToken: () => void;
+}) {
+  const label = KIND_LABEL[kind];
+  const [showToken, setShowToken] = useState(false);
+  const state = conn.signed_in ? "connected" : waiting ? "signing-in" : "choose";
+  return (
+    <div className="flex flex-col items-center py-4 text-center" data-testid="signin-step" data-state={state}>
+      <SourceLogo kind={kind} size="lg" />
+      {conn.signed_in ? (
+        <>
+          <h3 className="mt-5 text-lg font-semibold text-zinc-100">You&apos;re signed in to {label}</h3>
+          <p className="mt-2 inline-flex min-w-0 max-w-full items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-sm text-emerald-200" data-testid="signed-in-as">
+            <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+            <span className="min-w-0 wrap-anywhere">Connected as {conn.signed_in_as || "you"}</span>
+          </p>
+          <p className="mt-3 max-w-sm text-sm leading-relaxed text-zinc-400">
+            Coderhelm reads what you pick with this sign-in. Nothing is changed in {label}.
+          </p>
+          <button type="button" onClick={onContinue} className={`${buttonClass("primary")} mt-6 !min-h-11 !px-6`} data-testid="signin-continue" autoFocus>
+            Continue
+          </button>
+        </>
+      ) : waiting ? (
+        <>
+          <h3 className="mt-5 text-lg font-semibold text-zinc-100">Finish signing in to {label}</h3>
+          <p className="mt-2 max-w-sm text-sm leading-relaxed text-zinc-400" role="status">
+            A {label} window is open. Sign in there and allow Coderhelm to read your content. This page carries on when you&apos;re done.
+          </p>
+          <div className="mt-6 flex items-center gap-3">
+            <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-600 border-t-sky-400 motion-reduce:animate-none" />
+            <span className="text-sm text-zinc-300">Waiting for {label}…</span>
+          </div>
+          <button type="button" onClick={onCancel} className={`${linkButton} mt-4 text-sm`} data-testid="signin-cancel">
+            Cancel
+          </button>
+        </>
+      ) : (
+        <>
+          <h3 className="mt-5 text-lg font-semibold text-zinc-100">Connect {label}</h3>
+          <p className="mt-2 max-w-sm text-sm leading-relaxed text-zinc-400">
+            Sign in with your {label} account and choose what to bring in. There&apos;s nothing to set up and no key to copy. Nothing is changed in {label}.
+          </p>
+          <button type="button" onClick={onSignIn} className={`${buttonClass("primary")} mt-6 !min-h-11 !px-6`} data-testid="signin-button">
+            Sign in with {label}
+          </button>
+        </>
+      )}
+      {error && (
+        <p className="mt-4 max-w-sm text-sm text-red-300" role="alert">
+          {error}
+        </p>
+      )}
+      {!waiting && (
+        <div className="mt-8 w-full max-w-sm border-t border-zinc-800 pt-5 text-left" data-testid="token-option">
+          {conn.has_saved_key ? (
+            <button type="button" className={`${linkButton} text-sm`} onClick={onUseToken} data-testid="use-token">
+              Use the team&apos;s API token instead (adds instant updates)
+            </button>
+          ) : !showToken ? (
+            <button type="button" className={`${linkButton} text-sm`} onClick={() => setShowToken(true)} data-testid="use-token">
+              Use an API token instead (adds instant updates)
+            </button>
+          ) : (
+            <div className="text-sm leading-relaxed text-zinc-300" data-testid="token-help">
+              <p>
+                An admin saves a {label} API token (Viewer is enough) and the project id on the Integrations page. With a token, changes arrive the moment they&apos;re published.
+              </p>
+              <p className="mt-3">
+                <Link href="/settings/integrations/#integration-sanity" className={linkButton} target="_blank" rel="noopener noreferrer">
+                  Open Integrations in a new tab
+                </Link>
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

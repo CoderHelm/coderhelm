@@ -10,7 +10,7 @@ A knowledge base can hold pages from the apps your team already writes in, next 
 On the **Knowledge** page, choose **New knowledge base** (or **Add** on an existing one):
 
 1. Pick the app: Notion, Confluence, Google Drive, Sanity, GitHub, a website, or **Upload files**.
-2. If the app isn't connected yet, choose **Connect** and sign in to it. You come back to the same step.
+2. Sign in to the app. For Sanity, choose **Sign in with Sanity**: a small window opens, you sign in with your own Sanity account, and the dialog carries on where it was. If you're already signed in to Sanity on **Connected apps**, it says **Connected as** your account and you just continue. For other apps that aren't connected yet, choose **Connect**; you come back to the same step.
 3. Tick what to bring in. Ticking a page, space or folder includes everything inside it, including what is added there later.
 4. A new knowledge base is named after what you picked; change the name if you like. It is readable by your whole team unless you change that.
 
@@ -23,11 +23,17 @@ The pages start arriving right away, and the dialog shows each one as it comes i
 | Notion | Pages and databases | Each page's text, nested blocks and a database row's properties | A Notion sign-in, or the Notion token saved on the Integrations page |
 | Confluence | Spaces or page trees | Each current page's body | An Atlassian sign-in, or the Confluence email and API token saved on the Integrations page |
 | Google Drive | Folders (with their subfolders) or single files | Docs, Sheets and Slides as text; PDF, Word, Excel, Markdown, CSV, HTML and text files | A Google sign-in with read-only access to Drive |
-| Sanity | A dataset, or document types in it | Each published document's text (drafts never) | The Sanity token and project id saved on the Integrations page (a Viewer token is enough) |
+| Sanity | A project, then a dataset or document types in it | Each published document's text (drafts never) | Your own Sanity sign-in, or the Sanity token and project id saved on the Integrations page (a Viewer token is enough) |
 | GitHub | Repositories, folders or files | Markdown, MDX, text, reStructuredText and AsciiDoc files on the default branch | The Coderhelm GitHub App |
 | Website | Page addresses or a sitemap | Each page's readable text | Nothing: public pages only |
 
 A source keeps up to 1,000 pages. Coderhelm only ever reads: nothing is changed, created or deleted in the app.
+
+### Sanity: signing in or a token
+
+Signing in is the first choice: there is nothing to set up and no key to copy. The source syncs with the sign-in of the person who added it, and its card says so: **Synced with Ada's Sanity sign-in**. Coderhelm reads through Sanity's own MCP server and only ever reads.
+
+**Use an API token instead** is the second choice. A token adds instant updates: changes arrive the moment they are published, instead of at the next check.
 
 ### Sanity: turning documents into text
 
@@ -37,7 +43,8 @@ By default a document's title is its first `title`, `name`, `heading` or `label`
 
 | App | Changes arrive | Scheduled check |
 |---|---|---|
-| Sanity | The moment they are published (Coderhelm adds the webhook itself when the token may manage webhooks; otherwise the dialog shows the address and secret to add) | Every 6 hours |
+| Sanity, signed in | At the next check, which asks only for documents changed since the last one | Every 15 minutes |
+| Sanity, with a token | The moment they are published (Coderhelm adds the webhook itself when the token may manage webhooks; otherwise the dialog shows the address and secret to add) | Every 6 hours |
 | Notion | Within moments, when your install has Notion webhooks set up | Every hour, or every 6 hours with webhooks |
 | GitHub | On every push to the default branch | Every 6 hours |
 | Confluence, Google Drive, websites | At the scheduled check | Every hour |
@@ -58,6 +65,7 @@ Each source on a knowledge base's page shows one line: **Up to date, checked 5 m
 | What happened | What you see |
 |---|---|
 | The sign-in expired or was revoked | **Reconnect Notion** |
+| The Sanity sign-in a source syncs with expired, or that person left the team | One sentence saying whose sign-in stopped, and **Sign in again**. Any admin can press it; the source then syncs with their sign-in. The team's owner and admins are told once, in your chat channels and by email. |
 | What you picked was moved or deleted | **Choose pages again** |
 | The app asked Coderhelm to slow down, or didn't answer | **Try again** (it also retries on its own) |
 
@@ -68,7 +76,8 @@ A page that couldn't be read says why in the list of pages, and is tried again o
 Pages from an app follow the knowledge base's own setting, exactly like uploaded files: **everyone who can read the knowledge base can read every page brought into it, even if they can't open that page in the app.** The dialog says so when you add a source. Pick what you bring in with that in mind, or set the knowledge base to admins only.
 
 - Only people whose role includes managing knowledge add, change, pause and remove sources.
-- Connections belong to the team, not to the person who signed in, so syncs keep working when that person is away. The page shows who connected each app.
+- Most connections belong to the team, not to the person who signed in, so syncs keep working when that person is away. The page shows who connected each app.
+- A Sanity source added by signing in syncs with that person's own sign-in, and says so. If they leave the team, it stops and asks any admin to sign in again; their sign-in is never used after they leave.
 - Sign-ins are sealed with your install's encryption key for one team and one connection, renewed before they expire, revoked when you disconnect, and never sent to the browser or to a model.
 
 ## Citations
@@ -85,4 +94,4 @@ Every source type implements one interface with three calls: list what can be pi
 
 A plugin can add a source type by shipping a connector that answers those three calls; nothing else changes. The endpoints the dashboard uses are under `/api/knowledge/connectors` and `/api/knowledge/{kb_id}/sources`, and providers post change events to `POST /webhooks/knowledge/{token}` (see the [API reference](/api)).
 
-Running your own install? One-click sign-in for Notion, Confluence and Google Drive, and Notion webhooks, need OAuth apps of your own: see [Knowledge sources](/self-host/knowledge-sources) in the self-hosting guide.
+Running your own install? Signing in to Sanity works with nothing to set up. One-click sign-in for Notion, Confluence and Google Drive, and Notion webhooks, need OAuth apps of your own: see [Knowledge sources](/self-host/knowledge-sources) in the self-hosting guide.
