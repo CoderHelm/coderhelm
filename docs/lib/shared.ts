@@ -8,7 +8,7 @@ export const SITE = {
   appUrl: 'https://app.coderhelm.com',
   homeUrl: 'https://coderhelm.com',
   description:
-    'Guides and reference for CoderHelm: connect GitHub and Jira, run the coder and the reviewer, build plugins, self-host, and call the API.',
+    'Guides and reference for CoderHelm: connect GitHub and Jira, run the coder and the reviewer, ask Chat about your code, self-host it in your own AWS account, and call the API.',
 } as const;
 
 /** The docs live at the root of docs.coderhelm.com. */

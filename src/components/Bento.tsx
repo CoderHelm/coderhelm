@@ -106,7 +106,7 @@ export function Bento({ items }: { items: { title: string; text: string; href: s
                   <Link href={c.href} className="after:absolute after:inset-0">{c.title}</Link>
                 </h3>
                 <p className="mt-2 text-[15px] leading-relaxed text-text-secondary"><Inline text={c.text} /></p>
-                <span aria-hidden="true" className="mt-4 inline-flex text-[14px] font-medium text-accent-text group-hover:text-text-primary">Learn more →</span>
+                <span aria-hidden="true" className="mt-4 inline-flex text-[14px] font-medium text-accent-text group-hover:text-text-primary">Learn more</span>
               </div>
               <div aria-hidden="true">
                 <Mini />

@@ -83,3 +83,35 @@ h1 > .ch-badge {
 .dark .ch-badge[data-status='new'] {
   color: #4ade80;
 }
+
+/* The docs home: the pages listed under each path. */
+.ch-path-links ul {
+  display: grid;
+  gap: 0.15rem;
+}
+.ch-path-links a {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 0.375rem;
+  margin-inline: -0.5rem;
+  padding: 0.3rem 0.5rem;
+  color: var(--color-fd-muted-foreground);
+  transition: color 0.15s, background-color 0.15s;
+}
+.ch-path-links a::before {
+  content: '';
+  width: 0.3rem;
+  height: 0.3rem;
+  flex: none;
+  border-radius: 9999px;
+  background: var(--color-fd-border);
+  transition: background-color 0.15s;
+}
+.ch-path-links a:hover {
+  color: var(--color-fd-foreground);
+  background: var(--color-fd-accent);
+}
+.ch-path-links a:hover::before {
+  background: var(--color-fd-primary);
+}

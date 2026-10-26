@@ -6,6 +6,7 @@ import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 import { File, Files, Folder } from 'fumadocs-ui/components/files';
 import type { MDXComponents } from 'mdx/types';
 import { Badge } from '@/components/badge';
+import { Path, Paths, Tile, Tiles } from '@/components/home';
 
 export function getMDXComponents(components?: MDXComponents) {
   return {
@@ -21,6 +22,10 @@ export function getMDXComponents(components?: MDXComponents) {
     Files,
     Folder,
     Badge,
+    Path,
+    Paths,
+    Tile,
+    Tiles,
     ...components,
   } satisfies MDXComponents;
 }

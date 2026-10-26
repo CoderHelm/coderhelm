@@ -10,14 +10,24 @@ async function shot(page: Page, name: string) {
   await page.screenshot({ path: path.join(SHOTS, `${name}.png`), fullPage: false });
 }
 
-test('home page shows the sections and links into each', async ({ page }) => {
+test('home page shows the three paths, the newest features and links into each', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveTitle('CoderHelm Docs');
   await expect(page.getByRole('heading', { level: 1, name: 'CoderHelm documentation' })).toBeVisible();
   const main = page.locator('#nd-page');
-  for (const name of ['Quickstart', 'How it works', 'Build a plugin', 'Self-hosting', 'API', 'Changelog']) {
-    await expect(main.locator('a[data-card]').filter({ hasText: new RegExp(`^${name}`) })).toBeVisible();
+  const paths: [string, string, RegExp][] = [
+    ['Use CoderHelm', 'Start the quickstart', /\/getting-started\/?$/],
+    ['Self-host it', 'Open the install guide', /\/self-host\/install\/?$/],
+    ['Build on it', 'Read the API docs', /\/api\/?$/],
+  ];
+  for (const [title, cta, href] of paths) {
+    const path = main.locator('section').filter({ has: page.getByRole('heading', { level: 2, name: title }) });
+    await expect(path.getByRole('link', { name: cta })).toHaveAttribute('href', href);
   }
+  for (const name of ['Chat reads your code', 'Knowledge sources', 'Agent permissions', 'Public API']) {
+    await expect(main.getByRole('link', { name: new RegExp(`^${name}`) })).toBeVisible();
+  }
+  await expect(main.getByRole('link', { name: 'changelog' })).toBeVisible();
   await shot(page, 'home-desktop');
 });
 

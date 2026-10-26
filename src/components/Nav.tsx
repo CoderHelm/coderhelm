@@ -28,6 +28,9 @@ export default function Nav() {
         </ul>
 
         <div className="hidden items-center gap-5 lg:flex">
+          <a href={SITE.docsUrl} className="text-sm text-text-secondary transition-colors hover:text-text-primary">
+            Docs
+          </a>
           <a href={SITE.appUrl} className="text-sm text-text-secondary transition-colors hover:text-text-primary">
             Sign in
           </a>
@@ -54,6 +57,11 @@ export default function Nav() {
                   </Link>
                 </li>
               ))}
+              <li>
+                <a href={SITE.docsUrl} className="block border-b border-line py-3 text-[15px] text-text-secondary hover:text-text-primary">
+                  Docs
+                </a>
+              </li>
             </ul>
             <div className="mt-5 grid grid-cols-2 gap-3">
               <a href={SITE.appUrl} className="rounded-md border border-line px-4 py-2.5 text-center text-sm text-text-primary">

@@ -51,7 +51,7 @@ export function Story({ chapters }: { chapters: Chapter[] }) {
                     <h4 className="mt-2 text-balance text-lg font-semibold leading-snug text-text-primary sm:text-[22px]">{s.heading}</h4>
                     <p className="mt-3 text-[15px] leading-relaxed text-text-secondary sm:text-base"><Inline text={s.text} /></p>
                     <Link href={s.href} className="mt-4 inline-flex text-[15px] font-medium text-accent-text hover:text-text-primary">
-                      {s.linkLabel} <span aria-hidden="true" className="ml-1">→</span>
+                      {s.linkLabel}
                     </Link>
                   </div>
                   <Frame id={s.frame} caption={s.caption} hideCaption />

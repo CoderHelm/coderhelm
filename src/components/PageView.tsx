@@ -6,6 +6,7 @@ import { Inline } from "./Md";
 import { Frame } from "./Frames";
 import { Story } from "./Story";
 import { Bento } from "./Bento";
+import { Shot } from "./Shot";
 import Nav from "./Nav";
 import Footer from "./Footer";
 
@@ -51,7 +52,7 @@ function BlockView({ block }: { block: Block }) {
               <h3 className="text-[15px] font-semibold text-text-primary">
                 {c.href ? (
                   <Link href={c.href} className="after:absolute after:inset-0">
-                    {c.title} <span aria-hidden="true" className="text-text-muted">→</span>
+                    {c.title}
                   </Link>
                 ) : (
                   c.title
@@ -97,6 +98,30 @@ function BlockView({ block }: { block: Block }) {
       );
     case "frame":
       return <Frame id={block.id} caption={block.caption} />;
+    case "shot":
+      return <Shot id={block.shot} caption={block.caption} />;
+    case "actions":
+      return (
+        <div className="flex flex-wrap gap-3">
+          {block.items.map((a, i) => {
+            const cls =
+              i === 0
+                ? "rounded-md bg-white px-5 py-2.5 text-[15px] font-semibold text-black hover:opacity-90"
+                : "rounded-md border border-line px-5 py-2.5 text-[15px] font-medium text-text-primary hover:bg-surface-raised";
+            return a.href.startsWith("/") ? (
+              <Link key={a.href} href={a.href} className={cls}>{a.label}</Link>
+            ) : (
+              <a key={a.href} href={a.href} className={cls}>{a.label}</a>
+            );
+          })}
+        </div>
+      );
+    case "note":
+      return (
+        <p className="max-w-2xl border-l-2 border-line pl-4 text-sm leading-relaxed text-text-muted">
+          <Inline text={block.text} />
+        </p>
+      );
     case "story":
       return <Story chapters={block.chapters} />;
     case "bento":
@@ -105,10 +130,11 @@ function BlockView({ block }: { block: Block }) {
 }
 
 export function SectionView({ section }: { section: Section }) {
-  const frame = section.blocks.find((b) => b.type === "frame");
-  // A frame beside short text reads better side by side on wide screens.
-  const split = Boolean(frame) && section.blocks.every((b) => b.type === "frame" || b.type === "p" || b.type === "list");
-  const text = section.blocks.filter((b) => !split || b.type !== "frame");
+  const isPicture = (b: Block) => b.type === "frame" || b.type === "shot";
+  const frame = section.blocks.find(isPicture);
+  // A picture beside short text reads better side by side on wide screens.
+  const split = Boolean(frame) && section.blocks.every((b) => isPicture(b) || ["p", "list", "actions", "note"].includes(b.type));
+  const text = section.blocks.filter((b) => !split || !isPicture(b));
   const heading = (
     <>
       {section.eyebrow && <p className="font-mono text-xs uppercase tracking-[0.14em] text-accent-text">{section.eyebrow}</p>}
@@ -155,6 +181,7 @@ export function Cta({ heading = "Put CoderHelm on your next ticket." }: { headin
         <p className="mx-auto mt-4 max-w-xl text-[17px] text-text-secondary">{SITE.ctaNote}</p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <a href={SITE.appUrl} className="rounded-md bg-white px-5 py-2.5 text-[15px] font-semibold text-black hover:opacity-90">Get started</a>
+          <Link href="/self-host/" className="rounded-md border border-line px-5 py-2.5 text-[15px] font-medium text-text-primary hover:bg-surface-raised">Self-host it</Link>
           <Link href="/contact/" className="rounded-md border border-line px-5 py-2.5 text-[15px] font-medium text-text-primary hover:bg-surface-raised">Talk to us</Link>
         </div>
       </div>
@@ -190,7 +217,7 @@ export default function PageView({ page }: { page: Page }) {
         <h1 className="mt-3 max-w-4xl text-balance text-4xl font-semibold tracking-tight sm:text-6xl">{page.h1}</h1>
         <p className="mt-6 max-w-2xl text-lg leading-relaxed text-text-secondary"><Inline text={page.lede} /></p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <a href={SITE.appUrl} className="rounded-md bg-white px-5 py-2.5 text-[15px] font-semibold text-black hover:opacity-90">Get started</a>
+          <a href={page.heroCta?.href ?? SITE.appUrl} className="rounded-md bg-white px-5 py-2.5 text-[15px] font-semibold text-black hover:opacity-90">{page.heroCta?.label ?? "Get started"}</a>
           <a href={`/${page.slug}.md`} className="rounded-md border border-line px-5 py-2.5 text-[15px] font-medium text-text-secondary hover:text-text-primary">Read as Markdown</a>
         </div>
         {page.heroFrame && (
@@ -209,7 +236,7 @@ export default function PageView({ page }: { page: Page }) {
             <ul className="mt-6 grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-3">
               {related.map((p) => (
                 <li key={p.slug} className="relative bg-surface p-5 hover:bg-surface-raised">
-                  <Link href={p.path} className="font-medium text-text-primary after:absolute after:inset-0">{p.navLabel} <span aria-hidden="true" className="text-text-muted">→</span></Link>
+                  <Link href={p.path} className="font-medium text-text-primary after:absolute after:inset-0">{p.navLabel}</Link>
                   <p className="mt-1.5 text-sm leading-relaxed text-text-secondary">{p.description}</p>
                 </li>
               ))}

@@ -13,15 +13,21 @@ export const SITE = {
   alternateNames: ["Coderhelm", "Coder Helm"],
   url: "https://coderhelm.com",
   appUrl: "https://app.coderhelm.com",
+  docsUrl: "https://docs.coderhelm.com",
+  installUrl: "https://docs.coderhelm.com/self-host/install/",
   email: "support@coderhelm.com",
   tagline: "Ship code, not tickets. The AI engineer that stays on the code after the pull request.",
   // The one sentence that defines the product, used word for word in the home
   // page, the meta description, JSON-LD and llms.txt.
   entity:
-    "CoderHelm is an AI coding agent for GitHub and Jira. Assign it an issue or a ticket and it opens a pull request in your repository, then it stays on the code: it answers review comments, fixes its own failing CI, reviews your team's pull requests and turns production alerts into fixes that a person approves.",
+    "CoderHelm is an AI coding agent for GitHub and Jira. Assign it an issue or a ticket and it opens a pull request in your repository, then it stays on the code: it answers review comments, fixes its own failing CI, reviews your team's pull requests and turns production alerts into fixes that a person approves. Teams can also ask it about their code and documents in Chat, and run it hosted or in their own AWS account.",
   llmsDetails: [
-    "Status: closed beta. Sign in at https://app.coderhelm.com; new accounts are admitted from a waitlist.",
-    "Models: Claude, through the team's own Anthropic API key. Admins can set monthly token limits: one for new tokens, one for cache reads and one for cache writes.",
+    "Status: the hosted service is in closed beta. Sign in at https://app.coderhelm.com; new accounts are admitted from a waitlist.",
+    "Self-hosting: runs in your own AWS account, installed from the browser at https://docs.coderhelm.com/self-host/install/ or from a terminal. The first public self-host release is not out yet; releases are published at https://github.com/CoderHelm/coderhelm-platform/releases. License: FSL-1.1-ALv2 (each release becomes Apache 2.0 two years after it ships).",
+    "Models: Claude. Hosted teams use their own Anthropic API key; self-hosted installs use Amazon Bedrock in their own account or each team's Anthropic API key. Admins can set monthly token limits: one for new tokens, one for cache reads and one for cache writes.",
+    "Chat: answers questions about the team's repositories and knowledge. It reads the code itself (overview, files, code search, code graph) and cites real file paths and lines.",
+    "Knowledge sources: Notion, Confluence, Google Drive, Sanity, GitHub, websites and uploaded files, kept in sync.",
+    "API: a public REST API with team API keys, described at https://docs.coderhelm.com/openapi.json.",
     "Works with: GitHub (GitHub App), Jira (Forge app), Microsoft Teams, AWS (CloudWatch alarms through SNS, CloudWatch Logs, PostgreSQL, Redshift), GraphQL APIs, Playwright, JUnit and Cucumber reports, and 17 MCP servers.",
     "Starts a run when: a GitHub issue is assigned to CoderHelm, gets the `coderhelm` label, or gets a `/coderhelm` or `@coderhelm` comment; a Jira ticket is assigned to CoderHelm or gets the `coderhelm` label.",
     "Reviews any pull request that gets the review label (`ch-review` by default) once a repository turns the reviewer on.",
@@ -38,11 +44,17 @@ export const SITE = {
     "Read only lookups in GraphQL APIs, CloudWatch Logs, PostgreSQL and Redshift",
     "Team skills and agent briefs read from a repository",
     "AI plans that turn a description into ordered issues",
+    "Chat that reads your repositories and cites file paths and lines",
+    "Knowledge from Notion, Confluence, Google Drive, Sanity, GitHub, websites and files",
+    "Agent permissions: allow, ask or deny, with approvals",
+    "Custom roles and monthly token limits",
+    "Public REST API with team API keys",
+    "Self-hosting in your own AWS account",
   ],
   sameAs: ["https://github.com/CoderHelm"],
   ctaNote: "CoderHelm is in closed beta. Sign in to request access; you bring your own Anthropic API key.",
-  updated: "2026-10-19",
-  updatedLabel: "October 19, 2026",
+  updated: "2026-10-26",
+  updatedLabel: "October 26, 2026",
   year: 2026,
 } as const;
 
@@ -52,7 +64,7 @@ const home: Page = {
   navLabel: "Home",
   title: "CoderHelm: AI coding agent for GitHub and Jira. Ship code, not tickets.",
   description:
-    "Assign a GitHub issue or Jira ticket and get a pull request. Then CoderHelm keeps the code healthy: it fixes its CI, answers review comments, reviews PRs and turns alerts into fixes.",
+    "Assign a GitHub issue or Jira ticket and get a pull request. Then CoderHelm keeps the code healthy: it fixes its CI, answers review comments, reviews PRs, turns alerts into fixes and answers questions about your code.",
   eyebrow: "Closed beta",
   h1: "Ship code, not tickets.",
   lede:
@@ -166,6 +178,27 @@ const home: Page = {
       ],
     },
     {
+      id: "chat",
+      eyebrow: "Chat",
+      heading: "Ask about your code. Get answers you can check.",
+      blocks: [
+        {
+          type: "p",
+          text: "Chat reads your team's repositories itself: it looks a repository over, searches the code, reads the files and follows the code graph. Every claim has a numbered citation with the real file path and lines, and it never asks you to paste what it can open.",
+        },
+        {
+          type: "list",
+          items: [
+            "It reads everything you can see; type @ to narrow a question to one repository or knowledge collection",
+            "Knowledge from Notion, Confluence, Google Drive, Sanity, GitHub, websites and files, kept in sync",
+            "When nothing in your sources supports an answer, it says so",
+          ],
+        },
+        { type: "actions", items: [{ label: "How Chat works", href: "/chat/" }] },
+        { type: "shot", shot: "chat", caption: "Chat answering a question about a repository: what it read, then an answer with numbered citations. Example data." },
+      ],
+    },
+    {
       id: "around-the-work",
       eyebrow: "Around the work",
       heading: "What it uses to get the change right.",
@@ -194,7 +227,7 @@ const home: Page = {
             },
             {
               title: "Guarded in code, not in a prompt",
-              text: "Its own branch, a build sandbox with no credentials, read only data access, secrets encrypted with AWS KMS, signed webhooks and team roles.",
+              text: "Allow, ask or deny for everything an agent does, with approvals. Its own branch, a build sandbox with no credentials, read only data access, secrets encrypted with AWS KMS and custom roles.",
               href: "/security/",
               mini: "security",
               wide: true,
@@ -203,8 +236,41 @@ const home: Page = {
         },
         {
           type: "p",
-          text: "Works with GitHub, Jira, Microsoft Teams, AWS, Playwright, JUnit and Cucumber reports, 17 MCP servers, and Claude models through your own Anthropic API key.",
+          text: "Works with GitHub, Jira, Microsoft Teams, AWS, Playwright, JUnit and Cucumber reports, 17 MCP servers, and Claude models through your own Anthropic API key or Amazon Bedrock. Build on it with the [public API](https://docs.coderhelm.com/api/).",
         },
+      ],
+    },
+    {
+      id: "self-host",
+      eyebrow: "Self-host",
+      heading: "Run it in your own AWS account.",
+      blocks: [
+        {
+          type: "p",
+          text: "Your code, tickets, logs and model calls stay in your account. The install guide sets it up from your browser and checks every step against your own install.",
+        },
+        {
+          type: "list",
+          items: [
+            "One click opens AWS with every value filled in, and the guide follows the install as it runs",
+            "Your GitHub App in one click, and a check that Claude answers on Amazon Bedrock",
+            "Your own domain, set up in Route 53 for you or with DNS records to copy, checked live",
+            "The same install checks in the guide, the `doctor` command and the dashboard's Setup page",
+            "Automatic updates in a maintenance window, health checked and rolled back if unhealthy",
+          ],
+        },
+        {
+          type: "actions",
+          items: [
+            { label: "Open the install guide", href: SITE.installUrl },
+            { label: "More about self-hosting", href: "/self-host/" },
+          ],
+        },
+        {
+          type: "note",
+          text: "The first public self-host release is not out yet. Until it is, you can read through the guide, but an install cannot finish.",
+        },
+        { type: "shot", shot: "setup", caption: "The Setup page of a self hosted install: each check passing, or saying what is wrong and how to fix it. Example data." },
       ],
     },
     {
@@ -220,7 +286,8 @@ const home: Page = {
             { q: "Does CoderHelm push to my main branch?", a: "No. It writes every change on its own `coderhelm/` branch and opens a pull request. Merging is your call; the optional auto merge for reviewed pull requests waits for a person's approval and green checks." },
             { q: "What happens after the pull request is merged?", a: "CoderHelm stays on the code. It answers questions and review comments, reviews new pull requests that get the review label, turns routed alerts into fixes, keeps flaky tests from blocking builds and, with auto merge on, checks the deploy after the merge and reports only new failures." },
             { q: "Which languages does it support?", a: "It works on the repository as text and runs your own build and tests, so it is not tied to one language or framework." },
-            { q: "Which AI models does it use?", a: "Claude models from Anthropic, through your team's own Anthropic API key. Admins can choose the models and set a monthly token limit." },
+            { q: "Which AI models does it use?", a: "Claude models from Anthropic, through your team's own Anthropic API key. A self-hosted install can use Amazon Bedrock in its own AWS account instead. Admins can choose the models and set monthly token limits." },
+            { q: "Can we run it ourselves?", a: "Yes. CoderHelm runs entirely in your own AWS account, installed from your browser with the [install guide](https://docs.coderhelm.com/self-host/install/). It is licensed under FSL-1.1-ALv2: you can run it, change it and self-host it for your own company, and each release becomes Apache 2.0 two years after it ships. See [self-hosting](/self-host/)." },
             { q: "How much does it cost?", a: "CoderHelm is in closed beta. Each team brings its own Anthropic API key, so model usage is billed to your Anthropic account, and admins can cap it with a monthly token limit." },
             { q: "Can it change data in my database?", a: "No. Lookups are read only, enforced in code at several independent points: the query is checked, the transaction is read only and rolled back, and the database user cannot write." },
           ],
@@ -711,6 +778,159 @@ const security: Page = {
   related: ["data-sources", "alerts", "pull-requests"],
 };
 
+const chat: Page = {
+  slug: "chat",
+  path: "/chat/",
+  navLabel: "Chat",
+  title: "Chat that reads your code and cites it",
+  description:
+    "Ask CoderHelm about your team's repositories and knowledge. Chat opens the code itself, searches it, follows the code graph and cites every claim with the real file path and lines.",
+  eyebrow: "Chat and knowledge",
+  h1: "Ask about your code. Every claim comes with its source.",
+  lede:
+    "Chat answers questions about your team's work from your own sources: your repositories, your knowledge, connected apps, memories, data sources and skills. It does the reading itself and shows exactly where each answer came from.",
+  sections: [
+    {
+      id: "research",
+      heading: "It opens the code, like a teammate would",
+      blocks: [
+        {
+          type: "p",
+          text: "Chat looks a repository over (its README, its folders, manifests such as `package.json` and agent notes such as `AGENTS.md`), searches the code, reads files by line range and checks the code graph, over as many steps as the question needs. Every read is pinned to one commit. It never asks you to open or paste a file it can read; an answer that does is sent back before you see it.",
+        },
+        { type: "shot", shot: "chat", caption: "One quiet line says what Chat read; open it to see each step. The answer cites files by number. Example data." },
+      ],
+    },
+    {
+      id: "asking",
+      heading: "Asking",
+      blocks: [
+        {
+          type: "cards",
+          items: [
+            { title: "It picks what to read", text: "Every question can use everything you can see. Name a repository in the question and Chat reads that one." },
+            { title: "@ to narrow", text: "Type @ to point a question at one repository or knowledge collection. Nothing is narrowed unless you choose it." },
+            { title: "Numbered citations", text: "Hover or tap a number to see the source: the file path and lines with a link to them on GitHub at that commit, or the knowledge page and its date." },
+            { title: "No guessing", text: "When nothing in your sources supports an answer, Chat says so instead of making one up." },
+            { title: "Private until shared", text: "Your chats are yours. Share one and teammates can read it; only you ask in it." },
+            { title: "Metered and capped", text: "Chat's model calls show under their own name on the usage page and count toward your token limits." },
+          ],
+        },
+      ],
+    },
+    {
+      id: "knowledge",
+      heading: "Knowledge that stays in sync",
+      blocks: [
+        {
+          type: "p",
+          text: "A knowledge base holds pages from the apps your team writes in, next to files you upload. Pick what to bring in once and CoderHelm keeps it current, removes what is deleted and cites each page with a link back to where it lives. Agents can search a base too, so a plan can follow your runbook instead of guessing.",
+        },
+        {
+          type: "table",
+          head: ["Source", "What it brings in"],
+          rows: [
+            ["Notion", "Pages and databases"],
+            ["Confluence", "Spaces or page trees"],
+            ["Google Drive", "Folders or files: Docs, Sheets, Slides, PDF, Word, Excel and more"],
+            ["Sanity", "Published documents. Sign in with Sanity, or use an API token for instant updates"],
+            ["GitHub", "Markdown and text files on the default branch"],
+            ["Websites", "Public pages or a sitemap"],
+            ["Files", "PDF, Word, Markdown, text, CSV, Excel and HTML uploads"],
+          ],
+        },
+        { type: "shot", shot: "knowledge", caption: "A knowledge base fed by several apps, each card showing whether it is up to date. Example data." },
+        { type: "p", text: "CoderHelm only ever reads from these apps: nothing is changed, created or deleted there." },
+      ],
+    },
+  ],
+  related: ["pull-requests", "skills", "security"],
+};
+
+const selfHost: Page = {
+  slug: "self-host",
+  path: "/self-host/",
+  navLabel: "Self-host",
+  title: "Self-host CoderHelm in your own AWS account",
+  description:
+    "Run all of CoderHelm in your own AWS account, installed from your browser: AWS quick create, your GitHub App in one click, a model access check, your own domain and checks for every step.",
+  eyebrow: "Self-hosting",
+  h1: "All of CoderHelm, in your own AWS account.",
+  lede:
+    "Your code, tickets, logs and model calls never pass through CoderHelm's account. The install guide sets it up from your browser, and the install keeps checking itself after that.",
+  heroCta: { label: "Open the install guide", href: SITE.installUrl },
+  sections: [
+    {
+      id: "guide",
+      heading: "Installed from your browser",
+      blocks: [
+        {
+          type: "steps",
+          items: [
+            { title: "AWS", text: "Enter your email and pick a region. One click opens AWS on a quick create page with every value filled in. CoderHelm deploys inside your account in about 20 minutes, with live progress in the guide." },
+            { title: "GitHub and models", text: "Create your own GitHub App in one click; its keys go straight to your install. Your install then checks that Claude answers on Amazon Bedrock and opens the right page if access is missing." },
+            { title: "Domain and the rest", text: "Keep the AWS address or add your own domain: in Route 53 it is set up for you, anywhere else you copy two DNS records and the guide checks them live. Then pick from the optional setup list." },
+          ],
+        },
+        {
+          type: "actions",
+          items: [
+            { label: "Open the install guide", href: SITE.installUrl },
+            { label: "Read the self-hosting docs", href: "https://docs.coderhelm.com/self-host/" },
+          ],
+        },
+        {
+          type: "note",
+          text: "The first public self-host release is not out yet. Until it is, you can read through the guide, but an install cannot finish. Releases are published on [GitHub](https://github.com/CoderHelm/coderhelm-platform/releases).",
+        },
+      ],
+    },
+    {
+      id: "after",
+      heading: "It keeps checking itself",
+      blocks: [
+        {
+          type: "p",
+          text: "The same install checks run in three places: the install guide, the `doctor` command on your machine and the Setup page in the dashboard. Each failing check says what is wrong, why it matters and how to fix it.",
+        },
+        { type: "shot", shot: "setup", caption: "The Setup page of a self hosted install. Example data." },
+      ],
+    },
+    {
+      id: "running",
+      heading: "Running it",
+      blocks: [
+        {
+          type: "cards",
+          items: [
+            { title: "Automatic updates", text: "Turn them on and new releases install in your maintenance window, health checked and rolled back if unhealthy. Off, admins get an email about each release." },
+            { title: "Your models", text: "Amazon Bedrock in your account, with no API key anywhere, or each team's own Anthropic API key." },
+            { title: "Serverless on AWS", text: "Lambda, API Gateway, SQS, DynamoDB, S3, CloudFront, Cognito and SES. No servers to patch, and no Rust or Docker needed to install." },
+            { title: "Prefer a terminal?", text: "The installer asks a few questions, deploys the release and creates your GitHub App: `npx -y github:CoderHelm/coderhelm-platform init`, then `deploy`." },
+          ],
+        },
+      ],
+    },
+    {
+      id: "license",
+      heading: "License",
+      blocks: [
+        {
+          type: "list",
+          items: [
+            "CoderHelm is licensed under FSL-1.1-ALv2, the Functional Source License with Apache 2.0 as the future license",
+            "You can run it, change it and self-host it for your own company",
+            "You can't offer it, or something built from it, as a competing hosted product",
+            "Each release becomes Apache 2.0 two years after it ships",
+          ],
+        },
+        { type: "p", text: "The full terms are in the [license](https://github.com/CoderHelm/coderhelm/blob/main/LICENSE.md)." },
+      ],
+    },
+  ],
+  related: ["security", "chat", "pull-requests"],
+};
+
 function legal(slug: string, navLabel: string, title: string, description: string, body: string): Page {
   return { slug, path: `/${slug}/`, navLabel, title, description, h1: title, lede: "", sections: [], kind: "legal", body };
 }
@@ -724,6 +944,8 @@ export const pages: Page[] = [
   tests,
   dataSources,
   skills,
+  chat,
+  selfHost,
   security,
   legal("contact", "Contact", "Contact", "How to reach CoderHelm for support, legal, privacy, security and abuse reports.", contact),
   legal("privacy", "Privacy", "Privacy Policy", "How CoderHelm collects, uses and protects your data, and the sub processors it uses.", privacy),
@@ -740,5 +962,5 @@ export function mdPath(page: Page): string {
 }
 
 export function navPages(): Page[] {
-  return ["pull-requests", "reviewer", "maintenance", "alerts", "tests", "security"].map((s) => pageBySlug(s)!);
+  return ["pull-requests", "reviewer", "maintenance", "chat", "self-host", "security"].map((s) => pageBySlug(s)!);
 }
