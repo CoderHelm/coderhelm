@@ -150,15 +150,14 @@ async function shot(page: Page, name: string) {
   await page.screenshot({ path: path.join(SHOTS_DIR, `${name}.png`), fullPage: true });
 }
 
-test("Logs is a Code review page, in the tabs after Tests", async ({ page }) => {
+test("Logs is its own menu item, with Logs and Alerts as its tabs", async ({ page }) => {
   await mockApi(page);
   await page.goto("/logs/");
-  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Code review" })).toHaveAttribute("aria-current", "page");
-  const tabs = page.getByRole("navigation", { name: "Code review pages" });
-  const labels = (await tabs.getByRole("link").allInnerTexts()).map((t) => t.trim());
-  const tests = labels.indexOf("Tests");
-  expect(tests).toBeGreaterThanOrEqual(0);
-  expect(labels.indexOf("Logs")).toBeGreaterThan(tests);
+  const main = page.getByRole("navigation", { name: "Main" });
+  await expect(main.getByRole("link", { name: "Logs", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(main.getByRole("link", { name: "Code review", exact: true })).not.toHaveAttribute("aria-current", "page");
+  const tabs = page.getByRole("navigation", { name: "Logs pages" });
+  await expect(tabs.getByRole("link")).toHaveText(["Logs", "Alerts"]);
   await expect(page.getByRole("heading", { level: 1, name: "Logs" })).toBeVisible();
   await expect(tabs.getByRole("link", { name: "Logs" })).toHaveAttribute("aria-current", "page");
 });

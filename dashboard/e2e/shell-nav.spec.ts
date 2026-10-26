@@ -9,7 +9,7 @@ import path from "node:path";
 
 const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots");
 
-const LINKS = ["Runs", "Plans", "Code review", "Insights", "Settings", "Admin", "Support queue"];
+const LINKS = ["Runs", "Plans", "Code review", "Logs", "Insights", "Settings", "Admin", "Support queue"];
 
 async function mockApi(page: Page) {
   const json = (route: Route, body: unknown, status = 200) =>
