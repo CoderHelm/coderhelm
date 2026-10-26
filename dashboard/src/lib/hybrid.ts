@@ -46,6 +46,21 @@ export const GITHUB_OUTCOMES: Record<string, { ok: boolean; title: string; fix: 
     title: "The link couldn't be saved.",
     fix: "Press Install on GitHub again. If it keeps failing, contact support.",
   },
+  no_write_access: {
+    ok: false,
+    title: "Your GitHub account can't push to any repository in that installation, so nothing was linked.",
+    fix: "Ask someone who can push to those repositories to press Install on GitHub, or get write access on GitHub and try again.",
+  },
+  declined: {
+    ok: false,
+    title: "Nothing was linked: you chose Cancel on Coderhelm's confirmation page.",
+    fix: "If you meant to link it, press Install on GitHub again and choose Link.",
+  },
+  install_off: {
+    ok: false,
+    title: "Coderhelm doesn't see this install as verified and active, so nothing was linked.",
+    fix: "Press Check again below. If it says Coderhelm turned off this install's access, contact support.",
+  },
 };
 
 /** Why a name can't be used, when the server sent no words of its own. */

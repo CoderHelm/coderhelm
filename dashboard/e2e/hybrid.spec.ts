@@ -256,6 +256,9 @@ for (const [outcome, words, tone] of [
   ["linked_elsewhere", "already linked to another install", "error"],
   ["used_by_hosted_team", "used by a team on Coderhelm's hosted service", "error"],
   ["signin_failed", "didn't confirm who you are", "error"],
+  ["no_write_access", "can't push to any repository", "error"],
+  ["declined", "you chose Cancel", "error"],
+  ["install_off", "verified and active", "error"],
 ] as const) {
   test(`GitHub sent back ${outcome}: one sentence and the fix, and the address is cleaned`, async ({ page }) => {
     await setup(page, SELF, { registered: true, verified: true, mode: "hosted" });
@@ -402,6 +405,28 @@ test("hosted: any other OAuth callback (404 from the hand-off) finishes as befor
   await expect(page).toHaveURL(/\/settings\/integrations\/#integration-mcp:srv_1$/);
   expect(calls.filter((c) => c.path === "/hybrid/oauth/callback")).toHaveLength(1);
 });
+
+for (const [label, viewport] of [["1440", { width: 1440, height: 1000 }], ["390", { width: 390, height: 844 }]] as const) {
+  test(`linking refusals read plainly and fit at ${label}, and the install step names the Link confirmation`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await setup(page, SELF, { registered: true, verified: true, mode: "hosted" });
+    await page.goto("/settings/system/#hybrid");
+    await expect(page.getByTestId("hybrid-github")).toContainText("press Link");
+    await expect(page.getByTestId("hybrid-github")).toContainText("only the repositories you can push to");
+    for (const [outcome, title, fix] of [
+      ["no_write_access", "can't push to any repository in that installation", "get write access on GitHub"],
+      ["declined", "you chose Cancel on Coderhelm's confirmation page", "choose Link"],
+      ["install_off", "verified and active, so nothing was linked", "Press Check again"],
+    ] as const) {
+      await page.goto(`/settings/system/?hybrid_github=${outcome}#hybrid`);
+      const box = page.getByTestId("hybrid-github-outcome");
+      await expect(box).toHaveAttribute("data-outcome", outcome);
+      await expect(box).toContainText(title);
+      await expect(box).toContainText(fix);
+      expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= window.innerWidth)).toBe(true);
+    }
+  });
+}
 
 test("on a phone the Hybrid section fits", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

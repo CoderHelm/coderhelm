@@ -1286,7 +1286,7 @@ export function InstallWizard() {
     };
     screen = (
       <section data-testid="screen-github">
-        <Heading title="Install CoderHelm’s GitHub App" lead="One app on your organization, and you pick the repositories. GitHub asks you to sign in once, which proves the installation is yours." />
+        <Heading title="Install CoderHelm’s GitHub App" lead="One app on your organization, and you pick the repositories. GitHub asks you to sign in once, which proves the installation is yours. CoderHelm then shows which install it is about to link: check the address and press Link." />
         {ho ? (
           <Notice tone={ho.ok ? 'pass' : 'fail'} title={ho.title} testId="hybrid-github-outcome">
             {ho.fix ? <p>{ho.fix}</p> : null}

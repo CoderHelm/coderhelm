@@ -647,6 +647,9 @@ export const HYBRID_GITHUB_OUTCOMES: Record<string, { ok: boolean; title: string
   signin_failed: { ok: false, title: 'GitHub didn\u2019t finish signing you in.', fix: 'Press Install on GitHub again and allow the sign-in.' },
   github_unreachable: { ok: false, title: 'CoderHelm couldn\u2019t reach GitHub.', fix: 'Press Install on GitHub again in a minute.' },
   store_failed: { ok: false, title: 'CoderHelm couldn\u2019t save the link.', fix: 'Press Install on GitHub again in a minute.' },
+  no_write_access: { ok: false, title: 'Your GitHub account can\u2019t push to any repository in that installation, so nothing was linked.', fix: 'Ask someone who can push to those repositories to press Install on GitHub, or get write access on GitHub and try again.' },
+  declined: { ok: false, title: 'Nothing was linked: you chose Cancel on CoderHelm\u2019s confirmation page.', fix: 'If you meant to link it, press Install on GitHub again and choose Link.' },
+  install_off: { ok: false, title: 'CoderHelm doesn\u2019t see your install as verified and active, so nothing was linked.', fix: 'Press Check again. If it stays, open Settings, System, Hybrid in CoderHelm; if access was turned off, contact support.' },
 };
 
 /** What the install said when a hybrid call was refused, as one sentence and the fix. */
