@@ -19,8 +19,21 @@ import {
   type SetupStatus,
   type StatusDoc,
   type StepId,
+  CREATES,
   DNS_PROVIDERS,
   GITHUB_OUTCOMES,
+  HYBRID_GITHUB_OUTCOMES,
+  NAME_ZONE,
+  SETUPS,
+  STEP_TIME,
+  type Setup,
+  cleanName,
+  hybridError,
+  hybridRows,
+  hybridUrl,
+  monthlyCost,
+  nameCheckUrl,
+  nameProblem,
   LATEST_URL,
   PERMISSION_REASONS,
   GITHUB_PERMISSIONS,
@@ -58,7 +71,7 @@ import {
   validate,
   withDomainDoc,
 } from '@/lib/install/core';
-import { AnthropicLogo, AwsLogo, GitHubLogo } from './logos';
+import { AnthropicLogo, AwsColorLogo, AwsLogo, GitHubLogo } from './logos';
 
 // Timings (the end-to-end tests shorten them through window.__CH_*).
 function timing(name: string, fallback: number): number {
@@ -79,9 +92,9 @@ function store(s: InstallState) {
   }
 }
 
-function load(): { state: InstallState; github?: string; app?: string } {
+function load(): { state: InstallState; github?: string; app?: string; hybridGithub?: string } {
   const partial = queryToPartial(window.location.search);
-  const { github, app, ...fromUrl } = partial;
+  const { github, app, hybridGithub, ...fromUrl } = partial;
   let stored: InstallState | null = null;
   try {
     const id = fromUrl.statusId ?? localStorage.getItem(STORAGE_LAST);
@@ -94,7 +107,62 @@ function load(): { state: InstallState; github?: string; app?: string } {
   const state = { ...base, ...fromUrl };
   if (fromUrl.statusId && !state.launchedAt && !stored) state.launchedAt = Date.now();
   if (!state.setupToken && !fromUrl.statusId) state.setupToken = newState().setupToken;
-  return { state, github, app };
+  return { state, github, app, hybridGithub };
+}
+
+/**
+ * A call to the install's hybrid setup endpoints: a simple cross-origin POST
+ * (the setup key in a text/plain body, so the browser sends no preflight).
+ */
+async function postInstall(url: string, body: Record<string, unknown>): Promise<{ ok: boolean; status: number; body: Record<string, unknown> | null }> {
+  try {
+    const r = await fetch(url, { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'text/plain' }, credentials: 'omit', cache: 'no-store' });
+    let b: Record<string, unknown> | null = null;
+    try {
+      b = await r.json();
+    } catch {
+      b = null;
+    }
+    return { ok: r.ok, status: r.status, body: b };
+  } catch {
+    return { ok: false, status: 0, body: null };
+  }
+}
+
+/** How far the install is, as a share of its usual 20 minutes. */
+function livePercent(doc: StatusDoc | null, answering: boolean): number {
+  if (answering) return 100;
+  if (!doc) return 3;
+  switch (doc.phase) {
+    case 'starting': return 6;
+    case 'preparing': return 14;
+    case 'deploying': return Math.round(20 + 68 * ((doc.step ?? 0) / Math.max(1, doc.steps ?? 10)));
+    case 'finishing': return 92;
+    case 'done': return 97;
+    default: return 0;
+  }
+}
+
+/** The install's progress, alive: the share done, time left and a moving bar. */
+function LiveProgress({ doc, answering, launchedAt, failed }: { doc: StatusDoc | null; answering: boolean; launchedAt: number | null; failed: boolean }) {
+  const pct = livePercent(doc, answering);
+  // Time left from how far it is (20 minutes in all), never less than a minute.
+  void launchedAt;
+  const left = Math.max(1, Math.round((20 * (100 - pct)) / 100));
+  return (
+    <div className="mb-5 rounded-2xl border border-fd-border bg-fd-card/50 p-4 sm:p-5" data-testid="live-progress">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-3xl font-semibold tabular-nums tracking-tight">{failed ? '–' : `${pct}%`}</span>
+        <span className="text-sm text-fd-muted-foreground">{failed ? 'Stopped' : answering ? 'Done' : doc ? `About ${left} minute${left === 1 ? '' : 's'} left` : 'Waiting for AWS to start'}</span>
+      </div>
+      <div className="relative mt-3 h-2 overflow-hidden rounded-full bg-fd-border" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Install progress">
+        <span className={`absolute inset-y-0 left-0 overflow-hidden rounded-full transition-[width] duration-700 ease-out ${failed ? 'bg-red-500' : answering ? 'bg-emerald-500' : 'bg-fd-primary'}`} style={{ width: `${Math.max(3, pct)}%` }}>
+          {!failed && !answering ? <span className="ch-shimmer absolute inset-0" /> : null}
+        </span>
+      </div>
+      <style>{`.ch-shimmer{background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);background-size:200% 100%;animation:ch-shimmer 1.6s linear infinite}@keyframes ch-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}@media (prefers-reduced-motion:reduce){.ch-shimmer{animation:none}}`}</style>
+    </div>
+  );
 }
 
 async function getJson(url: string): Promise<{ ok: boolean; status: number; body: unknown }> {
@@ -164,10 +232,19 @@ function Row({ tone, title, children }: { tone: Tone; title: React.ReactNode; ch
   );
 }
 
-function Primary({ children, href, onClick, disabled, type = 'button', newTab, testId }: {
-  children: React.ReactNode; href?: string; onClick?: () => void; disabled?: boolean; type?: 'button' | 'submit'; newTab?: boolean; testId?: string;
+type Brand = 'aws' | 'github' | 'anthropic' | 'plain';
+
+/** The primary button: one per screen. A provider's own look when it opens that provider. */
+function Primary({ children, href, onClick, disabled, type = 'button', newTab, testId, brand = 'plain' }: {
+  children: React.ReactNode; href?: string; onClick?: () => void; disabled?: boolean; type?: 'button' | 'submit'; newTab?: boolean; testId?: string; brand?: Brand;
 }) {
-  const cls = 'inline-flex min-h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-fd-primary px-6 py-3 text-base font-semibold text-fd-primary-foreground shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fd-ring focus-visible:ring-offset-2 focus-visible:ring-offset-fd-background disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto';
+  const look = {
+    aws: 'bg-[#232F3E] text-white ring-1 ring-inset ring-white/10 hover:bg-[#2b394c]',
+    github: 'bg-[#1f2328] text-white ring-1 ring-inset ring-white/10 hover:bg-[#2b3036]',
+    anthropic: 'bg-[#1f1e1d] text-[#f5f0e8] ring-1 ring-inset ring-white/10 hover:bg-[#2a2826]',
+    plain: 'bg-fd-primary text-fd-primary-foreground hover:opacity-90',
+  }[brand];
+  const cls = `group/btn inline-flex min-h-12 w-full items-center justify-center gap-2.5 rounded-xl px-6 py-3 text-base font-semibold shadow-sm transition active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fd-ring focus-visible:ring-offset-2 focus-visible:ring-offset-fd-background disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto ${look}`;
   if (href)
     return (
       <a className={cls} href={href} data-testid={testId} onClick={onClick} {...(newTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
@@ -256,34 +333,95 @@ function Notice({ tone, title, children, testId }: { tone: 'fail' | 'warn' | 'pa
   );
 }
 
-function Stepper({ steps, current, done, onPick }: { steps: { id: StepId; label: string }[]; current: StepId; done: Set<StepId>; onPick: (s: StepId) => void }) {
-  const at = steps.findIndex((s) => s.id === current);
+type RailCheck = { id: string; label: string; status: RowStatusLike };
+type RowStatusLike = 'pass' | 'fail' | 'active' | 'pending';
+
+/**
+ * The steps on the left: each one's state, how long it takes, and, for the
+ * step under way, its checks as they pass. Done steps can be opened again.
+ */
+function StepsRail({ steps, current, done, onPick, checks }: {
+  steps: { id: StepId; label: string }[]; current: StepId; done: Set<StepId>; onPick: (s: StepId) => void; checks: RailCheck[];
+}) {
   return (
-    <ol className={`mb-8 grid gap-2 ${steps.length === 5 ? 'grid-cols-5' : 'grid-cols-4'}`} aria-label="Install steps">
-      {steps.map((s, i) => {
-        const isDone = done.has(s.id) && s.id !== current;
-        const isCurrent = s.id === current;
+    <ol className="relative space-y-1" aria-label="Install steps">
+      {steps.map((st, i) => {
+        const isCurrent = st.id === current;
+        const isDone = done.has(st.id) && !isCurrent;
         const can = isDone || isCurrent;
         return (
-          <li key={s.id}>
+          <li key={st.id} className="relative">
+            {i < steps.length - 1 ? (
+              <span aria-hidden className={`absolute left-[15px] top-9 h-[calc(100%-20px)] w-px ${isDone ? 'bg-emerald-500/50' : 'bg-fd-border'}`} />
+            ) : null}
             <button
               type="button"
               disabled={!can}
-              onClick={() => onPick(s.id)}
+              onClick={() => onPick(st.id)}
               aria-current={isCurrent ? 'step' : undefined}
-              className="group flex w-full flex-col items-start gap-2 text-left disabled:cursor-default"
+              className={`relative flex w-full items-start gap-3 rounded-xl px-0 py-2 text-left transition disabled:cursor-default ${can && !isCurrent ? 'hover:opacity-80' : ''}`}
             >
-              <span className={`h-1.5 w-full rounded-full ${isDone ? 'bg-emerald-500' : isCurrent ? 'bg-fd-primary' : i < at ? 'bg-emerald-500' : 'bg-fd-border'}`} />
-              <span className={`flex items-center gap-1.5 text-xs font-medium sm:text-sm ${isCurrent ? 'text-fd-foreground' : 'text-fd-muted-foreground'} ${can && !isCurrent ? 'group-hover:text-fd-foreground' : ''}`}>
-                <span className="hidden sm:inline">{i + 1}.</span>
-                {s.label}
+              <span className={`relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition ${
+                isDone ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                  : isCurrent ? 'border-fd-primary bg-fd-primary text-fd-primary-foreground shadow-[0_0_0_4px] shadow-fd-primary/15'
+                  : 'border-fd-border bg-fd-background text-fd-muted-foreground'}`}>
+                {isDone ? (
+                  <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 8.5l3 3 6-7" /></svg>
+                ) : i + 1}
+              </span>
+              <span className="min-w-0 pt-1">
+                <span className={`block text-sm font-semibold leading-5 ${isCurrent ? 'text-fd-foreground' : isDone ? 'text-fd-foreground/80' : 'text-fd-muted-foreground'}`}>{st.label}</span>
+                <span className="block text-xs leading-5 text-fd-muted-foreground">{isDone ? 'Done' : STEP_TIME[st.id]}</span>
               </span>
             </button>
+            {isCurrent && checks.length ? (
+              <ul className="mb-2 ml-11 space-y-1.5 border-l border-transparent" data-testid="rail-checks">
+                {checks.map((c) => (
+                  <li key={c.id} className="flex items-start gap-2 text-xs leading-5" data-rail-status={c.status}>
+                    <span className={`mt-1.5 size-1.5 shrink-0 rounded-full ${c.status === 'pass' ? 'bg-emerald-500' : c.status === 'fail' ? 'bg-red-500' : c.status === 'active' ? 'animate-pulse bg-fd-primary' : 'bg-fd-border'}`} />
+                    <span className={c.status === 'pending' ? 'text-fd-muted-foreground/70' : 'text-fd-muted-foreground'}>{c.label}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </li>
         );
       })}
     </ol>
   );
+}
+
+/** Phones: the step, its number and a progress bar, in one line. */
+function MobileSteps({ steps, current }: { steps: { id: StepId; label: string }[]; current: StepId }) {
+  const at = Math.max(0, steps.findIndex((s) => s.id === current));
+  return (
+    <div className="mb-5 lg:hidden" data-testid="mobile-steps">
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <span className="font-semibold">Step {at + 1} of {steps.length}: {steps[at]?.label}</span>
+        <span className="shrink-0 text-xs text-fd-muted-foreground">{STEP_TIME[steps[at]?.id ?? 'aws']}</span>
+      </div>
+      <div className="mt-2 flex gap-1.5" aria-hidden>
+        {steps.map((s, i) => (
+          <span key={s.id} className={`h-1 flex-1 rounded-full transition-colors ${i < at ? 'bg-emerald-500' : i === at ? 'bg-fd-primary' : 'bg-fd-border'}`} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Small trust cues under the steps: open source, where it runs, what leaves the account. */
+function TrustCard({ hybrid }: { hybrid: boolean }) {
+  return (
+    <div className="mt-8 space-y-3 rounded-2xl border border-fd-border bg-fd-card/40 p-4 text-xs leading-5 text-fd-muted-foreground" data-testid="trust">
+      <p className="flex gap-2"><Dot />Runs in your AWS account. You own every resource.</p>
+      <p className="flex gap-2"><Dot /><span>Source available: <a className="font-medium text-fd-foreground underline decoration-fd-border underline-offset-2 hover:decoration-fd-foreground" href="https://github.com/CoderHelm/coderhelm-platform" target="_blank" rel="noopener noreferrer">read the code</a>.</span></p>
+      <p className="flex gap-2"><Dot />{hybrid ? <span>Hybrid: GitHub events pass through CoderHelm, never your code. <a className="font-medium text-fd-foreground underline decoration-fd-border underline-offset-2 hover:decoration-fd-foreground" href="/self-host/hybrid/#trust-model">Exactly what</a></span> : 'Fully private: nothing about your install reaches CoderHelm.'}</p>
+    </div>
+  );
+}
+
+function Dot() {
+  return <span aria-hidden className="mt-2 size-1 shrink-0 rounded-full bg-fd-muted-foreground/60" />;
 }
 
 function Field({ label, help, error, children, htmlFor }: { label: string; help?: string; error?: string; children: React.ReactNode; htmlFor: string }) {
@@ -302,8 +440,124 @@ function Heading({ title, lead }: { title: string; lead?: React.ReactNode }) {
   return (
     <header className="mb-6">
       <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl" data-testid="step-title">{title}</h1>
-      {lead ? <p className="mt-2 text-base leading-relaxed text-fd-muted-foreground">{lead}</p> : null}
+      {lead ? <p className="mt-2 text-pretty text-base leading-relaxed text-fd-muted-foreground">{lead}</p> : null}
     </header>
+  );
+}
+
+type NameState = { kind: 'idle' | 'checking' | 'free' | 'taken' | 'problem' | 'offline'; text?: string };
+
+/**
+ * A CoderHelm address: the name, with the suffix shown, checked with
+ * CoderHelm as people type (the rules first, then whether it's free).
+ */
+function NamePicker({ value, onChange, error, testId = 'name-picker', compact }: { value: string; onChange: (v: string) => void; error?: string; testId?: string; compact?: boolean }) {
+  const [st, setSt] = useState<NameState>({ kind: 'idle' });
+  const name = cleanName(value);
+  useEffect(() => {
+    if (!value.trim()) {
+      setSt({ kind: 'idle' });
+      return;
+    }
+    const p = nameProblem(value);
+    if (p) {
+      setSt({ kind: 'problem', text: p });
+      return;
+    }
+    setSt({ kind: 'checking' });
+    let live = true;
+    const t = setTimeout(async () => {
+      const r = await getJson(nameCheckUrl(value));
+      if (!live) return;
+      const b = r.body as { available?: boolean; error?: string; code?: string } | null;
+      if (!r.ok || !b) setSt({ kind: 'offline', text: 'Couldn’t check right now. You can go on: your install claims it later and says if it’s taken.' });
+      else if (b.available) setSt({ kind: 'free' });
+      else setSt({ kind: b.code === 'taken' ? 'taken' : 'problem', text: b.error ?? 'That name can’t be used.' });
+    }, timing('__CH_NAME_DEBOUNCE_MS', 350));
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [value]);
+  const tone = st.kind === 'free' ? 'border-emerald-500/60 focus-within:ring-emerald-500/30' : st.kind === 'taken' || st.kind === 'problem' || error ? 'border-red-500/60 focus-within:ring-red-500/30' : 'border-fd-border focus-within:border-fd-primary focus-within:ring-fd-ring/40';
+  return (
+    <div data-testid={testId} data-name-state={st.kind}>
+      <label htmlFor={`${testId}-input`} className="mb-1.5 block text-sm font-medium">{compact ? 'Another name' : 'Your CoderHelm address name'}</label>
+      <div className={`flex min-h-12 items-stretch overflow-hidden rounded-xl border bg-fd-background transition focus-within:ring-2 ${tone}`}>
+        <input
+          id={`${testId}-input`}
+          className="min-w-0 flex-1 bg-transparent px-3.5 text-base outline-none"
+          value={value}
+          placeholder="yourname"
+          autoCapitalize="off"
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(e) => onChange(e.target.value.toLowerCase())}
+        />
+        <span className="flex items-center border-l border-fd-border bg-fd-secondary/60 px-3 text-sm text-fd-muted-foreground">.{NAME_ZONE}</span>
+      </div>
+      <p className="mt-1.5 flex min-h-5 items-center gap-1.5 text-sm" aria-live="polite" data-testid={`${testId}-status`}>
+        {error && st.kind === 'idle' ? <span className="text-red-600 dark:text-red-400">{error}</span>
+          : st.kind === 'checking' ? <span className="text-fd-muted-foreground">Checking {name}.{NAME_ZONE}…</span>
+          : st.kind === 'free' ? <span className="font-medium text-emerald-700 dark:text-emerald-400">{name}.{NAME_ZONE} is free. It’s claimed for you once your install answers.</span>
+          : st.kind === 'taken' || st.kind === 'problem' ? <span className="text-red-600 dark:text-red-400">{st.text}</span>
+          : st.kind === 'offline' ? <span className="text-fd-muted-foreground">{st.text}</span>
+          : <span className="text-fd-muted-foreground">Lowercase letters, digits and hyphens. Your company’s name works well.</span>}
+      </p>
+    </div>
+  );
+}
+
+function Toggle({ checked, onChange, title, help, testId }: { checked: boolean; onChange: (v: boolean) => void; title: string; help: string; testId: string }) {
+  return (
+    <label className="flex cursor-pointer gap-3 rounded-xl border border-fd-border p-3.5 transition hover:border-fd-foreground/25">
+      <input type="checkbox" className="peer sr-only" checked={checked} onChange={(e) => onChange(e.target.checked)} data-testid={testId} />
+      <span aria-hidden className={`mt-0.5 flex h-6 w-10 shrink-0 items-center rounded-full p-0.5 transition peer-focus-visible:ring-2 peer-focus-visible:ring-fd-ring ${checked ? 'bg-fd-primary' : 'bg-fd-border'}`}>
+        <span className={`size-5 rounded-full bg-white shadow transition ${checked ? 'translate-x-4' : ''}`} />
+      </span>
+      <span className="min-w-0">
+        <span className="block font-medium leading-6">{title}</span>
+        <span className="mt-0.5 block text-sm leading-relaxed text-fd-muted-foreground">{help}</span>
+      </span>
+    </label>
+  );
+}
+
+/** What will be created, where it will answer and what it costs, before anyone opens AWS. */
+function Summary({ s, cost }: { s: InstallState; cost: { low: number; high: number; model: string } }) {
+  const address = s.domainChoice === 'coderhelm'
+    ? `${cleanName(s.coderhelmName) || 'yourname'}.${NAME_ZONE}`
+    : s.domainChoice === 'own' ? cleanHostname(s.hostname) || 'your domain' : 'a cloudfront.net address';
+  return (
+    <section className="rounded-2xl border border-fd-border bg-fd-card/50" aria-label="Summary" data-testid="summary">
+      <div className="grid gap-px overflow-hidden rounded-2xl bg-fd-border sm:grid-cols-3">
+        {[
+          ['Address', address],
+          ['GitHub', s.githubChoice === 'hosted' ? 'CoderHelm’s app' : 'Your own app'],
+          ['AWS cost', `about $${cost.low} to $${cost.high} a month`],
+        ].map(([k, v]) => (
+          <div key={k} className="bg-fd-card px-4 py-3">
+            <div className="text-xs font-medium uppercase tracking-wide text-fd-muted-foreground">{k}</div>
+            <div className="mt-0.5 text-sm font-semibold wrap-anywhere">{v}</div>
+          </div>
+        ))}
+      </div>
+      <details className="group px-4 py-3 text-sm">
+        <summary className="flex cursor-pointer list-none items-center gap-2 font-medium text-fd-muted-foreground marker:hidden hover:text-fd-foreground">
+          <svg viewBox="0 0 16 16" width="12" height="12" className="transition group-open:rotate-90" fill="currentColor" aria-hidden><path d="M6 3.5l5 4.5-5 4.5z" /></svg>
+          What gets created in {REGIONS.find((r) => r.id === s.region)?.name ?? s.region}
+        </summary>
+        <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+          {CREATES.map((c) => (
+            <li key={c.what} className="rounded-lg bg-fd-secondary/50 px-3 py-2">
+              <span className="block font-medium">{c.what}</span>
+              <span className="block text-xs text-fd-muted-foreground">{c.why}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 text-xs leading-5 text-fd-muted-foreground">A small team&apos;s estimate; most of it scales with use. Not included: {cost.model.charAt(0).toLowerCase() + cost.model.slice(1)}.</p>
+      </details>
+    </section>
   );
 }
 
@@ -328,10 +582,11 @@ export function InstallWizard() {
 
   // Load what this browser and the address bar remember.
   useEffect(() => {
-    const { state, github, app } = load();
+    const { state, github, app, hybridGithub } = load();
     setS(state);
     if (state.org) setOrgMode(true);
     if (github) setOutcome({ code: github, app });
+    if (hybridGithub) setHybridOutcome(hybridGithub);
     if (app) setS((p) => (p ? { ...p, appSlug: app } : p));
   }, []);
 
@@ -433,11 +688,48 @@ export function InstallWizard() {
   const view: StepId = manual ?? derived;
   const steps = stepsFor({ domainChoice: s?.domainChoice ?? 'aws' });
   const done = useMemo(() => {
-    const order: StepId[] = ['aws', 'domain', 'github', 'models', 'ready'];
+    const order: StepId[] = ['aws', 'domain', 'address', 'github', 'models', 'ready'];
     const i = order.indexOf(derived);
     return new Set<StepId>(i < 0 ? [] : order.slice(0, i));
   }, [derived]);
   const [provider, setProvider] = useState('');
+  // Hybrid: register, send the choices, claim the name, all by themselves.
+  const [hyb, setHyb] = useState<{ error: { title: string; fix: string } | null; claimRefused: boolean; settingsSent: boolean; lastTry: number; busy: boolean }>({ error: null, claimRefused: false, settingsSent: false, lastTry: 0, busy: false });
+  const [newName, setNewName] = useState('');
+  const [hybridOutcome, setHybridOutcome] = useState<string | null>(null);
+  const hybridWanted = !!s && (s.domainChoice === 'coderhelm' || s.githubChoice === 'hosted');
+  useEffect(() => {
+    if (!s || !hybridWanted || !s.url || !setup || !s.setupToken || hyb.busy) return;
+    if (Date.now() - hyb.lastTry < timing('__CH_HYBRID_RETRY_MS', 8000)) return;
+    const reg = findCheck(setup, 'hybrid_registered');
+    const nm = findCheck(setup, 'hybrid_name');
+    let path: '' | '/register' | '/name' | '/settings' | null = null;
+    let body: Record<string, unknown> = { setup_token: s.setupToken };
+    if (!reg || reg.code === 'not_registered') path = '/register';
+    else if (reg.status !== 'pass') path = '';
+    else if (!hyb.settingsSent) {
+      path = '/settings';
+      body = { ...body, github_mode: s.githubChoice, sharing: { enabled: s.sharing, payloads: false } };
+    } else if (s.domainChoice === 'coderhelm' && !nm && !hyb.claimRefused && cleanName(s.coderhelmName)) {
+      path = '/name';
+      body = { ...body, name: cleanName(s.coderhelmName) };
+    }
+    if (path === null) return;
+    setHyb((h) => ({ ...h, busy: true, lastTry: Date.now() }));
+    void postInstall(hybridUrl(s.url, path), body).then(async (r) => {
+      const code = (r.body?.code as string | undefined) ?? undefined;
+      const refused = path === '/name' && !r.ok && (code === 'taken' || code === 'reserved');
+      setHyb((h) => ({
+        ...h,
+        busy: false,
+        settingsSent: h.settingsSent || (path === '/settings' && r.ok),
+        claimRefused: h.claimRefused || refused,
+        error: r.ok ? null : hybridError(code, r.status === 0 ? 'Your CoderHelm didn’t answer.' : (r.body?.error as string) ?? 'Your CoderHelm refused the request.'),
+      }));
+      if (r.ok) await refresh(true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setup, hybridWanted, s?.url, hyb.busy, hyb.settingsSent, hyb.claimRefused]);
 
   const checkAgain = async () => {
     setChecking(true);
@@ -507,31 +799,103 @@ export function InstallWizard() {
   let screen: React.ReactNode;
 
   if (view === 'start') {
+    const cost = monthlyCost(s.provider);
+    const hybrid = s.setup === 'hybrid';
+    const pickSetup = (id: Setup) =>
+      update(id === 'hybrid'
+        ? { setup: 'hybrid', domainChoice: 'coderhelm', githubChoice: 'hosted' }
+        : { setup: 'private', domainChoice: s.domainChoice === 'coderhelm' ? 'aws' : s.domainChoice, githubChoice: 'own' });
     screen = (
       <section data-testid="screen-start">
         <Heading title="Install CoderHelm in your AWS account" lead="About 25 minutes, mostly waiting. You press a few buttons; this page does the rest and checks every step." />
         <form
-          className="space-y-5"
+          className="space-y-7"
           onSubmit={(e) => {
             e.preventDefault();
             launch();
           }}
           noValidate
         >
-          <Field label="Your email" htmlFor="ch-email" help="You will be the first admin." error={errors.email}>
-            <input id="ch-email" type="email" autoComplete="email" inputMode="email" placeholder="you@company.com" className={inputCls} value={s.email} onChange={(e) => update({ email: e.target.value })} />
-          </Field>
-          <Field label="AWS region" htmlFor="ch-region" help="Where CoderHelm runs. Pick the one closest to your team." error={errors.region}>
-            <select id="ch-region" className={`${inputCls} appearance-none bg-[length:12px] bg-[right_14px_center] bg-no-repeat pr-10`} value={s.region} onChange={(e) => update({ region: e.target.value })}
-              style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23888' stroke-width='1.6'/%3E%3C/svg%3E\")" }}>
-              {REGIONS.map((r) => (
-                <option key={r.id} value={r.id}>{r.name}</option>
-              ))}
-            </select>
-          </Field>
+          <fieldset data-testid="setup-choice">
+            <legend className="mb-3 text-sm font-semibold">Choose a setup</legend>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {SETUPS.map((x) => {
+                const on = s.setup === x.id;
+                return (
+                  <label
+                    key={x.id}
+                    data-setup={x.id}
+                    className={`relative flex cursor-pointer flex-col rounded-2xl border p-4 transition sm:p-5 ${on ? 'border-fd-primary bg-fd-primary/[0.06] shadow-[0_0_0_3px] shadow-fd-primary/15' : 'border-fd-border bg-fd-background hover:border-fd-foreground/25'}`}
+                  >
+                    <input type="radio" name="setup" className="sr-only" checked={on} onChange={() => pickSetup(x.id)} />
+                    <span className="flex items-center gap-3">
+                      <span className={`flex size-9 items-center justify-center rounded-xl ${on ? 'bg-fd-primary text-fd-primary-foreground' : 'bg-fd-secondary text-fd-muted-foreground'}`}>
+                        {x.id === 'private' ? (
+                          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="9" width="12" height="8" rx="2" /><path d="M7 9V6.5a3 3 0 016 0V9" /></svg>
+                        ) : (
+                          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 11.5a3.5 3.5 0 005 0l2.5-2.5a3.5 3.5 0 00-5-5l-1 1" /><path d="M11.5 8.5a3.5 3.5 0 00-5 0L4 11a3.5 3.5 0 005 5l1-1" /></svg>
+                        )}
+                      </span>
+                      <span className="font-semibold">{x.title}</span>
+                      {x.tag ? <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">{x.tag}</span> : null}
+                      <span aria-hidden className={`ml-auto flex size-5 items-center justify-center rounded-full border-2 ${on ? 'border-fd-primary' : 'border-fd-border'}`}>
+                        {on ? <span className="size-2.5 rounded-full bg-fd-primary" /> : null}
+                      </span>
+                    </span>
+                    <ul className="mt-3 space-y-1.5 text-sm">
+                      {x.gets.map((g) => (
+                        <li key={g} className="flex gap-2">
+                          <svg viewBox="0 0 16 16" width="14" height="14" className="mt-[3px] shrink-0 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 8.5l3 3 6-7" /></svg>
+                          <span>{g}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-3 border-t border-fd-border pt-3 text-xs leading-5 text-fd-muted-foreground">{x.tradeoff}</p>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field label="Your email" htmlFor="ch-email" help="You will be the first admin." error={errors.email}>
+              <input id="ch-email" type="email" autoComplete="email" inputMode="email" placeholder="you@company.com" className={inputCls} value={s.email} onChange={(e) => update({ email: e.target.value })} />
+            </Field>
+            <Field label="AWS region" htmlFor="ch-region" help="Pick the one closest to your team." error={errors.region}>
+              <select id="ch-region" className={`${inputCls} appearance-none bg-[length:12px] bg-[right_14px_center] bg-no-repeat pr-10`} value={s.region} onChange={(e) => update({ region: e.target.value })}
+                style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23888' stroke-width='1.6'/%3E%3C/svg%3E\")" }}>
+                {REGIONS.map((r) => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          {s.domainChoice === 'coderhelm' ? <NamePicker value={s.coderhelmName} onChange={(v) => update({ coderhelmName: v })} error={errors.coderhelmName} /> : null}
+
+          {hybrid ? (
+            <fieldset className="space-y-3" data-testid="hybrid-options">
+              <legend className="mb-1 text-sm font-semibold">What CoderHelm sets up for you</legend>
+              <Toggle
+                checked={s.githubChoice === 'hosted'}
+                onChange={(v) => update({ githubChoice: v ? 'hosted' : 'own' })}
+                testId="hosted-github"
+                title="Use CoderHelm’s GitHub App"
+                help="Install one app on your organization instead of creating your own. Events come through CoderHelm, checked and re-signed; your install gets short-lived tokens only for the repositories you pick."
+              />
+              <Toggle
+                checked={s.sharing}
+                onChange={(v) => update({ sharing: v })}
+                testId="share-deliveries"
+                title="Share delivery data with CoderHelm support"
+                help="Off unless you turn it on. Support sees which deliveries failed and why (source, event type, status, reason, attempts and timings) and can warn you about relay failures. Never headers, never payloads. Your own Deliveries page works either way."
+              />
+            </fieldset>
+          ) : null}
 
           <div>
-            <button type="button" className="text-sm font-medium text-fd-primary hover:underline" onClick={() => setShowMore((v) => !v)} aria-expanded={showMore}>
+            <button type="button" className="inline-flex items-center gap-1.5 text-sm font-medium text-fd-primary hover:underline" onClick={() => setShowMore((v) => !v)} aria-expanded={showMore}>
+              <svg viewBox="0 0 16 16" width="12" height="12" className={`transition ${showMore ? 'rotate-90' : ''}`} fill="currentColor" aria-hidden><path d="M6 3.5l5 4.5-5 4.5z" /></svg>
               {showMore ? 'Fewer options' : 'More options'}
             </button>
             {showMore ? (
@@ -541,11 +905,12 @@ export function InstallWizard() {
                   {(
                     [
                       ['aws', 'The AWS address', 'Free and ready right away, like d1234abcd.cloudfront.net. You can add a domain later.'],
+                      ['coderhelm', 'A CoderHelm address', 'Like yourname.coderhelm.com. CoderHelm sets up the DNS for you; the certificate stays in your AWS account.'],
                       ['own', 'My own domain', 'Like coderhelm.example.com. Set up for you when its zone is in Route 53 in this AWS account; anywhere else you add two DNS records.'],
                     ] as const
                   ).map(([id, title, help]) => (
                     <label key={id} className={`mb-2 flex cursor-pointer gap-3 rounded-xl border p-3 transition ${s.domainChoice === id ? 'border-fd-primary bg-fd-primary/5' : 'border-fd-border hover:bg-fd-accent'}`}>
-                      <input type="radio" name="domain" className="mt-1 accent-[var(--color-fd-primary)]" checked={s.domainChoice === id} onChange={() => update({ domainChoice: id })} />
+                      <input type="radio" name="domain" className="mt-1 accent-[var(--color-fd-primary)]" checked={s.domainChoice === id} onChange={() => update({ domainChoice: id, ...(id === 'coderhelm' ? { setup: 'hybrid' as const } : {}) })} />
                       <span>
                         <span className="block font-medium">{title}</span>
                         <span className="block text-sm text-fd-muted-foreground">{help}</span>
@@ -631,10 +996,14 @@ export function InstallWizard() {
             ) : null}
           </div>
 
-          <div className="pt-2">
-            <Primary type="submit" testId="launch">
-              <AwsLogo size={26} />
+
+          <Summary s={s} cost={cost} />
+
+          <div>
+            <Primary type="submit" testId="launch" brand="aws">
+              <AwsColorLogo size={30} />
               Open AWS with everything filled in
+              <svg viewBox="0 0 16 16" width="14" height="14" className="opacity-60 transition group-hover/btn:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6 3.5l4.5 4.5L6 12.5" /></svg>
             </Primary>
             <p className="mt-3 text-sm text-fd-muted-foreground">Sign in to AWS if it asks. Then tick the box at the bottom of the page and press <b className="text-fd-foreground">Create stack</b>.</p>
           </div>
@@ -642,9 +1011,8 @@ export function InstallWizard() {
         <Details summary="What happens in AWS">
           <p>A CloudFormation stack starts the installer in CodeBuild, inside your account. It downloads CoderHelm {s.version}, checks its signature and deploys CoderHelm: Lambda functions, DynamoDB tables, an S3 bucket, CloudFront and Cognito sign-in. Nothing to install on your computer.</p>
           <p>The box you tick lets the stack create IAM roles. The installer needs administrator rights in your account to create CoderHelm&apos;s own, narrower roles.</p>
-          <p>{s.domainChoice === 'own' ? `Your domain: when its zone is in Route 53 in this account, the install makes the certificate and the records. Anywhere else, CoderHelm starts on its free cloudfront.net address and this page shows the two records to add; it moves to ${cleanHostname(s.hostname) || 'your domain'} once they work.` : 'No domain or DNS work: CoderHelm gets a free cloudfront.net address. You can add your own domain later, in More options or in CoderHelm.'}</p>
-          <p>AWS bills your account for what CoderHelm uses. The services are pay per use, so an idle install costs little; model calls are most of the bill.</p>
-          <p>Two random values from this page go along: a progress ID, so this page can follow the install, and a one-time setup key, so GitHub can hand your app&apos;s keys straight to your CoderHelm. Both stay in your account and this browser.</p>
+          <p>{s.domainChoice === 'own' ? `Your domain: when its zone is in Route 53 in this account, the install makes the certificate and the records. Anywhere else, CoderHelm starts on its free cloudfront.net address and this page shows the two records to add; it moves to ${cleanHostname(s.hostname) || 'your domain'} once they work.` : s.domainChoice === 'coderhelm' ? `Your CoderHelm address: once your install answers, this page registers it with CoderHelm and claims ${cleanName(s.coderhelmName) || 'your name'}.${NAME_ZONE}. Your install requests the certificate in your account; CoderHelm adds the DNS records. Nothing for you to do.` : 'No domain or DNS work: CoderHelm gets a free cloudfront.net address. You can add your own domain later, in More options or in CoderHelm.'}</p>
+          <p>Two random values from this page go along: a progress ID, so this page can follow the install, and a one-time setup key, so GitHub (or CoderHelm, for hybrid) can talk to your CoderHelm directly. Both stay in your account and this browser.</p>
         </Details>
       </section>
     );
@@ -664,6 +1032,7 @@ export function InstallWizard() {
     screen = (
       <section data-testid="screen-aws">
         <Heading title={title} lead={lead} />
+        <LiveProgress doc={doc} answering={answering} launchedAt={s.launchedAt} failed={failed} />
         <ul className="divide-y divide-fd-border rounded-xl border border-fd-border px-4" data-testid="progress">
           {rows.map((r) => (
             <Row key={r.id} tone={r.status} title={r.label}>
@@ -697,7 +1066,7 @@ export function InstallWizard() {
 
         {noSign ? (
           <Notice tone="warn" title="No sign of the install yet" testId="no-sign">
-            <p>Did you press Create stack? If not, open AWS again. If you did, your account may keep the progress file private (S3 Block Public Access). The install still runs: when the stack says CREATE_COMPLETE, copy the CoderHelm address from its Outputs tab and paste it below.</p>
+            <p>Did you press Create stack? If not, open AWS again. If you did, your account may keep the progress file private (S3 Block Public Access). The install still runs: when the stack says CREATE_COMPLETE, copy your install’s address from its Outputs tab and paste it below.</p>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               <Secondary href={quickCreateUrl(s)} newTab testId="reopen-aws">Open AWS again</Secondary>
               <Secondary href={stacksConsoleUrl(s.region)} newTab>See your stacks</Secondary>
@@ -719,7 +1088,7 @@ export function InstallWizard() {
           <div className="mt-6 flex flex-wrap gap-3">
             {!doc && !s.url ? <Secondary href={quickCreateUrl(s)} newTab testId="reopen-aws">Open AWS again</Secondary> : null}
             {!s.url ? (
-              <Secondary onClick={() => setPasteOpen((v) => !v)} testId="paste-toggle">I have my CoderHelm address</Secondary>
+              <Secondary onClick={() => setPasteOpen((v) => !v)} testId="paste-toggle">I have my install’s address</Secondary>
             ) : null}
           </div>
         ) : null}
@@ -731,7 +1100,7 @@ export function InstallWizard() {
               usePasted();
             }}
           >
-            <label htmlFor="ch-paste" className="sr-only">Your CoderHelm address</label>
+            <label htmlFor="ch-paste" className="sr-only">Your install’s address</label>
             <input id="ch-paste" className={`${inputCls} sm:flex-1`} placeholder="https://d1234abcd.cloudfront.net" value={paste} onChange={(e) => setPaste(e.target.value)} />
             <Secondary onClick={usePasted} testId="paste-use">Use this address</Secondary>
           </form>
@@ -739,8 +1108,56 @@ export function InstallWizard() {
         {pasteError ? <p className="mt-2 text-sm text-red-600 dark:text-red-400">{pasteError}</p> : null}
 
         <Details summary="What is happening">
-          <p>The installer runs in CodeBuild in your account. It writes its progress to a small file in your account (bucket coderhelm-setup-{s.statusId}) that this page reads: the phase, the step and, at the end, your CoderHelm address. Nothing else.</p>
+          <p>The installer runs in CodeBuild in your account. It writes its progress to a small file in your account (bucket coderhelm-setup-{s.statusId}) that this page reads: the phase, the step and, at the end, your install’s address. Nothing else.</p>
           <p>Stack name: {stackName(s)}, in {REGIONS.find((r) => r.id === s.region)?.name ?? s.region}. Release {s.version}.</p>
+        </Details>
+      </section>
+    );
+  } else if (view === 'address') {
+    const name = cleanName(s.coderhelmName);
+    const host = `${name || 'yourname'}.${NAME_ZONE}`;
+    const nm = findCheck(setup, 'hybrid_name');
+    const reg = findCheck(setup, 'hybrid_registered');
+    const rows = hybridRows(setup, name, hyb.claimRefused);
+    const now = nm ? checkText(nm) : reg && reg.status !== 'pass' ? checkText(reg) : { title: hyb.claimRefused ? 'That name can’t be used' : 'Connecting your install to CoderHelm', fix: hyb.claimRefused ? 'Pick another name below; this page claims it for you.' : 'This page registers your install and claims the name by itself.' };
+    const tone = nm?.status === 'pass' ? 'pass' : nm?.status === 'fail' || reg?.status === 'fail' || hyb.claimRefused ? 'fail' : 'todo';
+    screen = (
+      <section data-testid="screen-address">
+        <Heading title={`Setting up ${host}`} lead="CoderHelm does this by itself: no DNS records to add. You can close this page and come back; it picks up here." />
+        <Notice tone={tone} title={now.title} testId="address-status">
+          {now.fix ? <p>{now.fix}</p> : null}
+        </Notice>
+        {hyb.error && !hyb.claimRefused ? (
+          <Notice tone="warn" title={hyb.error.title} testId="hybrid-error">
+            <p>{hyb.error.fix}</p>
+          </Notice>
+        ) : null}
+        <ul className="mt-5 divide-y divide-fd-border rounded-xl border border-fd-border px-4" data-testid="address-progress">
+          {rows.map((r) => <Row key={r.id} tone={r.status} title={r.label} />)}
+        </ul>
+        {hyb.claimRefused ? (
+          <form
+            className="mt-6 space-y-4 rounded-2xl border border-fd-border p-4 sm:p-5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (nameProblem(newName)) return;
+              update({ coderhelmName: cleanName(newName) });
+              setHyb((h) => ({ ...h, claimRefused: false, error: null, lastTry: 0 }));
+            }}
+          >
+            <NamePicker value={newName} onChange={setNewName} testId="rename" compact />
+            <Primary type="submit" testId="claim-name" disabled={!!nameProblem(newName)}>Claim this name</Primary>
+          </form>
+        ) : null}
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <Secondary onClick={() => void checkAgain()} testId="check-again">{checking ? 'Checking…' : 'Check again'}</Secondary>
+          <Secondary onClick={() => update({ domainSkipped: true })} testId="skip-address">Use the AWS address for now</Secondary>
+        </div>
+        <p className="mt-3 text-sm text-fd-muted-foreground">This page checks again by itself every few seconds. Skipping finishes on the AWS address; the name keeps being set up and CoderHelm moves to it when it’s ready.</p>
+        <Details summary="What CoderHelm does, and what it sees">
+          <p>Your install registers with CoderHelm and proves it answers on its own CloudFront address. CoderHelm reserves {host} and shows a “being set up” page there.</p>
+          <p>Your install asks AWS for a certificate in your own account. CoderHelm writes its validation record, then, once the certificate is issued and your install has moved, the record that sends {host} to your CloudFront. It can only ever write those records, for this name.</p>
+          <p>Visitors go straight to your CloudFront: no traffic passes through CoderHelm. <a className="underline" href="/self-host/hybrid/#trust-model">The trust model</a> lists everything.</p>
         </Details>
       </section>
     );
@@ -824,6 +1241,74 @@ export function InstallWizard() {
         </Details>
       </section>
     );
+  } else if (view === 'github' && s.githubChoice === 'hosted') {
+    const installed = findCheck(setup, 'github_installed');
+    const linked = installed?.status === 'pass' && installed.code === 'ok';
+    const ho = hybridOutcome ? HYBRID_GITHUB_OUTCOMES[hybridOutcome] : undefined;
+    const ready = hyb.settingsSent || findCheck(setup, 'github_app')?.code === 'hosted_app';
+    const [linkError, setLinkError] = [hyb.error, (e: { title: string; fix: string } | null) => setHyb((h) => ({ ...h, error: e }))];
+    const startLink = async () => {
+      if (!s.url) return;
+      const back = `${window.location.origin}${window.location.pathname}?${stateToQuery(s)}`;
+      const r = await postInstall(hybridUrl(s.url, '/github/link'), { setup_token: s.setupToken, return_url: back });
+      const url = r.body?.install_url as string | undefined;
+      if (r.ok && url) window.location.assign(url);
+      else setLinkError(hybridError(r.body?.code as string | undefined, (r.body?.error as string) ?? 'Your CoderHelm couldn’t start the link.'));
+    };
+    screen = (
+      <section data-testid="screen-github">
+        <Heading title="Install CoderHelm’s GitHub App" lead="One app on your organization, and you pick the repositories. GitHub asks you to sign in once, which proves the installation is yours." />
+        {ho ? (
+          <Notice tone={ho.ok ? 'pass' : 'fail'} title={ho.title} testId="hybrid-github-outcome">
+            {ho.fix ? <p>{ho.fix}</p> : null}
+          </Notice>
+        ) : null}
+        {linkError ? (
+          <Notice tone="fail" title={linkError.title} testId="hybrid-error">
+            <p>{linkError.fix}</p>
+          </Notice>
+        ) : null}
+        <ul className="mb-6 mt-5 divide-y divide-fd-border rounded-xl border border-fd-border px-4" data-testid="github-hosted-progress">
+          <Row tone={ready ? 'pass' : 'active'} title={ready ? 'Your install is connected to CoderHelm' : 'Connecting your install to CoderHelm'} />
+          <Row tone={linked ? 'pass' : ready ? 'active' : 'pending'} title={linked ? 'Installed and linked to your install' : 'Installed on your repositories'}>
+            {!linked && ready ? 'Waiting for you to install it on GitHub.' : null}
+          </Row>
+        </ul>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Primary onClick={() => void startLink()} disabled={!ready} testId="install-hosted-app" brand="github">
+            <GitHubLogo size={22} /> Install on GitHub
+          </Primary>
+          <Secondary onClick={() => void checkAgain()} testId="check-again">{checking ? 'Checking…' : 'Check again'}</Secondary>
+        </div>
+        <p className="mt-3 text-sm text-fd-muted-foreground">
+          Prefer your own app?{' '}
+          <button
+            type="button"
+            className="font-medium text-fd-primary hover:underline"
+            data-testid="use-own-app"
+            onClick={() => {
+              update({ githubChoice: 'own' });
+              setHyb((h) => ({ ...h, settingsSent: false, lastTry: 0 }));
+            }}
+          >
+            Create my own GitHub App instead
+          </button>{' '}
+          (fully private: nothing passes through CoderHelm).
+        </p>
+        <Details summary="What passes through CoderHelm">
+          <p>GitHub sends the app&apos;s events to CoderHelm, which checks GitHub&apos;s signature and forwards each one to your install, re-signed with your install&apos;s own key. Your install refuses anything older than 5 minutes or seen before.</p>
+          <p>When your install works on a repository it asks CoderHelm for a token that lasts an hour, only for the repositories you chose. CoderHelm stores no code; an event is held only while its forward is retried, and delivery records are kept for 14 days.</p>
+          <ul className="space-y-1.5">
+            {Object.entries(GITHUB_PERMISSIONS).filter(([k]) => k !== 'email_addresses').map(([k, v]) => (
+              <li key={k} className="flex flex-col sm:flex-row sm:gap-2">
+                <span className="font-mono text-[13px] text-fd-foreground">{k}: {v}</span>
+                <span>{PERMISSION_REASONS[k]}</span>
+              </li>
+            ))}
+          </ul>
+        </Details>
+      </section>
+    );
   } else if (view === 'github') {
     const app = findCheck(setup, 'github_app');
     const installed = findCheck(setup, 'github_installed');
@@ -883,8 +1368,8 @@ export function InstallWizard() {
             <Notice tone="info" title="Create the app from a terminal" testId="github-cli">
               <p>
                 {s.setupToken && setup && !setup.github_manifest_ready
-                  ? 'Your CoderHelm has no setup key from this page (it was installed another way, or the key was used), so GitHub can\u2019t hand the keys to it directly.'
-                  : 'This browser no longer has the setup key from the launch, so GitHub can\u2019t hand the keys to your CoderHelm directly.'}{' '}
+                  ? 'Your CoderHelm has no setup key from this page (it was installed another way, or the key was used), so GitHub can’t hand the keys to it directly.'
+                  : 'This browser no longer has the setup key from the launch, so GitHub can’t hand the keys to your CoderHelm directly.'}{' '}
                 Run this from a computer with Node.js 20 and AWS credentials for the account. It opens GitHub for the same one click.
               </p>
               <CopyBox text={cliGithubCommand(s)} testId="cli-command" />
@@ -1062,25 +1547,66 @@ export function InstallWizard() {
     );
   }
 
+  // The checks of the step under way, for the rail.
+  const railChecks: RailCheck[] = (() => {
+    // Something still to do (not installed yet) is under way, not a failure.
+    const waiting = ['not_installed', 'not_linked', 'needs_app', 'missing', 'not_signed_up', 'use_case_required', 'subscription_pending'];
+    const tone = (c?: Check): RowStatusLike => (!c ? 'pending' : c.status === 'pass' || c.status === 'skip' ? 'pass' : c.status === 'fail' && !waiting.includes(c.code) ? 'fail' : 'active');
+    switch (view) {
+      case 'start': return [
+        { id: 'email', label: s.email.trim() ? 'Admin email entered' : 'Enter your email', status: s.email.trim() ? 'pass' : 'active' },
+        { id: 'setup', label: s.setup === 'hybrid' ? 'Hybrid setup' : 'Fully private setup', status: 'pass' },
+        { id: 'aws', label: 'Open AWS and press Create stack', status: 'pending' },
+      ];
+      case 'aws': return progressRows(doc, !!setup, !!s.launchedAt).map((r) => ({ id: r.id, label: r.label, status: r.status }));
+      case 'address': return hybridRows(setup, cleanName(s.coderhelmName), hyb.claimRefused).map((r) => ({ id: r.id, label: r.label, status: r.status }));
+      case 'domain': return domainRows(findCheck(setup, 'domain')?.code, s.domainDoc?.mode ?? 'external').map((r) => ({ id: r.id, label: r.label, status: r.status }));
+      case 'github': return [
+        { id: 'app', label: s.githubChoice === 'hosted' ? 'CoderHelm’s app' : 'GitHub App created', status: tone(findCheck(setup, 'github_app')) },
+        { id: 'installed', label: 'Installed on your repositories', status: tone(findCheck(setup, 'github_installed')) },
+      ];
+      case 'models': return [{ id: 'models', label: 'Claude answers', status: tone(findCheck(setup, 'models')) }];
+      default: return [{ id: 'admin', label: 'You sign up as the admin', status: tone(findCheck(setup, 'admin')) }];
+    }
+  })();
+  const current = view === 'start' ? 'aws' : view;
+
   return (
-    <div className="mx-auto w-full max-w-2xl">
-      <Stepper steps={steps} current={view === 'start' ? 'aws' : view} done={done} onPick={(id) => setManual(id === derived ? null : id)} />
-      {manual && manual !== derived ? (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-fd-border px-4 py-2 text-sm">
-          <span className="text-fd-muted-foreground">You are looking at a finished step.</span>
-          <button type="button" className="font-medium text-fd-primary hover:underline" onClick={() => setManual(null)}>Back to where you are</button>
+    <div className="mx-auto w-full max-w-6xl">
+      <MobileSteps steps={steps} current={current} />
+      <div className="grid gap-8 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-14">
+        <aside className="hidden lg:block">
+          <div className="sticky top-8">
+            <StepsRail steps={steps} current={current} done={done} onPick={(id) => setManual(id === derived ? null : id)} checks={railChecks} />
+            <TrustCard hybrid={s.setup === 'hybrid' || hybridWanted} />
+          </div>
+        </aside>
+        <div className="min-w-0">
+          {manual && manual !== derived ? (
+            <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-fd-border px-4 py-2 text-sm">
+              <span className="text-fd-muted-foreground">You are looking at a finished step.</span>
+              <button type="button" className="font-medium text-fd-primary hover:underline" onClick={() => setManual(null)}>Back to where you are</button>
+            </div>
+          ) : null}
+          <div key={view} className="ch-enter rounded-3xl border border-fd-border bg-fd-card/30 p-5 shadow-[0_1px_0_rgba(255,255,255,0.03)_inset,0_24px_48px_-24px_rgba(0,0,0,0.35)] sm:p-8">
+            {screen}
+          </div>
+          <style>{`.ch-enter{animation:ch-enter .28s ease-out}@keyframes ch-enter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}@media (prefers-reduced-motion:reduce){.ch-enter{animation:none}}`}</style>
+          <footer className="mt-6 flex flex-col gap-3 px-1 text-sm text-fd-muted-foreground sm:flex-row sm:items-start sm:justify-between">
+            <p className="flex gap-2" data-testid="privacy">
+              <svg viewBox="0 0 16 16" width="16" height="16" className="mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="7" width="10" height="7" rx="1.5" /><path d="M5.5 7V5a2.5 2.5 0 015 0v2" /></svg>
+              <span>
+                {s.setup === 'hybrid' || hybridWanted
+                  ? <>This page talks to AWS, GitHub, your own CoderHelm and CoderHelm&apos;s API (to check a name is free). Your install, not this page, registers with CoderHelm. <a className="underline decoration-fd-border underline-offset-2 hover:text-fd-foreground" href="/self-host/hybrid/#trust-model">What CoderHelm sees</a></>
+                  : <>This page talks only to AWS, GitHub and your own CoderHelm. Nothing about your install goes to CoderHelm&apos;s servers.</>}
+              </span>
+            </p>
+            {s.launchedAt || s.url ? (
+              <button type="button" onClick={startOver} className="shrink-0 font-medium hover:text-fd-foreground" data-testid="start-over">Start over</button>
+            ) : null}
+          </footer>
         </div>
-      ) : null}
-      {screen}
-      <footer className="mt-10 flex flex-col gap-3 border-t border-fd-border pt-5 text-sm text-fd-muted-foreground sm:flex-row sm:items-start sm:justify-between">
-        <p className="flex gap-2" data-testid="privacy">
-          <svg viewBox="0 0 16 16" width="16" height="16" className="mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="7" width="10" height="7" rx="1.5" /><path d="M5.5 7V5a2.5 2.5 0 015 0v2" /></svg>
-          <span>This page talks only to AWS, GitHub and your own CoderHelm. Nothing about your install goes to CoderHelm&apos;s servers.</span>
-        </p>
-        {s.launchedAt || s.url ? (
-          <button type="button" onClick={startOver} className="shrink-0 font-medium hover:text-fd-foreground" data-testid="start-over">Start over</button>
-        ) : null}
-      </footer>
+      </div>
     </div>
   );
 }

@@ -19,6 +19,7 @@ import { CopyButton } from "@/components/copy-button";
 import { Skeleton } from "@/components/skeleton";
 import { AtlassianIcon, ChevronRightIcon, ExternalLinkIcon } from "@/components/icons";
 import { Page, PageHeader, Section } from "@/components/page";
+import { HybridAppChoice } from "@/components/hybrid-app-choice";
 import { Code, Field, SaveBar, SettingsRow, SettingsSection, Switch, useDirtyForm } from "@/components/settings";
 import { buttonClass, focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 
@@ -128,6 +129,7 @@ function JiraPage() {
           </>
         }
       />
+      <HybridAppChoice id="jira" name="Jira" className="mt-6" />
 
       {load.state === "loading" && (
         <div className="mt-8 grid gap-4 lg:grid-cols-3" aria-busy="true">

@@ -27,4 +27,6 @@ export const SAMPLE_QUERY: Record<string, string> = {
   "/plugins/plugin": `?id=${encodeURIComponent(PLUGIN_ID)}`,
   "/plugins/draft": `?id=${DRAFT_ID}`,
   "/plugins/runs": `?id=${PLUGIN_RUN_ID}`,
+  // Not an item's page, but its fullest view is a delivery's details.
+  "/settings/deliveries": `?id=${encodeURIComponent("github:4f1c2a9e-8b7d-6c5f-4e3d-2c1b0a9f8e7d6c5b4a39")}`,
 };

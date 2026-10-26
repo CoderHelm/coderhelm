@@ -30,6 +30,7 @@ import {
   type WebhookSetup,
 } from "@/lib/knowledge";
 import { SourceLogo } from "./logos";
+import { HybridAppChoice } from "@/components/hybrid-app-choice";
 import { Picker } from "./picker";
 
 // The one way to add to Knowledge, for a new knowledge base or an existing
@@ -44,6 +45,9 @@ import { Picker } from "./picker";
 type Step = "choose" | "connect" | "pick" | "upload" | "name" | "progress";
 
 export type FlowMode = { kind: "create" } | { kind: "add"; base: Base };
+
+/** Sources a self-hosted install can reach through Coderhelm's app or its own (lib/hybrid.ts). */
+const HYBRID_KINDS = new Set<SourceKind>(["notion", "confluence", "google_drive"]);
 
 const TILES: SourceKind[] = ["notion", "confluence", "google_drive", "sanity", "github", "web"];
 
@@ -564,6 +568,7 @@ function SignInStep({
           <p className="mt-2 max-w-sm text-sm leading-relaxed text-zinc-400">
             Sign in with your {label} account and choose what to bring in. There&apos;s nothing to set up and no key to copy. Nothing is changed in {label}.
           </p>
+          {HYBRID_KINDS.has(kind) && <HybridAppChoice id={kind} name={label} className="mt-5 w-full max-w-md text-left" />}
           <button type="button" onClick={onSignIn} className={`${buttonClass("primary", "lg")} mt-6`} data-testid="signin-button">
             Sign in with {label}
           </button>
@@ -629,6 +634,7 @@ function ConnectStep({
             ? "You'll sign in to Notion and choose which pages Coderhelm can see. Nothing is changed in Notion."
             : `You'll sign in to ${label} and allow Coderhelm to read it. Nothing is changed in ${label}.`}
       </p>
+      {HYBRID_KINDS.has(kind) && <HybridAppChoice id={kind} name={label} className="mt-5 w-full max-w-md text-left" />}
       {conn?.can_sign_in ? (
         <button type="button" onClick={onConnect} className={`${buttonClass("primary", "lg")} mt-6`} disabled={busy} data-testid="connect-button">
           {busy ? "Opening…" : `Connect ${label}`}

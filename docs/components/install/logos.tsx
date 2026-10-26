@@ -15,5 +15,16 @@ const GITHUB = "M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092
 const ANTHROPIC = "M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z";
 
 export const AwsLogo = (p: P) => <Mark d={AWS} {...p} />;
+
+/** The AWS mark in its colors: the wordmark and the orange smile. */
+export function AwsColorLogo({ size = 28, className, title }: P) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} className={className} role={title ? 'img' : undefined} aria-hidden={title ? undefined : true} aria-label={title}>
+      <path d={AWS} fill="currentColor" transform="translate(0 -2.2)" />
+      <path d="M2.6 16.9c4.9 3.3 12.4 3.6 18.1.6" fill="none" stroke="#FF9900" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M18.6 15.9l2.6 1.4-1.2 2.6" fill="none" stroke="#FF9900" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 export const GitHubLogo = (p: P) => <Mark d={GITHUB} {...p} />;
 export const AnthropicLogo = (p: P) => <Mark d={ANTHROPIC} {...p} />;

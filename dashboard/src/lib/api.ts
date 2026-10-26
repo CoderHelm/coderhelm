@@ -21,7 +21,7 @@ export function httpErrorMessage(status: number): string {
 
 /** A failed request, with its HTTP status for pages that branch on it. */
 export class ApiError extends Error {
-  constructor(message: string, readonly status: number) {
+  constructor(message: string, readonly status: number, readonly code?: string) {
     super(message);
     this.name = "ApiError";
   }
@@ -45,10 +45,13 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     let serverMsg = "";
+    let serverCode: string | undefined;
     try {
-      serverMsg = body ? JSON.parse(body).error || "" : "";
+      const parsed = body ? JSON.parse(body) : {};
+      serverMsg = parsed.error || "";
+      serverCode = typeof parsed.code === "string" ? parsed.code : undefined;
     } catch {}
-    throw new ApiError(serverMsg || httpErrorMessage(res.status), res.status);
+    throw new ApiError(serverMsg || httpErrorMessage(res.status), res.status, serverCode);
   }
   const text = await res.text();
   return text ? JSON.parse(text) : (undefined as T);
@@ -1113,6 +1116,31 @@ export const api = {
   setSystemDomain: (hostname: string) =>
     request<DomainView>("/api/system/domain", { method: "PUT", body: JSON.stringify({ hostname }) }),
   removeSystemDomain: () => request<DomainView>("/api/system/domain", { method: "DELETE" }),
+
+  // Deliveries (team admins): every webhook and notice in and out, with why each failed.
+  listDeliveries: (f: DeliveryFilter = {}) => {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(f)) if (v !== undefined && v !== "" && v !== "all") q.set(k, String(v));
+    const s = q.toString();
+    return request<DeliveriesReply>(`/api/deliveries${s ? `?${s}` : ""}`);
+  },
+  getDelivery: (id: string) => request<DeliveryDetailReply>(`/api/deliveries/${encodeURIComponent(id)}`),
+  redeliver: (id: string) =>
+    requestWithBody<{ message?: string }, { code?: string }>(`/api/deliveries/${encodeURIComponent(id)}/redeliver`, { method: "POST", body: "{}" }),
+
+  // Hybrid (install admins, self-hosted only): connect this install to Coderhelm's apps and address.
+  getHybrid: (deep = false) => request<HybridStatus>(`/api/system/hybrid${deep ? "?deep=1" : ""}`),
+  registerHybrid: () => request<HybridStatus>("/api/system/hybrid/register", { method: "POST", body: "{}" }),
+  leaveHybrid: () => request<HybridStatus>("/api/system/hybrid", { method: "DELETE" }),
+  checkHybridName: (name: string) => request<HybridNameCheck>(`/api/system/hybrid/names/${encodeURIComponent(name)}`),
+  claimHybridName: (name: string) => request<HybridStatus>("/api/system/hybrid/name", { method: "PUT", body: JSON.stringify({ name }) }),
+  releaseHybridName: () => request<HybridStatus>("/api/system/hybrid/name", { method: "DELETE" }),
+  linkHybridGithub: (return_url?: string) =>
+    request<{ state: string; install_url: string }>("/api/system/hybrid/github/link", { method: "POST", body: JSON.stringify(return_url ? { return_url } : {}) }),
+  setHybridGithubRepos: (installationId: number, repositories: string[]) =>
+    request<HybridStatus>(`/api/system/hybrid/github/${installationId}`, { method: "PUT", body: JSON.stringify({ repositories }) }),
+  unlinkHybridGithub: (installationId: number) => request<HybridStatus>(`/api/system/hybrid/github/${installationId}`, { method: "DELETE" }),
+  setHybridSettings: (s: HybridSettingsPatch) => request<HybridStatus>("/api/system/hybrid/settings", { method: "PUT", body: JSON.stringify(s) }),
 
   // Remote MCP servers
   listMcpServers: () =>
@@ -3601,4 +3629,140 @@ export interface SystemVersion {
   settings?: AutoUpdateSettings;
   running?: boolean;
   history?: UpdateEntry[];
+}
+
+// ── Deliveries ──────────────────────────────────────────────────────────
+
+export type DeliveryStatus = "received" | "pending" | "handled" | "ignored" | "failed";
+export type DeliveryStatusFilter = "all" | "ok" | "failed" | "pending" | "handled" | "ignored";
+
+export interface DeliveryFilter {
+  source?: string;
+  status?: DeliveryStatusFilter;
+  /** RFC 3339. */
+  since?: string;
+  q?: string;
+  limit?: number;
+}
+
+/** One webhook or notice, in or out (a list row). */
+export interface DeliveryRow {
+  /** May hold ':' ("alert:01J…", "relay:…"): always encode it in a path. */
+  id: string;
+  direction: "inbound" | "outbound";
+  source: string;
+  event: string;
+  target: string;
+  status: DeliveryStatus;
+  outcome: string;
+  /** A reason code; the detail explains it in words. */
+  reason: string;
+  external_id: string;
+  repo: string;
+  pr: number | null;
+  created_at: string;
+  duration_ms: number;
+  attempts: number;
+  next_retry_at: string | null;
+}
+
+export interface DeliveryAttempt {
+  at: string;
+  code?: number;
+  duration_ms: number;
+  error?: string;
+}
+
+export interface DeliveryFull extends Omit<DeliveryRow, "attempts"> {
+  attempts: DeliveryAttempt[];
+  /** Secrets are already "[redacted]". */
+  headers: Record<string, string>;
+  /** May be empty, or "[N bytes, not JSON: not kept]". */
+  payload_preview: string;
+  payload_bytes: number;
+  redeliver?: "github" | "relay" | "notify_test";
+}
+
+export interface DeliveriesSummary {
+  total: number;
+  ok: number;
+  failed: number;
+  pending: number;
+  /** 0..1, or null with nothing to measure. */
+  success_rate: number | null;
+  oldest_pending_at: string | null;
+  last_failure_at: string | null;
+}
+
+export interface DeliveriesReply {
+  deliveries: DeliveryRow[];
+  summary: DeliveriesSummary;
+  sources: string[];
+  retention_days: number;
+  sharing: { available: boolean; enabled: boolean; payloads: boolean };
+  hybrid: boolean;
+}
+
+export interface DeliveryDetailReply {
+  delivery: DeliveryFull;
+  reason: { code: string; message: string; fix: string } | null;
+  can_redeliver: boolean;
+}
+
+// ── Hybrid (self-hosted) ────────────────────────────────────────────────
+
+export type HybridCheckStatus = "pass" | "fail" | "wait" | "todo";
+export type HybridIntegrationId = "github" | "jira" | "notion" | "confluence" | "google_drive" | (string & {});
+
+export interface HybridGithubLink {
+  installation_id: number;
+  account: string;
+  repositories: string[];
+}
+
+export interface HybridIntegration {
+  id: HybridIntegrationId;
+  name: string;
+  mode: "hosted" | "direct" | "unavailable";
+  through_coderhelm: string;
+  stays_with_you: string;
+  reason?: string;
+  uses_coderhelm: boolean;
+}
+
+export interface HybridCheck {
+  id: string;
+  status: HybridCheckStatus;
+  code: string;
+  title: string;
+  fix: string | null;
+}
+
+export interface HybridStatus {
+  available: boolean;
+  hosted_url: string;
+  registered: boolean;
+  install_id: string | null;
+  cloudfront: string;
+  verified: boolean;
+  name: { name: string; hostname: string; code: string } | null;
+  github: { mode: "own" | "hosted"; links: HybridGithubLink[]; app_slug: string | null };
+  integrations: HybridIntegration[];
+  sharing: { enabled: boolean; payloads: boolean };
+  checks: HybridCheck[];
+}
+
+export interface HybridNameCheck {
+  name: string;
+  hostname?: string;
+  available: boolean;
+  code: string;
+  error: string | null;
+}
+
+export interface HybridSettingsPatch {
+  github_mode?: "own" | "hosted";
+  /** The hosted-app integrations among jira, notion, confluence, google_drive (github follows github_mode). */
+  integrations?: string[];
+  sharing?: { enabled: boolean; payloads: boolean };
 }

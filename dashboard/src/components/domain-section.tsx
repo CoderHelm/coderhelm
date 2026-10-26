@@ -7,8 +7,10 @@ import { Code } from "@/components/settings/code";
 import { CopyButton } from "@/components/copy-button";
 import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
-import { inputClass, primaryButton, secondaryButton } from "@/components/ui";
+import { inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { useToast } from "@/components/toast";
+import { Chip } from "@/components/list";
+import { useHybrid } from "@/lib/hybrid";
 
 /** Codes that are waiting on something outside this page: check again by itself. */
 const WAITING = new Set(["validating", "attaching", "removing", "dns_missing"]);
@@ -28,6 +30,7 @@ export function cleanHostname(raw: string): string {
  */
 export function DomainSection() {
   const { toast } = useToast();
+  const hybrid = useHybrid();
   const [data, setData] = useState<SystemDomain | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [host, setHost] = useState("");
@@ -124,6 +127,11 @@ export function DomainSection() {
   const check = data.check && hasRecords && repeats && data.check.fix ? { ...data.check, fix: { ...data.check.fix, command: undefined } } : data.check;
   return (
     <div className="min-w-0" data-testid="domain-section" data-code={code}>
+      <AddressChoices
+        aws={d?.current || d?.target || ""}
+        own={d?.hostname ? { hostname: d.hostname, live: !!onDomain } : null}
+        coderhelm={hybrid.status?.available ? { hostname: hybrid.status.name?.hostname ?? null, registered: hybrid.status.registered } : null}
+      />
       {check && (
         <ul className="divide-y divide-zinc-800" aria-label="Domain check">
           <CheckRow check={check} />
@@ -209,6 +217,65 @@ export function DomainSection() {
           </div>
         </details>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The three kinds of address side by side: the AWS one (always works), a
+ * domain you own (the form below), and a name.coderhelm.com address, which
+ * is claimed in the Hybrid section further down the page.
+ */
+function AddressChoices({
+  aws,
+  own,
+  coderhelm,
+}: {
+  aws: string;
+  own: { hostname: string; live: boolean } | null;
+  /** Null when this install has no hybrid. */
+  coderhelm: { hostname: string | null; registered: boolean } | null;
+}) {
+  const go = (id: string) => (e: React.MouseEvent<HTMLAnchorElement>) => {
+    const el = document.getElementById(id) ?? document.getElementById("hybrid");
+    if (!el) return;
+    e.preventDefault();
+    el.scrollIntoView({ block: "start" });
+    window.history.replaceState(null, "", `#${el.id}`);
+    el.querySelector<HTMLElement>("input, button")?.focus({ preventScroll: true });
+  };
+  const card = "min-w-0 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3";
+  return (
+    <div className="min-w-0 border-b border-zinc-800 px-4 py-4" data-testid="address-choices">
+      <ul className={`grid min-w-0 gap-3 ${coderhelm ? "md:grid-cols-3" : "md:grid-cols-2"}`} aria-label="Kinds of address">
+        <li className={card} data-choice="aws">
+          <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-zinc-100">AWS address <Chip tone="success">Always works</Chip></p>
+          <p className="mt-1 text-sm text-zinc-400">{aws ? <Code>{aws}</Code> : "Given by AWS when the install was created."}</p>
+        </li>
+        <li className={card} data-choice="own">
+          <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-zinc-100">
+            Your own domain {own && <Chip tone={own.live ? "success" : "waiting"}>{own.live ? "Live" : "Setting up"}</Chip>}
+          </p>
+          <p className="mt-1 text-sm text-zinc-400">{own ? <span className="wrap-anywhere">{own.hostname}</span> : "Such as coderhelm.example.com. Set it up below."}</p>
+        </li>
+        {coderhelm && (
+          <li className={card} data-choice="coderhelm">
+            <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-zinc-100">
+              A Coderhelm address {coderhelm.hostname && <Chip tone="success">Claimed</Chip>}
+            </p>
+            {coderhelm.hostname ? (
+              <p className="mt-1 text-sm text-zinc-400"><span className="wrap-anywhere">{coderhelm.hostname}</span></p>
+            ) : (
+              <p className="mt-1 text-sm text-zinc-400">
+                name.coderhelm.com, with no DNS to set up.{" "}
+                <a href={coderhelm.registered ? "#hybrid-name" : "#hybrid"} onClick={go(coderhelm.registered ? "hybrid-name" : "hybrid")} className={linkButton} data-testid="address-choose-coderhelm">
+                  {coderhelm.registered ? "Pick a name" : "Set up hybrid first"}
+                </a>
+              </p>
+            )}
+          </li>
+        )}
+      </ul>
     </div>
   );
 }

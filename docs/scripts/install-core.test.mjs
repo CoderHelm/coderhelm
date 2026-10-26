@@ -320,7 +320,7 @@ test('optional setup: each item has one action, its check where the install repo
   const withChecks = { ...setup(), checks: [...setup().checks, { id: 'domain', status: 'skip', code: 'none' }, { id: 'google_sign_in', status: 'skip', code: 'off' }, { id: 'updates', status: 'pass', code: 'ok' }] };
   const items = c.optionalSetup(st, withChecks);
   const by = Object.fromEntries(items.map((i) => [i.id, i]));
-  assert.deepEqual(items.map((i) => i.id), ['domain', 'email', 'invite', 'chat', 'jira', 'google_sign_in', 'updates', 'backups']);
+  assert.deepEqual(items.map((i) => i.id), ['domain', 'email', 'invite', 'chat', 'jira', 'google_sign_in', 'updates', 'hybrid_apps', 'deliveries', 'backups']);
   assert.equal(by.domain.state, 'todo');
   assert.equal(by.domain.action.href, 'https://coderhelm.example.com/settings/system/#domain');
   assert.equal(by.email.state, 'todo');
@@ -340,4 +340,77 @@ test('optional setup: each item has one action, its check where the install repo
   // An unverified sender links to the identities page.
   const unverified = c.optionalSetup(st, setup({ email: { status: 'warn', code: 'identity_unverified', required: false } }));
   assert.match(unverified.find((i) => i.id === 'email').action.href, /#\/identities$/);
+});
+
+test('setups: fully private and hybrid, each with what it gives and its trade-off', () => {
+  assert.deepEqual(c.SETUPS.map((x) => x.id), ['private', 'hybrid']);
+  for (const x of c.SETUPS) {
+    assert.ok(x.gets.length >= 3 && x.tradeoff.endsWith('.'));
+  }
+  const n = c.newState();
+  assert.equal(n.setup, 'private');
+  assert.equal(n.githubChoice, 'own');
+  assert.equal(n.sharing, false, 'sharing is off by default');
+});
+
+test('CoderHelm address names: the same rules as the server, checked before asking', () => {
+  assert.equal(c.cleanName(' Example-Co.coderhelm.com '), 'example-co');
+  assert.equal(c.nameProblem('example'), null);
+  assert.match(c.nameProblem(''), /Type a name/);
+  assert.match(c.nameProblem('ab'), /3 characters/);
+  assert.match(c.nameProblem('a'.repeat(41)), /40/);
+  assert.match(c.nameProblem('ex_ample'), /lowercase/);
+  assert.match(c.nameProblem('-example'), /Start and end/);
+  assert.match(c.nameProblem('ex--ample'), /hyphens/);
+  assert.equal(c.nameCheckUrl('Example'), 'https://api.coderhelm.com/hybrid/names/example');
+  assert.equal(c.hybridUrl('https://d111test.cloudfront.net/', '/register'), 'https://d111test.cloudfront.net/api/setup/hybrid/register');
+  const p = c.validate({ email: 'a@example.com', stage: 'prod', region: 'us-east-1', domainChoice: 'coderhelm', coderhelmName: 'x' });
+  assert.match(p.coderhelmName, /3 characters/);
+});
+
+test('a CoderHelm address adds an Address step that waits for registration and the name', () => {
+  assert.deepEqual(c.stepsFor({ domainChoice: 'coderhelm' }).map((x) => x.id), ['aws', 'address', 'github', 'models', 'ready']);
+  const st = (checks) => ({ schema: 1, ready: false, checks });
+  const base = { launchedAt: 1, url: 'https://d111test.cloudfront.net', domainChoice: 'coderhelm' };
+  const gh = [{ id: 'github_app', status: 'fail', code: 'missing' }];
+  assert.equal(c.deriveStep(base, st(gh)), 'address');
+  assert.equal(c.deriveStep(base, st([...gh, { id: 'hybrid_registered', status: 'pass', code: 'ok' }, { id: 'hybrid_name', status: 'wait', code: 'cert_pending' }])), 'address');
+  assert.equal(c.deriveStep(base, st([...gh, { id: 'hybrid_registered', status: 'pass', code: 'ok' }, { id: 'hybrid_name', status: 'pass', code: 'ok' }])), 'github');
+  assert.equal(c.deriveStep({ ...base, domainSkipped: true }, st(gh)), 'github');
+  for (const code of ['requested', 'cert_pending', 'attaching', 'taken']) assert.ok(c.checkText({ id: 'hybrid_name', code, status: 'wait' }).fix);
+});
+
+test('hybrid outcomes and refusals each read as one sentence with a fix', () => {
+  for (const [, o] of Object.entries(c.HYBRID_GITHUB_OUTCOMES)) assert.ok(o.title.endsWith('.') && (o.ok || o.fix));
+  for (const code of ['taken', 'proof_failed', 'hosted_unreachable', 'broker_refused', 'signature_mismatch']) {
+    const e = c.hybridError(code, 'x');
+    assert.ok(e.title.endsWith('.') && e.fix.endsWith('.'), code);
+  }
+  assert.equal(c.hybridError('nope', 'Fallback.').title, 'Fallback.');
+  assert.equal(c.queryToPartial('?hybrid_github=linked').hybridGithub, 'linked');
+  assert.equal(c.checkText({ id: 'github_installed', code: 'not_linked', status: 'fail' }).title, 'Install CoderHelm\u2019s GitHub App on your repositories');
+});
+
+test('the summary: what the stack creates and an honest monthly cost', () => {
+  const m = c.monthlyCost('bedrock');
+  assert.ok(m.low > 0 && m.high > m.low);
+  assert.match(m.model, /per token/);
+  assert.ok(c.CREATES.length >= 4);
+  assert.ok(c.optionalSetup({ url: 'https://x.example.org', region: 'us-east-1', provider: 'bedrock', domainChoice: 'coderhelm' }, null).some((o) => o.id === 'deliveries'));
+});
+
+test('the Address step follows registration, the claim, the certificate and the move', () => {
+  const st = (checks) => ({ schema: 1, ready: false, checks });
+  const status = (rows) => rows.map((r) => r.status).join(' ');
+  assert.equal(status(c.hybridRows(st([]), 'example', false)), 'active pending pending pending');
+  const reg = { id: 'hybrid_registered', status: 'pass', code: 'ok' };
+  assert.equal(status(c.hybridRows(st([reg]), 'example', false)), 'pass active pending pending');
+  assert.equal(status(c.hybridRows(st([reg, { id: 'hybrid_name', status: 'wait', code: 'cert_pending' }]), 'example', false)), 'pass pass active pending');
+  assert.equal(status(c.hybridRows(st([reg, { id: 'hybrid_name', status: 'wait', code: 'attaching' }]), 'example', false)), 'pass pass pass active');
+  assert.equal(status(c.hybridRows(st([reg, { id: 'hybrid_name', status: 'pass', code: 'ok' }]), 'example', false)), 'pass pass pass pass');
+  assert.equal(status(c.hybridRows(st([reg, { id: 'hybrid_name', status: 'fail', code: 'https_failed' }]), 'example', false)), 'pass pass pass fail');
+  const refused = c.hybridRows(st([reg]), 'example', true);
+  assert.equal(refused[1].status, 'fail');
+  assert.equal(c.hybridRows(st([{ id: 'hybrid_registered', status: 'fail', code: 'proof_failed' }]), 'example', false)[0].status, 'fail');
+  assert.match(c.hybridRows(st([]), 'example', false)[3].label, /example\.coderhelm\.com/);
 });

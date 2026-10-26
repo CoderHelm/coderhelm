@@ -23,6 +23,7 @@ import { BookIcon, ChatIcon, GearIcon, LifeBuoyIcon, PlanIcon, PlayIcon, Reviewe
 import { ADMIN_SECTIONS, NAV_SECTIONS, sectionFor, visiblePages, type NavIconKey, type NavSection } from "@/lib/nav";
 import { SETTINGS_ITEMS } from "./settings-items";
 import { isSelfHosted } from "@/lib/runtime-config";
+import { hybridGithubSetupTarget, hybridOAuthHandoff, maybeHybridOAuthCallback } from "@/lib/hybrid";
 import { Menu } from "./menu";
 import { SectionTabs } from "./section-tabs";
 import { inSettings, SettingsNav } from "./settings-nav";
@@ -152,6 +153,24 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     });
   };
   const [authChecked, setAuthChecked] = useState(false);
+  // A self-hosted install's callback from Coderhelm's GitHub App or an OAuth
+  // sign-in (lib/hybrid.ts): passed on before sign-in, since the person here
+  // usually has no hosted account.
+  const [handoff, setHandoff] = useState<"" | "github" | "oauth">("");
+  useEffect(() => {
+    const github = hybridGithubSetupTarget(window.location);
+    if (github) {
+      setHandoff("github");
+      window.location.replace(github);
+      return;
+    }
+    if (maybeHybridOAuthCallback(window.location)) {
+      setHandoff("oauth");
+      hybridOAuthHandoff().then((moved) => {
+        if (!moved) setHandoff("");
+      });
+    }
+  }, []);
 
   // Small screens: the sidebar is a drawer opened from a top bar. From md up
   // the wrapper is `display: contents`, so the desktop layout is untouched.
@@ -260,6 +279,18 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   // covers the screens before it). React hoists <title> into the head.
   const tabName = routeTabTitle(pathname);
   const tabTitle = <title>{tabName ? `${tabName} · Coderhelm` : "Coderhelm"}</title>;
+
+  if (handoff) {
+    return (
+      <div className="ch-boot" role="status" data-testid="hybrid-handoff" data-kind={handoff}>
+        {tabTitle}
+        <div className="ch-boot-inner">
+          <div className="ch-boot-spinner" aria-hidden="true" />
+          <span>{handoff === "github" ? "Linking your install…" : "Finishing the sign-in…"}</span>
+        </div>
+      </div>
+    );
+  }
 
   if (!authChecked) {
     return (
