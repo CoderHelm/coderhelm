@@ -101,6 +101,7 @@
     "/self-host/setup-checks/",
     "/self-host/sign-in/",
     "/self-host/troubleshooting/",
+    "/self-host/updates-security/",
     "/self-host/updates/"
   ]
 }
