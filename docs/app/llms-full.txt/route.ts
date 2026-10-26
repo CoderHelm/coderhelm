@@ -1,7 +1,9 @@
 import { docsLlms } from '@/lib/source';
+import { installGuideMarkdown } from '@/lib/install/page-info';
 
 export const revalidate = false;
 
 export async function GET() {
-  return new Response(await docsLlms.full(), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+  // The install guide is an app page, not MDX: its Markdown twin goes at the end.
+  return new Response(`${await docsLlms.full()}\n\n${installGuideMarkdown()}`, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
 }
