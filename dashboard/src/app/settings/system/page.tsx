@@ -6,6 +6,7 @@ import { api, type AutoUpdateSettings, type SystemPreflight, type SystemVersion,
 import { FixBlock } from "@/components/install-checks";
 import { DomainSection } from "@/components/domain-section";
 import { HybridSection } from "@/components/hybrid-section";
+import { ModelsSection, UpdateNeedsAction } from "@/components/models-section";
 import { CodeBlock } from "@/components/code-block";
 
 /** The same checks from the operator's machine. */
@@ -158,11 +159,23 @@ function System() {
     }
   };
 
-  const start = async (kind: "update" | "rollback") => {
+  const start = async (kind: "update" | "rollback", skipCheck = false) => {
     setBusy(kind);
     try {
-      const e = kind === "update" ? await api.updateNow(latest?.version) : await api.rollbackInstall();
-      toast(kind === "update" ? `Updating to ${e.version}. This takes 10 to 20 minutes.` : `Rolling back to ${e.version}.`);
+      if (kind === "update") {
+        const r = await api.updateNow(latest?.version, skipCheck);
+        if (!r.ok) {
+          // A model the release calls was refused: show which, with its fix.
+          if (r.model_check) setData({ ...data, model_check: r.model_check });
+          toast(r.error, "error");
+          loadPreflight();
+          return;
+        }
+        toast(`Updating to ${r.version}. This takes 10 to 20 minutes.`);
+      } else {
+        const e = await api.rollbackInstall();
+        toast(`Rolling back to ${e.version}.`);
+      }
       await load();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Could not start", "error");
@@ -175,6 +188,16 @@ function System() {
     <Page>
       {header}
       <div className="space-y-8">
+        {latest && data.model_check?.version === latest.version && (
+          <UpdateNeedsAction
+            check={data.model_check}
+            onChecked={(c) => {
+              setData({ ...data, model_check: c });
+              loadPreflight();
+            }}
+            onSkip={() => start("update", true)}
+          />
+        )}
         <SettingsSection id="version" title="Version">
           <SettingsRow
             label="Running"
@@ -236,6 +259,10 @@ function System() {
 
         <SettingsSection id="readiness" title="Update readiness" description="What an update checks before it starts, run now: anything that would stop it, and anything to read first.">
           <Readiness pre={pre} state={preState} onRecheck={loadPreflight} />
+        </SettingsSection>
+
+        <SettingsSection id="models" title="Models" description="How this install calls Claude: Amazon Bedrock in this AWS account, or each team's Anthropic API key. Change it at any time.">
+          <ModelsSection />
         </SettingsSection>
 
         <SettingsSection id="domain" title="Domain" description="The address people and GitHub use for this install: the AWS address, your own domain, or a coderhelm.com address.">
@@ -321,6 +348,7 @@ function System() {
                     <p className="truncate text-xs text-zinc-400">
                       <Time iso={h.started_at} /> · {h.actor === "auto" ? "automatic" : h.actor}
                       {h.reason ? ` · ${h.reason}` : ""}
+                      {h.note ? ` · ${h.note}` : ""}
                     </p>
                     {(h.status === "failed" || h.status === "rolled_back") && (
                       <p className="mt-1 text-xs text-zinc-300" data-testid="history-next-step">

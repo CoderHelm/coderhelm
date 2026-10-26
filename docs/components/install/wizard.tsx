@@ -1006,6 +1006,7 @@ export function InstallWizard() {
                       </span>
                     </label>
                   ))}
+                  <p className="text-sm text-fd-muted-foreground">You can change this later in Settings, System.</p>
                 </fieldset>
               </div>
             ) : null}
