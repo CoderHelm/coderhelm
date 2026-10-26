@@ -1,4 +1,4 @@
-// The app's top-level destinations: seven places a person goes, each with
+// The app's top-level destinations: eight places a person goes, each with
 // the pages that belong to it. The sidebar lists the destinations; when a
 // destination has more than one page, the shell shows its pages as tabs
 // above the page (components/section-tabs.tsx). Settings has its own left
@@ -7,7 +7,7 @@
 import { ANY_CHANGE } from "./capabilities";
 import { KNOWLEDGE_HREF, normalizePath } from "./routes";
 
-export type NavIconKey = "runs" | "plans" | "reviews" | "chat" | "knowledge" | "plugins" | "insights" | "settings" | "admin" | "queue";
+export type NavIconKey = "runs" | "plans" | "reviews" | "logs" | "chat" | "knowledge" | "plugins" | "insights" | "settings" | "admin" | "queue";
 
 export interface NavPage {
   href: string;
@@ -50,7 +50,17 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/reviewer", label: "Reviewer", need: ANY_CHANGE },
       { href: "/tests", label: "Tests", need: ANY_CHANGE },
       { href: "/releases", label: "Releases", need: "reviews" },
+    ],
+  },
+  {
+    // Production signal: what the log analyzer found and the alerts that
+    // fired, each one a start on a fix.
+    key: "logs",
+    label: "Logs",
+    icon: "logs",
+    pages: [
       { href: "/logs", label: "Logs", need: "recommendations" },
+      { href: "/alerts", label: "Alerts", need: "view_alerts" },
     ],
   },
   { key: "chat", label: "Chat", icon: "chat", pages: [{ href: "/chat", label: "Chat", need: "brain_read" }] },
@@ -77,7 +87,6 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/memory", label: "Memory", need: ANY_CHANGE },
       { href: "/graph", label: "Code graph", need: ANY_CHANGE },
       { href: "/infrastructure", label: "Infrastructure", need: ANY_CHANGE },
-      { href: "/alerts", label: "Alerts", need: "view_alerts" },
       { href: "/health", label: "Health", need: "system" },
     ],
   },

@@ -7,9 +7,9 @@ import { pageWidthClass } from "./page";
 
 /**
  * The pages of the current destination, as tabs above the page: Reviewer,
- * Tests, Releases and Logs under Code review; Analytics, Learning and the
- * rest under Insights. Nothing on a destination with one page, or on an
- * item's page underneath (a run, a review).
+ * Tests and Releases under Code review; Logs and Alerts under Logs;
+ * Analytics, Learning and the rest under Insights. Nothing on a destination
+ * with one page, or on an item's page underneath (a run, a review).
  */
 export function SectionTabs({ allowed }: { allowed: (need?: string) => boolean }) {
   const pathname = usePathname();

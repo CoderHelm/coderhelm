@@ -27,7 +27,7 @@ import { Menu } from "./menu";
 import { SectionTabs } from "./section-tabs";
 import { inSettings, SettingsNav } from "./settings-nav";
 import { buttonClass } from "./ui";
-import { AlertCircleIcon, InfoIcon, WarningIcon, XIcon } from "./icons";
+import { AlertCircleIcon, InfoIcon, LogFindingsIcon, WarningIcon, XIcon } from "./icons";
 import { apiBase, runtimeConfig, siteUrl } from "@/lib/runtime-config";
 import { SetupBanner } from "@/components/setup-banner";
 import { CopyButton } from "./copy-button";
@@ -72,6 +72,7 @@ const NAV_ICONS: Record<NavIconKey, ReactNode> = {
   runs: <PlayIcon />,
   plans: <PlanIcon />,
   reviews: <ReviewerIcon />,
+  logs: <LogFindingsIcon />,
   chat: <ChatIcon />,
   knowledge: <BookIcon />,
   insights: <TrendingUpIcon />,
@@ -462,7 +463,7 @@ function TeamSwitcher({
   if (!currentTeam) return null;
 
   return (
-    <div ref={ref} className="relative mb-3 pb-3 border-b border-zinc-800/60">
+    <div ref={ref} className="relative mb-2 pb-3 border-b border-zinc-800/60">
       <p className="px-2 mb-1.5 text-xs font-medium text-zinc-400">Team</p>
       <button
         type="button"
@@ -601,7 +602,7 @@ function Sidebar({
       <ScrollFade axis="y" className="flex-1" innerClassName="px-3 pt-3 pb-2" testId="sidebar-scroll">
       <Link
         href="/"
-        className={`flex items-center gap-2.5 px-2 py-2.5 mb-2 rounded-md ${focusRing}`}
+        className={`flex items-center gap-2.5 px-2 py-2 mb-1 rounded-md ${focusRing}`}
       >
         <Logo />
         <span className="text-sm font-semibold text-zinc-100">Coderhelm</span>
@@ -616,7 +617,7 @@ function Sidebar({
       </ul>
 
       {visibleSections(user).some((x) => x.section.superAdminOnly) && (
-        <div className="mt-5">
+        <div className="mt-3">
           <p className="mb-1 px-2 text-xs font-medium text-zinc-400">Platform</p>
           <ul className="space-y-0.5">
             {visibleSections(user).filter((x) => x.section.superAdminOnly).map(({ section, href }) => (

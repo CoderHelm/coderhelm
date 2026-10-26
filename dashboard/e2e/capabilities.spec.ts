@@ -95,6 +95,21 @@ test("a built-in member is unchanged: repos read-only, member pages open", async
   await expect(page.getByRole("navigation", { name: "Insights pages" }).getByRole("link", { name: "Health" })).toHaveCount(0);
 });
 
+test("someone who can open only one of Logs and Alerts gets that page under Logs, with no tabs", async ({ page }) => {
+  const cases = [
+    { caps: MEMBER.filter((c) => c !== "view_alerts"), href: /\/logs\/?$/, path: "/logs" },
+    { caps: MEMBER.filter((c) => c !== "recommendations"), href: /\/alerts\/?$/, path: "/alerts" },
+  ];
+  for (const { caps, href, path: p } of cases) {
+    await mockApi(page, { role: "member", capabilities: caps });
+    await page.goto(p);
+    await expect(nav(page).getByRole("link", { name: "Logs", exact: true })).toHaveAttribute("href", href);
+    await expect(page.getByRole("navigation", { name: "Logs pages" })).toHaveCount(0);
+    await expect(page.getByTestId("section-tabs")).toHaveCount(0);
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  }
+});
+
 test("viewers are unchanged: member pages stay closed and out of the menu", async ({ page }) => {
   for (const me of [{ role: "viewer" }, { role: "viewer", capabilities: BASELINE }]) {
     await mockApi(page, me);
