@@ -22,7 +22,7 @@ function finding(over: Partial<Finding> & Pick<Finding, "rec_id" | "status">): F
     account_id: "111122223333",
     error_pattern: "Task timed out after 30.00 seconds",
     error_count: 412,
-    seen_count: 3,
+    seen_count: 1290,
     first_seen: ago(30 * HOUR),
     last_seen: ago(2 * HOUR),
     suspected_location: "src/payments/client.ts",
@@ -172,7 +172,7 @@ test("findings list with status toggles, filters and the inline detail", async (
   // The service's name in the row; the full log group in its title and details.
   await expect(row).toContainText("shop-checkout");
   await expect(row.locator('[title="/aws/lambda/shop-checkout"]')).toBeVisible();
-  await expect(row).toContainText("412 lines");
+  await expect(row).toContainText("412 lines in the last analysis");
   await expect(row).toContainText("first seen 1 day ago");
   await expect(row).toContainText("Critical");
   await expect(row.getByRole("button", { name: /Create fix PR/ })).toBeVisible();
@@ -216,6 +216,8 @@ test("findings list with status toggles, filters and the inline detail", async (
   await expect(page).toHaveURL(/finding=rec_new/);
   await expect(row).toContainText("Add a 10 second timeout to the payment client and retry once.");
   await expect(row).toContainText("src/payments/client.ts");
+  // Lines over every analysis, not the number of analyses.
+  await expect(row).toContainText("1,290 matching lines since first seen");
   await expect(row.getByTestId("sample-lines")).toContainText("Task timed out after 30.00 seconds token=[hidden]");
   await expect(row.getByRole("link", { name: /Open logs/ })).toHaveAttribute("href", /logsV2:log-groups/);
   await shot(page, "logs-1280");

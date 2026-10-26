@@ -2304,11 +2304,14 @@ export interface LogFinding {
   log_group: string;
   account_id: string;
   error_pattern: string;
-  /** Matching lines in the analysis that last saw it. */
+  /** Matching lines in its log group in the analysis that last saw it. */
   error_count?: number | null;
-  /** Analyses it appeared in. */
+  /** Matching lines in its log group over every analysis (null on findings
+   *  stored before lines were counted). */
   seen_count?: number | null;
+  /** The first matching line's own time; never moves forward. */
   first_seen: string;
+  /** The last matching line's own time. */
   last_seen: string;
   suspected_location?: string | null;
   plan_id?: string | null;

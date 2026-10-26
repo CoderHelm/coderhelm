@@ -476,7 +476,7 @@ function FindingRow({
         <span key="g" title={f.log_group} className="font-medium text-zinc-300">
           {serviceName(f.log_group)}
         </span>,
-        typeof f.error_count === "number" && f.error_count > 0 ? plural(f.error_count, "line") : null,
+        typeof f.error_count === "number" && f.error_count > 0 ? `${plural(f.error_count, "line")} in the last analysis` : null,
         f.first_seen ? `first seen ${timeAgo(f.first_seen)}` : null,
         f.last_seen ? `last seen ${timeAgo(f.last_seen)}` : null,
         f.repo ? <span key="r">{f.repo}</span> : null,
@@ -576,7 +576,7 @@ function FindingDetail({
         </DetailBlock>
       )}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        {f.seen_count ? <span>Seen in {plural(f.seen_count, "analysis", "analyses")}</span> : null}
+        {f.seen_count ? <span>{plural(f.seen_count, "matching line")} since first seen</span> : null}
         {f.plan_id && (
           <Link href={`/plans/detail?id=${encodeURIComponent(f.plan_id)}`} className={`${linkButton} !text-xs`}>
             Its plan
