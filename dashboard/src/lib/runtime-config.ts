@@ -66,6 +66,19 @@ export function apiOrigin(): string {
   return typeof window === "undefined" ? "" : window.location.origin;
 }
 
+/**
+ * This deployment's GitHub App on GitHub: the gateway redirects to its own
+ * app (a self-hosted install's app, not the hosted one). `state` starts a new
+ * installation; `installationId` opens that installation's settings.
+ */
+export function githubAppUrl(opts: { state?: string; installationId?: number | string } = {}): string {
+  const q = new URLSearchParams();
+  if (opts.state) q.set("state", opts.state);
+  if (opts.installationId !== undefined && opts.installationId !== "") q.set("installation_id", String(opts.installationId));
+  const qs = q.toString();
+  return `${apiOrigin()}/auth/github/app${qs ? `?${qs}` : ""}`;
+}
+
 export function isSelfHosted(): boolean {
   return runtimeConfig().selfHosted === true;
 }

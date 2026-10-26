@@ -7,6 +7,7 @@ import { useCan } from "@/hooks/use-can";
 import { ANY_CHANGE } from "@/lib/capabilities";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { api, type Repo } from "@/lib/api";
+import { githubAppUrl } from "@/lib/runtime-config";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
 import { Page, PageHeader } from "@/components/page";
@@ -221,7 +222,7 @@ function ReposPage() {
             title="No repositories connected yet"
             action={
               <>
-                <a href="https://github.com/apps/coderhelm" className={secondaryButton}>
+                <a href={githubAppUrl()} className={secondaryButton}>
                   Install the GitHub App
                 </a>
                 {canManage && (
@@ -260,7 +261,7 @@ function ReposPage() {
                         <span>{readProblem(repo.onboard_error).text}</span>
                         {canManage &&
                           (readProblem(repo.onboard_error).fixInGitHub ? (
-                            <a href="https://github.com/apps/coderhelm/installations/new" target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
+                            <a href={githubAppUrl()} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
                               Fix access in GitHub
                             </a>
                           ) : (

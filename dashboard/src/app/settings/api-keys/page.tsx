@@ -19,6 +19,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
 import { useCan } from "@/hooks/use-can";
 import { relativeTime } from "@/lib/team";
+import { apiOrigin } from "@/lib/runtime-config";
 import {
   API_DOCS_URL,
   apiKeysApi,
@@ -208,7 +209,7 @@ function ApiKeysPage() {
             </h2>
             <ul className="list-disc space-y-1 pl-5 text-sm text-zinc-400">
               <li>
-                Send the key as <Code>Authorization: Bearer chk_...</Code> to <Code>https://api.coderhelm.com</Code>.
+                Send the key as <Code>Authorization: Bearer chk_...</Code> to <Code>{apiOrigin()}</Code>.
               </li>
               <li>The key is shown once, when you create it. Coderhelm keeps only a fingerprint of it.</li>
               <li>

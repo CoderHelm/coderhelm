@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCan } from "@/hooks/use-can";
 import { api, type Integration, type Repo } from "@/lib/api";
+import { githubAppUrl } from "@/lib/runtime-config";
 import { findCard, INTEGRATION_STATUS } from "@/lib/integration-status";
 import { Skeleton } from "@/components/skeleton";
 import { RoleGuard } from "@/components/role-guard";
@@ -19,7 +20,6 @@ import { HybridAppChoice } from "@/components/hybrid-app-choice";
 import { ExternalLinkIcon, GitHubIcon } from "@/components/icons";
 import { buttonClass, linkButton } from "@/components/ui";
 
-const GITHUB_APP_INSTALL_URL = "https://github.com/apps/coderhelm/installations/new";
 const STATE_STORAGE_KEY = "gh_install_state";
 
 /** `url` when it is an http(s) address, else null. */
@@ -170,7 +170,7 @@ function GitHubSettingsPage() {
   const handleInstallClick = () => {
     const state = crypto.randomUUID();
     sessionStorage.setItem(STATE_STORAGE_KEY, state);
-    window.location.href = `${GITHUB_APP_INSTALL_URL}?state=${state}`;
+    window.location.href = githubAppUrl({ state });
   };
 
   const header = (
@@ -250,7 +250,7 @@ function GitHubSettingsPage() {
                   <StatusPill tone="success">Connected</StatusPill>
                   {installationId && (
                     <a
-                      href={`https://github.com/apps/coderhelm/installations/${installationId}`}
+                      href={githubAppUrl({ installationId })}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={`${buttonClass("secondary", "sm")} gap-1.5`}
