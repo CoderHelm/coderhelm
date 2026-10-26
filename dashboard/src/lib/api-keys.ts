@@ -2,7 +2,7 @@
 // own programs. The gateway keeps only a hash of each key; the key itself is
 // in the create answer and nowhere else.
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
+import { apiBase, apiOrigin } from "./runtime-config";
 
 /** Where the public API is documented. */
 export const API_DOCS_URL = "https://docs.coderhelm.com/api";
@@ -54,7 +54,7 @@ export interface NewApiKey {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${apiBase()}${path}`, {
     ...options,
     credentials: "include",
     cache: "no-store",
@@ -81,5 +81,5 @@ export const apiKeysApi = {
 
 /** A first request to try a new key with. */
 export function curlExample(token: string): string {
-  return `curl https://api.coderhelm.com/api/me \\\n  -H "Authorization: Bearer ${token}"`;
+  return `curl ${apiOrigin()}/api/me \\\n  -H "Authorization: Bearer ${token}"`;
 }

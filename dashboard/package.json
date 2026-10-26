@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "node scripts/ui-lint.mjs",
+    "lint": "node scripts/ui-lint.mjs && node scripts/no-hosted-links.mjs",
     "typecheck": "tsc --noEmit",
     "openapi:fields": "node scripts/openapi-fields.mjs",
     "check:openapi": "node scripts/openapi-fields.mjs --check",

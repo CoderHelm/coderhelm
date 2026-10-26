@@ -29,7 +29,7 @@ import { SectionTabs } from "./section-tabs";
 import { inSettings, SettingsNav } from "./settings-nav";
 import { buttonClass } from "./ui";
 import { AlertCircleIcon, InfoIcon, LogFindingsIcon, WarningIcon, XIcon } from "./icons";
-import { apiBase, runtimeConfig, siteUrl } from "@/lib/runtime-config";
+import { apiBase, githubAppUrl, runtimeConfig, siteUrl } from "@/lib/runtime-config";
 import { SetupBanner } from "@/components/setup-banner";
 import { CopyButton } from "./copy-button";
 import { openInChromeHref, signInProblem, type SignInProblem } from "@/lib/sign-in-errors";
@@ -67,8 +67,8 @@ interface User {
 /** Who sees the platform admin pages. The server checks again on every call. */
 function isPlatformAdmin(user: User | null): boolean {
   if (typeof user?.platform_admin === "boolean") return user.platform_admin;
-  // A gateway from before the field: the hosted admin.
-  return user?.email === "admin@coderhelm.com";
+  // A gateway from before the field: the hosted admin, on the hosted dashboard only.
+  return !isSelfHosted() && user?.email === "admin@coderhelm.com";
 }
 
 const NAV_ICONS: Record<NavIconKey, ReactNode> = {
@@ -353,7 +353,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           </p>
           <div className="flex flex-col items-center gap-3">
             <a
-              href="https://github.com/apps/coderhelm/installations/new"
+              href={githubAppUrl()}
               target="_blank"
               rel="noopener noreferrer"
               className={buttonClass("primary")}
@@ -363,7 +363,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={() => {
-                void navigator.clipboard?.writeText("https://github.com/apps/coderhelm/installations/new").catch(() => {});
+                void navigator.clipboard?.writeText(githubAppUrl()).catch(() => {});
               }}
               className={buttonClass("secondary")}
             >

@@ -142,7 +142,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       # Includes: a self-hosted install never loads Google's tag.
       - name: Self-host checks
-        run: npx playwright test e2e/selfhost.spec.ts e2e/google-analytics.spec.ts --project=chromium
+        run: npx playwright test e2e/selfhost.spec.ts e2e/google-analytics.spec.ts e2e/selfhost-links.spec.ts --project=chromium
         env:
           E2E_STATIC: "1"
 

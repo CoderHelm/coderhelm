@@ -3,7 +3,7 @@
 // stand between a draft and anything going out. Off unless the team's
 // `plugins` flag is on.
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
+import { apiBase } from "./runtime-config";
 
 export type Risk = "read" | "write" | "consequential";
 export type TrackKind = "branch" | "tag" | "sha";
@@ -256,7 +256,7 @@ export class PluginError extends Error {
 }
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${apiBase()}${path}`, {
     ...init,
     credentials: "include",
     cache: "no-store",
