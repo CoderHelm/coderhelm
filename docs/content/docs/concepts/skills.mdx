@@ -55,7 +55,7 @@ description: How to write a database migration in this codebase. Read before cha
 | `tools` or `allowed-tools` | list, or one string split by commas | none | Claude Code tool names, mapped to CoderHelm's own (below). |
 | `model` | string | none | Agents only. A hint for which model answers. |
 
-Claude Code tool names map like this: `Read` → read files, `Edit`/`MultiEdit` → edit files, `Write` → write files, `Grep` → search code, `Glob`/`LS` → list files. Others (shell, web, notebooks, sub-agents) have no equivalent and are reported as missing.
+Claude Code tool names map to these abilities: `Read` to read files, `Edit` and `MultiEdit` to edit files, `Write` to write files, `Grep` to search code, and `Glob` and `LS` to list files. Others (shell, web, notebooks, sub-agents) have no equivalent and are reported as missing.
 
 ## Limits
 
@@ -97,7 +97,7 @@ A team agent answers questions from the main agents, in one turn. It only gets r
 
 A **team tool** is a named, typed lookup, such as "find an order by id", that agents can call. Each tool reads one [data source](/concepts/data-sources) with a fixed query (SQL, GraphQL, a logs query or an HTTP GET), and its inputs are typed and checked before they are bound into the query, never pasted into it.
 
-Find them under **Data sources** → **Team tools**. Define one in the dashboard, or commit it as `.coderhelm/tools/<name>.yaml` on a default branch; a pushed file becomes a proposal and is never switched on by itself.
+Find them on **Data sources**, under **Team tools**. Define one in the dashboard, or commit it as `.coderhelm/tools/<name>.yaml` on a default branch; a pushed file becomes a proposal and is never switched on by itself.
 
 ```yaml title=".coderhelm/tools/order_by_id.yaml"
 name: order_by_id

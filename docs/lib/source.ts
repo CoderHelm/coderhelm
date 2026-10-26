@@ -8,6 +8,7 @@ import { SITE, docsRoute, markdownPath } from './shared';
 import { openapi } from './openapi';
 import { operationMarkdown } from './api-markdown';
 import { INSTALL_GUIDE } from './install/page-info';
+import { diagramsAsText } from './diagrams/text.mjs';
 
 /**
  * Page frontmatter. `status: coming-soon` marks a page that documents work not
@@ -97,7 +98,7 @@ export async function pageMarkdown(page: DocsPage): Promise<string> {
     return `# ${page.data.title}\n\nSource: ${SITE.url}${page.url}\n\n${body}`;
   }
   const status = page.data.status ? `\n\n> ${STATUS_LABEL[page.data.status]}: this page describes work that is not on main yet.` : '';
-  return `# ${page.data.title}\n\nSource: ${SITE.url}${page.url}${description}${status}\n\n${await page.data.getText('processed')}`;
+  return `# ${page.data.title}\n\nSource: ${SITE.url}${page.url}${description}${status}\n\n${diagramsAsText(await page.data.getText('processed'))}`;
 }
 
 export const docsLlms = llms(source, {

@@ -115,3 +115,138 @@ h1 > .ch-badge {
 .ch-path-links a:hover::before {
   background: var(--color-fd-primary);
 }
+
+/* Diagrams (components/diagram.tsx). Every color is a theme token, so light
+   and dark follow the site; text is the page font. */
+.ch-dg {
+  --dg-surface: color-mix(in oklab, var(--color-fd-card) 55%, var(--color-fd-background));
+  --dg-node: var(--color-fd-popover);
+  --dg-line: color-mix(in oklab, var(--color-fd-foreground) 38%, transparent);
+  --dg-accent: var(--color-fd-primary);
+  container-type: inline-size;
+  margin: 1.75rem 0;
+  border: 1px solid var(--color-fd-border);
+  border-radius: 0.875rem;
+  background-color: var(--dg-surface);
+  background-image: radial-gradient(color-mix(in oklab, var(--color-fd-foreground) 9%, transparent) 1px, transparent 1px);
+  background-size: 16px 16px;
+  font-family: var(--font-sans);
+}
+.ch-dg-caption {
+  padding: 0.75rem 1rem 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-fd-muted-foreground);
+}
+.ch-dg-canvas {
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+}
+.ch-dg-svg {
+  display: block;
+  overflow: visible;
+  font-family: inherit;
+}
+.ch-dg-narrow {
+  display: none;
+}
+@container (max-width: 600px) {
+  .ch-dg-wide {
+    display: none;
+  }
+  .ch-dg-narrow {
+    display: block;
+  }
+  /* No side padding on a phone: the stacked drawing gets the column's
+     whole width, so it shows at full size. */
+  .ch-dg-canvas {
+    padding: 0.75rem 0;
+  }
+}
+.ch-dg-group rect {
+  fill: color-mix(in oklab, var(--color-fd-foreground) 2.5%, transparent);
+  stroke: var(--color-fd-border);
+  stroke-dasharray: 4 3;
+}
+.ch-dg-group[data-tone='boundary'] rect {
+  fill: color-mix(in oklab, var(--dg-accent) 5%, transparent);
+  stroke: color-mix(in oklab, var(--dg-accent) 35%, transparent);
+  stroke-dasharray: none;
+}
+.ch-dg-group text {
+  fill: var(--color-fd-muted-foreground);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.ch-dg-group[data-tone='boundary'] text {
+  fill: var(--dg-accent);
+}
+.ch-dg-node rect {
+  fill: var(--dg-node);
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 16%, transparent);
+}
+.ch-dg-label {
+  fill: var(--color-fd-foreground);
+  font-weight: 500;
+}
+.ch-dg-detail {
+  fill: var(--color-fd-muted-foreground);
+}
+.ch-dg-icon {
+  color: var(--color-fd-muted-foreground);
+}
+.ch-dg-node[data-tone='person'] .ch-dg-icon {
+  color: var(--dg-accent);
+}
+.ch-dg-node[data-tone='store'] rect {
+  fill: color-mix(in oklab, var(--dg-node) 70%, var(--color-fd-secondary));
+}
+.ch-dg-node[data-tone='result'] rect {
+  fill: color-mix(in oklab, var(--dg-accent) 10%, var(--dg-node));
+  stroke: color-mix(in oklab, var(--dg-accent) 55%, transparent);
+}
+.ch-dg-node[data-tone='result'] .ch-dg-icon {
+  color: var(--dg-accent);
+}
+.ch-dg-node[data-tone='muted'] rect {
+  fill: transparent;
+  stroke-dasharray: 4 3;
+}
+.ch-dg-node[data-tone='muted'] .ch-dg-label {
+  fill: var(--color-fd-muted-foreground);
+}
+.ch-dg-edge path {
+  stroke: var(--dg-line);
+  stroke-width: 1.25;
+}
+.ch-dg-edge[data-dashed] path:first-child {
+  stroke-dasharray: 4 3;
+}
+.ch-dg-edge .ch-dg-head {
+  fill: var(--dg-line);
+  stroke: none;
+}
+.ch-dg-edge-label rect {
+  fill: var(--dg-surface);
+  stroke: var(--color-fd-border);
+}
+.ch-dg-edge-label text {
+  fill: var(--color-fd-muted-foreground);
+}
+.ch-dg-text {
+  border-top: 1px solid var(--color-fd-border);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+}
+.ch-dg-text summary {
+  cursor: pointer;
+  color: var(--color-fd-muted-foreground);
+  font-size: 0.8125rem;
+}
+.ch-dg-text summary:hover {
+  color: var(--color-fd-foreground);
+}
+.ch-dg-text[open] summary {
+  margin-bottom: 0.25rem;
+}

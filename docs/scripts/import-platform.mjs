@@ -20,6 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SPEC_PATH, checkSpec, operationsOf } from './lib/openapi.mjs';
 import { renderManifestReference } from './lib/manifest-reference.mjs';
+import { plainArrows } from './lib/prose.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONTENT = path.join(ROOT, 'content/docs');
@@ -188,7 +189,8 @@ export function convertGuide(raw, srcPath, ref) {
     `{/* Imported from ${lock.repo}/${srcPath} at ${ref.slice(0, 12)}. Edit it there. */}`,
     '',
   ];
-  return lines.join('\n') + body.trimStart();
+  // Arrows in prose become words, as on every other page (scripts/lib/prose.mjs).
+  return lines.join('\n') + plainArrows(body.trimStart());
 }
 
 function writeSelfHostStub(ref) {
@@ -291,7 +293,7 @@ function writeChangelog(platform) {
   const add = (repo, url, pr) => {
     const key = pr.date.slice(0, 7);
     if (!months.has(key)) months.set(key, { platform: [], app: [] });
-    months.get(key)[repo].push(`- ${escapeMdx(pr.title)} ([#${pr.number}](${url}/pull/${pr.number}))`);
+    months.get(key)[repo].push(`- ${escapeMdx(plainArrows(pr.title))} ([#${pr.number}](${url}/pull/${pr.number}))`);
   };
   platformPrs.forEach((pr) => add('platform', REPO_URL, pr));
   appPrs.forEach((pr) => add('app', 'https://github.com/CoderHelm/coderhelm', pr));

@@ -37,15 +37,18 @@ Adding a plugin needs no deploy and no code from CoderHelm. Every field is liste
 
 ## How a run works
 
-```txt
-trigger (brief, schedule, release)
-  └─► plugin run ─► agent with only the granted tools ─► drafts
-                                                           └─► approval ─► publish now or at a set time
-```
+<Diagram id="plugin-run">
+
+1. A person's brief, a schedule or a release starts a plugin run.
+2. The run uses the plugin's pinned version, the inputs and who asked. The plugin agent works with only the tools the manifest grants.
+3. The agent saves what it makes as drafts in the review queue.
+4. A person approves one exact version of a draft, to publish now or at a set time (a scheduled publish can be cancelled until then).
+
+</Diagram>
 
 1. A trigger starts a run, with the plugin's pinned version, the inputs and who asked.
 2. The plugin's agent works with exactly the tools the manifest grants. A repository is optional.
-3. What it makes is saved as **drafts** in the review queue (**Plugins** → **Review**).
+3. What it makes is saved as **drafts** in the review queue (in **Plugins**, under **Review**).
 4. A person approves a specific version of a draft. Only then can a consequential tool, such as publish, run.
 
 ## Words used in these docs
