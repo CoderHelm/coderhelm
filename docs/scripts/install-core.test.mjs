@@ -211,8 +211,14 @@ test('the install\'s GET /api/setup/status, in its exact shape, drives the guide
 test('more options: domain, sender, sign-up domain and updates go into the quick-create link only when set', () => {
   const q = (st) => new URLSearchParams(new URL(c.quickCreateUrl(st)).hash.split('?')[1]);
   const plain = q(S);
-  for (const k of ['param_Hostname', 'param_EmailFrom', 'param_SignupDomain', 'param_AutoUpdate', 'param_UpdateWindow', 'param_UpdateTimezone']) assert.equal(plain.get(k), null, k);
-  const all = q({ ...S, domainChoice: 'own', hostname: 'https://CoderHelm.Example.com/', emailFrom: 'Bot@Example.com', signupDomain: '@example.com', autoUpdate: true, updateWindow: 'daily 02:00', updateTimezone: 'Europe/Berlin' });
+  for (const k of ['param_Hostname', 'param_EmailFrom', 'param_SignupDomain', 'param_RequireTwoFactor', 'param_AutoUpdate', 'param_UpdateWindow', 'param_UpdateTimezone']) assert.equal(plain.get(k), null, k);
+  const all = q({ ...S, domainChoice: 'own', hostname: 'https://CoderHelm.Example.com/', emailFrom: 'Bot@Example.com', joinDomain: true, signupDomain: '@example.com', requireTwoFactor: true, autoUpdate: true, updateWindow: 'daily 02:00', updateTimezone: 'Europe/Berlin' });
+  assert.equal(all.get('param_RequireTwoFactor'), 'on');
+  // Only people I invite (the default): a typed domain is not sent.
+  assert.equal(c.newState().joinDomain, false);
+  assert.equal(q({ ...S, joinDomain: false, signupDomain: 'example.com' }).get('param_SignupDomain'), null);
+  // A guide saved before the choice existed keeps its domain.
+  assert.equal(q({ ...S, joinDomain: undefined, signupDomain: 'example.com' }).get('param_SignupDomain'), 'example.com');
   assert.equal(all.get('param_Hostname'), 'coderhelm.example.com');
   assert.equal(all.get('param_EmailFrom'), 'bot@example.com');
   assert.equal(all.get('param_SignupDomain'), 'example.com');
@@ -235,6 +241,8 @@ test('more options are validated in plain words', () => {
   assert.deepEqual(c.validate({ ...base, domainChoice: 'own', hostname: 'https://coderhelm.example.com/' }), {});
   assert.match(c.validate({ ...base, emailFrom: 'nope' }).emailFrom, /email address/);
   assert.match(c.validate({ ...base, signupDomain: 'not a domain' }).signupDomain, /example\.com/);
+  assert.match(c.validate({ ...base, joinDomain: true, signupDomain: '' }).signupDomain, /Only people I invite/);
+  assert.deepEqual(c.validate({ ...base, joinDomain: false, signupDomain: 'not a domain' }), {}, 'a domain only matters when people may join by it');
   assert.match(c.validate({ ...base, autoUpdate: true, updateTimezone: 'Mars' }).updateTimezone, /time zone/);
   assert.deepEqual(c.validate({ ...base, autoUpdate: true, updateWindow: 'Sat 22:00', updateTimezone: 'America/New_York' }), {});
 });

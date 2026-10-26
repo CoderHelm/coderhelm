@@ -193,6 +193,24 @@ export const settingsData: Handler = ({ method, path, url }) => {
     };
   }
   if (p === "/api/users") return { users: USERS };
+  // Sign-in (self-hosted): long domains, long names and an unbroken email.
+  if (p === "/api/sign-in") {
+    return {
+      self_hosted: true,
+      is_org: true,
+      domains: ["payments-reconciliation.engineering-platform.example.com", "example.com"],
+      require_2fa: true,
+      require_2fa_since: iso(60 * 24 * 3),
+      pending_invites: 12,
+      people: [
+        { user_id: "u1", email: EMAIL, name: "", github_login: "", role: "owner", two_factor: "cognito", is_self: true },
+        { user_id: "u2", email: EMAIL, name: "Alexandria Montgomery-Fitzwilliam the Third", github_login: "", role: "admin", two_factor: "app", is_self: false },
+        { user_id: "u3", email: "", name: "", github_login: "a-very-long-github-login-name-for-testing", role: "member", two_factor: null, is_self: false },
+      ],
+      api_keys: [{ id: "k1", name: "Nightly-release-notes-and-deploy-pipeline-k1", created_by: EMAIL }],
+      your_session_has_2fa: true,
+    };
+  }
   // API keys: a long name, a long maker, and every scope.
   if (p === "/api/api-keys") {
     const key = (id: string, status: string, over: Record<string, unknown> = {}) => ({

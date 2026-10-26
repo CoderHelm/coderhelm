@@ -21,6 +21,8 @@ export interface SettingsItem {
   status?: SettingsStatusKey;
   /** Only on a self-hosted install, and only for its install admins. */
   selfHostOnly?: boolean;
+  /** Only on a self-hosted install (for whoever holds `view`). */
+  selfHosted?: boolean;
 }
 
 export interface SettingsGroup {
@@ -50,6 +52,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     label: "Team",
     items: [
       { href: "/settings/team", title: "Team", description: "Who is on the team, their roles and what each role can do.", icon: <UsersIcon />, view: "view_team", edit: "people", status: "team" },
+      { href: "/settings/sign-in", title: "Sign-in", description: "Who may join this install, and whether everyone must use two-factor sign-in.", icon: <LockIcon />, view: "sign_in", edit: "sign_in", selfHosted: true },
       { href: "/settings/support-access", title: "Support access", description: "Let Coderhelm support look at your workspace for a while, without changing anything. See every page they open.", icon: <LifeBuoyIcon />, view: "support", edit: "support" },
       { href: "/settings/api-keys", title: "API keys", description: "Let your own scripts and tools use Coderhelm. For developers.", icon: <KeyIcon />, view: "api_keys", edit: "api_keys" },
     ],
@@ -91,6 +94,13 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
 ];
 
 export const SETTINGS_ITEMS: SettingsItem[] = SETTINGS_GROUPS.flatMap((g) => g.items);
+
+/** Whether this install offers the item at all (before any capability check). */
+export function offered(item: SettingsItem, selfHosted: boolean, platformAdmin: boolean): boolean {
+  if (item.selfHostOnly) return selfHosted && platformAdmin;
+  if (item.selfHosted) return selfHosted;
+  return true;
+}
 
 /** The settings item for a path such as "/settings/budget/" (trailing slash optional). */
 export function settingsItemFor(pathname: string): SettingsItem | undefined {

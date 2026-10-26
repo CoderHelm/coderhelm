@@ -87,6 +87,42 @@ async function requestWithBody<T, E>(
   return { ...(body as T), ok: true };
 }
 
+/** A person's own two-factor sign-in (self-hosted installs). */
+export interface MyTwoFactor {
+  self_hosted: boolean;
+  /** The organization requires it. */
+  required: boolean;
+  /** This session can only set it up until it has a second factor. */
+  held: boolean;
+  session_has_2fa?: boolean;
+  signed_in_with?: "password" | "google" | "github";
+  /** What they have set up: Cognito's codes (password sign-in) or Coderhelm's (Google, GitHub). */
+  set_up?: "cognito" | "app" | null;
+  /** The kind that fits how they signed in. */
+  fits?: "cognito" | "app";
+}
+
+/** Settings, Sign-in (self-hosted installs). */
+export interface SignInSettings {
+  self_hosted: boolean;
+  is_org?: boolean;
+  domains?: string[];
+  require_2fa?: boolean;
+  require_2fa_since?: string | null;
+  pending_invites?: number;
+  people?: {
+    user_id: string;
+    email: string;
+    name: string;
+    github_login: string;
+    role: string;
+    two_factor: "cognito" | "app" | null;
+    is_self: boolean;
+  }[];
+  api_keys?: { id: string; name: string; created_by: string }[];
+  your_session_has_2fa?: boolean;
+}
+
 export const api = {
   // Auth
   me: () =>
@@ -734,6 +770,27 @@ export const api = {
     }),
   mfaDisable: () =>
     request<{ status: string }>("/api/users/mfa", { method: "DELETE" }),
+  // Self-hosted: one organization, who may join, and two-factor sign-in.
+  myTwoFactor: () => request<MyTwoFactor>("/api/users/2fa"),
+  appTwoFactorSetup: () =>
+    request<{ secret: string; qr_uri: string }>("/api/users/2fa/app/setup", { method: "POST" }),
+  appTwoFactorVerify: (code: string) =>
+    request<{ status: string }>("/api/users/2fa/app/verify", { method: "POST", body: JSON.stringify({ code }) }),
+  appTwoFactorDisable: (code: string) =>
+    request<{ status: string }>("/api/users/2fa/app", { method: "DELETE", body: JSON.stringify({ code }) }),
+  verifySecondStep: (code: string) =>
+    request<{ status: string; team_id: string }>("/auth/2fa/verify", { method: "POST", body: JSON.stringify({ code }) }),
+  signInSettings: () => request<SignInSettings>("/api/sign-in"),
+  updateSignInSettings: (body: { domains?: string[]; require_2fa?: boolean }) =>
+    request<{ domains: string[]; require_2fa: boolean; require_2fa_since: string | null }>("/api/sign-in", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  resetTwoFactor: (userId: string, verifiedHow: string) =>
+    request<{ status: string }>(`/api/users/${encodeURIComponent(userId)}/2fa/reset`, {
+      method: "POST",
+      body: JSON.stringify({ verified_how: verifiedHow }),
+    }),
 
   // AWS Connections (Log Analyzer)
   // Alert routes: SNS topic → repo, turning alerts into pull requests

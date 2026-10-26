@@ -167,8 +167,16 @@ export interface InstallState {
   domainSkipped: boolean;
   /** Who sends CoderHelm's email; empty uses their own address. */
   emailFrom: string;
-  /** An email domain anyone may sign up from; empty for only them (they invite people later). */
+  /**
+   * Who may join the install's one organization besides the people its
+   * admins invite: `false` (the default) is only people they invite; `true`
+   * also lets anyone with an email at `signupDomain` join.
+   */
+  joinDomain?: boolean;
+  /** The company's email domain, used when `joinDomain` is on. */
   signupDomain: string;
+  /** Start with two-factor sign-in required for everyone (changed later in Settings, Sign-in). */
+  requireTwoFactor?: boolean;
   /** Install new releases by themselves, in the window. */
   autoUpdate: boolean;
   updateWindow: string;
@@ -178,6 +186,15 @@ export interface InstallState {
 }
 
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Whether people at the company's domain may join, as well as people the
+ * admins invite. A guide saved before the choice existed: on when it held a
+ * domain.
+ */
+export function joinsByDomain(s: Partial<Pick<InstallState, 'joinDomain' | 'signupDomain'>>): boolean {
+  return s.joinDomain ?? !!s.signupDomain?.trim();
+}
 export const STAGE_RE = /^[a-z][a-z0-9-]{0,19}$/;
 export const STATUS_ID_RE = /^[a-z0-9]{16}$/;
 export const TAG_RE = /^v\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/;
@@ -218,7 +235,9 @@ export function newState(over: Partial<InstallState> = {}): InstallState {
     hostname: '',
     domainSkipped: false,
     emailFrom: '',
+    joinDomain: false,
     signupDomain: '',
+    requireTwoFactor: false,
     autoUpdate: false,
     updateWindow: DEFAULT_WINDOW,
     updateTimezone: 'UTC',
@@ -248,7 +267,11 @@ export function validate(s: Pick<InstallState, 'email' | 'stage' | 'region'> & P
     else if (/\.(cloudfront\.net|amazonaws\.com)$/.test(h)) p.hostname = 'Enter a domain you own, not an AWS address.';
   }
   if (s.emailFrom && !EMAIL_RE.test(s.emailFrom.trim())) p.emailFrom = 'Enter an email address, or leave it empty to use yours.';
-  if (s.signupDomain && !HOST_RE.test(s.signupDomain.trim().toLowerCase().replace(/^@/, ''))) p.signupDomain = 'Enter an email domain such as example.com, or leave it empty.';
+  if (joinsByDomain(s)) {
+    const d = (s.signupDomain ?? '').trim().toLowerCase().replace(/^@/, '');
+    if (!d) p.signupDomain = 'Enter your company\'s email domain, such as example.com, or pick Only people I invite.';
+    else if (!HOST_RE.test(d)) p.signupDomain = 'Enter an email domain such as example.com.';
+  }
   if (s.autoUpdate && s.updateWindow && !WINDOW_RE.test(s.updateWindow)) p.updateWindow = 'Pick a day and an hour.';
   if (s.autoUpdate && s.updateTimezone && !TIMEZONE_RE.test(s.updateTimezone)) p.updateTimezone = 'Enter a time zone such as Europe/Berlin, or UTC.';
   return p;
@@ -291,7 +314,8 @@ export function quickCreateUrl(s: InstallState): string {
   // The optional ones only when set, so the link stays short and older templates still open.
   if (s.domainChoice === 'own' && s.hostname) params.push(['param_Hostname', cleanHostname(s.hostname)]);
   if (s.emailFrom?.trim()) params.push(['param_EmailFrom', s.emailFrom.trim().toLowerCase()]);
-  if (s.signupDomain?.trim()) params.push(['param_SignupDomain', s.signupDomain.trim().toLowerCase().replace(/^@/, '')]);
+  if (joinsByDomain(s) && s.signupDomain?.trim()) params.push(['param_SignupDomain', s.signupDomain.trim().toLowerCase().replace(/^@/, '')]);
+  if (s.requireTwoFactor) params.push(['param_RequireTwoFactor', 'on']);
   if (s.autoUpdate) {
     params.push(['param_AutoUpdate', 'on']);
     if (s.updateWindow && s.updateWindow !== DEFAULT_WINDOW) params.push(['param_UpdateWindow', s.updateWindow]);

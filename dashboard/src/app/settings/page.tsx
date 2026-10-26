@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/skeleton";
 import { ChevronRightIcon, CloudIcon } from "@/components/icons";
 import { dangerButton, focusRing, inputClass, secondaryButton } from "@/components/ui";
 import { Modal, modalActions } from "@/components/modal";
-import { SETTINGS_GROUPS, type SettingsItem } from "@/components/settings-items";
+import { SETTINGS_GROUPS, offered, type SettingsItem } from "@/components/settings-items";
 import { isSelfHosted } from "@/lib/runtime-config";
 import { ROLE_LABEL, whoCan, type Role } from "@/lib/roles";
 import { builtInRoleFor, can } from "@/lib/capabilities";
@@ -27,7 +27,7 @@ export default function SettingsPage() {
   }, []);
 
   const groups = me
-    ? SETTINGS_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => can(me, i.view) && (!i.selfHostOnly || (isSelfHosted() && me.platform_admin === true))) })).filter((g) => g.items.length > 0)
+    ? SETTINGS_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => can(me, i.view) && offered(i, isSelfHosted(), me.platform_admin === true)) })).filter((g) => g.items.length > 0)
     : [];
   const roleLabel = me ? (me.custom_role?.name ?? ROLE_LABEL[me.role as Role] ?? me.role) : null;
   const anyReadOnly = groups.some((g) => g.items.some((i) => !can(me, i.edit)));
