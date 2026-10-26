@@ -27,6 +27,9 @@ async function mockApi(page: Page, opts: { cards: Card[]; install: string; repos
     }
     if (p === "/api/repos") return json(r, { repos: opts.repos ?? [{ name: "your-team/web", enabled: true, onboard_status: "ready" }] });
     if (p === "/api/github/installation-status") return json(r, { status: opts.install });
+    if (p === "/api/github/link-installation") {
+      return json(r, { error: "One more step: connect your GitHub account.", code: "github_auth_required", auth_url: `${new URL(r.request().url()).origin}/auth/github`, github_org: "your-team", installation_id: 42 });
+    }
     if (p === "/api/integrations/jira/check") {
       return json(r, { ready: true, secret_configured: true, configured_repos: { total: 1, enabled: 1 }, enabled_repos: ["your-team/web"], jira_events_seen: true, installation_id: 7, team_id: "t_1", webhook_url: "https://example.com/hook" });
     }
@@ -57,4 +60,13 @@ test("Jira: a problem the overview found shows on the Jira page too", async ({ p
   await page.goto("/settings/integrations/jira/");
   await expect(page.getByText("Not working").first()).toBeVisible();
   await expect(page.getByText("Jira refused the app's key.")).toBeVisible();
+});
+
+test("GitHub: a new installation is linked through GitHub sign-in, not from the address bar", async ({ page }) => {
+  await mockApi(page, { cards: [{ id: "github", status: "not_connected" }, { id: "jira", status: "connected" }], install: "not_connected" });
+  await page.addInitScript(() => sessionStorage.setItem("gh_install_state", "s-1"));
+  const linked = page.waitForRequest((req) => new URL(req.url()).pathname === "/api/github/link-installation");
+  await page.goto("/settings/integrations/github/?installation_id=42&setup_action=install&state=s-1");
+  expect((await linked).postDataJSON()).toEqual({ installation_id: 42 });
+  await page.waitForURL(/\/auth\/github$/);
 });

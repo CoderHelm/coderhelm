@@ -391,6 +391,11 @@ export const api = {
       github_org?: string;
       installation_id?: number;
       repos_synced?: number;
+      /** `github_auth_required`: the installation isn't linked yet. Only a
+       * GitHub sign-in at `auth_url` links it, once GitHub confirms the
+       * person can access it. */
+      code?: string;
+      auth_url?: string;
     }>("/api/github/link-installation", {
       method: "POST",
       body: JSON.stringify({ installation_id }),
