@@ -13,6 +13,7 @@ import {
   type AlertRule,
   type AwsConnection,
   type Repo,
+  type RepoResolution,
   type TopicAlarm,
 } from "@/lib/api";
 import { timeAgo } from "@/lib/data-sources";
@@ -20,6 +21,7 @@ import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RepoCombobox } from "@/components/repo-combobox";
+import { ResolvedRepo } from "@/components/resolved-repo";
 import { Callout } from "@/components/callout";
 import { StatusPill } from "@/components/status-pill";
 import { Segmented } from "@/components/segmented";
@@ -1068,6 +1070,7 @@ function AlarmPicker({ id, alarms, selected, onChange }: { id: string; alarms: T
 const split = (v: string) => v.split(",").map((t) => t.trim()).filter(Boolean);
 
 function RuleEditor({
+  topicArn,
   rule,
   index,
   count,
@@ -1080,6 +1083,7 @@ function RuleEditor({
   onRemove,
   onMove,
 }: {
+  topicArn: string;
   rule: AlertRule;
   index: number;
   count: number;
@@ -1096,6 +1100,38 @@ function RuleEditor({
   const [names, setNames] = useState(rule.alarms.join(", "));
   const [by, setBy] = useState<"alarms" | "text">(rule.alarms.length === 0 && rule.terms.length > 0 ? "text" : "alarms");
   const id = `rule-${index}`;
+
+  // The repo, worked out from what the rule's alarms watch, while none is chosen.
+  const [resolution, setResolution] = useState<RepoResolution | null>(null);
+  const [resolving, setResolving] = useState(false);
+  const alarmKey = rule.alarms.join("\n");
+  const needsRepo = !rule.repo;
+  useEffect(() => {
+    if (!needsRepo || !topicArn || !alarmKey) return;
+    let live = true;
+    const t = setTimeout(() => {
+      setResolving(true);
+      api
+        .resolveAlertRepo(topicArn, alarmKey.split("\n"))
+        .then((r) => {
+          if (!live) return;
+          setResolution(r);
+          if (r.repo) onChangeRef.current({ ...ruleRef.current, repo: r.repo });
+        })
+        .catch(() => live && setResolution(null))
+        .finally(() => live && setResolving(false));
+    }, 600);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [needsRepo, topicArn, alarmKey]);
+  const ruleRef = useRef(rule);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    ruleRef.current = rule;
+    onChangeRef.current = onChange;
+  });
 
   // A rule matches one way: switching clears the other, so a hidden field
   // never widens what the rule takes.
@@ -1221,8 +1257,20 @@ function RuleEditor({
           <label htmlFor={`${id}-repo`} className="text-sm font-semibold text-zinc-100">
             Open a pull request in
           </label>
-          <RepoCombobox id={`${id}-repo`} label="Repository for this rule" repos={repos} selected={rule.repo} onSelect={(name) => onChange({ ...rule, repo: name })} />
-          {!rule.repo && <p className="text-sm text-amber-300">Choose a repository.</p>}
+          {resolution || resolving ? (
+            <ResolvedRepo
+              id={`${id}-repo`}
+              label="Repository for this rule"
+              resolution={resolution}
+              loading={resolving}
+              repos={repos}
+              selected={rule.repo}
+              onSelect={(name) => onChange({ ...rule, repo: name })}
+            />
+          ) : (
+            <RepoCombobox id={`${id}-repo`} label="Repository for this rule" repos={repos} selected={rule.repo} onSelect={(name) => onChange({ ...rule, repo: name })} />
+          )}
+          {!rule.repo && !resolving && <p className="text-sm text-amber-300">Choose a repository.</p>}
         </div>
 
         <Field
@@ -1386,6 +1434,7 @@ function RouteEditor({
             {route.rules.map((rule, i) => (
               <RuleEditor
                 key={keys.current[i]}
+                topicArn={route.topic_arn}
                 rule={rule}
                 index={i}
                 count={route.rules.length}
