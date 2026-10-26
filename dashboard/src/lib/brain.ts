@@ -128,6 +128,16 @@ export function uploadProblem(file: { name: string; size: number }, limits: { ma
 
 // ── Chat ──────────────────────────────────────────────────────────
 
+/** A place in a repository at one commit. */
+export interface CodeRef {
+  repo: string;
+  path: string;
+  commit: string;
+  /** 1-based; 0 when the source is a whole file or a folder. */
+  start_line?: number;
+  end_line?: number;
+}
+
 export interface Citation {
   id: string;
   kind: "knowledge" | "upload" | "connection" | "data_source" | "code" | "memory" | "skill" | string;
@@ -135,9 +145,14 @@ export interface Citation {
   loc: string;
   as_of: string;
   passage: string;
+  /** A page in the dashboard. */
   href?: string;
+  /** The original outside Coderhelm (the file on GitHub at its commit, a synced page). */
+  url?: string;
   authoritative: boolean;
   base?: string;
+  source_kind?: string;
+  code?: CodeRef;
 }
 
 export interface Picks {
@@ -148,9 +163,17 @@ export interface Picks {
   data_sources: boolean;
   skills: boolean;
   repo?: string | null;
+  repos?: string[];
+  /** Chat chose (everything the asker can see). */
+  auto?: boolean;
 }
 
-export const NO_PICKS: Picks = { knowledge: [], connections: false, code: false, memories: false, data_sources: false, skills: false };
+/** Something the asker pointed a question at with @. */
+export interface Mention {
+  kind: "repo" | "knowledge";
+  /** owner/name, or the knowledge base id. */
+  id: string;
+}
 
 export interface BrainThread {
   id: string;
@@ -163,6 +186,15 @@ export interface BrainThread {
   messages: number;
 }
 
+/** One step an answer took (a file read, a search). */
+export interface UsedStep {
+  kind: string;
+  label: string;
+  name?: string;
+  repo?: string;
+  summary?: string;
+}
+
 export interface BrainMessage {
   seq: number;
   role: "user" | "assistant";
@@ -170,8 +202,9 @@ export interface BrainMessage {
   citations: Citation[];
   grounded: boolean;
   sources?: Picks;
+  mentions?: Mention[];
   attachments: string[];
-  used: { kind: string; label: string }[];
+  used: UsedStep[];
   at: string;
   /** The asker's rating of an answer. */
   feedback?: Rating | null;
@@ -182,23 +215,22 @@ export type Rating = "up" | "down";
 /** A question the empty chat offers, built from the team's own data. */
 export interface Starter {
   question: string;
-  /** Where it comes from: "From the HR handbook knowledge". */
+  /** Where it comes from: "From the web code". */
   why: string;
-  /** The sources it turns on when picked. */
-  sources: Picks;
+  sources?: Picks;
 }
 
-export interface SourceKind {
-  key: keyof Omit<Picks, "repo">;
-  label: string;
-  about: string;
+export interface BrainRepo {
+  name: string;
+  short: string;
+  role?: string | null;
 }
 
 export interface BrainSources {
-  kinds: SourceKind[];
   knowledge: { id: string; name: string; ready: number; authoritative: boolean }[];
   connections: { id: string }[];
   repos: string[];
+  repositories?: BrainRepo[];
   can_ask: boolean;
 }
 
@@ -224,7 +256,8 @@ export type BrainEvent =
   | { type: "thread"; id: string; title: string }
   | { type: "retrieved"; sources: Citation[] }
   | { type: "tool_start"; id: string; name: string; kind: string }
-  | { type: "tool_result"; id: string; name: string; label: string; status: "success" | "error"; summary: string }
+  | { type: "tool_result"; id: string; name: string; label: string; kind?: string; repo?: string; status: "success" | "error"; summary: string; sources?: Citation[] }
+  | { type: "step"; id: string; label: string; status: "success" | "error" }
   | { type: "text_delta"; text: string }
   | { type: "text_reset" }
   | { type: "answer"; text: string; citations: Citation[]; grounded: boolean }
@@ -234,7 +267,10 @@ export type BrainEvent =
 export interface AskBody {
   thread_id?: string;
   question: string;
-  sources: Picks;
+  /** Left out, Chat reads everything the asker can see. */
+  sources?: Picks;
+  /** What the asker pointed the question at with @. */
+  mentions: Mention[];
   attachments: { id: string; name: string }[];
 }
 
@@ -298,20 +334,94 @@ export async function askBrain(body: AskBody, onEvent: (e: BrainEvent) => void, 
   if (buffer.trim()) parseSse(buffer + "\n\n", onEvent);
 }
 
-/** `[S1, S3]` markers as links the markdown renders as citation buttons. */
-export function linkCitations(text: string, citations: Citation[]): string {
-  const known = new Map(citations.map((c, i) => [c.id, i + 1]));
-  return text.replace(/\[(S\d+(?:\s*[,;]\s*S\d+)*)\]/g, (whole, inner: string) => {
-    const ids = inner.split(/[,;]/).map((s) => s.trim());
-    const links = ids.filter((id) => known.has(id)).map((id) => `[${known.get(id)}](#cite-${id})`);
-    return links.length ? links.join("") : "";
+/** One source an answer leans on: every citation of the same file or page, as one. */
+export interface SourceDoc {
+  /** Its number in the answer (1, 2, ...). */
+  n: number;
+  key: string;
+  /** The citations it gathers (several line ranges of one file). */
+  parts: Citation[];
+}
+
+/** What makes two citations the same source: a file in a repository, or a page. */
+export function sourceKey(c: Citation): string {
+  if (c.code?.path) return `code:${c.code.repo}:${c.code.path}`;
+  if (c.code) return `code:${c.code.repo}:${c.title}`;
+  return `${c.kind}:${c.base ?? ""}:${c.title}`;
+}
+
+/** The answer's sources, each once, numbered in the order the answer first cites them. */
+export function groupSources(citations: Citation[]): { docs: SourceDoc[]; numberOf: Map<string, number> } {
+  const docs: SourceDoc[] = [];
+  const byKey = new Map<string, SourceDoc>();
+  const numberOf = new Map<string, number>();
+  for (const c of citations) {
+    const key = sourceKey(c);
+    let d = byKey.get(key);
+    if (!d) {
+      d = { n: docs.length + 1, key, parts: [] };
+      byKey.set(key, d);
+      docs.push(d);
+    }
+    d.parts.push(c);
+    numberOf.set(c.id, d.n);
+  }
+  return { docs, numberOf };
+}
+
+const MARKERS = /\s?(?:\[(?:S\d+(?:\s*[,;]\s*S\d+)*)\])+/g;
+
+/**
+ * `[S1, S3][S4]` markers as links the markdown renders as citation markers:
+ * one per source (two citations of one file are one marker), unknown ids
+ * dropped, and a marker placed after the sentence's period.
+ */
+export function linkCitations(text: string, numberOf: Map<string, number>): string {
+  const linked = text.replace(MARKERS, (whole: string) => {
+    const ns: number[] = [];
+    for (const id of whole.match(/S\d+/g) ?? []) {
+      const n = numberOf.get(id);
+      if (n !== undefined && !ns.includes(n)) ns.push(n);
+    }
+    return ns.length ? ` ${ns.map((n) => `[${n}](#cite-${n})`).join("")}` : "";
   });
+  // "paid [1]." reads "paid.[1]": the marker follows the sentence it backs.
+  return linked.replace(/ ((?:\[\d+\]\(#cite-\d+\))+)([.,;:!?])/g, "$2$1");
+}
+
+/** The words for what an answer did, from its steps: "Read 4 files in web, searched the code". */
+export function activitySummary(steps: { name?: string; label: string; repo?: string; status?: string }[]): string {
+  const done = steps.filter((s) => s.status !== "running");
+  if (!done.length) return "";
+  const count = (pred: (n: string) => boolean) => done.filter((s) => pred(s.name ?? "")).length;
+  const reposOf = (pred: (n: string) => boolean) => [...new Set(done.filter((s) => pred(s.name ?? "") && s.repo).map((s) => s.repo!))];
+  const isRead = (n: string) => n === "github__read_file";
+  const isOverview = (n: string) => n === "github__repo_overview";
+  const isSearch = (n: string) => n === "github__search_code" || n === "github__list_files" || n.startsWith("graph_");
+  const parts: string[] = [];
+  const overviews = reposOf(isOverview);
+  if (overviews.length) parts.push(`looked over ${overviews.join(" and ")}`);
+  const reads = count(isRead);
+  if (reads) {
+    const where = reposOf(isRead);
+    parts.push(`read ${reads} ${reads === 1 ? "file" : "files"}${where.length === 1 ? ` in ${where[0]}` : ""}`);
+  }
+  if (count(isSearch)) parts.push("searched the code");
+  if (count((n) => n === "search_knowledge")) parts.push("searched knowledge");
+  if (count((n) => n === "search_memories")) parts.push("checked past work");
+  const known = (n: string) => isRead(n) || isOverview(n) || isSearch(n) || n === "search_knowledge" || n === "search_memories" || n === "github__list_repos";
+  const other = done.filter((s) => !known(s.name ?? "") && !s.label.startsWith("Looked further"));
+  if (other.length === 1) parts.push(other[0].label.charAt(0).toLowerCase() + other[0].label.slice(1));
+  else if (other.length > 1) parts.push(`${other.length} other lookups`);
+  if (!parts.length) return done.length === 1 ? done[0].label : `${done.length} steps`;
+  const text = parts.join(", ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /** An answer's text without its `[S1]` markers, for copying. */
 export function withoutCitations(text: string): string {
   return text
-    .replace(/\s?\[(S\d+(?:\s*[,;]\s*S\d+)*)\]/g, "")
+    .replace(MARKERS, "")
     .replace(/[ \t]+\n/g, "\n")
     .trim();
 }
