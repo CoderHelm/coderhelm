@@ -7,6 +7,9 @@
 //   - sitemap.xml lists every page; robots.txt points at it
 //   - the plugin manifest schema and the bundled validator are published
 //   - a 404 page exists
+//   - no page shows raw source syntax as text: an MDX comment, a component
+//     tag printed instead of rendered, an escaped brace or entity (and the
+//     Markdown twins carry none of it outside code)
 //   - every page ever published (published-pages.json) is still a page or
 //     has a redirect (redirects.json), and new pages are recorded
 
@@ -16,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { files } from './lib/out.mjs';
 import { checkMoves, exportedPages, readMoves } from './lib/moves.mjs';
 import { proseProblems } from './lib/prose.mjs';
+import { markdownProse, rawSyntax, visibleText } from './lib/raw-syntax.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'out');
@@ -57,6 +61,9 @@ for (const segs of pages) {
     need(!/<\/?Diagram\b/.test(twin), `/${md}: a <Diagram> tag was not turned into text`);
     // Imported and generated pages follow the same rules as written ones.
     for (const p of proseProblems(twin, { allow: PROSE_ALLOW.filter((a) => twinOf(a.file) === md) })) need(false, `/${md}:${p.line}: ${p.rule}: ${p.text}`);
+    // Component tags stay in the twins on purpose (they read as structure);
+    // a comment, an escaped brace or a double-escaped entity never should.
+    for (const r of rawSyntax(markdownProse(twin)).filter((f) => f.rule !== 'jsx-tag')) need(false, `/${md}: raw ${r.rule} in the text: ${r.text}`);
   }
   if (llms) need(llms.includes(`(${SITE}/${md})`), `llms.txt: no link to /${md}`);
   if (sitemap) need(sitemap.includes(`<loc>${SITE}${url === '/' ? '/' : `${url}/`}</loc>`) || sitemap.includes(`<loc>${SITE}${url}</loc>`), `sitemap.xml: no ${url}`);
@@ -65,6 +72,7 @@ for (const segs of pages) {
   const html = read(path.join(...(segs.length ? segs : ['.']), 'index.html'));
   need(html && /<meta property="og:image" content="[^"]+\/og\//.test(html), `${url}: no og:image meta`);
   need(html && html.includes('text/markdown'), `${url}: no Markdown alternate link`);
+  if (html) for (const r of rawSyntax(visibleText(html))) need(false, `${url}: raw ${r.rule} shows on the page: ${r.text}`);
 }
 
 const schemaText = read('schema/plugin-manifest.v1.json');
