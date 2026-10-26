@@ -21,6 +21,7 @@ import {
   itemWord,
   knowledge,
   rememberReturn,
+  signInWindow,
   uploadProblem,
   uploadToSignedUrl,
   type AddKind,
@@ -152,6 +153,40 @@ function BaseView() {
       window.location.assign(r.authorize_url);
     } catch (e) {
       toast(errorMessage(e, `Couldn't start the ${KIND_LABEL[s.kind]} sign-in.`), "error");
+    }
+  };
+
+  // "Sign in again": the source switches to your own sign-in. When you're
+  // already signed in it happens at once; otherwise a small window signs
+  // you in first and the page carries on.
+  const needsSignIn = sources.some((s) => s.error?.action === "sign_in");
+  const [signedIn, setSignedIn] = useState<Partial<Record<SourceKind, boolean>>>({});
+  useEffect(() => {
+    if (!needsSignIn || !canManage) return;
+    knowledge
+      .connectors()
+      .then((r) => setSignedIn(Object.fromEntries(r.connectors.map((c) => [c.kind, !!c.signed_in]))))
+      .catch(() => {});
+  }, [needsSignIn, canManage]);
+
+  const signInAgain = async (s: Source) => {
+    try {
+      // Known before the click, so the sign-in window opens inside it.
+      if (!signedIn[s.kind]) {
+        const ok = await signInWindow(async () => {
+          rememberReturn({ path: `/knowledge/base/?id=${encodeURIComponent(id)}`, kind: s.kind, kbId: id });
+          const r = await knowledge.signIn(s.kind);
+          return r.signed_in ? null : (r.authorize_url ?? null);
+        });
+        if (!ok) return;
+      }
+      const r = await knowledge.signInSource(id, s.id);
+      if (r.source) {
+        setSources((cur) => cur.map((x) => (x.id === s.id ? r.source! : x)));
+        toast(`Signed in. Checking ${KIND_LABEL[s.kind]} for changes now.`);
+      }
+    } catch (e) {
+      toast(errorMessage(e, `Couldn't sign in to ${KIND_LABEL[s.kind]}.`), "error");
     }
   };
 
@@ -390,7 +425,15 @@ function BaseView() {
                 source={s}
                 canManage={canManage}
                 onSync={() => sync(s)}
-                onFix={() => (s.error?.action === "reconnect" ? reconnect(s) : s.error?.action === "edit" ? setEditing({ source: s, picked: s.selection }) : sync(s))}
+                onFix={() =>
+                  s.error?.action === "sign_in"
+                    ? signInAgain(s)
+                    : s.error?.action === "reconnect"
+                      ? reconnect(s)
+                      : s.error?.action === "edit"
+                        ? setEditing({ source: s, picked: s.selection })
+                        : sync(s)
+                }
                 onEdit={() => setEditing({ source: s, picked: s.selection })}
                 onPause={(p) => pause(s, p)}
                 onRemove={() => removeSource(s)}
@@ -574,7 +617,12 @@ function BaseView() {
             </div>
           }
         >
-          <Picker kind={editing.source.kind} value={editing.picked} onChange={(picked) => setEditing((e) => (e ? { ...e, picked } : e))} />
+          <Picker
+            kind={editing.source.kind}
+            via={editing.source.connection === "sign_in" ? "sign_in" : "team"}
+            value={editing.picked}
+            onChange={(picked) => setEditing((e) => (e ? { ...e, picked } : e))}
+          />
         </Modal>
       )}
     </Page>
