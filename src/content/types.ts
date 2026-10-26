@@ -18,6 +18,10 @@ export type FrameId =
   | "reply"
   | "merge";
 
+// Screenshots of the dashboard in public/shots/, taken from its end to end
+// tests' made up data (see src/content/shots.ts).
+export type ShotId = "chat" | "knowledge" | "setup";
+
 // Small pictures for the bento cells on the home page.
 export type MiniId = "lookup" | "skills" | "plans" | "security";
 
@@ -45,7 +49,13 @@ export type Block =
   | { type: "story"; chapters: Chapter[] }
   | { type: "bento"; items: { title: string; text: string; href: string; mini: MiniId; wide?: boolean }[] }
   // A picture of the product. The caption is what the Markdown twin keeps.
-  | { type: "frame"; id: FrameId; caption: string };
+  | { type: "frame"; id: FrameId; caption: string }
+  // A screenshot of the real dashboard, taken with made up example data.
+  | { type: "shot"; shot: ShotId; caption: string }
+  // Buttons that lead on: the first one is the main action.
+  | { type: "actions"; items: { label: string; href: string }[] }
+  // A short aside under the text, such as a note about releases.
+  | { type: "note"; text: string };
 
 export type Section = {
   id: string;
@@ -64,6 +74,8 @@ export type Page = {
   h1: string;
   lede: string;
   heroFrame?: { id: FrameId; caption: string };
+  // The main button under the heading, when it is not "Get started".
+  heroCta?: { label: string; href: string };
   sections: Section[];
   related?: string[]; // slugs
   kind?: "product" | "legal";

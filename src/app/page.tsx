@@ -46,6 +46,9 @@ export default function Home() {
             <Link href="#how-it-works" className="rounded-md border border-line px-5 py-3 text-[15px] font-medium text-text-primary hover:bg-surface-raised">
               See how it works
             </Link>
+            <Link href="/self-host/" className="rounded-md px-3 py-3 text-[15px] font-medium text-text-secondary hover:text-text-primary">
+              Or self-host it
+            </Link>
           </div>
           <p className="mt-4 text-sm text-text-muted">{SITE.ctaNote}</p>
           <nav aria-label="The life of a ticket" className="mt-14 sm:mt-20">

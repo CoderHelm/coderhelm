@@ -31,6 +31,12 @@ function block(b: Block): string {
     }
     case "frame":
       return `*Product view: ${b.caption}*`;
+    case "shot":
+      return `*Screenshot: ${b.caption}*`;
+    case "actions":
+      return b.items.map((a) => `- [${a.label}](${a.href.startsWith("/") ? SITE.url + a.href : a.href})`).join("\n");
+    case "note":
+      return `> ${absolutize(b.text)}`;
     case "story": {
       let n = 0;
       return b.chapters

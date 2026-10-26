@@ -28,7 +28,14 @@ export default function Footer() {
           </ul>
         </div>
         <div>
-          <h2 className="text-sm font-semibold text-text-primary">For agents</h2>
+          <h2 className="text-sm font-semibold text-text-primary">Build and run</h2>
+          <ul className="mt-3 space-y-2 text-sm">
+            <li><a href={SITE.docsUrl} className="text-text-secondary hover:text-text-primary">Documentation</a></li>
+            <li><a href={SITE.installUrl} className="text-text-secondary hover:text-text-primary">Self-host install guide</a></li>
+            <li><a href={`${SITE.docsUrl}/api/`} className="text-text-secondary hover:text-text-primary">API</a></li>
+            <li><a href="https://github.com/CoderHelm" className="text-text-secondary hover:text-text-primary">GitHub</a></li>
+          </ul>
+          <h2 className="mt-8 text-sm font-semibold text-text-primary">For agents</h2>
           <ul className="mt-3 space-y-2 text-sm">
             <li><a href="/llms.txt" className="text-text-secondary hover:text-text-primary">llms.txt</a></li>
             <li><a href="/llms-full.txt" className="text-text-secondary hover:text-text-primary">llms-full.txt</a></li>

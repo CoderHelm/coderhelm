@@ -1,37 +1,92 @@
 ---
 title: CoderHelm documentation
-description: Guides and reference for CoderHelm, the AI agent that turns tickets into pull requests, reviews code, and stays on the code after the PR.
+description: Guides and reference for CoderHelm, the AI engineer that turns tickets into pull requests, answers questions about your code, reviews pull requests and stays on the code after the merge.
+full: true
 ---
 
-CoderHelm is an AI coding agent for teams. Assign it a GitHub issue or a Jira ticket and it opens a pull request: it reads your code, plans the change, writes it, runs your build and tests, reviews its own work, and keeps fixing until CI is green. It also reviews your team's pull requests, writes release notes, and watches your logs and tests for problems worth fixing.
+CoderHelm is an AI coding agent for teams on GitHub and Jira. Assign it an issue or a ticket and it opens a pull request: it reads your code, plans the change, writes it, runs your build and tests and reviews its own work. Then it stays on the code. It fixes its own failing CI, answers review comments, reviews your team's pull requests, turns alerts into fixes and answers questions about your code in Chat.
 
-You bring your own Anthropic API key, so the model calls are billed to you directly and you choose which Claude model does each part of the work.
+## Pick your path
 
-## Start here
+<Paths>
+<Path title="Use CoderHelm" icon="cloud" href="/getting-started" cta="Start the quickstart" description="Hosted at app.coderhelm.com. Sign in, add your Anthropic API key, connect GitHub and get your first pull request in about ten minutes.">
 
-<Cards>
-  <Card title="Quickstart" href="/getting-started">
-    Sign up, add your model key, connect GitHub and get your first pull request.
-  </Card>
-  <Card title="How it works" href="/concepts">
-    Agents, skills, memories, the code graph and the rest, explained.
-  </Card>
-  <Card title="Build a plugin" href="/plugins">
-    Package instructions, agents and tools for marketing, support or any other team.
-  </Card>
-  <Card title="Self-hosting" href="/self-host">
-    Run CoderHelm in your own AWS account, installed from your browser.
-  </Card>
-  <Card title="API" href="/api">
-    Authentication, webhooks and every route the gateway serves.
-  </Card>
-  <Card title="Changelog" href="/changelog">
-    What changed, month by month.
-  </Card>
-</Cards>
+- [Connect GitHub](/getting-started/github)
+- [Connect Jira](/getting-started/jira)
+- [Your first run](/getting-started/first-run)
+- [Turn on the reviewer](/getting-started/reviewer)
 
-Running CoderHelm in your own AWS account? The [install guide](/self-host/install/) does it from your browser: one click opens AWS with everything filled in, and the guide checks every step against your own install.
+</Path>
+<Path title="Self-host it" icon="server" href="/self-host/install/" cta="Open the install guide" featured description="Run all of CoderHelm in your own AWS account. The install guide does it from your browser and checks every step against your own install.">
+
+- [What you need](/self-host/requirements)
+- [Install from a terminal](/self-host/quick-start)
+- [Your own domain](/self-host/domains)
+- [Updates](/self-host/updates)
+
+</Path>
+<Path title="Build on it" icon="code" href="/api" cta="Read the API docs" description="Call CoderHelm from your scripts, CI jobs and tools with a team API key: follow and retry runs, create and run plans, read reviews and token usage, upload test reports.">
+
+- [Authentication](/api/authentication)
+- [Webhooks](/api/webhooks)
+- [The OpenAPI document](/openapi.json)
+- [Plugins, coming soon](/plugins)
+
+</Path>
+</Paths>
+
+<Callout title="Self-host releases">
+The first public self-host release is not out yet. Until it is, you can read through the install guide, but an install cannot finish. Releases are published on [GitHub](https://github.com/CoderHelm/coderhelm-platform/releases).
+</Callout>
+
+## New in CoderHelm
+
+<Tiles>
+<Tile title="Chat reads your code" href="/concepts/chat" icon="chat" badge="new">
+Ask about your repositories and knowledge. Chat opens the files itself and cites real paths and lines.
+</Tile>
+<Tile title="Knowledge sources" href="/concepts/knowledge-sources" icon="book" badge="new">
+Notion, Confluence, Google Drive, Sanity, GitHub, websites and files, kept in sync.
+</Tile>
+<Tile title="Agent permissions" href="/concepts/agent-permissions" icon="shield" badge="new">
+Allow, ask or deny each thing an agent can do, with approval cards and sign-in prompts.
+</Tile>
+<Tile title="One click self-host install" href="/self-host/install/" icon="server" badge="new">
+AWS quick create, live progress, the GitHub App in one click and a model access check.
+</Tile>
+<Tile title="Public API" href="/api" icon="key" badge="new">
+Team API keys, an OpenAPI 3.1 document and a page for every endpoint.
+</Tile>
+<Tile title="Custom roles" href="/concepts/roles" icon="sparkles" badge="new">
+Make roles from the capability behind every action, next to the built-in ones.
+</Tile>
+</Tiles>
+
+Everything that shipped, month by month, is in the [changelog](/changelog).
+
+## Learn how it works
+
+<Tiles>
+<Tile title="Tickets to pull requests" href="/getting-started/first-run" icon="bot">
+Each stage of a run, from triage to the opened pull request.
+</Tile>
+<Tile title="Plans" href="/getting-started/plans" icon="wrench">
+Describe a bigger change and get an ordered list of tickets to approve.
+</Tile>
+<Tile title="Agents, skills and memory" href="/concepts" icon="book">
+The agents, the skills and rules they read, what they remember and the code graph.
+</Tile>
+<Tile title="Data sources" href="/concepts/data-sources" icon="shield">
+Read only lookups in your API, logs and databases, every one recorded.
+</Tile>
+<Tile title="Token limits" href="/concepts/token-limits" icon="key">
+Monthly limits for new tokens, cache reads and cache writes.
+</Tile>
+<Tile title="Usage and audit" href="/concepts/usage-and-audit" icon="sparkles">
+What CoderHelm delivered, the tokens it used, and records of what it looked at and changed.
+</Tile>
+</Tiles>
 
 ## For agents and tools
 
-Every page on this site is also plain Markdown. Add `.md` to a page's URL (for example [/getting-started.md](/getting-started.md)), or send the header `Accept: text/markdown`. The index of all pages is at [/llms.txt](/llms.txt) and the whole site in one file is at [/llms-full.txt](/llms-full.txt).
+Every page on this site is also plain Markdown. Add `.md` to a page's URL (for example [/getting-started.md](/getting-started.md)), or send the header `Accept: text/markdown`. The index of all pages is at [/llms.txt](/llms.txt), the whole site in one file is at [/llms-full.txt](/llms-full.txt) and the API is described at [/openapi.json](/openapi.json).

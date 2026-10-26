@@ -161,7 +161,7 @@ function AlertFrame() {
             <span className="font-mono text-text-primary">api-5xx-rate</span>
             <span className="ml-auto font-mono text-[11px] text-text-muted">02:14</span>
           </div>
-          <p className="mt-2 text-text-secondary">Rule <b className="text-text-primary">API errors</b> → repository <code className="font-mono text-text-primary">example/api</code></p>
+          <p className="mt-2 text-text-secondary">Rule <b className="text-text-primary">API errors</b> goes to repository <code className="font-mono text-text-primary">example/api</code></p>
         </div>
         <div className="rounded-lg border border-line p-3">
           <div className="flex items-center gap-2">
