@@ -477,6 +477,10 @@ test('ready: the optional setup list, each with its check and one action', async
   await expect(list.locator('[data-optional="updates"]')).toHaveAttribute('data-state', 'done');
   await expect(list.locator('[data-optional="backups"]')).toContainText('Done by the install');
   await expect(page.getByTestId('optional-invite-action')).toHaveAttribute('href', `${INSTALL}/settings/people/`);
+  // Teams moving from the hosted service: a person helps, by email to support.
+  const moving = page.getByTestId('screen-ready').getByTestId('moving-note');
+  await expect(moving).toHaveText("Moving from CoderHelm cloud? Talk to us and we'll help move your data.");
+  await expect(moving.getByRole('link', { name: 'Talk to us' })).toHaveAttribute('href', 'mailto:support@coderhelm.com?subject=Moving%20to%20self-hosted%20CoderHelm');
   assertPrivate(m);
 });
 
@@ -658,6 +662,7 @@ test('hybrid: pick the setup, the name is checked as you type, and AWS opens wit
   await expect(page.getByTestId('name-picker-status')).toHaveText('Available: example-co.coderhelm.com is free. It’s claimed for you once your install answers.');
   await expect(page.getByTestId('summary')).toContainText('example-co.coderhelm.com');
   await expect(page.getByTestId('summary')).toContainText('CoderHelm’s app');
+  await expect(page.getByTestId('summary').getByTestId('moving-note').getByRole('link', { name: 'Talk to us' })).toHaveAttribute('href', /^mailto:support@coderhelm\.com\?subject=Moving/);
   await page.getByLabel('Your email').fill('ada@example.com');
   await page.getByTestId('launch').click();
   await expect(page.getByTestId('step-title')).toHaveText('Waiting for AWS');

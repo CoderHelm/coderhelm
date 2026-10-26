@@ -7,7 +7,7 @@ import { useToast } from "@/components/toast";
 import { Callout } from "@/components/callout";
 import { StatusPill } from "@/components/status-pill";
 import { Skeleton } from "@/components/skeleton";
-import { ChevronRightIcon } from "@/components/icons";
+import { ChevronRightIcon, CloudIcon } from "@/components/icons";
 import { dangerButton, focusRing, inputClass, secondaryButton } from "@/components/ui";
 import { Modal, modalActions } from "@/components/modal";
 import { SETTINGS_GROUPS, type SettingsItem } from "@/components/settings-items";
@@ -85,6 +85,8 @@ export default function SettingsPage() {
         ))}
       </div>
 
+      {me && !isSelfHosted() && <MoveToSelfHost />}
+
       {me && can(me, "reset") && <DangerZone />}
     </Page>
   );
@@ -119,6 +121,32 @@ function SettingsRow({ item, readOnly, status }: { item: SettingsItem; readOnly:
         <ChevronRightIcon />
       </span>
     </Link>
+  );
+}
+
+/**
+ * Hosted only: moving the team to its own AWS account starts as a support
+ * ticket. A person helps plan the move and bring settings and data over.
+ */
+function MoveToSelfHost() {
+  return (
+    <section aria-labelledby="move-to-selfhost" className="mt-10" data-testid="move-to-selfhost">
+      <SectionHeading id="move-to-selfhost" className="mb-3">
+        Hosting
+      </SectionHeading>
+      <div className="flex items-start gap-3 rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-4 lg:max-w-[calc(50%-0.375rem)]">
+        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-300" aria-hidden="true">
+          <CloudIcon />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-zinc-100">Move to your own AWS account</p>
+          <p className="mt-0.5 text-sm text-zinc-400">Run Coderhelm in your own AWS account. We&apos;ll help you plan the move and bring your settings and data over.</p>
+          <Link href="/support?new=1&type=selfhost" className={`${secondaryButton} mt-3`}>
+            Talk to us about moving
+          </Link>
+        </div>
+      </div>
+    </section>
   );
 }
 
