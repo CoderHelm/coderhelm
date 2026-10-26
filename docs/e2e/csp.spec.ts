@@ -147,14 +147,15 @@ async function context(browser: Browser): Promise<BrowserContext> {
   return ctx;
 }
 
-test('the guide is served with the install guide policy; other pages keep connect-src self', async ({ request }) => {
+test('the guide is served with the install guide policy; other pages reach only their own origin and Google Analytics', async ({ request }) => {
   const guide = await request.get('/self-host/install/');
   expect(guide.headers()['content-security-policy']).toBe(CSP.installGuide);
   expect(CSP.installGuide).toContain("connect-src 'self' https:");
   expect(CSP.installGuide).toContain("form-action 'self' https://github.com");
   const other = await request.get('/');
   expect(other.headers()['content-security-policy']).toBe(CSP.docs);
-  expect(CSP.docs).toContain("connect-src 'self';");
+  // Beyond its own origin, a docs page may reach Google Analytics only (e2e/analytics.spec.ts).
+  expect(CSP.docs).toContain("connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com;");
 });
 
 test('real headers: the name check says Available, Taken or Reserved from CoderHelm’s API on another origin', async ({ browser }) => {

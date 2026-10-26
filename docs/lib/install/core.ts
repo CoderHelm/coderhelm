@@ -236,7 +236,7 @@ export function cleanHostname(raw: string): string {
 export function validate(s: Pick<InstallState, 'email' | 'stage' | 'region'> & Partial<InstallState>): Record<string, string> {
   const p: Record<string, string> = {};
   if (!EMAIL_RE.test(s.email.trim())) p.email = 'Enter the email you will sign in with.';
-  if (!STAGE_RE.test(s.stage)) p.stage = 'Use lowercase letters, digits and hyphens, starting with a letter.';
+  if (!STAGE_RE.test(s.stage)) p.stage = 'Use 1 to 20 lowercase letters, digits or hyphens, starting with a letter.';
   if (!REGIONS.some((r) => r.id === s.region)) p.region = 'Pick a region from the list.';
   if (s.domainChoice === 'coderhelm') {
     const np = nameProblem(s.coderhelmName ?? '');

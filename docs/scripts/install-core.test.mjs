@@ -21,7 +21,9 @@ test('validation speaks plainly', () => {
   assert.deepEqual(c.validate({ email: 'ada@example.com', stage: 'prod', region: 'us-east-1' }), {});
   const p = c.validate({ email: 'nope', stage: 'Prod!', region: 'mars-1' });
   assert.match(p.email, /email/);
-  assert.match(p.stage, /lowercase/);
+  assert.equal(p.stage, 'Use 1 to 20 lowercase letters, digits or hyphens, starting with a letter.');
+  assert.ok(c.validate({ email: 'a@example.com', stage: 'a'.repeat(21), region: 'us-east-1' }).stage);
+  assert.equal(c.validate({ email: 'a@example.com', stage: 'a'.repeat(20), region: 'us-east-1' }).stage, undefined);
   assert.match(p.region, /region/);
 });
 

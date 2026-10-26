@@ -158,7 +158,7 @@ test('happy path: launch, follow the install, GitHub, models, ready', async ({ p
   await mock(page, m);
   await page.goto('/self-host/install/');
   await expect(page.getByTestId('step-title')).toHaveText('Install CoderHelm in your AWS account');
-  await expect(page.getByTestId('privacy')).toContainText('Nothing about your install goes to CoderHelm');
+  await expect(page.getByTestId('privacy')).toContainText('Nothing you type and nothing about your install is sent to CoderHelm or Google.');
 
   // Validation speaks plainly, then the console opens with everything filled in.
   await page.getByTestId('launch').click();
@@ -324,6 +324,30 @@ test('once someone has signed up (setup window closed), the guide shows the inst
   await expect(page.getByTestId('screen-github')).toBeVisible();
   m.setup = CLOSED;
   await expect(page.getByTestId('step-title')).toHaveText('Your CoderHelm is ready');
+});
+
+test('more options: the name in your AWS account is explained, checked in one sentence and named in the stack', async ({ page }) => {
+  const m = newMock();
+  await mock(page, m);
+  await page.goto('/self-host/install/');
+  await page.getByLabel('Your email').fill('ada@example.com');
+  await page.getByRole('button', { name: 'More options' }).click();
+  const name = page.getByLabel('Name in your AWS account');
+  await expect(name).toHaveValue('prod');
+  await expect(page.getByText('Names the AWS resources this install creates, so you can find them in the AWS console. Keep it unless this AWS account already has a CoderHelm; each install in one account needs its own name.')).toBeVisible();
+  await expect(page.getByText('Install name')).toHaveCount(0);
+  await name.fill('2nd_install');
+  await page.getByTestId('launch').click();
+  await expect(page.getByText('Use 1 to 20 lowercase letters, digits or hyphens, starting with a letter.')).toBeVisible();
+  expect(await opened(page)).toEqual([]);
+  await name.fill('helm-two');
+  await page.getByText('What happens in AWS').click();
+  await expect(page.getByText('Everything it creates is named after the name in your AWS account, helm-two: the stack is coderhelm-helm-two')).toBeVisible();
+  await page.getByTestId('launch').click();
+  const [link] = await opened(page);
+  expect(new URLSearchParams(new URL(link).hash.split('?')[1]).get('param_Stage')).toBe('helm-two');
+  await page.getByText('What is happening').click();
+  await expect(page.getByText('Stack name: coderhelm-helm-two (from the name in your AWS account, helm-two)')).toBeVisible();
 });
 
 test('more options: domain, sender, sign-up and updates go to AWS; a bad hostname opens More options with the sentence', async ({ page }) => {

@@ -277,10 +277,15 @@ test("docs: only the install guide may call other origins; every page keeps its 
   const directive = (policy: string, name: string) =>
     policy.split(";").map((d) => d.trim()).find((d) => d.startsWith(name + " "));
 
-  // The exact strings the docs e2e tests serve (lib/docs-csp.json).
-  assert.equal(directive(DOCS_CSP, "connect-src"), "connect-src 'self'");
+  // The exact strings the docs e2e tests serve (lib/docs-csp.json). Beyond
+  // the docs' own origin, only Google Analytics (docs/lib/analytics.ts): its
+  // tag from googletagmanager.com, its hits to these hosts.
+  const GA = "https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com";
+  assert.equal(directive(DOCS_CSP, "script-src"), "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com");
+  assert.equal(directive(DOCS_CSP, "img-src"), `img-src 'self' data: https: ${GA}`);
+  assert.equal(directive(DOCS_CSP, "connect-src"), `connect-src 'self' ${GA}`);
   assert.equal(directive(DOCS_CSP, "form-action"), "form-action 'self'");
-  assert.equal(directive(INSTALL_GUIDE_CSP, "connect-src"), "connect-src 'self' https:");
+  assert.equal(directive(INSTALL_GUIDE_CSP, "connect-src"), `connect-src 'self' https: ${GA}`);
   assert.equal(directive(INSTALL_GUIDE_CSP, "form-action"), "form-action 'self' https://github.com");
   for (const name of ["default-src", "script-src", "style-src", "img-src", "font-src", "frame-ancestors", "base-uri"]) {
     assert.equal(directive(INSTALL_GUIDE_CSP, name), directive(DOCS_CSP, name), name);
@@ -308,4 +313,16 @@ test("docs: only the install guide may call other origins; every page keeps its 
   assert.deepEqual(cfg.CacheBehaviors[0].FunctionAssociations, cfg.DefaultCacheBehavior.FunctionAssociations);
   assert.equal(cfg.CacheBehaviors[0].CachePolicyId, cfg.DefaultCacheBehavior.CachePolicyId);
   assert.equal(cfg.CacheBehaviors[0].ViewerProtocolPolicy, "redirect-to-https");
+});
+
+test("site and app: the CSP lets Google Analytics 4 load and send from every host it uses", () => {
+  const GA_HOSTS = ["https://*.google-analytics.com", "https://*.analytics.google.com", "https://www.googletagmanager.com"];
+  for (const kind of ["site", "app"] as const) {
+    const [[, policy]] = ofType(synth(kind), "AWS::CloudFront::ResponseHeadersPolicy");
+    const csp: string = policy.Properties.ResponseHeadersPolicyConfig.SecurityHeadersConfig.ContentSecurityPolicy.ContentSecurityPolicy;
+    const directive = (name: string) => csp.split(";").map((d) => d.trim()).find((d) => d.startsWith(name + " ")) ?? "";
+    assert.ok(directive("script-src").split(" ").includes("https://www.googletagmanager.com"), `${kind} script-src`);
+    // GA4 sends to regional hosts (region1.google-analytics.com), not only www.
+    for (const h of GA_HOSTS) assert.ok(directive("connect-src").split(" ").includes(h), `${kind} connect-src ${h}`);
+  }
 });
