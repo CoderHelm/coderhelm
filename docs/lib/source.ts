@@ -20,6 +20,9 @@ export const frontmatterSchema = pageSchema.extend({
   editUrl: z.string().url().optional(),
   /** Written by a build script; the edit link goes to the script's source. */
   generated: z.boolean().optional(),
+  /** Imported pages: the file they come from (repo/path) and the commit it was read at. */
+  source: z.string().optional(),
+  sourceCommit: z.string().optional(),
 });
 
 const docs = defineDocs({

@@ -184,9 +184,12 @@ export function convertGuide(raw, srcPath, ref) {
     `title: ${yamlString(front.title)}`,
     ...(front.description ? [`description: ${yamlString(front.description)}`] : []),
     `editUrl: ${yamlString(`${REPO_URL}/blob/main/${srcPath}`)}`,
+    // Where the page comes from, as data. These files are Markdown, not MDX,
+    // so a {/* comment */} in the body would print on the page as text.
+    `source: ${yamlString(`${lock.repo}/${srcPath}`)}`,
+    `sourceCommit: ${yamlString(ref)}`,
     '---',
     '',
-    `{/* Imported from ${lock.repo}/${srcPath} at ${ref.slice(0, 12)}. Edit it there. */}`,
     '',
   ];
   // Arrows in prose become words, as on every other page (scripts/lib/prose.mjs).

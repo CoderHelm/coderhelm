@@ -6,7 +6,7 @@ const REF = '0123456789abcdef0123456789abcdef01234567';
 
 test('a guide gets frontmatter from its first heading and paragraph, and an edit link to the platform repo', () => {
   const out = convertGuide('# Install on AWS\n\nDeploy CoderHelm into **your** account in one command.\n\n## Steps\n', 'docs/self-host/install.md', REF);
-  assert.match(out, /^---\ntitle: "Install on AWS"\ndescription: "Deploy CoderHelm into your account in one command."\neditUrl: "https:\/\/github.com\/CoderHelm\/coderhelm-platform\/blob\/main\/docs\/self-host\/install.md"\n---/);
+  assert.match(out, /^---\ntitle: "Install on AWS"\ndescription: "Deploy CoderHelm into your account in one command."\neditUrl: "https:\/\/github.com\/CoderHelm\/coderhelm-platform\/blob\/main\/docs\/self-host\/install.md"\nsource: "CoderHelm\/coderhelm-platform\/docs\/self-host\/install.md"\nsourceCommit: "[0-9a-f]{40}"\n---\n\n/);
   assert.ok(!out.includes('# Install on AWS'), 'the H1 becomes the page title, not a second heading');
   assert.match(out, /## Steps/);
 });
@@ -29,4 +29,13 @@ test('guides are listed by their order front matter, the rest by name', () => {
   assert.equal(guideOrder('# No front matter'), undefined);
   const order = new Map([['quick-start', 1], ['faq', 13], ['requirements', 2]]);
   assert.deepEqual(sortByOrder(['faq', 'zeta', 'quick-start', 'alpha', 'requirements'], order), ['quick-start', 'requirements', 'faq', 'alpha', 'zeta']);
+});
+
+test('where a guide comes from is front matter, never a comment in the body (Markdown would print it)', () => {
+  const out = convertGuide('# Backups\n\nKeep a copy.\n', 'docs/self-host/backups.md', REF);
+  assert.match(out, /\nsource: "CoderHelm\/coderhelm-platform\/docs\/self-host\/backups.md"\n/);
+  assert.match(out, new RegExp(`\\nsourceCommit: "${REF}"\\n`));
+  const body = out.slice(out.indexOf('\n---\n', 4) + 5);
+  assert.ok(!/\{\/\*|<!--/.test(body), `no comment in the body:\n${body}`);
+  assert.match(body, /^\nKeep a copy\./);
 });
