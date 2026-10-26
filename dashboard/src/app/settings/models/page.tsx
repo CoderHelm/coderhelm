@@ -6,7 +6,7 @@ import { MODELS, MODEL_ROLES, modelInfo, modelName, type ModelRole, type ModelRo
 import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
 import { Page, PageHeader } from "@/components/page";
-import { Callout } from "@/components/callout";
+import { Problem } from "@/components/problem";
 import { Skeleton } from "@/components/skeleton";
 import { Chip, StatusDot, timeAgo } from "@/components/list";
 import { inputClass, linkButton, monoInputClass, secondaryButton } from "@/components/ui";
@@ -192,10 +192,11 @@ function ModelProviderPage() {
     return (
       <Page>
         {header}
-        <Callout variant="error" title="Could not load your AI model settings">
-          <p>Nothing is shown, so the saved settings cannot be overwritten by mistake.</p>
-          <button type="button" onClick={fetchConfig} className={`mt-2 ${secondaryButton}`}>Try again</button>
-        </Callout>
+        <div className="max-w-3xl">
+          <Problem title="Couldn't load your AI model settings" onRetry={fetchConfig}>
+            We couldn&apos;t load your settings. Nothing has changed. Try again.
+          </Problem>
+        </div>
       </Page>
     );
   }
@@ -206,10 +207,10 @@ function ModelProviderPage() {
     <Page>
       {header}
 
-      <div className="space-y-8">
+      <div className="max-w-3xl space-y-8">
         {bedrock ? (
           <SettingsSection id="api-key" title="Model access">
-            <p className="text-sm text-zinc-400" data-testid="bedrock-note">
+            <p className="px-4 py-4 text-sm text-zinc-400" data-testid="bedrock-note">
               This install calls Claude through Amazon Bedrock in its own AWS account. No API key is needed, and usage is billed to that account.
             </p>
           </SettingsSection>
@@ -253,9 +254,12 @@ function ModelProviderPage() {
                           if (test.state !== "testing") setTest({ state: "idle" });
                         }}
                         placeholder="sk-ant-api03-…"
-                        aria-describedby={ids.helpId}
+                        aria-describedby={[ids.helpId, `${ids.inputId}-where`].filter(Boolean).join(" ")}
                         className={monoInputClass}
                       />
+                      <p id={`${ids.inputId}-where`} className="mt-1.5 text-sm text-zinc-400">
+                        Find it at console.anthropic.com, under API keys.
+                      </p>
                     </div>
                   )}
 
@@ -266,7 +270,7 @@ function ModelProviderPage() {
                       disabled={testing || saving || (!hasKey && !typedKey)}
                       className={secondaryButton}
                     >
-                      {testing ? "Testing…" : "Test key"}
+                      {testing ? "Saving and testing…" : "Save and test key"}
                     </button>
                     {hasKey && !replacing && (
                       <button type="button" onClick={() => { setReplacing(true); setTest({ state: "idle" }); }} className={linkButton}>
@@ -344,7 +348,7 @@ function ModelRow({ role, value, unsaved, onChange }: { role: ModelRole; value: 
               </optgroup>
             )}
           </select>
-          <p id={`${ids.inputId}-about`} className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
+          <p id={`${ids.inputId}-about`} className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400">
             {value === role.recommended && <Chip tone="success">Recommended</Chip>}
             <span>{info ? info.blurb : "Not on the current list. Pick another model to move off it."}</span>
             {value !== role.recommended && (

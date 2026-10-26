@@ -253,21 +253,24 @@ function shot(name: string) {
 
 test("the permissions page shows agents, presets, rules and a working test box", async ({ page }) => {
   const db = await mockApi(page, "admin");
-  await page.goto("/settings/agents");
+  await page.goto("/settings/agents?tab=agents");
   await expect(page.getByTestId("agent-permissions-page")).toBeVisible();
   await expect(page.getByTestId("agent-switches").getByRole("switch")).toHaveCount(8);
   await expect(page.getByTestId("presets").getByText("In use")).toBeVisible();
-  await expect(page.getByTestId("rules-list").getByTestId("rule-row")).toHaveCount(2);
 
   // A preset replaces only the preset rules.
   await page.getByRole("button", { name: "Use Cautious" }).click();
   await expect.poll(() => db.calls.some((c) => c.path === "/api/agents/policy/preset" && c.body?.preset === "cautious" && c.body?.version === 3)).toBe(true);
-  await expect(page.getByTestId("rules-list").getByText("Cautious: every change asks.")).toBeVisible();
 
   // Switching an agent off sends the version read.
   await page.getByRole("switch", { name: "Plugin runs on for the team" }).click();
   await expect.poll(() => db.calls.some((c) => c.path === "/api/agents/policy/switches" && c.body?.agent === "plugin" && c.body?.on === false)).toBe(true);
   await expect(page.getByRole("switch", { name: "Plugin runs off for the team" })).toHaveAttribute("aria-checked", "false");
+
+  // Rules, the test box and the sandbox are under Advanced.
+  await page.getByRole("navigation", { name: "Agent permissions" }).getByRole("link", { name: "Advanced" }).click();
+  await expect(page).toHaveURL(/tab=advanced/);
+  await expect(page.getByTestId("rules-list").getByText("Cautious: every change asks.")).toBeVisible();
 
   // Add a repository rule.
   await page.getByTestId("add-rule").click();
@@ -303,14 +306,44 @@ test("a viewer sees the page read only and can still test a call", async ({ page
   await mockApi(page, "viewer");
   await page.goto("/settings/agents");
   await expect(page.getByText("Changing them needs permission to edit agent permissions.")).toBeVisible();
-  await expect(page.getByTestId("add-rule")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Pause all agents" })).toHaveCount(0);
-  await expect(page.getByRole("switch").first()).toBeDisabled();
   await expect(page.getByTestId("approval-queue").getByText("Someone who can approve agent actions needs to answer this.")).toBeVisible();
+  await page.goto("/settings/agents?tab=agents");
+  await expect(page.getByRole("switch").first()).toBeDisabled();
+  await page.goto("/settings/agents?tab=advanced");
+  await expect(page.getByTestId("add-rule")).toHaveCount(0);
   const box = page.getByTestId("test-call");
   await box.getByLabel("Tool name").fill("write_file");
   await box.getByRole("button", { name: "Test" }).click();
   await expect(box.getByTestId("test-result")).toHaveAttribute("data-decision", "allow");
+});
+
+test("the page splits into Approvals, Agents and Advanced, and a switch can be undone", async ({ page }) => {
+  const db = await mockApi(page, "admin");
+  await page.goto("/settings/agents");
+  const tabs = page.getByRole("navigation", { name: "Agent permissions" });
+  await expect(tabs.getByRole("link", { name: /Approvals/ })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("approval-queue")).toBeVisible();
+  // Rules and the sandbox are out of the way until Advanced is opened.
+  await expect(page.getByTestId("rules-list")).toHaveCount(0);
+  await expect(page.getByTestId("agent-switches")).toHaveCount(0);
+
+  await tabs.getByRole("link", { name: "Agents" }).click();
+  await expect(page.getByTestId("agent-switches")).toBeVisible();
+  await page.getByRole("switch", { name: "Plugin runs on for the team" }).click();
+  const toast = page.getByTestId("toast").filter({ hasText: "Plugin runs is off for the team." });
+  await toast.getByRole("button", { name: "Undo" }).click();
+  await expect
+    .poll(() => db.calls.filter((c) => c.path === "/api/agents/policy/switches" && c.body?.agent === "plugin").map((c) => c.body?.on))
+    .toEqual([false, true]);
+
+  // The sandbox saves its commands, domains and timeout with one bar.
+  await tabs.getByRole("link", { name: "Advanced" }).click();
+  await page.getByLabel("Approval timeout (minutes)").fill("30");
+  const bar = page.getByRole("region", { name: "Save changes" });
+  await expect(bar).toContainText("1 unsaved change");
+  await bar.getByRole("button", { name: "Save changes" }).click();
+  await expect.poll(() => db.calls.find((c) => c.path === "/api/agents/policy" && c.method === "PUT")?.body?.ask_timeout_secs).toBe(1800);
 });
 
 test("pause all agents shows the banner, and resume lifts it", async ({ page }) => {
@@ -335,12 +368,14 @@ test("an approval card on the run page approves once, and a member can't choose 
   await page.goto(`/runs/detail?id=${RUN_ID}`);
   const card = page.getByTestId("run-agent-asks").getByTestId("approval-card");
   await expect(card).toHaveAttribute("data-status", "pending");
-  await expect(card).toContainText("Use create_issue on linear");
+  // Plain words first; the tool's own name is under Show details.
+  await expect(card.getByTestId("approval-headline")).toHaveText("Coderhelm wants to create issue in Linear");
   await expect(card).toContainText("Why: Track the flaky test so it gets fixed.");
-  await card.getByText("Exact arguments").click();
+  await card.getByText("Show details").click();
+  await expect(card).toContainText("Use create_issue on linear");
   await expect(card).toContainText("(hidden)");
-  await expect(card.getByRole("button", { name: "Always for this tool" })).toHaveCount(0);
-  await card.getByRole("button", { name: "Approve once" }).click();
+  await expect(card.getByRole("button", { name: "Always allow this action" })).toHaveCount(0);
+  await card.getByRole("button", { name: "Allow once" }).click();
   await expect.poll(() => db.calls.find((c) => /\/decide$/.test(c.path))?.body).toMatchObject({ approve: true, choice: "once", via: "run_page" });
   await expect(card.getByTestId("approval-decision")).toContainText("Approved once by member@example.com from the run page.");
 });
@@ -355,7 +390,7 @@ test("an admin can deny with a note, or approve always from the queue", async ({
   await first.getByLabel("Tell the agent why (optional)").fill("Not in this sprint");
   await first.getByRole("button", { name: "Deny", exact: true }).click();
   await expect.poll(() => db.calls.find((c) => c.path === "/api/agents/approvals/ap_1/decide")?.body).toMatchObject({ approve: false, note: "Not in this sprint" });
-  await second.getByRole("button", { name: "Always in this repository" }).click();
+  await second.getByRole("button", { name: "Always allow in this project" }).click();
   await expect.poll(() => db.calls.find((c) => c.path === "/api/agents/approvals/ap_2/decide")?.body).toMatchObject({ approve: true, choice: "always_repo" });
 });
 
@@ -365,8 +400,8 @@ test("the plan chat shows an approval card and carries on once it's approved", a
   await page.getByRole("textbox").first().fill("File an issue for the flaky test");
   await page.keyboard.press("Enter");
   const card = page.getByTestId("approval-card");
-  await expect(card).toContainText("Use create_issue on linear");
-  await card.getByRole("button", { name: "Approve once" }).click();
+  await expect(card.getByTestId("approval-headline")).toHaveText("Coderhelm wants to create issue in Linear");
+  await card.getByRole("button", { name: "Allow once" }).click();
   await expect.poll(() => db.calls.find((c) => c.path === "/api/agents/approvals/ap_chat/decide")?.body).toMatchObject({ approve: true, via: "chat" });
   // The conversation is sent on by itself.
   await expect.poll(() => db.chatPosts.length).toBe(2);

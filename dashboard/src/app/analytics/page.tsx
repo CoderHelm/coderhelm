@@ -1,15 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api, type Analytics, type Stats, type AnalyticsCiOutcomes, type AnalyticsComparison, type AnalyticsCounts, type AnalyticsPeriod } from "@/lib/api";
 import { CardSkeleton, ChartSkeleton } from "@/components/skeleton";
+import { StatGrid, StatTile } from "@/components/stat-tile";
+import { DataTable, type Column } from "@/components/data-table";
+import { Problem } from "@/components/problem";
+import { Tabs } from "@/components/tabs";
+import { useSearchParams } from "next/navigation";
 import { Segmented } from "@/components/segmented";
 import { Callout } from "@/components/callout";
-import { focusRing } from "@/components/ui";
+import { focusRing, inputClass } from "@/components/ui";
 import { Page, PageHeader, Section } from "@/components/page";
-import { RepoFilter } from "@/components/list";
+import { RepoFilter, formatDuration } from "@/components/list";
 
 // Categorical slots for the dark chart surface, checked for color-vision
 // separation and contrast (blue, orange). Text never takes a series color.
@@ -66,15 +71,9 @@ const shortDay = (day: string) => {
 
 // ── Pieces ─────────────────────────────────────────────────────────────────
 
+/** One number: the shared stat tile, with the change in neutral ink (the reader judges). */
 function Tile({ label, value, change, basis, testId }: { label: string; value: string; change?: string; basis?: string; testId?: string }) {
-  return (
-    <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4" data-testid={testId}>
-      <p className="text-xs font-medium text-zinc-400">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-100">{value}</p>
-      {change && <p className="mt-1 text-xs text-zinc-400">{change}</p>}
-      {basis && <p className="mt-1 text-xs text-zinc-500">{basis}</p>}
-    </div>
-  );
+  return <StatTile testId={testId} label={label} value={value} delta={change ? { text: change, tone: "flat" } : undefined} note={basis} />;
 }
 
 /** People's ratings of reviews, as the share rated helpful. */
@@ -124,32 +123,36 @@ function ChartTip({ active, payload, label, format }: { active?: boolean; payloa
 
 const axis = { stroke: "transparent", tick: { fill: "#71717a", fontSize: 11 }, tickLine: false, axisLine: false };
 
-/** A plain table; wide ones scroll inside their box, never the page. */
-function Table({ head, rows, empty, label }: { head: string[]; rows: ReactNode[][]; empty: string; label: string }) {
-  if (rows.length === 0) {
-    return <p className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-sm text-zinc-400">{empty}</p>;
-  }
+/**
+ * A table on the shared DataTable: the first column takes the spare width and
+ * wraps, numbers stay narrow, and a phone gets one card per row, so no column
+ * is ever pushed out of its card. `grow` marks other text columns that wrap.
+ */
+function Table({ head, rows, empty, label, grow = [] }: { head: string[]; rows: ReactNode[][]; empty: string; label: string; grow?: number[] }) {
+  const columns: Column<ReactNode[]>[] = head.map((h, i) => ({
+    key: `${i}-${h}`,
+    header: h,
+    cell: (r) => <span className="[overflow-wrap:break-word]">{r[i]}</span>,
+    width: i === 0 || grow.includes(i) ? "grow" : "fit",
+    align: i === 0 || grow.includes(i) ? "left" : "right",
+    clamp: grow.includes(i),
+  }));
+  const table = (
+    <DataTable
+      label={label}
+      columns={columns}
+      rows={rows}
+      rowKey={(_, i) => String(i)}
+      empty={<p className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-sm text-zinc-400">{empty}</p>}
+    />
+  );
+  // A wide table keeps a minimum width from sm: up and scrolls inside its own
+  // box, so no column squeezes a word in half; a phone gets one card per row.
+  if (head.length < 4) return table;
+  const min = head.length >= 7 ? "sm:min-w-[960px]" : head.length >= 5 ? "sm:min-w-[860px]" : "sm:min-w-[600px]";
   return (
-    <div className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/50">
-      {/* Only wide tables keep a minimum width (and scroll inside their box on a phone). */}
-      <table className={`w-full text-sm ${head.length >= 6 ? "min-w-[640px]" : ""}`} aria-label={label}>
-        <thead>
-          <tr className="border-b border-zinc-800 text-left text-xs text-zinc-400">
-            {head.map((h, i) => (
-              <th key={h} scope="col" className={`px-3 py-2.5 font-medium sm:px-4 ${i > 0 ? "text-right" : ""}`}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-zinc-800">
-          {rows.map((r, i) => (
-            <tr key={i}>
-              {r.map((c, j) => (
-                <td key={j} className={`px-3 py-2.5 sm:px-4 ${j > 0 ? "text-right tabular-nums text-zinc-300" : "min-w-0 text-zinc-100"}`}>{c}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="min-w-0 overflow-x-auto">
+      <div className={min}>{table}</div>
     </div>
   );
 }
@@ -166,7 +169,7 @@ function sourceLabel(s: string) {
 /** People first, then Coderhelm's own work, then runs that recorded nobody; most runs first inside each. */
 function peopleRows(people: Analytics["people"]) {
   const order = (r: Analytics["people"][number]) => (r.kind === "coderhelm" ? 1 : r.kind === "not_recorded" || !r.person ? 2 : 0);
-  return [...people].sort((a, b) => order(a) - order(b) || b.runs - a.runs).map((r) => [r.person || "Not recorded (older runs)", r.runs, r.merged]);
+  return [...people].sort((a, b) => order(a) - order(b) || b.runs - a.runs).map((r) => [r.person || "Not recorded", r.runs, r.merged]);
 }
 
 /**
@@ -191,7 +194,7 @@ function UsageNote({ stats }: { stats: Stats | null }) {
     },
   ].filter((x): x is { key: string; text: string; why: string } => !!x);
   return (
-    <div className="mt-3 text-xs text-zinc-500" data-testid="usage-note">
+    <div className="mt-3 text-xs text-zinc-400" data-testid="usage-note">
       <p>
         Token totals this month include{" "}
         {parts.map((x, i) => (
@@ -213,7 +216,28 @@ function UsageNote({ stats }: { stats: Stats | null }) {
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
-export default function AnalyticsPage() {
+/** The page's views, as tabs: each keeps one subject on screen instead of one 5,000px column. */
+const TABS = [
+  { value: "overview", label: "Overview" },
+  { value: "trends", label: "Compared" },
+  { value: "reliability", label: "Reliability" },
+  { value: "teams", label: "Teams and repos" },
+  { value: "lookups", label: "Lookups" },
+] as const;
+type Tab = (typeof TABS)[number]["value"];
+
+export default function AnalyticsPageRoute() {
+  return (
+    <Suspense fallback={null}>
+      <AnalyticsPage />
+    </Suspense>
+  );
+}
+
+function AnalyticsPage() {
+  const params = useSearchParams();
+  const asked = params.get("tab");
+  const tab: Tab = (TABS.find((t) => t.value === asked)?.value ?? "overview") as Tab;
   const [period, setPeriod] = useState<AnalyticsPeriod>(30);
   const [repo, setRepo] = useState("");
   const [data, setData] = useState<Analytics | null>(null);
@@ -253,8 +277,10 @@ export default function AnalyticsPage() {
     <Page>
       <PageHeader
         title="Analytics"
-        lead="What Coderhelm delivered, the tokens it used, and where it struggles. Every number comes from your runs, reviews and lookups; open any row to see the work behind it."
+        lead="What Coderhelm delivered, the tokens it used, and where it struggles. Every number comes from your runs, reviews and lookups."
       />
+
+      <Tabs label="Analytics views" items={TABS.map((t) => ({ value: t.value, label: t.label, href: t.value === "overview" ? "/analytics" : `/analytics?tab=${t.value}` }))} value={tab} />
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <Segmented label="Period" options={PERIODS} value={`${period}` as `${AnalyticsPeriod}`} onChange={(v) => setPeriod(v === "mtd" ? "mtd" : (Number(v) as AnalyticsPeriod))} />
@@ -263,10 +289,9 @@ export default function AnalyticsPage() {
 
       {error ? (
         <div className="mt-6">
-          <Callout variant="error" title="We couldn't load analytics">
-            <p>{error} Your data is not affected.</p>
-            <button type="button" onClick={() => void load()} className={`mt-2 rounded text-sm font-medium underline ${focusRing}`}>Try again</button>
-          </Callout>
+          <Problem title="Couldn't load analytics" onRetry={() => void load()} details={error}>
+            Your data is not affected. Check your connection and try again.
+          </Problem>
         </div>
       ) : loading && !data ? (
         <div className="mt-6 space-y-4" aria-busy="true">
@@ -276,13 +301,13 @@ export default function AnalyticsPage() {
           <ChartSkeleton />
         </div>
       ) : data ? (
-        <Body data={data} loading={loading} stats={stats} />
+        <Body data={data} loading={loading} stats={stats} tab={tab} />
       ) : null}
     </Page>
   );
 }
 
-function Body({ data, loading, stats }: { data: Analytics; loading: boolean; stats: Stats | null }) {
+function Body({ data, loading, stats, tab }: { data: Analytics; loading: boolean; stats: Stats | null; tab: Tab }) {
   const s = data.summary;
   const p = data.previous;
   const d = data.days;
@@ -302,9 +327,11 @@ function Body({ data, loading, stats }: { data: Analytics; loading: boolean; sta
   }
 
   return (
-    <div className={loading ? "opacity-60 transition-opacity" : ""}>
+    <div className={loading ? "opacity-60 transition-opacity" : ""} data-testid={`analytics-${tab}`}>
+      {tab === "overview" && (
+        <>
       <Section title="Is it worth it" id="worth">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatGrid>
           <Tile testId="tile-merged" label="PRs merged" value={count(s.prs_merged)} change={delta(s.prs_merged, p.prs_merged, "count", vs)} basis={`${plural(s.prs_opened, "PR")} opened, ${count(s.prs_open)} still open`} />
           <Tile testId="tile-merge-rate" label="Merge rate" value={pct(s.merge_rate)} change={delta(s.merge_rate, p.merge_rate, "rate", vs)} basis="Merged out of opened" />
           <Tile testId="tile-time-to-merge" label="Median time to merge" value={hours(s.median_hours_to_merge)} change={delta(s.median_hours_to_merge, p.median_hours_to_merge, "hours", vs)} basis={s.time_to_merge_known ? `From ${plural(s.time_to_merge_known, "merged PR")}` : "Recorded for PRs merged from now on"} />
@@ -313,7 +340,7 @@ function Body({ data, loading, stats }: { data: Analytics; loading: boolean; sta
           <Tile testId="tile-ci" label="Red CI fixed by Coderhelm" value={pct(data.ci.fix_rate)} basis={data.ci.runs_with_red_ci ? `${count(data.ci.fixed_by_coderhelm)} of ${plural(data.ci.runs_with_red_ci, "run")} went green after its fixes` : "No red CI on Coderhelm's PRs"} />
           <Tile testId="tile-findings" label="Review findings acted on" value={pct(data.reviews.acted_on_rate)} basis={data.reviews.outcomes_known_reviews ? `${count(data.reviews.findings_fixed)} fixed in code, ${count(data.reviews.findings_settled_by_person)} settled by a person` : "Counted from re-reviews from now on"} />
           <Tile testId="tile-failed" label="Failed runs" value={count(s.failed_runs)} change={delta(s.failed_runs, p.failed_runs, "count", vs)} basis={s.runs ? `${pct(s.failure_rate)} of runs${s.closed_runs ? ` · ${plural(s.closed_runs, "run")} closed by a person, not counted` : ""}` : undefined} />
-        </div>
+        </StatGrid>
         <UsageNote stats={stats} />
       </Section>
 
@@ -340,6 +367,9 @@ function Body({ data, loading, stats }: { data: Analytics; loading: boolean; sta
           title="Tokens per day"
           table={<Table label="Tokens per day" head={["Day", "Tokens", "Runs"]} rows={data.daily.map((r) => [shortDay(r.day), tokens(r.tokens ?? 0), r.runs])} empty="No days." />}
         >
+          {data.daily.every((r) => !r.tokens) ? (
+            <div className="flex h-56 items-center justify-center text-sm text-zinc-400" data-testid="tokens-empty">No AI usage recorded in this period.</div>
+          ) : (
           <div className="h-56" role="img" aria-label="Bar chart of tokens used per day">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.daily} barCategoryGap="20%">
@@ -351,13 +381,23 @@ function Body({ data, loading, stats }: { data: Analytics; loading: boolean; sta
               </BarChart>
             </ResponsiveContainer>
           </div>
+          )}
         </ChartCard>
       </div>
 
-      {data.comparison && <Comparison c={data.comparison} period={data.period} previous={data.previous_period} mtd={mtd} />}
-
       <TimeSaved merged={s.prs_merged} span={span} />
+        </>
+      )}
 
+      {tab === "trends" &&
+        (data.comparison ? (
+          <Comparison c={data.comparison} period={data.period} previous={data.previous_period} mtd={mtd} />
+        ) : (
+          <p className="mt-10 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-sm text-zinc-400">No comparison for this period yet.</p>
+        ))}
+
+      {tab === "reliability" && (
+        <>
       <Section title="Where it struggles" id="struggles" description="Failed runs grouped by what went wrong. Open the latest run of a group to see its steps.">
         <Table
           label="Failures by reason"
@@ -380,14 +420,43 @@ function Body({ data, loading, stats }: { data: Analytics; loading: boolean; sta
       </Section>
 
       <Section title="Reviews" id="reviews" description="Pull request reviews Coderhelm posted, and what became of the findings it raised before.">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatGrid>
           <Tile label="Reviews posted" value={count(data.reviews.posted)} change={delta(s.reviews, p.reviews, "count", vs)} basis={`On ${plural(data.reviews.prs_reviewed, "PR")}`} />
           <Tile label="Approved / changes asked / comments" value={`${count(data.reviews.approve)} / ${count(data.reviews.request_changes)} / ${count(data.reviews.comment)}`} />
           <Tile label="Findings raised" value={count(data.reviews.findings)} basis={data.reviews.questions ? `${plural(data.reviews.questions, "question")} answered too` : undefined} />
           <RatingsTile up={data.reviews.thumbs_up} down={data.reviews.thumbs_down} />
-        </div>
+        </StatGrid>
       </Section>
 
+        <Section title="Where the work goes" id="steps" description={`Tokens and time by step, over ${d > data.steps_window_days ? `the last ${data.steps_window_days} days` : span} (step details are kept for ${data.steps_window_days} days).`}>
+          <Table
+            label="By step"
+            head={["Step", "Times", "Tokens", "Avg time"]}
+            rows={data.steps.map((r) => [stepLabel(r.step), r.count, tokens(r.tokens_in + r.tokens_out), formatDuration(r.avg_seconds)])}
+            empty="No step details in this period."
+          />
+        </Section>
+
+        <Section title="Recently failed" id="failed">
+          <Table
+            label="Recently failed"
+            head={["Run", "Reason"]}
+            grow={[1]}
+            rows={data.failed_recent.map((r) => [
+              <span key={r.run_id} className="block min-w-0">
+                <Link href={`/runs/detail?id=${r.run_id}`} className="text-zinc-100 underline-offset-2 hover:underline">{r.title || `Run ${r.run_id}`}</Link>
+                <span className="block text-xs text-zinc-400">{r.repo}</span>
+              </span>,
+              <span key="reason" className="text-xs text-zinc-300" title={r.reason}>{r.reason}</span>,
+            ])}
+            empty={`No failed runs in ${span}.`}
+          />
+        </Section>
+        </>
+      )}
+
+      {tab === "teams" && (
+        <>
       <Section title="By repository" id="repos">
         <Table
           label="By repository"
@@ -416,31 +485,6 @@ function Body({ data, loading, stats }: { data: Analytics; loading: boolean; sta
         </Section>
       </div>
 
-      <div className="grid gap-x-6 lg:grid-cols-2">
-        <Section title="Where the work goes" id="steps" description={`Tokens and time by step, over ${d > data.steps_window_days ? `the last ${data.steps_window_days} days` : span} (step details are kept for ${data.steps_window_days} days).`}>
-          <Table
-            label="By step"
-            head={["Step", "Times", "Tokens", "Avg time"]}
-            rows={data.steps.map((r) => [stepLabel(r.step), r.count, tokens(r.tokens_in + r.tokens_out), `${Math.round(r.avg_seconds)} s`])}
-            empty="No step details in this period."
-          />
-        </Section>
-        <Section title="Data source lookups" id="lookups" description={data.lookups.total ? `${plural(data.lookups.total, "lookup")}: ${count(data.lookups.refused)} refused by the read-only rules, ${count(data.lookups.failed)} failed.` : undefined}>
-          <Table
-            label="Lookups by source"
-            head={["Source", "Lookups", "Refused", "Failed"]}
-            rows={data.lookups.by_source.map((r) => [r.source, r.total, r.refused, r.failed])}
-            empty="No lookups in this period."
-          />
-          {data.lookups.by_actor.length > 0 && (
-            <p className="mt-3 text-sm text-zinc-400">
-              {data.lookups.by_actor.map((a) => `${actorLabel(a.actor)} ${count(a.total)}`).join(" · ")}
-            </p>
-          )}
-        </Section>
-      </div>
-
-      <div className="grid gap-x-6 lg:grid-cols-2">
         <Section title="Recently merged" id="merged">
           <Table
             label="Recently merged"
@@ -448,7 +492,7 @@ function Body({ data, loading, stats }: { data: Analytics; loading: boolean; sta
             rows={data.merged_recent.map((r) => [
               <span key={r.run_id} className="block min-w-0">
                 <Link href={`/runs/detail?id=${r.run_id}`} className="text-zinc-100 underline-offset-2 hover:underline">{r.title || `Run ${r.run_id}`}</Link>
-                <span className="block text-xs text-zinc-500">
+                <span className="block text-xs text-zinc-400">
                   {r.repo}
                   {r.pr_url && (
                     <>
@@ -464,21 +508,29 @@ function Body({ data, loading, stats }: { data: Analytics; loading: boolean; sta
             empty={`No merged PRs in ${span}.`}
           />
         </Section>
-        <Section title="Recently failed" id="failed">
+        </>
+      )}
+
+      {tab === "lookups" && (
+        <Section title="Data source lookups" id="lookups" description={data.lookups.total ? `${plural(data.lookups.total, "lookup")}: ${count(data.lookups.refused)} refused by the read-only rules, ${count(data.lookups.failed)} failed.` : undefined}>
           <Table
-            label="Recently failed"
-            head={["Run", "Reason"]}
-            rows={data.failed_recent.map((r) => [
-              <span key={r.run_id} className="block min-w-0">
-                <Link href={`/runs/detail?id=${r.run_id}`} className="text-zinc-100 underline-offset-2 hover:underline">{r.title || `Run ${r.run_id}`}</Link>
-                <span className="block text-xs text-zinc-500">{r.repo}</span>
-              </span>,
-              <span key="reason" className="block text-left text-xs text-zinc-400">{r.reason}</span>,
-            ])}
-            empty={`No failed runs in ${span}.`}
+            label="Lookups by source"
+            head={["Source", "Lookups", "Refused", "Failed"]}
+            rows={data.lookups.by_source.map((r) => [r.source, r.total, r.refused, r.failed])}
+            empty="No lookups in this period."
           />
+          {data.lookups.by_actor.length > 0 && (
+            <div className="mt-6">
+              <Table
+                label="Lookups by who asked"
+                head={["Who looked things up", "Lookups"]}
+                rows={data.lookups.by_actor.map((a) => [actorLabel(a.actor), count(a.total)])}
+                empty="No lookups in this period."
+              />
+            </div>
+          )}
         </Section>
-      </div>
+      )}
     </div>
   );
 }
@@ -626,9 +678,9 @@ function Comparison({ c, period, previous, mtd }: { c: AnalyticsComparison; peri
           </tbody>
         </table>
       </div>
-      {full && <p className="mt-2 text-xs text-zinc-500 sm:hidden">{fullLabel} shows on a wider screen.</p>}
+      {full && <p className="mt-2 text-xs text-zinc-400 sm:hidden">{fullLabel} shows on a wider screen.</p>}
       {notes.length > 0 && (
-        <ul className="mt-3 space-y-1 text-xs text-zinc-500" data-testid="compare-notes">
+        <ul className="mt-3 space-y-1 text-xs text-zinc-400" data-testid="compare-notes">
           {notes.map((n) => (
             <li key={n}>{n}</li>
           ))}
@@ -711,29 +763,29 @@ function TimeSaved({ merged, span }: { merged: number; span: string }) {
   const valid = minutes !== "" && Number.isFinite(perPr) && perPr > 0 && perPr <= 10_000;
   const total = useMemo(() => (valid ? (merged * perPr) / 60 : 0), [merged, perPr, valid]);
   return (
-    <Section title="Time saved (your estimate)" id="saved">
+    <Section title="Time saved (your estimate)" id="saved" description="Coderhelm doesn't guess how long work would have taken you. Enter your own figure to see an estimate; it's remembered on this device.">
       <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-sm">
-        <label className="flex flex-wrap items-center gap-2 text-zinc-300">
-          <span>If one of these PRs would take a person</span>
+        <label htmlFor="minutes-per-pr" className="block text-sm font-medium text-zinc-200">
+          Minutes a person would spend on one pull request
+        </label>
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
           <input
+            id="minutes-per-pr"
             type="number"
             inputMode="numeric"
             min={1}
             value={minutes}
             onChange={(e) => save(e.target.value)}
-            placeholder="minutes"
-            aria-label="Minutes a person would spend on one PR"
-            className={`w-24 rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1 text-zinc-100 ${focusRing}`}
+            placeholder="e.g. 90"
+            className={`${inputClass} !w-32`}
           />
-          <span>minutes,</span>
-        </label>
-        {valid ? (
-          <p className="mt-2 text-zinc-100" data-testid="time-saved">
-            about <span className="font-semibold">{hours(total)}</span> of work in {span}.
-            <span className="block text-xs text-zinc-500">{count(merged)} merged PRs × {perPr} minutes ÷ 60. An estimate from your number, not a measurement.</span>
+          <span className="text-zinc-400">minutes</span>
+        </div>
+        {valid && (
+          <p className="mt-3 text-zinc-100" data-testid="time-saved">
+            About <span className="font-semibold">{hours(total)}</span> of work in {span}.
+            <span className="block text-xs text-zinc-400">{count(merged)} merged PRs × {perPr} minutes ÷ 60. An estimate from your number, not a measurement.</span>
           </p>
-        ) : (
-          <p className="mt-2 text-xs text-zinc-500">Coderhelm doesn&apos;t guess how long work would have taken you. Enter your own figure to see an estimate.</p>
         )}
       </div>
     </Section>

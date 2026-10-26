@@ -8,7 +8,7 @@ import { CAUSE_LABEL, githubPrUrl, minutes, plural, runHref, shortSha, testHref 
 import { errorMessage, formatDuration } from "@/lib/data-sources";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
-import { linkButton, secondaryButton } from "@/components/ui";
+import { linkButton, secondaryButton, smallSecondaryButton } from "@/components/ui";
 import {
   DetailBlock,
   GROUP_LABEL,
@@ -376,7 +376,7 @@ export function QuarantineView({ repo, canEdit, ticketDays = 2 }: { repo: string
                 {t.ticket_url && <a href={t.ticket_url} target="_blank" rel="noreferrer" className={linkButton}>Ticket</a>}
                 {t.fix_pr_url && <a href={t.fix_pr_url} target="_blank" rel="noreferrer" className={linkButton}>Fix PR</a>}
                 {canEdit && (
-                  <button type="button" onClick={() => release(t)} disabled={busy === t.id} className={`${secondaryButton} !min-h-8 !py-1`}>
+                  <button type="button" onClick={() => release(t)} disabled={busy === t.id} className={`${smallSecondaryButton}`}>
                     {busy === t.id ? "Releasing…" : "Release from quarantine"}
                   </button>
                 )}

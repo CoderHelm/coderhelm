@@ -191,11 +191,15 @@ test("the scorecard answers whether it is worth it, against the previous period"
   await expect(page.getByTestId("tile-untouched")).toContainText("75%");
   await expect(page.getByTestId("tile-ci")).toContainText("6 of 8 runs went green");
   await expect(page.getByTestId("tile-findings")).toContainText("24 fixed in code, 8 settled by a person");
+  const views = page.getByRole("navigation", { name: "Analytics views" });
+  await views.getByRole("link", { name: "Reliability" }).click();
   await expect(page.getByRole("table", { name: "Failures by reason" })).toContainText("Timed out after #s");
-  // People first, Coderhelm's own work next, runs that recorded nobody last.
-  await expect(page.getByRole("table", { name: "By person" }).locator("tbody tr td:first-child")).toHaveText(["Ada Lovelace", "CoderHelm (E2E tests)", "Not recorded (older runs)"]);
-  await expect(page.getByRole("table", { name: "Lookups by source" })).toContainText("orders-db database");
   await expect(page.getByRole("table", { name: "By step" })).toContainText("Writing code");
+  await views.getByRole("link", { name: "Lookups" }).click();
+  await expect(page.getByRole("table", { name: "Lookups by source" })).toContainText("orders-db database");
+  await views.getByRole("link", { name: "Teams and repos" }).click();
+  // People first, Coderhelm's own work next, runs that recorded nobody last.
+  await expect(page.getByRole("table", { name: "By person" }).locator("tbody tr td:first-child")).toHaveText(["Ada Lovelace", "CoderHelm (E2E tests)", "Not recorded"]);
   // Drill-downs open the run behind a number.
   await expect(page.getByRole("link", { name: "Show the class schedule on the details page" })).toHaveAttribute("href", /^\/runs\/detail\/?\?id=01RUNMERGED00000000000000A$/);
   await expect(page.getByRole("link", { name: "#101" })).toHaveAttribute("href", "https://github.com/your-team/web/pull/101");
@@ -205,7 +209,7 @@ test("the scorecard answers whether it is worth it, against the previous period"
 
 test("where it struggles places every red CI run in one outcome, base-branch failures apart", async ({ page }) => {
   await mockApi(page);
-  await page.goto("/analytics");
+  await page.goto("/analytics?tab=reliability");
   await expect(page.getByTestId("ci-line")).toContainText("CI went red on 8 runs, plus 1 run red only on checks that already fail on the base branch");
   await expect(page.getByTestId("ci-line")).toContainText("6 ended green after its fixes");
   const outcomes = page.getByRole("table", { name: "CI outcomes" });
@@ -245,11 +249,11 @@ test("time saved is shown only from the reader's own figure, with the formula", 
   await mockApi(page);
   await page.goto("/analytics");
   await expect(page.getByText("Coderhelm doesn't guess how long work would have taken you")).toBeVisible();
-  await page.getByLabel("Minutes a person would spend on one PR").fill("90");
-  await expect(page.getByTestId("time-saved")).toContainText("about 32 h");
+  await page.getByLabel("Minutes a person would spend on one pull request").fill("90");
+  await expect(page.getByTestId("time-saved")).toContainText("About 32 h");
   await expect(page.getByTestId("time-saved")).toContainText("21 merged PRs × 90 minutes ÷ 60");
   await page.reload();
-  await expect(page.getByTestId("time-saved")).toContainText("about 32 h");
+  await expect(page.getByTestId("time-saved")).toContainText("About 32 h");
 });
 
 test("empty and error states explain themselves", async ({ page }) => {
@@ -259,7 +263,7 @@ test("empty and error states explain themselves", async ({ page }) => {
   db.empty = false;
   db.fail = true;
   await page.getByRole("group", { name: "Period" }).getByRole("button", { name: "90 days" }).click();
-  await expect(page.getByText("We couldn't load analytics")).toBeVisible();
+  await expect(page.getByText("Couldn't load analytics")).toBeVisible();
   db.fail = false;
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(page.getByTestId("tile-merged")).toContainText("21");
@@ -267,7 +271,7 @@ test("empty and error states explain themselves", async ({ page }) => {
 
 test("this period is compared with the one before, each thing counted once", async ({ page }) => {
   await mockApi(page);
-  await page.goto("/analytics");
+  await page.goto("/analytics?tab=trends");
   const table = page.getByRole("table", { name: "Compared with the period before" });
   await expect(table).toBeVisible();
   const row = (name: string) => table.locator("tbody tr").filter({ has: page.getByRole("rowheader").filter({ hasText: name }) });
@@ -311,6 +315,7 @@ test("month to date compares the same days of last month and shows all of last m
   await page.getByRole("group", { name: "Period" }).getByRole("button", { name: "This month" }).click();
   await expect(page.getByTestId("tile-merged")).toContainText("vs the same days last month");
   expect(db.calls).toContain("/api/analytics?period=mtd");
+  await page.getByRole("navigation", { name: "Analytics views" }).getByRole("link", { name: "Compared" }).click();
   const table = page.getByRole("table", { name: "Compared with the period before" });
   await expect(table.locator("thead th")).toHaveCount(5);
   await expect(table.locator("thead th").last()).toHaveText(/^All of /);
@@ -325,6 +330,27 @@ test("month to date compares the same days of last month and shows all of last m
   await page.getByTestId("combo-popover").getByRole("option", { name: "your-team/web", exact: true }).first().click();
   expect(db.calls).toContain("/api/analytics?period=mtd&repo=your-team%2Fweb");
   await shot(page, "analytics-compare-mtd");
+});
+
+test("the page is split into views: each keeps one subject on screen", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/analytics");
+  const views = page.getByRole("navigation", { name: "Analytics views" });
+  await expect(views.getByRole("link")).toHaveText(["Overview", "Compared", "Reliability", "Teams and repos", "Lookups"]);
+  await expect(views.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
+  // The overview holds the scorecard and the charts, not the long tables.
+  await expect(page.getByTestId("tile-merged")).toBeVisible();
+  await expect(page.getByRole("table", { name: "By repository" })).toHaveCount(0);
+  await expect(page.getByRole("table", { name: "Failures by reason" })).toHaveCount(0);
+  await views.getByRole("link", { name: "Teams and repos" }).click();
+  await expect(page).toHaveURL(/tab=teams/);
+  await expect(page.getByRole("table", { name: "By repository" })).toBeVisible();
+  await expect(page.getByTestId("tile-merged")).toHaveCount(0);
+  // Recently merged keeps every column inside its card.
+  const merged = page.getByRole("table", { name: "Recently merged" });
+  const card = await merged.boundingBox();
+  const last = await merged.locator("thead th").last().boundingBox();
+  expect(card && last && last.x + last.width <= card.x + card.width + 1).toBe(true);
 });
 
 test("a server without the comparison still shows the rest of the page", async ({ page }) => {

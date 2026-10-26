@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/skeleton";
 import { ListError, StatusText } from "@/components/list";
 import { AvatarStack, Composer, PanelSection, SupportThread, TicketContext, TicketHeader, TicketLayout, TicketPeople, ThreadDock } from "@/components/support";
 import { useToast } from "@/components/toast";
-import { focusRing, secondaryButton } from "@/components/ui";
+import { focusRing, secondaryButton, smallSecondaryButton } from "@/components/ui";
 
 interface Me {
   user_id: string;
@@ -146,7 +146,7 @@ function TicketPage() {
           <>
             <AvatarStack ticket={t} avatars={detail.avatars} />
             {canManage ? (
-              <button type="button" onClick={openAdding} className={`${secondaryButton} !min-h-8 !py-1 !px-3`} data-testid="header-add-people">
+              <button type="button" onClick={openAdding} className={`${smallSecondaryButton}`} data-testid="header-add-people">
                 + Add people
               </button>
             ) : (
@@ -154,7 +154,7 @@ function TicketPage() {
                 <button
                   type="button"
                   onClick={() => void (role === "participant" ? removePerson({ user_id: me.user_id }) : addPerson({ user_id: me.user_id }))}
-                  className={`${secondaryButton} !min-h-8 !py-1 !px-3`}
+                  className={`${smallSecondaryButton}`}
                   data-testid="header-follow"
                 >
                   {role === "participant" ? "Unfollow" : "Follow"}
@@ -198,7 +198,7 @@ function TicketPage() {
             </PanelSection>
             {canGrant && t.status !== "resolved" && (
               <PanelSection title="Let support look at this" testId="ticket-support-access">
-                <p className="mb-3 text-xs text-zinc-500">
+                <p className="mb-3 text-xs text-zinc-400">
                   Coderhelm support sees your workspace read only, for the time you choose. You can end it any time in{" "}
                   <Link href="/settings/support-access" className={`rounded underline underline-offset-4 hover:text-zinc-300 ${focusRing}`}>
                     Settings

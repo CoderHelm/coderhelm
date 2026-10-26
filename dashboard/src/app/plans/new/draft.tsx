@@ -158,7 +158,7 @@ export function DraftPanel({
     <div className="flex min-h-0 flex-1 flex-col" data-testid="draft-panel">
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
         <div className="min-w-0">
-          <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+          <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
             {live ? (
               <span className="inline-flex items-center gap-1.5 text-sky-300">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-400 motion-reduce:animate-none" />
@@ -181,7 +181,7 @@ export function DraftPanel({
             <Skeleton className="mt-1 h-5 w-3/4" />
           )}
           {plan?.description && <div className="mt-1"><Markdown>{plan.description}</Markdown></div>}
-          {plan?.repo && <p className="mt-1 text-xs text-zinc-500">{plan.repo}</p>}
+          {plan?.repo && <p className="mt-1 text-xs text-zinc-400">{plan.repo}</p>}
         </div>
 
         <ol className="space-y-2" aria-label="Draft tasks">
@@ -210,7 +210,7 @@ export function DraftPanel({
                     )}
                     {task.acceptance_criteria && !live && (
                       <details className="group mt-1.5">
-                        <summary className={`cursor-pointer list-none rounded text-xs text-zinc-500 hover:text-zinc-300 [&::-webkit-details-marker]:hidden ${focusRing}`}>
+                        <summary className={`cursor-pointer list-none rounded text-xs text-zinc-400 hover:text-zinc-300 [&::-webkit-details-marker]:hidden ${focusRing}`}>
                           <span aria-hidden="true" className="mr-1 inline-block transition-transform group-open:rotate-90 motion-reduce:transition-none">›</span>
                           Done when
                         </summary>
@@ -237,7 +237,7 @@ export function DraftPanel({
       {draft && !live && (
         <div className="mt-3 space-y-3">
           <div>
-            <p className="mb-1.5 text-xs text-zinc-500">Each task becomes</p>
+            <p className="mb-1.5 text-xs text-zinc-400">Each task becomes</p>
             <div className="flex gap-2" role="group" aria-label="Destination">
               <DestButton on={destination === "github" || !jiraReady} onClick={() => onDestination("github")} icon={<GitHubIcon />}>
                 GitHub Issues
@@ -256,7 +256,7 @@ export function DraftPanel({
           <button type="button" onClick={onSave} disabled={saving} className={`${primaryButton} ${fullWidthOnPhone} font-semibold`}>
             {saving ? "Saving..." : "Save plan"}
           </button>
-          <p className="text-center text-xs text-zinc-500">Nothing runs yet. You approve each task on the plan&apos;s page.</p>
+          <p className="text-center text-xs text-zinc-400">Nothing runs yet. You approve each task on the plan&apos;s page.</p>
         </div>
       )}
     </div>

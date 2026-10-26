@@ -1,15 +1,17 @@
 "use client";
 
-import { CodeBlock } from "@/components/code-block";
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { RoleGuard } from "@/components/role-guard";
 import { StatusPill } from "@/components/status-pill";
 import { useToast } from "@/components/toast";
 import { ToolStatus, ToolSwitch } from "@/components/tools";
-import { linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { buttonClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { EmptyState } from "@/components/empty-state";
+import { TechnicalDetails } from "@/components/problem";
 import { Page, PageHeader } from "@/components/page";
 import {
+  Chip,
   List,
   ListEmpty,
   ListError,
@@ -135,9 +137,9 @@ function ToolsPage() {
       <div className="mt-8">
         <ListSection id="inbox" title="Waiting for your yes" count={pending.length || undefined} tone={pending.length ? "waiting" : undefined}>
           {pending.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-zinc-800 px-4 py-4 text-sm text-zinc-400">
-              Nothing waiting. Tools marked &quot;ask me first&quot; show up here when Coderhelm wants to run them, and wait up to 10 minutes.
-            </p>
+            <EmptyState title="Nothing waiting." testId="tools-inbox-empty">
+              Tools marked &quot;ask me first&quot; show up here when Coderhelm wants to run them, and wait up to 10 minutes.
+            </EmptyState>
           ) : (
             <List label="Calls waiting for approval">
               {pending.map((a) => (
@@ -146,19 +148,20 @@ function ToolsPage() {
                   testId="tool-ask"
                   status={{ tone: "waiting" }}
                   title={<><span className="font-mono">{a.tool}</span> wants to run</>}
-                  meta={[`${a.actor}${a.repo ? ` on ${a.repo}${a.pr ? ` #${a.pr}` : ""}` : ""} · ${Math.ceil(a.expires_in_s / 60)} min left`]}
+                  meta={[`${a.actor}${a.repo ? ` on ${a.repo}${a.pr ? ` #${a.pr}` : ""}` : ""}`]}
+                  chips={<Chip tone="waiting">{Math.ceil(a.expires_in_s / 60)} min left</Chip>}
                   actions={
                     <>
-                      <button type="button" className={primaryButton} disabled={busy === a.id} onClick={() => decide(a, true)}>
+                      <button type="button" className={buttonClass("primary", "sm")} disabled={busy === a.id} onClick={() => decide(a, true)}>
                         Approve this call
                       </button>
-                      <button type="button" className={secondaryButton} disabled={busy === a.id} onClick={() => decide(a, false)}>
+                      <button type="button" className={buttonClass("secondary", "sm")} disabled={busy === a.id} onClick={() => decide(a, false)}>
                         Decline
                       </button>
                     </>
                   }
                 >
-                  <CodeBlock code={JSON.stringify(a.inputs, null, 2)} lang="json" label={`Inputs for ${a.tool}`} className="mt-1.5" />
+                  <InputsList inputs={a.inputs} tool={a.tool} />
                 </ListRow>
               ))}
             </List>
@@ -244,5 +247,36 @@ function ToolsPage() {
         </ListSection>
       </div>
     </Page>
+  );
+}
+
+/** "customer_id" to "Customer ID". */
+function humanKey(k: string): string {
+  const words = k.replace(/[_-]+/g, " ").trim();
+  return (words.charAt(0).toUpperCase() + words.slice(1)).replace(/\bid\b/gi, "ID").replace(/\burl\b/gi, "URL");
+}
+
+/**
+ * What a waiting call would send, as label and value pairs an approver can
+ * read; the raw JSON is one click away.
+ */
+function InputsList({ inputs, tool }: { inputs: Record<string, unknown>; tool: string }) {
+  const entries = Object.entries(inputs ?? {});
+  return (
+    <div className="mt-2 min-w-0">
+      {entries.length === 0 ? (
+        <p className="text-sm text-zinc-400">No inputs.</p>
+      ) : (
+        <dl aria-label={`Inputs for ${tool}`} className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
+          {entries.map(([k, v]) => (
+            <div key={k} className="contents">
+              <dt className="text-zinc-400">{humanKey(k)}</dt>
+              <dd className="min-w-0 text-zinc-100 [overflow-wrap:anywhere]">{typeof v === "string" ? v : JSON.stringify(v)}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      <TechnicalDetails text={JSON.stringify(inputs, null, 2)} lang="json" summary="Show raw" />
+    </div>
   );
 }

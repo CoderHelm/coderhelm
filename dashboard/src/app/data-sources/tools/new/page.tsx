@@ -418,7 +418,7 @@ function RepoPicker({ value, onChange }: { value: string; onChange: (v: string) 
           className=""
         />
       )}
-      {picked.length > 0 && <p className="mt-1.5 text-xs text-zinc-500">Remove them all to let every repo use it.</p>}
+      {picked.length > 0 && <p className="mt-1.5 text-xs text-zinc-400">Remove them all to let every repo use it.</p>}
     </fieldset>
   );
 }

@@ -157,7 +157,7 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
               Replace key
             </button>
           </div>
-          <p className="mt-1 text-xs text-zinc-500">Encrypted for your team. It can be replaced but never shown.</p>
+          <p className="mt-1 text-xs text-zinc-400">Encrypted for your team. It can be replaced but never shown.</p>
         </div>
       )}
       {k === "newrelic" && (

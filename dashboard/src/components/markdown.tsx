@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { markdownCode, markdownCodeFor } from "./markdown-code";
 import { Code } from "./settings/code";
+import { ScrollFade } from "./scroll-fade";
 
 /** Body text no wider than a comfortable reading line; code and tables may use the full width. */
 const MEASURE = "max-w-[80ch]";
@@ -24,7 +25,12 @@ export function Markdown({ children, codeLang }: { children: string; /** The lan
         ...(codeLang ? markdownCodeFor(codeLang) : markdownCode),
         a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline underline-offset-2">{children}</a>,
         blockquote: ({ children }) => <blockquote className={`border-l-2 border-zinc-700 pl-3 text-sm text-zinc-400 italic mb-2 ${MEASURE}`}>{children}</blockquote>,
-        table: ({ children }) => <div className="overflow-x-auto mb-2"><table className="text-sm text-zinc-300 border-collapse w-full">{children}</table></div>,
+        // A table wider than its card scrolls inside it, with a fade on the edge that has more, so a cut-off column reads as "scroll", not as clipped text.
+        table: ({ children }) => (
+          <ScrollFade axis="x" className="mb-2" fadeFrom="from-zinc-900">
+            <table className="text-sm text-zinc-300 border-collapse w-full">{children}</table>
+          </ScrollFade>
+        ),
         thead: ({ children }) => <thead className="border-b border-zinc-700">{children}</thead>,
         th: ({ children }) => <th className="text-left text-xs font-medium text-zinc-300 px-3 py-1.5">{children}</th>,
         td: ({ children }) => <td className="text-sm text-zinc-300 px-3 py-1.5 border-t border-zinc-800 align-top [&:has(code)]:min-w-[14rem]">{children}</td>,

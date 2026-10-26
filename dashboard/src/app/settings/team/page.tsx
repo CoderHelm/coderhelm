@@ -27,13 +27,15 @@ import {
 } from "@/lib/team";
 import { Callout } from "@/components/callout";
 import { StatusPill } from "@/components/status-pill";
-import { GROUP_LABEL, List, ListEmpty, ListError, ListRow, ListSection, ListSkeleton, ListToolbar, useListParams } from "@/components/list";
+import { Chip, GROUP_LABEL, List, ListEmpty, ListError, ListRow, ListSection, ListSkeleton, ListToolbar, useListParams } from "@/components/list";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { CheckIcon, GitHubIcon, MailIcon } from "@/components/icons";
-import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { buttonClass, focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
 import { Modal, modalActions } from "@/components/modal";
+import { Select as SharedSelect } from "@/components/select";
+import { SectionHeading } from "@/components/page";
 import { Menu } from "@/components/menu";
 import { RolesMatrix } from "@/components/roles-matrix";
 import { CustomRoles } from "@/components/custom-roles";
@@ -260,9 +262,9 @@ function TeamPage() {
 
       {suggestions.length > 0 && (
         <section aria-labelledby="dupes-heading" className="mt-8">
-          <h2 id="dupes-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-            Possibly the same person ({suggestions.length})
-          </h2>
+          <SectionHeading id="dupes-heading" count={suggestions.length} className="mb-3">
+            Possibly the same person
+          </SectionHeading>
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/5">
             <p className="border-b border-zinc-800 px-4 py-3 text-sm text-zinc-300">
               These GitHub sign-ins look like members who sign in with email. Linking makes them one person who can sign in either way. Check
@@ -310,11 +312,11 @@ function TeamPage() {
                 ],
               }}
               actions={
-                <Select label="Filter by sign-in" value={statusFilter} onChange={(v) => setParams({ signin: v })}>
-                  <option value="all">Any sign-in</option>
+                <SharedSelect aria-label="Filter by sign-in" title="How they sign in" value={statusFilter} onChange={(e) => setParams({ signin: e.target.value })} className="bg-zinc-900">
+                  <option value="all">Any way of signing in</option>
                   <option value="active">Signs in with email</option>
-                  <option value="github">GitHub sign-in only</option>
-                </Select>
+                  <option value="github">Signs in with GitHub only</option>
+                </SharedSelect>
               }
               onClear={query || roleFilter !== "all" || statusFilter !== "all" ? clearFilters : undefined}
             />
@@ -365,7 +367,7 @@ function TeamPage() {
                       key={m.user_id}
                       testId="invite-row"
                       leading={
-                        <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-dashed border-zinc-700 text-zinc-500">
+                        <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-zinc-400">
                           <MailIcon />
                         </span>
                       }
@@ -381,12 +383,12 @@ function TeamPage() {
                       actions={
                         canInvites ? (
                           <span className="flex gap-2">
-                            <button type="button" className={`${secondaryButton} !min-h-8 !py-1`} disabled={busy === m.user_id} onClick={() => resend(m)}>
+                            <button type="button" className={buttonClass("secondary", "sm")} disabled={busy === m.user_id} onClick={() => resend(m)}>
                               Resend
                             </button>
                             <button
                               type="button"
-                              className={`inline-flex min-h-8 items-center rounded-lg px-3 text-sm font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50 ${focusRing}`}
+                              className={buttonClass("danger", "sm")}
                               disabled={busy === m.user_id}
                               onClick={() => remove(m)}
                               aria-label={`Revoke invite for ${m.email}`}
@@ -444,30 +446,6 @@ function errorText(e: unknown) {
   return e instanceof Error ? e.message : "The request failed.";
 }
 
-function Select({ label, value, onChange, children }: { label: string; value: string; onChange: (v: string) => void; children: ReactNode }) {
-  return (
-    <div className="relative min-w-0 flex-1 sm:flex-none">
-      <select
-        aria-label={label}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={`min-h-9 w-full appearance-none rounded-lg border border-zinc-700 bg-zinc-900 py-1.5 pl-3 pr-8 text-sm text-zinc-100 hover:border-zinc-500 sm:w-auto ${focusRing}`}
-      >
-        {children}
-      </select>
-      <Chevron />
-    </div>
-  );
-}
-
-function Chevron() {
-  return (
-    <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400">
-      <polyline points="6 9 12 15 18 9" />
-    </svg>
-  );
-}
-
 function Avatar({ m, size = 40 }: { m: Member; size?: number }) {
   const [broken, setBroken] = useState(false);
   const label = displayName(m).replace(/^@/, "");
@@ -485,7 +463,7 @@ function Avatar({ m, size = 40 }: { m: Member; size?: number }) {
 
 function RoleChip({ role, label }: { role: string; label: string }) {
   return (
-    <span className={`inline-flex min-h-8 items-center rounded-lg border px-2.5 text-xs font-medium ${roleStyle(role)}`}>{label}</span>
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${roleStyle(role)}`}>{label}</span>
   );
 }
 
@@ -553,50 +531,53 @@ function MemberRow({
   return (
     <ListRow
       testId="member-row"
+      className="relative"
       data={{ role: m.role }}
       leading={<Avatar m={m} />}
       title={
         <>
           {name}
-          {m.is_self && <span className="ml-2 rounded border border-zinc-700 px-1.5 text-[11px] font-normal leading-5 text-zinc-400">You</span>}
+          {m.is_self && (
+            <span className="ml-2 align-middle">
+              <Chip tone="muted">You</Chip>
+            </span>
+          )}
         </>
       }
       titleText={name}
       meta={[
         m.email && m.email !== name ? <span key="email">{m.email}</span> : null,
         m.github_login ? <GithubLink key="gh" login={m.github_login} /> : null,
+        githubOnly ? <span key="how">Signs in with GitHub</span> : null,
+        <span key="seen">{seen ? `Active ${seen}` : "Not signed in yet"}</span>,
       ]}
       chips={
         <>
-          <span className="flex flex-col items-start gap-1 sm:items-end">
-            {githubOnly ? <StatusPill>GitHub sign-in only</StatusPill> : <StatusPill tone="success">Active</StatusPill>}
-            <span className="text-xs text-zinc-500">{seen ? `Active ${seen}` : "Not active yet"}</span>
-          </span>
           {manageable && !lastOwner ? (
-            <span className="relative">
-              <select
-                aria-label={`Role for ${name}`}
-                value={m.role}
-                disabled={busy}
-                onChange={(e) => onRole(e.target.value)}
-                className={`min-h-8 cursor-pointer appearance-none rounded-lg border py-1 pl-2.5 pr-7 text-xs font-medium disabled:opacity-50 ${roleStyle(m.role)} ${focusRing}`}
-              >
-                {options.map((r) => (
-                  <option key={r.key} value={r.key} className="bg-zinc-900 text-zinc-100">
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-              <Chevron />
-            </span>
+            <SharedSelect size="sm" aria-label={`Role for ${name}`} value={m.role} disabled={busy} onChange={(e) => onRole(e.target.value)}>
+              {options.map((r) => (
+                <option key={r.key} value={r.key}>
+                  {r.label}
+                </option>
+              ))}
+            </SharedSelect>
           ) : (
-            <span title={lastOwner && manageable ? "Make someone else an owner before changing this role" : undefined}>
+            <span title={lastOwner && manageable ? "Make someone else an owner before changing this role" : "You can't change this role"}>
               <RoleChip role={m.role} label={roleLabel(m.role)} />
             </span>
           )}
         </>
       }
-      actions={actions.length > 0 ? <ActionsMenu label={`More actions for ${name}`} actions={actions} disabled={busy} /> : <span className="hidden w-9 sm:block" />}
+      actions={
+        actions.length > 0 ? (
+          // On a phone the menu sits at the row's top right instead of on a line of its own.
+          <span className="max-sm:absolute max-sm:right-2 max-sm:top-2">
+            <ActionsMenu label={`More actions for ${name}`} actions={actions} disabled={busy} />
+          </span>
+        ) : (
+          <span className="hidden w-9 sm:block" />
+        )
+      }
     />
   );
 }
@@ -649,10 +630,10 @@ function SuggestionRow({ s, busy, onReview }: { s: LinkSuggestion; busy: boolean
               </span>
               {s.github.github_login}
             </span>
-            <span className="text-zinc-500">may be</span>
+            <span className="text-zinc-400">may be</span>
             <span className="truncate">{displayName(s.person)}</span>
           </p>
-          <p className="truncate text-xs text-zinc-500">
+          <p className="truncate text-xs text-zinc-400">
             {s.reason}
             {s.person.email && s.person.email !== displayName(s.person) ? ` · ${s.person.email}` : ""}
           </p>
@@ -743,7 +724,7 @@ function LinkDialog({
                     <span className="block truncate text-sm text-zinc-100">
                       {fromGithub ? displayName(m) : m.github_login}
                     </span>
-                    <span className="block truncate text-xs text-zinc-500">
+                    <span className="block truncate text-xs text-zinc-400">
                       {fromGithub ? m.email : `GitHub sign-in only · ${m.role}`}
                     </span>
                     {score >= 0.5 && (
@@ -830,16 +811,13 @@ function InviteForm({ roles, onInvited }: { roles: RoleInfo[]; onInvited: (email
           />
         </div>
         <div className="flex gap-2">
-          <div className="relative flex-1 sm:flex-none">
-            <select aria-label="Role" value={role} onChange={(e) => setRole(e.target.value)} className={`${inputClass} appearance-none pr-8 sm:w-32`}>
-              {roles.map((r) => (
-                <option key={r.key} value={r.key}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-            <Chevron />
-          </div>
+          <SharedSelect aria-label="Role" value={role} onChange={(e) => setRole(e.target.value)} className="flex-1 sm:w-36 sm:flex-none">
+            {roles.map((r) => (
+              <option key={r.key} value={r.key}>
+                {r.label}
+              </option>
+            ))}
+          </SharedSelect>
           <button type="submit" className={`${primaryButton} shrink-0`} disabled={sending}>
             {sending ? "Sending…" : "Send invite"}
           </button>
@@ -850,8 +828,8 @@ function InviteForm({ roles, onInvited }: { roles: RoleInfo[]; onInvited: (email
           {error}
         </p>
       ) : (
-        <p id="invite-help" className="mt-2 text-sm text-zinc-500">
-          {selected ? `${selected.label}: ${selected.summary}` : ""} They get an email and join when they sign in with that address.
+        <p id="invite-help" className="mt-2 text-sm text-zinc-400">
+          {selected ? `${selected.summary} ` : ""}We&apos;ll email them an invite; they join when they sign in with that address.
         </p>
       )}
     </form>

@@ -120,7 +120,7 @@ function ActivityRow({ e, showItem }: { e: SkillAccessEvent; showItem: boolean }
       {e.why && (
         <p className="mt-1 line-clamp-3 text-sm text-zinc-400 [overflow-wrap:anywhere]">
           <span className="sr-only">{e.action === "ask" ? "Question: " : e.action === "agent_tool" ? "Input: " : "Why: "}</span>
-          <span aria-hidden="true" className="text-zinc-600">
+          <span aria-hidden="true" className="text-zinc-400">
             {lead}
           </span>
           {e.why}
@@ -196,10 +196,10 @@ export function SkillActivity({
   return (
     <section aria-labelledby="skill-activity-heading" className="mt-6" id="skill-activity">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="skill-activity-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+        <h2 id="skill-activity-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
           {heading}
         </h2>
-        <p className="text-xs text-zinc-500" aria-live="polite">
+        <p className="text-xs text-zinc-400" aria-live="polite">
           {loading ? "" : events.length === 0 ? "" : `${events.length.toLocaleString()}${next ? "+" : ""} shown`}
         </p>
       </div>
@@ -285,7 +285,7 @@ export function SkillActivity({
         <div className="space-y-4">
           {days.map((d) => (
             <div key={d.label}>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">{d.label}</h3>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">{d.label}</h3>
               <List>
                 {d.list.map((e) => (
                   <ActivityRow key={e.id || e.cursor} e={e} showItem={!item} />
@@ -295,7 +295,7 @@ export function SkillActivity({
           ))}
           <div ref={sentinel} />
           <LoadMore hasMore={!!next} loading={loadingMore} failed={moreFailed} onClick={loadMore} />
-          {!next && events.length > pageSize / 2 && <p className="text-center text-xs text-zinc-600">That&apos;s everything kept. Reads and asks are kept for 180 days.</p>}
+          {!next && events.length > pageSize / 2 && <p className="text-center text-xs text-zinc-400">That&apos;s everything kept. Reads and asks are kept for 180 days.</p>}
         </div>
       )}
     </section>

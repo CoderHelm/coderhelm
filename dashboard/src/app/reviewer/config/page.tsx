@@ -17,8 +17,11 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { Segmented } from "@/components/segmented";
-import { Chip, StatusText, type StatusLook } from "@/components/list";
-import { focusRing, inputClass, linkButton, monoInputClass, primaryButton, secondaryButton } from "@/components/ui";
+import { StatusText, type StatusLook } from "@/components/list";
+import { focusRing, inputClass, linkButton, monoInputClass } from "@/components/ui";
+import { EmptyState } from "@/components/empty-state";
+import { Problem } from "@/components/problem";
+import { Select } from "@/components/select";
 import {
   Code,
   Field,
@@ -93,7 +96,7 @@ const TAG_MODES = [
   { value: "date", label: "Date and time" },
 ];
 
-/** The page's sections, in order. The nav, the anchors and the summary read this. */
+/** The page's sections, in order. The nav shows one at a time (?section=). */
 const SECTIONS = [
   { id: "reviews", title: "Reviews" },
   { id: "tests", title: "Tests" },
@@ -105,6 +108,10 @@ const SECTIONS = [
   { id: "stop", title: "Stop everything" },
 ] as const;
 type SectionId = (typeof SECTIONS)[number]["id"];
+/** What the right-hand side shows: one repo section, or the standards shared by every repo. */
+type View = SectionId | "standards";
+const VIEWS: View[] = [...SECTIONS.map((s) => s.id), "standards"];
+const isView = (v: string | null): v is View => !!v && (VIEWS as string[]).includes(v);
 
 /** Which settings each section holds, for its "on/off" word and its unsaved dot. */
 const SECTION_KEYS: Record<SectionId, Key[]> = {
@@ -201,6 +208,16 @@ function summaryLines(cfg: ReviewerConfig): string[] {
 
 const shortInput = "sm:w-64";
 
+/** ?repo= and ?section= in the address, so a refresh or a shared link opens the same view. */
+function writeParams(next: { repo?: string; section?: View }) {
+  const url = new URL(window.location.href);
+  for (const [k, v] of Object.entries(next)) {
+    if (v) url.searchParams.set(k, v);
+    else url.searchParams.delete(k);
+  }
+  window.history.replaceState(null, "", url.toString());
+}
+
 // ── The page ────────────────────────────────────────────────────────
 
 function ReviewerConfigPage() {
@@ -230,15 +247,23 @@ function ReviewerConfigPage() {
   const [orgSaved, setOrgSaved] = useState("");
   const [orgState, setOrgState] = useState<"loading" | "ready" | "error">("loading");
   const [savingOrg, setSavingOrg] = useState(false);
-  const [active, setActive] = useState<string>(SECTIONS[0].id);
+  const [view, setView] = useState<View>("reviews");
 
   // Restore the selected repo from the URL (?repo=owner/name) so a refresh keeps
   // the page on the same repo. Read window.location directly (not useSearchParams)
   // to stay compatible with the static export without a Suspense boundary.
   useEffect(() => {
-    const r = new URLSearchParams(window.location.search).get("repo");
+    const q = new URLSearchParams(window.location.search);
+    const r = q.get("repo");
     if (r) setRepo(r);
+    const sec = q.get("section");
+    if (isView(sec)) setView(sec);
   }, []);
+
+  const goTo = (v: View) => {
+    setView(v);
+    writeParams({ section: v === "reviews" ? undefined : v });
+  };
 
   useEffect(() => {
     // Members can read these settings; only admins can save them.
@@ -304,28 +329,13 @@ function ReviewerConfigPage() {
   const unsavedKeys = form.dirtyKeys;
   const dirty = form.dirty;
   const orgDirty = orgState === "ready" && orgInstructions !== orgSaved;
-  const notDefault = (Object.keys(DEFAULTS) as Key[]).filter((k) => !sameSetting(cfg[k], DEFAULTS[k]));
   const isChanged = (...ks: Key[]) => ks.some((k) => !sameSetting(cfg[k], DEFAULTS[k]));
-  const marks = (...ks: Key[]) => ({ unsaved: form.isDirty(...ks), notDefault: isChanged(...ks) });
+  // Only what the person just changed is marked; "differs from the default"
+  // would sit on nearly every row of a configured repo.
+  const marks = (...ks: Key[]) => ({ unsaved: form.isDirty(...ks) });
 
   // Leaving with unsaved repo edits asks first (useDirtyForm); so do unsaved standards.
   useLeaveWarning(orgDirty);
-
-  // The nav marks the section in view.
-  useEffect(() => {
-    if (!repo || loading || loadFailed) return;
-    const els = SECTIONS.map((s) => document.getElementById(s.id)).filter((el): el is HTMLElement => !!el);
-    if (els.length === 0 || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        const top = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        if (top) setActive(top.target.id);
-      },
-      { rootMargin: "0px 0px -65% 0px" },
-    );
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, [repo, loading, loadFailed]);
 
   // Select a repo AND reflect it in the URL so the choice survives a refresh /
   // is shareable, mirroring /runs/detail?id= and /reviewer/detail?sk=.
@@ -342,10 +352,7 @@ function ReviewerConfigPage() {
       if (ok !== "primary") return;
     }
     setRepo(r);
-    const url = new URL(window.location.href);
-    if (r) url.searchParams.set("repo", r);
-    else url.searchParams.delete("repo");
-    window.history.replaceState(null, "", url.toString());
+    writeParams({ repo: r });
   };
 
   const save = async () => {
@@ -388,16 +395,45 @@ function ReviewerConfigPage() {
   };
 
   const readOnly = isAdmin === false;
-  const ready = !!repo && !loading && !loadFailed;
   // A refused save reveals every option, so the field it names is in view.
   const reveal = (on: boolean) => on || !!problem;
   const state = stateOf(cfg);
 
+  const repoReady = !!repo && !loading && !loadFailed;
   const navItems = SECTIONS.map((s) => ({
     ...s,
-    word: sectionWord(s.id, cfg),
+    word: repoReady ? sectionWord(s.id, cfg) : "",
     unsaved: SECTION_KEYS[s.id].some((k) => unsavedKeys.includes(k)),
   }));
+  const stopItem = navItems.find((s) => s.id === "stop");
+  const viewTitle = view === "standards" ? "Every repository" : SECTIONS.find((s) => s.id === view)?.title ?? "";
+  const navLink = (id: View, title: string, opts: { word?: string; unsaved?: boolean; danger?: boolean } = {}) => (
+    <a
+      href={`?${new URLSearchParams({ ...(repo ? { repo } : {}), ...(id === "reviews" ? {} : { section: id }) }).toString()}`}
+      aria-current={view === id ? "page" : undefined}
+      onClick={(e) => {
+        e.preventDefault();
+        goTo(id);
+      }}
+      className={`flex min-h-8 items-center justify-between gap-3 rounded-md px-2.5 py-1 text-sm ${
+        view === id
+          ? opts.danger
+            ? "bg-red-500/10 text-red-200"
+            : "bg-zinc-800 text-zinc-100"
+          : opts.danger
+            ? "text-red-300 hover:bg-red-500/10"
+            : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+      } ${focusRing}`}
+    >
+      <span className="flex min-w-0 items-center gap-1.5">
+        {title}
+        {opts.unsaved && <span aria-label="unsaved" className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />}
+      </span>
+      {opts.word && (
+        <span className={`text-xs ${opts.word === "On" ? "text-emerald-300" : opts.word === "Stopped" ? "text-red-300" : "text-zinc-400"}`}>{opts.word}</span>
+      )}
+    </a>
+  );
 
   return (
     <Page>
@@ -406,104 +442,114 @@ function ReviewerConfigPage() {
         lead="What the pull request reviewer does, set one repository at a time. A new repository starts with everything off."
       />
 
-      {/* Repository switcher: the one choice everything below depends on. */}
-      <div className="mt-6 flex min-w-0 flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 sm:flex-row sm:items-center sm:gap-4">
-        {/* The picker says "Repository: <name>" itself; this is the visible caption. */}
-        <span aria-hidden="true" className="shrink-0 text-sm font-medium text-zinc-300">Repository</span>
-        <div className="min-w-0 sm:w-96">
-          <RepoCombobox id="rc-repo" repos={repos} selected={repo} onSelect={selectRepo} placeholder="Choose a repository" className="" />
-        </div>
-      </div>
-
-      {readOnly && (
-        <div className="mt-4">
-          <Callout variant="neutral" title="You can view these settings">
-            <p>Only admins can change them. Ask an admin on your team if something should be different.</p>
-          </Callout>
-        </div>
-      )}
-
-      {!repo ? (
-        <div className="mt-6 rounded-lg border border-dashed border-zinc-800 px-4 py-12 text-center text-sm text-zinc-400">
-          Choose a repository to see what the reviewer does there and change it.
-        </div>
-      ) : loading ? (
-        <div className="mt-6 space-y-4" aria-busy="true" aria-label="Loading settings">
-          <Skeleton className="h-28 w-full" />
-          <Skeleton className="h-40 w-full" />
-        </div>
-      ) : loadFailed ? (
-        <div className="mt-6">
-          <Callout variant="error" title={`Could not load the settings for ${repo}`}>
-            <p>Nothing is shown, so the saved settings cannot be overwritten by mistake.</p>
-            <button type="button" onClick={() => setReloadKey((k) => k + 1)} className={`mt-2 ${secondaryButton}`}>
-              Try again
-            </button>
-          </Callout>
-        </div>
-      ) : (
-        <div className="mt-6 grid min-w-0 gap-8 lg:grid-cols-[12rem_minmax(0,1fr)]">
-          {/* Section nav: a column on wide screens, a scrolling strip on a phone. */}
-          <nav aria-label="Settings sections" className="min-w-0 lg:sticky lg:top-6 lg:self-start">
-            <ul className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0">
-              {navItems.map((s) => (
-                <li key={s.id} className="shrink-0">
-                  <a
-                    href={`#${s.id}`}
-                    aria-current={active === s.id ? "location" : undefined}
-                    onClick={() => setActive(s.id)}
-                    className={`flex min-h-8 items-center justify-between gap-3 whitespace-nowrap rounded-md px-2.5 py-1 text-sm ${
-                      active === s.id ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
-                    } ${s.id === "stop" ? "lg:mt-3" : ""} ${focusRing}`}
-                  >
-                    <span className="flex items-center gap-1.5">
-                      {s.title}
-                      {s.unsaved && <span aria-label="unsaved" className="h-1.5 w-1.5 rounded-full bg-amber-400" />}
-                    </span>
-                    {s.word && (
-                      <span className={`hidden text-xs lg:inline ${s.word === "On" ? "text-emerald-300" : s.word === "Stopped" ? "text-red-300" : "text-zinc-500"}`}>
-                        {s.word}
-                      </span>
-                    )}
-                  </a>
-                </li>
-              ))}
-              <li className="shrink-0 lg:mt-3 lg:border-t lg:border-zinc-800 lg:pt-3">
-                <a
-                  href="#standards"
-                  className={`flex min-h-8 items-center whitespace-nowrap rounded-md px-2.5 py-1 text-sm text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 ${focusRing}`}
-                >
-                  Every repository
-                </a>
-              </li>
-            </ul>
-          </nav>
-
-          <div className="min-w-0">
-            {/* What the reviewer does here, in plain words. */}
-            <section aria-labelledby="rc-summary" className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4" data-testid="reviewer-summary">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 id="rc-summary" className="min-w-0 wrap-anywhere text-sm font-semibold text-zinc-100">On {repo}</h2>
-                <StatusText look={state} />
-              </div>
-              <ul className="mt-2 space-y-1 text-sm text-zinc-300">
-                {summaryLines(cfg).map((l) => (
-                  <li key={l} className="flex gap-2">
-                    <span aria-hidden="true" className="mt-2 h-1 w-1 shrink-0 rounded-full bg-zinc-500" />
-                    <span className="min-w-0">{l}</span>
-                  </li>
+      <div className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-8">
+        {/* Section nav: one section at a time. A column on wide screens, a select on a phone. */}
+        <nav aria-label="Settings sections" className="min-w-0 lg:sticky lg:top-20 lg:self-start">
+          <div className="lg:hidden">
+            <label htmlFor="rc-section" className="mb-1.5 block text-sm font-medium text-zinc-200">
+              Section
+            </label>
+            <Select id="rc-section" value={view} onChange={(e) => goTo(e.target.value as View)} className="w-full">
+              {navItems
+                .filter((s) => s.id !== "stop")
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.title}
+                    {s.word ? ` (${s.word})` : ""}
+                    {s.unsaved ? " · unsaved" : ""}
+                  </option>
                 ))}
-              </ul>
-              <p className="mt-3 text-xs text-zinc-500" data-testid="not-default-count">
-                {notDefault.length === 0
-                  ? "Every setting is at its default."
-                  : `${notDefault.length} setting${notDefault.length === 1 ? " differs" : "s differ"} from the defaults, marked “Not default” below.`}
-              </p>
-            </section>
+              <option value="standards">Every repository{orgDirty ? " · unsaved" : ""}</option>
+              <option value="stop">Stop everything{stopItem?.word ? ` (${stopItem.word})` : ""}</option>
+            </Select>
+          </div>
+          <ul className="hidden flex-col gap-0.5 lg:flex">
+            {navItems
+              .filter((s) => s.id !== "stop")
+              .map((s) => (
+                <li key={s.id}>{navLink(s.id, s.title, { word: s.word, unsaved: s.unsaved })}</li>
+              ))}
+            <li className="mt-3 border-t border-zinc-800 pt-3">{navLink("standards", "Every repository", { unsaved: orgDirty })}</li>
+            <li className="mt-3 border-t border-zinc-800 pt-3">
+              {navLink("stop", "Stop everything", { word: stopItem?.word, unsaved: stopItem?.unsaved, danger: true })}
+            </li>
+          </ul>
+        </nav>
 
-            <fieldset disabled={readOnly} className="mt-8 min-w-0 space-y-10">
-              <legend className="sr-only">Settings for {repo}</legend>
+        <div className="min-w-0" data-testid="reviewer-config-view" data-view={view}>
+          {readOnly && (
+            <div className="mb-4">
+              <Callout variant="neutral" title="You can view these settings">
+                <p>Only admins can change them. Ask an admin on your team if something should be different.</p>
+              </Callout>
+            </div>
+          )}
+          {view === "standards" ? (
+            <StandardsSection
+              state={orgState}
+              value={orgInstructions}
+              onChange={setOrgInstructions}
+              onRetry={loadOrg}
+              onSave={saveOrg}
+              onDiscard={() => setOrgInstructions(orgSaved)}
+              saving={savingOrg}
+              dirty={orgDirty}
+              readOnly={readOnly}
+            />
+          ) : (
+            <>
+              {/* Repository switcher: the one choice a repo section depends on. */}
+              <div className="flex min-w-0 flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 sm:flex-row sm:items-center sm:gap-4">
+                {/* The picker says "Repository: <name>" itself; this is the visible caption. */}
+                <span aria-hidden="true" className="shrink-0 text-sm font-medium text-zinc-300">Repository</span>
+                <div className="min-w-0 sm:w-96">
+                  <RepoCombobox id="rc-repo" repos={repos} selected={repo} onSelect={selectRepo} placeholder="Choose a repository" className="" />
+                </div>
+                {repoReady && <StatusText look={state} />}
+              </div>
 
+              {!repo ? (
+                <div className="mt-6">
+                  <EmptyState title="Choose a repository">
+                    Choose a repository to see what the reviewer does there and change it. The review standards under Every repository apply to all
+                    of them.
+                  </EmptyState>
+                </div>
+              ) : loading ? (
+                <div className="mt-6 space-y-4" aria-busy="true" aria-label="Loading settings">
+                  <Skeleton className="h-28 w-full" />
+                  <Skeleton className="h-40 w-full" />
+                </div>
+              ) : loadFailed ? (
+                <div className="mt-6">
+                  <Problem title={`Could not load the settings for ${repo}`} onRetry={() => setReloadKey((k) => k + 1)}>
+                    Nothing is shown until they load, so the saved settings can&apos;t be overwritten by mistake. Try again.
+                  </Problem>
+                </div>
+              ) : (
+                <>
+                  {view === "reviews" && (
+                    <section aria-labelledby="rc-summary" className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4" data-testid="reviewer-summary">
+                      <h2 id="rc-summary" className="min-w-0 wrap-anywhere text-sm font-semibold text-zinc-100">
+                        On {repo}
+                      </h2>
+                      <ul className="mt-2 space-y-1 text-sm text-zinc-300">
+                        {summaryLines(cfg).map((l) => (
+                          <li key={l} className="flex gap-2">
+                            <span aria-hidden="true" className="mt-2 h-1 w-1 shrink-0 rounded-full bg-zinc-500" />
+                            <span className="min-w-0">{l}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+
+                  <fieldset disabled={readOnly} className="mt-6 min-w-0">
+                    <legend className="sr-only">
+                      {viewTitle} settings for {repo}
+                    </legend>
+
+              {view === "reviews" && (
               <SettingsSection id="reviews" title="Reviews" description="Whether the reviewer looks at pull requests here, and what it pays attention to.">
                 <SettingsRow
                   label="Enable reviewer for this repo"
@@ -513,11 +559,12 @@ function ReviewerConfigPage() {
                   control={({ labelId, helpId, inputId }) => <Switch id={inputId} checked={cfg.enabled} onChange={(v) => set("enabled", v)} labelledBy={labelId} describedBy={helpId} />}
                 />
                 <SettingsRow
+                  layout="stacked"
                   label="Trigger label"
                   help="Add this label to a pull request to have it reviewed."
                   {...marks("label")}
                   control={({ inputId, helpId }) => (
-                    <input id={inputId} aria-describedby={helpId} value={cfg.label} onChange={(e) => set("label", e.target.value)} placeholder="ch-review" className={`${monoInputClass} ${shortInput}`} />
+                    <input id={inputId} aria-describedby={helpId} value={cfg.label} onChange={(e) => set("label", e.target.value)} placeholder="ch-review" className={monoInputClass} />
                   )}
                 />
                 <SettingsRow
@@ -542,7 +589,9 @@ function ReviewerConfigPage() {
                   )}
                 />
               </SettingsSection>
+              )}
 
+              {view === "tests" && (
               <SettingsSection id="tests" title="Tests">
                 <SettingsRow
                   label="Check the change by running tests"
@@ -566,7 +615,9 @@ function ReviewerConfigPage() {
                   control={({ labelId, helpId, inputId }) => <Switch id={inputId} checked={cfg.require_tests} onChange={(v) => set("require_tests", v)} labelledBy={labelId} describedBy={helpId} />}
                 />
               </SettingsSection>
+              )}
 
+              {view === "labels" && (
               <SettingsSection id="labels" title="CI labels">
                 <SettingsRow
                   label="Add CI labels from what the PR changes"
@@ -631,12 +682,10 @@ function ReviewerConfigPage() {
                   )}
                 </SettingsRow>
               </SettingsSection>
+              )}
 
-              <SettingsSection
-                id="merge"
-                title="Auto-merge"
-                description="Lets the reviewer merge after it approves. It only merges the exact commit it reviewed; a later push blocks the merge."
-              >
+              {view === "merge" && (
+              <SettingsSection id="merge" title="Auto-merge" description="Lets the reviewer merge after it approves. It only merges the exact commit it reviewed; a later push blocks the merge.">
                 <SettingsRow
                   label="Auto-merge on approve"
                   help="Merges once the review approves and all CI has passed."
@@ -678,7 +727,9 @@ function ReviewerConfigPage() {
                   )}
                 />
               </SettingsSection>
+              )}
 
+              {view === "after-merge" && (
               <SettingsSection id="after-merge" title="Tags and health check" description="What happens once a pull request has merged.">
                 <SettingsRow
                   label="Tag after merge"
@@ -765,7 +816,7 @@ function ReviewerConfigPage() {
                             return (
                               <div className="max-h-48 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950">
                                 {shown.length === 0 ? (
-                                  <p className="px-3 py-2 text-sm text-zinc-500">No log groups match “{logGroupFilter}”.</p>
+                                  <p className="px-3 py-2 text-sm text-zinc-400">No log groups match “{logGroupFilter}”.</p>
                                 ) : (
                                   shown.map((lg) => {
                                     const on = cfg.health_log_groups.includes(lg);
@@ -788,7 +839,7 @@ function ReviewerConfigPage() {
                             );
                           })()}
                           {cfg.health_log_groups.length > 0 && (
-                            <p className="mt-1.5 text-xs text-zinc-500">
+                            <p className="mt-1.5 text-xs text-zinc-400">
                               {cfg.health_log_groups.length} of {MAX_LOG_GROUPS} chosen
                               {cfg.health_log_groups.length >= MAX_LOG_GROUPS && ". Clear one to pick another."}
                             </p>
@@ -799,7 +850,9 @@ function ReviewerConfigPage() {
                   )}
                 </SettingsRow>
               </SettingsSection>
+              )}
 
+              {view === "release-notes" && (
               <SettingsSection id="release-notes" title="Release notes">
                 <SettingsRow
                   label="Write release notes for each release tag"
@@ -824,7 +877,6 @@ function ReviewerConfigPage() {
                         {...marks("release_notes_branch")}
                         help={<>Only tags on merges into this branch get notes, for example <Code>main</Code> when features merge into <Code>develop</Code>. Empty: the default branch.</>}
                         mono
-                        controlClassName={shortInput}
                         value={cfg.release_notes_branch}
                         onChange={(e) => set("release_notes_branch", e.target.value)}
                         placeholder="main"
@@ -834,9 +886,9 @@ function ReviewerConfigPage() {
                         summary="Publish to Confluence"
                         defaultOpen={isChanged("release_notes_confluence_parent_id", "release_notes_confluence_container", "release_notes_confluence_space") || !!problem}
                       >
-                        <p className="text-xs text-zinc-500">
-                          Entries go to parent → {cfg.release_notes_confluence_container || "Changelog"} → one page per year, newest at the top, through the
-                          Coderhelm app in Jira (it needs Confluence access). Leave the parent empty to skip Confluence.
+                        <p className="text-sm text-zinc-400">
+                          Entries go under the parent page, in a &ldquo;{cfg.release_notes_confluence_container || "Changelog"}&rdquo; page with one page per
+                          year, newest at the top, through the Coderhelm app in Jira (it needs Confluence access). Leave the parent empty to skip Confluence.
                         </p>
                         <div className="grid min-w-0 gap-4 sm:grid-cols-3">
                           <Field label="Parent page id" {...marks("release_notes_confluence_parent_id")} mono inputMode="numeric" value={cfg.release_notes_confluence_parent_id} onChange={(e) => set("release_notes_confluence_parent_id", e.target.value.replace(/\D/g, ""))} placeholder="123456789" />
@@ -920,7 +972,9 @@ function ReviewerConfigPage() {
                   )}
                 </SettingsRow>
               </SettingsSection>
+              )}
 
+              {view === "reminders" && (
               <SettingsSection id="reminders" title="Review reminders">
                 <SettingsRow
                   label="Remind reviewers in Microsoft Teams or Slack"
@@ -955,7 +1009,9 @@ function ReviewerConfigPage() {
                   )}
                 </SettingsRow>
               </SettingsSection>
+              )}
 
+              {view === "stop" && (
               <SettingsSection id="stop" title="Stop everything" danger>
                 <SettingsRow
                   label="Stop everything"
@@ -965,107 +1021,100 @@ function ReviewerConfigPage() {
                   control={({ labelId, helpId, inputId }) => <Switch id={inputId} checked={cfg.killed} onChange={(v) => set("killed", v)} labelledBy={labelId} describedBy={helpId} />}
                 />
               </SettingsSection>
-            </fieldset>
+              )}
+                  </fieldset>
 
-            {/* Save bar: sticks to the bottom of the screen while there are unsaved edits, and says what they are. */}
-            {!readOnly && (
-              <SaveBar
-                persistent
-                count={unsavedKeys.length}
-                context={repo}
-                problem={problem}
-                onSave={save}
-                onDiscard={discard}
-                saving={saving}
-                saveLabel="Save settings"
-              />
-            )}
-          </div>
+                  {/* One save bar for the repo's settings, whichever section is open. */}
+                  {!readOnly && (
+                    <SaveBar
+                      persistent
+                      count={unsavedKeys.length}
+                      context={repo}
+                      problem={problem}
+                      onSave={save}
+                      onDiscard={discard}
+                      saving={saving}
+                      saveLabel="Save settings"
+                    />
+                  )}
+                </>
+              )}
+            </>
+          )}
         </div>
-      )}
-
-      <StandardsSection
-        state={orgState}
-        value={orgInstructions}
-        onChange={setOrgInstructions}
-        onRetry={loadOrg}
-        onSave={saveOrg}
-        saving={savingOrg}
-        dirty={orgDirty}
-        readOnly={readOnly}
-        indent={ready}
-      />
+      </div>
     </Page>
   );
 }
 
-/** Team-wide standards: one text for every repo, saved on its own. */
+/** Team-wide standards: one text for every repo, its own view with its own save bar. */
 function StandardsSection({
   state,
   value,
   onChange,
   onRetry,
   onSave,
+  onDiscard,
   saving,
   dirty,
   readOnly,
-  indent,
 }: {
   state: "loading" | "ready" | "error";
   value: string;
   onChange: (v: string) => void;
   onRetry: () => void;
   onSave: () => void;
+  onDiscard: () => void;
   saving: boolean;
   dirty: boolean;
   readOnly: boolean;
-  /** Line up with the settings column when the section nav is showing. */
-  indent: boolean;
 }) {
   return (
-    <section id="standards" aria-labelledby="standards-heading" className={`mt-12 min-w-0 scroll-mt-6 ${indent ? "lg:ml-[14rem]" : ""}`}>
-      <h2 id="standards-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Every repository</h2>
-      <p className="mt-1 max-w-prose text-sm text-zinc-400">Shared by all of your repos and saved on its own, separate from the settings above.</p>
+    <section id="standards" aria-labelledby="standards-heading" className="min-w-0">
+      <h2 id="standards-heading" className="text-sm font-semibold text-zinc-100">Every repository</h2>
+      <p className="mt-1 max-w-prose text-sm text-zinc-400">Shared by all of your repos and saved here, separately from each repo&apos;s own settings.</p>
       <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
         <div className="flex flex-wrap items-center gap-2">
           <label htmlFor="org-standards" className="text-sm font-medium text-zinc-100">Review standards for every repo</label>
-          {dirty && <Chip tone="waiting">Unsaved</Chip>}
+          <RowMarks unsaved={dirty} />
         </div>
         <p id="org-standards-help" className="mt-0.5 mb-3 max-w-prose text-sm text-zinc-400">
           Applied to every repo&apos;s review, on top of each repo&apos;s own focus and its AGENTS.md. Put shared conventions here: error handling,
           auth, naming, security expectations.
         </p>
         {state === "error" ? (
-          <Callout variant="error" title="Could not load the review standards">
-            <p>Saving is off until they load, so they cannot be replaced by a blank box.</p>
-            <button type="button" onClick={onRetry} className={`mt-2 ${secondaryButton}`}>Try again</button>
-          </Callout>
+          <Problem title="Could not load the review standards" onRetry={onRetry}>
+            Saving is off until they load, so they can&apos;t be replaced by a blank box. Try again.
+          </Problem>
         ) : (
-          <>
-            <MarkdownEditor
-              id="org-standards"
-              aria-describedby="org-standards-help"
-              variant="instructions"
-              value={value}
-              onChange={onChange}
-              disabled={state !== "ready"}
-              readOnly={readOnly}
-              minRows={5}
-              emptyText="No standards yet."
-              previewNote="The reviewer reads this as written, on every repo."
-              placeholder={state === "loading" ? "Loading…" : "For example: use our error handling wrapper in every handler. Flag any new dependency. Never log secrets."}
-              testId="org-standards"
-            />
-            {!readOnly && (
-              <div className="mt-3 flex justify-end">
-                <button type="button" onClick={onSave} disabled={saving || state !== "ready"} className={primaryButton}>
-                  {saving ? "Saving…" : "Save standards"}
-                </button>
-              </div>
-            )}
-          </>
+          <MarkdownEditor
+            id="org-standards"
+            aria-describedby="org-standards-help"
+            variant="instructions"
+            value={value}
+            onChange={onChange}
+            disabled={state !== "ready"}
+            readOnly={readOnly}
+            minRows={5}
+            emptyText="No standards yet."
+            previewNote="The reviewer reads this as written, on every repo."
+            placeholder={state === "loading" ? "Loading…" : "For example: use our error handling wrapper in every handler. Flag any new dependency. Never log secrets."}
+            testId="org-standards"
+          />
         )}
       </div>
+      {!readOnly && state === "ready" && (
+        <SaveBar
+          persistent
+          count={dirty ? 1 : 0}
+          context="every repository"
+          onSave={onSave}
+          onDiscard={onDiscard}
+          saving={saving}
+          saveLabel="Save standards"
+          testId="standards-save-bar"
+        />
+      )}
     </section>
   );
 }

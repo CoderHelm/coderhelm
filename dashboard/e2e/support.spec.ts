@@ -247,7 +247,7 @@ test.describe("support tickets for a team", () => {
     const db = await mockApi(page);
     await page.goto(`/runs/detail/?id=${RUN.run_id}`);
     const link = page.getByTestId("help-link");
-    await expect(link).toHaveText("Something wrong with this run?");
+    await expect(link).toHaveText("Get help with this run");
     await link.click();
 
     await expect(page.getByRole("heading", { level: 1, name: "Get help" })).toBeVisible();

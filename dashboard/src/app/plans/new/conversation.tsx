@@ -41,7 +41,7 @@ export function timeDivider(prev: StreamMessage | undefined, msg: StreamMessage)
 
 export function TimeDivider({ label }: { label: string }) {
   return (
-    <div className="flex items-center gap-3 py-1 text-xs text-zinc-600" role="separator" aria-label={label}>
+    <div className="flex items-center gap-3 py-1 text-xs text-zinc-400" role="separator" aria-label={label}>
       <span className="h-px flex-1 bg-zinc-800" />
       <span>{label}</span>
       <span className="h-px flex-1 bg-zinc-800" />
@@ -127,7 +127,7 @@ function WorkLine({
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className={`inline-flex max-w-full items-center gap-1.5 rounded-md py-0.5 text-left text-xs text-zinc-500 hover:text-zinc-300 ${focusRing}`}
+        className={`inline-flex max-w-full items-center gap-1.5 rounded-md py-0.5 text-left text-xs text-zinc-400 hover:text-zinc-300 ${focusRing}`}
       >
         {streaming ? (
           <LoaderIcon className="shrink-0 animate-spin motion-reduce:animate-none" />
@@ -145,11 +145,11 @@ function WorkLine({
       </button>
       {open && (
         <div className="mt-1.5 ml-1.5 border-l border-zinc-800 pl-3">
-          {servers.length > 0 && <p className="mb-1 text-xs text-zinc-500">Through {servers.join(", ")}</p>}
+          {servers.length > 0 && <p className="mb-1 text-xs text-zinc-400">Through {servers.join(", ")}</p>}
           {thinking
             .filter((t) => t.content.trim())
             .map((t, i) => (
-              <p key={i} className="mb-1.5 max-h-48 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-zinc-500">
+              <p key={i} className="mb-1.5 max-h-48 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-zinc-400">
                 {t.content}
               </p>
             ))}
@@ -275,7 +275,7 @@ export const AssistantMessage = memo(function AssistantMessage({
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-medium text-zinc-200">{plan.change ? "Updated the plan" : "Drafted the plan"}</span>
-            <span className="block truncate text-xs text-zinc-500">
+            <span className="block truncate text-xs text-zinc-400">
               {plan.change ? changeWords(plan.change) || "No task changes" : `${plan.tasks} task${plan.tasks === 1 ? "" : "s"}`}
             </span>
           </span>
@@ -344,7 +344,7 @@ export const UserMessage = memo(function UserMessage({
           className="w-full resize-none rounded-xl border border-zinc-600 bg-zinc-800 px-4 py-2.5 text-sm text-zinc-100 focus:border-zinc-500 focus:outline-none"
         />
         <div className="mt-1.5 flex justify-end gap-2">
-          <button type="button" onClick={() => setEditing(false)} className={`flex items-center gap-1 rounded px-2.5 py-1 text-xs text-zinc-500 hover:text-zinc-300 ${focusRing}`}>
+          <button type="button" onClick={() => setEditing(false)} className={`flex items-center gap-1 rounded px-2.5 py-1 text-xs text-zinc-400 hover:text-zinc-300 ${focusRing}`}>
             <XIcon />
             Cancel
           </button>
@@ -373,7 +373,7 @@ export const UserMessage = memo(function UserMessage({
           }}
           aria-label="Edit message"
           title="Edit message"
-          className={`mt-1.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-zinc-600 hover:text-zinc-300 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 ${focusRing}`}
+          className={`mt-1.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-zinc-400 hover:text-zinc-300 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 ${focusRing}`}
         >
           <PenIcon />
         </button>

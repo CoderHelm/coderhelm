@@ -21,7 +21,7 @@ import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Skeleton } from "@/components/skeleton";
 import { CopyButton } from "@/components/copy-button";
-import { focusRing, inputClass, primaryButton, secondaryButton } from "@/components/ui";
+import { focusRing, inputClass, primaryButton, secondaryButton, smallSecondaryButton } from "@/components/ui";
 import { Tabs } from "@/components/tabs";
 import { Page, PageHeader, Section, cardClass } from "@/components/page";
 import { StatusPill } from "@/components/status-pill";
@@ -32,15 +32,16 @@ import {
   ListRow,
   ListSkeleton,
   ListToolbar,
-  TONES,
+  Chip,
   Time,
+  formatDate,
   useListParams,
   type Tone,
 } from "@/components/list";
 
 const fmtInt = (n: number) => n.toLocaleString();
 const fmtUsd = (n: number) => `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const fmtDate = (iso: string) => (iso ? new Date(iso).toLocaleDateString() : "");
+const fmtDate = (iso: string) => formatDate(iso);
 const plural = (n: number, one: string, many = `${one}s`) => `${fmtInt(n)} ${n === 1 ? one : many}`;
 
 /** The allowlist gets its own search once it is this long. */
@@ -59,13 +60,6 @@ const SIGNUP_LOOK: Record<BetaSignupStatus, { label: string; tone: Tone }> = {
   joined: { label: "Joined", tone: "success" },
 };
 
-function Chip({ tone = "neutral", children }: { tone?: Tone; children: ReactNode }) {
-  return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs whitespace-nowrap ${TONES[tone].chip}`}>
-      {children}
-    </span>
-  );
-}
 
 function planWord(plan: string): string {
   return plan ? `${plan[0].toUpperCase()}${plan.slice(1)} plan` : "Beta";
@@ -189,7 +183,7 @@ function AdminPage() {
     <Page>
       <PageHeader
         title="Platform admin"
-        lead="Every organisation using Coderhelm, who is waiting to get in, and who may sign up."
+        lead="Every organization using Coderhelm, who is waiting to get in, and who may sign up."
         actions={
           <div className="flex flex-wrap gap-2">
             <Link href="/admin/queue" className={secondaryButton}>
@@ -333,10 +327,14 @@ function UsageCheckPanel() {
 
   return (
     <Section
-      title="Usage check"
+      title={
+        <span className="inline-flex flex-wrap items-center gap-2">
+          Usage check
+          {pill}
+        </span>
+      }
       id="usage-check"
       description="Once a day, the model usage Coderhelm recorded for each team is compared with Anthropic's own report."
-      actions={pill}
     >
       <div data-testid="usage-check" data-state={check ? (ok ? "ok" : check.state === "ran" ? "problems" : check.state) : error ? "error" : "loading"}>
         {error ? (
@@ -347,8 +345,9 @@ function UsageCheckPanel() {
           <ListSkeleton rows={1} label="Loading the usage check" />
         ) : (
           <>
+            <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/30">
             {check.state === "ran" && (
-              <p className={`${cardClass} text-sm text-zinc-300`}>
+              <p className="px-4 py-3 text-sm text-zinc-300">
                 {ok ? "Recorded usage matches Anthropic's report: " : ""}
                 {plural(check.teams ?? 0, "team")} compared for {check.day || "the last day"}
                 {check.checked_at && (
@@ -361,12 +360,13 @@ function UsageCheckPanel() {
               </p>
             )}
             {problems.length > 0 && (
-              <List label="Usage check problems" className={check.state === "ran" ? "mt-3" : ""}>
+              <List label="Usage check problems" className={`rounded-none border-0 bg-transparent ${check.state === "ran" ? "border-t border-zinc-800" : ""}`}>
                 {problems.map((x) => (
                   <ListRow key={x.key} testId="usage-problem" data={{ problem: x.key }} status={{ tone: x.tone }} title={x.title} summary={x.summary} summaryTone="muted" />
                 ))}
               </List>
             )}
+            </div>
           </>
         )}
       </div>
@@ -407,15 +407,15 @@ function TeamsView({
     <section aria-labelledby="teams-heading" className="mt-6">
       <h2 id="teams-heading" className="sr-only">Teams</h2>
       <p className="mb-4 text-sm text-zinc-500">
-        {plural(orgs.length, "organisation")} with {plural(teamTotal, "team")}. Teams on the same GitHub installation, Jira site,
-        people or company email domain sit under one organisation; runs and cost this month are for {month || "this month"}.
+        {plural(orgs.length, "organization")} with {plural(teamTotal, "team")}. Teams on the same GitHub installation, Jira site,
+        people or company email domain sit under one organization; runs and cost this month are for {month || "this month"}.
       </p>
       <ListToolbar
         className="mb-4"
         search={{
           value: q,
           onChange: (v) => setParams({ q: v }, { replace: true }),
-          placeholder: "Search organisations, teams, ids or domains",
+          placeholder: "Search organizations, teams, ids or domains",
           label: "Search teams",
         }}
         status={{
@@ -429,7 +429,7 @@ function TeamsView({
           ],
         }}
         sort={{ value: sort, onChange: (v) => setParams({ sort: v }), options: TEAM_SORTS }}
-        summary={`Showing ${plural(shown.length, "organisation")}, ${plural(shownTeams, "team")}`}
+        summary={`Showing ${plural(shown.length, "organization")}, ${plural(shownTeams, "team")}`}
         onClear={filtered ? clear : undefined}
       />
       {shown.length === 0 ? (
@@ -465,7 +465,7 @@ function OrgRow({ org, hidden, filter }: { org: AdminOrg; hidden: number; filter
       summaryTone="muted"
       chips={<Chip>{planWord(org.plan)}</Chip>}
       time={org.last_active_at || null}
-      detailsLabel={org.teams.length === 1 ? "Team" : plural(org.teams.length, "team")}
+      detailsLabel={plural(org.teams.length, "team")}
       detailsFor={`teams of ${name}`}
       details={
         <ul aria-label={`Teams of ${name}`} className="divide-y divide-zinc-800/70 -my-1">
@@ -488,7 +488,7 @@ function TeamLine({ team: t }: { team: AdminTeam }) {
         {!t.active && <Chip tone="muted">No activity</Chip>}
         {t.status !== "active" && <Chip tone="waiting">{t.status}</Chip>}
       </div>
-      <p className="mt-0.5 font-mono text-[11px] text-zinc-500 [overflow-wrap:anywhere]">{t.team_id}</p>
+      <p className="mt-0.5 font-mono text-xs text-zinc-400 [overflow-wrap:anywhere]">{t.team_id}</p>
       <p className="mt-1 flex flex-wrap gap-x-1.5 text-xs text-zinc-400">
         <span>{plural(t.members, "member")}{t.invites > 0 ? ` (+${t.invites} invited)` : ""}</span>
         <span aria-hidden="true">·</span>
@@ -643,7 +643,7 @@ function BetaView({
                             onClick={() => void invite(s)}
                             disabled={inviting === s.email}
                             aria-label={`Mark ${s.email} invited`}
-                            className={`${secondaryButton} !px-3 !py-1 text-xs`}
+                            className={`${smallSecondaryButton}`}
                           >
                             {inviting === s.email ? "Saving..." : "Mark invited"}
                           </button>

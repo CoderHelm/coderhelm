@@ -1,6 +1,7 @@
 "use client";
 
-import { PageHeader } from "@/components/page";
+import { KindPicker } from "@/components/data-source-kinds";
+import { Page, PageHeader } from "@/components/page";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
@@ -95,6 +96,21 @@ function ConnectDataSourcePage() {
   const source = sources?.find((s) => s.id === id) ?? null;
   const updateSource = (next: DataSource) =>
     setSources((prev) => (prev ? prev.map((s) => (s.id === next.id ? next : s)) : [next]));
+
+  // Opened with no step (an old link, the palette): ask what kind of source
+  // first, instead of dropping everyone into the API flow.
+  if (!params.get("step") && !id && !url) {
+    return (
+      <Page>
+        <div className="mb-6">
+          <PageHeader title="What do you want to connect?" lead="Pick the kind of system. Each one takes a few minutes and ends with a check that Coderhelm can only read." />
+        </div>
+        <div data-testid="connect-kind-picker">
+          <KindPicker />
+        </div>
+      </Page>
+    );
+  }
 
   if (step === "address") {
     return (
@@ -732,7 +748,7 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
   };
 
   const panel = "rounded-lg border border-zinc-800 bg-zinc-900/50 p-5";
-  const panelTitle = "text-xs font-semibold uppercase tracking-wider text-zinc-500";
+  const panelTitle = "text-xs font-semibold uppercase tracking-wider text-zinc-400";
   const queryLabel = kind === "database" ? "One SQL SELECT" : kind === "logs" ? "A Logs Insights search" : "A GraphQL read query";
   const placeholder =
     kind === "database"
@@ -861,7 +877,7 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
                 className="mt-2"
               />
               {kind === "logs" && result.fields.length > 0 && (
-                <p className="mt-2 text-xs text-zinc-500">In {result.fields.join(", ")}</p>
+                <p className="mt-2 text-xs text-zinc-400">In {result.fields.join(", ")}</p>
               )}
             </section>
             <section aria-labelledby="back-heading" className={panel}>
@@ -888,7 +904,7 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
               ) : (
                 <>
                   <CodeBlock code={prettyJson(result.result ?? "")} lang="json" label="What came back" maxHeightClass="max-h-96" className="mt-2" />
-                  <p className="mt-2 text-xs text-zinc-500">
+                  <p className="mt-2 text-xs text-zinc-400">
                     {result.note && (
                       <span>
                         {result.note}

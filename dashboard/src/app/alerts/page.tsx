@@ -4,7 +4,7 @@ import { Suspense, useMemo } from "react";
 import Link from "next/link";
 import { api, type AlertEvent } from "@/lib/api";
 import { RoleGuard } from "@/components/role-guard";
-import { linkButton } from "@/components/ui";
+import { primaryButton, secondaryButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
 import {
   GROUP_LABEL,
@@ -20,7 +20,7 @@ import {
   usePagedList,
   useTeamRepos,
 } from "@/components/list";
-import { OUTCOMES, OUTCOME_GROUPS, outcomeLook } from "./outcome";
+import { KIND_LABEL, OUTCOMES, OUTCOME_GROUPS, humanize, outcomeDetail, outcomeLook } from "./outcome";
 
 export default function AlertsHistoryGuarded() {
   return (
@@ -63,13 +63,11 @@ function AlertsHistory() {
     <Page>
       <PageHeader
         title="Alerts"
-        lead={
-          <>
-            Every alert Coderhelm received on your alert routes and what it did with it. Open one to share its link.{" "}
-            <Link href="/settings/alerts" className={linkButton}>
-              Alert routes
-            </Link>
-          </>
+        lead="Alerts from your monitoring tools, and what Coderhelm did with each one."
+        actions={
+          <Link href="/settings/alerts" className={secondaryButton}>
+            Alert routes
+          </Link>
         }
       />
 
@@ -107,7 +105,16 @@ function AlertsHistory() {
         ) : error ? (
           <ListError title="We couldn't load your alerts" onRetry={reload} />
         ) : alerts.length === 0 ? (
-          <ListEmpty title="No alerts yet">Alerts appear here once a topic mapped in Alert routes publishes one.</ListEmpty>
+          <ListEmpty
+            title="No alerts yet"
+            action={
+              <Link href="/settings/alerts" className={primaryButton}>
+                Set up alert routes
+              </Link>
+            }
+          >
+            When one of your monitoring tools sends an alert to Coderhelm, it shows up here with what Coderhelm did about it.
+          </ListEmpty>
         ) : shown.length === 0 ? (
           <ListEmpty title={q ? `No alerts match “${q}”` : "No alerts here"} onClear={clear}>
             {next ? "Only the alerts loaded so far were searched. Load more to search older ones." : undefined}
@@ -121,12 +128,16 @@ function AlertsHistory() {
                   key={a.id}
                   testId="alert-row"
                   data={{ outcome: a.outcome }}
-                  status={look}
-                  title={a.title || "(untitled alert)"}
+                  title={a.title || <span className="italic text-zinc-400">Alert with no title</span>}
                   titleText={a.title || undefined}
                   href={`/alerts/detail?id=${a.id}`}
-                  meta={[a.ticket_id || null, !repo ? a.repo || null : null]}
-                  chips={<StatusText look={look} />}
+                  meta={[a.kind ? KIND_LABEL[a.kind] ?? humanize(a.kind) : null, !repo ? a.repo || null : null]}
+                  summary={outcomeDetail(a.outcome)}
+                  chips={
+                    <span title={look.hover}>
+                      <StatusText look={look} />
+                    </span>
+                  }
                   time={a.received_at}
                 />
               );

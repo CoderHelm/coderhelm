@@ -1,3 +1,4 @@
+import { ROUTES } from "./routes";
 // Support tickets: the words, colours and links both sides use, so the
 // customer's list and the admin queue say the same thing the same way.
 
@@ -75,7 +76,8 @@ export function itemHref(item: SupportItem): string {
 
 /** The page a ticket was filed from, as a menu-style name. */
 export function pageWords(page: string): string {
-  const path = page.replace(/\/+$/, "") || "/";
+  // The page's own name, never its raw address: drop the query and the hash.
+  const path = page.split(/[?#]/)[0].replace(/\/+$/, "") || "/";
   const known: Record<string, string> = {
     "/": "Runs",
     "/runs/detail": "A run",
@@ -86,7 +88,9 @@ export function pageWords(page: string): string {
     "/plans/detail": "A plan",
     "/settings": "Settings",
   };
-  return known[path] ?? path;
+  if (known[path]) return known[path];
+  const route = ROUTES[path];
+  return route ? (route.detail ? `A ${route.label.toLowerCase()}` : route.label) : path;
 }
 
 /** When a time is, in words: "in 3 h 20 min", "in 2 days". Empty once it has passed. */

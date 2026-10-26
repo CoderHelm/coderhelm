@@ -201,7 +201,7 @@ test("one list per section, each row with its status in the same column and one 
   await page.goto("/settings/integrations");
   await expect(page.getByRole("heading", { name: "Integrations", level: 1 })).toBeVisible();
   const headings = page.getByRole("main").getByRole("heading", { level: 2 });
-  await expect(headings).toHaveText(["Code and tickets", "Cloud", "Monitoring", "Docs and design", "Chat", "Other tools", "MCP servers", "Your websites", "Data sources"]);
+  await expect(headings).toHaveText(["Code and tickets", "Cloud", "Monitoring", "Docs and design", "Chat", "Other tools", "MCP servers", "Your websites"]);
   await expect(page.getByTestId("integrations-summary")).toContainText("4 connected · 3 need credentials");
   // Lists, not card grids.
   await expect(page.getByRole("main").getByRole("list", { name: "Monitoring" }).getByRole("listitem")).toHaveCount(2);
@@ -213,7 +213,9 @@ test("one list per section, each row with its status in the same column and one 
   await expect(jira).toHaveAccessibleName("Jira, Not connected. Connect");
   await expect(row(page, "jira").getByTestId("integration-action")).toHaveText("Connect");
   await expect(row(page, "newrelic").getByTestId("integration-status")).toContainText("Connected");
-  await expect(row(page, "newrelic").getByTestId("integration-status")).toContainText(/Checked (1 h(ou)?r? ago|60 min ago)/);
+  // One "Checked" line for the page; a recent row doesn't repeat it.
+  await expect(page.getByTestId("integrations-checked")).toContainText(/Checked \d+ min(utes?)? ago/);
+  await expect(row(page, "newrelic").getByTestId("integration-status")).not.toContainText("Checked");
 
   // Switched on without credentials: the status says it and the action fixes it; the why is inside.
   for (const [id, name] of [["sentry", "Sentry"], ["figma", "Figma"], ["sanity", "Sanity"]]) {
@@ -506,7 +508,7 @@ test("your websites: an admin adds and removes domains, and a bad entry says why
   await card.getByRole("button", { name: "Add" }).click();
   await expect(card.getByTestId("website-name")).toHaveText(["example.com", "docs.example.org", "shop.example.net"]);
   await expect(card.getByLabel("Add a domain")).toHaveValue("");
-  expect(db.calls.filter((c) => c.method === "PUT").at(-1)?.body).toEqual({ web_domains: ["example.com", "https://Docs.Example.org/", "shop.example.net"] });
+  expect(db.calls.filter((c) => c.method === "PUT").at(-1)?.body).toEqual({ web_domains: ["example.com", "docs.example.org", "shop.example.net"] });
 
   await card.getByLabel("Add a domain").fill("10.0.0.1");
   await card.getByRole("button", { name: "Add" }).click();

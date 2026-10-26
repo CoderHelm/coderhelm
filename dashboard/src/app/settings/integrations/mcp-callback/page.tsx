@@ -1,5 +1,6 @@
 "use client";
 
+import { Problem, TechnicalDetails } from "@/components/problem";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
@@ -7,7 +8,7 @@ import { errorMessage } from "@/lib/data-sources";
 import { RoleGuard } from "@/components/role-guard";
 import { Page, PageHeader } from "@/components/page";
 import { Callout } from "@/components/callout";
-import { linkButton } from "@/components/ui";
+import { linkButton, secondaryButton } from "@/components/ui";
 import { returnAddress, takeReturn } from "@/lib/knowledge";
 import { MCP_CONNECTED_MESSAGE } from "@/components/sign-in-card";
 
@@ -80,10 +81,15 @@ function McpCallback() {
     <Page testId="mcp-callback-page">
       <PageHeader title="Connecting an MCP server" />
       <div className="mt-6 max-w-xl" data-testid="mcp-callback" data-state={view.kind}>
-        {view.kind === "working" && <p className="text-sm text-zinc-400">Finishing the sign-in…</p>}
+        {view.kind === "working" && (
+          <p role="status" className="flex items-center gap-2.5 text-sm text-zinc-300">
+            <span aria-hidden="true" className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-zinc-600 border-t-zinc-200 motion-reduce:animate-none" />
+            Finishing the sign-in…
+          </p>
+        )}
         {view.kind === "idle" && (
           <p className="text-sm text-zinc-400">
-            This page finishes a sign-in to an MCP server. Start one from{" "}
+            Nothing to finish here. To connect an MCP server, start from{" "}
             <Link href="/settings/integrations/#mcp-servers" className={linkButton}>
               Integrations
             </Link>
@@ -92,18 +98,21 @@ function McpCallback() {
         )}
         {view.kind === "done" && (
           <Callout variant="success" title={`${view.name} is connected`}>
-            <p>{view.note ? `Its tools couldn't be listed yet: ${view.note}` : "Taking you back to pick its tools…"}</p>
+            <p>{view.note ? "Connected, but its tools couldn't be listed yet. Open Integrations to try again." : "Taking you back to pick its tools…"}</p>
+            {view.note && <TechnicalDetails text={view.note} />}
           </Callout>
         )}
         {view.kind === "failed" && (
-          <Callout variant="error" title="The server isn't connected">
-            <p>{view.message}</p>
-            <p>
-              <Link href="/settings/integrations/#mcp-servers" className={linkButton}>
+          <Problem
+            title="The server isn't connected"
+            action={
+              <Link href="/settings/integrations/#mcp-servers" className={secondaryButton}>
                 Back to Integrations
               </Link>
-            </p>
-          </Callout>
+            }
+          >
+            {view.message} Go back to Integrations and connect the server again.
+          </Problem>
         )}
       </div>
     </Page>

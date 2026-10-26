@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api, type Review } from "@/lib/api";
 import { RoleGuard } from "@/components/role-guard";
-import { Markdown } from "@/components/markdown";
+import { InlineMarkdown, Markdown } from "@/components/markdown";
 import { ChatMarkdown } from "@/components/chat-markdown";
 import { MarkdownEditor, clearDraft } from "@/components/markdown-editor";
 import { langFromPath } from "@/lib/highlight";
@@ -15,10 +15,10 @@ import { ReReviewButton } from "@/components/re-review-button";
 import { Callout } from "@/components/callout";
 import { HelpLink } from "@/components/support";
 import { Skeleton } from "@/components/skeleton";
-import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
-import { Page, PageHeader, cardClass } from "@/components/page";
+import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { Page, PageHeader, SectionHeading, cardClass } from "@/components/page";
 import { ExternalLinkIcon, ThumbsDownIcon, ThumbsUpIcon } from "@/components/icons";
-import { TONES, Time } from "@/components/list";
+import { Chip, TONES, Time, type Tone } from "@/components/list";
 import { VerdictPill, RiskText } from "../labels";
 import { WorkUsedLine } from "@/components/work-used";
 import { bySeverity, fileUrl, reviewParts, type Finding } from "./findings";
@@ -76,7 +76,7 @@ function postedNote(verdict: string, postedAs: string): string | null {
   if (verdict === "QUESTION") return "Answered in a comment on the PR.";
   if (verdict === "COMMENT") return "Posted as a comment. Reviews from before verdicts were always an approval or a change request.";
   if (postedAs === "COMMENT" && (verdict === "APPROVE" || verdict === "REQUEST_CHANGES")) {
-    return "Posted as a comment because Coderhelm opened this PR. GitHub doesn't let a PR's author approve or request changes.";
+    return "Posted as a comment (GitHub doesn't let Coderhelm approve or request changes on a PR it opened).";
   }
   if (postedAs === "APPROVE") return "Posted on GitHub as an approval.";
   if (postedAs === "REQUEST_CHANGES") return "Posted on GitHub as a change request.";
@@ -225,13 +225,13 @@ function Header({ review, title }: { review: Review; title: string }) {
         detail
         crumb={`${shortRepo(review.repo)} #${review.pr_number}`}
         title={
-          <a href={prUrl} target="_blank" rel="noreferrer" className={`relative block truncate ${externalLink}`} title={title || review.repo}>
+          <a href={prUrl} target="_blank" rel="noreferrer" className={`relative line-clamp-3 [overflow-wrap:anywhere] ${externalLink}`} title={title || review.repo}>
             {title || repoRef}
             <span className="sr-only"> (opens the PR on GitHub in a new tab)</span>
           </a>
         }
         titleClassName="w-full"
-        lead={title ? <span className="text-zinc-500">{repoRef}</span> : undefined}
+        lead={title ? <span className="text-zinc-400">{repoRef}</span> : undefined}
         actions={
           <>
             <a href={prUrl} target="_blank" rel="noreferrer" className={`${secondaryButton} gap-1.5`}>
@@ -239,7 +239,7 @@ function Header({ review, title }: { review: Review; title: string }) {
               <span aria-hidden="true" className="inline-flex"><ExternalLinkIcon /></span>
               <span className="sr-only"> (opens in a new tab)</span>
             </a>
-            <ReReviewButton repo={review.repo} pr={review.pr_number} className="min-h-9 !rounded-lg !px-4 !text-sm font-medium" />
+            <ReReviewButton repo={review.repo} pr={review.pr_number} size="md" />
           </>
         }
       />
@@ -248,13 +248,12 @@ function Header({ review, title }: { review: Review; title: string }) {
         <VerdictPill verdict={review.verdict} />
         <RiskText risk={review.risk} />
       </div>
-      <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-500" aria-label="About this review">
+      <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-zinc-400" aria-label="About this review">
         {trigger && <li>{trigger}</li>}
         {sha && (
           <li>
-            Reviewed commit{" "}
-            <a href={`https://github.com/${review.repo}/commit/${sha}`} target="_blank" rel="noreferrer" className={`font-mono text-zinc-300 ${externalLink}`}>
-              {sha.slice(0, 7)}
+            <a href={`https://github.com/${review.repo}/commit/${sha}`} target="_blank" rel="noreferrer" title={`Reviewed commit ${sha}`} className={`text-zinc-300 ${externalLink}`}>
+              Commit {sha.slice(0, 7)}
             </a>
           </li>
         )}
@@ -264,17 +263,18 @@ function Header({ review, title }: { review: Review; title: string }) {
           </li>
         )}
       </ul>
-      {posted && <p className="mt-1.5 max-w-prose text-xs text-zinc-500" data-testid="posted-note">{posted}</p>}
+      {posted && <p className="mt-1.5 max-w-prose text-sm text-zinc-400" data-testid="posted-note">{posted}</p>}
     </div>
   );
 }
 
-const SEVERITY_TONE: Record<string, string> = {
-  blocking: TONES.danger.chip,
-  high: TONES.danger.chip,
-  medium: TONES.waiting.chip,
-  low: TONES.neutral.chip,
-  nit: TONES.muted.chip,
+// One severity vocabulary: the same words and colours as the risk on the list.
+const SEVERITY_TONE: Record<string, Tone> = {
+  blocking: "danger",
+  high: "danger",
+  medium: "waiting",
+  low: "neutral",
+  nit: "muted",
 };
 
 const KIND_WORD: Record<string, string> = {
@@ -282,9 +282,10 @@ const KIND_WORD: Record<string, string> = {
   concern: "Unverified concern",
   question: "Question",
   note: "Note",
+  suggestion: "Suggestion",
 };
 
-const chip = "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap";
+const sentence = (w: string) => (w ? w.charAt(0).toUpperCase() + w.slice(1).replace(/_/g, " ").toLowerCase() : w);
 
 function FindingCard({ f, repo, sha }: { f: Finding; repo: string; sha: string }) {
   const url = fileUrl(repo, sha, f.file, f.line);
@@ -292,10 +293,10 @@ function FindingCard({ f, repo, sha }: { f: Finding; repo: string; sha: string }
   return (
     <li className={`${cardClass} space-y-2`} data-testid="finding">
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className={`${chip} ${SEVERITY_TONE[f.severity] ?? TONES.neutral.chip}`}>{f.severity.charAt(0).toUpperCase() + f.severity.slice(1)}</span>
-        {f.kind && <span className={`${chip} ${TONES.muted.chip}`}>{KIND_WORD[f.kind] ?? f.kind}</span>}
+        <Chip tone={SEVERITY_TONE[f.severity] ?? "neutral"}>{sentence(f.severity)}</Chip>
+        {f.kind && <Chip tone="muted">{KIND_WORD[f.kind] ?? sentence(f.kind)}</Chip>}
       </div>
-      <h3 className="text-sm font-semibold text-zinc-100 [overflow-wrap:anywhere]">{f.title || "Untitled finding"}</h3>
+      <h3 className="text-sm font-semibold text-zinc-100 [overflow-wrap:anywhere]">{f.title ? <InlineMarkdown>{f.title}</InlineMarkdown> : "Untitled finding"}</h3>
       {where &&
         (url ? (
           <a href={url} target="_blank" rel="noreferrer" className={`inline-block max-w-full font-mono text-xs text-zinc-400 underline decoration-zinc-700 underline-offset-2 hover:text-zinc-200 hover:decoration-zinc-400 [overflow-wrap:anywhere] ${focusRing} rounded`}>
@@ -318,9 +319,9 @@ function FindingGroup({ id, title, list, repo, sha }: { id: string; title: strin
   if (list.length === 0) return null;
   return (
     <section className="mt-6" aria-labelledby={id}>
-      <h2 id={id} className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-        {title} <span className="text-zinc-600">· {list.length}</span>
-      </h2>
+      <SectionHeading id={id} count={list.length}>
+        {title}
+      </SectionHeading>
       <ul className="mt-2 space-y-3">
         {list.map((f, i) => (
           <FindingCard key={`${f.file}:${f.line}:${i}`} f={f} repo={repo} sha={sha} />
@@ -343,7 +344,7 @@ function ReviewBody({ review }: { review: Review }) {
       <section className={`mt-6 ${cardClass}`} aria-labelledby="review-summary">
         <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="review-summary" className="text-sm font-semibold text-zinc-200">Summary</h2>
-          {findings.length > 0 && <span className="text-xs text-zinc-500" data-testid="finding-counts">{counts}</span>}
+          {findings.length > 0 && <span className="text-sm text-zinc-400" data-testid="finding-counts">{counts}</span>}
         </div>
         <div className="min-w-0 overflow-x-auto [&_p:last-child]:mb-0">
           <Markdown>{summary || (findings.length > 0 ? "_No summary._" : "_The review has no text._")}</Markdown>
@@ -447,19 +448,19 @@ function Rating({ review, onSaved }: { review: Review; onSaved: () => void }) {
           {answer("up")}
           {answer("down")}
         </div>
+        {total > 0 && (
+          <span className="text-sm text-zinc-400" data-testid="rating-counts">
+            {review.thumbs_up} said yes · {review.thumbs_down} said no
+          </span>
+        )}
         {rated ? (
-          <span className="text-xs text-zinc-500" role="status">Thanks, your answer is saved.</span>
+          <span className="text-sm text-zinc-400 sm:ml-auto" role="status">Thanks, your answer is saved.</span>
         ) : (
           !noteOpen && (
-            <button type="button" onClick={() => setNoteOpen(true)} className={linkButton}>
+            <button type="button" onClick={() => setNoteOpen(true)} className={`${linkButton} sm:ml-auto`}>
               Add a note
             </button>
           )
-        )}
-        {total > 0 && (
-          <span className="text-xs text-zinc-500 sm:ml-auto" data-testid="rating-counts">
-            {review.thumbs_up} said yes · {review.thumbs_down} said no
-          </span>
         )}
       </div>
 
@@ -491,7 +492,7 @@ function Rating({ review, onSaved }: { review: Review; onSaved: () => void }) {
         </div>
       )}
 
-      <p className="mt-3 text-xs text-zinc-500">
+      <p className="mt-3 text-sm text-zinc-400">
         Coderhelm also learns from your replies on the PR on its own, so there is no need to repeat them here.
       </p>
 
@@ -499,11 +500,11 @@ function Rating({ review, onSaved }: { review: Review; onSaved: () => void }) {
         <ul className="mt-4 space-y-3 border-t border-zinc-800 pt-4" aria-label="Notes on this review">
           {review.rating_comments.map((c, i) => (
             <li key={i} className="text-sm">
-              <div className="mb-0.5 flex flex-wrap items-center gap-x-2 text-xs text-zinc-500">
-                <span className="min-w-0 text-zinc-300 wrap-anywhere">{c.by}</span>
+              <div className="mb-0.5 flex flex-wrap items-center gap-x-2 text-xs text-zinc-400">
+                <span className="min-w-0 font-medium text-zinc-200 wrap-anywhere" title={c.by}>{personName(c.by)}</span>
                 {c.rating === "up" && <span className={TONES.success.text}>said it was right</span>}
                 {c.rating === "down" && <span className={TONES.danger.text}>said it was wrong</span>}
-                {c.at && <span>· {new Date(c.at).toLocaleDateString()}</span>}
+                {c.at && <span>· <Time iso={c.at} /></span>}
               </div>
               <div><ChatMarkdown breaks>{c.text}</ChatMarkdown></div>
             </li>
@@ -512,4 +513,10 @@ function Rating({ review, onSaved }: { review: Review; onSaved: () => void }) {
       )}
     </section>
   );
+}
+
+/** A person's name to show: the part before the @ of an email, else as given. The full value is the hover text. */
+function personName(by: string): string {
+  const at = by.indexOf("@");
+  return at > 0 ? by.slice(0, at) : by;
 }

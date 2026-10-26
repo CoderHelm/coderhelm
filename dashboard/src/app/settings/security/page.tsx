@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/toast";
@@ -9,17 +9,27 @@ import { Skeleton } from "@/components/skeleton";
 import { Page, PageHeader } from "@/components/page";
 import { StatusDot } from "@/components/list";
 import { CopyButton } from "@/components/copy-button";
+import { Problem } from "@/components/problem";
+import { ExternalLinkIcon } from "@/components/icons";
 import { buttonClass, dangerButton, ghostButton, primaryButton } from "@/components/ui";
 import { Code, Field, SettingsSection } from "@/components/settings";
 
 /** The one name for it on this page and in Settings. */
 const TWO_STEP = "Two step sign in";
 
+/** How each sign-in provider is spelled, and where its own security settings live. */
+const PROVIDERS: Record<string, { name: string; settings: string }> = {
+  github: { name: "GitHub", settings: "https://github.com/settings/security" },
+  google: { name: "Google", settings: "https://myaccount.google.com/security" },
+};
+
 export default function SecurityPage() {
   const { toast } = useToast();
   const { confirm } = useConfirm();
 
   const [authProvider, setAuthProvider] = useState<string | null>(null);
+  const [login, setLogin] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   // Password
   const [currentPassword, setCurrentPassword] = useState("");
@@ -38,8 +48,10 @@ export default function SecurityPage() {
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [mfaLoading, setMfaLoading] = useState(false);
 
-  useEffect(() => {
+  const loadMe = useCallback(() => {
+    setLoadFailed(false);
     api.me().then((u) => {
+      setLogin(u.github_login ?? u.email ?? null);
       // The provider: the explicit field, or GitHub when the account has a GitHub login.
       if (u.auth_provider && u.auth_provider !== "email") {
         setAuthProvider(u.auth_provider);
@@ -49,8 +61,10 @@ export default function SecurityPage() {
         setAuthProvider(u.auth_provider ?? "email");
       }
       if (u.mfa_enabled) setMfaEnabled(true);
-    }).catch(() => {});
+    }).catch(() => setLoadFailed(true));
   }, []);
+
+  useEffect(loadMe, [loadMe]);
 
   const isOAuth = authProvider === "github" || authProvider === "google";
   const header = (
@@ -59,11 +73,24 @@ export default function SecurityPage() {
     </div>
   );
 
+  if (loadFailed) {
+    return (
+      <Page>
+        {header}
+        <div className="max-w-3xl">
+          <Problem title="Couldn't load your sign-in settings" onRetry={loadMe}>
+            Nothing has changed. Check your connection and try again.
+          </Problem>
+        </div>
+      </Page>
+    );
+  }
+
   if (authProvider === null) {
     return (
       <Page>
         {header}
-        <div className="max-w-md space-y-4" aria-busy="true" aria-label="Loading">
+        <div className="max-w-3xl space-y-4" aria-busy="true" aria-label="Loading">
           <Skeleton className="h-48 w-full" />
         </div>
       </Page>
@@ -92,7 +119,6 @@ export default function SecurityPage() {
       setConfirmPassword("");
     } catch {
       setPasswordError("The password was not changed. Check your current password.");
-      toast("Failed to change password. Check your current password.", "error");
     } finally {
       setChangingPassword(false);
     }
@@ -166,14 +192,31 @@ export default function SecurityPage() {
   };
 
   if (isOAuth) {
+    const provider = PROVIDERS[authProvider] ?? { name: authProvider, settings: "" };
     return (
       <Page>
         {header}
-        <div className="max-w-md rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
-          <p className="text-sm text-zinc-400">
-            You sign in with <span className="font-medium capitalize text-zinc-200">{authProvider}</span>. Your password and{" "}
-            {TWO_STEP.toLowerCase()} are set there.
-          </p>
+        <div className="max-w-3xl">
+          <SettingsSection id="sign-in" title="Sign in">
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-4 px-4 py-4">
+              <div className="min-w-0 flex-1 basis-60">
+                <p className="text-sm font-medium text-zinc-100">
+                  Signed in with {provider.name}
+                  {login ? <span className="font-normal text-zinc-400"> as {login}</span> : null}
+                </p>
+                <p className="mt-0.5 text-sm text-zinc-400">
+                  Your password and {TWO_STEP.toLowerCase()} are managed in your {provider.name} account.
+                </p>
+              </div>
+              {provider.settings && (
+                <a href={provider.settings} target="_blank" rel="noreferrer" className={`${buttonClass("secondary")} gap-1.5`}>
+                  Open {provider.name} security settings
+                  <ExternalLinkIcon />
+                  <span className="sr-only"> (opens in a new tab)</span>
+                </a>
+              )}
+            </div>
+          </SettingsSection>
         </div>
       </Page>
     );
@@ -183,7 +226,7 @@ export default function SecurityPage() {
     <Page>
       {header}
 
-      <div className="max-w-md space-y-8">
+      <div className="max-w-3xl space-y-8">
         <SettingsSection id="password" title="Password">
           <form
             onSubmit={(e) => {
@@ -294,7 +337,7 @@ export default function SecurityPage() {
                   </div>
                 )}
                 <div>
-                  <p className="mb-1.5 text-xs text-zinc-500">Or type this key into the app:</p>
+                  <p className="mb-1.5 text-xs text-zinc-400">Or type this setup key into the app:</p>
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <Code className="select-all tracking-wider">{mfaSecret}</Code>
                     <CopyButton text={mfaSecret} />

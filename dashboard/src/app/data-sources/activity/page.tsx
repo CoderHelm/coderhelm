@@ -70,7 +70,7 @@ function DataSourceActivityPage() {
       />
       <ActivitySummaryStrip />
       <ActivityFeed sources={sources} pageSize={100} initialFilters={initial} onFiltersChange={keepInAddress} />
-      <p className="mt-6 text-xs text-zinc-500">
+      <p className="mt-6 text-xs text-zinc-400">
         Looking for skills and team agents? Their reads and asks are on the{" "}
         <Link href="/skills/?tab=activity" className={`${linkButton} text-xs`}>Skills activity</Link> tab.
       </p>

@@ -135,7 +135,7 @@ test("roles: a matrix of every capability, your role highlighted, groups fold", 
   await settle(page);
   const matrix = page.getByTestId("roles-matrix");
   await expect(matrix).toBeVisible();
-  await expect(matrix.locator("thead th")).toHaveText(["Capability", "Viewer", "Member", "Admin You", "Owner"]);
+  await expect(matrix.locator("thead th")).toHaveText(["What they can do", "Viewer", "Member", "Admin You", "Owner"]);
   await expect(page.getByTestId("role-col-admin")).toHaveAttribute("aria-current", "true");
   // Every capability the server lists is a row, once; an unknown one lands in Other.
   await expect(matrix.locator('tbody tr[data-testid^="perm-"]')).toHaveCount(caps.length);

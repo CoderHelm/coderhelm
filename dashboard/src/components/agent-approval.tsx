@@ -17,6 +17,28 @@ import { buttonClass, inputClass } from "./ui";
 
 const RISK_TONE = { read: "neutral", write: "warning", consequential: "error" } as const;
 
+/** "create_reconciliation_adjustment" -> "create reconciliation adjustment". */
+function words(id: string): string {
+  return id.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+/** "payments-ledger-mcp-server" -> "Payments ledger". */
+function serverName(id: string): string {
+  const w = words(id).replace(/\b(mcp server|mcp|server)\b/g, "").replace(/\s+/g, " ").trim();
+  return w ? w.charAt(0).toUpperCase() + w.slice(1) : id;
+}
+
+/**
+ * The card's headline in plain words: "Coderhelm wants to create an issue
+ * in Linear". The exact tool and connection names stay under Show details.
+ */
+export function plainHeadline(a: Pick<Approval, "kind" | "tool" | "server" | "command">): { lead: string; action: string; where?: string } {
+  if (a.kind === "command") return { lead: "Coderhelm wants to run a command", action: a.command ?? "" };
+  const bare = a.tool.includes("__") ? a.tool.split("__").slice(1).join("__") : a.tool;
+  if (a.kind === "mcp") return { lead: "Coderhelm wants to", action: words(bare), where: a.server ? serverName(a.server) : "a connected tool" };
+  return { lead: "Coderhelm wants to use", action: words(bare) };
+}
+
 export function ApprovalCard({
   approval,
   can,
@@ -38,6 +60,7 @@ export function ApprovalCard({
   const [denying, setDenying] = useState(false);
   const [error, setError] = useState("");
   const pending = a.status === "pending" && Date.parse(a.expires_at) > Date.now();
+  const headline = plainHeadline(a);
   const noteId = `approval-note-${a.id}`;
 
   const answer = async (approve: boolean, choice: Choice = "once") => {
@@ -64,7 +87,7 @@ export function ApprovalCard({
 
   return (
     <section
-      aria-label={`Approval: ${approvalHeadline(a)}`}
+      aria-label={`Approval: ${headline.lead} ${headline.action}${headline.where ? ` in ${headline.where}` : ""}`}
       data-testid="approval-card"
       data-approval-id={a.id}
       data-status={pending ? "pending" : a.status}
@@ -75,17 +98,29 @@ export function ApprovalCard({
           {pending ? "Waiting for approval" : a.status === "pending" ? "Expired" : a.status[0].toUpperCase() + a.status.slice(1)}
         </StatusPill>
         {a.risk && <StatusPill tone={RISK_TONE[a.risk]}>{RISK_LABELS[a.risk]}</StatusPill>}
-        <span className="text-xs text-zinc-500">
+        <span className="text-xs text-zinc-400">
           {AGENT_LABELS[a.agent]}
           {a.repo ? ` in ${a.repo}` : ""}
         </span>
       </div>
-      <p className="mt-2 text-sm font-semibold text-zinc-100">{approvalHeadline(a)}</p>
+      <p className="mt-2 text-sm text-zinc-200 [overflow-wrap:anywhere]" data-testid="approval-headline">
+        {headline.lead}{" "}
+        {a.kind === "command" ? <code className="rounded bg-zinc-800 px-1 py-px text-zinc-100">{headline.action}</code> : <strong className="font-semibold text-zinc-50">{headline.action}</strong>}
+        {headline.where ? (
+          <>
+            {" "}in <strong className="font-semibold text-zinc-50">{headline.where}</strong>
+          </>
+        ) : null}
+      </p>
       {a.why && <p className="mt-1 text-sm text-zinc-300">Why: {a.why}</p>}
-      <p className="mt-1 text-xs text-zinc-500">Asked because: {decidedByText(a.asked_because)}</p>
       <details className="mt-2">
-        <summary className="cursor-pointer text-xs text-zinc-400 hover:text-zinc-200">Exact arguments</summary>
-        <CodeBlock code={args} lang="json" label="Arguments" wrap maxHeightClass="max-h-64" className="mt-2" />
+        <summary className="cursor-pointer text-sm text-zinc-400 hover:text-zinc-200">Show details</summary>
+        <div className="mt-2 space-y-2">
+          <p className="text-sm text-zinc-400 [overflow-wrap:anywhere]">
+            {approvalHeadline(a)}. Coderhelm asked because {decidedByText(a.asked_because).replace(/^./, (c) => c.toLowerCase())}
+          </p>
+          <CodeBlock code={args} lang="json" label="Arguments" wrap maxHeightClass="max-h-64" />
+        </div>
       </details>
 
       {pending ? (
@@ -93,7 +128,7 @@ export function ApprovalCard({
           <div className="mt-3 space-y-2">
             {denying && (
               <div>
-                <label htmlFor={noteId} className="block text-xs text-zinc-400">
+                <label htmlFor={noteId} className="block text-sm text-zinc-300">
                   Tell the agent why (optional)
                 </label>
                 <textarea id={noteId} rows={2} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} className={`${inputClass} mt-1`} />
@@ -101,16 +136,16 @@ export function ApprovalCard({
             )}
             <div className="flex flex-wrap gap-2">
               <button type="button" disabled={!!busy} onClick={() => answer(true, "once")} className={buttonClass("primary", "sm")}>
-                {busy === "once" ? "Approving…" : "Approve once"}
+                {busy === "once" ? "Allowing…" : "Allow once"}
               </button>
               {can.always && a.repo && (
                 <button type="button" disabled={!!busy} onClick={() => answer(true, "always_repo")} className={buttonClass("secondary", "sm")}>
-                  Always in this repository
+                  Always allow in this project
                 </button>
               )}
               {can.always && (
                 <button type="button" disabled={!!busy} onClick={() => answer(true, "always_tool")} className={buttonClass("secondary", "sm")}>
-                  Always for this tool
+                  Always allow this action
                 </button>
               )}
               {denying ? (
@@ -123,9 +158,9 @@ export function ApprovalCard({
                 </button>
               )}
             </div>
-            <p className="text-xs text-zinc-500">
-              Answer {relativeTime(a.expires_at)}, or the agent stops without doing it.
-              {can.always ? " “Always” adds a rule you can see and remove on the Agent permissions page." : ""}
+            <p className="text-xs text-zinc-400">
+              Answer {relativeTime(a.expires_at)}, or Coderhelm stops without doing it.
+              {can.always ? " “Always allow” adds a rule you can see and remove on the Agent permissions page." : ""}
             </p>
           </div>
         ) : (
@@ -138,7 +173,7 @@ export function ApprovalCard({
         </p>
       )}
       {error && (
-        <p role="alert" className="mt-2 text-xs text-red-400">
+        <p role="alert" className="mt-2 text-sm text-red-300">
           {error}
         </p>
       )}

@@ -64,7 +64,7 @@ export interface Skill {
 export const REVIEW_STEPS = [
   { id: "plan", label: "Plan", means: "Reads the draft plan before it's kept; with gaps, the planner revises once." },
   { id: "code", label: "Code", means: "Reads the pull request's diff; the reviewer checks each note before raising it." },
-  { id: "prose", label: "Prose", means: "Reads the pull request description draft; with gaps, it's revised once." },
+  { id: "prose", label: "Pull request description", means: "Reads the pull request description draft; with gaps, it's revised once." },
 ] as const;
 
 export type ReviewStep = (typeof REVIEW_STEPS)[number]["id"];

@@ -201,14 +201,18 @@ test("Reviewer rows stop a waiting auto-merge and re-arm a stopped one", async (
   const waiting = page.getByTestId("reviewer-pr").filter({ hasText: "Faster checkout" });
   const stopped = page.getByTestId("reviewer-pr").filter({ hasText: "Upgrade the image pipeline" });
   await expect(stopped.getByText("Auto-merge stopped by @a-reviewer · waits for someone to re-arm it")).toBeVisible();
-  await stopped.getByRole("button", { name: "Re-arm auto-merge on your-team/web #96" }).click();
+  await stopped.getByRole("button", { name: "Actions for your-team/web #96" }).click();
+  await page.getByRole("menu", { name: "More" }).getByRole("menuitem", { name: /Re-arm auto-merge/ }).click();
   await expect(page.getByText(/Auto-merge re-armed/)).toBeVisible();
   expect(db.posts).toEqual([{ repo: "your-team/web", pr: 96, action: "rearm" }]);
-  await waiting.getByRole("button", { name: "Stop auto-merge on your-team/web #101" }).click();
+  await waiting.getByRole("button", { name: "Actions for your-team/web #101" }).click();
+  await page.getByRole("menu", { name: "More" }).getByRole("menuitem", { name: /Stop auto-merge/ }).click();
   await expect.poll(() => db.posts.length).toBe(2);
   expect(db.posts[1]).toEqual({ repo: "your-team/web", pr: 101, action: "stop" });
-  // After the refresh the row offers the way back.
-  await expect(waiting.getByRole("button", { name: "Re-arm auto-merge on your-team/web #101" })).toBeVisible();
+  // After the refresh the row's menu offers the way back.
+  await waiting.getByRole("button", { name: "Actions for your-team/web #101" }).click();
+  await expect(page.getByRole("menu", { name: "More" }).getByRole("menuitem", { name: /Re-arm auto-merge/ })).toBeVisible();
+  await page.keyboard.press("Escape");
   // Each row links to its auto-merge page.
   await waiting.getByRole("button", { name: /Show details/ }).click();
   await expect(waiting.getByRole("link", { name: "Auto-merge details and history" })).toHaveAttribute(
@@ -232,9 +236,16 @@ test("a merged or closed PR offers no auto-merge control, whatever the gate last
   const stopped = page.getByTestId("reviewer-pr").filter({ hasText: "Upgrade the image pipeline" });
   await expect(merged).toBeVisible();
   await expect(closed).toBeVisible();
-  // The open, stopped PR still offers its way back.
-  await expect(stopped.getByRole("button", { name: /Re-arm auto-merge/ })).toBeVisible();
-  await expect(merged.getByRole("button", { name: /Re-arm auto-merge|Stop auto-merge/ })).toHaveCount(0);
-  await expect(closed.getByRole("button", { name: /Re-arm auto-merge|Stop auto-merge/ })).toHaveCount(0);
+  // The open, stopped PR still offers its way back, in its row menu.
+  const menu = page.getByRole("menu", { name: "More" });
+  await stopped.getByRole("button", { name: "Actions for your-team/web #96" }).click();
+  await expect(menu.getByRole("menuitem", { name: /Re-arm auto-merge/ })).toBeVisible();
+  await page.keyboard.press("Escape");
+  for (const [row, ref] of [[merged, "your-team/web #90"], [closed, "your-team/web #91"]] as const) {
+    await row.getByRole("button", { name: `Actions for ${ref}` }).click();
+    await expect(menu.getByRole("menuitem", { name: "Open on GitHub" })).toBeVisible();
+    await expect(menu.getByRole("menuitem", { name: /Re-arm auto-merge|Stop auto-merge/ })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+  }
   expect(db.posts).toEqual([]);
 });

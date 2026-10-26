@@ -160,7 +160,7 @@ function RoleRow({
       title={
         <>
           {role.name}
-          {mine && <span className="ml-2 rounded border border-zinc-700 px-1.5 text-[11px] font-normal leading-5 text-zinc-400">Your role</span>}
+          {mine && <span className="ml-2 rounded border border-zinc-700 px-1.5 text-xs font-normal leading-5 text-zinc-400">Your role</span>}
         </>
       }
       titleText={role.name}
@@ -349,7 +349,7 @@ function RoleEditor({
           <div className="mt-2 divide-y divide-zinc-800 rounded-lg border border-zinc-800">
             {offered.map((g) => (
               <div key={g.id} className="px-3 py-2.5" data-testid={`role-group-${g.id}`}>
-                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">{g.label}</p>
+                <p className="text-sm font-semibold text-zinc-100">{g.label}</p>
                 <ul className="mt-1.5 space-y-1">
                   {g.items.map((c) => {
                     const always = baseline.has(c.key);
@@ -370,7 +370,7 @@ function RoleEditor({
                           />
                           <span className="min-w-0">
                             {c.label}
-                            {note && <span className="block text-xs text-zinc-500">{note}</span>}
+                            {note && <span className="block text-xs text-zinc-400">{note}</span>}
                           </span>
                         </label>
                       </li>
@@ -381,7 +381,7 @@ function RoleEditor({
             ))}
           </div>
           {leftOut.length > 0 && (
-            <p className="mt-2 flex gap-1.5 text-xs text-zinc-500" data-testid="role-left-out">
+            <p className="mt-2 flex gap-1.5 text-xs text-zinc-400" data-testid="role-left-out">
               <span aria-hidden="true" className="mt-px shrink-0 scale-75">
                 <LockIcon />
               </span>

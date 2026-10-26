@@ -16,6 +16,11 @@ import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { Chip } from "@/components/list";
 import { Markdown } from "@/components/markdown";
+import { Redirect } from "@/components/redirect";
+import { Combobox } from "@/components/combobox";
+import { Time } from "@/components/list";
+import { Select } from "@/components/select";
+import { TechnicalDetails } from "@/components/problem";
 import { inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { SaveBar, SettingsRow, SettingsSection, Switch, useDirtyForm } from "@/components/settings";
 
@@ -37,6 +42,19 @@ const STATUS: Record<UpdateEntry["status"], { label: string; tone: "success" | "
   rolled_back: { label: "Rolled back", tone: "danger" },
 };
 
+/** Every time zone the browser knows, with the current value kept even if it isn't listed. */
+function timeZones(current: string): string[] {
+  let zones: string[] = [];
+  try {
+    zones = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.("timeZone") ?? [];
+  } catch {
+    zones = [];
+  }
+  const all = new Set(["UTC", ...zones]);
+  if (current) all.add(current);
+  return [...all];
+}
+
 const DEFAULTS: AutoUpdateSettings = { auto: false, channel: "stable", day: "sun", hour: 3, timezone: "UTC", majors: "ask" };
 
 /** Settings, then System: the install's version, update readiness, updates and their history (self-hosted, install admins). */
@@ -44,13 +62,11 @@ export default function SystemPage() {
   const { ready, allowed } = useInstallAdmin();
   if (!ready) return null;
   if (!allowed) {
+    // Only a self-hosted install has this page: anyone else goes to Settings.
     return (
       <Page>
-        <div className="max-w-xl" data-testid="system-unavailable">
-          <Callout variant="neutral" title="Not available here">
-            <p>This page is for the admins of a self-hosted Coderhelm install.</p>
-            <p className="pt-1"><Link href="/settings" className={linkButton}>Back to Settings</Link></p>
-          </Callout>
+        <div data-testid="system-unavailable">
+          <Redirect to="/settings/" />
         </div>
       </Page>
     );
@@ -162,11 +178,19 @@ function System() {
           <SettingsRow
             label="Running"
             testId="current-version"
-            help={[
-              data.current.commit && `Commit ${data.current.commit.slice(0, 7)}`,
-              data.current.released_at && `released ${data.current.released_at.slice(0, 10)}`,
-              data.current.config_fingerprint && `config ${data.current.config_fingerprint}`,
-            ].filter(Boolean).join(", ") || undefined}
+            help={data.current.released_at ? <>Released <Time iso={data.current.released_at} mode="date" /></> : undefined}
+            more={
+              data.current.commit || data.current.config_fingerprint ? (
+                <TechnicalDetails
+                  text={[
+                    data.current.commit && `Commit ${data.current.commit.slice(0, 7)}`,
+                    data.current.config_fingerprint && `Config ${data.current.config_fingerprint}`,
+                  ]
+                    .filter(Boolean)
+                    .join("\n")}
+                />
+              ) : undefined
+            }
             control={() => <span className="font-mono text-sm text-zinc-100">{data.current.version ?? "Development build"}</span>}
           />
           <SettingsRow
@@ -221,7 +245,7 @@ function System() {
           <SettingsRow
             label="Install updates automatically"
             layout="toggle"
-            help="Installs new releases in the window below, and goes back by itself if the new one is unhealthy. Admins are emailed either way."
+            help="Updates install during the hour you pick below. If anything goes wrong, Coderhelm switches back to the previous version and emails the admins."
             control={(ids) => <Switch id={ids.inputId} checked={v.auto} onChange={(c) => set("auto", c)} labelledBy={ids.labelId} describedBy={ids.helpId} />}
           />
           <SettingsRow
@@ -229,38 +253,50 @@ function System() {
             help="The only hour an automatic update may start."
             control={(ids) => (
               <div className="flex flex-wrap gap-2">
-                <select id={ids.inputId} aria-label="Day" className={`${inputClass} w-auto`} value={v.day} onChange={(e) => set("day", e.target.value)}>
+                <Select id={ids.inputId} aria-label="Day" value={v.day} onChange={(e) => set("day", e.target.value)}>
                   {DAYS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-                </select>
-                <select aria-label="Hour" className={`${inputClass} w-auto`} value={v.hour} onChange={(e) => set("hour", Number(e.target.value))}>
+                </Select>
+                <Select aria-label="Hour" value={v.hour} onChange={(e) => set("hour", Number(e.target.value))}>
                   {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{`${String(h).padStart(2, "0")}:00`}</option>)}
-                </select>
+                </Select>
               </div>
             )}
           />
           <SettingsRow
             label="Time zone"
-            help="The window's time zone, such as Europe/Berlin or America/New_York."
-            control={(ids) => <input id={ids.inputId} className={`${inputClass} sm:w-64`} value={v.timezone} onChange={(e) => set("timezone", e.target.value)} />}
+            help="The time zone the maintenance window is in."
+            control={(ids) => (
+              <Combobox
+                id={ids.inputId}
+                label="Time zone"
+                placeholder="Pick a time zone"
+                searchPlaceholder="Find a city or region…"
+                emptyText="No time zone matches"
+                value={v.timezone}
+                onChange={(tz) => set("timezone", tz)}
+                groups={[{ options: timeZones(v.timezone).map((tz) => ({ value: tz, label: tz.replace(/_/g, " ") })) }]}
+                className="sm:w-64"
+              />
+            )}
           />
           <SettingsRow
             label="Channel"
-            help="Stable gets finished releases; Preview also gets release candidates."
+            help="Preview: get new versions earlier, before they are fully tested."
             control={(ids) => (
-              <select id={ids.inputId} className={`${inputClass} w-auto`} value={v.channel} onChange={(e) => set("channel", e.target.value as AutoUpdateSettings["channel"])}>
+              <Select id={ids.inputId} value={v.channel} onChange={(e) => set("channel", e.target.value as AutoUpdateSettings["channel"])}>
                 <option value="stable">Stable</option>
                 <option value="preview">Preview</option>
-              </select>
+              </Select>
             )}
           />
           <SettingsRow
             label="Major releases"
-            help="Ask waits for an admin to press Update now on a release that may need a step from you."
+            help="Big updates sometimes need an admin to do something first. Choose Ask me to approve them yourself."
             control={(ids) => (
-              <select id={ids.inputId} className={`${inputClass} w-auto`} value={v.majors} onChange={(e) => set("majors", e.target.value as AutoUpdateSettings["majors"])}>
+              <Select id={ids.inputId} value={v.majors} onChange={(e) => set("majors", e.target.value as AutoUpdateSettings["majors"])}>
                 <option value="ask">Ask me</option>
                 <option value="auto">Install them too</option>
-              </select>
+              </Select>
             )}
           />
         </SettingsSection>
@@ -275,10 +311,10 @@ function System() {
                   <div className="min-w-0">
                     <p className="text-sm text-zinc-100">
                       {h.mode === "rollback" ? "Roll back to " : ""}<span className="font-mono">{h.version}</span>
-                      {h.from_version && <span className="text-zinc-500"> from {h.from_version}</span>}
+                      {h.from_version && <span className="text-zinc-400"> from {h.from_version}</span>}
                     </p>
-                    <p className="break-words text-xs text-zinc-500">
-                      {h.started_at?.slice(0, 16).replace("T", " ")} UTC · {h.actor === "auto" ? "automatic" : h.actor}
+                    <p className="truncate text-xs text-zinc-400">
+                      <Time iso={h.started_at} /> · {h.actor === "auto" ? "automatic" : h.actor}
                       {h.reason ? ` · ${h.reason}` : ""}
                     </p>
                     {(h.status === "failed" || h.status === "rolled_back") && (

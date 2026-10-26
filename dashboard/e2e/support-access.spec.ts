@@ -259,7 +259,9 @@ test.describe("support access", () => {
     const control = page.getByTestId("support-access-control");
     await expect(control).toHaveAttribute("data-active", "false");
     await expect(control).toContainText("Off.");
-    await expect(page.getByTestId("support-access-log")).toContainText("GET /runs?status=failed");
+    // The log names the page support looked at, not the raw request.
+    await expect(page.getByTestId("support-access-log")).toContainText("Viewed the runs list");
+    await expect(page.getByTestId("support-access-log")).not.toContainText("GET /runs");
 
     await page.getByLabel("For how long").selectOption("24");
     await page.getByLabel(/Note for support/).fill("Look at the failed run");

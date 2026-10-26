@@ -125,10 +125,12 @@ test("runs list: plain status words, readable times, grouped attempts with a nam
   await mockApi(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "Runs" })).toBeVisible();
+  // The page's main action sits beside its title.
+  await expect(page.getByTestId("page-actions").getByRole("link", { name: "Start a task" })).toHaveAttribute("href", /\/plans\/new/);
   const table = page.getByRole("list", { name: "Runs" });
   await expect(table.getByText("Needs your answer").filter({ visible: true })).toBeVisible();
   await expect(table.getByText("Merged").filter({ visible: true })).toBeVisible();
-  await expect(table.getByText("Waiting on CI").filter({ visible: true })).toBeVisible();
+  await expect(table.getByText("Waiting for checks").filter({ visible: true })).toBeVisible();
   await expect(table.getByText("needs_input")).toHaveCount(0);
   // A run whose fix is a setting in another system says so in words.
   await expect(table.getByText("Needs a change outside the code").filter({ visible: true })).toBeVisible();
@@ -139,10 +141,10 @@ test("runs list: plain status words, readable times, grouped attempts with a nam
   // A run with no title still has a link to open it.
   await expect(table.getByRole("link", { name: "Untitled run" })).toHaveAttribute("href", /\/runs\/detail\/?\?id=01RUN00000000000000000000/);
 
-  const toggle = page.getByRole("button", { name: /^Show 1 earlier attempt of / });
+  const toggle = page.getByRole("button", { name: /^Show 1 earlier try of / });
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await toggle.click();
-  await expect(page.getByRole("button", { name: /^Hide 1 earlier attempt of / })).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("button", { name: /^Hide 1 earlier try of / })).toHaveAttribute("aria-expanded", "true");
   await expect(table.getByText("Failed").filter({ visible: true })).toBeVisible();
   await expect(page).toHaveTitle("Runs · Coderhelm");
   await shot(page, "shell-runs");
@@ -154,7 +156,7 @@ test("runs list: a failed load says so and Try again reloads", async ({ page }) 
   const db = await mockApi(page, { runs: 500 });
   await page.goto("/");
   await expect(page.getByRole("alert").filter({ hasText: "Runs could not be loaded" })).toBeVisible();
-  await expect(page.getByText("No runs yet")).toHaveCount(0);
+  await expect(page.getByText("Nothing here yet")).toHaveCount(0);
   await shot(page, "shell-runs-error");
   db.runs = 200;
   await page.getByRole("button", { name: "Try again" }).click();
@@ -166,9 +168,10 @@ test("runs list: empty state says how to start a run", async ({ page }) => {
   const errors = watchConsole(page);
   await mockApi(page, { empty: true });
   await page.goto("/");
-  await expect(page.getByText("No runs yet")).toBeVisible();
-  await expect(page.getByText(/Assign a GitHub issue to the Coderhelm bot/)).toBeVisible();
-  await expect(page.getByRole("link", { name: "write a plan" })).toHaveAttribute("href", /\/plans\/new/);
+  await expect(page.getByText("Nothing here yet")).toBeVisible();
+  // The three ways work arrives, and one button to start.
+  await expect(page.getByTestId("ways-in").getByRole("listitem")).toHaveCount(3);
+  await expect(page.getByTestId("list-empty").getByRole("link", { name: "Write a plan" })).toHaveAttribute("href", /\/plans\/new/);
   await shot(page, "shell-runs-empty");
   expect(errors).toEqual([]);
 });
@@ -205,7 +208,7 @@ test("runs list: search and status filter ask the server, stay in the address, a
   await expect(page).toHaveURL(/\?q=api-7&status=failed$/);
   expect(db.calls.some((c) => c.includes("status=failed%2Ccancelled"))).toBe(true);
   await expect(page.getByText("No runs match")).toBeVisible();
-  await expect(page.getByText("No runs yet")).toHaveCount(0);
+  await expect(page.getByText("Nothing here yet")).toHaveCount(0);
   await shot(page, "shell-runs-no-match");
 
   await page.getByRole("button", { name: "Clear the search" }).click();
@@ -338,6 +341,8 @@ test("a role guarded page tells a viewer why it is closed and links back to runs
   await expect(page.getByText("This page needs a different role")).toBeVisible();
   await page.getByRole("link", { name: "Back to Runs" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Runs" })).toBeVisible();
+  // The page's main action sits beside its title.
+  await expect(page.getByTestId("page-actions").getByRole("link", { name: "Start a task" })).toHaveAttribute("href", /\/plans\/new/);
   expect(errors).toEqual([]);
 });
 
@@ -350,6 +355,8 @@ test("a link to a page that does not exist shows a 404 with a way back", async (
   await shot(page, "shell-404");
   await page.getByRole("link", { name: "Go to runs" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Runs" })).toBeVisible();
+  // The page's main action sits beside its title.
+  await expect(page.getByTestId("page-actions").getByRole("link", { name: "Start a task" })).toHaveAttribute("href", /\/plans\/new/);
   expect(errors.filter((e) => !e.includes("404"))).toEqual([]);
 });
 

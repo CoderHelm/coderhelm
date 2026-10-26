@@ -14,11 +14,13 @@ import { RoleGuard } from "@/components/role-guard";
 import { RepoCombobox } from "@/components/repo-combobox";
 import { Markdown } from "@/components/markdown";
 import { useToast } from "@/components/toast";
-import { Callout } from "@/components/callout";
 import { Segmented } from "@/components/segmented";
 import { Modal, ModalFooter } from "@/components/modal";
 import { AtlassianIcon, ExternalLinkIcon, GitHubIcon, MailIcon } from "@/components/icons";
-import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { buttonClass, focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { Problem } from "@/components/problem";
+import { StatusPill } from "@/components/status-pill";
+import { Time } from "@/components/list/time";
 import { Page, PageHeader } from "@/components/page";
 import { HelpLink } from "@/components/support";
 import {
@@ -42,8 +44,7 @@ import {
 // The characters the backend accepts in a tag (anything else is a bare 400).
 const TAG_PATTERN = /^[A-Za-z0-9._+/-]{1,200}$/;
 
-/** A compact button for rows and banners. */
-const smallButton = `inline-flex min-h-8 items-center justify-center rounded-md border border-zinc-700 bg-zinc-800 px-3 text-xs font-medium text-zinc-200 hover:bg-zinc-700 disabled:opacity-50 transition-colors motion-reduce:transition-none ${focusRing}`;
+const smallButton = buttonClass("secondary", "sm");
 
 /** Turn a failed send into words: the endpoint answers with bare status codes. */
 function sendError(e: unknown): string {
@@ -58,9 +59,11 @@ function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-function fullDate(iso: string): string {
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? "" : d.toLocaleString();
+/** Seconds left, in words: "about 10 min", "45 s". */
+function countdown(ms: number): string {
+  const secs = Math.ceil(ms / 1000);
+  if (secs < 60) return `${secs} s`;
+  return `about ${Math.round(secs / 60)} min`;
 }
 
 /** "owner/name" → "name" (the org is the same for every repo of a team). */
@@ -294,37 +297,43 @@ function ReleasesPage() {
       {(blocked.length > 0 || waiting.length > 0) && (
         <div className="mt-6 flex flex-col gap-2">
           {blocked.map((b) => (
-            <Callout key={`blocked:${b.repo}`} variant="error" title={`Release blocked for ${b.repo}`}>
-              <p className="text-xs">{b.error}</p>
-              <p className="mt-1 text-[11px] opacity-80">
-                Tried {plural(b.attempts, "time")}
-                {b.failed_at && <>, last {fullDate(b.failed_at)}</>}. Fix the cause (for example a tag rule on GitHub),
-                then retry.
-              </p>
-              <button type="button" onClick={() => releaseNow(b.repo, true)} disabled={!!busy} className={`mt-2 ${smallButton}`}>
-                {busy === `now:${b.repo}` ? "Retrying…" : "Retry release"}
-              </button>
-            </Callout>
+            <Problem
+              key={`blocked:${b.repo}`}
+              testId="release-blocked"
+              title={`Release blocked for ${shortName(b.repo)}`}
+              details={b.error}
+              action={
+                <button type="button" onClick={() => releaseNow(b.repo, true)} disabled={!!busy} className={buttonClass("primary", "sm")}>
+                  {busy === `now:${b.repo}` ? "Retrying…" : "Retry release"}
+                </button>
+              }
+            >
+              Coderhelm couldn&apos;t publish this release (tried {plural(b.attempts, "time")}
+              {b.failed_at && (
+                <>
+                  , last <Time iso={b.failed_at} />
+                </>
+              )}
+              ). This is often a tag rule on GitHub: fix the cause, then retry.
+            </Problem>
           ))}
           {waiting.map((w) => {
             const left = Math.max(0, w.fires_at * 1000 - now);
-            const mins = Math.floor(left / 60_000);
-            const secs = Math.floor((left % 60_000) / 1000);
             return (
               <div
                 key={`waiting:${w.repo}`}
                 data-testid="pending-release"
-                className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-sky-500/25 bg-sky-500/5 px-4 py-2"
+                className="flex min-w-0 flex-col items-start gap-x-3 gap-y-2 rounded-lg border border-sky-500/25 bg-sky-500/5 px-4 py-2.5 sm:flex-row sm:items-center"
               >
-                <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400 animate-pulse motion-reduce:animate-none" />
-                <p className="min-w-0 flex-1 text-sm text-zinc-300" aria-live="polite">
+                <p className="flex min-w-0 flex-1 items-baseline gap-2 text-sm text-zinc-300" aria-live="polite">
+                  <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 -translate-y-0.5 rounded-full bg-sky-400 animate-pulse motion-reduce:animate-none" />
+                  <span className="min-w-0">
                   {showRepoInBanner && <span className="font-medium text-zinc-100">{shortName(w.repo)}: </span>}
                   {plural(w.merges, "merge")} waiting
-                  <span className="text-zinc-500">
+                  <span className="text-zinc-400">
                     {" · "}
-                    {left > 0
-                      ? `releases from ${w.base_branch || "the default branch"} in ${mins}:${String(secs).padStart(2, "0")}`
-                      : "releasing…"}
+                    {left > 0 ? `next release from ${w.base_branch || "the default branch"} in ${countdown(left)}` : "releasing…"}
+                  </span>
                   </span>
                 </p>
                 <button
@@ -571,7 +580,7 @@ const DEST_TONES: Record<DestTone, string> = {
   done: "text-emerald-400",
   failed: "text-red-400",
   pending: "text-amber-400",
-  off: "text-zinc-600",
+  off: "text-zinc-400",
 };
 
 /** One small icon per destination; the color and tooltip carry its state. */
@@ -589,6 +598,30 @@ function DestIcon({ dest }: { dest: Dest }) {
         <span aria-hidden="true" className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-red-500 ring-2 ring-zinc-900" />
       )}
       <span className="sr-only">{label}.</span>
+    </span>
+  );
+}
+
+/**
+ * One pill for where the release went: "Published to 2 of 3", the breakdown
+ * on hover and for screen readers. Destinations not set up for the repo
+ * don't count.
+ */
+function PublishedPill({ dests }: { dests: Dest[] }) {
+  const counted = dests.filter((d) => d.tone !== "off");
+  const done = counted.filter((d) => d.tone === "done").length;
+  const failed = counted.some((d) => d.tone === "failed");
+  const breakdown = dests.map((d) => `${d.name}: ${d.state}`).join("\n");
+  const tone = failed ? "error" : counted.length > 0 && done === counted.length ? "success" : done === 0 ? "neutral" : "warning";
+  const words = failed ? `${counted.find((d) => d.tone === "failed")?.name} failed` : counted.length === 0 ? "Not published" : `Published to ${done} of ${counted.length}`;
+  return (
+    <span title={breakdown} data-testid="release-published" className="inline-flex max-w-full">
+      <StatusPill tone={tone}>{words}</StatusPill>
+      <span className="sr-only">
+        {dests.map((d) => (
+          <DestIcon key={d.key} dest={d} />
+        ))}
+      </span>
     </span>
   );
 }
@@ -651,20 +684,14 @@ function ReleaseRow({
       title={
         <>
           <span className="sr-only">{r.repo} </span>
-          <span className="font-mono">{r.tag}</span>
+          {r.tag}
         </>
       }
       titleText={`${r.repo} ${r.tag}`}
       meta={[showRepo ? shortName(r.repo) : null, r.pr_count > 0 ? plural(r.pr_count, "PR") : null]}
-      summary={r.headline || <span className="italic text-zinc-500">No summary written yet</span>}
+      summary={r.headline || <span className="italic text-zinc-400">No summary written yet</span>}
       summaryTone="neutral"
-      chips={
-        <span className="flex items-center gap-0.5">
-          {dests.map((d) => (
-            <DestIcon key={d.key} dest={d} />
-          ))}
-        </span>
-      }
+      chips={<PublishedPill dests={dests} />}
       time={r.updated_at}
       open={isOpen}
       onOpenChange={onToggle}

@@ -73,7 +73,7 @@ export function TeamAgentAsks({ runId, status, traces = [] }: { runId: string; s
     const next = whatNext(step, list, results);
     return next ? (
       <p className="mt-2 flex gap-1.5 pl-4 text-xs text-zinc-400">
-        <span aria-hidden="true" className="text-zinc-600">↳</span>
+        <span aria-hidden="true" className="text-zinc-400">↳</span>
         <span data-testid={`asks-next-${step}`}>{next}</span>
       </p>
     ) : null;
@@ -84,7 +84,7 @@ export function TeamAgentAsks({ runId, status, traces = [] }: { runId: string; s
       <h2 id="team-asks-heading" className="text-sm font-medium text-zinc-300">
         Team agents asked <span className="font-normal text-zinc-500">({asks.length})</span>
       </h2>
-      <p className="mt-0.5 mb-3 text-xs text-zinc-500" data-testid="asks-summary">{summaryLine(asks, results)}</p>
+      <p className="mt-0.5 mb-3 text-xs text-zinc-400" data-testid="asks-summary">{summaryLine(asks, results)}</p>
 
       {grouped ? (
         <div className="space-y-5">
@@ -105,7 +105,7 @@ export function TeamAgentAsks({ runId, status, traces = [] }: { runId: string; s
       )}
 
       {framing && (
-        <details className="group mt-2 text-xs text-zinc-500">
+        <details className="group mt-2 text-xs text-zinc-400">
           <summary className="inline-flex min-h-7 cursor-pointer list-none items-center gap-1 rounded hover:text-zinc-300 [&::-webkit-details-marker]:hidden">
             <span aria-hidden="true" className="transition-transform group-open:rotate-90 motion-reduce:transition-none">›</span>
             What the reviewing agents were asked
@@ -175,10 +175,10 @@ function AskDetails({ ask, gaps, review }: { ask: AgentAsk; gaps: Gap[]; review:
           <ol className="space-y-2" aria-label="Gaps">
             {gaps.map((g, i) => (
               <li key={i} className="flex min-w-0 gap-2" data-testid="gap">
-                <span className="w-4 shrink-0 text-right tabular-nums text-zinc-600">{i + 1}.</span>
+                <span className="w-4 shrink-0 text-right tabular-nums text-zinc-400">{i + 1}.</span>
                 <div className="min-w-0 flex-1">
                   {g.file && (
-                    <span className="mb-1 mr-1.5 inline-flex rounded border border-zinc-700 bg-zinc-800/60 px-1.5 py-px font-mono text-[11px] text-zinc-300" data-testid="gap-file">
+                    <span className="mb-1 mr-1.5 inline-flex rounded border border-zinc-700 bg-zinc-800/60 px-1.5 py-px font-mono text-xs text-zinc-300" data-testid="gap-file">
                       {g.file}
                     </span>
                   )}

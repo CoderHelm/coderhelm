@@ -10,7 +10,7 @@ import { errorMessage } from "@/lib/data-sources";
 import { readRepo, writeRepo } from "@/lib/tests";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
-import { focusRing, primaryButton } from "@/components/ui";
+import { focusRing, primaryButton, secondaryButton } from "@/components/ui";
 import { Tabs } from "@/components/tabs";
 import { Page, PageHeader } from "@/components/page";
 import { LoadError, Loading } from "@/components/tests/common";
@@ -33,7 +33,9 @@ export default function TestsPageGuarded() {
 
 type View = "attention" | "runs" | "groups" | "trends" | "slowest" | "quarantine" | "coverage" | "setup" | "settings";
 
-const VIEWS: { value: View; label: string; adminOnly?: boolean }[] = [
+// The views are the tabs; Setup and Settings configure the page, so they
+// open from the header's buttons instead of sitting among the views.
+const VIEWS: { value: View; label: string; adminOnly?: boolean; config?: boolean }[] = [
   { value: "attention", label: "Needs attention" },
   { value: "runs", label: "Runs" },
   { value: "groups", label: "Failure groups" },
@@ -41,8 +43,8 @@ const VIEWS: { value: View; label: string; adminOnly?: boolean }[] = [
   { value: "slowest", label: "Slowest" },
   { value: "quarantine", label: "Quarantine" },
   { value: "coverage", label: "Coverage" },
-  { value: "setup", label: "Setup" },
-  { value: "settings", label: "Settings", adminOnly: true },
+  { value: "setup", label: "CI setup", config: true },
+  { value: "settings", label: "Settings", adminOnly: true, config: true },
 ];
 
 
@@ -117,14 +119,24 @@ function TestsPage() {
         titleClassName="text-balance"
         lead="Every E2E run from your CI: which tests are flaky, which are broken, what they cost your team, and which tests are worth adding."
         actions={
-          summary && (summary.repos.length > 1 || repo) ? <RepoFilter value={repo} onChange={pickRepo} repos={summary.repos} /> : undefined
+          <>
+            {summary && (summary.repos.length > 1 || repo) ? <RepoFilter value={repo} onChange={pickRepo} repos={summary.repos} /> : null}
+            <Link href="/tests?view=setup" aria-current={view === "setup" ? "page" : undefined} className={secondaryButton}>
+              CI setup
+            </Link>
+            {isAdmin && (
+              <Link href="/tests?view=settings" aria-current={view === "settings" ? "page" : undefined} className={secondaryButton} data-testid="tests-settings-link">
+                Settings
+              </Link>
+            )}
+          </>
         }
       />
 
       <Tabs
         label="Tests views"
         value={view}
-        items={visible.map((v) => ({ value: v.value, label: v.label, href: v.value === "attention" ? "/tests" : `/tests?view=${v.value}` }))}
+        items={visible.filter((v) => !v.config).map((v) => ({ value: v.value, label: v.label, href: v.value === "attention" ? "/tests" : `/tests?view=${v.value}` }))}
       />
 
       <div className="mt-6">

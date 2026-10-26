@@ -264,11 +264,13 @@ test.describe("AWS", () => {
 
     const card = page.getByRole("article", { name: `AWS account ${ACCOUNT}` });
     await expect(card.getByText("Connected", { exact: true })).toBeVisible();
+    await expect(card.getByText(/The role must be named/)).toHaveCount(0);
+    await card.getByRole("button", { name: "Change" }).click();
     await expect(card.getByLabel("Role")).toHaveValue(ROLE_ARN);
     await expect(card.getByText("1 chosen")).toBeVisible();
     await expect(card.getByText("40 minutes ago")).toBeVisible();
     await expect(page.getByRole("heading", { name: "What Coderhelm can do with it" })).toBeVisible();
-    await expect(page.getByText("Change, delete or write anything in your account")).toBeVisible();
+    await expect(page.getByRole("complementary", { name: "What Coderhelm can do with it" }).getByText("Change, delete or write anything in your account")).toBeVisible();
     await shot(page, "aws-connected");
 
     await card.getByRole("button", { name: "Actions" }).click();
@@ -467,7 +469,8 @@ test.describe("Alert routes", () => {
     await expect(card.getByText("Paused", { exact: true }).first()).toBeVisible();
     expect(callsTo(db, "PUT", /\/api\/alert-routes$/).at(-1)!.body).toMatchObject({ enabled: false });
 
-    await card.getByRole("button", { name: "Remove the route for prod-alarms" }).click();
+    await card.getByRole("button", { name: "Actions for prod-alarms" }).click();
+    await page.getByRole("menuitem", { name: "Remove route" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Remove route" }).click();
     await expect(page.getByText("No alert routes yet")).toBeVisible();
   });
@@ -501,6 +504,26 @@ test.describe("Alert routes", () => {
 });
 
 // ── Slack and Teams ──────────────────────────────────────────────────
+
+test.describe("Alert outcomes", () => {
+  test("every known outcome has words; an unknown one is a neutral Other with the raw value on hover", async ({ page }) => {
+    await mockApi(page, {
+      alerts: [
+        { id: "01JB0000000000000000000003", received_at: ago(5 * MIN), topic_arn: TOPIC, repo: "", kind: "message", title: "Posted one", outcome: "posted", ticket_id: "A-1" },
+        { id: "01JB0000000000000000000002", received_at: ago(6 * MIN), topic_arn: TOPIC, repo: "", kind: "message", title: "Repeat one", outcome: "deduplicated", ticket_id: "A-2" },
+        { id: "01JB0000000000000000000001", received_at: ago(7 * MIN), topic_arn: TOPIC, repo: "", kind: "message", title: "Strange one", outcome: "brand_new_outcome", ticket_id: "A-3" },
+      ],
+    });
+    await page.goto("/settings/alerts");
+    const timeline = page.getByRole("list", { name: "Recent alerts" });
+    const item = (t: string) => timeline.getByRole("listitem").filter({ hasText: t });
+    await expect(item("Posted one")).toContainText("Posted to chat");
+    await expect(item("Repeat one")).toContainText("Repeat, skipped");
+    await expect(item("Strange one")).toContainText("Other");
+    await expect(item("Strange one")).not.toContainText("brand new outcome");
+    await expect(item("Strange one").locator('[data-outcome="brand_new_outcome"]')).toHaveAttribute("title", "brand_new_outcome");
+  });
+});
 
 test.describe("Where alerts post", () => {
   test("the team channel posts to Teams, Slack or both, and saved webhooks are never sent back", async ({ page }) => {

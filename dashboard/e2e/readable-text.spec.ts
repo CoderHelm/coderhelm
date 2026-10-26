@@ -96,7 +96,8 @@ test("editing the review focus still saves, keeps the marks, and goes back to th
   await page.goto(CONFIG);
   const field = focusField(page);
   await expect(field.getByTestId("md-reading")).toBeVisible();
-  await expect(page.getByText("Not default").first()).toBeVisible();
+  // Only unsaved edits are marked; "differs from the default" is not repeated on every row.
+  await expect(page.getByText("Not default")).toHaveCount(0);
 
   await field.getByRole("button", { name: "Edit" }).click();
   const box = page.getByLabel("Review focus");
@@ -188,7 +189,8 @@ test("viewers see the formatted text only, with no box and no Edit", async ({ pa
   await expect(field.getByRole("button", { name: "Edit" })).toHaveCount(0);
   await expect(field.getByRole("toolbar")).toHaveCount(0);
 
-  // The team standards too.
+  // The team standards too, in their own view.
+  await page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "Every repository" }).click();
   const standards = page.getByTestId("org-standards-field");
   await expect(standards).toHaveAttribute("data-mode", "read");
   await expect(standards.getByTestId("md-reading").getByRole("listitem").first()).toContainText("Auth changes");

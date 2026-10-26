@@ -7,7 +7,8 @@ import { api, type DataSource, type DataSourceActivityEvent, type DataSourceActi
 import { actorLabel, errorMessage, formatDuration } from "@/lib/data-sources";
 import { RANGES, originHref, rangeSince, type Range } from "@/lib/activity";
 import { StatusPill } from "./status-pill";
-import { focusRing, linkButton, secondaryButton } from "./ui";
+import { buttonClass, focusRing, linkButton, secondaryButton } from "./ui";
+import { SectionHeading } from "./page";
 import { List, ListEmpty, ListError, ListRow, ListSkeleton, ListToolbar, LoadMore, Time, type Tone } from "./list";
 
 /** How often the feed asks for new lookups while it is following. */
@@ -295,7 +296,7 @@ export function ActivityFeed({
   return (
     <section id="activity" aria-labelledby="activity-heading" className="mt-10 scroll-mt-8">
       <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <h2 id="activity-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Activity</h2>
+        <SectionHeading id="activity-heading">Activity</SectionHeading>
         <span className="flex items-center gap-1.5 text-xs text-zinc-400" aria-live="polite">
           <span
             aria-hidden="true"
@@ -306,7 +307,7 @@ export function ActivityFeed({
         <button
           type="button"
           onClick={() => setFollowing((f) => !f)}
-          className={`${secondaryButton} !min-h-7 !px-2.5 !py-0.5 text-xs`}
+          className={buttonClass("secondary", "sm")}
           aria-pressed={!following}
         >
           {following ? "Pause" : "Resume"}
@@ -389,7 +390,7 @@ export function ActivityFeed({
                 className={fresh.has(key) ? "animate-feed-in" : ""}
                 // A lookup that just arrived pulses once it lands.
                 status={{ tone: OUTCOME_TONE[ev.outcome] ?? "neutral", live: fresh.has(key) }}
-                title={ev.summary}
+                title={lookupTitle(ev)}
                 titleText={ev.summary}
                 summary={ev.outcome !== "ok" && ev.detail ? ev.detail : undefined}
                 summaryTone={ev.outcome === "failed" ? "danger" : "waiting"}
@@ -404,7 +405,7 @@ export function ActivityFeed({
                   <>
                     <OutcomePill outcome={ev.outcome} />
                     {repeats > 1 && (
-                      <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[11px] font-medium tabular-nums text-zinc-300">
+                      <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-medium tabular-nums text-zinc-300">
                         {repeats} times in a row
                       </span>
                     )}
@@ -412,7 +413,7 @@ export function ActivityFeed({
                 }
                 open={open.has(key)}
                 onOpenChange={() => toggle(key)}
-                detailsFor={`details of the lookup: ${ev.summary}`}
+                detailsFor={`details of the lookup: ${lookupTitle(ev)}`}
                 details={
                   <>
                     <CodeBlock code={full} title="What was asked" wrap maxHeightClass="max-h-72" />
@@ -429,7 +430,7 @@ export function ActivityFeed({
                         <time dateTime={ev.at}>{new Date(ev.at).toLocaleString()}</time>.
                       </p>
                     )}
-                    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
+                    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
                       <span>Only the lookup is kept, never what came back.</span>
                       {ev.origin && !prUrl && (
                         <span className="[overflow-wrap:anywhere]">
@@ -463,4 +464,17 @@ export function ActivityFeed({
       )}
     </section>
   );
+}
+
+/**
+ * A row's title as a sentence. Most summaries already are one ("Checked which
+ * fields an order has"); a raw call with JSON arguments
+ * (`query_orders({"id":"4f1c"})`) becomes "Ran query orders on <source>", and
+ * the call itself stays in the row's details.
+ */
+function lookupTitle(ev: { summary: string; source_name?: string }): string {
+  const m = ev.summary.trim().match(/^([A-Za-z_][\w.]*)\s*\(/);
+  if (!m || !/[{}()]/.test(ev.summary)) return ev.summary;
+  const name = m[1].replace(/^tool_/, "").replace(/[_.]+/g, " ").trim();
+  return `Ran ${name}${ev.source_name ? ` on ${ev.source_name}` : ""}`;
 }

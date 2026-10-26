@@ -9,6 +9,9 @@ import { CloseRunDialog } from "@/components/close-run-dialog";
 import { useToast } from "@/components/toast";
 import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Page, PageHeader } from "@/components/page";
+import { EmptyState } from "@/components/empty-state";
+import { Code } from "@/components/settings/code";
+import { PlayIcon } from "@/components/icons";
 import {
   GROUP_LABEL,
   List,
@@ -19,6 +22,7 @@ import {
   ListToolbar,
   LoadMore,
   type RowSelect,
+  StatusDot,
   StatusText,
   Time,
   formatDuration,
@@ -64,7 +68,7 @@ function groupRunsByTicket(runs: Run[]): RunGroup[] {
 
 export default function RunsPageWithParams() {
   return (
-    <Suspense fallback={<Page><PageHeader title="Runs" lead="All agent runs across your repositories." /><div className="mt-6"><ListSkeleton /></div></Page>}>
+    <Suspense fallback={<Page><PageHeader title="Runs" lead="Everything Coderhelm is working on or has finished, across your projects." /><div className="mt-6"><ListSkeleton /></div></Page>}>
       <RunsPage />
     </Suspense>
   );
@@ -163,7 +167,15 @@ function RunsPage() {
 
   return (
     <Page>
-      <PageHeader title="Runs" lead="All agent runs across your repositories." />
+      <PageHeader
+        title="Runs"
+        lead="Everything Coderhelm is working on or has finished, across your projects."
+        actions={
+          <Link href="/plans/new" className={primaryButton} data-testid="start-task">
+            Start a task
+          </Link>
+        }
+      />
       <ListToolbar
         className="mt-6 mb-4"
         search={{
@@ -193,14 +205,29 @@ function RunsPage() {
           {next ? "None of the most recent runs match. Load more to search older runs." : "Try a ticket number, part of a title, or a repo."}
         </ListEmpty>
       ) : runs.length === 0 ? (
-        <ListEmpty title="No runs yet">
-          Assign a GitHub issue to the Coderhelm bot, add the <code className="text-zinc-300">coderhelm</code> label to it, or send a
-          Jira ticket to start a run. Or{" "}
-          <Link href="/plans/new" className={`text-zinc-300 underline underline-offset-4 hover:text-zinc-100 rounded ${focusRing}`}>
-            write a plan
-          </Link>{" "}
-          and let Coderhelm do the tasks.
-        </ListEmpty>
+        <EmptyState
+          icon={<PlayIcon />}
+          title="Nothing here yet"
+          testId="list-empty"
+          action={
+            <Link href="/plans/new" className={primaryButton}>
+              Write a plan
+            </Link>
+          }
+        >
+          <p>Ask Coderhelm to do something. Work arrives here three ways:</p>
+          <ul className="mx-auto mt-3 max-w-md space-y-1.5 text-left" data-testid="ways-in">
+            <li>
+              <span className="font-medium text-zinc-200">Write a plan</span> and Coderhelm works through it step by step.
+            </li>
+            <li>
+              <span className="font-medium text-zinc-200">Tag a GitHub issue</span> with the <Code>coderhelm</Code> label.
+            </li>
+            <li>
+              <span className="font-medium text-zinc-200">Send a Jira ticket</span> with the same label.
+            </li>
+          </ul>
+        </EmptyState>
       ) : (
         <>
           {problems.length > 0 && (
@@ -218,13 +245,14 @@ function RunsPage() {
                   </li>
                 ))}
               </ul>
-              <button type="button" onClick={() => setProblems([])} className={`${linkButton} mt-2 !text-xs`}>
+              <button type="button" onClick={() => setProblems([])} className={`${linkButton} mt-2`}>
                 Dismiss
               </button>
             </div>
           )}
-          {canClose && closableIds.length > 0 && (
-            <label className="mb-2 inline-flex cursor-pointer items-center gap-2 px-4 text-xs text-zinc-400">
+          {/* Bulk tools stay out of the way until a row is picked. */}
+          {canClose && closableIds.length > 0 && somePicked && (
+            <label className="mb-2 inline-flex cursor-pointer items-center gap-2 px-4 text-sm text-zinc-300">
               <input
                 type="checkbox"
                 checked={allPicked}
@@ -232,9 +260,10 @@ function RunsPage() {
                   if (el) el.indeterminate = somePicked && !allPicked;
                 }}
                 onChange={(e) => pickAll(e.target.checked)}
+                aria-label={`Select all ${closableIds.length} that can be closed on this page`}
                 className={`h-4 w-4 cursor-pointer accent-zinc-100 ${focusRing}`}
               />
-              Select all {closableIds.length} that can be closed on this page
+              Select all {closableIds.length}
             </label>
           )}
           <List label="Runs">
@@ -243,14 +272,14 @@ function RunsPage() {
                 key={group.ticket_id}
                 group={group}
                 showRepo={!repo}
+                // Rows that are over have nothing to close: no checkbox, just room for one so the dots line up.
+                spacer={canClose && !runCanClose(group.attempts[0].status)}
                 select={
-                  canClose
+                  canClose && runCanClose(group.attempts[0].status)
                     ? {
                         checked: selected.has(group.attempts[0].run_id),
                         onChange: (checked, range) => pick(i, checked, range),
                         label: `Select ${runTitle(group.attempts[0])}`,
-                        disabled: !runCanClose(group.attempts[0].status),
-                        title: runCanClose(group.attempts[0].status) ? undefined : "This run is over already",
                       }
                     : undefined
                 }
@@ -293,13 +322,31 @@ function RunsPage() {
   );
 }
 
-function RunItem({ group, showRepo, select }: { group: RunGroup; showRepo: boolean; select?: RowSelect }) {
+/** "your-team/web#1234" on a row that already names "your-team/web": just "Issue #1234". */
+function ticketWords(run: Run, showRepo: boolean): string | null {
+  const id = run.ticket_id;
+  if (!id) return null;
+  if (run.repo && id.startsWith(`${run.repo}#`)) return `Issue #${id.slice(run.repo.length + 1)}`;
+  if (!showRepo && id.includes("#")) return `Issue #${id.split("#").pop()}`;
+  return id;
+}
+
+function RunItem({ group, showRepo, select, spacer }: { group: RunGroup; showRepo: boolean; select?: RowSelect; spacer?: boolean }) {
   const [latest, ...earlier] = group.attempts;
   const look = runStatusLook(latest.status);
   const title = runTitle(latest);
+  const ticket = ticketWords(latest, showRepo);
   return (
     <ListRow
       select={select}
+      leading={
+        spacer ? (
+          <span className="flex items-start gap-3">
+            <span aria-hidden="true" className="h-4 w-4 shrink-0" />
+            <StatusDot tone={look.tone} live={look.live} className="mt-[5px]" />
+          </span>
+        ) : undefined
+      }
       testId="run-row"
       data={{ status: latest.status }}
       status={look}
@@ -307,14 +354,14 @@ function RunItem({ group, showRepo, select }: { group: RunGroup; showRepo: boole
       titleText={title}
       href={`/runs/detail?id=${encodeURIComponent(latest.run_id)}`}
       meta={[
-        latest.ticket_id && latest.ticket_id !== title ? latest.ticket_id : null,
+        ticket && ticket !== title ? ticket : null,
         showRepo ? latest.repo : null,
         latest.duration_s ? `took ${formatDuration(latest.duration_s)}` : null,
       ]}
       chips={
         <>
           <StatusText look={look} />
-          {earlier.length > 0 && <span className="text-xs text-zinc-500">{group.attempts.length} attempts</span>}
+          {earlier.length > 0 && <span className="text-xs text-zinc-400">Tried {group.attempts.length} times</span>}
         </>
       }
       time={latest.created_at}
@@ -323,7 +370,7 @@ function RunItem({ group, showRepo, select }: { group: RunGroup; showRepo: boole
           <ol className="flex flex-col divide-y divide-zinc-800/60">
             {earlier.map((run, i) => (
               <li key={run.run_id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
-                <span className="w-6 shrink-0 tabular-nums text-zinc-600">#{earlier.length - i}</span>
+                <span className="w-6 shrink-0 tabular-nums text-zinc-400">#{earlier.length - i}</span>
                 <Link
                   href={`/runs/detail?id=${encodeURIComponent(run.run_id)}`}
                   className={`min-w-0 rounded text-zinc-300 hover:text-zinc-100 hover:underline ${focusRing}`}
@@ -331,15 +378,15 @@ function RunItem({ group, showRepo, select }: { group: RunGroup; showRepo: boole
                   {runTitle(run)}
                 </Link>
                 <StatusText look={runStatusLook(run.status)} />
-                <Time iso={run.created_at} className="text-zinc-500" />
-                {run.duration_s ? <span className="text-zinc-600">took {formatDuration(run.duration_s)}</span> : null}
+                <Time iso={run.created_at} className="text-zinc-400" />
+                {run.duration_s ? <span className="text-zinc-400">took {formatDuration(run.duration_s)}</span> : null}
               </li>
             ))}
           </ol>
         ) : undefined
       }
-      detailsLabel="Earlier attempts"
-      detailsFor={`${earlier.length} earlier attempt${earlier.length === 1 ? "" : "s"} of ${title}`}
+      detailsLabel="Earlier tries"
+      detailsFor={`${earlier.length} earlier ${earlier.length === 1 ? "try" : "tries"} of ${title}`}
     />
   );
 }

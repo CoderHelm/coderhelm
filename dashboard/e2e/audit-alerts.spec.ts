@@ -146,10 +146,15 @@ test("the alerts list shows each alert with its outcome in words", async ({ page
   await expect(page.getByRole("link", { name: "ALARM: web-5xx-rate" })).toHaveAttribute("href", new RegExp(`^/alerts/detail/?\\?id=${ALERT_ID}$`));
   const list = page.getByRole("list", { name: "Alerts" });
   await expect(list.getByText("Run started")).toBeVisible();
-  // An outcome this page doesn't know yet reads as words, not a raw value.
-  await expect(list.getByText("Some new outcome")).toBeVisible();
+  // An outcome this page doesn't know yet is a neutral "Other", never the raw value.
+  const other = list.getByRole("listitem").filter({ hasText: "Alert with no title" });
+  await expect(other.getByText("Other", { exact: true })).toBeVisible();
+  await expect(other).toContainText("Some new outcome");
   await expect(page.getByText("some_new_outcome")).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "(untitled alert)" })).toBeVisible();
+  // Each row says what happened, and leads with where the alert came from, not its ticket id.
+  await expect(list.getByRole("listitem").first()).toContainText("CloudWatch alarm");
+  await expect(list.getByRole("listitem").first()).not.toContainText("ALERT-web-5xx");
+  await expect(page.getByRole("link", { name: "Alert with no title" })).toBeVisible();
   await shot(page, "audit-alerts-list");
   expect(errors).toEqual([]);
 });
@@ -170,7 +175,7 @@ test("the alerts toolbar searches and filters by outcome, and the address keeps 
   await page.getByRole("searchbox", { name: "Search alerts" }).fill("ALERT-other");
   await expect(page).toHaveURL(/q=ALERT-other/);
   await expect(list.getByRole("listitem")).toHaveCount(1);
-  await expect(list.getByRole("link", { name: "(untitled alert)" })).toBeVisible();
+  await expect(list.getByRole("link", { name: "Alert with no title" })).toBeVisible();
   await page.getByRole("searchbox", { name: "Search alerts" }).fill("nothing-like-this");
   await expect(page.getByText("No alerts match")).toBeVisible();
   expect(errors).toEqual([]);
@@ -219,9 +224,9 @@ test("an alert's page shows its source, runs and text in words", async ({ page }
   await expect(page.getByRole("heading", { level: 1, name: "ALARM: web-5xx-rate" })).toBeVisible();
   await expect(page.getByText("CloudWatch alarm")).toBeVisible();
   await expect(page.getByText("cloudwatch_alarm")).toHaveCount(0);
-  await expect(page.getByText("Waiting on CI")).toBeVisible();
+  await expect(page.getByText("Waiting for checks")).toBeVisible();
   await expect(page.getByText("awaiting_ci")).toHaveCount(0);
-  await expect(page.getByText("started by this alert")).toBeVisible();
+  await expect(page.getByText("Started by this alert")).toBeVisible();
   await expect(page.getByRole("link", { name: "Pull request" })).toHaveAttribute("href", "https://github.com/your-team/web/pull/12");
   // The facts list is two columns: each label sits beside its value.
   const label = await page.locator("dt", { hasText: "Source" }).boundingBox();
@@ -238,6 +243,9 @@ test("an alert's page shows its source, runs and text in words", async ({ page }
   await expect(fields).toContainText("HTTPCode_Target_5XX_Count");
   await expect(fields.locator("dd time")).toHaveText("31 min ago");
   await expect(page.getByText('"AlarmName"')).toBeHidden();
+  // Where it came from is the topic's name, not its address; the reference id sits in the facts.
+  await expect(page.getByRole("link", { name: "prod-alerts" })).toHaveAttribute("title", /^arn:aws:sns:/);
+  await expect(page.locator("dt", { hasText: "Reference" })).toBeVisible();
   await page.locator("summary", { hasText: "Raw alert" }).click();
   await expect(page.locator("details", { hasText: "Raw alert" })).toContainText('"AlarmName": "web-5xx-rate"');
   await shot(page, "audit-alert-detail");
