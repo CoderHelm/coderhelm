@@ -395,3 +395,61 @@ test.describe("the platform admin's support queue", () => {
     await shot(page, "support-queue-phone");
   });
 });
+
+// Settings, hosted only: "Move to your own AWS account" opens Contact us with
+// the move preset and files a normal ticket. A person helps with the move.
+test.describe("moving to your own AWS account", () => {
+  for (const vp of [
+    { name: "desktop", width: 1440, height: 900 },
+    { name: "phone", width: 390, height: 844 },
+  ]) {
+    test(`the Settings card files a "Move to self-host" ticket with the answers (${vp.name})`, async ({ page }) => {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      const db = await mockApi(page);
+      await page.goto("/settings/");
+      const card = page.getByTestId("move-to-selfhost");
+      await expect(card).toContainText("Move to your own AWS account");
+      await expect(card).toContainText("We'll help you plan the move and bring your settings and data over.");
+      await card.scrollIntoViewIfNeeded();
+      await noSideScroll(page);
+      await card.screenshot({ path: path.join(SHOTS_DIR, `move-card-${vp.width}.png`) });
+      await shot(page, `move-settings-${vp.width}`);
+
+      await card.getByRole("link", { name: "Talk to us about moving" }).click();
+      await expect(page).toHaveURL(/\/support\/?\?new=1&type=selfhost/);
+      await expect(page.getByRole("heading", { level: 1, name: "Move to your own AWS account" })).toBeVisible();
+      await expect(page.getByLabel("Subject")).toHaveValue("Move to self-host");
+      await page.getByLabel("Team size").selectOption("11 to 50 people");
+      await page.getByLabel("AWS region").selectOption("eu-west-1");
+      await page.getByLabel("Settings and instructions").check();
+      await page.getByLabel("Knowledge and data sources").check();
+      await noSideScroll(page);
+      await shot(page, `move-form-${vp.width}`);
+
+      // Notes are optional for a move: the answers are the ticket.
+      await page.getByRole("button", { name: "Send to support" }).click();
+      await expect(page).toHaveURL(/\/support\/ticket\/?\?id=/);
+      const post = db.posts.find((p) => p.path === "/api/support/tickets");
+      expect(post?.body.subject).toBe("Move to self-host");
+      expect(post?.body.body).toBe(
+        "**Topic:** Move to self-host\n**Team size:** 11 to 50 people\n**AWS region:** eu-west-1\n**What to bring over:** Settings and instructions, Knowledge and data sources",
+      );
+    });
+  }
+
+  test("a self-hosted install never shows the card, and the move link is plain help there", async ({ page }) => {
+    await page.route((url) => url.pathname === "/runtime-config.js", (route) =>
+      route.fulfill({ contentType: "text/javascript", body: `window.__CODERHELM_CONFIG__ = ${JSON.stringify({ selfHosted: true })};` }),
+    );
+    await mockApi(page);
+    await page.goto("/settings/");
+    await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Notifications/ }).first()).toBeVisible();
+    await expect(page.getByTestId("move-to-selfhost")).toHaveCount(0);
+    await expect(page.getByText("Move to your own AWS account")).toHaveCount(0);
+
+    await page.goto("/support/?new=1&type=selfhost");
+    await expect(page.getByRole("heading", { level: 1, name: "Get help" })).toBeVisible();
+    await expect(page.getByTestId("move-form")).toHaveCount(0);
+  });
+});

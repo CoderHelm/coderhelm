@@ -16,6 +16,11 @@ export const SITE = {
   docsUrl: "https://docs.coderhelm.com",
   installUrl: "https://docs.coderhelm.com/self-host/install/",
   email: "support@coderhelm.com",
+  // "Talk to us about moving": the site has no contact form, so moving from
+  // the hosted service to a self-hosted install starts as an email to support
+  // with the topic in the subject. A person answers; there is no automatic
+  // migration tool.
+  moveUrl: "mailto:support@coderhelm.com?subject=Moving%20to%20self-hosted%20CoderHelm",
   tagline: "Ship code, not tickets. The AI engineer that stays on the code after the pull request.",
   // The one sentence that defines the product, used word for word in the home
   // page, the meta description, JSON-LD and llms.txt.
@@ -269,6 +274,10 @@ const home: Page = {
         {
           type: "note",
           text: "The first public self-host release is not out yet. Until it is, you can read through the guide, but an install cannot finish.",
+        },
+        {
+          type: "p",
+          text: `Moving from CoderHelm cloud? [Talk to us](${SITE.moveUrl}) and we'll help move your settings and data.`,
         },
         { type: "shot", shot: "setup", caption: "The Setup page of a self hosted install: each check passing, or saying what is wrong and how to fix it. Example data." },
       ],
@@ -882,6 +891,20 @@ const selfHost: Page = {
         {
           type: "note",
           text: "The first public self-host release is not out yet. Until it is, you can read through the guide, but an install cannot finish. Releases are published on [GitHub](https://github.com/CoderHelm/coderhelm-platform/releases).",
+        },
+      ],
+    },
+    {
+      id: "moving",
+      heading: "Moving from CoderHelm cloud?",
+      blocks: [
+        {
+          type: "p",
+          text: "We'll help you plan the move and bring your settings and data over to your own AWS account. Tell us about your team and a person from CoderHelm will work through it with you.",
+        },
+        {
+          type: "actions",
+          items: [{ label: "Talk to us about moving", href: SITE.moveUrl }],
         },
       ],
     },

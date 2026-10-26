@@ -12,6 +12,7 @@
 // answers decide the screen.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MOVE_TO_SELF_HOST_URL } from '@/lib/shared';
 import {
   type Check,
   type DnsRecord,
@@ -531,6 +532,17 @@ function Toggle({ checked, onChange, title, help, testId }: { checked: boolean; 
   );
 }
 
+/** One line for teams coming from the hosted service: a person helps them move. */
+function MovingNote({ className = '' }: { className?: string }) {
+  return (
+    <p className={`text-sm text-fd-muted-foreground ${className}`} data-testid="moving-note">
+      Moving from CoderHelm cloud?{' '}
+      <a className="font-medium text-fd-primary hover:underline" href={MOVE_TO_SELF_HOST_URL}>Talk to us</a>{' '}
+      and we&apos;ll help move your data.
+    </p>
+  );
+}
+
 /** What will be created, where it will answer and what it costs, before anyone opens AWS. */
 function Summary({ s, cost }: { s: InstallState; cost: { low: number; high: number; model: string } }) {
   const address = s.domainChoice === 'coderhelm'
@@ -565,6 +577,7 @@ function Summary({ s, cost }: { s: InstallState; cost: { low: number; high: numb
         </ul>
         <p className="mt-3 text-xs leading-5 text-fd-muted-foreground">A small team&apos;s estimate; most of it scales with use. Not included: {cost.model.charAt(0).toLowerCase() + cost.model.slice(1)}.</p>
       </details>
+      <MovingNote className="border-t border-fd-border px-4 py-3" />
     </section>
   );
 }
@@ -1551,6 +1564,7 @@ export function InstallWizard() {
             </li>
           ))}
         </ul>
+        <MovingNote className="mt-4" />
       </section>
     );
   }

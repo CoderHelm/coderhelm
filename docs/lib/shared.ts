@@ -23,6 +23,13 @@ export const gitConfig = {
   contentDir: 'docs/content/docs',
 };
 
+/**
+ * "Moving from CoderHelm cloud?": an email to support with the topic in the
+ * subject. A person helps with the move; there is no automatic migration tool.
+ * coderhelm.com's /self-host/ page uses the same address.
+ */
+export const MOVE_TO_SELF_HOST_URL = 'mailto:support@coderhelm.com?subject=Moving%20to%20self-hosted%20CoderHelm';
+
 /** The JSON Schema for plugin manifests, served at a stable URL. */
 export const PLUGIN_SCHEMA_PATH = '/schema/plugin-manifest.v1.json';
 

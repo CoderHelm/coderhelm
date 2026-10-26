@@ -21,6 +21,7 @@ import { Field } from "@/components/settings";
 import { MarkdownEditor, clearDraft } from "@/components/markdown-editor";
 import { Segmented } from "@/components/segmented";
 import { buttonClass, focusRing, fullWidthOnPhone, primaryButton, secondaryButton } from "@/components/ui";
+import { isSelfHosted } from "@/lib/runtime-config";
 import { List, ListEmpty, ListError, ListRow, ListSkeleton, ListToolbar, StatusText, useListParams } from "@/components/list";
 
 const KINDS: SupportItemKind[] = ["run", "review", "release", "plan", "alert", "data_source"];
@@ -42,6 +43,32 @@ const BODY_TIPS = [
 ];
 
 const NEW_TICKET_DRAFT = "support:new-ticket";
+
+// "Move to your own AWS account" (Settings, hosted only): a normal ticket
+// whose subject names the topic and whose body carries these answers. A
+// person helps with the move; nothing is copied automatically.
+const MOVE_TOPIC = "Move to self-host";
+const TEAM_SIZES = ["1 to 10 people", "11 to 50 people", "51 to 200 people", "More than 200 people"];
+const AWS_REGIONS = ["us-east-1", "us-east-2", "us-west-2", "ca-central-1", "eu-west-1", "eu-west-2", "eu-central-1", "ap-southeast-1", "ap-southeast-2", "ap-northeast-1"];
+const BRING_OVER = [
+  "Settings and instructions",
+  "Repositories and their settings",
+  "Knowledge and data sources",
+  "Memory and what Coderhelm learned",
+  "Run and review history",
+  "People and roles",
+];
+
+/** The ticket body for a move: the answers first, then anything else they wrote. */
+function moveTicketBody(a: { size: string; region: string; bring: string[]; notes: string }): string {
+  const lines = [
+    `**Topic:** ${MOVE_TOPIC}`,
+    `**Team size:** ${a.size || "Not given"}`,
+    `**AWS region:** ${a.region || "Not sure yet"}`,
+    `**What to bring over:** ${a.bring.length ? a.bring.join(", ") : "Not sure yet"}`,
+  ];
+  return a.notes.trim() ? `${lines.join("\n")}\n\n${a.notes.trim()}` : lines.join("\n");
+}
 
 export default function SupportPageWithParams() {
   return (
@@ -194,8 +221,11 @@ function NewTicket() {
   const from = params.get("from") || "";
   // Where the person came from: "Report an issue", "Contact us", or "Get help".
   const type = params.get("type");
-  const intro =
-    type === "issue"
+  // Only the hosted service offers the move; on an install it is plain help.
+  const isMove = type === "selfhost" && !isSelfHosted();
+  const intro = isMove
+    ? { title: "Move to your own AWS account", lead: "Tell us a little about your team. A person from Coderhelm support will help you plan the move and bring your settings and data over.", placeholder: MOVE_TOPIC }
+    : type === "issue"
       ? { title: "Report an issue", lead: "Tell us what went wrong. The page you were on is attached; remove it below if it doesn't help.", placeholder: "A run stopped at the test step" }
       : type === "contact"
         ? { title: "Contact us", lead: "Questions, feedback or anything else. Coderhelm support answers here and by email.", placeholder: "A question about auto-merge" }
@@ -213,9 +243,14 @@ function NewTicket() {
   const [subject, setSubject] = useState(
     initialItem
       ? `Something is wrong with ${initialItem.kind === "review" || initialItem.kind === "alert" ? `an ${initialItem.kind}` : initialItem.kind === "data_source" ? "a data source" : `a ${initialItem.kind}`}`
-      : "",
+      : isMove
+        ? MOVE_TOPIC
+        : "",
   );
   const [body, setBody] = useState("");
+  const [size, setSize] = useState("");
+  const [region, setRegion] = useState("");
+  const [bring, setBring] = useState<string[]>([]);
   const [priority, setPriority] = useState<SupportPriority>("normal");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -253,10 +288,11 @@ function NewTicket() {
   };
 
   const submit = async () => {
-    if (!subject.trim() || !body.trim() || busy) return;
+    if (!subject.trim() || (!isMove && !body.trim()) || busy) return;
     setBusy(true);
     setError("");
-    const req: NewSupportTicket = { subject: subject.trim(), body: body.trim(), priority };
+    const text = isMove ? moveTicketBody({ size, region, bring, notes: body }) : body.trim();
+    const req: NewSupportTicket = { subject: subject.trim(), body: text, priority };
     if (page) req.page = page;
     if (items.length > 0) req.items = items.map((i) => ({ kind: i.kind, id: i.id, label: i.label || undefined, repo: i.repo || undefined }));
     if (people.length > 0) req.people = people.map((p) => (p.outside ? { email: p.email } : { user_id: p.user_id }));
@@ -293,7 +329,44 @@ function NewTicket() {
           placeholder={intro.placeholder}
           autoFocus
         />
-        <Field as="custom" id="ticket-body" label="What happened?">
+        {isMove && (
+          <fieldset className="space-y-4" data-testid="move-form">
+            <legend className="sr-only">About your move</legend>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field as="select" id="move-size" label="Team size" value={size} onChange={(e) => setSize(e.target.value)}>
+                <option value="">Choose one</option>
+                {TEAM_SIZES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </Field>
+              <Field as="select" id="move-region" label="AWS region" value={region} onChange={(e) => setRegion(e.target.value)}>
+                <option value="">Not sure yet</option>
+                {AWS_REGIONS.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </Field>
+            </div>
+            <div>
+              <p className="mb-1.5 text-sm font-medium text-zinc-200">What to bring over</p>
+              <ul className="grid gap-1.5 sm:grid-cols-2">
+                {BRING_OVER.map((b) => (
+                  <li key={b}>
+                    <label className="flex cursor-pointer items-center gap-2.5 text-sm text-zinc-300">
+                      <input
+                        type="checkbox"
+                        checked={bring.includes(b)}
+                        onChange={() => setBring((now) => (now.includes(b) ? now.filter((x) => x !== b) : [...now, b]))}
+                        className="h-4 w-4 shrink-0 accent-emerald-500"
+                      />
+                      {b}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </fieldset>
+        )}
+        <Field as="custom" id="ticket-body" label={isMove ? "Anything else? (optional)" : "What happened?"}>
           {(ids) => (
             <MarkdownEditor
               {...ids}
@@ -303,8 +376,8 @@ function NewTicket() {
               maxLength={8000}
               minRows={7}
               draftKey={NEW_TICKET_DRAFT}
-              placeholder="What happened, what you expected, and when. The template above gives you a head start."
-              template={{ label: "Use issue template", text: ISSUE_TEMPLATE }}
+              placeholder={isMove ? "Dates that matter, anything you must keep, questions about the move." : "What happened, what you expected, and when. The template above gives you a head start."}
+              template={isMove ? undefined : { label: "Use issue template", text: ISSUE_TEMPLATE }}
               tips={BODY_TIPS}
               onSubmitShortcut={() => void submit()}
             />
@@ -398,7 +471,7 @@ function NewTicket() {
           <Link href="/support" className={`${secondaryButton} ${fullWidthOnPhone}`}>
             Cancel
           </Link>
-          <button type="submit" disabled={busy || !subject.trim() || !body.trim()} className={`${primaryButton} ${fullWidthOnPhone}`}>
+          <button type="submit" disabled={busy || !subject.trim() || (!isMove && !body.trim())} className={`${primaryButton} ${fullWidthOnPhone}`}>
             {busy ? "Sending…" : "Send to support"}
           </button>
         </div>
