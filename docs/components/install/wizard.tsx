@@ -2,8 +2,9 @@
 
 // The browser install guide for self-hosted CoderHelm.
 //
-// One primary action per screen: open AWS with everything filled in, create
-// the GitHub App, turn on Claude, open CoderHelm. Between them the page
+// One primary action per screen: open AWS with everything filled in, point
+// your own domain (when you chose one), create the GitHub App, turn on
+// Claude, open CoderHelm, then the optional setup list. Between them the page
 // checks the real thing: the installer's progress file in the person's own
 // bucket, then their install's /api/setup/status. Everything it remembers
 // is in this browser (localStorage) and the address bar (no secrets), so a
@@ -13,27 +14,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type Check,
+  type DnsRecord,
   type InstallState,
   type SetupStatus,
   type StatusDoc,
   type StepId,
+  DNS_PROVIDERS,
   GITHUB_OUTCOMES,
   LATEST_URL,
   PERMISSION_REASONS,
   GITHUB_PERMISSIONS,
   REGIONS,
-  STEPS,
   STORAGE_LAST,
   STORAGE_PREFIX,
   parseSetupStatus,
   checkText,
+  baseDomain,
+  cleanHostname,
   cliGithubCommand,
   deriveStep,
+  domainRows,
+  domainUrl,
   elapsed,
   findCheck,
   githubManifest,
   newAppUrl,
   newState,
+  optionalSetup,
   parseStatusDoc,
   parseStored,
   pickVersion,
@@ -41,12 +48,15 @@ import {
   queryToPartial,
   quickCreateUrl,
   randomId,
+  relativeName,
   stackName,
   stacksConsoleUrl,
   stateToQuery,
   statusFileUrl,
+  stepsFor,
   urlFromPaste,
   validate,
+  withDomainDoc,
 } from '@/lib/install/core';
 import { AnthropicLogo, AwsLogo, GitHubLogo } from './logos';
 
@@ -202,7 +212,7 @@ function CopyBox({ text, testId }: { text: string; testId?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="mt-3 flex items-stretch overflow-hidden rounded-lg border border-fd-border bg-fd-secondary">
-      <code className="min-w-0 flex-1 whitespace-pre-wrap break-all px-3 py-2.5 font-mono text-[13px] leading-relaxed" data-testid={testId}>{text}</code>
+      <code className="min-w-0 flex-1 whitespace-pre-wrap wrap-anywhere px-3 py-2.5 font-mono text-[13px] leading-relaxed" data-testid={testId}>{text}</code>
       <button
         type="button"
         className="shrink-0 border-l border-fd-border px-3 text-sm font-medium hover:bg-fd-accent"
@@ -246,11 +256,11 @@ function Notice({ tone, title, children, testId }: { tone: 'fail' | 'warn' | 'pa
   );
 }
 
-function Stepper({ current, done, onPick }: { current: StepId; done: Set<StepId>; onPick: (s: StepId) => void }) {
-  const at = STEPS.findIndex((s) => s.id === current);
+function Stepper({ steps, current, done, onPick }: { steps: { id: StepId; label: string }[]; current: StepId; done: Set<StepId>; onPick: (s: StepId) => void }) {
+  const at = steps.findIndex((s) => s.id === current);
   return (
-    <ol className="mb-8 grid grid-cols-4 gap-2" aria-label="Install steps">
-      {STEPS.map((s, i) => {
+    <ol className={`mb-8 grid gap-2 ${steps.length === 5 ? 'grid-cols-5' : 'grid-cols-4'}`} aria-label="Install steps">
+      {steps.map((s, i) => {
         const isDone = done.has(s.id) && s.id !== current;
         const isCurrent = s.id === current;
         const can = isDone || isCurrent;
@@ -359,6 +369,7 @@ export function InstallWizard() {
       const d = r.ok ? parseStatusDoc(r.body) : null;
       if (d) {
         setDoc(d);
+        setS((p) => (p ? withDomainDoc(p, d) ?? p : p));
         if (d.phase === 'done' && d.url) {
           const u = urlFromPaste(d.url);
           if (u) update({ url: u });
@@ -372,6 +383,20 @@ export function InstallWizard() {
       clearInterval(t);
     };
   }, [s?.launchedAt, s?.url, s?.statusId, s?.region, update]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Their own domain, after a refresh or on another device: the records come
+  // from the progress file (read once; the install never publishes them).
+  useEffect(() => {
+    if (!s?.url || s.domainDoc || !s.launchedAt) return;
+    let live = true;
+    void getJson(statusFileUrl(s)).then((r) => {
+      const d = r.ok ? parseStatusDoc(r.body) : null;
+      if (live && d) setS((p) => (p ? withDomainDoc(p, d) ?? p : p));
+    });
+    return () => {
+      live = false;
+    };
+  }, [s?.url, s?.statusId, s?.region]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Ask the install itself.
   const refresh = useCallback(
@@ -398,13 +423,21 @@ export function InstallWizard() {
     return () => clearInterval(t);
   }, []);
 
+  // Once the domain answers, follow the install there (the GitHub App then gets the domain's URLs).
+  const nextUrl = s ? domainUrl(s, setup) : null;
+  useEffect(() => {
+    if (nextUrl) update({ url: nextUrl });
+  }, [nextUrl, update]);
+
   const derived: StepId = s ? deriveStep(s, setup) : 'start';
   const view: StepId = manual ?? derived;
+  const steps = stepsFor({ domainChoice: s?.domainChoice ?? 'aws' });
   const done = useMemo(() => {
-    const order: StepId[] = ['aws', 'github', 'models', 'ready'];
+    const order: StepId[] = ['aws', 'domain', 'github', 'models', 'ready'];
     const i = order.indexOf(derived);
     return new Set<StepId>(i < 0 ? [] : order.slice(0, i));
   }, [derived]);
+  const [provider, setProvider] = useState('');
 
   const checkAgain = async () => {
     setChecking(true);
@@ -421,8 +454,13 @@ export function InstallWizard() {
 
   const launch = () => {
     setTouched(true);
-    if (Object.keys(validate(s)).length) return;
-    const next = { ...s, email: s.email.trim(), launchedAt: Date.now() };
+    const problems = Object.keys(validate(s));
+    if (problems.length) {
+      // A problem inside More options opens it, so the sentence is seen.
+      if (problems.some((k) => k !== 'email' && k !== 'region')) setShowMore(true);
+      return;
+    }
+    const next = { ...s, email: s.email.trim(), hostname: s.domainChoice === 'own' ? cleanHostname(s.hostname) : '', domainDoc: null, domainSkipped: false, launchedAt: Date.now() };
     setS(next);
     setDoc(null);
     setManual(null);
@@ -456,7 +494,7 @@ export function InstallWizard() {
     } catch {
       /* ignore */
     }
-    setS(newState({ email: s.email, region: s.region }));
+    setS(newState({ email: s.email, region: s.region, domainChoice: s.domainChoice, hostname: s.hostname }));
     setDoc(null);
     setSetup(null);
     setOutcome(null);
@@ -497,7 +535,78 @@ export function InstallWizard() {
               {showMore ? 'Fewer options' : 'More options'}
             </button>
             {showMore ? (
-              <div className="mt-4 space-y-5 rounded-xl border border-fd-border p-4">
+              <div className="mt-4 space-y-6 rounded-xl border border-fd-border p-4">
+                <fieldset data-testid="domain-choice">
+                  <legend className="mb-2 text-sm font-medium">Web address</legend>
+                  {(
+                    [
+                      ['aws', 'The AWS address', 'Free and ready right away, like d1234abcd.cloudfront.net. You can add a domain later.'],
+                      ['own', 'My own domain', 'Like coderhelm.example.com. Set up for you when its zone is in Route 53 in this AWS account; anywhere else you add two DNS records.'],
+                    ] as const
+                  ).map(([id, title, help]) => (
+                    <label key={id} className={`mb-2 flex cursor-pointer gap-3 rounded-xl border p-3 transition ${s.domainChoice === id ? 'border-fd-primary bg-fd-primary/5' : 'border-fd-border hover:bg-fd-accent'}`}>
+                      <input type="radio" name="domain" className="mt-1 accent-[var(--color-fd-primary)]" checked={s.domainChoice === id} onChange={() => update({ domainChoice: id })} />
+                      <span>
+                        <span className="block font-medium">{title}</span>
+                        <span className="block text-sm text-fd-muted-foreground">{help}</span>
+                      </span>
+                    </label>
+                  ))}
+                  {s.domainChoice === 'own' ? (
+                    <div className="mt-3">
+                      <Field label="Your domain" htmlFor="ch-hostname" help="The address people will open. A subdomain such as coderhelm.example.com is easiest." error={errors.hostname}>
+                        <input id="ch-hostname" className={inputCls} value={s.hostname} placeholder="coderhelm.example.com" onChange={(e) => update({ hostname: e.target.value })} autoCapitalize="off" spellCheck={false} inputMode="url" />
+                      </Field>
+                    </div>
+                  ) : null}
+                </fieldset>
+                <Field label="Send email from" htmlFor="ch-email-from" help="Optional. Empty uses your email: AWS emails you a link to confirm it, no DNS needed." error={errors.emailFrom}>
+                  <input id="ch-email-from" type="email" className={inputCls} value={s.emailFrom} placeholder="coderhelm@example.com" onChange={(e) => update({ emailFrom: e.target.value })} autoCapitalize="off" spellCheck={false} />
+                </Field>
+                <Field label="Who else may sign up" htmlFor="ch-signup" help="Optional. Anyone with an email at this domain may create an account. Empty for only you; you can invite people later." error={errors.signupDomain}>
+                  <input id="ch-signup" className={inputCls} value={s.signupDomain} placeholder="example.com" onChange={(e) => update({ signupDomain: e.target.value })} autoCapitalize="off" spellCheck={false} />
+                </Field>
+                <fieldset>
+                  <legend className="mb-2 text-sm font-medium">Updates</legend>
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      className="mt-1 size-4 accent-[var(--color-fd-primary)]"
+                      checked={s.autoUpdate}
+                      data-testid="auto-update"
+                      onChange={(e) => {
+                        let tz = s.updateTimezone;
+                        try {
+                          if (e.target.checked && tz === 'UTC') tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+                        } catch {
+                          /* keep UTC */
+                        }
+                        update({ autoUpdate: e.target.checked, updateTimezone: tz });
+                      }}
+                    />
+                    <span>
+                      <span className="block font-medium">Install new releases by themselves</span>
+                      <span className="block text-sm text-fd-muted-foreground">In a maintenance window, health checked, rolled back if unhealthy. Off: admins get an email about each release.</span>
+                    </span>
+                  </label>
+                  {s.autoUpdate ? (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                      <Field label="Day" htmlFor="ch-day">
+                        <select id="ch-day" className={inputCls} value={s.updateWindow.split(' ')[0]} onChange={(e) => update({ updateWindow: `${e.target.value} ${s.updateWindow.split(' ')[1] ?? '03:00'}` })}>
+                          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'daily'].map((d) => <option key={d} value={d}>{d === 'daily' ? 'Every day' : d}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Hour" htmlFor="ch-hour">
+                        <select id="ch-hour" className={inputCls} value={s.updateWindow.split(' ')[1] ?? '03:00'} onChange={(e) => update({ updateWindow: `${s.updateWindow.split(' ')[0]} ${e.target.value}` })}>
+                          {Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`).map((h) => <option key={h} value={h}>{h}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Time zone" htmlFor="ch-tz" error={errors.updateTimezone}>
+                        <input id="ch-tz" className={inputCls} value={s.updateTimezone} onChange={(e) => update({ updateTimezone: e.target.value.trim() })} autoCapitalize="off" spellCheck={false} />
+                      </Field>
+                    </div>
+                  ) : null}
+                </fieldset>
                 <Field label="Install name" htmlFor="ch-stage" help="Change it to run a second CoderHelm in the same account." error={errors.stage}>
                   <input id="ch-stage" className={inputCls} value={s.stage} onChange={(e) => update({ stage: e.target.value.toLowerCase() })} autoCapitalize="off" spellCheck={false} />
                 </Field>
@@ -533,7 +642,7 @@ export function InstallWizard() {
         <Details summary="What happens in AWS">
           <p>A CloudFormation stack starts the installer in CodeBuild, inside your account. It downloads CoderHelm {s.version}, checks its signature and deploys CoderHelm: Lambda functions, DynamoDB tables, an S3 bucket, CloudFront and Cognito sign-in. Nothing to install on your computer.</p>
           <p>The box you tick lets the stack create IAM roles. The installer needs administrator rights in your account to create CoderHelm&apos;s own, narrower roles.</p>
-          <p>No domain or DNS work: CoderHelm gets a free cloudfront.net address. You can add your own domain later.</p>
+          <p>{s.domainChoice === 'own' ? `Your domain: when its zone is in Route 53 in this account, the install makes the certificate and the records. Anywhere else, CoderHelm starts on its free cloudfront.net address and this page shows the two records to add; it moves to ${cleanHostname(s.hostname) || 'your domain'} once they work.` : 'No domain or DNS work: CoderHelm gets a free cloudfront.net address. You can add your own domain later, in More options or in CoderHelm.'}</p>
           <p>AWS bills your account for what CoderHelm uses. The services are pay per use, so an idle install costs little; model calls are most of the bill.</p>
           <p>Two random values from this page go along: a progress ID, so this page can follow the install, and a one-time setup key, so GitHub can hand your app&apos;s keys straight to your CoderHelm. Both stay in your account and this browser.</p>
         </Details>
@@ -632,6 +741,86 @@ export function InstallWizard() {
         <Details summary="What is happening">
           <p>The installer runs in CodeBuild in your account. It writes its progress to a small file in your account (bucket coderhelm-setup-{s.statusId}) that this page reads: the phase, the step and, at the end, your CoderHelm address. Nothing else.</p>
           <p>Stack name: {stackName(s)}, in {REGIONS.find((r) => r.id === s.region)?.name ?? s.region}. Release {s.version}.</p>
+        </Details>
+      </section>
+    );
+  } else if (view === 'domain') {
+    const d = findCheck(setup, 'domain');
+    const code = d?.code;
+    const text = d ? checkText(d) : { title: 'Checking your domain' };
+    const dd = s.domainDoc;
+    const mode = dd?.mode ?? 'external';
+    const hostname = cleanHostname(s.hostname || dd?.hostname || '');
+    const base = hostname ? baseDomain(hostname) : 'your domain';
+    const records: DnsRecord[] = dd?.records ?? [];
+    const rows = domainRows(code, mode);
+    const p = DNS_PROVIDERS.find((x) => x.id === provider);
+    const tone = d?.status === 'pass' ? 'pass' : d?.status === 'fail' ? 'fail' : d?.status === 'warn' ? 'warn' : 'todo';
+    const show = records;
+    screen = (
+      <section data-testid="screen-domain">
+        <Heading
+          title={mode === 'route53' ? 'Setting up your domain' : 'Point your domain at CoderHelm'}
+          lead={mode === 'route53'
+            ? <>The zone for {base} is in Route 53 in your AWS account, so CoderHelm adds the records itself. This page checks each part.</>
+            : <>Add two records where the DNS for {base} is hosted. This page checks them and moves CoderHelm to <b className="text-fd-foreground">{hostname}</b> once they work.</>}
+        />
+        <Notice tone={tone} title={text.title} testId="domain-status">
+          {text.fix ? <p>{text.fix}</p> : null}
+        </Notice>
+        <ul className="mt-5 divide-y divide-fd-border rounded-xl border border-fd-border px-4" data-testid="domain-progress">
+          {rows.map((r) => <Row key={r.id} tone={r.status} title={r.label} />)}
+        </ul>
+
+        {mode === 'external' && show.length ? (
+          <div className="mt-6" data-testid="dns-records">
+            <h2 className="text-lg font-semibold">The records to add</h2>
+            <p className="mt-1 text-sm text-fd-muted-foreground">Type CNAME for both. If the form shows .{base} after the name box, type only the short name.</p>
+            <ol className="mt-3 space-y-4">
+              {show.map((r, i) => (
+                <li key={`${r.name}-${i}`} className="rounded-xl border border-fd-border p-4" data-testid={`record-${r.purpose}`}>
+                  <div className="flex flex-wrap items-center gap-2 font-medium">
+                    <span className="rounded-full border border-fd-border px-2 py-0.5 text-xs font-normal text-fd-muted-foreground">{r.type}</span>
+                    {r.purpose === 'certificate' ? 'For the certificate' : 'For the address'}
+                  </div>
+                  <p className="mt-1 text-sm text-fd-muted-foreground">
+                    {r.purpose === 'certificate' ? 'Proves to AWS that the domain is yours. Keep it: AWS renews the certificate with it.' : 'Sends people who open your domain to CoderHelm.'}
+                  </p>
+                  <div className="mt-2 text-sm font-medium">Name <span className="font-normal text-fd-muted-foreground">(short name: <code className="wrap-anywhere font-mono text-[13px]">{relativeName(r.name, hostname)}</code>)</span></div>
+                  <CopyBox text={r.name} testId={`record-${r.purpose}-name`} />
+                  <div className="mt-3 text-sm font-medium">Value</div>
+                  <CopyBox text={r.value} testId={`record-${r.purpose}-value`} />
+                </li>
+              ))}
+            </ol>
+            <div className="mt-6">
+              <Field label="Where is your domain's DNS?" htmlFor="ch-provider" help={p ? p.where : 'Pick one for where to add the records.'}>
+                <select id="ch-provider" className={inputCls} value={provider} onChange={(e) => setProvider(e.target.value)} data-testid="dns-provider">
+                  <option value="">Choose…</option>
+                  {DNS_PROVIDERS.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                </select>
+              </Field>
+            </div>
+          </div>
+        ) : null}
+        {mode === 'external' && !records.length ? (
+          <Notice tone="info" title="The records to add aren't readable here" testId="domain-no-records">
+            <p>Your account keeps the progress file private. Sign up at {host || 'your CoderHelm'} and open Settings, System, Domain: it shows the same records and checks.</p>
+          </Notice>
+        ) : null}
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          {p?.url ? (
+            <Primary href={p.url} newTab testId="open-provider">Open {p.name.replace(/ \(.*\)$/, '')}</Primary>
+          ) : null}
+          <Secondary onClick={() => void checkAgain()} testId="check-again">{checking ? 'Checking…' : 'Check again'}</Secondary>
+          <Secondary onClick={() => update({ domainSkipped: true })} testId="skip-domain">Skip for now</Secondary>
+        </div>
+        <p className="mt-3 text-sm text-fd-muted-foreground">This page checks again by itself every few seconds. Skip finishes the install on the AWS address; you can add the domain later in Settings, System.</p>
+        <Details summary="Why this step comes before GitHub">
+          <p>CoderHelm gives its address to GitHub when it creates its GitHub App. Doing the domain first means the app points at {hostname || 'your domain'} from the start.</p>
+          <p>AWS issues the certificate once it sees the first record (usually within 30 minutes of it showing up). CoderHelm then moves to your domain by itself, which takes about 10 minutes, and keeps working on the AWS address meanwhile.</p>
+          <p>The records are checked from your own install, through public DNS. This page reads only the results.</p>
         </Details>
       </section>
     );
@@ -785,8 +974,10 @@ export function InstallWizard() {
   } else {
     const admin = findCheck(setup, 'admin');
     const extra = (setup?.checks ?? []).filter(
-      (c: Check) => ['email', 'github_installed', 'models'].includes(c.id) || (c.id === 'admin' && c.code === 'unconfirmed'),
+      (c: Check) => ['github_installed', 'models'].includes(c.id) || (c.id === 'admin' && c.code === 'unconfirmed'),
     ).filter((c) => c.status !== 'pass' && c.status !== 'skip');
+    const optional = optionalSetup(s, setup);
+    const optTone = (st: string): Tone => (st === 'done' || st === 'auto' ? 'pass' : st === 'todo' ? 'warn' : 'pending');
     screen = (
       <section data-testid="screen-ready">
         <Heading title="Your CoderHelm is ready" lead={<>It runs at <a className="font-medium text-fd-foreground underline decoration-fd-border underline-offset-4" href={s.url} target="_blank" rel="noopener noreferrer">{host}</a>.</>} />
@@ -809,26 +1000,55 @@ export function InstallWizard() {
           <ul className="mt-6 divide-y divide-fd-border rounded-xl border border-fd-border px-4" data-testid="ready-checks">
             {extra.map((c) => {
               const t = checkText(c);
-              const link = c.detail?.console_url as string | undefined;
               return (
                 <Row key={c.id} tone={c.status === 'wait' ? 'active' : c.status} title={c.required === false ? <>{t.title} <span className="ml-1 rounded-full border border-fd-border px-2 py-0.5 text-xs font-normal text-fd-muted-foreground">Optional</span></> : t.title}>
                   {t.fix}
-                  {link && c.id === 'email' ? (
-                    <> <a className="font-medium text-fd-primary hover:underline" href={link} target="_blank" rel="noopener noreferrer">Open SES</a></>
-                  ) : null}
                 </Row>
               );
             })}
           </ul>
         ) : null}
         {admin?.status === 'pass' ? <Notice tone="pass" title="You are signed up as the admin. Setup is complete." testId="complete" /> : null}
+        {s.domainSkipped && s.domainChoice === 'own' ? (
+          <Notice tone="info" title="Your domain is waiting" testId="domain-later">
+            <p>CoderHelm runs on its AWS address for now. Add {cleanHostname(s.hostname)} any time in CoderHelm: Settings, System, Domain. It shows the same records and checks.</p>
+            <div className="mt-3">
+              <Secondary onClick={() => update({ domainSkipped: false })} testId="back-to-domain">Back to the domain step</Secondary>
+            </div>
+          </Notice>
+        ) : null}
+
+        <h2 className="mt-8 text-lg font-semibold">Optional setup</h2>
+        <p className="mt-1 text-sm text-fd-muted-foreground">None of these is needed to start. Each says whether it is done, checked by your install where it can be.</p>
+        <ul className="mt-3 divide-y divide-fd-border rounded-xl border border-fd-border px-4" data-testid="optional-setup">
+          {optional.map((o) => (
+            <li key={o.id} className="flex gap-3 py-3" data-optional={o.id} data-state={o.state}>
+              <StatusIcon tone={optTone(o.state)} />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2 font-medium leading-6">
+                  {o.title}
+                  <span className="rounded-full border border-fd-border px-2 py-0.5 text-xs font-normal text-fd-muted-foreground">
+                    {o.state === 'done' ? 'Done' : o.state === 'auto' ? 'Done by the install' : o.state === 'todo' ? 'Not yet' : 'In CoderHelm'}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-sm text-fd-muted-foreground">{o.why}</p>
+                {o.fix && o.state === 'todo' ? <p className="mt-1 text-sm">{o.fix}</p> : null}
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                  {o.action && o.state !== 'done' ? (
+                    <a className="font-medium text-fd-primary hover:underline" href={o.action.href} target="_blank" rel="noopener noreferrer" data-testid={`optional-${o.id}-action`}>{o.action.label}</a>
+                  ) : null}
+                  <a className="text-fd-muted-foreground hover:text-fd-foreground hover:underline" href={o.doc}>How it works</a>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+
         <h2 className="mt-8 text-lg font-semibold">Next</h2>
         <ul className="mt-3 grid gap-3 sm:grid-cols-2">
           {[
             ['Run your first task', 'Assign a GitHub issue to CoderHelm.', '/getting-started/first-run/'],
-            ['Invite your team', 'In CoderHelm: Settings, People.', '/self-host/'],
-            ['Use your own domain', 'Optional, any time.', '/self-host/domains/'],
-            ['Stay up to date', 'Updates install from Settings, System.', '/self-host/updates/'],
+            ['Check your install', 'The same checks from a terminal, any time.', '/self-host/check-your-install/'],
           ].map(([t, d, href]) => (
             <li key={t}>
               <a href={href} className="block h-full rounded-xl border border-fd-border p-4 transition hover:bg-fd-accent">
@@ -844,7 +1064,7 @@ export function InstallWizard() {
 
   return (
     <div className="mx-auto w-full max-w-2xl">
-      <Stepper current={view === 'start' ? 'aws' : view} done={done} onPick={(id) => setManual(id === derived ? null : id)} />
+      <Stepper steps={steps} current={view === 'start' ? 'aws' : view} done={done} onPick={(id) => setManual(id === derived ? null : id)} />
       {manual && manual !== derived ? (
         <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-fd-border px-4 py-2 text-sm">
           <span className="text-fd-muted-foreground">You are looking at a finished step.</span>

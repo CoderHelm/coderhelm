@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const INSTALL = 'https://d111test.cloudfront.net';
+const DOMAIN = 'https://coderhelm.example.com';
 const SITE = `http://localhost:${process.env.E2E_PORT ?? 3460}`;
 const SHOTS = process.env.E2E_SHOTS;
 const CORS = { 'access-control-allow-origin': '*' };
@@ -17,6 +18,8 @@ type Json = Record<string, unknown>;
 interface Mock {
   status: Json | null;
   setup: Json | number | null;
+  /** The install's answer on the person's own domain, once it is live there (default: the same). */
+  domainSetup?: Json | number | null;
   posted?: string;
   requests: string[];
 }
@@ -29,7 +32,25 @@ interface Mock {
 const LABELS: Record<string, string> = {
   api: 'CoderHelm answers', github_app: 'GitHub App created', github_installed: 'GitHub App installed on your repositories',
   models: 'Claude access', email: 'Email', admin: 'First admin signed up',
+  domain: 'Your domain', google_sign_in: 'Sign in with Google', updates: 'Automatic updates',
 };
+/** The optional checks a newer install adds after email (domain, Google sign-in, updates). */
+function withOptional(doc: Json, domain: Json = { status: 'skip', code: 'none' }, more: Record<string, Json> = {}) {
+  const checks = [...(doc.checks as Json[])];
+  const at = checks.findIndex((c) => c.id === 'admin');
+  const add = [
+    { id: 'domain', label: LABELS.domain, required: false, ...domain },
+    { id: 'google_sign_in', label: LABELS.google_sign_in, status: 'skip', code: 'off', required: false, ...(more.google_sign_in ?? {}) },
+    { id: 'updates', label: LABELS.updates, status: 'skip', code: 'auto_off', required: false, ...(more.updates ?? {}) },
+  ];
+  checks.splice(at, 0, ...add);
+  return { ...doc, checks };
+}
+const RECORDS = [
+  { purpose: 'certificate', name: '_a1b2c3.coderhelm.example.com', type: 'CNAME', value: '_d4e5f6.xyz.acm-validations.aws' },
+  { purpose: 'address', name: 'coderhelm.example.com', type: 'CNAME', value: 'd111test.cloudfront.net' },
+];
+const EXTERNAL = { hostname: 'coderhelm.example.com', mode: 'external', state: 'validating', records: RECORDS };
 function setupDoc(over: Record<string, Json> = {}, extra: Json = {}) {
   const base: Json[] = [
     { id: 'api', status: 'pass', code: 'ok' },
@@ -74,6 +95,12 @@ async function mock(page: Page, m: Mock) {
     if (typeof m.setup === 'number') return r.fulfill({ status: m.setup, body: '', headers: CORS });
     return r.fulfill({ json: m.setup, headers: CORS });
   });
+  await page.route(`${DOMAIN}/api/setup/status**`, (r) => {
+    const v = m.domainSetup === undefined ? m.setup : m.domainSetup;
+    if (v === null) return r.abort('connectionrefused');
+    if (typeof v === 'number') return r.fulfill({ status: v, body: '', headers: CORS });
+    return r.fulfill({ json: v, headers: CORS });
+  });
   // GitHub's manifest flow: the form post, then GitHub's redirect to the
   // install, then the install's redirect back to the guide.
   await page.route('https://github.com/settings/apps/new**', async (r: Route) => {
@@ -114,7 +141,7 @@ const newMock = (over: Partial<Mock> = {}): Mock => ({ status: null, setup: null
 function assertPrivate(m: Mock) {
   for (const u of m.requests) {
     const h = new URL(u).hostname;
-    const ok = h === 'localhost' || h.endsWith('.amazonaws.com') || h === 'github.com' || h === new URL(INSTALL).hostname;
+    const ok = h === 'localhost' || h.endsWith('.amazonaws.com') || h === 'github.com' || h === new URL(INSTALL).hostname || h === new URL(DOMAIN).hostname;
     expect(ok, `unexpected request to ${u}`).toBe(true);
   }
 }
@@ -192,7 +219,7 @@ test('happy path: launch, follow the install, GitHub, models, ready', async ({ p
   await expect(page.getByTestId('step-title')).toHaveText('Your CoderHelm is ready');
   await expect(page.getByTestId('admin-email')).toHaveText('ada@example.com');
   await expect(page.getByTestId('open-coderhelm')).toHaveAttribute('href', `${INSTALL}/?signup=1`);
-  await expect(page.getByTestId('ready-checks')).toContainText('Optional');
+  await expect(page.getByTestId('optional-setup').locator('[data-optional="email"]')).toHaveAttribute('data-state', 'todo');
   await expect(page.getByTestId('waiting-signup')).toBeVisible();
   m.setup = setupDoc({ admin: { status: 'pass', code: 'ok' } });
   await expect(page.getByTestId('complete')).toContainText('Setup is complete.');
@@ -299,6 +326,136 @@ test('once someone has signed up (setup window closed), the guide shows the inst
   await expect(page.getByTestId('step-title')).toHaveText('Your CoderHelm is ready');
 });
 
+test('more options: domain, sender, sign-up and updates go to AWS; a bad hostname opens More options with the sentence', async ({ page }) => {
+  const m = newMock();
+  await mock(page, m);
+  await page.goto('/self-host/install/');
+  await page.getByLabel('Your email').fill('ada@example.com');
+  await page.getByRole('button', { name: 'More options' }).click();
+  await page.getByLabel('My own domain').check();
+  await page.getByLabel('Your domain').fill('coderhelm');
+  await page.getByRole('button', { name: 'Fewer options' }).click();
+  await page.getByTestId('launch').click();
+  // The problem is inside More options: it opens, with the sentence.
+  await expect(page.getByText('Enter a hostname such as coderhelm.example.com.')).toBeVisible();
+  expect(await opened(page)).toEqual([]);
+  await page.getByLabel('Your domain').fill('https://CoderHelm.example.com/');
+  await page.getByLabel('Send email from').fill('helm@example.com');
+  await page.getByLabel('Who else may sign up').fill('example.com');
+  await page.getByTestId('auto-update').check();
+  await page.getByLabel('Day').selectOption('daily');
+  await page.getByLabel('Hour').selectOption('02:00');
+  await page.getByLabel('Time zone').fill('Europe/Berlin');
+  await page.getByTestId('launch').click();
+  const [link] = await opened(page);
+  const q = new URLSearchParams(new URL(link).hash.split('?')[1]);
+  expect(q.get('param_Hostname')).toBe('coderhelm.example.com');
+  expect(q.get('param_EmailFrom')).toBe('helm@example.com');
+  expect(q.get('param_SignupDomain')).toBe('example.com');
+  expect(q.get('param_AutoUpdate')).toBe('on');
+  expect(q.get('param_UpdateWindow')).toBe('daily 02:00');
+  expect(q.get('param_UpdateTimezone')).toBe('Europe/Berlin');
+  // The steps now include the domain.
+  await expect(page.getByRole('list', { name: 'Install steps' })).toContainText('Domain');
+});
+
+test('another DNS provider: the records to copy, a hint for the provider, each failure\'s fix, then the guide follows CoderHelm to the domain', async ({ page }) => {
+  const m = newMock({ status: { schema: 1, phase: 'done', url: INSTALL, domain: EXTERNAL } });
+  m.setup = withOptional(setupDoc(NO_APP), { status: 'wait', code: 'validating' });
+  await seeded(page, m, { domainChoice: 'own', hostname: 'coderhelm.example.com' });
+  await expect(page.getByTestId('screen-domain')).toBeVisible();
+  await expect(page.getByTestId('step-title')).toHaveText('Point your domain at CoderHelm');
+  await expect(page.getByTestId('domain-status')).toContainText('Waiting for the certificate record');
+  await expect(page.getByTestId('record-certificate-name')).toHaveText('_a1b2c3.coderhelm.example.com');
+  await expect(page.getByTestId('record-certificate-value')).toHaveText('_d4e5f6.xyz.acm-validations.aws');
+  await expect(page.getByTestId('record-address-value')).toHaveText('d111test.cloudfront.net');
+  await expect(page.getByTestId('record-certificate')).toContainText('_a1b2c3.coderhelm');
+  await expect(page.locator('[data-testid="domain-progress"] [data-row-status]').first()).toHaveAttribute('data-row-status', 'active');
+  // Where to add them, for the provider they pick.
+  await page.getByTestId('dns-provider').selectOption('cloudflare');
+  await expect(page.getByText('Set Proxy status to DNS only')).toBeVisible();
+  await expect(page.getByTestId('open-provider')).toHaveAttribute('href', 'https://dash.cloudflare.com/');
+
+  // A record with the wrong value, then CAA, each with its own fix.
+  m.setup = withOptional(setupDoc(NO_APP), { status: 'fail', code: 'validation_wrong_value' });
+  await page.getByTestId('check-again').click();
+  await expect(page.getByTestId('domain-status')).toContainText('The certificate record has a different value');
+  await expect(page.getByTestId('domain-status')).toHaveAttribute('data-tone', 'fail');
+  await expect(page.locator('[data-testid="domain-progress"] [data-row-status="fail"]')).toHaveCount(1);
+  m.setup = withOptional(setupDoc(NO_APP), { status: 'fail', code: 'caa_blocked' });
+  await page.getByTestId('check-again').click();
+  await expect(page.getByTestId('domain-status')).toContainText('0 issue "amazon.com"');
+  m.setup = withOptional(setupDoc(NO_APP), { status: 'fail', code: 'cname_at_apex' });
+  await page.getByTestId('check-again').click();
+  await expect(page.getByTestId('domain-status')).toContainText('ALIAS or ANAME');
+
+  // Issued, moving, then waiting for the address record.
+  m.setup = withOptional(setupDoc(NO_APP), { status: 'wait', code: 'attaching' });
+  await expect(page.getByTestId('domain-status')).toContainText('Moving CoderHelm to your domain');
+  m.setup = withOptional(setupDoc(NO_APP), { status: 'wait', code: 'dns_missing' });
+  await expect(page.getByTestId('domain-status')).toContainText('Waiting for the address record');
+  // A refresh keeps the records (this browser remembers them).
+  await page.reload();
+  await expect(page.getByTestId('record-address-value')).toHaveText('d111test.cloudfront.net');
+
+  // Live: the guide moves to the domain, and the GitHub App gets its URLs.
+  m.setup = withOptional(setupDoc(NO_APP), { status: 'pass', code: 'ok' });
+  await expect(page.getByTestId('screen-github')).toBeVisible();
+  await expect.poll(() => page.url()).toContain(encodeURIComponent(DOMAIN));
+  await page.getByTestId('create-app').click();
+  const manifest = JSON.parse(new URLSearchParams(m.posted!).get('manifest')!);
+  expect(manifest.hook_attributes.url).toBe(`${DOMAIN}/webhooks/github`);
+  expect(manifest.redirect_url).toBe(`${DOMAIN}/api/setup/github/callback`);
+  assertPrivate(m);
+});
+
+test('a Route 53 zone in the account: set up by the install, nothing to add', async ({ page }) => {
+  const m = newMock({ status: { schema: 1, phase: 'done', url: DOMAIN, domain: { hostname: 'coderhelm.example.com', mode: 'route53', state: 'live', records: [] } } });
+  m.setup = withOptional(setupDoc(NO_APP), { status: 'wait', code: 'dns_missing' });
+  await seeded(page, m, { domainChoice: 'own', hostname: 'coderhelm.example.com' });
+  await expect(page.getByTestId('step-title')).toHaveText('Setting up your domain');
+  await expect(page.getByTestId('dns-records')).toHaveCount(0);
+  await expect(page.getByTestId('domain-progress')).toContainText('Route 53');
+  m.setup = withOptional(setupDoc(NO_APP), { status: 'pass', code: 'ok' });
+  await expect(page.getByTestId('screen-github')).toBeVisible();
+});
+
+test('skip the domain: finish on the AWS address, with the way back', async ({ page }) => {
+  const m = newMock({ status: { schema: 1, phase: 'done', url: INSTALL, domain: EXTERNAL } });
+  m.setup = withOptional(setupDoc(), { status: 'wait', code: 'validating' });
+  await seeded(page, m, { domainChoice: 'own', hostname: 'coderhelm.example.com' });
+  await expect(page.getByTestId('screen-domain')).toBeVisible();
+  await page.getByTestId('skip-domain').click();
+  await expect(page.getByTestId('screen-ready')).toBeVisible();
+  await expect(page.getByTestId('domain-later')).toContainText('coderhelm.example.com');
+  await page.getByTestId('back-to-domain').click();
+  await expect(page.getByTestId('screen-domain')).toBeVisible();
+});
+
+test('a private progress file: the domain step says where the records are', async ({ page }) => {
+  const m = newMock({ status: null });
+  m.setup = withOptional(setupDoc(NO_APP), { status: 'wait', code: 'validating' });
+  await seeded(page, m, { domainChoice: 'own', hostname: 'coderhelm.example.com', url: INSTALL });
+  await expect(page.getByTestId('domain-no-records')).toContainText('Settings, System, Domain');
+});
+
+test('ready: the optional setup list, each with its check and one action', async ({ page }) => {
+  const m = newMock({ setup: withOptional(setupDoc(), { status: 'skip', code: 'none' }, { updates: { status: 'pass', code: 'ok' } }) });
+  await seeded(page, m, { url: INSTALL, region: 'eu-west-1' });
+  await expect(page.getByTestId('screen-ready')).toBeVisible();
+  const list = page.getByTestId('optional-setup');
+  await expect(list.locator('[data-optional]')).toHaveCount(8);
+  await expect(list.locator('[data-optional="domain"]')).toHaveAttribute('data-state', 'todo');
+  await expect(page.getByTestId('optional-domain-action')).toHaveAttribute('href', `${INSTALL}/settings/system/#domain`);
+  await expect(list.locator('[data-optional="email"]')).toHaveAttribute('data-state', 'todo');
+  await expect(list.locator('[data-optional="email"]')).toContainText('Request production access');
+  await expect(page.getByTestId('optional-email-action')).toHaveAttribute('href', 'https://eu-west-1.console.aws.amazon.com/ses/home?region=eu-west-1#/account');
+  await expect(list.locator('[data-optional="updates"]')).toHaveAttribute('data-state', 'done');
+  await expect(list.locator('[data-optional="backups"]')).toContainText('Done by the install');
+  await expect(page.getByTestId('optional-invite-action')).toHaveAttribute('href', `${INSTALL}/settings/people/`);
+  assertPrivate(m);
+});
+
 test('screenshots of every screen at 1440 and 390', async ({ page }) => {
   test.skip(!SHOTS, 'set E2E_SHOTS=<dir> to save screenshots');
   test.setTimeout(120_000);
@@ -358,6 +515,47 @@ test('screenshots of every screen at 1440 and 390', async ({ page }) => {
     await page.getByTestId('launch').click();
     await expect(page.getByTestId('no-sign')).toBeVisible();
     await at('12-no-sign-paste');
+    // Your own domain: the options, the records, a failure, Route 53, optional setup.
+    await page.evaluate(() => localStorage.clear());
+    await page.goto('/self-host/install/');
+    await page.getByRole('button', { name: 'More options' }).click();
+    await page.getByLabel('My own domain').check();
+    await page.getByLabel('Your domain').fill('coderhelm.example.com');
+    await page.getByTestId('auto-update').check();
+    await at('14-start-domain-options');
+    await page.getByLabel('Your email').fill('ada@example.com');
+    m.status = { schema: 1, phase: 'done', url: INSTALL, domain: EXTERNAL };
+    m.setup = withOptional(setupDoc(NO_APP), { status: 'wait', code: 'validating' });
+    await page.getByTestId('launch').click();
+    await expect(page.getByTestId('screen-domain')).toBeVisible();
+    await page.getByTestId('dns-provider').selectOption('godaddy');
+    await at('15-domain-records');
+    m.setup = withOptional(setupDoc(NO_APP), { status: 'fail', code: 'dns_wrong_value' });
+    await page.getByTestId('check-again').click();
+    await expect(page.getByTestId('domain-status')).toHaveAttribute('data-tone', 'fail');
+    await at('16-domain-wrong-value');
+    m.status = { schema: 1, phase: 'done', url: DOMAIN, domain: { hostname: 'coderhelm.example.com', mode: 'route53', state: 'live', records: [] } };
+    m.setup = withOptional(setupDoc(NO_APP), { status: 'wait', code: 'attaching' });
+    await page.evaluate(() => localStorage.clear());
+    await page.goto('/self-host/install/');
+    await page.getByRole('button', { name: 'More options' }).click();
+    await page.getByLabel('My own domain').check();
+    await page.getByLabel('Your domain').fill('coderhelm.example.com');
+    await page.getByLabel('Your email').fill('ada@example.com');
+    await page.getByTestId('launch').click();
+    await expect(page.getByTestId('step-title')).toHaveText('Setting up your domain');
+    await at('17-domain-route53');
+    m.setup = withOptional(setupDoc(), { status: 'pass', code: 'ok' }, { updates: { status: 'pass', code: 'ok' } });
+    await expect(page.getByTestId('screen-ready')).toBeVisible();
+    await at('18-ready-optional-setup');
+    // Back to the no-sign screen for the light-mode shots below.
+    m.status = null;
+    m.setup = null;
+    await page.evaluate(() => localStorage.clear());
+    await page.goto('/self-host/install/');
+    await page.getByLabel('Your email').fill('ada@example.com');
+    await page.getByTestId('launch').click();
+    await expect(page.getByTestId('no-sign')).toBeVisible();
   }
   // Light mode: the status colors and the primary button keep their contrast.
   await page.emulateMedia({ colorScheme: 'light' });

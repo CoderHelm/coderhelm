@@ -203,3 +203,141 @@ test('the install\'s GET /api/setup/status, in its exact shape, drives the guide
   assert.equal(c.checkText({ id: 'new_check', code: 'x', status: 'warn', label: 'Something new' }).title, 'Something new');
   assert.equal(c.bedrockPrefixFor('ap-south-1'), 'apac.');
 });
+
+// ── Everything else you can set up ──────────────────────────────────────
+
+test('more options: domain, sender, sign-up domain and updates go into the quick-create link only when set', () => {
+  const q = (st) => new URLSearchParams(new URL(c.quickCreateUrl(st)).hash.split('?')[1]);
+  const plain = q(S);
+  for (const k of ['param_Hostname', 'param_EmailFrom', 'param_SignupDomain', 'param_AutoUpdate', 'param_UpdateWindow', 'param_UpdateTimezone']) assert.equal(plain.get(k), null, k);
+  const all = q({ ...S, domainChoice: 'own', hostname: 'https://CoderHelm.Example.com/', emailFrom: 'Bot@Example.com', signupDomain: '@example.com', autoUpdate: true, updateWindow: 'daily 02:00', updateTimezone: 'Europe/Berlin' });
+  assert.equal(all.get('param_Hostname'), 'coderhelm.example.com');
+  assert.equal(all.get('param_EmailFrom'), 'bot@example.com');
+  assert.equal(all.get('param_SignupDomain'), 'example.com');
+  assert.equal(all.get('param_AutoUpdate'), 'on');
+  assert.equal(all.get('param_UpdateWindow'), 'daily 02:00');
+  assert.equal(all.get('param_UpdateTimezone'), 'Europe/Berlin');
+  // The AWS address chosen: a typed hostname is not sent.
+  assert.equal(q({ ...S, domainChoice: 'aws', hostname: 'coderhelm.example.com' }).get('param_Hostname'), null);
+  // Defaults stay out of the link.
+  const def = q({ ...S, autoUpdate: true });
+  assert.equal(def.get('param_UpdateWindow'), null);
+  assert.equal(def.get('param_UpdateTimezone'), null);
+});
+
+test('more options are validated in plain words', () => {
+  const base = { email: 'ada@example.com', stage: 'prod', region: 'us-east-1' };
+  assert.deepEqual(c.validate({ ...base, domainChoice: 'aws', hostname: 'junk' }), {}, 'a hostname only matters with own domain');
+  assert.match(c.validate({ ...base, domainChoice: 'own', hostname: 'coderhelm' }).hostname, /coderhelm\.example\.com/);
+  assert.match(c.validate({ ...base, domainChoice: 'own', hostname: 'd111.cloudfront.net' }).hostname, /domain you own/);
+  assert.deepEqual(c.validate({ ...base, domainChoice: 'own', hostname: 'https://coderhelm.example.com/' }), {});
+  assert.match(c.validate({ ...base, emailFrom: 'nope' }).emailFrom, /email address/);
+  assert.match(c.validate({ ...base, signupDomain: 'not a domain' }).signupDomain, /example\.com/);
+  assert.match(c.validate({ ...base, autoUpdate: true, updateTimezone: 'Mars' }).updateTimezone, /time zone/);
+  assert.deepEqual(c.validate({ ...base, autoUpdate: true, updateWindow: 'Sat 22:00', updateTimezone: 'America/New_York' }), {});
+});
+
+test('the domain step: only for their own domain, before GitHub, skippable, and the guide follows the install there', () => {
+  assert.deepEqual(c.stepsFor({ domainChoice: 'aws' }).map((x) => x.id), ['aws', 'github', 'models', 'ready']);
+  assert.deepEqual(c.stepsFor({ domainChoice: 'own' }).map((x) => x.id), ['aws', 'domain', 'github', 'models', 'ready']);
+  const own = { launchedAt: 1, url: 'https://d111.cloudfront.net', domainChoice: 'own', domainSkipped: false };
+  const withDomain = (st, code, extra = {}) => ({ ...setup(extra), checks: [...setup(extra).checks, { id: 'domain', status: st, code, required: false }] });
+  assert.equal(c.deriveStep(own, withDomain('wait', 'validating', { github_app: { status: 'fail', code: 'missing' } })), 'domain');
+  assert.equal(c.deriveStep(own, withDomain('fail', 'cname_at_apex')), 'domain');
+  assert.equal(c.deriveStep({ ...own, domainSkipped: true }, withDomain('wait', 'validating', { github_app: { status: 'fail', code: 'missing' } })), 'github');
+  assert.equal(c.deriveStep({ ...own, domainChoice: 'aws' }, withDomain('skip', 'none')), 'ready');
+  assert.equal(c.deriveStep(own, withDomain('pass', 'ok', { github_app: { status: 'fail', code: 'missing' } })), 'github');
+  assert.equal(c.deriveStep(own, setup()), 'ready', 'an install too old to report the domain holds nobody up');
+  const st = { domainChoice: 'own', hostname: 'coderhelm.example.com', url: 'https://d111.cloudfront.net' };
+  assert.equal(c.domainUrl(st, withDomain('wait', 'attaching')), null);
+  assert.equal(c.domainUrl(st, withDomain('pass', 'ok')), 'https://coderhelm.example.com');
+  assert.equal(c.domainUrl({ ...st, url: 'https://coderhelm.example.com' }, withDomain('pass', 'ok')), null);
+  assert.equal(c.domainUrl({ ...st, domainChoice: 'aws' }, withDomain('pass', 'ok')), null);
+});
+
+test('domain progress rows follow the code; failures sit on their row', () => {
+  const st = (code, mode = 'external') => c.domainRows(code, mode).map((r) => r.status).join(',');
+  assert.equal(st('validating'), 'active,pending,pending,pending');
+  assert.equal(st('validation_wrong_value'), 'fail,pending,pending,pending');
+  assert.equal(st('caa_blocked'), 'fail,pending,pending,pending');
+  assert.equal(st('attaching'), 'pass,active,pending,pending');
+  assert.equal(st('attach_failed'), 'pass,fail,pending,pending');
+  assert.equal(st('dns_missing'), 'pass,pass,active,pending');
+  assert.equal(st('cname_at_apex'), 'pass,pass,fail,pending');
+  assert.equal(st('https_failed'), 'pass,pass,pass,fail');
+  assert.equal(st('ok'), 'pass,pass,pass,pass');
+  assert.match(c.domainRows('validating', 'route53')[0].label, /Route 53/);
+});
+
+test('every domain, sign-in and updates code the install documents has a sentence and a fix', () => {
+  const documented = {
+    domain: ['ok', 'none', 'validating', 'zone_not_delegated', 'validation_wrong_value', 'caa_blocked', 'certificate_failed', 'attaching', 'attach_failed', 'dns_missing', 'dns_wrong_value', 'cname_at_apex', 'https_failed', 'api_unreachable', 'removing', 'unknown'],
+    google_sign_in: ['ok', 'off', 'missing_keys'],
+    updates: ['ok', 'auto_off', 'unknown'],
+  };
+  for (const [id, codes] of Object.entries(documented)) {
+    for (const code of codes) {
+      const t = c.checkText({ id, code, status: 'fail' });
+      assert.ok(t.title && !t.title.includes(':'), `${id}.${code}`);
+      if (code !== 'ok') assert.ok(t.fix, `${id}.${code} has a fix`);
+      for (const g of ['→', '⇒', '➜']) assert.ok(!`${t.title} ${t.fix ?? ''}`.includes(g), 'no arrow glyphs');
+      assert.ok(!/brain/i.test(`${t.title} ${t.fix ?? ''}`));
+    }
+  }
+});
+
+test('DNS records: short names for providers that add the domain, a hint for each common provider', () => {
+  assert.equal(c.baseDomain('coderhelm.example.com'), 'example.com');
+  assert.equal(c.baseDomain('helm.example.co.uk'), 'example.co.uk');
+  assert.equal(c.relativeName('coderhelm.example.com', 'coderhelm.example.com'), 'coderhelm');
+  assert.equal(c.relativeName('_a1.coderhelm.example.com', 'coderhelm.example.com'), '_a1.coderhelm');
+  assert.equal(c.relativeName('example.com', 'example.com'), '@');
+  for (const p of c.DNS_PROVIDERS) {
+    assert.ok(p.where.length > 10, p.id);
+    if (p.url) assert.match(p.url, /^https:\/\//);
+  }
+  assert.ok(c.DNS_PROVIDERS.find((p) => p.id === 'cloudflare').where.includes('DNS only'));
+});
+
+test('the progress file\'s domain part is checked before it is shown, and remembered for a refresh', () => {
+  const d = c.parseStatusDoc({ schema: 1, phase: 'done', url: 'https://d111.cloudfront.net', domain: { hostname: 'coderhelm.example.com', mode: 'external', state: 'validating', records: [
+    { purpose: 'certificate', name: '_a1.coderhelm.example.com', type: 'CNAME', value: '_b2.acm-validations.aws' },
+    { purpose: 'address', name: 'coderhelm.example.com', type: 'CNAME', value: 'd111.cloudfront.net' },
+    { purpose: 'address', name: '<script>', type: 'CNAME', value: 'x' },
+  ] } });
+  assert.equal(d.domain.records.length, 2, 'a junk record is dropped');
+  assert.equal(c.parseStatusDoc({ schema: 1, phase: 'done', domain: { hostname: 'javascript:1' } }).domain, null);
+  assert.equal(c.parseStatusDoc({ schema: 1, phase: 'done' }).domain, null);
+  const next = c.withDomainDoc(c.newState(), d);
+  assert.equal(next.domainChoice, 'own');
+  assert.equal(next.hostname, 'coderhelm.example.com');
+  assert.equal(c.withDomainDoc(next, d), null, 'nothing new');
+  assert.equal(c.parseStored(JSON.stringify(next)).domainDoc.records[0].value, '_b2.acm-validations.aws');
+});
+
+test('optional setup: each item has one action, its check where the install reports one, and backups are done by the install', () => {
+  const st = { url: 'https://coderhelm.example.com', region: 'eu-west-1', provider: 'bedrock', domainChoice: 'aws' };
+  const withChecks = { ...setup(), checks: [...setup().checks, { id: 'domain', status: 'skip', code: 'none' }, { id: 'google_sign_in', status: 'skip', code: 'off' }, { id: 'updates', status: 'pass', code: 'ok' }] };
+  const items = c.optionalSetup(st, withChecks);
+  const by = Object.fromEntries(items.map((i) => [i.id, i]));
+  assert.deepEqual(items.map((i) => i.id), ['domain', 'email', 'invite', 'chat', 'jira', 'google_sign_in', 'updates', 'backups']);
+  assert.equal(by.domain.state, 'todo');
+  assert.equal(by.domain.action.href, 'https://coderhelm.example.com/settings/system/#domain');
+  assert.equal(by.email.state, 'todo');
+  assert.equal(by.email.action.href, 'https://eu-west-1.console.aws.amazon.com/ses/home?region=eu-west-1#/account');
+  assert.equal(by.updates.state, 'done');
+  assert.equal(by.google_sign_in.state, 'todo');
+  assert.equal(by.backups.state, 'auto');
+  assert.equal(by.invite.state, 'unknown');
+  for (const i of items) {
+    assert.ok(i.title && i.why && i.doc, i.id);
+    if (i.state !== 'auto') assert.ok(i.action?.href.startsWith('https://'), `${i.id} has a link`);
+  }
+  // Anthropic keys add the key item; a live own domain drops the domain item.
+  const anthropic = c.optionalSetup({ ...st, provider: 'anthropic', domainChoice: 'own' }, { ...withChecks, checks: withChecks.checks.map((x) => (x.id === 'domain' ? { ...x, status: 'pass', code: 'ok' } : x)) });
+  assert.ok(anthropic.some((i) => i.id === 'anthropic'));
+  assert.ok(!anthropic.some((i) => i.id === 'domain'));
+  // An unverified sender links to the identities page.
+  const unverified = c.optionalSetup(st, setup({ email: { status: 'warn', code: 'identity_unverified', required: false } }));
+  assert.match(unverified.find((i) => i.id === 'email').action.href, /#\/identities$/);
+});

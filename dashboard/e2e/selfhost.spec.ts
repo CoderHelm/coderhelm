@@ -68,8 +68,36 @@ function installChecks(fixed: boolean) {
   return { checked_at: "2026-10-25T10:00:00Z", summary: { pass: n("pass"), warn: n("warn"), fail: n("fail"), skip: n("skip"), ready: n("fail") === 0 }, checks };
 }
 
-async function setup(page: Page, cfg: RuntimeConfig | null, opts: { signedIn?: boolean; provider?: "anthropic" | "bedrock"; blocked?: boolean } = {}) {
+const RECORDS = [
+  { purpose: "certificate", name: "_a1b2c3.coderhelm.example.com", type: "CNAME", value: "_d4e5f6.xyz.acm-validations.aws" },
+  { purpose: "address", name: "coderhelm.example.com", type: "CNAME", value: "d111test.cloudfront.net" },
+];
+
+/** GET /api/system/domain for a domain state: the updater's view, the decision and the check. */
+function domainAnswer(code: string) {
+  if (code === "none") {
+    return {
+      available: true, status: "skip", code,
+      domain: { hostname: null, state: "none", mode: null, current: "d111test.cloudfront.net", target: "d111test.cloudfront.net", records: [] },
+      check: { key: "domain", group: "Domain", label: "Your own domain", status: "skip", detail: "CoderHelm uses its AWS address d111test.cloudfront.net (optional: use your own domain).", why: "A domain of your own is easier to remember and share, and Google sign-in needs one.", fix: { text: "Add it in Settings, then System.", href: "/settings/system#domain" } },
+    };
+  }
+  const state = code === "ok" ? "live" : code === "caa_blocked" ? "failed" : "validating";
+  const status = code === "ok" ? "pass" : code === "caa_blocked" ? "fail" : "warn";
+  return {
+    available: true, status: code === "validating" ? "wait" : status, code,
+    domain: { hostname: "coderhelm.example.com", state, mode: "external", current: "d111test.cloudfront.net", target: "d111test.cloudfront.net", certificate: { status: code === "caa_blocked" ? "FAILED" : "PENDING_VALIDATION", failure_reason: code === "caa_blocked" ? "CAA_ERROR" : null }, records: RECORDS },
+    check: code === "ok"
+      ? { key: "domain", group: "Domain", label: "Your own domain", status: "pass", detail: "https://coderhelm.example.com answers with its certificate, and so does the API." }
+      : code === "caa_blocked"
+        ? { key: "domain", group: "Domain", label: "Your own domain", status: "fail", detail: "Your domain's CAA records don't allow Amazon to issue a certificate for coderhelm.example.com.", why: "Without a certificate CloudFront can't answer on your domain.", fix: { text: "Add this CAA record next to the ones you have, then press Try again in Settings, then System.", command: 'example.com  CAA  0 issue "amazon.com"', href: "/settings/system#domain" } }
+        : { key: "domain", group: "Domain", label: "Your own domain", status: "warn", detail: "The certificate for coderhelm.example.com is waiting for its DNS record.", why: "CloudFront needs the certificate before it can answer on your domain.", fix: { text: "Add these DNS records where your domain's DNS is hosted. AWS checks every few minutes; new records can take up to an hour to show up.", command: RECORDS.map((r) => `${r.name}  CNAME  ${r.value}`).join("\n"), href: "/settings/system#domain" } },
+  };
+}
+
+async function setup(page: Page, cfg: RuntimeConfig | null, opts: { signedIn?: boolean; provider?: "anthropic" | "bedrock"; blocked?: boolean; domain?: string } = {}) {
   const calls: string[] = [];
+  const domainState = { code: opts.domain ?? "none" };
   const checksState = { fixed: false, runs: 0 };
   const puts: Record<string, unknown>[] = [];
   const systemCalls: { path: string; body: Record<string, unknown> }[] = [];
@@ -141,6 +169,21 @@ async function setup(page: Page, cfg: RuntimeConfig | null, opts: { signedIn?: b
         checks: c.checks,
       });
     }
+    if (p === "/api/system/domain") {
+      if (req.method() === "PUT") {
+        const body = JSON.parse(req.postData() || "{}");
+        systemCalls.push({ path: p, body });
+        if (body.hostname === "taken.example.com") return json(route, { error: "the address is being changed right now; wait for it to finish (about 10 minutes)" }, 400);
+        domainState.code = "validating";
+        return json(route, domainAnswer("validating").domain);
+      }
+      if (req.method() === "DELETE") {
+        systemCalls.push({ path: p, body: { method: "DELETE" } });
+        domainState.code = "none";
+        return json(route, domainAnswer("none").domain);
+      }
+      return json(route, domainAnswer(domainState.code));
+    }
     if (p === "/api/system/test-email") {
       systemCalls.push({ path: p, body: {} });
       return json(route, { sent: true, to: "owner@example.org" });
@@ -159,7 +202,7 @@ async function setup(page: Page, cfg: RuntimeConfig | null, opts: { signedIn?: b
     }
     return json(route, {}, 200);
   });
-  return { calls, puts, systemCalls, checksState };
+  return { calls, puts, systemCalls, checksState, domainState };
 }
 
 test("API calls go where the runtime config says, not where the build said", async ({ page, baseURL }) => {
@@ -251,7 +294,9 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
       const { systemCalls } = await setup(page, SELF, { signedIn: true, provider: "bedrock" });
       await page.goto("/settings/setup/");
       const list = page.getByTestId("setup-checklist");
-      await expect(list.locator("li")).toHaveCount(7);
+      await expect(list.locator("li")).toHaveCount(8);
+      await expect(list.locator("#domain")).toContainText("Optional");
+      await expect(list.locator("#domain").getByRole("link", { name: "Add a domain" })).toHaveAttribute("href", /\/settings\/system\/?#domain$/);
       await expect(list.locator("#github")).toHaveAttribute("data-done", "yes");
       await expect(list.locator("#repos")).toHaveAttribute("data-done", "no");
       await expect(list.locator("#repos").getByRole("link", { name: "Choose repositories" })).toHaveAttribute("href", /\/settings\/repos\/?$/);
@@ -356,3 +401,57 @@ for (const [name, viewport] of [["1440", { width: 1440, height: 1000 }], ["390",
     });
   });
 }
+
+test("System: use your own domain, see the records to add, fix a CAA refusal with Try again, and go back to the AWS address", async ({ page }) => {
+  const { systemCalls, domainState } = await setup(page, SELF, { signedIn: true });
+  await page.goto("/settings/system/");
+  const sec = page.getByTestId("domain-section");
+  await expect(sec).toHaveAttribute("data-code", "none");
+  await expect(sec).toContainText("CoderHelm uses its AWS address d111test.cloudfront.net");
+  // A bad hostname is refused in plain words, before any call.
+  await page.getByTestId("domain-input").fill("coderhelm");
+  await page.getByTestId("domain-use").click();
+  await expect(page.getByTestId("domain-error")).toHaveText("Enter a hostname such as coderhelm.example.com.");
+  expect(systemCalls.filter((c) => c.path === "/api/system/domain")).toEqual([]);
+  // The updater's refusal shows as it says it.
+  await page.getByTestId("domain-input").fill("taken.example.com");
+  await page.getByTestId("domain-use").click();
+  await expect(page.getByTestId("domain-error")).toContainText("being changed right now");
+  await page.getByTestId("domain-input").fill("https://CoderHelm.example.com/");
+  await page.getByTestId("domain-use").click();
+  await expect.poll(() => systemCalls.filter((c) => c.path === "/api/system/domain").map((c) => c.body.hostname)).toContain("coderhelm.example.com");
+  await expect(sec).toHaveAttribute("data-code", "validating");
+  await expect(page.getByTestId("domain-record-certificate")).toContainText("_a1b2c3.coderhelm.example.com");
+  await expect(page.getByTestId("domain-record-certificate")).toContainText("_d4e5f6.xyz.acm-validations.aws");
+  await expect(page.getByTestId("domain-record-address")).toContainText("d111test.cloudfront.net");
+  // CAA blocks Amazon: the fix, and Try again requests a new certificate.
+  domainState.code = "caa_blocked";
+  await page.reload();
+  await expect(sec).toContainText("CAA records don't allow Amazon");
+  await expect(sec).toContainText('0 issue "amazon.com"');
+  await page.getByTestId("domain-retry").click();
+  await expect(sec).toHaveAttribute("data-code", "validating");
+  // Live, then back to the AWS address after a confirm.
+  domainState.code = "ok";
+  await page.reload();
+  await expect(sec).toContainText("answers with its certificate");
+  await expect(page.getByTestId("domain-records")).toHaveCount(0);
+  page.once("dialog", (d) => void d.accept());
+  await page.getByTestId("domain-remove").click();
+  await expect.poll(() => systemCalls.some((c) => c.body.method === "DELETE")).toBe(true);
+  await expect(sec).toHaveAttribute("data-code", "none");
+});
+
+test("System: the domain section at 1440 and 390, no sideways scroll", async ({ page }) => {
+  const shots = process.env.E2E_SHOTS;
+  await setup(page, SELF, { signedIn: true, domain: "validating" });
+  for (const [w, h] of [[1440, 900], [390, 844]] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/settings/system/#domain");
+    const sec = page.getByTestId("domain-section");
+    await expect(sec).toHaveAttribute("data-code", "validating");
+    const width = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(width).toBeLessThanOrEqual(w);
+    if (shots) await sec.screenshot({ path: `${shots}/dashboard-${w}-domain.png` });
+  }
+});

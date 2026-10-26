@@ -1101,6 +1101,11 @@ export const api = {
   getSystemChecks: () => request<SystemChecks>("/api/system/checks"),
   getSystemPreflight: () => request<SystemPreflight>("/api/system/preflight"),
   sendTestEmail: () => request<{ sent: boolean; to?: string; reason?: string }>("/api/system/test-email", { method: "POST", body: "{}" }),
+  // Your own domain (install admins): status with the records to add, set, back to the AWS address.
+  getSystemDomain: () => request<SystemDomain>("/api/system/domain"),
+  setSystemDomain: (hostname: string) =>
+    request<DomainView>("/api/system/domain", { method: "PUT", body: JSON.stringify({ hostname }) }),
+  removeSystemDomain: () => request<DomainView>("/api/system/domain", { method: "DELETE" }),
 
   // Remote MCP servers
   listMcpServers: () =>
@@ -3529,6 +3534,37 @@ export interface SystemChecks {
   checked_at: string;
   summary: { pass: number; warn: number; fail: number; skip: number; ready: boolean };
   checks: InstallCheck[];
+}
+
+/** One DNS record to add for your own domain. */
+export interface DomainRecord {
+  purpose: "certificate" | "address";
+  name: string;
+  type: string;
+  value: string;
+}
+
+/** The updater's view of the domain (GET /api/system/domain `domain`). */
+export interface DomainView {
+  hostname: string | null;
+  state: "none" | "validating" | "attaching" | "live" | "failed" | "removing";
+  mode: "route53" | "external" | "config" | null;
+  reason?: string;
+  zone?: string | null;
+  name_servers?: string[];
+  current?: string | null;
+  target?: string | null;
+  certificate?: { status?: string; failure_reason?: string | null } | null;
+  records: DomainRecord[];
+}
+
+export interface SystemDomain {
+  available: boolean;
+  reason?: string;
+  status?: "pass" | "warn" | "fail" | "skip" | "wait";
+  code?: string;
+  domain?: DomainView | null;
+  check?: InstallCheck;
 }
 
 /** Something that would stop (block) or should pause (warn) an update. */

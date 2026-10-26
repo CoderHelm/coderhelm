@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type AutoUpdateSettings, type SystemPreflight, type SystemVersion, type UpdateEntry } from "@/lib/api";
 import { FixBlock } from "@/components/install-checks";
+import { DomainSection } from "@/components/domain-section";
 import { CodeBlock } from "@/components/code-block";
 
 /** The same checks from the operator's machine. */
@@ -210,6 +211,10 @@ function System() {
 
         <SettingsSection id="readiness" title="Update readiness" description="What an update checks before it starts, run now: anything that would stop it, and anything to read first.">
           <Readiness pre={pre} state={preState} onRecheck={loadPreflight} />
+        </SettingsSection>
+
+        <SettingsSection id="domain" title="Domain" description="The address people and GitHub use for this install: the AWS address, or your own domain.">
+          <DomainSection />
         </SettingsSection>
 
         <SettingsSection id="auto" title="Automatic updates">
