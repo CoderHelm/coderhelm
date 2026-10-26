@@ -68,6 +68,7 @@
     "/plugins/walkthrough/",
     "/self-host/",
     "/self-host/backups/",
+    "/self-host/check-your-install/",
     "/self-host/config-reference/",
     "/self-host/domains/",
     "/self-host/email/",
@@ -77,9 +78,12 @@
     "/self-host/integrations/",
     "/self-host/knowledge-sources/",
     "/self-host/model-providers/",
+    "/self-host/options/",
     "/self-host/quick-start/",
     "/self-host/requirements/",
     "/self-host/security/",
+    "/self-host/setup-checks/",
+    "/self-host/sign-in/",
     "/self-host/troubleshooting/",
     "/self-host/updates/"
   ]
