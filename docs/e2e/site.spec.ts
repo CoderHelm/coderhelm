@@ -288,6 +288,11 @@ test('the webhooks page is about the events CoderHelm sends, with every event an
     await expect(page.getByRole('tabpanel').filter({ hasText: 'whsec_' }).first()).toBeVisible();
   }
   await expect(page.getByRole('link', { name: 'Incoming webhooks' }).first()).toHaveAttribute('href', /\/api\/incoming-webhooks\/?$/);
+  // The threat model and the receiver's replay checks are on the page.
+  await expect(page.getByRole('heading', { name: 'Threat model' })).toBeVisible();
+  for (const text of ['Webhooks only go out', 'Skip a `webhook-id` you already handled'.replace(/`/g, ''), 'at most 4 KB of the answer is read']) {
+    await expect(page.getByText(text, { exact: false }).first()).toBeVisible();
+  }
   await shot(page, 'webhooks-desktop');
 });
 

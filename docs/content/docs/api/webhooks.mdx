@@ -89,6 +89,7 @@ The signature is the HMAC-SHA256 of `<webhook-id>.<webhook-timestamp>.<raw body>
 1. Read the **raw** body, before any JSON parsing. Parsing and printing the JSON again changes the bytes and the signature fails.
 2. Refuse a `webhook-timestamp` more than 5 minutes from your clock, so an old request can't be played again.
 3. Work out the signature and compare it, in constant time, with each `v1,` entry of `webhook-signature`. Accept the request when any entry matches.
+4. Skip a `webhook-id` you already handled. A valid request can be sent again on purpose (retries, Resend, replay) or captured and played again inside the 5 minutes, so keep the ids you handled for at least as long as retries last (two days is plenty) and answer `2xx` to a repeat without acting on it.
 
 Any [Standard Webhooks library](https://github.com/standard-webhooks/standard-webhooks/tree/main/libraries) (JavaScript, Python, Go, Rust, Java, Ruby, PHP, C# and more) does all three; pass it your `whsec_` secret as it is. Or copy one of these:
 
@@ -304,7 +305,22 @@ Both send the event with its original `id`, so a receiver that skips ids it has 
 - **Skip repeats** by `webhook-id`. Retries, Resend and replay send an event again on purpose.
 - **Keep the secret secret.** It is stored encrypted, shown in full only when created, revealed or rotated, and every reveal and rotation is in the team's audit log.
 - **Rotate without a gap.** **Rotate secret** (or `POST /api/webhooks/endpoints/{endpoint_id}/secret/rotate`) makes a new secret. For the next 24 hours (choose 0 to 168 with `overlap_hours`), each request carries two signatures, one per secret, so your endpoint keeps verifying with the old one until you switch it to the new one.
-- **The data is about your team's work.** Events carry titles, repository names, pull request links and short error texts, never code or credentials.
+- **The data is about your team's work.** Events carry titles, repository names, pull request links and short error texts, never code, log lines or credentials. Before an event is sent, anything that looks like a credential (tokens, keys, passwords in addresses, `key=value` pairs that name a secret, private key blocks) is replaced with `[redacted]`, and long text is cut.
+- **Your answer is only read, never acted on.** CoderHelm keeps the status code and at most the first 4 KB of the body, to show on the delivery. Redirects are not followed.
+
+## Threat model
+
+What the design defends against, and what it asks of you.
+
+| Threat | How it's handled |
+|---|---|
+| Someone sends your endpoint a fake event pretending to be CoderHelm | Each endpoint has its own secret: 32 random bytes from a cryptographic generator, stored sealed with AWS KMS and bound to your team and that endpoint. Without it no one can make a valid `webhook-signature`. You must verify every request and compare in constant time. |
+| A real request is captured and sent again later | The signature covers the timestamp, so a changed timestamp fails. Refuse timestamps more than 5 minutes off, and skip `webhook-id`s you already handled. |
+| Your endpoint, or whoever controls it, tries to send events into CoderHelm | Webhooks only go out. There is no inbound route on this path; the endpoint's answer is kept only as a short note on the delivery and is never parsed or acted on. Managing endpoints needs a signed-in admin or an API key with the `webhooks` scope. |
+| An endpoint address is used to reach CoderHelm's own network (SSRF) | `https://` only; private, loopback, link-local, carrier-grade NAT and metadata addresses (and their IPv6 forms, including IPv4-mapped ones) are refused at save and again, after a fresh DNS lookup, before every attempt. The connection is pinned to the checked address, redirects aren't followed, each attempt stops after 10 seconds, and at most 4 KB of the answer is read. |
+| Another team sees or changes your endpoints, deliveries or secrets | Every endpoint, event and delivery is stored under your team and every route reads only the caller's team. Only admins (and API keys with the `webhooks` scope, never more than the admin who made them) can manage endpoints, and every secret reveal and rotation is in the team's audit log. |
+| A secret leaks | Rotate it: the new one signs at once, and the old one keeps signing only for the overlap you choose (0 to 168 hours). Secrets are never written to logs, and a delivery's stored headers have the signature removed. |
+| Sensitive text ends up in an event | Events carry no code, log lines or credentials, and anything shaped like a credential is replaced with `[redacted]` before sending. |
 
 ## Versioning
 

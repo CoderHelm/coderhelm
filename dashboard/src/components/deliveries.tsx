@@ -193,8 +193,8 @@ export function Deliveries({
 
   return (
     <div className="min-w-0">
-      {data ? <Health data={data} /> : !error && <HealthSkeleton />}
       {data?.sharing?.available && <SharingNote enabled={data.sharing.enabled} payloads={data.sharing.payloads} />}
+      {data ? <Health data={data} /> : !error && <HealthSkeleton />}
 
       <section aria-labelledby="deliveries-heading" className="mt-8 min-w-0">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -330,23 +330,32 @@ function HealthSkeleton() {
   );
 }
 
+/** Where the sharing switch lives: Settings, System, Hybrid, its own row. */
+export const SHARING_HREF = "/settings/system/#hybrid-sharing";
+
+/**
+ * One line at the top: whether this install shares its failed deliveries with
+ * Coderhelm support, and how much (the hybrid section's sharing row says
+ * exactly what is sent). Left out where sharing doesn't apply.
+ */
+export function sharingWords(enabled: boolean, payloads: boolean): string {
+  if (!enabled) return "Not shared with Coderhelm support";
+  return payloads
+    ? "Failed deliveries are shared with Coderhelm support (details and payload previews)"
+    : "Failed deliveries are shared with Coderhelm support (details only)";
+}
+
 function SharingNote({ enabled, payloads }: { enabled: boolean; payloads: boolean }) {
   return (
-    <div className="mt-4 flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-3" data-testid="sharing-note" data-enabled={String(enabled)}>
-      <p className="flex min-w-0 items-center gap-2 text-sm text-zinc-300">
+    <p className="mb-4 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-300" data-testid="sharing-note" data-enabled={String(enabled)} data-payloads={String(payloads)}>
+      <span className="flex min-w-0 items-center gap-2">
         <StatusDot tone={enabled ? "success" : "muted"} />
-        <span className="min-w-0">
-          {enabled
-            ? payloads
-              ? "Failed deliveries, with payload previews, are shared with Coderhelm support."
-              : "Failed deliveries are shared with Coderhelm support, without headers or payloads."
-            : "Sharing with Coderhelm support is off. Only you can see these."}
-        </span>
-      </p>
-      <Link href={HYBRID_HREF} className={`${linkButton} shrink-0`}>
-        {enabled ? "Change what is shared" : "Turn on sharing"}
+        <span className="min-w-0">{sharingWords(enabled, payloads)}</span>
+      </span>
+      <Link href={SHARING_HREF} className={`${linkButton} shrink-0`} aria-label="Change what is shared with Coderhelm support">
+        Change
       </Link>
-    </div>
+    </p>
   );
 }
 
