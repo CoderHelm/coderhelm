@@ -445,7 +445,10 @@ function Heading({ title, lead }: { title: string; lead?: React.ReactNode }) {
   );
 }
 
-type NameState = { kind: 'idle' | 'checking' | 'free' | 'taken' | 'problem' | 'offline'; text?: string };
+type NameState = { kind: 'idle' | 'checking' | 'free' | 'taken' | 'reserved' | 'problem' | 'offline'; text?: string };
+
+/** The verdict word before the reason, so the answer reads at a glance. */
+const NAME_VERDICT: Partial<Record<NameState['kind'], string>> = { free: 'Available', taken: 'Taken', reserved: 'Reserved', problem: 'Not allowed' };
 
 /**
  * A CoderHelm address: the name, with the suffix shown, checked with
@@ -469,17 +472,22 @@ function NamePicker({ value, onChange, error, testId = 'name-picker', compact }:
     const t = setTimeout(async () => {
       const r = await getJson(nameCheckUrl(value));
       if (!live) return;
-      const b = r.body as { available?: boolean; error?: string; code?: string } | null;
-      if (!r.ok || !b) setSt({ kind: 'offline', text: 'Couldn’t check right now. You can go on: your install claims it later and says if it’s taken.' });
+      const b = r.body as { available?: unknown; error?: unknown; code?: unknown } | null;
+      // Only a failed request (or an answer that isn't one) is "couldn't check".
+      if (!r.ok || !b || typeof b.available !== 'boolean') setSt({ kind: 'offline', text: 'Couldn’t check right now. You can go on: your install claims it later and says if it’s taken.' });
       else if (b.available) setSt({ kind: 'free' });
-      else setSt({ kind: b.code === 'taken' ? 'taken' : 'problem', text: b.error ?? 'That name can’t be used.' });
+      else {
+        const kind = b.code === 'taken' ? 'taken' : b.code === 'reserved' ? 'reserved' : 'problem';
+        const fallback = kind === 'taken' ? 'That name is taken. Try another one.' : kind === 'reserved' ? 'That name is reserved. Try another one.' : 'That name can’t be used.';
+        setSt({ kind, text: typeof b.error === 'string' && b.error ? b.error : fallback });
+      }
     }, timing('__CH_NAME_DEBOUNCE_MS', 350));
     return () => {
       live = false;
       clearTimeout(t);
     };
   }, [value]);
-  const tone = st.kind === 'free' ? 'border-emerald-500/60 focus-within:ring-emerald-500/30' : st.kind === 'taken' || st.kind === 'problem' || error ? 'border-red-500/60 focus-within:ring-red-500/30' : 'border-fd-border focus-within:border-fd-primary focus-within:ring-fd-ring/40';
+  const tone = st.kind === 'free' ? 'border-emerald-500/60 focus-within:ring-emerald-500/30' : st.kind === 'taken' || st.kind === 'reserved' || st.kind === 'problem' || error ? 'border-red-500/60 focus-within:ring-red-500/30' : 'border-fd-border focus-within:border-fd-primary focus-within:ring-fd-ring/40';
   return (
     <div data-testid={testId} data-name-state={st.kind}>
       <label htmlFor={`${testId}-input`} className="mb-1.5 block text-sm font-medium">{compact ? 'Another name' : 'Your CoderHelm address name'}</label>
@@ -499,8 +507,8 @@ function NamePicker({ value, onChange, error, testId = 'name-picker', compact }:
       <p className="mt-1.5 flex min-h-5 items-center gap-1.5 text-sm" aria-live="polite" data-testid={`${testId}-status`}>
         {error && st.kind === 'idle' ? <span className="text-red-600 dark:text-red-400">{error}</span>
           : st.kind === 'checking' ? <span className="text-fd-muted-foreground">Checking {name}.{NAME_ZONE}…</span>
-          : st.kind === 'free' ? <span className="font-medium text-emerald-700 dark:text-emerald-400">{name}.{NAME_ZONE} is free. It’s claimed for you once your install answers.</span>
-          : st.kind === 'taken' || st.kind === 'problem' ? <span className="text-red-600 dark:text-red-400">{st.text}</span>
+          : st.kind === 'free' ? <span className="text-emerald-700 dark:text-emerald-400"><strong className="font-semibold" data-testid={`${testId}-verdict`}>{NAME_VERDICT.free}:</strong> {name}.{NAME_ZONE} is free. It’s claimed for you once your install answers.</span>
+          : st.kind === 'taken' || st.kind === 'reserved' || st.kind === 'problem' ? <span className="text-red-600 dark:text-red-400"><strong className="font-semibold" data-testid={`${testId}-verdict`}>{NAME_VERDICT[st.kind]}:</strong> {st.text}</span>
           : st.kind === 'offline' ? <span className="text-fd-muted-foreground">{st.text}</span>
           : <span className="text-fd-muted-foreground">Lowercase letters, digits and hyphens. Your company’s name works well.</span>}
       </p>

@@ -9,6 +9,7 @@ import * as targets from "aws-cdk-lib/aws-route53-targets";
 import * as fs from "fs";
 import * as path from "path";
 import { Construct } from "constructs";
+import * as CSP from "./docs-csp.json";
 import {
   NextExportDeployment,
   NOT_FOUND_PAGE,
@@ -29,6 +30,17 @@ interface DocsStackProps extends cdk.StackProps {
    */
   redirects?: Record<string, string>;
 }
+
+/**
+ * The docs' Content-Security-Policy (lib/docs-csp.json, which the docs e2e
+ * tests also read). Pages load nothing from other origins; the install
+ * guide's pages call CoderHelm's API, S3 progress files and the install
+ * itself, which can be any https origin, and post the GitHub app manifest
+ * form to github.com.
+ */
+export const DOCS_CSP = CSP.docs;
+export const INSTALL_GUIDE_PATH = CSP.installGuidePath;
+export const INSTALL_GUIDE_CSP = CSP.installGuide;
 
 /** The docs' redirect map, checked against the pages of the build. */
 export function docsRedirects(pages: string[], redirects: Record<string, string>): Record<string, string> {
@@ -84,45 +96,44 @@ export class DocsStack extends cdk.Stack {
       originAccessControlName: `${prefix}-docs-oac`,
     });
 
-    // The docs load nothing from other origins: fonts are self-hosted, search
-    // runs in the browser over /search-index.json, and there is no analytics.
-    const responseHeadersPolicy = new cloudfront.ResponseHeadersPolicy(this, "SecurityHeaders", {
-      responseHeadersPolicyName: `${prefix}-docs-security-headers`,
-      securityHeadersBehavior: {
-        strictTransportSecurity: {
-          accessControlMaxAge: cdk.Duration.days(365),
-          includeSubdomains: true,
-          preload: true,
-          override: true,
+    // The same security headers on every page; only the CSP differs on the
+    // install guide (INSTALL_GUIDE_CSP).
+    const securityHeaders = (id: string, name: string, csp: string) =>
+      new cloudfront.ResponseHeadersPolicy(this, id, {
+        responseHeadersPolicyName: `${prefix}-${name}`,
+        securityHeadersBehavior: {
+          strictTransportSecurity: {
+            accessControlMaxAge: cdk.Duration.days(365),
+            includeSubdomains: true,
+            preload: true,
+            override: true,
+          },
+          contentTypeOptions: { override: true },
+          frameOptions: { frameOption: cloudfront.HeadersFrameOption.DENY, override: true },
+          xssProtection: { protection: true, modeBlock: true, override: true },
+          referrerPolicy: {
+            referrerPolicy: cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
+            override: true,
+          },
+          contentSecurityPolicy: { contentSecurityPolicy: csp, override: true },
         },
-        contentTypeOptions: { override: true },
-        frameOptions: { frameOption: cloudfront.HeadersFrameOption.DENY, override: true },
-        xssProtection: { protection: true, modeBlock: true, override: true },
-        referrerPolicy: {
-          referrerPolicy: cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
-          override: true,
+        // Editors and validators fetch the plugin manifest schema from other
+        // origins. CloudFront refuses CORS headers as custom headers.
+        corsBehavior: {
+          accessControlAllowOrigins: ["*"],
+          accessControlAllowMethods: ["GET", "HEAD"],
+          accessControlAllowHeaders: ["*"],
+          accessControlAllowCredentials: false,
+          originOverride: true,
         },
-        contentSecurityPolicy: {
-          contentSecurityPolicy:
-            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
-          override: true,
+        customHeadersBehavior: {
+          customHeaders: [
+            { header: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()", override: true },
+          ],
         },
-      },
-      // Editors and validators fetch the plugin manifest schema from other
-      // origins. CloudFront refuses CORS headers as custom headers.
-      corsBehavior: {
-        accessControlAllowOrigins: ["*"],
-        accessControlAllowMethods: ["GET", "HEAD"],
-        accessControlAllowHeaders: ["*"],
-        accessControlAllowCredentials: false,
-        originOverride: true,
-      },
-      customHeadersBehavior: {
-        customHeaders: [
-          { header: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()", override: true },
-        ],
-      },
-    });
+      });
+    const responseHeadersPolicy = securityHeaders("SecurityHeaders", "docs-security-headers", DOCS_CSP);
+    const installHeadersPolicy = securityHeaders("InstallGuideHeaders", "docs-install-headers", INSTALL_GUIDE_CSP);
 
     // Page paths open the page's index.html. A path that is no page opens the
     // 404 page right here (no distribution-wide 404 response, which would
@@ -177,21 +188,26 @@ function handler(event) {
       runtime: cloudfront.FunctionRuntime.JS_2_0,
     });
 
+    // LIST lets S3 answer a missing file with 404 instead of 403.
+    const siteOrigin = origins.S3BucketOrigin.withOriginAccessControl(siteBucket, {
+      originAccessControl: oac,
+      originAccessLevels: [cloudfront.AccessLevel.READ, cloudfront.AccessLevel.LIST],
+    });
+    const pageBehavior = (policy: cloudfront.IResponseHeadersPolicy): cloudfront.BehaviorOptions => ({
+      origin: siteOrigin,
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+      responseHeadersPolicy: policy,
+      functionAssociations: [
+        { function: urlRewrite, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST },
+        { function: varyAccept, eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE },
+      ],
+    });
+
     const distribution = new cloudfront.Distribution(this, "Distribution", {
-      defaultBehavior: {
-        // LIST lets S3 answer a missing file with 404 instead of 403.
-        origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket, {
-          originAccessControl: oac,
-          originAccessLevels: [cloudfront.AccessLevel.READ, cloudfront.AccessLevel.LIST],
-        }),
-        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
-        responseHeadersPolicy,
-        functionAssociations: [
-          { function: urlRewrite, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST },
-          { function: varyAccept, eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE },
-        ],
-      },
+      defaultBehavior: pageBehavior(responseHeadersPolicy),
+      // The install guide alone may call other origins (INSTALL_GUIDE_CSP).
+      additionalBehaviors: { [INSTALL_GUIDE_PATH]: pageBehavior(installHeadersPolicy) },
       defaultRootObject: "index.html",
       webAclId: props.webAclArn,
       domainNames: [domainName],

@@ -1,0 +1,6 @@
+{
+  "_comment": "The docs site's Content-Security-Policy, read by lib/docs-stack.ts (CloudFront) and by the docs e2e tests (docs/e2e/csp.spec.ts), so the tests run the guide under the policy production sends. The install guide calls CoderHelm's API, S3 progress files in any region and the install itself, which answers on any https origin (custom domains vary); the GitHub app manifest form posts to github.com. Every other page loads nothing from other origins.",
+  "docs": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; connect-src 'self'; form-action 'self'",
+  "installGuidePath": "/self-host/install*",
+  "installGuide": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; connect-src 'self' https:; form-action 'self' https://github.com"
+}

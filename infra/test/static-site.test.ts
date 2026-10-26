@@ -14,7 +14,7 @@ import * as cdk from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
 import { AppStack } from "../lib/app-stack";
 import { FrontendStack } from "../lib/frontend-stack";
-import { DocsStack, docsRedirects } from "../lib/docs-stack";
+import { DOCS_CSP, DocsStack, INSTALL_GUIDE_CSP, INSTALL_GUIDE_PATH, docsRedirects } from "../lib/docs-stack";
 import { ASSET_CACHE_CONTROL, PAGE_CACHE_CONTROL, SWEEP_CODE, pageRoutes } from "../lib/static-site";
 
 const env = { account: "111111111111", region: "us-east-1" };
@@ -266,4 +266,46 @@ test("docs: Markdown, llms.txt, the schema and the validator go up with their ow
   assert.equal(typeOf("schema/*"), "application/schema+json; charset=utf-8");
   assert.equal(typeOf("tools/*"), "text/javascript; charset=utf-8");
   assert.equal(typeOf("errors/404.html"), undefined);
+});
+
+test("docs: only the install guide may call other origins; every page keeps its security headers", () => {
+  const r = synth("docs");
+  const policies = Object.fromEntries(
+    ofType(r, "AWS::CloudFront::ResponseHeadersPolicy").map(([id, v]) => [id, v.Properties.ResponseHeadersPolicyConfig]),
+  );
+  const csp = (c: any) => c.SecurityHeadersConfig.ContentSecurityPolicy.ContentSecurityPolicy;
+  const directive = (policy: string, name: string) =>
+    policy.split(";").map((d) => d.trim()).find((d) => d.startsWith(name + " "));
+
+  // The exact strings the docs e2e tests serve (lib/docs-csp.json).
+  assert.equal(directive(DOCS_CSP, "connect-src"), "connect-src 'self'");
+  assert.equal(directive(DOCS_CSP, "form-action"), "form-action 'self'");
+  assert.equal(directive(INSTALL_GUIDE_CSP, "connect-src"), "connect-src 'self' https:");
+  assert.equal(directive(INSTALL_GUIDE_CSP, "form-action"), "form-action 'self' https://github.com");
+  for (const name of ["default-src", "script-src", "style-src", "img-src", "font-src", "frame-ancestors", "base-uri"]) {
+    assert.equal(directive(INSTALL_GUIDE_CSP, name), directive(DOCS_CSP, name), name);
+  }
+
+  const byCsp = (want: string) => Object.entries(policies).filter(([, c]) => csp(c) === want).map(([id]) => id);
+  const [docsId] = byCsp(DOCS_CSP);
+  const [installId] = byCsp(INSTALL_GUIDE_CSP);
+  assert.ok(docsId && installId, "both policies are in the stack");
+  // Everything but the CSP is the same on both.
+  const rest = (c: any) => ({ ...c, Name: undefined, SecurityHeadersConfig: { ...c.SecurityHeadersConfig, ContentSecurityPolicy: undefined } });
+  assert.deepEqual(rest(policies[installId]), rest(policies[docsId]));
+  assert.equal(policies[installId].SecurityHeadersConfig.FrameOptions.FrameOption, "DENY");
+  assert.equal(policies[installId].CorsConfig.AccessControlAllowCredentials, false);
+
+  // The default behavior gets the docs policy; only the install guide's path the other.
+  const [, dist] = ofType(r, "AWS::CloudFront::Distribution")[0];
+  const cfg = dist.Properties.DistributionConfig;
+  assert.deepEqual(cfg.DefaultCacheBehavior.ResponseHeadersPolicyId, { Ref: docsId });
+  assert.equal(cfg.CacheBehaviors.length, 1);
+  assert.equal(cfg.CacheBehaviors[0].PathPattern, INSTALL_GUIDE_PATH);
+  assert.equal(INSTALL_GUIDE_PATH, "/self-host/install*");
+  assert.deepEqual(cfg.CacheBehaviors[0].ResponseHeadersPolicyId, { Ref: installId });
+  // The guide's pages are rewritten and cached like every other page.
+  assert.deepEqual(cfg.CacheBehaviors[0].FunctionAssociations, cfg.DefaultCacheBehavior.FunctionAssociations);
+  assert.equal(cfg.CacheBehaviors[0].CachePolicyId, cfg.DefaultCacheBehavior.CachePolicyId);
+  assert.equal(cfg.CacheBehaviors[0].ViewerProtocolPolicy, "redirect-to-https");
 });
