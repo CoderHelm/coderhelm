@@ -1,11 +1,6 @@
 {
   "$comment": "Pages that moved or were removed, and where they went. The docs CloudFront function answers each with a 301 (infra/lib/docs-stack.ts). Keys and targets are page paths ending in /.",
   "redirects": {
-    "/api/routes/": "/api/",
-    "/api/reference/webhooks/receive-github-event/": "/api/reference/incoming-webhooks/receive-github-event/",
-    "/api/reference/webhooks/receive-jira-webhook/": "/api/reference/incoming-webhooks/receive-jira-webhook/",
-    "/api/reference/webhooks/receive-knowledge-webhook/": "/api/reference/incoming-webhooks/receive-knowledge-webhook/",
-    "/api/reference/webhooks/receive-relayed-event/": "/api/reference/incoming-webhooks/receive-relayed-event/",
-    "/api/reference/webhooks/receive-sns-alert/": "/api/reference/incoming-webhooks/receive-sns-alert/"
+    "/api/routes/": "/api/"
   }
 }

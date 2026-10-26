@@ -1,13 +1,13 @@
 ---
 title: Webhooks
-description: Get CoderHelm's events in your own systems. Add an endpoint, verify each request's Standard Webhooks signature, and see every event type with an example.
+description: Get CoderHelm's events in your own systems, signed the Standard Webhooks way, and see which webhooks CoderHelm receives, how it verifies them and what they start.
 ---
 
 CoderHelm sends an HTTP `POST` to your endpoints when it does something: a run starts, finishes, fails or waits for an answer, it opens a pull request, posts a review, fixes CI, takes an alert, finds a problem in your logs, publishes release notes, or someone approves a plan. Every request is signed the [Standard Webhooks](https://www.standardwebhooks.com/) way, retried for about a day when your endpoint can't take it, and recorded on the **Deliveries** page.
 
-<Callout title="Looking for the webhooks CoderHelm receives?">
-GitHub, Jira, AWS SNS and the other services that send events **to** CoderHelm are on [Incoming webhooks](/api/incoming-webhooks).
-</Callout>
+<span id="what-coderhelm-sends" />
+
+CoderHelm also receives webhooks: from its GitHub App, its Jira app, Jira webhooks, AWS SNS alerts and CI test uploads. It verifies each one and decides what it starts; that's at the [end of this page](#webhooks-coderhelm-receives).
 
 ## Quick start
 
@@ -262,7 +262,7 @@ To check your code, use the spec's test values: the secret `whsec_MfKQ9r8GKYqrTw
 
 ## Event types
 
-These are all the events CoderHelm sends. The list is made from the same catalog the platform sends from, and each type is also in the [OpenAPI document](/openapi.json) under `webhooks`, with its schema. An endpoint gets the types it subscribes to; one subscribed to all events (`["*"]`) also gets types added later. Use [`GET /api/webhooks/event-types`](/api/reference/webhooks/list-webhook-event-types) to read the list from the API.
+These are all the events CoderHelm sends. The list is made from the same catalog the platform sends from, and each type is also in the [OpenAPI document](/openapi.json) under `webhooks`, with its schema. An endpoint gets the types it subscribes to; one subscribed to all events (`["*"]`) also gets types added later. Use [`GET /api/webhooks/event-types`](/api/reference/webhook-endpoints/list-webhook-event-types) to read the list from the API.
 
 <include>../../../.generated/webhook-events.md</include>
 
@@ -328,7 +328,7 @@ Each event says which shape it has in `api_version`, `2026-10-26` today. Within 
 
 ## Managing endpoints with the API
 
-The endpoint routes are under [Reference](/api/reference/webhooks/list-webhook-endpoints), in **Webhooks**, and need a key with the `webhooks` scope (an admin's key). A team has at most 20 endpoints.
+The endpoint routes are under [Reference](/api/reference/webhook-endpoints/list-webhook-endpoints), in **Webhook endpoints**, and need a key with the `webhooks` scope (an admin's key). A team has at most 20 endpoints.
 
 | Route | What it does |
 | --- | --- |
@@ -341,3 +341,79 @@ The endpoint routes are under [Reference](/api/reference/webhooks/list-webhook-e
 | `GET /api/webhooks/endpoints/{endpoint_id}/deliveries` | The endpoint's deliveries and their attempts. |
 | `POST /api/webhooks/endpoints/{endpoint_id}/deliveries/{delivery_id}/resend` | Send one delivery's event again. |
 | `POST /api/webhooks/endpoints/{endpoint_id}/replay` | Send a time range's events again. |
+
+## Webhooks CoderHelm receives
+
+CoderHelm listens on these addresses on `https://api.coderhelm.com` (your own domain when self-hosted). It verifies every request before anything happens; one that doesn't verify is refused and changes nothing. Each also has a page under **Reference**, in **Webhooks**, with its headers and the fields CoderHelm reads.
+
+### GitHub
+
+`POST /webhooks/github`, from the CoderHelm GitHub App (installing the app sets it up). **Verified by** `X-Hub-Signature-256: sha256=<hex>`, an HMAC-SHA256 of the raw body with the app's webhook secret, compared in constant time; otherwise `401`. **Triggers:**
+
+- `issues` assigned to the bot or labelled `coderhelm`: a run.
+- `issue_comment`, `pull_request_review_comment` with `/coderhelm` or `@coderhelm`: a run, feedback, a re-review or an answer.
+- `pull_request`, `pull_request_review`: reviews, feedback on CoderHelm's pull requests, merge tracking.
+- `push`: a tag writes release notes; the default branch syncs skills, team tools and the code graph.
+- `check_run`, `check_suite`, `workflow_run`: CI results and CI fixes.
+- `installation`, `installation_repositories`, `repository`: links, renames, archives.
+
+Other events, and events from an installation not linked to a team, are accepted and ignored.
+
+### Jira app
+
+`POST /webhooks/jira`, from the CoderHelm Jira app. **Verified by** the team id and app secret in the body (`coderhelm.team_id`, `coderhelm.forge_secret`); a wrong secret gets `403`. **Triggers** the same work as a Jira webhook, below.
+
+### Jira webhook
+
+`POST /webhooks/jira/<token>`, from a plain Jira webhook you create when you can't install the app ([Connect Jira](/getting-started/jira)). **Verified by** the team's token in the address (unknown: `401`) and, if you generated a secret, `X-Hub-Signature: sha256=<hex>`, an HMAC-SHA256 of the raw body. **Triggers:** an issue labelled `coderhelm` (or `coderhelm:…`), or assigned to a CoderHelm user, in a project you switched on, starts a run; a comment retries a failed run or sends feedback to one with a pull request. Add `repo_owner` and `repo_name` (top level or under `coderhelm`) to pin the repository.
+
+Sending from your own automation? Sign the exact bytes you send:
+
+```bash
+BODY='{"webhookEvent":"jira:issue_updated","issue":{"key":"WEB-42","fields":{"labels":["coderhelm"]}}}'
+SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$JIRA_WEBHOOK_SECRET" -hex | sed 's/^.* //')
+curl -X POST "https://api.coderhelm.com/webhooks/jira/$JIRA_WEBHOOK_TOKEN" \
+  -H 'Content-Type: application/json' -H "X-Hub-Signature: sha256=$SIG" -d "$BODY"
+```
+
+### Alerts from AWS
+
+`POST /webhooks/alerts/sns`, from an SNS topic subscribed over HTTPS and added under **Alert routes**. **Verified by** the SNS message signature (versions 1 and 2) with a certificate from SNS; otherwise `403`. The subscription is confirmed once the topic has an enabled route. **Triggers:** a message that matches a route's rule starts a run that opens a pull request; others are posted to your Slack or Teams channel. Every alert is on the **Alerts** page.
+
+### CI test results
+
+`POST /webhooks/ci/tests/results`, from a GitHub Actions job. **Verified by** a GitHub OIDC token for a connected repository ([Authentication](/api/authentication#ci-jobs)); no CoderHelm secret lives in CI. **Triggers:** the test reports are read into the **Tests** page.
+
+### Verifying GitHub's signature
+
+Proxying GitHub's events through your own service first, or self-hosting? Check them the way CoderHelm does:
+
+<Tabs items={['TypeScript', 'Python']}>
+<Tab value="TypeScript">
+
+```ts
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
+export function verifyGithub(rawBody: Buffer, header: string | undefined, secret: string): boolean {
+  if (!header?.startsWith('sha256=')) return false;
+  const expected = Buffer.from(`sha256=${createHmac('sha256', secret).update(rawBody).digest('hex')}`);
+  const got = Buffer.from(header);
+  return got.length === expected.length && timingSafeEqual(got, expected);
+}
+```
+
+</Tab>
+<Tab value="Python">
+
+```python
+import hashlib, hmac
+
+def verify_github(raw_body: bytes, header: str | None, secret: str) -> bool:
+    if not header or not header.startswith("sha256="):
+        return False
+    expected = "sha256=" + hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(header, expected)
+```
+
+</Tab>
+</Tabs>

@@ -123,7 +123,6 @@ const PHONE_PAGES = [
   '/api/authentication/',
   '/api/errors/',
   '/api/webhooks/',
-  '/api/incoming-webhooks/',
   '/api/reference/runs/list-runs/',
   '/api/reference/plans/create-plan/',
   '/api/reference/reviews/get-review/',
@@ -163,10 +162,10 @@ test('the API section lists the guides, then every endpoint grouped by resource'
   await page.goto('/api/');
   await expect(page.getByRole('heading', { level: 1, name: 'API introduction' })).toBeVisible();
   const nav = page.locator('aside');
-  for (const name of ['Authentication', 'Errors', 'Pagination', 'Rate limits', 'Versioning and idempotency', 'Webhooks', 'Incoming webhooks']) {
+  for (const name of ['Authentication', 'Errors', 'Pagination', 'Rate limits', 'Versioning and idempotency', 'Webhooks']) {
     await expect(nav.getByRole('link', { name, exact: true }).first()).toBeAttached();
   }
-  for (const group of ['Runs', 'Plans', 'Reviews', 'Usage', 'CI', 'Webhooks', 'Incoming webhooks']) {
+  for (const group of ['Runs', 'Plans', 'Reviews', 'Usage', 'CI', 'Webhook endpoints', 'Webhooks']) {
     await expect(nav.getByText(group, { exact: true }).first()).toBeAttached();
   }
   // The old dump of every gateway route is gone, internal routes with it.
@@ -284,10 +283,9 @@ test('the webhooks page is about the events CoderHelm sends, with every event an
   }
   await expect(page.getByText('"type": "review.completed"').first()).toBeAttached();
   for (const tab of ['Node.js', 'Python', 'Go', 'Rust']) {
-    await page.getByRole('tab', { name: tab, exact: true }).click();
+    await page.getByRole('tab', { name: tab, exact: true }).first().click();
     await expect(page.getByRole('tabpanel').filter({ hasText: 'whsec_' }).first()).toBeVisible();
   }
-  await expect(page.getByRole('link', { name: 'Incoming webhooks' }).first()).toHaveAttribute('href', /\/api\/incoming-webhooks\/?$/);
   // The threat model and the receiver's replay checks are on the page.
   await expect(page.getByRole('heading', { name: 'Threat model' })).toBeVisible();
   for (const text of ['Webhooks only go out', 'Skip a `webhook-id` you already handled'.replace(/`/g, ''), 'at most 4 KB of the answer is read']) {
@@ -296,14 +294,17 @@ test('the webhooks page is about the events CoderHelm sends, with every event an
   await shot(page, 'webhooks-desktop');
 });
 
-test('the webhooks CoderHelm receives have their own page, and their reference pages moved', async ({ page }) => {
-  await page.goto('/api/incoming-webhooks/');
-  await expect(page.getByRole('heading', { level: 1, name: 'Incoming webhooks' })).toBeVisible();
-  await expect(page.locator('h2#github')).toBeVisible();
-  await expect(page.locator('h2#alerts-from-aws')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Webhooks' }).first()).toHaveAttribute('href', /\/api\/webhooks\/?$/);
-  const moved = await page.request.get('/api/reference/incoming-webhooks/receive-github-event/');
-  expect(moved.status()).toBe(200);
-  const endpoint = await page.request.get('/api/reference/webhooks/create-webhook-endpoint/');
-  expect(endpoint.status()).toBe(200);
+test('the webhooks CoderHelm receives are on the same page, at their old anchors', async ({ page }) => {
+  await page.goto('/api/webhooks/');
+  await expect(page.getByRole('heading', { level: 2, name: 'Webhooks CoderHelm receives' })).toBeVisible();
+  // The anchors the page had before outbound webhooks still land on their sections.
+  for (const id of ['github', 'jira-app', 'jira-webhook', 'alerts-from-aws', 'verifying-githubs-signature', 'what-coderhelm-sends']) {
+    await expect(page.locator(`[id="${id}"]`)).toHaveCount(1);
+  }
+  await expect(page.locator('#ci-test-results')).toHaveCount(1);
+  // One webhooks page: no separate page for received webhooks.
+  expect((await page.request.get('/api/incoming-webhooks/')).status()).toBe(404);
+  // The received webhooks' reference pages stay where they were; the endpoint routes have their own group.
+  expect((await page.request.get('/api/reference/webhooks/receive-github-event/')).status()).toBe(200);
+  expect((await page.request.get('/api/reference/webhook-endpoints/create-webhook-endpoint/')).status()).toBe(200);
 });
