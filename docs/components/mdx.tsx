@@ -8,10 +8,12 @@ import type { MDXComponents } from 'mdx/types';
 import { Badge } from '@/components/badge';
 import { Path, Paths, Tile, Tiles } from '@/components/home';
 import { Diagram } from '@/components/diagram';
+import { Table } from '@/components/table';
 
 export function getMDXComponents(components?: MDXComponents) {
   return {
     ...defaultMdxComponents,
+    table: Table,
     Tab,
     Tabs,
     Step,
