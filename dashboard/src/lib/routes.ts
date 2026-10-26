@@ -95,6 +95,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/settings/budget": { label: "Token limit", parent: "/settings" },
   "/settings/setup": { label: "Setup", parent: "/settings" },
   "/settings/system": { label: "System", parent: "/settings" },
+  "/settings/emails": { label: "Emails", parent: "/settings" },
   "/settings/deliveries": { label: "Deliveries", parent: "/settings", tab: "Webhook deliveries" },
   "/settings/webhooks": { label: "Webhooks", parent: "/settings" },
   "/settings/integrations": { label: "Integrations", parent: "/settings" },
@@ -114,6 +115,7 @@ export const ROUTES: Record<string, RouteInfo> = {
 
   "/admin": { label: "Platform admin" },
   "/admin/tickets": { label: "Support queue", parent: "/admin" },
+  "/admin/self-host": { label: "Self-host", parent: "/admin" },
   "/admin/queue": { label: "Shared queue", parent: "/admin", tab: "Shared failed-message queue" },
 };
 

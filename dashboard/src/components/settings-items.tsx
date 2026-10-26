@@ -89,6 +89,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     label: "This install",
     items: [
       { href: "/settings/setup", title: "Setup", description: "What is left to set up, checked live: GitHub, repositories, models, email, updates.", icon: <WrenchIcon />, view: "system", edit: "system", selfHostOnly: true },
+      { href: "/settings/emails", title: "Emails", description: "Which optional emails this install sends, and whether email goes out through your own Amazon SES or Coderhelm.", icon: <BellIcon />, view: "emails", edit: "emails", selfHostOnly: true },
       { href: "/settings/system", title: "System", description: "Which version runs, updates and their history, automatic updates and roll back.", icon: <CpuIcon />, view: "system", edit: "system", selfHostOnly: true },
     ],
   },

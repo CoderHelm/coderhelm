@@ -726,7 +726,7 @@ export function InstallWizard() {
   const [hyb, setHyb] = useState<{ error: { title: string; fix: string } | null; claimRefused: boolean; settingsSent: boolean; lastTry: number; busy: boolean }>({ error: null, claimRefused: false, settingsSent: false, lastTry: 0, busy: false });
   const [newName, setNewName] = useState('');
   const [hybridOutcome, setHybridOutcome] = useState<string | null>(null);
-  const hybridWanted = !!s && (s.domainChoice === 'coderhelm' || s.githubChoice === 'hosted');
+  const hybridWanted = !!s && (s.domainChoice === 'coderhelm' || s.githubChoice === 'hosted' || s.emailTransport === 'coderhelm');
   useEffect(() => {
     if (!s || !hybridWanted || !s.url || !setup || !s.setupToken || hyb.busy) return;
     if (Date.now() - hyb.lastTry < timing('__CH_HYBRID_RETRY_MS', 8000)) return;
@@ -954,9 +954,32 @@ export function InstallWizard() {
                     </div>
                   ) : null}
                 </fieldset>
-                <Field label="Send email from" htmlFor="ch-email-from" help="Optional. Empty uses your email: AWS emails you a link to confirm it, no DNS needed." error={errors.emailFrom}>
-                  <input id="ch-email-from" type="email" className={inputCls} value={s.emailFrom} placeholder="coderhelm@example.com" onChange={(e) => update({ emailFrom: e.target.value })} autoCapitalize="off" spellCheck={false} />
-                </Field>
+                <fieldset data-testid="email-choice">
+                  <legend className="mb-2 text-sm font-medium">Send email</legend>
+                  {([
+                    ['coderhelm', 'Send email through CoderHelm (easiest)', 'No Amazon SES setup. CoderHelm sees each recipient’s address and the email’s details (such as names and PR titles), and keeps only delivery records. Needs your install registered with CoderHelm, which this page does.'],
+                    ['ses', 'Through my own Amazon SES', 'Email leaves from your AWS account. Nothing passes through CoderHelm.'],
+                  ] as const).map(([id, title, help]) => (
+                    <label key={id} className={`mb-2 flex cursor-pointer gap-3 rounded-xl border p-3 transition ${s.emailTransport === id ? 'border-fd-primary bg-fd-primary/5' : 'border-fd-border hover:bg-fd-accent'}`}>
+                      <input type="radio" name="email-transport" className="mt-1 accent-[var(--color-fd-primary)]" checked={s.emailTransport === id} onChange={() => update({ emailTransport: id })} />
+                      <span>
+                        <span className="block font-medium">{title}</span>
+                        <span className="block text-sm text-fd-muted-foreground">{help}</span>
+                      </span>
+                    </label>
+                  ))}
+                  {s.emailTransport === '' ? (
+                    <p className="text-sm text-fd-muted-foreground">Not chosen: email goes through your own Amazon SES until you pick in Settings, Emails.</p>
+                  ) : null}
+                  {s.emailTransport !== 'coderhelm' ? (
+                    <div className="mt-3">
+                      <Field label="Send email from" htmlFor="ch-email-from" help="Optional. Empty uses your email: AWS emails you a link to confirm it, no DNS needed." error={errors.emailFrom}>
+                        <input id="ch-email-from" type="email" className={inputCls} value={s.emailFrom} placeholder="coderhelm@example.com" onChange={(e) => update({ emailFrom: e.target.value })} autoCapitalize="off" spellCheck={false} />
+                      </Field>
+                    </div>
+                  ) : null}
+                  <p className="mt-2 text-sm text-fd-muted-foreground">Optional emails such as the weekly summary start off; turn them on in Settings, Emails.</p>
+                </fieldset>
                 <fieldset data-testid="who-may-join">
                   <legend className="mb-1 text-sm font-medium">Let people from your company join</legend>
                   <p className="mb-2 text-sm text-fd-muted-foreground">This install is for one organization only: nobody else can sign up.</p>

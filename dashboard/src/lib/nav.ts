@@ -102,7 +102,17 @@ export const NAV_SECTIONS: NavSection[] = [
 
 /** Only for the install's platform admins. */
 export const ADMIN_SECTIONS: NavSection[] = [
-  { key: "admin", label: "Admin", icon: "admin", pages: [{ href: "/admin", label: "Platform admin" }], superAdminOnly: true, countKey: "betaSignups" },
+  {
+    key: "admin",
+    label: "Admin",
+    icon: "admin",
+    pages: [
+      { href: "/admin", label: "Platform admin" },
+      { href: "/admin/self-host", label: "Self-host" },
+    ],
+    superAdminOnly: true,
+    countKey: "betaSignups",
+  },
   { key: "queue", label: "Support queue", icon: "queue", pages: [{ href: "/admin/tickets", label: "Support queue" }], superAdminOnly: true, countKey: "supportQueue" },
 ];
 

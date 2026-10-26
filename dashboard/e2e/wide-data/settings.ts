@@ -339,6 +339,33 @@ export const settingsData: Handler = ({ method, path, url }) => {
   if (p === "/api/activity/summary") {
     return { days: Number(url.searchParams.get("days") || 7), since: iso(60 * 24 * 7), skills: { reads: 1204, asks: 12, read_problems: 3, ask_problems: 1, applies: 4 }, lookups: { total: 980, ok: 960, refused: 12, failed: 8 } };
   }
+  // Settings, Emails and Admin, Self-host: long addresses and host names.
+  if (p === "/api/system/emails") {
+    return {
+      self_hosted: true,
+      optional: [{ id: "weekly_summary", label: "Weekly summary", description: SENTENCE, on: true }],
+      essential: [{ id: "team_invite", label: "Team invites", why: SENTENCE }],
+      transport: "coderhelm",
+      ses: { from: EMAIL, check: "email", note: SENTENCE },
+      relay: { available: true, registered: true, turned_off: false, trust: SENTENCE, status: { paused: null, sent_today: 12, quota: 500, display_name: `${TOKEN}.cloudfront.net via CoderHelm`, from: EMAIL } },
+    };
+  }
+  if (p === "/api/admin/hybrid/summary") {
+    const row = {
+      install_id: "ins_aaaaaaaaaaaaaaaaaaaaaaaa", name: TOKEN.toLowerCase(), hostname: `${TOKEN.toLowerCase()}.coderhelm.com`, cloudfront: `${TOKEN.toLowerCase()}.cloudfront.net`,
+      version: "v0.7.0-rc.1+build.123456789", registered_at: iso(60 * 24 * 30), last_seen: iso(5), status: "active", verified: true, name_live: true, sharing: true,
+      integrations: ["jira", "notion", "confluence", "google_drive"], github_links: 12, relay_24h: 123456, relay_7d: 1234567, relay_failed_7d: 12, broker_7d: 123456,
+      email_opted_in: true, email_paused: false, emails_24h: 1234, emails_7d: 12345, bounced_7d: 12, complained_7d: 1, listed_recipients: 1234,
+      parts: ["address", "github", "jira", "notion", "confluence", "google_drive", "broker", "email", "sharing"],
+    };
+    return {
+      installs: { total: 1234, active_7d: 1200, revoked: 34 }, address: { claimed: 1000, live: 990 },
+      github: { installs: 900, linked_installations: 12345, relayed_24h: 1234567, relayed_7d: 12345678, failure_rate_7d: 0.0123 },
+      integrations: { jira: 100, notion: 200, confluence: 300, google_drive: 400 }, broker: { installs: 800, tokens_7d: 1234567, tokens_per_day: 176366.7 },
+      email: { opted_in: 500, sent_24h: 123456, sent_7d: 1234567, bounce_rate_7d: 0.0123, complaint_rate_7d: 0.0012, paused: 3, recipients: 123456 },
+      sharing: 50, trend: Array.from({ length: 7 }, (_, i) => ({ day: `2026-01-0${i + 1}`, events: 100000 + i, emails: 20000 + i })), rows: [row], generated_at: iso(1),
+    };
+  }
   // The install's setup checks and update readiness: long ids, URLs and
   // commands, so Settings, then Setup and System keep to the screen.
   if (p === "/api/system/checks" || p === "/api/system/preflight") {
