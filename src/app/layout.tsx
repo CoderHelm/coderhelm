@@ -36,6 +36,14 @@ export const viewport: Viewport = {
 };
 
 const GA_ID = "G-T14Q1LDRC0";
+// The docs (docs.coderhelm.com) send to the same property, so the site, the
+// docs and the install guide are one funnel; the linker carries the visit
+// across. No Google signals and no ad personalization.
+const GA_CONFIG = {
+  allow_google_signals: false,
+  allow_ad_personalization_signals: false,
+  linker: { domains: ["coderhelm.com", "docs.coderhelm.com"], accept_incoming: true },
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -46,7 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script async src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} />
         <script
           dangerouslySetInnerHTML={{
-            __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}');`,
+            __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}',${JSON.stringify(GA_CONFIG)});`,
           }}
         />
       </head>

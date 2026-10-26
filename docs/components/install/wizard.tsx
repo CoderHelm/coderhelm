@@ -72,6 +72,8 @@ import {
   withDomainDoc,
 } from '@/lib/install/core';
 import { AnthropicLogo, AwsColorLogo, AwsLogo, GitHubLogo } from './logos';
+import { track } from '@/components/analytics';
+import { GUIDE_TRUST, installStepEvent } from '@/lib/analytics';
 
 // Timings (the end-to-end tests shorten them through window.__CH_*).
 function timing(name: string, fallback: number): number {
@@ -694,6 +696,11 @@ export function InstallWizard() {
 
   const derived: StepId = s ? deriveStep(s, setup) : 'start';
   const view: StepId = manual ?? derived;
+  // Analytics counts the step reached, by name only.
+  const loaded = s !== null;
+  useEffect(() => {
+    if (loaded) track(installStepEvent(view));
+  }, [view, loaded]);
   const steps = stepsFor({ domainChoice: s?.domainChoice ?? 'aws' });
   const done = useMemo(() => {
     const order: StepId[] = ['aws', 'domain', 'address', 'github', 'models', 'ready'];
@@ -980,7 +987,7 @@ export function InstallWizard() {
                     </div>
                   ) : null}
                 </fieldset>
-                <Field label="Install name" htmlFor="ch-stage" help="Change it to run a second CoderHelm in the same account." error={errors.stage}>
+                <Field label="Name in your AWS account" htmlFor="ch-stage" help="Names the AWS resources this install creates, so you can find them in the AWS console. Keep it unless this AWS account already has a CoderHelm; each install in one account needs its own name." error={errors.stage}>
                   <input id="ch-stage" className={inputCls} value={s.stage} onChange={(e) => update({ stage: e.target.value.toLowerCase() })} autoCapitalize="off" spellCheck={false} />
                 </Field>
                 <fieldset>
@@ -1018,6 +1025,7 @@ export function InstallWizard() {
         </form>
         <Details summary="What happens in AWS">
           <p>A CloudFormation stack starts the installer in CodeBuild, inside your account. It downloads CoderHelm {s.version}, checks its signature and deploys CoderHelm: Lambda functions, DynamoDB tables, an S3 bucket, CloudFront and Cognito sign-in. Nothing to install on your computer.</p>
+          <p>Everything it creates is named after the name in your AWS account, {s.stage}: the stack is {stackName(s)}, and every resource name starts with coderhelm-{s.stage}, so you can find them in the AWS console.</p>
           <p>The box you tick lets the stack create IAM roles. The installer needs administrator rights in your account to create CoderHelm&apos;s own, narrower roles.</p>
           <p>{s.domainChoice === 'own' ? `Your domain: when its zone is in Route 53 in this account, the install makes the certificate and the records. Anywhere else, CoderHelm starts on its free cloudfront.net address and this page shows the two records to add; it moves to ${cleanHostname(s.hostname) || 'your domain'} once they work.` : s.domainChoice === 'coderhelm' ? `Your CoderHelm address: once your install answers, this page registers it with CoderHelm and claims ${cleanName(s.coderhelmName) || 'your name'}.${NAME_ZONE}. Your install requests the certificate in your account; CoderHelm adds the DNS records. Nothing for you to do.` : 'No domain or DNS work: CoderHelm gets a free cloudfront.net address. You can add your own domain later, in More options or in CoderHelm.'}</p>
           <p>Two random values from this page go along: a progress ID, so this page can follow the install, and a one-time setup key, so GitHub (or CoderHelm, for hybrid) can talk to your CoderHelm directly. Both stay in your account and this browser.</p>
@@ -1117,7 +1125,7 @@ export function InstallWizard() {
 
         <Details summary="What is happening">
           <p>The installer runs in CodeBuild in your account. It writes its progress to a small file in your account (bucket coderhelm-setup-{s.statusId}) that this page reads: the phase, the step and, at the end, your install’s address. Nothing else.</p>
-          <p>Stack name: {stackName(s)}, in {REGIONS.find((r) => r.id === s.region)?.name ?? s.region}. Release {s.version}.</p>
+          <p>Stack name: {stackName(s)} (from the name in your AWS account, {s.stage}), in {REGIONS.find((r) => r.id === s.region)?.name ?? s.region}. Release {s.version}.</p>
         </Details>
       </section>
     );
@@ -1605,8 +1613,8 @@ export function InstallWizard() {
               <svg viewBox="0 0 16 16" width="16" height="16" className="mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="7" width="10" height="7" rx="1.5" /><path d="M5.5 7V5a2.5 2.5 0 015 0v2" /></svg>
               <span>
                 {s.setup === 'hybrid' || hybridWanted
-                  ? <>This page talks to AWS, GitHub, your own CoderHelm and CoderHelm&apos;s API (to check a name is free). Your install, not this page, registers with CoderHelm. <a className="underline decoration-fd-border underline-offset-2 hover:text-fd-foreground" href="/self-host/hybrid/#trust-model">What CoderHelm sees</a></>
-                  : <>This page talks only to AWS, GitHub and your own CoderHelm. Nothing about your install goes to CoderHelm&apos;s servers.</>}
+                  ? <>{GUIDE_TRUST.hybrid} <a className="underline decoration-fd-border underline-offset-2 hover:text-fd-foreground" href="/self-host/hybrid/#trust-model">What CoderHelm sees</a></>
+                  : GUIDE_TRUST.private}
               </span>
             </p>
             {s.launchedAt || s.url ? (

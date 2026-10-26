@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { Analytics } from '@/components/analytics';
 import { Provider } from '@/components/provider';
 import { SITE } from '@/lib/shared';
 import './global.css';
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
       <body className="flex min-h-screen flex-col">
         <Provider>{children}</Provider>
+        <Analytics />
       </body>
     </html>
   );

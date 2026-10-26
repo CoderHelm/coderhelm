@@ -18,7 +18,7 @@ Source: ${SITE.url}${INSTALL_GUIDE.url}
 
 ${INSTALL_GUIDE.description}
 
-The guide is an interactive page. It talks only to AWS, GitHub and your own CoderHelm; nothing about your install goes to CoderHelm's servers.
+The guide is an interactive page. It talks to AWS, GitHub and your own CoderHelm, and counts anonymous page views with Google Analytics (origin and path only). Nothing you type and nothing about your install is sent to CoderHelm or Google. With a CoderHelm address (Hybrid), it also asks CoderHelm's API whether the name you picked is free.
 
 ## Steps
 

@@ -267,6 +267,10 @@ const home: Page = {
           ],
         },
         {
+          type: "p",
+          text: "The guide talks to AWS, GitHub and your own install, and counts anonymous page views with Google Analytics. Nothing you type and nothing about your install is sent to CoderHelm or Google.",
+        },
+        {
           type: "note",
           text: "The first public self-host release is not out yet. Until it is, you can read through the guide, but an install cannot finish.",
         },
@@ -878,6 +882,10 @@ const selfHost: Page = {
             { label: "Open the install guide", href: SITE.installUrl },
             { label: "Read the self-hosting docs", href: "https://docs.coderhelm.com/self-host/" },
           ],
+        },
+        {
+          type: "p",
+          text: "The guide talks to AWS, GitHub and your own install, and counts anonymous page views with Google Analytics. Nothing you type and nothing about your install is sent to CoderHelm or Google.",
         },
         {
           type: "note",
