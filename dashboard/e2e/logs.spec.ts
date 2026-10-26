@@ -61,7 +61,14 @@ const SKIPPED = finding({
 const IGNORED = finding({ rec_id: "rec_ignored", status: "ignored", title: "Health check noise", severity: "info", log_group: "/ecs/web" });
 
 interface Call { method: string; path: string; body: unknown }
+type Resolution = Record<string, unknown>;
+const NO_REPO: Resolution = {
+  repo: null, confidence: "none", source: "resolved", reason: "Nothing ties this to one of the team's repos yet.",
+  decided_by: [], candidates: [], permissions: [], resolved_at: "", cached: false, saved: null,
+};
 interface Backend {
+  /** What GET /api/log-findings/:id/repo answers, per finding (default: no repo). */
+  resolutions: Record<string, Resolution>;
   role: string;
   connected: boolean;
   findings: Finding[];
@@ -73,6 +80,7 @@ const DEFAULT_AUTOFIX = { enabled: false, min_severity: "critical", daily_cap: 3
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = {
+    resolutions: {},
     role: "admin",
     connected: true,
     findings: [NEW, FIXING, SKIPPED, IGNORED].map((f) => ({ ...f })),
@@ -117,6 +125,11 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
         return json(route, { ok: true, autofix: db.autofix });
       }
       return json(route, { autofix: db.autofix, runs_today: 1 });
+    }
+    const repoOf = p.match(/^\/api\/log-findings\/([^/]+)\/repo$/);
+    if (repoOf) {
+      await new Promise((r) => setTimeout(r, 150));
+      return json(route, db.resolutions[decodeURIComponent(repoOf[1])] ?? NO_REPO);
     }
     const one = p.match(/^\/api\/log-findings\/([^/]+)\/(samples|fix|ignore|acknowledge|reopen)$/);
     if (one) {
@@ -230,7 +243,10 @@ test("Create fix PR starts a run in the chosen repo and the row follows it", asy
   await expect(dialog).toContainText("/aws/lambda/shop-checkout");
   await dialog.getByRole("button", { name: /Repository/ }).click();
   await dialog.getByRole("option", { name: WEB, exact: true }).click();
-  await expect(dialog.getByRole("checkbox", { name: /Always use this repo/ })).toBeChecked();
+  // Nothing was worked out, so remembering is the person's call.
+  const remember = dialog.getByRole("checkbox", { name: /Always use this repo/ });
+  await expect(remember).not.toBeChecked();
+  await remember.check();
   await dialog.getByRole("button", { name: "Start fix run" }).click();
   await expect(dialog).toBeHidden();
 
@@ -341,3 +357,110 @@ test("phone width: no sideways scroll, actions reachable", async ({ page }) => {
   expect(overflow2).toBeLessThanOrEqual(0);
   await shot(page, "logs-autofix-390");
 });
+
+// ── The repo, worked out ────────────────────────────────────────────
+
+const SURE: Resolution = {
+  repo: API,
+  confidence: "high",
+  source: "resolved",
+  reason: "The ECS task's image source points to this repo.",
+  decided_by: [{ kind: "image_source", detail: "ECS service orders-worker has the container label org.opencontainers.image.source=https://github.com/your-team/api" }],
+  candidates: [{ repo: API, reason: "The ECS task's image source points to this repo." }],
+  permissions: [],
+  resolved_at: new Date().toISOString(),
+  cached: false,
+  saved: null,
+};
+// The lines came from the web site, though the API repo was saved for the log group.
+const UNSURE: Resolution = {
+  repo: WEB,
+  confidence: "low",
+  source: "resolved",
+  reason: "The lines are a web framework's prerender cache, which the site has and the API worker doesn't. The saved repo is your-team/api.",
+  decided_by: [{ kind: "log_lines", detail: "2 of the 2 sample lines came from log group /ecs/prod-site" }],
+  candidates: [
+    { repo: WEB, reason: "The lines are a web framework's prerender cache" },
+    { repo: API, reason: "Saved for this log group" },
+  ],
+  permissions: ["ecs:DescribeTaskDefinition"],
+  resolved_at: new Date().toISOString(),
+  cached: false,
+  saved: API,
+};
+
+async function openFix(page: Page) {
+  await page.goto("/logs/");
+  await page.getByTestId("finding-rec_new").getByRole("button", { name: /Create fix PR/ }).click();
+  return page.getByRole("dialog", { name: "Create a fix PR" });
+}
+
+for (const width of [1440, 390]) {
+  test.describe(`the fix dialog works out the repo (${width})`, () => {
+    test.beforeEach(async ({ page }) => {
+      await page.setViewportSize({ width, height: width > 500 ? 900 : 844 });
+    });
+
+    test("sure: the repo is chosen, with the reason and a Change link", async ({ page }) => {
+      const db = await mockApi(page, { resolutions: { rec_new: SURE } });
+      const dialog = await openFix(page);
+      const chosen = dialog.getByTestId("resolved-repo");
+      await expect(chosen).toHaveAttribute("data-state", "sure");
+      await expect(chosen.getByTestId("resolved-repo-name")).toHaveText(API);
+      await expect(chosen.getByTestId("resolved-repo-reason")).toHaveText("The ECS task's image source points to this repo.");
+      await expect(chosen).not.toContainText("Check this");
+      await expect(dialog.getByRole("checkbox", { name: /Always use this repo/ })).toBeChecked();
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(0);
+      await shot(page, `log-repo-sure-${width}`);
+
+      // Change opens the picker; Coderhelm's choice is one press away.
+      await chosen.getByTestId("resolved-repo-change").click();
+      await expect(dialog.getByTestId("resolved-repo")).toHaveAttribute("data-state", "changing");
+      await dialog.getByRole("button", { name: "Use Coderhelm's choice (api)" }).click();
+      await dialog.getByRole("button", { name: "Start fix run" }).click();
+      await expect(dialog).toBeHidden();
+      expect(db.calls.find((c) => c.path === "/api/log-findings/rec_new/fix")?.body).toEqual({ repo: API, remember: true });
+    });
+
+    test("unsure: the best guess is preselected, says Check this and lists the others", async ({ page }) => {
+      const db = await mockApi(page, { resolutions: { rec_new: UNSURE } });
+      const dialog = await openFix(page);
+      const chosen = dialog.getByTestId("resolved-repo");
+      await expect(chosen).toHaveAttribute("data-state", "check");
+      // Never the saved repo the evidence contradicts.
+      await expect(chosen.getByTestId("resolved-repo-name")).toHaveText(WEB);
+      await expect(chosen).toContainText("Check this");
+      await expect(chosen.getByTestId("resolved-repo-reason")).toContainText("prerender cache");
+      await expect(chosen.getByTestId("resolved-repo-candidates")).toContainText("Saved for this log group");
+      await expect(chosen.getByTestId("resolved-repo-permissions")).toContainText("ecs:DescribeTaskDefinition");
+      // Not sure: remembering stays off until a person says so.
+      await expect(dialog.getByRole("checkbox", { name: /Always use this repo/ })).not.toBeChecked();
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(0);
+      await shot(page, `log-repo-unsure-${width}`);
+
+      // Picking the other candidate is one press, and it is what starts.
+      await chosen.getByTestId("resolved-repo-candidates").getByRole("button", { name: /api/ }).click();
+      await expect(chosen.getByTestId("resolved-repo-name")).toHaveText(API);
+      // The saved repo is picked again: nothing new to remember.
+      await expect(dialog.getByRole("checkbox", { name: /Always use this repo/ })).toHaveCount(0);
+      await dialog.getByRole("button", { name: "Start fix run" }).click();
+      await expect(dialog).toBeHidden();
+      expect(db.calls.find((c) => c.path === "/api/log-findings/rec_new/fix")?.body).toEqual({ repo: API, remember: false });
+    });
+
+    test("none: the picker, with why", async ({ page }) => {
+      await mockApi(page, { resolutions: { rec_new: { ...NO_REPO, permissions: ["ecs:ListClusters", "lambda:GetFunction"] } } });
+      const dialog = await openFix(page);
+      const picker = dialog.getByTestId("resolved-repo");
+      await expect(picker).toHaveAttribute("data-state", "none");
+      await expect(picker).toContainText("Nothing ties this to one of the team's repos yet. Choose the repo this code lives in.");
+      await expect(picker.getByTestId("resolved-repo-permissions")).toContainText("ecs:ListClusters");
+      await expect(dialog.getByRole("button", { name: "Start fix run" })).toBeDisabled();
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(0);
+      await shot(page, `log-repo-none-${width}`);
+    });
+  });
+}

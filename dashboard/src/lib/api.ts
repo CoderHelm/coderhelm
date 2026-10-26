@@ -756,6 +756,12 @@ export const api = {
     request<{ alarms: TopicAlarm[]; messages?: string[]; error?: string }>(
       `/api/alert-routes/alarms?topic_arn=${encodeURIComponent(topic_arn)}`,
     ),
+  /** The repo a rule for these alarms should fix in, from what the alarms watch. */
+  resolveAlertRepo: (topic_arn: string, alarms: string[]) =>
+    request<RepoResolution>("/api/alert-routes/resolve-repo", {
+      method: "POST",
+      body: JSON.stringify({ topic_arn, alarms }),
+    }),
   deleteAlertRoute: (topic_arn: string) =>
     request<void>(
       `/api/alert-routes?topic_arn=${encodeURIComponent(topic_arn)}`,
@@ -856,6 +862,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  /** Which repo the finding's code lives in: saved, or worked out from the evidence. */
+  getLogFindingRepo: (id: string, refresh = false) =>
+    request<RepoResolution>(`/api/log-findings/${encodeURIComponent(id)}/repo${refresh ? "?refresh=1" : ""}`),
   setLogFindingStatus: (id: string, action: "ignore" | "acknowledge" | "reopen") =>
     request<{ ok: boolean }>(`/api/log-findings/${encodeURIComponent(id)}/${action}`, { method: "POST", body: "{}" }),
   getLogAutofix: () => request<{ autofix: LogAutofix; runs_today: number }>("/api/log-findings/autofix"),
@@ -2328,6 +2337,25 @@ export interface LogFinding {
   } | null;
   /** What the automatic sweep decided, when it looked at it. */
   auto?: { status: "started" | "skipped" | "waiting"; reason: string } | null;
+}
+
+/** Which repo a log group's (or alarm's) code lives in, how sure, and why. */
+export interface RepoResolution {
+  repo: string | null;
+  confidence: "high" | "medium" | "low" | "none";
+  /** `saved`: a mapping someone saved; `resolved`: worked out from the evidence. */
+  source: "saved" | "resolved";
+  /** One sentence shown under the repo. */
+  reason: string;
+  decided_by: { kind: string; detail: string }[];
+  /** Best first when a person should check. */
+  candidates: { repo: string; reason: string }[];
+  /** AWS permissions that would let Coderhelm see more. */
+  permissions: string[];
+  resolved_at: string;
+  cached: boolean;
+  /** The repo saved for the log group, when the evidence was weighed against it. */
+  saved?: string | null;
 }
 
 export interface LogFindingsList {

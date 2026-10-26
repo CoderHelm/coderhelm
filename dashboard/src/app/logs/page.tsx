@@ -12,11 +12,13 @@ import {
   type LogSample,
   type LogSeverity,
   type Repo,
+  type RepoResolution,
 } from "@/lib/api";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
 import { Modal, ModalFooter } from "@/components/modal";
 import { RepoCombobox } from "@/components/repo-combobox";
+import { ResolvedRepo, isSure } from "@/components/resolved-repo";
 import { Segmented } from "@/components/segmented";
 import { Callout } from "@/components/callout";
 import { ChevronRightIcon, ExternalLinkIcon } from "@/components/icons";
@@ -650,10 +652,40 @@ function CreateFixForm({
   onDone: () => void;
 }) {
   const { toast } = useToast();
-  const [repo, setRepo] = useState(finding.repo ?? (repos.length === 1 ? repos[0].name : ""));
-  const [remember, setRemember] = useState(!finding.repo_mapped);
+  // Coderhelm works the repo out (a saved mapping, or the evidence); a
+  // person's own pick always stands.
+  const [resolution, setResolution] = useState<RepoResolution | null>(null);
+  const [resolving, setResolving] = useState(true);
+  const [repo, setRepo] = useState("");
+  const [touched, setTouched] = useState(false);
+  const [remember, setRemember] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    let live = true;
+    api
+      .getLogFindingRepo(finding.rec_id)
+      .then((r) => {
+        if (!live) return;
+        setResolution(r);
+        if (r.repo) setRepo((prev) => prev || r.repo!);
+        // Remembering defaults on only when Coderhelm is sure and nothing is saved yet.
+        setRemember(isSure(r) && r.source !== "saved");
+      })
+      .catch(() => live && setResolution(null))
+      .finally(() => live && setResolving(false));
+    return () => {
+      live = false;
+    };
+  }, [finding.rec_id]);
+
+  const choose = (name: string) => {
+    setTouched(true);
+    setRepo(name);
+  };
+  const saved = resolution?.source === "saved" ? resolution.repo : (resolution?.saved ?? null);
+  const showRemember = canRemember && !!repo && repo !== saved;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -661,7 +693,7 @@ function CreateFixForm({
     setSending(true);
     setError("");
     try {
-      await api.createLogFix(finding.rec_id, { repo, remember: canRemember && remember && !finding.repo_mapped });
+      await api.createLogFix(finding.rec_id, { repo, remember: showRemember && remember });
       toast(`Fix run started in ${repo}`);
       onDone();
     } catch (err) {
@@ -677,17 +709,24 @@ function CreateFixForm({
         <p className="font-medium text-zinc-100">{finding.title}</p>
         <p className="mt-0.5 text-xs text-zinc-400"><Code>{finding.log_group}</Code></p>
       </div>
-      <div>
+      <div className="min-w-0">
         <label htmlFor="fix-repo" className="mb-1 block text-sm font-medium text-zinc-300">
           Repository
         </label>
-        <RepoCombobox id="fix-repo" repos={repos} selected={repo} onSelect={setRepo} label="Repository" className="" />
-        {!finding.repo_mapped && <p className="mt-1 text-xs text-zinc-400">The repo this log group&apos;s code lives in.</p>}
+        <ResolvedRepo
+          id="fix-repo"
+          label="Repository"
+          resolution={resolution}
+          loading={resolving && !touched}
+          repos={repos}
+          selected={repo}
+          onSelect={choose}
+        />
       </div>
-      {canRemember && !finding.repo_mapped && (
-        <label className="flex items-start gap-2 text-sm text-zinc-300">
+      {showRemember && (
+        <label className="flex min-w-0 items-start gap-2 text-sm text-zinc-300">
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="mt-1" />
-          <span>Always use this repo for {finding.log_group}</span>
+          <span className="min-w-0 break-words">Always use this repo for {finding.log_group}</span>
         </label>
       )}
       {error && <Callout variant="error">{error}</Callout>}
@@ -828,7 +867,7 @@ function AutofixPanel({
               <Segmented
                 label="Which log groups"
                 options={[
-                  { value: "all", label: "Every group with a repo" },
+                  { value: "all", label: "Every group with a known repo" },
                   { value: "listed", label: "Only groups turned on below" },
                 ]}
                 value={a.scope}
@@ -910,7 +949,8 @@ function AutofixPanel({
       <div className="mt-6 min-w-0">
         <h3 className="text-sm font-medium text-zinc-300">Log groups</h3>
         <p className="mt-0.5 text-xs text-zinc-400">
-          The repo each log group&apos;s code lives in ({mapped} of {rows.length} set). A group without a repo is never fixed automatically.
+          The repo each log group&apos;s code lives in ({mapped} of {rows.length} saved). For a group without one, Coderhelm works the
+          repo out from AWS and your code: it fixes there when it&apos;s sure and asks you when it isn&apos;t.
         </p>
         {rows.length === 0 ? (
           <p className="mt-2 text-sm text-zinc-500">Log groups appear here once the analyzer finds something in them.</p>
