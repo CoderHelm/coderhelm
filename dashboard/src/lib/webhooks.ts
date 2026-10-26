@@ -3,7 +3,7 @@
 // retries, address checks, turning failing endpoints off) live in the
 // gateway (services/gateway/src/routes/webhooks.rs and common::webhooks).
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.coderhelm.com";
+import { apiBase } from "@/lib/runtime-config";
 
 /** Where outbound webhooks are documented. */
 export const WEBHOOK_DOCS_URL = "https://docs.coderhelm.com/api/webhooks/";
@@ -96,7 +96,7 @@ export class WebhookError extends Error {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${apiBase()}${path}`, {
     ...options,
     credentials: "include",
     cache: "no-store",
