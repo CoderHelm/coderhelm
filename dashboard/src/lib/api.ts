@@ -1113,8 +1113,26 @@ export const api = {
   getSystemVersion: () => request<SystemVersion>("/api/system/version"),
   setAutoUpdate: (settings: Partial<AutoUpdateSettings>) =>
     request<{ settings: AutoUpdateSettings }>("/api/system/auto-update", { method: "PUT", body: JSON.stringify(settings) }),
-  updateNow: (version?: string) =>
-    request<UpdateEntry>("/api/system/update", { method: "POST", body: JSON.stringify(version ? { version } : {}) }),
+  /**
+   * Update to `version` (default: the latest). Refused with the model check
+   * when a model the release calls was refused; `skipCheck` passes only a
+   * failure on a model the release doesn't call.
+   */
+  updateNow: (version?: string, skipCheck = false) =>
+    requestWithBody<UpdateEntry, { model_check: ModelCheck }>("/api/system/update", {
+      method: "POST",
+      body: JSON.stringify({ ...(version ? { version } : {}), ...(skipCheck ? { skip_check: true } : {}) }),
+    }),
+  /** The next release's model check, run again now. */
+  checkUpdateModels: () => request<{ model_check: ModelCheck | null }>("/api/system/update-check", { method: "POST", body: "{}" }),
+  /** How the install calls Claude (install admins, self-hosted). */
+  getSystemModels: () => request<SystemModels>("/api/system/models"),
+  /** The test calls a switch would make, nothing saved. */
+  checkSystemModels: (to: ModelsChoice) =>
+    request<{ ok: boolean; results: ModelAccess[] }>("/api/system/models/check", { method: "POST", body: JSON.stringify(to) }),
+  /** Switch, once every model answers; refused with the results otherwise. */
+  setSystemModels: (to: ModelsChoice) =>
+    requestWithBody<SystemModels, { results: ModelAccess[] }>("/api/system/models", { method: "PUT", body: JSON.stringify(to) }),
   rollbackInstall: () => request<UpdateEntry>("/api/system/rollback", { method: "POST", body: "{}" }),
   // Setup checks and update readiness (install admins), each with its fix.
   getSystemChecks: () => request<SystemChecks>("/api/system/checks"),
@@ -3573,6 +3591,8 @@ export interface UpdateEntry {
   mode?: "update" | "rollback";
   status: "running" | "succeeded" | "failed" | "rolled_back";
   reason?: string;
+  /** "model check skipped for …" when an admin skipped a model the release doesn't call. */
+  note?: string;
   started_at?: string;
   finished_at?: string;
 }
@@ -3652,6 +3672,62 @@ export interface SystemPreflight {
   checks: InstallCheck[];
 }
 
+/** One model's test call, explained (common::model_access on the platform). */
+export interface ModelAccess {
+  model: string;
+  /** What was called: the Bedrock id, or the model's name on the Anthropic API. */
+  id: string;
+  status: "pass" | "fail" | "skip";
+  code: string;
+  detail: string;
+  fix?: string;
+  url?: string;
+  href?: string;
+  /** Update check: the release calls this model (no skipping it). */
+  required?: boolean;
+}
+
+/** The updater's check of the next release's models. */
+export interface ModelCheck {
+  version: string;
+  checked_at: string;
+  ok: boolean;
+  provider?: string | null;
+  region?: string | null;
+  results: ModelAccess[];
+  /** Only a model the release doesn't call failed: Update now may skip it. */
+  skippable?: boolean;
+  /** The release's signature is being checked before its model list is read. */
+  pending?: boolean;
+  note?: string;
+}
+
+export type ModelProviderId = "bedrock" | "anthropic";
+
+export interface ModelsChoice {
+  provider: ModelProviderId;
+  inference_prefix?: string;
+  model_ids?: Record<string, string>;
+}
+
+export interface SystemModels {
+  provider: ModelProviderId;
+  inference_prefix: string;
+  model_ids: Record<string, string>;
+  /** `deploy`: the install config's first-boot choice; `settings`: changed here. */
+  source: "deploy" | "settings";
+  updated_at: string | null;
+  updated_by: string | null;
+  deploy_default: { provider: ModelProviderId; inference_prefix: string };
+  region: string;
+  /** The models this release calls. */
+  models: string[];
+  /** The Bedrock id each model is called by under these settings. */
+  bedrock_ids: Record<string, string>;
+  prefixes: string[];
+  results?: ModelAccess[];
+}
+
 export interface SystemVersion {
   self_hosted: boolean;
   current: { version: string | null; commit: string | null; released_at: string | null; config_fingerprint: string | null };
@@ -3660,6 +3736,8 @@ export interface SystemVersion {
   settings?: AutoUpdateSettings;
   running?: boolean;
   history?: UpdateEntry[];
+  /** The latest release's model check, once it has run. */
+  model_check?: ModelCheck | null;
 }
 
 // ── Deliveries ──────────────────────────────────────────────────────────

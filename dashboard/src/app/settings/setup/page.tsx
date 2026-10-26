@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { api, type SystemChecks } from "@/lib/api";
+import { api, type ModelCheck, type SystemChecks } from "@/lib/api";
+import { UpdateNeedsAction } from "@/components/models-section";
 import { EMAIL_OK_KEY, loadSetupChecks, setupProgress, useInstallAdmin, type SetupCheck } from "@/lib/install";
 import { Page, PageHeader } from "@/components/page";
 import { Callout } from "@/components/callout";
@@ -42,6 +43,14 @@ function Setup() {
   const [checks, setChecks] = useState<SetupCheck[] | null>(null);
   const [server, setServer] = useState<SystemChecks | null>(null);
   const [serverState, setServerState] = useState<"loading" | "ready" | "failed">("loading");
+  // The next release's model check (the updater's), for its banner.
+  const [modelCheck, setModelCheck] = useState<ModelCheck | null>(null);
+  useEffect(() => {
+    api
+      .getSystemVersion()
+      .then((v) => setModelCheck(v.latest && v.model_check?.version === v.latest.version ? v.model_check : null))
+      .catch(() => setModelCheck(null));
+  }, []);
 
   const runChecks = useCallback(() => {
     setServerState("loading");
@@ -93,6 +102,20 @@ function Setup() {
           lead={progress ? `${progress.done} of ${progress.total} required steps done. The install checks itself each time this page opens, and anything that needs a fix says how.` : "What is left to set up on this install. It checks itself each time this page opens, and anything that needs a fix says how."}
         />
       </div>
+      {modelCheck && !modelCheck.ok && (
+        <div className="mb-6 max-w-3xl">
+          <UpdateNeedsAction
+            check={modelCheck}
+            onChecked={(c) => {
+              setModelCheck(c);
+              runChecks();
+            }}
+          />
+          <p className="mt-2 text-sm text-zinc-400">
+            <Link href="/settings/system#readiness" className={linkButton}>Open Settings, System</Link>
+          </p>
+        </div>
+      )}
       <InstallChecks data={server} state={serverState} onRecheck={runChecks} />
 
       <h2 className="mb-3 mt-10 text-xs font-semibold uppercase tracking-wider text-zinc-400" id="getting-started">Getting started</h2>
