@@ -96,6 +96,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/settings/setup": { label: "Setup", parent: "/settings" },
   "/settings/system": { label: "System", parent: "/settings" },
   "/settings/deliveries": { label: "Deliveries", parent: "/settings", tab: "Webhook deliveries" },
+  "/settings/webhooks": { label: "Webhooks", parent: "/settings" },
   "/settings/integrations": { label: "Integrations", parent: "/settings" },
   "/settings/integrations/aws": { label: "AWS", parent: "/settings/integrations", tab: "AWS integration" },
   "/settings/integrations/github": { label: "GitHub", parent: "/settings/integrations", tab: "GitHub integration" },

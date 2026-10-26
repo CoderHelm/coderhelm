@@ -1,0 +1,170 @@
+---
+title: Incoming webhooks
+description: The webhooks CoderHelm receives from GitHub, Jira and AWS, how each is verified, and what each event does.
+---
+
+This page is about events sent **to** CoderHelm. For the events CoderHelm sends to your own systems, see [Webhooks](/api/webhooks).
+
+CoderHelm receives events on four kinds of webhook. Every one is verified before anything happens; an unverified request is refused and changes nothing.
+
+| Path | From | Verified by |
+| --- | --- | --- |
+| `POST /webhooks/github` | The CoderHelm GitHub App | `X-Hub-Signature-256` HMAC |
+| `POST /webhooks/jira` | The CoderHelm Jira app | The team's Jira app secret in the body |
+| `POST /webhooks/jira/:token` | A Jira webhook you create | The per-team token in the URL, and optionally `X-Hub-Signature` |
+| `POST /webhooks/alerts/sns` | An AWS SNS topic | The SNS message signature |
+| `POST /webhooks/ci/tests/results` | GitHub Actions | A GitHub OIDC token (see [Authentication](/api/authentication#ci-jobs)) |
+
+All paths are on `https://api.coderhelm.com`.
+
+## GitHub
+
+GitHub sends every event of the CoderHelm App here. You don't set this up; installing the app does.
+
+Each request is signed with the app's webhook secret: `X-Hub-Signature-256: sha256=<hex>` is an HMAC-SHA256 of the raw body, compared in constant time. A missing or wrong signature gets `401`. The event type comes from `X-GitHub-Event`, and the body must name an installation.
+
+| Event | What CoderHelm does |
+| --- | --- |
+| `installation`, `installation_repositories` | Links the installation and its repositories to your team. |
+| `issues` (`assigned` to the bot, or `labeled` `coderhelm`) | Starts a run. |
+| `issue_comment`, `pull_request_review_comment` | `/coderhelm` or `@coderhelm` starts a run or sends feedback; `@coderhelm re-review` and questions go to the reviewer. |
+| `pull_request` | Reviewer triggers (the review label, new pushes), review requests, and merge tracking. |
+| `pull_request_review` | Feedback on CoderHelm's pull requests. |
+| `push` | A tag writes release notes. A push to the default branch syncs skills, proposes team tools from `.coderhelm/tools/` and updates the code graph. |
+| `check_run`, `check_suite`, `workflow_run` | Records CI results and resumes CI fixing. |
+| `repository` | Follows renames, archives and deletes. |
+
+Other events are accepted with `200` and ignored. An event from an installation that isn't linked to a team is also accepted and ignored.
+
+## Jira app
+
+The CoderHelm Jira app (an Atlassian Forge app) posts events here. The body carries your team id and the secret shown on the Jira page of the dashboard, under `coderhelm.team_id` and `coderhelm.forge_secret`. A wrong secret gets `403`.
+
+## Jira webhook
+
+If you can't install the Jira app, create a plain Jira webhook (see [Connect Jira](/getting-started/jira)). Its URL holds a token generated for your team:
+
+```txt
+https://api.coderhelm.com/webhooks/jira/<token>
+```
+
+An unknown token gets `401`. If you also generated a secret, each request must carry `X-Hub-Signature: sha256=<hex>`, an HMAC-SHA256 of the raw body keyed with that secret. Jira Cloud adds it when you set the secret on the webhook. If you send events from your own automation, sign them the same way:
+
+<Tabs items={['Bash', 'TypeScript', 'Python']}>
+<Tab value="Bash">
+
+```bash
+BODY='{"webhookEvent":"jira:issue_updated","issue":{"key":"WEB-42","fields":{"labels":["coderhelm"]}}}'
+SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$JIRA_WEBHOOK_SECRET" -hex | sed 's/^.* //')
+curl -X POST "https://api.coderhelm.com/webhooks/jira/$JIRA_WEBHOOK_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -H "X-Hub-Signature: sha256=$SIG" \
+  -d "$BODY"
+```
+
+</Tab>
+<Tab value="TypeScript">
+
+```ts
+import { createHmac } from 'node:crypto';
+
+const body = JSON.stringify({
+  webhookEvent: 'jira:issue_updated',
+  issue: { key: 'WEB-42', fields: { labels: ['coderhelm'] } },
+});
+const signature = createHmac('sha256', process.env.JIRA_WEBHOOK_SECRET!).update(body).digest('hex');
+await fetch(`https://api.coderhelm.com/webhooks/jira/${process.env.JIRA_WEBHOOK_TOKEN}`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'X-Hub-Signature': `sha256=${signature}` },
+  body, // send exactly the bytes you signed
+});
+```
+
+</Tab>
+<Tab value="Python">
+
+```python
+import hashlib, hmac, json, os
+import requests
+
+body = json.dumps({
+    "webhookEvent": "jira:issue_updated",
+    "issue": {"key": "WEB-42", "fields": {"labels": ["coderhelm"]}},
+}).encode()
+signature = hmac.new(os.environ["JIRA_WEBHOOK_SECRET"].encode(), body, hashlib.sha256).hexdigest()
+requests.post(
+    f"https://api.coderhelm.com/webhooks/jira/{os.environ['JIRA_WEBHOOK_TOKEN']}",
+    data=body,  # send exactly the bytes you signed
+    headers={"Content-Type": "application/json", "X-Hub-Signature": f"sha256={signature}"},
+)
+```
+
+</Tab>
+</Tabs>
+
+Sign the exact bytes you send: re-serializing the JSON after signing changes them and the signature fails.
+
+What happens with each event:
+
+- An event whose name contains `comment` retries a failed run, or sends feedback to a run that already opened a pull request.
+- Any other issue event starts a run when the ticket has the label `coderhelm` (or one starting `coderhelm:`), or is assigned to a user whose name contains "CoderHelm", in a project you switched on.
+
+To pin a ticket to a repository from an automation, add `repo_owner` and `repo_name` to the payload, at the top level or under `coderhelm`:
+
+```json
+{
+  "webhookEvent": "jira:issue_updated",
+  "issue": { "key": "WEB-42", "fields": { "labels": ["coderhelm"] } },
+  "coderhelm": { "repo_owner": "your-org", "repo_name": "web" }
+}
+```
+
+## Alerts from AWS
+
+CoderHelm can turn an alarm into a fix. Subscribe CoderHelm to an SNS topic with an HTTPS subscription to `https://api.coderhelm.com/webhooks/alerts/sns`, and add the topic under **Alert routes** in the dashboard.
+
+- Every message's SNS signature is checked (signature versions 1 and 2), and the signing certificate must come from SNS. Anything else gets `403`.
+- The subscription is confirmed automatically once the topic has an enabled route. Messages from topics without a route are accepted and ignored.
+- Accepted messages: CloudWatch alarm notifications, AWS Chatbot custom notifications, EventBridge events and plain text.
+
+A message that matches one of the route's rules becomes a run that opens a pull request. Other messages are posted to your team's Slack or Teams channel. Every alert is listed on the **Alerts** page with what CoderHelm did with it.
+
+## Verifying GitHub's signature
+
+If you self-host CoderHelm, or proxy GitHub's events through your own service first, check the signature the same way CoderHelm does: an HMAC-SHA256 of the raw body keyed with the app's webhook secret, compared in constant time.
+
+<Tabs items={['TypeScript', 'Python']}>
+<Tab value="TypeScript">
+
+```ts
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
+export function verifyGithub(rawBody: Buffer, header: string | undefined, secret: string): boolean {
+  if (!header?.startsWith('sha256=')) return false;
+  const expected = Buffer.from(`sha256=${createHmac('sha256', secret).update(rawBody).digest('hex')}`);
+  const got = Buffer.from(header);
+  return got.length === expected.length && timingSafeEqual(got, expected);
+}
+```
+
+</Tab>
+<Tab value="Python">
+
+```python
+import hashlib, hmac
+
+def verify_github(raw_body: bytes, header: str | None, secret: str) -> bool:
+    if not header or not header.startswith("sha256="):
+        return False
+    expected = "sha256=" + hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(header, expected)
+```
+
+</Tab>
+</Tabs>
+
+## Events CoderHelm sends
+
+CoderHelm sends its own signed events (runs, pull requests, reviews, CI fixes, alerts, log findings, releases and plans) to the endpoints you add. See [Webhooks](/api/webhooks).
+
+Each webhook above also has a page under **Reference**, in **Incoming webhooks**, with its headers and the payload fields CoderHelm reads.

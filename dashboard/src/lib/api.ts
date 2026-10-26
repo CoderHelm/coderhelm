@@ -3846,7 +3846,9 @@ export interface DeliveryFull extends Omit<DeliveryRow, "attempts"> {
   /** May be empty, or "[N bytes, not JSON: not kept]". */
   payload_preview: string;
   payload_bytes: number;
-  redeliver?: "github" | "relay" | "notify_test";
+  redeliver?: "github" | "relay" | "notify_test" | "webhook";
+  /** A webhook delivery's endpoint (Settings, Webhooks). */
+  endpoint_id?: string;
 }
 
 export interface DeliveriesSummary {

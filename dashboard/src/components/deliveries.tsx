@@ -11,13 +11,14 @@ import {
   type DeliveryStatusFilter,
 } from "@/lib/api";
 import { HYBRID_HREF } from "@/lib/hybrid";
+import { endpointHref } from "@/lib/webhooks";
 import { Callout } from "./callout";
 import { CodeBlock } from "./code-block";
 import { CopyButton } from "./copy-button";
 import { Drawer } from "./drawer";
 import { EmptyState } from "./empty-state";
 import { FilterSelect } from "./data-source-activity";
-import { AtlassianIcon, BellIcon, ChatIcon, CloudIcon, GitHubIcon, MailIcon, PluginIcon, RepeatIcon, RetryIcon } from "./icons";
+import { AtlassianIcon, BellIcon, ChatIcon, CloudIcon, GitHubIcon, MailIcon, PluginIcon, RepeatIcon, RetryIcon, SendIcon } from "./icons";
 import { Chip, ListEmpty, ListError, ListSkeleton, ListToolbar, StatusDot, TONES, formatDate, formatMs, statusWords, timeAgo, type Tone } from "./list";
 import { SectionHeading } from "./page";
 import { Code } from "./settings/code";
@@ -39,6 +40,7 @@ const SOURCE_NAME: Record<string, string> = {
   teams: "Teams",
   email: "Email",
   hybrid: "Hybrid",
+  webhook: "Webhook",
 };
 
 export function sourceName(source: string): string {
@@ -56,6 +58,7 @@ function SourceIcon({ source }: { source: string }) {
     relay: <RepeatIcon />,
     broker: <CloudIcon />,
     hybrid: <CloudIcon />,
+    webhook: <SendIcon />,
   };
   return (
     <span aria-hidden="true" className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-zinc-300 [&_svg]:h-3.5 [&_svg]:w-3.5">
@@ -488,6 +491,7 @@ function httpTone(code?: number): Tone {
 const REDELIVER_WORDS: Record<string, { label: string; confirm: string }> = {
   github: { label: "Redeliver from GitHub", confirm: "GitHub sends this event again, and Coderhelm handles it as if it just arrived. This can start work again." },
   relay: { label: "Redeliver", confirm: "Coderhelm sends this event to your install again. This can start work again." },
+  webhook: { label: "Resend", confirm: "Coderhelm sends the same event, with the same id, to your webhook endpoint again, signed now. Your endpoint may act on it again unless it skips event ids it has seen." },
   notify_test: { label: "Send a test notice", confirm: "Coderhelm sends a test notice to the same place, so you can see that it arrives." },
 };
 
@@ -596,7 +600,7 @@ function DeliveryDetail({ detail, refusal }: { detail: DeliveryDetailReply; refu
   const kept = preview && !/^\[\d+ bytes, not JSON/.test(preview);
   const facts: [string, ReactNode][] = [
     ["Delivery id", <Code key="id">{d.id}</Code>],
-    ...(d.external_id ? ([[d.source === "github" ? "GitHub delivery id" : "Their id", <Code key="ext">{d.external_id}</Code>]] as [string, ReactNode][]) : []),
+    ...(d.external_id ? ([[d.source === "github" ? "GitHub delivery id" : d.source === "webhook" ? "Event id" : "Their id", <Code key="ext">{d.external_id}</Code>]] as [string, ReactNode][]) : []),
     ...(d.repo
       ? ([[
           "Repository",
@@ -610,6 +614,14 @@ function DeliveryDetail({ detail, refusal }: { detail: DeliveryDetailReply; refu
         ]] as [string, ReactNode][])
       : []),
     ...(d.target ? ([["Target", <span key="t" className="wrap-anywhere">{d.target}</span>]] as [string, ReactNode][]) : []),
+    ...(d.source === "webhook" && d.endpoint_id
+      ? ([[
+          "Endpoint",
+          <Link key="ep" href={endpointHref(d.endpoint_id)} className={linkButton} data-testid="delivery-endpoint-link">
+            Open the endpoint
+          </Link>,
+        ]] as [string, ReactNode][])
+      : []),
     ...(d.outcome ? ([["Outcome", <span key="o" className="wrap-anywhere">{d.outcome}</span>]] as [string, ReactNode][]) : []),
     ...(d.duration_ms ? ([["Took", formatMs(d.duration_ms)]] as [string, ReactNode][]) : []),
     ["Received", formatDate(d.created_at, { time: true })],

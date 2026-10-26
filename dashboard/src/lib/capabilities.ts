@@ -40,6 +40,7 @@ const BUILT_IN_MIN: Record<string, "viewer" | "member" | "admin" | "owner"> = {
   roles: "admin",
   sign_in: "admin",
   api_keys: "admin",
+  webhooks: "admin",
   delete_plans: "admin",
   repos: "admin",
   agent_settings: "admin",

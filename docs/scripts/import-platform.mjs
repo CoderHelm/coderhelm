@@ -6,6 +6,8 @@
 //   .generated/openapi.json         the public API's OpenAPI document, which the
 //                                   API reference pages are generated from
 //   public/openapi.json             the same document, published at /openapi.json
+//   .generated/webhook-events.md    the event catalog on /api/webhooks/, from the
+//                                   document's `webhooks` section
 //   content/docs/changelog.mdx      platform tags and merged pull requests
 //   content/docs/plugins/manifest-reference.mdx   rendered from schemas/plugin-manifest.schema.json
 //
@@ -20,6 +22,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SPEC_PATH, checkSpec, operationsOf } from './lib/openapi.mjs';
 import { renderManifestReference } from './lib/manifest-reference.mjs';
+import { checkEvents, eventsOf, renderWebhookEvents } from './lib/webhook-events.mjs';
 import { plainArrows } from './lib/prose.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -238,14 +241,23 @@ function importOpenApi(platform) {
   const spec = JSON.parse(text);
   const problems = checkSpec(spec);
   if (problems.length) throw new Error(`${SPEC_PATH} is not fit to publish:\n  ${problems.join('\n  ')}`);
-  for (const rel of ['.generated/openapi.json', 'public/openapi.json']) {
+  // Published as it is. The reference pages are made from a copy without the
+  // `webhooks` section: those are events CoderHelm sends, not endpoints to
+  // call, and they are listed on /api/webhooks/ instead.
+  const { webhooks: _events, ...endpoints } = spec;
+  const outputs = { '.generated/openapi.json': JSON.stringify(endpoints, null, 2) + '\n', 'public/openapi.json': text };
+  for (const [rel, body] of Object.entries(outputs)) {
     const to = path.join(ROOT, rel);
     fs.mkdirSync(path.dirname(to), { recursive: true });
-    fs.writeFileSync(to, text);
+    fs.writeFileSync(to, body);
   }
+  // The events CoderHelm sends, for the catalog on /api/webhooks/.
+  const eventProblems = checkEvents(spec);
+  if (eventProblems.length) throw new Error(`${SPEC_PATH} has no usable webhook events:\n  ${eventProblems.join('\n  ')}`);
+  fs.writeFileSync(path.join(ROOT, '.generated/webhook-events.md'), renderWebhookEvents(spec));
   // The route list the reference replaced, removed so a stale copy never builds.
   fs.rmSync(path.join(CONTENT, 'api/routes.mdx'), { force: true });
-  return { operations: operationsOf(spec).length };
+  return { operations: operationsOf(spec).length, events: eventsOf(spec).length };
 }
 
 // --- Changelog --------------------------------------------------------------
@@ -345,6 +357,6 @@ if (isMain) {
   const api = importOpenApi(platform);
   const log = writeChangelog(platform);
   console.log(
-    `platform ${platform.ref.slice(0, 12)}: ${selfHost.imported ? `${selfHost.imported} self-host guides` : 'no self-host guides yet (stub page)'}, ${api.operations} API operations, changelog ${log.platformPrs}+${log.appPrs} PRs${log.shallow ? ' (shallow clone: dashboard PRs left out)' : ''}, ${log.tags} tags`,
+    `platform ${platform.ref.slice(0, 12)}: ${selfHost.imported ? `${selfHost.imported} self-host guides` : 'no self-host guides yet (stub page)'}, ${api.operations} API operations, ${api.events} webhook events, changelog ${log.platformPrs}+${log.appPrs} PRs${log.shallow ? ' (shallow clone: dashboard PRs left out)' : ''}, ${log.tags} tags`,
   );
 }

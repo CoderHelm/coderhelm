@@ -123,6 +123,7 @@ const PHONE_PAGES = [
   '/api/authentication/',
   '/api/errors/',
   '/api/webhooks/',
+  '/api/incoming-webhooks/',
   '/api/reference/runs/list-runs/',
   '/api/reference/plans/create-plan/',
   '/api/reference/reviews/get-review/',
@@ -162,10 +163,10 @@ test('the API section lists the guides, then every endpoint grouped by resource'
   await page.goto('/api/');
   await expect(page.getByRole('heading', { level: 1, name: 'API introduction' })).toBeVisible();
   const nav = page.locator('aside');
-  for (const name of ['Authentication', 'Errors', 'Pagination', 'Rate limits', 'Versioning and idempotency', 'Webhooks']) {
+  for (const name of ['Authentication', 'Errors', 'Pagination', 'Rate limits', 'Versioning and idempotency', 'Webhooks', 'Incoming webhooks']) {
     await expect(nav.getByRole('link', { name, exact: true }).first()).toBeAttached();
   }
-  for (const group of ['Runs', 'Plans', 'Reviews', 'Usage', 'CI']) {
+  for (const group of ['Runs', 'Plans', 'Reviews', 'Usage', 'CI', 'Webhooks', 'Incoming webhooks']) {
     await expect(nav.getByText(group, { exact: true }).first()).toBeAttached();
   }
   // The old dump of every gateway route is gone, internal routes with it.
@@ -268,3 +269,36 @@ for (const scheme of ['dark', 'light'] as const) {
     });
   });
 }
+
+// ── Webhooks ─────────────────────────────────────────────────────────
+
+test('the webhooks page is about the events CoderHelm sends, with every event and signature code', async ({ page }) => {
+  await page.goto('/api/webhooks/');
+  await expect(page.getByRole('heading', { level: 1, name: 'Webhooks' })).toBeVisible();
+  for (const h of ['Quick start', 'Verifying signatures', 'Event types', 'Retries', 'Testing', 'Security', 'Versioning']) {
+    await expect(page.getByRole('heading', { level: 2, name: h })).toBeVisible();
+  }
+  // The catalog comes from the OpenAPI document: one section and one example per event.
+  for (const type of ['run.created', 'run.completed', 'run.failed', 'run.needs_input', 'pull_request.opened', 'review.completed', 'webhook.test']) {
+    await expect(page.locator('h4').filter({ has: page.getByText(type, { exact: true }) })).toHaveCount(1);
+  }
+  await expect(page.getByText('"type": "review.completed"').first()).toBeAttached();
+  for (const tab of ['Node.js', 'Python', 'Go', 'Rust']) {
+    await page.getByRole('tab', { name: tab, exact: true }).click();
+    await expect(page.getByRole('tabpanel').filter({ hasText: 'whsec_' }).first()).toBeVisible();
+  }
+  await expect(page.getByRole('link', { name: 'Incoming webhooks' }).first()).toHaveAttribute('href', /\/api\/incoming-webhooks\/?$/);
+  await shot(page, 'webhooks-desktop');
+});
+
+test('the webhooks CoderHelm receives have their own page, and their reference pages moved', async ({ page }) => {
+  await page.goto('/api/incoming-webhooks/');
+  await expect(page.getByRole('heading', { level: 1, name: 'Incoming webhooks' })).toBeVisible();
+  await expect(page.locator('h2#github')).toBeVisible();
+  await expect(page.locator('h2#alerts-from-aws')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Webhooks' }).first()).toHaveAttribute('href', /\/api\/webhooks\/?$/);
+  const moved = await page.request.get('/api/reference/incoming-webhooks/receive-github-event/');
+  expect(moved.status()).toBe(200);
+  const endpoint = await page.request.get('/api/reference/webhooks/create-webhook-endpoint/');
+  expect(endpoint.status()).toBe(200);
+});
