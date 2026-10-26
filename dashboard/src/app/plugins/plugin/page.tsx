@@ -173,7 +173,7 @@ function PluginPage() {
                 <DiffList title="Changed" tone="text-zinc-300" items={pend.diff.changed} sign="~" />
               </div>
             )}
-            <p className="mt-2 text-xs text-zinc-500">
+            <p className="mt-2 text-xs text-zinc-400">
               From commit {pend.sha.slice(0, 12)}, asked by {pend.requested_by}.
             </p>
             {p.can_approve_pending === false && p.why_not && (
@@ -214,8 +214,8 @@ function PluginPage() {
                   <li key={t.name} className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
                     <Code>{t.name}</Code>
                     <RiskChip risk={t.risk} />
-                    {t.ref && <span className="text-xs text-zinc-500">through {t.ref}</span>}
-                    {t.allow && t.allow.length > 0 && <span className="text-xs text-zinc-500">only {t.allow.join(", ")}</span>}
+                    {t.ref && <span className="text-xs text-zinc-400">through {t.ref}</span>}
+                    {t.allow && t.allow.length > 0 && <span className="text-xs text-zinc-400">only {t.allow.join(", ")}</span>}
                   </li>
                 ))}
               </ul>
@@ -329,7 +329,7 @@ function DiffList({ title, items, tone, sign }: { title: string; items: string[]
   if (items.length === 0) return null;
   return (
     <div className="min-w-0">
-      <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">{title}</p>
+      <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">{title}</p>
       <ul className={`mt-1 space-y-0.5 ${tone}`}>
         {items.map((i) => (
           <li key={i} className="min-w-0">
@@ -526,7 +526,8 @@ function SettingsForm({ plugin, act }: { plugin: InstalledPlugin; act: Act }) {
           <Field
             key={s.key}
             id={`setting-${s.key}`}
-            label={s.key}
+            // A setting's key is one long identifier: it may wrap anywhere.
+            label={<span className="wrap-anywhere">{s.key}</span>}
             helper={
               s.type === "connection"
                 ? `A connection${s.provider ? ` (${s.provider})` : ""}${s.scopes?.length ? ` with ${s.scopes.join(", ")}` : ""}. Connect it on Connections, then name it here.`

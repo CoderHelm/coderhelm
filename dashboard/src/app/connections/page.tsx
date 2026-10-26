@@ -11,6 +11,7 @@ import { AddMcpServerDialog, McpServerPanel } from "@/components/mcp-servers";
 import { PluginPanel } from "@/components/mcp-server-panel";
 import { Chip, List, ListError, ListSection, ListSkeleton, type Tone } from "@/components/list";
 import { linkButton, secondaryButton } from "@/components/ui";
+import { EmptyState } from "@/components/empty-state";
 
 // Connections: the MCP servers agents can reach, the catalog ones a team
 // switches on (Sentry, Linear, Notion…) and any remote server added by its
@@ -148,7 +149,7 @@ function ConnectionsPage() {
           <div className="mt-8">
             <ListSection id="connected" title="Connected" count={on.length || undefined}>
               {on.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-zinc-800 px-4 py-4 text-sm text-zinc-400">Nothing connected yet.</p>
+                <EmptyState title="Nothing connected yet" testId="connected-empty" />
               ) : (
                 <List label="Connected">{on.map(row)}</List>
               )}

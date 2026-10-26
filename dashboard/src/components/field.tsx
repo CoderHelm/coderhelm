@@ -24,7 +24,7 @@ export function Field({
   children,
 }: {
   id: string;
-  label: string;
+  label: ReactNode;
   helper?: ReactNode;
   error?: ReactNode;
   children: (props: FieldControlProps) => ReactNode;
