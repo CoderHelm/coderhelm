@@ -15,6 +15,7 @@ import { StatusText } from "@/components/list";
 import { SettingsSection } from "@/components/settings";
 import { EmptyState } from "@/components/empty-state";
 import { Problem } from "@/components/problem";
+import { HybridAppChoice } from "@/components/hybrid-app-choice";
 import { ExternalLinkIcon, GitHubIcon } from "@/components/icons";
 import { buttonClass, linkButton } from "@/components/ui";
 
@@ -109,6 +110,9 @@ function GitHubSettingsPage() {
       const setupAction = searchParams.get("setup_action");
       const returnedState = searchParams.get("state");
       if (!installationParam) return;
+      // A self-hosted install's GitHub link: the shell passes it on to the
+      // install (lib/hybrid.ts). It is never linked to this team.
+      if (returnedState?.startsWith("hyb_")) return;
 
       // The state we stored before sending the person to GitHub must come back unchanged.
       const savedState = sessionStorage.getItem(STATE_STORAGE_KEY);
@@ -203,6 +207,7 @@ function GitHubSettingsPage() {
       <div className="mb-6">{header}</div>
 
       <div className="space-y-4">
+        <HybridAppChoice id="github" name="GitHub" />
         {error && (
           <Problem title={error.title} details={error.details}>
             {error.body}

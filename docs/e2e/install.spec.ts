@@ -247,11 +247,11 @@ test('no progress file (private by account policy): paste the URL and carry on',
   await seeded(page, m, { launchedAt: Date.now() });
   await expect(page.getByTestId('no-sign')).toBeVisible();
   await expect(page.getByTestId('no-sign')).toContainText('S3 Block Public Access');
-  await page.getByLabel('Your CoderHelm address').fill('not a url');
+  await page.getByLabel('Your install’s address').fill('not a url');
   await page.getByTestId('paste-use').click();
   await expect(page.getByText('doesn’t look like a web address')).toBeVisible();
   m.setup = setupDoc(NO_APP);
-  await page.getByLabel('Your CoderHelm address').fill(`{"install":"${INSTALL}"}`);
+  await page.getByLabel('Your install’s address').fill(`{"install":"${INSTALL}"}`);
   await page.getByTestId('paste-use').click();
   await expect(page.getByTestId('screen-github')).toBeVisible();
 });
@@ -444,7 +444,7 @@ test('ready: the optional setup list, each with its check and one action', async
   await seeded(page, m, { url: INSTALL, region: 'eu-west-1' });
   await expect(page.getByTestId('screen-ready')).toBeVisible();
   const list = page.getByTestId('optional-setup');
-  await expect(list.locator('[data-optional]')).toHaveCount(8);
+  await expect(list.locator('[data-optional]')).toHaveCount(10);
   await expect(list.locator('[data-optional="domain"]')).toHaveAttribute('data-state', 'todo');
   await expect(page.getByTestId('optional-domain-action')).toHaveAttribute('href', `${INSTALL}/settings/system/#domain`);
   await expect(list.locator('[data-optional="email"]')).toHaveAttribute('data-state', 'todo');
@@ -565,5 +565,237 @@ test('screenshots of every screen at 1440 and 390', async ({ page }) => {
     await page.reload();
     await expect(page.getByTestId('no-sign')).toBeVisible();
     await shot(page, `${w}-13-light`);
+  }
+});
+
+// ── Hybrid: a CoderHelm address and CoderHelm's GitHub App ───────────────
+
+interface Hybrid {
+  calls: { path: string; body: Json }[];
+  /** Per path, a refusal to answer with ({status, code}), else ok. */
+  refuse: Record<string, { status: number; code: string; error?: string } | undefined>;
+}
+const newHybrid = (): Hybrid => ({ calls: [], refuse: {} });
+const REG_OK = { id: 'hybrid_registered', label: 'Registered with CoderHelm', status: 'pass', code: 'ok', required: false };
+const nameCheck = (status: string, code: string) => ({ id: 'hybrid_name', label: 'Your CoderHelm address', status, code, required: false });
+const HOSTED_GH = { github_app: { status: 'pass', code: 'hosted_app' }, github_installed: { status: 'fail', code: 'not_linked' } };
+function withHybrid(doc: Json, ...checks: Json[]) {
+  const list = [...(doc.checks as Json[])];
+  list.splice(list.findIndex((c) => c.id === 'admin'), 0, ...checks);
+  return { ...doc, checks: list };
+}
+
+async function mockHybrid(page: Page, h: Hybrid) {
+  await page.addInitScript(() => {
+    const w = window as unknown as Record<string, unknown>;
+    w.__CH_HYBRID_RETRY_MS = 50;
+    w.__CH_NAME_DEBOUNCE_MS = 20;
+  });
+  await page.route('https://api.coderhelm.com/hybrid/names/**', (r) => {
+    const name = decodeURIComponent(new URL(r.request().url()).pathname.split('/').pop() ?? '');
+    if (name === 'admin') return r.fulfill({ json: { name, available: false, code: 'reserved', error: 'That name is reserved. Try another one.' }, headers: CORS });
+    if (name === 'taken-co') return r.fulfill({ json: { name, available: false, code: 'taken', error: 'That name is taken. Try another one.' }, headers: CORS });
+    return r.fulfill({ json: { name, hostname: `${name}.coderhelm.com`, available: true, code: 'ok', error: null }, headers: CORS });
+  });
+  await page.route(`${INSTALL}/api/setup/hybrid**`, (r) => {
+    const p = new URL(r.request().url()).pathname.replace('/api/setup/hybrid', '');
+    const body = JSON.parse(r.request().postData() ?? '{}');
+    h.calls.push({ path: p, body });
+    const no = h.refuse[p];
+    if (no) return r.fulfill({ status: no.status, json: { code: no.code, error: no.error ?? 'Refused.' }, headers: CORS });
+    if (p === '/github/link') return r.fulfill({ json: { state: 'hyb_x', install_url: 'https://github.com/apps/coderhelm/installations/new?state=hyb_x' }, headers: CORS });
+    return r.fulfill({ json: { registered: true }, headers: CORS });
+  });
+}
+
+const HYBRID_STATE = { setup: 'hybrid', domainChoice: 'coderhelm', coderhelmName: 'example-co', githubChoice: 'hosted', sharing: false, url: INSTALL };
+
+test('hybrid: pick the setup, the name is checked as you type, and AWS opens with no domain to set up', async ({ page }) => {
+  const m = newMock();
+  const h = newHybrid();
+  await mock(page, m);
+  await mockHybrid(page, h);
+  await page.goto('/self-host/install/');
+  await expect(page.getByTestId('setup-choice')).toBeVisible();
+  await page.locator('[data-setup="hybrid"]').click();
+  await expect(page.getByTestId('hybrid-options')).toBeVisible();
+  await expect(page.getByTestId('hosted-github')).toBeChecked();
+  await expect(page.getByTestId('share-deliveries')).not.toBeChecked();
+  const input = page.getByLabel('Your CoderHelm address name');
+  await input.fill('ab');
+  await expect(page.getByTestId('name-picker-status')).toHaveText('Use at least 3 characters.');
+  await input.fill('admin');
+  await expect(page.getByTestId('name-picker-status')).toHaveText('That name is reserved. Try another one.');
+  await input.fill('taken-co');
+  await expect(page.getByTestId('name-picker')).toHaveAttribute('data-name-state', 'taken');
+  await input.fill('example-co');
+  await expect(page.getByTestId('name-picker-status')).toContainText('example-co.coderhelm.com is free');
+  await expect(page.getByTestId('summary')).toContainText('example-co.coderhelm.com');
+  await expect(page.getByTestId('summary')).toContainText('CoderHelm’s app');
+  await page.getByLabel('Your email').fill('ada@example.com');
+  await page.getByTestId('launch').click();
+  await expect(page.getByTestId('step-title')).toHaveText('Waiting for AWS');
+  const [u] = await opened(page);
+  const q = new URLSearchParams(new URL(u).hash.split('?')[1]);
+  expect(q.get('param_Hostname')).toBeNull();
+  // The steps for a CoderHelm address.
+  await expect(page.locator('[aria-label="Install steps"] > li')).toHaveCount(5);
+  await expect(page.getByTestId('trust')).toContainText('GitHub events pass through CoderHelm');
+});
+
+test('hybrid: an empty or bad name stops the launch with the reason', async ({ page }) => {
+  const m = newMock();
+  await mock(page, m);
+  await mockHybrid(page, newHybrid());
+  await page.goto('/self-host/install/');
+  await page.locator('[data-setup="hybrid"]').click();
+  await page.getByLabel('Your email').fill('ada@example.com');
+  await page.getByTestId('launch').click();
+  await expect(page.getByTestId('name-picker-status')).toHaveText('Type a name, such as your company’s.');
+  expect(await opened(page)).toHaveLength(0);
+});
+
+test('hybrid: registers, sends the choices and claims the name by itself, then follows the certificate', async ({ page }) => {
+  const m = newMock({ setup: setupDoc(NO_APP) });
+  const h = newHybrid();
+  await mockHybrid(page, h);
+  await seeded(page, m, HYBRID_STATE);
+  await expect(page.getByTestId('screen-address')).toBeVisible();
+  await expect(page.getByTestId('step-title')).toHaveText('Setting up example-co.coderhelm.com');
+  await expect.poll(() => h.calls.map((c) => c.path)).toContain('/register');
+  expect(h.calls[0].body.setup_token).toBe(TOKEN);
+  m.setup = withHybrid(setupDoc(NO_APP), REG_OK);
+  await expect.poll(() => h.calls.map((c) => c.path)).toContain('/name');
+  const settings = h.calls.find((c) => c.path === '/settings')!;
+  expect(settings.body).toMatchObject({ github_mode: 'hosted', sharing: { enabled: false, payloads: false } });
+  expect(h.calls.find((c) => c.path === '/name')!.body.name).toBe('example-co');
+  m.setup = withHybrid(setupDoc(HOSTED_GH), REG_OK, nameCheck('wait', 'cert_pending'));
+  await expect(page.getByTestId('address-status')).toContainText('Waiting for AWS to issue the certificate');
+  await expect(page.getByTestId('address-progress').locator('[data-row-status]')).toHaveText([/Registered/, /reserved for you/, /Certificate issued/, /answers on example-co\.coderhelm\.com/]);
+  await expect(page.getByTestId('address-progress').locator('[data-row-status="active"]')).toHaveCount(1);
+  m.setup = withHybrid(setupDoc(HOSTED_GH), REG_OK, nameCheck('wait', 'attaching'));
+  await expect(page.getByTestId('address-status')).toContainText('Moving CoderHelm to the address');
+  m.setup = withHybrid(setupDoc(HOSTED_GH), REG_OK, nameCheck('pass', 'ok'));
+  await expect(page.getByTestId('screen-github')).toBeVisible();
+  await expect(page.getByTestId('step-title')).toHaveText('Install CoderHelm’s GitHub App');
+});
+
+test('hybrid: a taken name is picked again right on the page', async ({ page }) => {
+  const m = newMock({ setup: withHybrid(setupDoc(NO_APP), REG_OK) });
+  const h = newHybrid();
+  h.refuse['/name'] = { status: 409, code: 'taken', error: 'That name is taken. Try another one.' };
+  await mockHybrid(page, h);
+  await seeded(page, m, HYBRID_STATE);
+  await expect(page.getByTestId('rename')).toBeVisible();
+  await expect(page.getByTestId('address-status')).toContainText('That name can’t be used');
+  h.refuse['/name'] = undefined;
+  await page.getByLabel('Another name').fill('example-two');
+  await expect(page.getByTestId('rename-status')).toContainText('is free');
+  await page.getByTestId('claim-name').click();
+  await expect.poll(() => h.calls.filter((c) => c.path === '/name').map((c) => c.body.name)).toContain('example-two');
+});
+
+test('hybrid failures each say what to do: unreachable install, unreachable CoderHelm, a refused registration', async ({ page }) => {
+  const m = newMock({ setup: withHybrid(setupDoc(NO_APP), { id: 'hybrid_registered', label: 'x', status: 'fail', code: 'proof_failed', required: false }) });
+  const h = newHybrid();
+  await mockHybrid(page, h);
+  await seeded(page, m, HYBRID_STATE);
+  await expect(page.getByTestId('address-status')).toContainText('CoderHelm can’t reach your install yet');
+  await expect(page.getByTestId('address-progress').locator('[data-row-status="fail"]')).toHaveCount(1);
+  // Asking again re-checks (the install proves itself on the next try).
+  await expect.poll(() => h.calls.filter((c) => c.path === '').length).toBeGreaterThan(0);
+  m.setup = setupDoc(NO_APP);
+  h.refuse['/register'] = { status: 502, code: 'hosted_unreachable', error: 'CoderHelm’s servers didn’t answer.' };
+  await page.getByTestId('check-again').click();
+  await expect(page.getByTestId('hybrid-error')).toContainText('Your install can’t reach CoderHelm.');
+  await expect(page.getByTestId('hybrid-error')).toContainText('api.coderhelm.com');
+  await page.getByTestId('skip-address').click();
+  await expect(page.getByTestId('screen-github')).toBeVisible();
+});
+
+test('hybrid GitHub: install CoderHelm’s app and come back linked; refusals read plainly', async ({ page }) => {
+  const m = newMock({ setup: withHybrid(setupDoc(HOSTED_GH), REG_OK, nameCheck('pass', 'ok')) });
+  const h = newHybrid();
+  await mockHybrid(page, h);
+  let githubOpened = '';
+  await page.route('https://github.com/apps/**', (r) => {
+    githubOpened = r.request().url();
+    return r.fulfill({ contentType: 'text/html', body: '<p>GitHub</p>' });
+  });
+  await seeded(page, m, HYBRID_STATE);
+  await expect(page.getByTestId('github-hosted-progress').locator('[data-row-status]').first()).toHaveAttribute('data-row-status', 'pass');
+  // A refused link says why.
+  h.refuse['/github/link'] = { status: 502, code: 'broker_refused' };
+  await page.getByTestId('install-hosted-app').click();
+  await expect(page.getByTestId('hybrid-error')).toContainText('CoderHelm refused the request.');
+  h.refuse['/github/link'] = { status: 401, code: 'signature_mismatch' };
+  await page.getByTestId('install-hosted-app').click();
+  await expect(page.getByTestId('hybrid-error')).toContainText('The keys on the two sides differ.');
+  h.refuse['/github/link'] = undefined;
+  await page.getByTestId('install-hosted-app').click();
+  await page.waitForURL(/github\.com\/apps\/coderhelm\/installations\/new/);
+  expect(githubOpened).toContain('github.com/apps/coderhelm/installations/new');
+  const link = h.calls.filter((c) => c.path === '/github/link').pop()!;
+  expect(String(link.body.return_url)).toContain('/self-host/install/?');
+  expect(link.body.setup_token).toBe(TOKEN);
+  // Back from GitHub: refused, then linked.
+  await page.goto('/self-host/install/?hybrid_github=not_yours');
+  await expect(page.getByTestId('hybrid-github-outcome')).toContainText('GitHub says that installation isn’t yours.');
+  m.setup = withHybrid(setupDoc({ github_app: { status: 'pass', code: 'hosted_app' } }), REG_OK, nameCheck('pass', 'ok'));
+  await page.goto('/self-host/install/?hybrid_github=linked');
+  await expect(page.getByTestId('screen-ready')).toBeVisible();
+});
+
+test('hybrid GitHub: switching back to your own app is one click', async ({ page }) => {
+  const m = newMock({ setup: withHybrid(setupDoc(HOSTED_GH), REG_OK, nameCheck('pass', 'ok')) });
+  const h = newHybrid();
+  await mockHybrid(page, h);
+  await seeded(page, m, HYBRID_STATE);
+  await page.getByTestId('use-own-app').click();
+  await expect.poll(() => h.calls.filter((c) => c.path === '/settings').map((c) => c.body.github_mode)).toContain('own');
+});
+
+test('hybrid screenshots at 1440 and 390', async ({ page }) => {
+  test.skip(!SHOTS, 'set E2E_SHOTS=<dir> to save screenshots');
+  test.setTimeout(120_000);
+  for (const [w, hgt] of [[1440, 900], [390, 844]] as const) {
+    await page.setViewportSize({ width: w, height: hgt });
+    const at = (n: string) => shot(page, `${w}-${n}`);
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+    const m = newMock();
+    const h = newHybrid();
+    await mock(page, m);
+    await mockHybrid(page, h);
+    await page.goto('/self-host/install/');
+    await page.evaluate(() => localStorage.clear());
+    await page.goto('/self-host/install/');
+    await page.locator('[data-setup="hybrid"]').click();
+    await page.getByLabel('Your CoderHelm address name').fill('example-co');
+    await expect(page.getByTestId('name-picker-status')).toContainText('is free');
+    await page.getByLabel('Your email').fill('ada@example.com');
+    await at('19-start-hybrid');
+    await page.getByLabel('Your CoderHelm address name').fill('taken-co');
+    await expect(page.getByTestId('name-picker')).toHaveAttribute('data-name-state', 'taken');
+    await at('20-start-name-taken');
+    await page.getByLabel('Your CoderHelm address name').fill('example-co');
+    m.status = { schema: 1, phase: 'deploying', step: 6, steps: 10 };
+    await page.getByTestId('launch').click();
+    await expect(page.getByText('Part 6 of 10')).toBeVisible();
+    await at('21-hybrid-deploying');
+    m.status = { schema: 1, phase: 'done', url: INSTALL };
+    m.setup = withHybrid(setupDoc(HOSTED_GH), REG_OK, nameCheck('wait', 'cert_pending'));
+    await expect(page.getByTestId('screen-address')).toBeVisible();
+    await expect(page.getByTestId('address-status')).toContainText('certificate');
+    await at('22-address-cert-pending');
+    m.setup = withHybrid(setupDoc(NO_APP), { id: 'hybrid_registered', label: 'x', status: 'fail', code: 'proof_failed', required: false });
+    await expect(page.getByTestId('address-status')).toContainText('reach your install');
+    await at('23-address-unreachable');
+    m.setup = withHybrid(setupDoc(HOSTED_GH), REG_OK, nameCheck('pass', 'ok'));
+    await expect(page.getByTestId('screen-github')).toBeVisible();
+    await at('24-github-hosted');
+    h.refuse['/github/link'] = { status: 502, code: 'broker_refused' };
+    await page.getByTestId('install-hosted-app').click();
+    await expect(page.getByTestId('hybrid-error')).toBeVisible();
+    await at('25-github-hosted-refused');
   }
 });

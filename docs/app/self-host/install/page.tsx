@@ -22,7 +22,7 @@ export default function InstallPage() {
   return (
     <div className="flex min-h-screen flex-col bg-fd-background text-fd-foreground">
       <header className="border-b border-fd-border">
-        <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-4 px-4">
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4">
           <Link href="/" aria-label="CoderHelm Docs home">
             <Logo />
           </Link>
@@ -31,7 +31,7 @@ export default function InstallPage() {
           </Link>
         </div>
       </header>
-      <main className="flex-1 px-4 py-10 sm:py-14">
+      <main className="flex-1 px-4 py-8 sm:py-12">
         <InstallWizard />
       </main>
     </div>

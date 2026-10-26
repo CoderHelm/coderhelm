@@ -173,11 +173,25 @@ const ASKS = [
 
 const GIT_DEFAULTS = { branch: "coderhelm/{ticket_lower}", commit: "{ticket}: {title}", pr_title: "{ticket}: {title}" };
 
+const WIDE_DELIVERY_ROW = {
+  id: "github:4f1c2a9e-8b7d-6c5f-4e3d-2c1b0a9f8e7d6c5b4a39", direction: "inbound", source: "github", event: "pull_request_review_comment.created_with_a_long_suffix_for_testing",
+  target: LONG_URL, status: "failed", outcome: TOKEN, reason: "handler_error", external_id: SHA, repo: REPO, pr: 12345, created_at: iso(31), duration_ms: 40_000, attempts: 2, next_retry_at: null,
+};
+
 export const settingsData: Handler = ({ method, path, url }) => {
   if (method !== "GET") return undefined;
   const p = decodeURIComponent(path);
 
   if (p === "/api/repos") return { repos: REPOS };
+  // Deliveries: long ids, a long repository and target, an unbroken error.
+  if (p === "/api/deliveries") return { deliveries: [WIDE_DELIVERY_ROW, { ...WIDE_DELIVERY_ROW, id: "relay:01JWIDE0000000000000000002", source: "relay", status: "pending", next_retry_at: iso(-5) }], summary: { total: 120, ok: 117, failed: 2, pending: 1, success_rate: 0.975, oldest_pending_at: iso(12), last_failure_at: iso(30) }, sources: ["github", "relay", "slack"], retention_days: 14, sharing: { available: true, enabled: false, payloads: false }, hybrid: true };
+  if (p === `/api/deliveries/${WIDE_DELIVERY_ROW.id}`) {
+    return {
+      delivery: { ...WIDE_DELIVERY_ROW, attempts: [{ at: iso(31), code: 502, duration_ms: 10_000, error: TOKEN }, { at: iso(30), duration_ms: 30_000, error: SENTENCE }], headers: { "x-github-event": "pull_request", "x-github-delivery": SHA, "x-hub-signature-256": "[redacted]", "user-agent": LONG_URL }, payload_preview: JSON.stringify({ repository: { full_name: REPO }, html_url: LONG_URL, token: TOKEN }), payload_bytes: 48_213, redeliver: "github" },
+      reason: { code: "handler_error", message: SENTENCE, fix: `${SENTENCE} ${LONG_URL}` },
+      can_redeliver: true,
+    };
+  }
   if (p === "/api/users") return { users: USERS };
   // API keys: a long name, a long maker, and every scope.
   if (p === "/api/api-keys") {

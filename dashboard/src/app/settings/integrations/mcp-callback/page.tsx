@@ -11,6 +11,7 @@ import { Callout } from "@/components/callout";
 import { linkButton, secondaryButton } from "@/components/ui";
 import { returnAddress, takeReturn } from "@/lib/knowledge";
 import { MCP_CONNECTED_MESSAGE } from "@/components/sign-in-card";
+import { hybridOAuthHandoff } from "@/lib/hybrid";
 
 // Where an MCP server's sign-in page sends the browser back. The code and
 // state are posted to the API with this person's session: the state works
@@ -35,6 +36,14 @@ function McpCallback() {
   useEffect(() => {
     if (sent.current) return;
     sent.current = true;
+    // A self-hosted install's sign-in through Coderhelm's app goes back to
+    // the install (lib/hybrid.ts); anything else carries on here unchanged.
+    void hybridOAuthHandoff().then((moved) => {
+      if (!moved) finish();
+    });
+  }, []);
+
+  function finish() {
     const q = new URLSearchParams(window.location.search);
     const state = q.get("state") ?? "";
     if (!state) {
@@ -75,7 +84,7 @@ function McpCallback() {
         window.location.replace(`/settings/integrations/#integration-${row}`);
       })
       .catch((e) => setView({ kind: "failed", message: errorMessage(e, "The sign-in didn't finish.") }));
-  }, []);
+  }
 
   return (
     <Page testId="mcp-callback-page">

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { ANY_CHANGE } from "@/lib/capabilities";
 import {
   BellIcon, BookIcon, CpuIcon, DatabaseIcon, GitBranchIcon, KeyIcon, LifeBuoyIcon,
-  LockIcon, PenIcon, PlanIcon, PluginIcon, ShieldCheckIcon, ShieldIcon, TargetIcon, UsersIcon, WrenchIcon,
+  LockIcon, PenIcon, PlanIcon, PluginIcon, RepeatIcon, ShieldCheckIcon, ShieldIcon, TargetIcon, UsersIcon, WrenchIcon,
 } from "./icons";
 
 /** Keys for the small "current value" line some items show on the hub. */
@@ -75,6 +75,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       { href: "/connections", title: "Connections", description: "Accounts and remote servers your team has connected, for plugins and agents to use.", icon: <PluginIcon />, view: "view_integrations", edit: "integrations" },
       { href: "/data-sources", title: "Data sources", description: "Live systems the reviewer may read to check facts. Read only.", icon: <DatabaseIcon />, view: "data_sources", edit: "data_sources", status: "dataSources" },
       { href: "/skills", title: "Skills", description: "Step by step guides from a repository that Coderhelm follows for common jobs.", icon: <BookIcon />, view: ANY_CHANGE, edit: ANY_CHANGE },
+      { href: "/settings/deliveries", title: "Deliveries", description: "Every webhook in and notice out, whether it worked, and how to fix the ones that failed.", icon: <RepeatIcon />, view: "integrations", edit: "integrations" },
       { href: "/settings/alerts", title: "Alert routes", description: "Turn monitoring alerts into pull requests or chat messages.", icon: <BellIcon />, view: "view_alerts", edit: "alerts", status: "alerts" },
       { href: "/settings/budget", title: "Token limit", description: "Monthly limits for new tokens, cache reads and cache writes. Work pauses when the team reaches one.", icon: <TargetIcon />, view: ANY_CHANGE, edit: "budget", status: "usage" },
     ],

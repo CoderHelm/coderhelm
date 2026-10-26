@@ -14,7 +14,7 @@ export const LATEST_URL = `https://${PUBLIC_BUCKET}.s3.amazonaws.com/launch/late
 export const REPO = 'CoderHelm/coderhelm-platform';
 
 export type Provider = 'bedrock' | 'anthropic';
-export type StepId = 'start' | 'aws' | 'domain' | 'github' | 'models' | 'ready';
+export type StepId = 'start' | 'aws' | 'domain' | 'address' | 'github' | 'models' | 'ready';
 export const STEPS: { id: StepId; label: string }[] = [
   { id: 'aws', label: 'AWS' },
   { id: 'github', label: 'GitHub' },
@@ -22,11 +22,100 @@ export const STEPS: { id: StepId; label: string }[] = [
   { id: 'ready', label: 'Ready' },
 ];
 
-/** The steps for this install: a Domain step after AWS when the person chose their own domain. */
+/** The steps for this install: a Domain step after AWS for their own domain, an Address step for a CoderHelm address. */
 export function stepsFor(s: Pick<InstallState, 'domainChoice'>): { id: StepId; label: string }[] {
-  if (s.domainChoice !== 'own') return STEPS;
-  return [STEPS[0], { id: 'domain', label: 'Domain' }, ...STEPS.slice(1)];
+  if (s.domainChoice === 'own') return [STEPS[0], { id: 'domain', label: 'Domain' }, ...STEPS.slice(1)];
+  if (s.domainChoice === 'coderhelm') return [STEPS[0], { id: 'address', label: 'Address' }, ...STEPS.slice(1)];
+  return STEPS;
 }
+
+/** How long each step takes, as people should expect it. */
+export const STEP_TIME: Record<StepId, string> = {
+  start: '1 min',
+  aws: 'about 20 min, mostly waiting',
+  domain: 'up to 30 min',
+  address: 'about 30 min, by itself',
+  github: '1 min',
+  models: '1 to 15 min',
+  ready: '1 min',
+};
+
+// ── Setups: fully private or hybrid ──────────────────────────────────────
+
+export type Setup = 'private' | 'hybrid';
+
+/** The two setups, side by side, with honest trade-offs. */
+export const SETUPS: { id: Setup; title: string; tag?: string; gets: string[]; tradeoff: string }[] = [
+  {
+    id: 'private',
+    title: 'Fully private',
+    gets: ['The AWS address or your own domain', 'Your own GitHub App, made in one click', 'Nothing goes through CoderHelm'],
+    tradeoff: 'One more step: you create a GitHub App (GitHub asks you to press one button).',
+  },
+  {
+    id: 'hybrid',
+    title: 'Hybrid',
+    tag: 'Easiest',
+    gets: ['yourname.coderhelm.com, set up for you', 'CoderHelm\u2019s GitHub App: install it and you\u2019re done', 'Your code and data still stay in your AWS account'],
+    tradeoff: 'GitHub events pass through CoderHelm on their way to you (checked, re-signed, never stored past retries).',
+  },
+];
+
+/** The suffix every CoderHelm address has. */
+export const NAME_ZONE = 'coderhelm.com';
+/** CoderHelm's API, which the guide asks whether a name is free. */
+export const HOSTED_API = 'https://api.coderhelm.com';
+export const NAME_RE = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
+
+/** A name as people type it: lowercase, without the suffix. */
+export function cleanName(raw: string): string {
+  return raw.trim().toLowerCase().replace(/\.coderhelm\.com\.?$/, '').replace(/\s+/g, '-');
+}
+
+/** What's wrong with a name before asking CoderHelm (the same rules as the server). */
+export function nameProblem(raw: string): string | null {
+  const n = cleanName(raw);
+  if (!n) return 'Type a name, such as your company\u2019s.';
+  if (!/^[a-z0-9-]+$/.test(n)) return 'Use lowercase letters, digits and hyphens only.';
+  if (n.length < 3) return 'Use at least 3 characters.';
+  if (n.length > 40) return 'Use at most 40 characters.';
+  if (n.startsWith('-') || n.endsWith('-')) return 'Start and end with a letter or a digit.';
+  if (n.includes('--')) return 'Two hyphens in a row aren\u2019t allowed.';
+  return null;
+}
+
+export function nameCheckUrl(name: string): string {
+  return `${HOSTED_API}/hybrid/names/${encodeURIComponent(cleanName(name))}`;
+}
+
+/** What the guide calls on the install itself for hybrid (simple POSTs: the setup key is in the body). */
+export function hybridUrl(installUrl: string, path: '' | '/register' | '/name' | '/github/link' | '/settings'): string {
+  return `${installUrl.replace(/\/+$/, '')}/api/setup/hybrid${path}`;
+}
+
+/** The monthly AWS cost for a small team (the same lines as the CLI's summary). */
+export const COST_LINES: [string, number, number][] = [
+  ['Lambda, API Gateway, SQS, DynamoDB, EventBridge', 2, 15],
+  ['CloudFront and the dashboard bucket', 1, 5],
+  ['KMS keys (4)', 4, 4],
+  ['Secrets Manager, SSM', 0.4, 1],
+  ['CloudWatch Logs', 1, 10],
+  ['Build sandbox (CodeBuild, by the minute)', 3, 25],
+  ['Updates and email', 0, 2],
+];
+export function monthlyCost(provider: Provider): { low: number; high: number; model: string } {
+  const low = Math.round(COST_LINES.reduce((a, l) => a + l[1], 0));
+  const high = Math.round(COST_LINES.reduce((a, l) => a + l[2], 0));
+  return { low, high, model: provider === 'bedrock' ? 'Claude on Bedrock is per token, on this AWS bill' : 'Claude is per token, on each team\u2019s Anthropic bill' };
+}
+
+/** What the stack creates in their account, in plain words. */
+export const CREATES: { what: string; why: string }[] = [
+  { what: 'A CloudFormation stack', why: 'Runs the installer once, in CodeBuild' },
+  { what: 'Lambda functions and an HTTP API', why: 'CoderHelm itself: pay per use, nothing idling' },
+  { what: 'DynamoDB tables and an S3 bucket', why: 'Your runs, settings and files, encrypted' },
+  { what: 'CloudFront and Cognito', why: 'The web address and sign-in' },
+];
 
 /** Regions with Claude on Amazon Bedrock, by the names people know them by. */
 export const REGIONS: { id: string; name: string }[] = [
@@ -62,8 +151,16 @@ export interface InstallState {
   attempt: number;
   /** The GitHub App's slug, from GitHub's return (the shared status has none). */
   appSlug: string;
-  /** The AWS address (default) or the person's own domain. */
-  domainChoice: 'aws' | 'own';
+  /** The AWS address (default), the person's own domain, or a CoderHelm address. */
+  domainChoice: 'aws' | 'own' | 'coderhelm';
+  /** Fully private or hybrid. */
+  setup: Setup;
+  /** The CoderHelm address name (domainChoice 'coderhelm'). */
+  coderhelmName: string;
+  /** Their own GitHub App, or CoderHelm's through the relay. */
+  githubChoice: 'own' | 'hosted';
+  /** Share failed-delivery metadata with CoderHelm support (off by default). */
+  sharing: boolean;
   /** Their domain, e.g. coderhelm.example.com (only with domainChoice 'own'). */
   hostname: string;
   /** They chose to finish on the AWS address and add the domain later. */
@@ -114,6 +211,10 @@ export function newState(over: Partial<InstallState> = {}): InstallState {
     attempt: 1,
     appSlug: '',
     domainChoice: 'aws',
+    setup: 'private',
+    coderhelmName: '',
+    githubChoice: 'own',
+    sharing: false,
     hostname: '',
     domainSkipped: false,
     emailFrom: '',
@@ -137,6 +238,10 @@ export function validate(s: Pick<InstallState, 'email' | 'stage' | 'region'> & P
   if (!EMAIL_RE.test(s.email.trim())) p.email = 'Enter the email you will sign in with.';
   if (!STAGE_RE.test(s.stage)) p.stage = 'Use lowercase letters, digits and hyphens, starting with a letter.';
   if (!REGIONS.some((r) => r.id === s.region)) p.region = 'Pick a region from the list.';
+  if (s.domainChoice === 'coderhelm') {
+    const np = nameProblem(s.coderhelmName ?? '');
+    if (np) p.coderhelmName = np;
+  }
   if (s.domainChoice === 'own') {
     const h = cleanHostname(s.hostname ?? '');
     if (!HOST_RE.test(h)) p.hostname = 'Enter a hostname such as coderhelm.example.com.';
@@ -396,13 +501,19 @@ export function progressRows(doc: StatusDoc | null, answering: boolean, launched
 }
 
 /** Which screen to show, from what is known. The install's own answers win over memory. */
-export function deriveStep(s: Pick<InstallState, 'launchedAt' | 'url'> & Partial<Pick<InstallState, 'domainChoice' | 'domainSkipped'>>, setup: SetupStatus | null): StepId {
+export function deriveStep(s: Pick<InstallState, 'launchedAt' | 'url'> & Partial<Pick<InstallState, 'domainChoice' | 'domainSkipped' | 'githubChoice'>>, setup: SetupStatus | null): StepId {
   if (!s.launchedAt && !s.url) return 'start';
   if (!setup) return 'aws';
   // Their own domain first, so the GitHub App gets the domain's URLs. An
   // install too old to report the domain doesn't hold anyone up.
   const domain = findCheck(setup, 'domain');
   if (s.domainChoice === 'own' && !s.domainSkipped && domain && domain.status !== 'pass' && domain.code !== 'none') return 'domain';
+  // A CoderHelm address: registered, claimed and live, all by itself.
+  if (s.domainChoice === 'coderhelm' && !s.domainSkipped) {
+    const reg = findCheck(setup, 'hybrid_registered');
+    const name = findCheck(setup, 'hybrid_name');
+    if (!reg || reg.status !== 'pass' || !name || name.status !== 'pass') return 'address';
+  }
   const app = findCheck(setup, 'github_app');
   const installed = findCheck(setup, 'github_installed');
   if (app?.status !== 'pass' || (installed && installed.status !== 'pass')) return 'github';
@@ -419,6 +530,7 @@ export const CHECK_TEXT: Record<string, Record<string, { title: string; fix?: st
     missing: { title: 'No GitHub App yet', fix: 'Create it on GitHub: one click, then press Create GitHub App.' },
     missing_no_setup_key: { title: 'No GitHub App yet', fix: 'This browser no longer has the setup key. Create the app from a terminal with the command below.' },
     secret_unreadable: { title: 'CoderHelm cannot read its own keys', fix: 'Open the installer log in AWS, then press Check again.' },
+    hosted_app: { title: 'Using CoderHelm\u2019s GitHub App' },
   },
   github_installed: {
     ok: { title: 'Installed on your repositories' },
@@ -427,6 +539,7 @@ export const CHECK_TEXT: Record<string, Record<string, { title: string; fix?: st
     app_rejected: { title: 'GitHub does not accept the app’s key', fix: 'The app may have been deleted on GitHub. Create a new one with the terminal command below.' },
     bad_key: { title: 'The stored app key is damaged', fix: 'Create a new GitHub App with the terminal command below.' },
     github_unreachable: { title: 'GitHub did not answer', fix: 'This usually passes on its own. Press Check again in a minute.' },
+    not_linked: { title: 'Install CoderHelm\u2019s GitHub App on your repositories', fix: 'Press Install on GitHub, pick the repositories, and sign in to GitHub when it asks.' },
   },
   models: {
     ok: { title: 'Claude on Amazon Bedrock works' },
@@ -465,6 +578,31 @@ export const CHECK_TEXT: Record<string, Record<string, { title: string; fix?: st
     removing: { title: 'Moving back to the AWS address', fix: 'This takes about 10 minutes; this page follows along.' },
     unknown: { title: 'The domain could not be checked', fix: 'This usually passes on its own. Press Check again in a minute.' },
   },
+  hybrid_registered: {
+    ok: { title: 'Registered with CoderHelm' },
+    not_registered: { title: 'Registering with CoderHelm', fix: 'This page does it by itself as soon as your CoderHelm answers.' },
+    proof_failed: { title: 'CoderHelm can\u2019t reach your install yet', fix: 'It restarts after registering. This page tries again by itself; if it stays, check that your CloudFront address opens.' },
+  },
+  hybrid_name: {
+    ok: { title: 'Your CoderHelm address is live' },
+    requested: { title: 'Requesting the certificate', fix: 'Your install asks AWS for a certificate in your account. This page follows along.' },
+    cert_pending: { title: 'Waiting for AWS to issue the certificate', fix: 'CoderHelm added the records. AWS usually issues it within 30 minutes; nothing to do.' },
+    attaching: { title: 'Moving CoderHelm to the address', fix: 'About 10 minutes. It keeps working on its AWS address meanwhile.' },
+    taken: { title: 'That name is taken', fix: 'Pick another name below; this page claims it for you.' },
+    reserved: { title: 'That name is reserved', fix: 'Pick another name below; this page claims it for you.' },
+    unknown: { title: 'The address isn\u2019t working yet', fix: 'Open Settings, System, Domain in CoderHelm for the reason and press Try again.' },
+  },
+  hybrid_github: {
+    ok: { title: 'CoderHelm\u2019s GitHub App is linked' },
+    no_link: { title: 'Install CoderHelm\u2019s GitHub App', fix: 'Press Install on GitHub, pick the repositories, and sign in to GitHub when it asks.' },
+  },
+  hybrid_access: {
+    broker_revoked: { title: 'CoderHelm turned off this install\u2019s access', fix: 'Contact support, or switch to your own GitHub App and domain.' },
+  },
+  hybrid_relay: {
+    signature_mismatch: { title: 'Your install refused CoderHelm\u2019s signature', fix: 'The relay keys differ: register again in CoderHelm, Settings, System, Hybrid.' },
+    signature_stale: { title: 'Forwarded events arrived late', fix: 'Usually a slow retry; check your install\u2019s clock if it keeps happening.' },
+  },
   google_sign_in: {
     ok: { title: 'Sign in with Google is on' },
     off: { title: 'Sign in with Google', fix: 'Optional, and it needs your own domain: create a Google OAuth client and add its keys to your install.' },
@@ -500,6 +638,36 @@ export const GITHUB_OUTCOMES: Record<string, { ok: boolean; title: string; fix?:
   store_failed: { ok: false, title: 'Your CoderHelm could not save the app’s keys.', fix: 'Open the installer log in AWS, then create the app from a terminal with the command below.' },
 };
 
+/** What came back from linking CoderHelm's GitHub App (?hybrid_github=). */
+export const HYBRID_GITHUB_OUTCOMES: Record<string, { ok: boolean; title: string; fix?: string }> = {
+  linked: { ok: true, title: 'CoderHelm\u2019s GitHub App is linked to your install.' },
+  not_yours: { ok: false, title: 'GitHub says that installation isn\u2019t yours.', fix: 'Sign in to GitHub as an owner of the organization you installed the app on, then press Install on GitHub again.' },
+  linked_elsewhere: { ok: false, title: 'That installation is already linked to another CoderHelm.', fix: 'Uninstall it there first, or install the app on another organization.' },
+  used_by_hosted_team: { ok: false, title: 'That installation belongs to a team on coderhelm.com.', fix: 'Install the app on another organization, or use your own GitHub App.' },
+  signin_failed: { ok: false, title: 'GitHub didn\u2019t finish signing you in.', fix: 'Press Install on GitHub again and allow the sign-in.' },
+  github_unreachable: { ok: false, title: 'CoderHelm couldn\u2019t reach GitHub.', fix: 'Press Install on GitHub again in a minute.' },
+  store_failed: { ok: false, title: 'CoderHelm couldn\u2019t save the link.', fix: 'Press Install on GitHub again in a minute.' },
+};
+
+/** What the install said when a hybrid call was refused, as one sentence and the fix. */
+export const HYBRID_ERRORS: Record<string, { title: string; fix: string }> = {
+  taken: { title: 'That name is taken.', fix: 'Pick another name.' },
+  reserved: { title: 'That name is reserved.', fix: 'Pick another name.' },
+  proof_failed: { title: 'CoderHelm can\u2019t reach your install yet.', fix: 'It restarts after registering: this page tries again in a few seconds.' },
+  hosted_unreachable: { title: 'Your install can\u2019t reach CoderHelm.', fix: 'Check that it can open api.coderhelm.com (a firewall or VPC rule), then press Try again.' },
+  broker_unreachable: { title: 'Your install can\u2019t reach CoderHelm.', fix: 'Check that it can open api.coderhelm.com, then press Try again.' },
+  broker_refused: { title: 'CoderHelm refused the request.', fix: 'Press Try again; if it stays, open Settings, System, Hybrid in CoderHelm.' },
+  broker_revoked: { title: 'CoderHelm turned off this install\u2019s access.', fix: 'Contact support, or switch to the fully private setup.' },
+  signature_mismatch: { title: 'The keys on the two sides differ.', fix: 'Register again in CoderHelm: Settings, System, Hybrid.' },
+  bad_setup_key: { title: 'This browser\u2019s setup key doesn\u2019t match your install.', fix: 'Finish in CoderHelm: Settings, System, Hybrid.' },
+  setup_closed: { title: 'Setup is finished.', fix: 'Continue in CoderHelm: Settings, System, Hybrid.' },
+  no_cloudfront: { title: 'Your install\u2019s address isn\u2019t known yet.', fix: 'This page tries again by itself.' },
+  rate_limited: { title: 'Too many tries.', fix: 'Wait a minute and press Try again.' },
+};
+export function hybridError(code: string | undefined, fallback: string): { title: string; fix: string } {
+  return (code && HYBRID_ERRORS[code]) || { title: fallback, fix: 'Press Try again.' };
+}
+
 // ── Remembering (localStorage + URL) ─────────────────────────────────────
 
 export const STORAGE_PREFIX = 'coderhelm-install:';
@@ -518,9 +686,11 @@ export function stateToQuery(s: InstallState): string {
 }
 
 /** What the address bar says (also the stack's InstallGuide output). */
-export function queryToPartial(search: string): Partial<InstallState> & { github?: string; app?: string } {
+export function queryToPartial(search: string): Partial<InstallState> & { github?: string; app?: string; hybridGithub?: string } {
   const q = new URLSearchParams(search);
-  const out: Partial<InstallState> & { github?: string; app?: string } = {};
+  const out: Partial<InstallState> & { github?: string; app?: string; hybridGithub?: string } = {};
+  const hg = q.get('hybrid_github');
+  if (hg && /^[a-z_]{2,40}$/.test(hg)) out.hybridGithub = hg;
   const id = q.get('id');
   if (id && STATUS_ID_RE.test(id)) out.statusId = id;
   const region = q.get('region');
@@ -667,6 +837,31 @@ export function domainRows(code: string | undefined, mode: 'route53' | 'external
   return rows;
 }
 
+/** The Address step's progress, from the hybrid checks (and a claim the install refused). */
+export function hybridRows(setup: SetupStatus | null, name: string, claimRefused: boolean): DomainRow[] {
+  const reg = findCheck(setup, 'hybrid_registered');
+  const nm = findCheck(setup, 'hybrid_name');
+  const host = `${name || 'yourname'}.${NAME_ZONE}`;
+  const r0: RowStatus = reg?.status === 'pass' ? 'pass' : reg?.status === 'fail' && reg.code !== 'not_registered' ? 'fail' : 'active';
+  const at = (() => {
+    if (!nm) return claimRefused ? -1 : 0;
+    switch (nm.code) {
+      case 'requested': case 'cert_pending': return 2;
+      case 'attaching': return 3;
+      case 'ok': return 4;
+      default: return nm.status === 'fail' ? 3 : 2;
+    }
+  })();
+  const failed = nm?.status === 'fail';
+  const row = (i: number): RowStatus => (r0 !== 'pass' ? 'pending' : at > i ? 'pass' : at === i ? (failed ? 'fail' : 'active') : 'pending');
+  return [
+    { id: 'registered', label: 'Registered with CoderHelm and verified', status: r0 },
+    { id: 'claimed', label: claimRefused ? 'Pick another name' : `${host} reserved for you`, status: r0 !== 'pass' ? 'pending' : claimRefused ? 'fail' : at >= 1 || nm ? 'pass' : 'active' },
+    { id: 'certificate', label: 'Certificate issued in your AWS account', status: row(2) },
+    { id: 'live', label: `CoderHelm answers on ${host}`, status: row(3) },
+  ];
+}
+
 /** Once the domain answers, the guide follows the install there (the GitHub App then gets its URLs). */
 export function domainUrl(s: Pick<InstallState, 'domainChoice' | 'hostname' | 'url'>, setup: SetupStatus | null): string | null {
   if (s.domainChoice !== 'own' || !s.hostname) return null;
@@ -702,7 +897,7 @@ export function optionalSetup(s: Pick<InstallState, 'url' | 'region' | 'provider
   const email = check('email');
   const items: OptionalItem[] = [];
   const domain = check('domain');
-  if (!(s.domainChoice === 'own' && domain?.status === 'pass')) {
+  if (s.domainChoice !== 'coderhelm' && !(s.domainChoice === 'own' && domain?.status === 'pass')) {
     items.push({
       id: 'domain', title: 'Use your own domain', why: 'An address that’s easy to share, and Google sign-in needs one.',
       state: domain ? (domain.status === 'pass' ? 'done' : 'todo') : 'unknown',
@@ -750,6 +945,16 @@ export function optionalSetup(s: Pick<InstallState, 'url' | 'region' | 'provider
     id: 'updates', title: 'Automatic updates', why: 'New releases install by themselves in your maintenance window, health checked and rolled back if unhealthy.',
     state: updates ? (updates.status === 'pass' ? 'done' : 'todo') : 'unknown',
     action: { label: 'Open Settings, System', href: at('/settings/system/') }, doc: '/self-host/updates/',
+  });
+  items.push({
+    id: 'hybrid_apps', title: 'Integrations through CoderHelm\u2019s apps, or your own',
+    why: 'Jira, Notion, Confluence and Google Drive with one click through CoderHelm\u2019s apps, or your own apps to keep everything private.',
+    state: 'unknown', action: { label: 'Open Settings, System, Hybrid', href: at('/settings/system/#hybrid') }, doc: '/self-host/hybrid/',
+  });
+  items.push({
+    id: 'deliveries', title: 'See every event in and out',
+    why: 'Deliveries lists each webhook, forward, notification and email with what happened and the fix for any failure.',
+    state: 'auto', action: { label: 'Open Settings, Deliveries', href: at('/settings/deliveries/') }, doc: '/self-host/deliveries/',
   });
   items.push({
     id: 'backups', title: 'Backups', why: 'Point-in-time recovery (35 days) on every table and a versioned bucket, from the install itself.',
