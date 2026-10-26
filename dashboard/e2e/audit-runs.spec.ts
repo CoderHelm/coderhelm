@@ -274,6 +274,32 @@ const OUTSIDE_REPORT = [
   "No code was changed and no pull request was opened: the code works as designed, and changing it would override the data in the source system. Once the change above is made, nothing else is needed here.",
 ].join("\n");
 
+/** The Details tab's "Run ID" value (the row after its label). */
+function runIdRow(page: Page) {
+  return page.getByRole("region", { name: "Run" }).getByText("Run ID", { exact: true }).locator("xpath=following-sibling::dd[1]");
+}
+
+test("the details show the run's id from the server, with a copy button", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page, { run: baseRun({ run_id: "01RUNFROMSERVER0000000000A" }) });
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A&tab=details");
+  await expect(runIdRow(page)).toContainText("01RUNFROMSERVER0000000000A");
+  await expect(runIdRow(page).getByRole("button", { name: "Copy run ID" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("the details show the run's id from the link when the answer leaves it out", async ({ page }) => {
+  const errors = watchConsole(page);
+  const bare: Record<string, unknown> = baseRun();
+  delete bare.run_id;
+  await mockApi(page, { run: bare });
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A&tab=details");
+  await expect(page.getByRole("heading", { name: "Show the class schedule on the details page" })).toBeVisible();
+  await expect(runIdRow(page)).toContainText("01RUNDONE000000000000000A");
+  await expect(runIdRow(page).getByRole("button", { name: "Copy run ID" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test("a run whose fix is outside the code shows what to change there and opens no pull request", async ({ page }) => {
   const errors = watchConsole(page);
   await mockApi(page, {

@@ -1011,8 +1011,8 @@ function RunDetailInner() {
             <dl className="grid grid-cols-1 gap-x-6 gap-y-2 rounded-lg border border-zinc-800 bg-zinc-900/30 p-4 text-sm sm:grid-cols-[auto_1fr]">
               <dt className="text-zinc-400">Run ID</dt>
               <dd className="flex min-w-0 flex-wrap items-center gap-2">
-                <Code>{run.run_id}</Code>
-                <CopyButton text={run.run_id} label="Copy run ID" variant="link" />
+                <Code>{run.run_id || runId}</Code>
+                <CopyButton text={run.run_id || runId} label="Copy run ID" variant="link" />
               </dd>
               {run.branch && (
                 <>

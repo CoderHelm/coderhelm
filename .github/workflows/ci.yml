@@ -48,6 +48,10 @@ jobs:
         run: npm run lint
       - name: Type check
         run: npm run typecheck
+      # src/lib/openapi-fields.ts is the public API's document at the platform
+      # commit it names; the type check above holds the run and plan types to it.
+      - name: API contract matches the platform
+        run: npm run check:openapi
       # The e2e suite runs against this build, so it points the API at the
       # local server the specs mock.
       - name: Build
