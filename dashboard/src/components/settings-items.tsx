@@ -72,6 +72,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     label: "Connections and usage",
     items: [
       { href: "/settings/integrations", title: "Integrations", description: "GitHub, Jira, AWS and the other tools Coderhelm works with, and whether each one is working.", icon: <PluginIcon />, view: "view_integrations", edit: "integrations", status: "integrations" },
+      { href: "/connections", title: "Connections", description: "Accounts and remote servers your team has connected, for plugins and agents to use.", icon: <PluginIcon />, view: "view_integrations", edit: "integrations" },
       { href: "/data-sources", title: "Data sources", description: "Live systems the reviewer may read to check facts. Read only.", icon: <DatabaseIcon />, view: "data_sources", edit: "data_sources", status: "dataSources" },
       { href: "/skills", title: "Skills", description: "Step by step guides from a repository that Coderhelm follows for common jobs.", icon: <BookIcon />, view: ANY_CHANGE, edit: ANY_CHANGE },
       { href: "/settings/alerts", title: "Alert routes", description: "Turn monitoring alerts into pull requests or chat messages.", icon: <BellIcon />, view: "view_alerts", edit: "alerts", status: "alerts" },

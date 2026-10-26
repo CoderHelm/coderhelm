@@ -330,11 +330,15 @@ test("plugins off: the nav hides them and the pages say so", async ({ page }) =>
 test("plugins on: the nav shows Plugins, Review and the audit log", async ({ page }) => {
   await mockApi(page);
   await page.goto("/plugins");
-  const nav = page.getByRole("navigation", { name: "Main" });
-  await expect(nav.getByRole("link", { name: "Plugins", exact: true })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Review", exact: true })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Audit log" })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Connections" })).toBeVisible();
+  // Plugins is one destination in the main menu; its pages are tabs above the page.
+  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Plugins", exact: true })).toBeVisible();
+  const tabs = page.getByRole("navigation", { name: "Plugins pages" });
+  await expect(tabs.getByRole("link", { name: "Plugins", exact: true })).toBeVisible();
+  await expect(tabs.getByRole("link", { name: "Review", exact: true })).toBeVisible();
+  await expect(tabs.getByRole("link", { name: "Audit log" })).toBeVisible();
+  // Connections is a settings page, in Settings' own list.
+  await page.goto("/connections");
+  await expect(page.getByRole("navigation", { name: "Settings" }).getByRole("link", { name: "Connections" })).toBeVisible();
 });
 
 test("install from the catalog waits for a second admin; the asker can't approve, another admin can", async ({ page }) => {

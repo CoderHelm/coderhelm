@@ -5,6 +5,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { api, type CloseResult, type CloseRunRequest, type Run } from "@/lib/api";
 import { RUN_GROUP_STATUSES, runCanClose, runStatusLook } from "@/components/run-status";
+import { runHref } from "@/lib/plugins";
 import { CloseRunDialog } from "@/components/close-run-dialog";
 import { useToast } from "@/components/toast";
 import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
@@ -53,7 +54,8 @@ function runTitle(run: Run): string {
 function groupRunsByTicket(runs: Run[]): RunGroup[] {
   const map = new Map<string, Run[]>();
   for (const run of runs) {
-    const key = run.ticket_id || run.run_id;
+    // Each plugin run is its own row (they share a ticket id per plugin).
+    const key = run.ticket_source === "plugin" ? run.run_id : run.ticket_id || run.run_id;
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(run);
   }
@@ -322,6 +324,11 @@ function RunsPage() {
   );
 }
 
+/** Where a run opens: a plugin run has its own page. */
+function runPage(run: Run): string {
+  return run.ticket_source === "plugin" ? runHref(run.run_id) : `/runs/detail?id=${encodeURIComponent(run.run_id)}`;
+}
+
 /** "your-team/web#1234" on a row that already names "your-team/web": just "Issue #1234". */
 function ticketWords(run: Run, showRepo: boolean): string | null {
   const id = run.ticket_id;
@@ -336,6 +343,7 @@ function RunItem({ group, showRepo, select, spacer }: { group: RunGroup; showRep
   const look = runStatusLook(latest.status);
   const title = runTitle(latest);
   const ticket = ticketWords(latest, showRepo);
+  const isPlugin = latest.ticket_source === "plugin";
   return (
     <ListRow
       select={select}
@@ -352,9 +360,9 @@ function RunItem({ group, showRepo, select, spacer }: { group: RunGroup; showRep
       status={look}
       title={title}
       titleText={title}
-      href={`/runs/detail?id=${encodeURIComponent(latest.run_id)}`}
+      href={runPage(latest)}
       meta={[
-        ticket && ticket !== title ? ticket : null,
+        isPlugin ? `Plugin ${latest.ticket_id?.replace(/^plugin:/, "") ?? ""}` : ticket && ticket !== title ? ticket : null,
         showRepo ? latest.repo : null,
         latest.duration_s ? `took ${formatDuration(latest.duration_s)}` : null,
       ]}
