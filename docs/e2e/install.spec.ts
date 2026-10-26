@@ -623,13 +623,15 @@ test('hybrid: pick the setup, the name is checked as you type, and AWS opens wit
   await expect(page.getByTestId('share-deliveries')).not.toBeChecked();
   const input = page.getByLabel('Your CoderHelm address name');
   await input.fill('ab');
-  await expect(page.getByTestId('name-picker-status')).toHaveText('Use at least 3 characters.');
+  await expect(page.getByTestId('name-picker-status')).toHaveText('Not allowed: Use at least 3 characters.');
   await input.fill('admin');
-  await expect(page.getByTestId('name-picker-status')).toHaveText('That name is reserved. Try another one.');
+  await expect(page.getByTestId('name-picker-status')).toHaveText('Reserved: That name is reserved. Try another one.');
+  await expect(page.getByTestId('name-picker')).toHaveAttribute('data-name-state', 'reserved');
   await input.fill('taken-co');
   await expect(page.getByTestId('name-picker')).toHaveAttribute('data-name-state', 'taken');
+  await expect(page.getByTestId('name-picker-status')).toHaveText('Taken: That name is taken. Try another one.');
   await input.fill('example-co');
-  await expect(page.getByTestId('name-picker-status')).toContainText('example-co.coderhelm.com is free');
+  await expect(page.getByTestId('name-picker-status')).toHaveText('Available: example-co.coderhelm.com is free. It’s claimed for you once your install answers.');
   await expect(page.getByTestId('summary')).toContainText('example-co.coderhelm.com');
   await expect(page.getByTestId('summary')).toContainText('CoderHelm’s app');
   await page.getByLabel('Your email').fill('ada@example.com');
@@ -653,6 +655,26 @@ test('hybrid: an empty or bad name stops the launch with the reason', async ({ p
   await page.getByTestId('launch').click();
   await expect(page.getByTestId('name-picker-status')).toHaveText('Type a name, such as your company’s.');
   expect(await opened(page)).toHaveLength(0);
+});
+
+test('hybrid: "couldn’t check" only when the check really fails', async ({ page }) => {
+  await mock(page, newMock());
+  await mockHybrid(page, newHybrid());
+  // A failed request (no answer), then an answer that isn't one: both "couldn't check".
+  await page.route('https://api.coderhelm.com/hybrid/names/down-co', (r) => r.abort('connectionrefused'));
+  await page.route('https://api.coderhelm.com/hybrid/names/odd-co', (r) => r.fulfill({ status: 502, body: 'Bad Gateway', headers: CORS }));
+  await page.goto('/self-host/install/');
+  await page.locator('[data-setup="hybrid"]').click();
+  const input = page.getByLabel('Your CoderHelm address name');
+  for (const name of ['down-co', 'odd-co']) {
+    await input.fill(name);
+    await expect(page.getByTestId('name-picker')).toHaveAttribute('data-name-state', 'offline');
+    await expect(page.getByTestId('name-picker-status')).toContainText('Couldn’t check right now');
+  }
+  // A real answer is never "couldn't check".
+  await input.fill('example-co');
+  await expect(page.getByTestId('name-picker-verdict')).toHaveText('Available:');
+  await expect(page.getByTestId('name-picker-status')).not.toContainText('Couldn’t check');
 });
 
 test('hybrid: registers, sends the choices and claims the name by itself, then follows the certificate', async ({ page }) => {
