@@ -3,6 +3,7 @@
   "pages": [
     "index",
     "walkthrough",
+    "build-with-an-agent",
     "---Build---",
     "layout",
     "manifest-reference",
