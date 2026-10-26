@@ -46,7 +46,7 @@ export function SourceCard({
           <h3 className="truncate text-sm font-semibold text-zinc-100" title={source.name}>
             {source.name}
           </h3>
-          <p className="mt-0.5 truncate text-xs text-zinc-500">
+          <p className="mt-0.5 truncate text-xs text-zinc-400">
             {label} · {itemWord(source.kind, source.items)}
           </p>
           {source.connection === "sign_in" && source.signin && (
@@ -87,9 +87,9 @@ export function SourceCard({
       )}
 
       {source.failed_items > 0 && source.status !== "error" && (
-        <p className="mt-2 text-xs text-zinc-500">{itemWord(source.kind, source.failed_items)} couldn&apos;t be read. They&apos;re tried again on the next check.</p>
+        <p className="mt-2 text-xs text-zinc-400">{itemWord(source.kind, source.failed_items)} couldn&apos;t be read. They&apos;re tried again on the next check.</p>
       )}
-      {source.truncated && <p className="mt-2 text-xs text-zinc-500">Only the first 1,000 are kept. Choose fewer pages to keep everything.</p>}
+      {source.truncated && <p className="mt-2 text-xs text-zinc-400">Only the first 1,000 are kept. Choose fewer pages to keep everything.</p>}
 
       {canManage && (
         <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">

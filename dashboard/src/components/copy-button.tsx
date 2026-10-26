@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CheckIcon, CopyIcon } from "./icons";
-import { linkButton, secondaryButton } from "./ui";
+import { buttonClass, linkButton } from "./ui";
 
 export async function copyText(text: string): Promise<boolean> {
   try {
@@ -58,7 +58,7 @@ export function CopyButton({
     timer.current = setTimeout(() => setState("idle"), ok ? 2000 : 4000);
   };
 
-  const base = variant === "link" ? `${linkButton} gap-1.5 text-left` : `${secondaryButton} gap-1.5 !px-3 !py-1 text-xs`;
+  const base = variant === "link" ? `${linkButton} gap-1.5 text-left` : `${buttonClass("secondary", "sm")} gap-1.5`;
   return (
     <button type="button" onClick={onClick} className={`${base} ${className}`}>
       {variant === "button" && <span aria-hidden="true" className="scale-90">{state === "copied" ? <CheckIcon /> : <CopyIcon />}</span>}

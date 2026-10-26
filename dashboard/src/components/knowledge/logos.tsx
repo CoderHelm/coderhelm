@@ -88,7 +88,7 @@ export function LogoStack({ kinds, size = "sm", max = 4 }: { kinds: string[]; si
       {shown.map((k, i) => (
         <SourceLogo key={k} kind={k} size={size} className={`${i > 0 ? "-ml-1.5" : ""} ring-2 !ring-zinc-900`} />
       ))}
-      {more > 0 && <span className="ml-1.5 text-xs text-zinc-500">+{more}</span>}
+      {more > 0 && <span className="ml-1.5 text-xs text-zinc-400">+{more}</span>}
     </span>
   );
 }

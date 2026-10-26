@@ -113,9 +113,9 @@ export function Menu({
             >
               <span className="min-w-0">
                 {item.label}
-                {item.note && <span className="mt-0.5 block text-xs text-zinc-500">{item.note}</span>}
+                {item.note && <span className="mt-0.5 block text-xs text-zinc-400">{item.note}</span>}
               </span>
-              {item.hint && <span className="shrink-0 text-xs text-zinc-500">{item.hint}</span>}
+              {item.hint && <span className="shrink-0 text-xs text-zinc-400">{item.hint}</span>}
             </button>
           ))}
         </div>

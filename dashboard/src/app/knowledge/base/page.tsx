@@ -445,7 +445,7 @@ function BaseView() {
                   <SourceLogo kind="upload" size="md" />
                   <div className="min-w-0">
                     <h3 className="text-sm font-semibold text-zinc-100">Uploaded files</h3>
-                    <p className="mt-0.5 text-xs text-zinc-500">{itemWord("upload", uploadsCount)}</p>
+                    <p className="mt-0.5 text-xs text-zinc-400">{itemWord("upload", uploadsCount)}</p>
                   </div>
                 </div>
                 <p className="mt-4 text-sm text-zinc-400">{canManage ? "Drop files anywhere on this page, or choose them." : "Files people uploaded."}</p>

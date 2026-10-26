@@ -228,17 +228,17 @@ function TreePicker({ kind, value, onChange, via }: { kind: SourceKind; value: S
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm text-zinc-100">{node.title}</span>
                         {(node.detail || covered) && (
-                          <span className="block truncate text-xs text-zinc-500">{covered ? "Included with the page above" : node.detail}</span>
+                          <span className="block truncate text-xs text-zinc-400">{covered ? "Included with the page above" : node.detail}</span>
                         )}
                       </span>
                     </label>
                   </div>
-                  {open[node.id] && kids === "loading" && <p className="py-1.5 text-xs text-zinc-500" style={{ paddingLeft: `${3.5 + row.depth * 1.25}rem` }}>Opening…</p>}
+                  {open[node.id] && kids === "loading" && <p className="py-1.5 text-xs text-zinc-400" style={{ paddingLeft: `${3.5 + row.depth * 1.25}rem` }}>Opening…</p>}
                   {open[node.id] && kids && typeof kids === "object" && !Array.isArray(kids) && (
                     <p className="py-1.5 text-xs text-amber-300" style={{ paddingLeft: `${3.5 + row.depth * 1.25}rem` }}>{kids.error}</p>
                   )}
                   {open[node.id] && Array.isArray(kids) && kids.length === 0 && (
-                    <p className="py-1.5 text-xs text-zinc-500" style={{ paddingLeft: `${3.5 + row.depth * 1.25}rem` }}>Nothing inside</p>
+                    <p className="py-1.5 text-xs text-zinc-400" style={{ paddingLeft: `${3.5 + row.depth * 1.25}rem` }}>Nothing inside</p>
                   )}
                 </li>
               );
@@ -320,7 +320,7 @@ function AddressPicker({ value, onChange }: { value: Selected[]; onChange: (v: S
               <NodeIcon kind={v.kind} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm text-zinc-100">{v.title}</span>
-                <span className="block text-xs text-zinc-500">{v.kind === "sitemap" ? "Every page in this sitemap" : "This page"}</span>
+                <span className="block text-xs text-zinc-400">{v.kind === "sitemap" ? "Every page in this sitemap" : "This page"}</span>
               </span>
               <button type="button" className={smallSecondaryButton} onClick={() => onChange(value.filter((x) => x.id !== v.id))} aria-label={`Remove ${v.title}`}>
                 Remove

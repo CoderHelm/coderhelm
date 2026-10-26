@@ -95,7 +95,7 @@ function Setup() {
       </div>
       <InstallChecks data={server} state={serverState} onRecheck={runChecks} />
 
-      <h2 className="mb-3 mt-10 text-xs font-semibold uppercase tracking-wider text-zinc-500" id="getting-started">Getting started</h2>
+      <h2 className="mb-3 mt-10 text-xs font-semibold uppercase tracking-wider text-zinc-400" id="getting-started">Getting started</h2>
       {!checks ? (
         <div className="space-y-3" aria-busy="true" aria-label="Checking">
           <Skeleton className="h-16 w-full" />
@@ -161,7 +161,7 @@ function InstallChecks({ data, state, onRecheck }: { data: SystemChecks | null; 
     <section aria-labelledby="install-checks-heading" data-testid="install-checks" className="min-w-0">
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <h2 id="install-checks-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Install checks</h2>
+          <h2 id="install-checks-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Install checks</h2>
           <p className="mt-1 text-sm text-zinc-400" data-testid="install-checks-summary" aria-live="polite">
             {state === "loading" && !data
               ? "Checking GitHub, email, Claude and the rest..."

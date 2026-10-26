@@ -252,7 +252,7 @@ const TIPS: Record<MarkdownEditorVariant, ReactNode[]> = {
 };
 
 function Kbd({ children }: { children: ReactNode }) {
-  return <code className="rounded bg-zinc-800 px-1 py-px text-[11px] text-zinc-300">{children}</code>;
+  return <code className="rounded bg-zinc-800 px-1 py-px text-xs text-zinc-300">{children}</code>;
 }
 
 function useIsMac(): boolean {
@@ -401,7 +401,7 @@ function PreviewPanel({ id, labelledBy, value, max, minHeight, note }: {
       style={{ minHeight, maxHeight: max }}
       data-testid="md-preview"
     >
-      {note && <p className="mb-2 text-xs text-zinc-500">{note}</p>}
+      {note && <p className="mb-2 text-xs text-zinc-400">{note}</p>}
       {value.trim() ? (
         <ChatMarkdown breaks tone="reading">{value}</ChatMarkdown>
       ) : (
@@ -830,7 +830,7 @@ export function MarkdownEditor({
               <path d="M3 7V3l2 2.2L7 3v4M11 3v4M9.5 5.6L11 7l1.5-1.4" />
             </svg>
             Markdown supported
-            <span aria-hidden className="text-zinc-600">· Tips</span>
+            <span aria-hidden className="text-zinc-400">· Tips</span>
           </button>
           {status}
         </div>
@@ -838,12 +838,12 @@ export function MarkdownEditor({
           <ul id={tipsId} className="space-y-1 border-t border-zinc-800/70 px-3 py-2 text-xs leading-relaxed text-zinc-400" data-testid="md-tips">
             {tipList.map((t, i) => (
               <li key={i} className="flex gap-2">
-                <span aria-hidden className="text-zinc-600">•</span>
+                <span aria-hidden className="text-zinc-400">•</span>
                 <span className="min-w-0">{t}</span>
               </li>
             ))}
             <li className="flex gap-2">
-              <span aria-hidden className="text-zinc-600">•</span>
+              <span aria-hidden className="text-zinc-400">•</span>
               <span className="min-w-0">
                 Shortcuts: {mod}B bold, {mod}I italic, {mod}E code, {mod}K link{onSubmitShortcut ? `, ${mod}Enter send` : ""}.
               </span>

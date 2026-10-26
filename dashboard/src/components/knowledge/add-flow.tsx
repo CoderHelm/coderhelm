@@ -476,7 +476,7 @@ function ChooseStep({
                 <SourceLogo kind={k} size="lg" />
                 <span className="min-w-0">
                   <span className="block text-sm font-semibold text-zinc-100">{KIND_LABEL[k]}</span>
-                  <span className="mt-0.5 block text-xs leading-snug text-zinc-500">{c?.blurb ?? " "}</span>
+                  <span className="mt-0.5 block text-xs leading-snug text-zinc-400">{c?.blurb ?? " "}</span>
                 </span>
                 {c?.connected && (
                   <span className="mt-auto inline-flex items-center gap-1.5 text-xs text-emerald-300">
@@ -498,7 +498,7 @@ function ChooseStep({
         <SourceLogo kind="upload" size="lg" />
         <span className="min-w-0">
           <span className="block text-sm font-semibold text-zinc-100">Upload files</span>
-          <span className="block text-xs text-zinc-500">PDF, Word, Markdown, text, spreadsheets or web pages</span>
+          <span className="block text-xs text-zinc-400">PDF, Word, Markdown, text, spreadsheets or web pages</span>
         </span>
       </button>
     </div>
@@ -540,7 +540,7 @@ function SignInStep({
           <p className="mt-3 max-w-sm text-sm leading-relaxed text-zinc-400">
             Coderhelm reads what you pick with this sign-in. Nothing is changed in {label}.
           </p>
-          <button type="button" onClick={onContinue} className={`${buttonClass("primary")} mt-6 !min-h-11 !px-6`} data-testid="signin-continue" autoFocus>
+          <button type="button" onClick={onContinue} className={`${buttonClass("primary", "lg")} mt-6`} data-testid="signin-continue" autoFocus>
             Continue
           </button>
         </>
@@ -564,7 +564,7 @@ function SignInStep({
           <p className="mt-2 max-w-sm text-sm leading-relaxed text-zinc-400">
             Sign in with your {label} account and choose what to bring in. There&apos;s nothing to set up and no key to copy. Nothing is changed in {label}.
           </p>
-          <button type="button" onClick={onSignIn} className={`${buttonClass("primary")} mt-6 !min-h-11 !px-6`} data-testid="signin-button">
+          <button type="button" onClick={onSignIn} className={`${buttonClass("primary", "lg")} mt-6`} data-testid="signin-button">
             Sign in with {label}
           </button>
         </>
@@ -630,7 +630,7 @@ function ConnectStep({
             : `You'll sign in to ${label} and allow Coderhelm to read it. Nothing is changed in ${label}.`}
       </p>
       {conn?.can_sign_in ? (
-        <button type="button" onClick={onConnect} className={`${buttonClass("primary")} mt-6 !min-h-11 !px-6`} disabled={busy} data-testid="connect-button">
+        <button type="button" onClick={onConnect} className={`${buttonClass("primary", "lg")} mt-6`} disabled={busy} data-testid="connect-button">
           {busy ? "Opening…" : `Connect ${label}`}
         </button>
       ) : (
@@ -684,7 +684,7 @@ function UploadStep({
       >
         <SourceLogo kind="upload" size="lg" />
         <p className="mt-4 text-sm font-medium text-zinc-100">Drop files here</p>
-        <p className="mt-1 text-xs text-zinc-500">
+        <p className="mt-1 text-xs text-zinc-400">
           {limits ? `Up to ${Math.round(limits.max_file_bytes / (1024 * 1024))} MB each` : "PDF, Word, Markdown, text, spreadsheets"}
         </p>
         <button type="button" className={`${secondaryButton} mt-4`} onClick={() => input.current?.click()}>
@@ -710,7 +710,7 @@ function UploadStep({
           {files.map((f) => (
             <li key={f.key} className="flex min-w-0 items-center gap-3 px-3 py-2.5">
               <span className="min-w-0 flex-1 truncate text-sm text-zinc-100">{f.file.name}</span>
-              <span className="shrink-0 text-xs text-zinc-500">{fileSize(f.file.size)}</span>
+              <span className="shrink-0 text-xs text-zinc-400">{fileSize(f.file.size)}</span>
               <button type="button" className={`${buttonClass("ghost", "sm")}`} onClick={() => onRemove(f.key)} aria-label={`Remove ${f.file.name}`}>
                 Remove
               </button>
@@ -777,7 +777,7 @@ function ProgressStep({
             <li key={f.key} className="flex min-w-0 items-center gap-3 text-sm">
               <Tick done={!!f.done} failed={!!f.error} />
               <span className="min-w-0 flex-1 truncate text-zinc-200">{f.file.name}</span>
-              <span className="shrink-0 text-xs text-zinc-500">{f.error ? f.error : f.done ? "Uploaded" : `${Math.round(f.progress * 100)}%`}</span>
+              <span className="shrink-0 text-xs text-zinc-400">{f.error ? f.error : f.done ? "Uploaded" : `${Math.round(f.progress * 100)}%`}</span>
             </li>
           ))}
         </ul>
@@ -803,7 +803,7 @@ function ProgressStep({
           <p className="text-sm font-medium text-zinc-100" data-testid="progress-words">
             {source?.status === "ready" ? `Done. ${itemWord(kind, source.items)} ready.` : health.words}
           </p>
-          <p className="text-xs text-zinc-500">You can close this. It keeps going, and stays up to date on its own.</p>
+          <p className="text-xs text-zinc-400">You can close this. It keeps going, and stays up to date on its own.</p>
         </div>
       </div>
       <div className="mt-5">
@@ -822,7 +822,7 @@ function ProgressStep({
               <span className="min-w-0 flex-1 truncate text-zinc-200">{i.name}</span>
             </li>
           ))}
-          {ready.length > 6 && <li className="pl-7 text-xs text-zinc-500">and {ready.length - 6} more</li>}
+          {ready.length > 6 && <li className="pl-7 text-xs text-zinc-400">and {ready.length - 6} more</li>}
         </ul>
       )}
       {made.setup && (
@@ -831,11 +831,11 @@ function ProgressStep({
           <p className="mt-2 text-zinc-400">
             Changes in Sanity are brought in every hour. To bring them in the moment they&apos;re published, add this address in Sanity (API, then Webhooks) with the secret below.
           </p>
-          <p className="mt-3 text-xs text-zinc-500">Address</p>
+          <p className="mt-3 text-xs text-zinc-400">Address</p>
           <p className="mt-1">
             <Code className="block px-2 py-1.5 text-xs">{made.setup.url}</Code>
           </p>
-          <p className="mt-3 text-xs text-zinc-500">Secret</p>
+          <p className="mt-3 text-xs text-zinc-400">Secret</p>
           <p className="mt-1">
             <Code className="block px-2 py-1.5 text-xs">{made.setup.secret}</Code>
           </p>
@@ -851,7 +851,7 @@ function ProgressStep({
 }
 
 function Tick({ done, failed }: { done: boolean; failed: boolean }) {
-  if (failed) return <span aria-hidden="true" className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-500/20 text-[10px] text-red-300">!</span>;
+  if (failed) return <span aria-hidden="true" className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-500/20 text-xs text-red-300">!</span>;
   return (
     <span aria-hidden="true" className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${done ? "bg-emerald-500/20 text-emerald-300" : "bg-zinc-800"}`}>
       {done && (

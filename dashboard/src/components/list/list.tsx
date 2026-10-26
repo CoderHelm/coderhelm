@@ -397,7 +397,7 @@ export function MoreMenu({
           className={
             compact
               ? `inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 ${focusRing}`
-              : `${secondaryButton} gap-1.5 !px-3`
+              : `${secondaryButton} gap-1.5`
           }
         >
           {compact ? (

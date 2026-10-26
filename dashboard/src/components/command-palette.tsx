@@ -215,7 +215,7 @@ export function CommandPaletteButton({ compact = false, inline = false }: { comp
       >
         <SearchGlyph />
         <span className="flex-1 text-left">Search</span>
-        <kbd className="rounded border border-zinc-700 px-1.5 text-[11px] leading-5 text-zinc-500">{mac ? "⌘K" : "Ctrl K"}</kbd>
+        <kbd className="rounded border border-zinc-700 px-1.5 text-xs leading-5 text-zinc-400">{mac ? "⌘K" : "Ctrl K"}</kbd>
       </button>
     );
   }
@@ -242,7 +242,7 @@ export function CommandPaletteButton({ compact = false, inline = false }: { comp
     >
       <SearchGlyph />
       <span className="flex-1 text-left">Search</span>
-      <kbd className="rounded border border-zinc-700 px-1.5 text-[11px] leading-5 text-zinc-500">{mac ? "⌘K" : "Ctrl K"}</kbd>
+      <kbd className="rounded border border-zinc-700 px-1.5 text-xs leading-5 text-zinc-400">{mac ? "⌘K" : "Ctrl K"}</kbd>
     </button>
   );
 }
@@ -692,16 +692,16 @@ function Palette({
           className="min-w-0 flex-1 bg-transparent py-3.5 text-base text-zinc-100 placeholder-zinc-500 outline-none sm:text-sm"
         />
         <Dialog.Close
-          className={`shrink-0 rounded border border-zinc-700 px-1.5 text-[11px] leading-5 text-zinc-500 hover:text-zinc-300 ${focusRing}`}
+          className={`shrink-0 rounded border border-zinc-700 px-1.5 text-xs leading-5 text-zinc-400 hover:text-zinc-300 ${focusRing}`}
         >
           <span className="hidden sm:inline">Esc</span>
           <span className="sm:hidden">Close</span>
         </Dialog.Close>
       </div>
-      <Command.List ref={listRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-zinc-500">
+      <Command.List ref={listRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-zinc-400">
         {waiting && (
           <Command.Loading>
-            <p className="px-2 py-1.5 text-xs text-zinc-500" aria-live="polite">
+            <p className="px-2 py-1.5 text-xs text-zinc-400" aria-live="polite">
               Searching runs, pull requests, releases and plans…
             </p>
           </Command.Loading>
@@ -728,10 +728,10 @@ function Palette({
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block truncate">{e.label}</span>
-                    {e.sub && <span className="block truncate text-xs text-zinc-500">{e.sub}</span>}
+                    {e.sub && <span className="block truncate text-xs text-zinc-400">{e.sub}</span>}
                   </span>
-                  {e.run && <span className="shrink-0 text-xs text-zinc-500">Scope</span>}
-                  {e.external && <span className="shrink-0 text-xs text-zinc-500">↗</span>}
+                  {e.run && <span className="shrink-0 text-xs text-zinc-400">Scope</span>}
+                  {e.external && <span className="shrink-0 text-xs text-zinc-400">↗</span>}
                 </Command.Item>
               ))}
             </Command.Group>
@@ -749,7 +749,7 @@ function Palette({
           </Command.Group>
         )}
       </Command.List>
-      <div className="hidden items-center gap-4 border-t border-zinc-800 px-3 py-2 text-[11px] text-zinc-500 sm:flex">
+      <div className="hidden items-center gap-4 border-t border-zinc-800 px-3 py-2 text-xs text-zinc-400 sm:flex">
         <span>
           <kbd className="font-sans">↑↓</kbd> move
         </span>

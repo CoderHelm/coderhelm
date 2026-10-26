@@ -71,7 +71,7 @@ export function ListToolbar({ search, status, repo, sort, actions, onClear, summ
         {actions && <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div>}
       </div>
       {(summary || onClear) && (
-        <div className="mt-2 flex min-h-5 flex-wrap items-center gap-x-3 text-xs text-zinc-500">
+        <div className="mt-2 flex min-h-5 flex-wrap items-center gap-x-3 text-xs text-zinc-400">
           {summary && <p role="status">{summary}</p>}
           {onClear && (
             <button type="button" onClick={onClear} className={`${linkButton} !text-xs`}>
@@ -235,7 +235,7 @@ export function StatusToggles({
               {o.tone && !on && <StatusDot tone={o.tone} live={false} className="!h-1.5 !w-1.5" />}
               {o.label}
               {o.count !== undefined && (
-                <span className={`tabular-nums text-xs ${on ? "text-zinc-600" : "text-zinc-400"}`}>{o.count}</span>
+                <span className={`tabular-nums text-xs ${on ? "text-zinc-400" : "text-zinc-400"}`}>{o.count}</span>
               )}
             </button>
           );

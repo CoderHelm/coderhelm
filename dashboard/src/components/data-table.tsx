@@ -63,7 +63,7 @@ export function DataTable<T>({
                 <td
                   key={c.key}
                   title={c.title?.(r)}
-                  className={`px-4 py-2.5 ${c.width === "grow" ? "max-w-0 text-zinc-100" : "whitespace-nowrap tabular-nums text-zinc-300"} ${
+                  className={`px-4 py-2.5 ${c.width === "grow" ? "min-w-48 text-zinc-100" : "whitespace-nowrap tabular-nums text-zinc-300"} ${
                     c.align === "right" ? "text-right" : "text-left"
                   }`}
                 >

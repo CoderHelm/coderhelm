@@ -90,13 +90,13 @@ export function BaseForm({
             ))}
           </div>
         )}
-        <p className="text-xs text-zinc-500">Chat can always use it for people who may read it.</p>
+        <p className="text-xs text-zinc-400">Chat can always use it for people who may read it.</p>
       </fieldset>
       <label className="flex items-start gap-2 text-sm text-zinc-200">
         <input type="checkbox" className="mt-0.5 accent-emerald-500" checked={v.authoritative} onChange={(e) => setV({ ...v, authoritative: e.target.checked })} />
         <span>
           Source of truth
-          <span className="block text-xs text-zinc-500">When sources disagree, answers prefer this one and say so.</span>
+          <span className="block text-xs text-zinc-400">When sources disagree, answers prefer this one and say so.</span>
         </span>
       </label>
       <div className="flex flex-wrap justify-end gap-2">
