@@ -27,6 +27,7 @@ import { Page, PageHeader, Section, cardClass } from "@/components/page";
 import { StatusPill } from "@/components/status-pill";
 import { Switch } from "@/components/teams-webhook";
 import { pluginsApi } from "@/lib/plugins";
+import { SignInAppsPanel } from "@/components/sign-in-apps";
 import { resetPluginsFlag } from "@/hooks/use-plugins-flag";
 import {
   List,
@@ -200,6 +201,8 @@ function AdminPage() {
       />
 
       <UsageCheckPanel />
+
+      <SignInAppsPanel />
 
       <Tabs
         label="Admin views"

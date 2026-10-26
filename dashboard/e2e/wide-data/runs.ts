@@ -513,6 +513,16 @@ export const runsData: Handler = ({ method, path, url }) => {
   if (path === "/api/admin/dlq") {
     return { messages: DLQ.map((m) => ({ ...m, team_id: "TEAM#your-team", global: false, shared_only: false })), count: 1, unretryable: 1, complete: true };
   }
+  if (path === "/api/admin/sign-in-apps") {
+    const redirect = `https://app.engineering-platform-with-a-long-subdomain.example.com/settings/integrations/mcp-callback/`;
+    return {
+      secret_name: `coderhelm/prod/${TOKEN}`,
+      apps: [
+        { kind: "notion", name: "Notion", app: "Notion public connection (OAuth)", configured: false, source: "", id_key: "notion_client_id", secret_key: "notion_client_secret", console: LONG_URL, scopes: [], redirect_uri: redirect },
+        { kind: "confluence", name: "Atlassian (Confluence)", app: "Atlassian OAuth 2.0 (3LO) app", configured: true, source: "atlassian_client_id", id_key: "atlassian_client_id", secret_key: "atlassian_client_secret", console: LONG_URL, scopes: ["read:hierarchical-content:confluence", "read:confluence-content.summary", TOKEN], redirect_uri: redirect },
+      ],
+    };
+  }
   if (path === "/api/admin/usage-check") {
     return { state: "ran", checked_at: iso(60), secret: `coderhelm/prod/${TOKEN}`, day: "2026-10-23", teams: 1234567, flagged_models: 12345, failed_teams: 6789 };
   }
