@@ -1,0 +1,84 @@
+---
+title: Build a plugin with your coding agent
+description: Paste one brief into Claude Code, Cursor, Copilot or another coding agent, and it builds, validates and documents a plugin for you.
+---
+
+A coding agent can build a plugin for you. The [example plugins repository](https://github.com/CoderHelm/coderhelm-plugins) holds the rules agents follow, in [`AGENTS.md`](https://github.com/CoderHelm/coderhelm-plugins/blob/main/AGENTS.md): every manifest field and its allowed values, the triggers, tools and outputs CoderHelm supports, safe defaults, and a checklist the agent must pass. Most coding agents read `AGENTS.md` on their own; the brief below tells them to anyway.
+
+<Steps>
+<Step>
+
+### Get a copy of the repository
+
+```bash
+git clone https://github.com/CoderHelm/coderhelm-plugins my-plugins
+cd my-plugins
+npm ci
+```
+
+Or click **Use this template** on GitHub to get your own copy, public or private.
+
+</Step>
+<Step>
+
+### Paste the brief
+
+Open your coding agent in that folder, fill in the first four lines, and paste:
+
+```text title="Brief for your coding agent"
+Build a CoderHelm plugin in this repository.
+
+What it should do: <one or two sentences>
+When it runs: <a person's brief | a schedule, such as "Mondays 9:00 UTC" | each new release tag>
+What it may touch: <the services it reads, and anything it may change, such as "reads GitHub; may post to Slack">
+Where results go: <drafts to review in CoderHelm | a channel, issue or service, after approval>
+
+How to work:
+1. Read AGENTS.md in full first. It is the source of truth for every field,
+   trigger, tool and limit. Use nothing it doesn't list.
+2. Pick the example under plugins/ closest to this request and copy it to
+   plugins/<new-name>/ as your starting point. Say which one you picked.
+3. If the request needs something CoderHelm doesn't support (for example a
+   trigger other than manual, schedule or github.release), choose the
+   closest supported way, and say what you chose and why in the plugin's
+   README and in your report.
+4. Ask me only what you can't answer from the repository or from the four
+   lines above. Put anything a team would type (channels, repositories,
+   accounts, style guides) in settings instead of asking me.
+5. Start read only. Make every tool that changes something outside
+   CoderHelm consequential, so it waits for a person's approval.
+6. Write plugin.yaml, the agents, any skills, and README.md as AGENTS.md
+   describes.
+7. Run `node tools/validate-plugin.mjs plugins/<new-name>` and
+   `npm run check`. Fix and run again until both pass. Don't change tools/,
+   scripts/ or other plugins.
+8. Finish with a short report: which example you started from, what the
+   plugin does, its tools with their risks, the validator's last line, and
+   what I must connect, fill in and approve in CoderHelm to use it.
+```
+
+</Step>
+<Step>
+
+### Check what it built
+
+The agent starts from the closest example, asks only what it can't answer from the repository, runs the [validator](/plugins/testing) until it passes, writes the plugin's README, and reports what you must connect, fill in and approve. Read `plugin.yaml` and check that every tool marked `consequential` is one you want to approve each time.
+
+</Step>
+<Step>
+
+### Install it
+
+Push your repository, add it as a source on the **Plugins** page, install the plugin, and start it once with a brief on a test team. See [Public and private repos](/plugins/repos).
+
+</Step>
+</Steps>
+
+## Two filled-in examples
+
+[`BUILD_WITH_AN_AGENT.md`](https://github.com/CoderHelm/coderhelm-plugins/blob/main/BUILD_WITH_AN_AGENT.md) has the brief filled in for:
+
+- **A weekly summary of merged pull requests, posted to Slack.** A schedule and a brief trigger, read-only GitHub tools, and a Slack post that waits for approval.
+- **A changelog entry when a pull request is labeled.** CoderHelm has no label trigger, so the agent picks a supported one (a schedule that looks for newly labeled pull requests, plus a brief) and says so in the README.
+
+Both were built from these briefs by a coding agent with no other help, and passed the validator on the first run.

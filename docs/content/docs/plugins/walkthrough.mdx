@@ -10,7 +10,9 @@ In this walkthrough you build a plugin that:
 - drafts a blog post in your CMS, three LinkedIn posts and an email, in your brand voice,
 - waits for an editor to approve a post, then publishes it to LinkedIn at the time they pick.
 
-The finished plugin is in the docs repository at [`docs/examples/marketing`](https://github.com/CoderHelm/coderhelm/tree/main/docs/examples/marketing). The files on this page are included from it, and the docs' tests validate it on every build, so what you read here is what passes.
+The plugin this page builds is in the docs repository at [`docs/examples/marketing`](https://github.com/CoderHelm/coderhelm/tree/main/docs/examples/marketing). The files on this page are included from it, and the docs' tests validate it on every build, so what you read here is what passes.
+
+The maintained marketing plugin, with more since, is in **[CoderHelm/coderhelm-plugins](https://github.com/CoderHelm/coderhelm-plugins)**, next to examples for release notes, incident summaries, dependency checks and docs updates, and an annotated starter. Add that repository as a source to install them, or copy one to start your own. You can also [have your coding agent build a plugin](/plugins/build-with-an-agent).
 
 <Steps>
 <Step>
@@ -116,6 +118,7 @@ An editor (not the person who asked) opens **Plugins**, then **Review**, edits o
 
 ## Where to go next
 
+- Start from another [example plugin](https://github.com/CoderHelm/coderhelm-plugins), or have [your coding agent build one](/plugins/build-with-an-agent).
 - Add a publish output for `send_email`, with its own approval.
 - Change the HTTP tools' addresses and bodies to use the services your team already has.
 - Put the plugin in your [private marketplace](/plugins/marketplace) for other teams.

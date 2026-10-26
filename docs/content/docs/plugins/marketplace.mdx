@@ -21,6 +21,8 @@ Each source is read at a pinned commit. A private source is read only through yo
 
 Make the repository private and readable by your team's GitHub App, then add it as a source on the **Plugins** page as `your-org/coderhelm-plugins`. Its plugins appear in the catalog on the **Plugins** page, and installing one goes through the usual steps: an admin installs, a second admin approves when there are two, and connections are made separately.
 
+To start one, click **Use this template** on [CoderHelm/coderhelm-plugins](https://github.com/CoderHelm/coderhelm-plugins): it already has the `plugins/<name>/` layout, example plugins, and a CI workflow that validates every folder.
+
 ## Keep it vetted
 
 - Protect the repository's default branch and require review, since merging is publishing.
