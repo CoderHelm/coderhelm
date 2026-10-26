@@ -807,6 +807,28 @@ test('hybrid GitHub: install CoderHelm’s app and come back linked; refusals re
   await expect(page.getByTestId('screen-ready')).toBeVisible();
 });
 
+for (const [label, viewport] of [['1440', { width: 1440, height: 1000 }], ['390', { width: 390, height: 844 }]] as const) {
+  test(`hybrid GitHub at ${label}: the confirmation step is named, and the new refusals say what to do`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const m = newMock({ setup: withHybrid(setupDoc(HOSTED_GH), REG_OK, nameCheck('pass', 'ok')) });
+    const h = newHybrid();
+    await mockHybrid(page, h);
+    await seeded(page, m, HYBRID_STATE);
+    await expect(page.getByTestId('screen-github')).toContainText('check the address and press Link');
+    for (const [outcome, title, fix] of [
+      ['no_write_access', 'can\u2019t push to any repository in that installation', 'get write access on GitHub'],
+      ['declined', 'you chose Cancel on CoderHelm\u2019s confirmation page', 'choose Link'],
+      ['install_off', 'verified and active, so nothing was linked', 'Press Check again'],
+    ] as const) {
+      await page.goto(`/self-host/install/?hybrid_github=${outcome}`);
+      const box = page.getByTestId('hybrid-github-outcome');
+      await expect(box).toContainText(title);
+      await expect(box).toContainText(fix);
+      expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= window.innerWidth)).toBe(true);
+    }
+  });
+}
+
 test('hybrid GitHub: switching back to your own app is one click', async ({ page }) => {
   const m = newMock({ setup: withHybrid(setupDoc(HOSTED_GH), REG_OK, nameCheck('pass', 'ok')) });
   const h = newHybrid();

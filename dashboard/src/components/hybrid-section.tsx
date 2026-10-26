@@ -511,7 +511,7 @@ function GithubRow({ hybrid, s }: RowProps) {
         <div className="mt-4 min-w-0 space-y-3">
           {s.github.links.length === 0 ? (
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-950/40 p-4">
-              <p className="min-w-0 flex-1 basis-56 text-sm text-zinc-300">Install Coderhelm&apos;s app on the GitHub account or organization that owns your repositories. GitHub brings you back here.</p>
+              <p className="min-w-0 flex-1 basis-56 text-sm text-zinc-300">Install Coderhelm&apos;s app on the GitHub account or organization that owns your repositories. Coderhelm then shows which install it is about to link: check that the address is this one and press Link. Tokens reach only the repositories you can push to.</p>
               <button type="button" className={`${primaryButton} gap-1.5`} disabled={!!busy} onClick={() => void install()} data-testid="hybrid-github-install">
                 <span aria-hidden="true"><GitHubIcon /></span>
                 {busy === "link" ? "Opening GitHub…" : "Install on GitHub"}

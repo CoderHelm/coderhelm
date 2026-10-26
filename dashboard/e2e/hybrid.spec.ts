@@ -227,11 +227,14 @@ test("GitHub: switch to Coderhelm's app, install on GitHub, edit repositories, u
   await expect(row).toHaveAttribute("data-mode", "hosted");
   expect(puts()).toContainEqual({ github_mode: "hosted" });
 
+  // Read before the click: once the browser is on its way to GitHub the
+  // page's address can already be the next one.
+  const origin = new URL(page.url()).origin;
   const toGithub = page.waitForRequest((r) => r.url().startsWith("https://github.com/apps/coderhelm/installations/new?state=hyb_abc123"));
   await row.getByTestId("hybrid-github-install").click();
   await toGithub;
   const link = calls.find((c) => c.method === "POST" && c.path === "/api/system/hybrid/github/link");
-  expect(link?.body).toEqual({ return_url: `${new URL(page.url()).origin}/settings/system/` });
+  expect(link?.body).toEqual({ return_url: `${origin}/settings/system/` });
 });
 
 test("GitHub links: repositories are edited and saved, and a link is removed", async ({ page }) => {
@@ -256,6 +259,9 @@ for (const [outcome, words, tone] of [
   ["linked_elsewhere", "already linked to another install", "error"],
   ["used_by_hosted_team", "used by a team on Coderhelm's hosted service", "error"],
   ["signin_failed", "didn't confirm who you are", "error"],
+  ["no_write_access", "can't push to any repository", "error"],
+  ["declined", "you chose Cancel", "error"],
+  ["install_off", "verified and active", "error"],
 ] as const) {
   test(`GitHub sent back ${outcome}: one sentence and the fix, and the address is cleaned`, async ({ page }) => {
     await setup(page, SELF, { registered: true, verified: true, mode: "hosted" });
@@ -402,6 +408,28 @@ test("hosted: any other OAuth callback (404 from the hand-off) finishes as befor
   await expect(page).toHaveURL(/\/settings\/integrations\/#integration-mcp:srv_1$/);
   expect(calls.filter((c) => c.path === "/hybrid/oauth/callback")).toHaveLength(1);
 });
+
+for (const [label, viewport] of [["1440", { width: 1440, height: 1000 }], ["390", { width: 390, height: 844 }]] as const) {
+  test(`linking refusals read plainly and fit at ${label}, and the install step names the Link confirmation`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await setup(page, SELF, { registered: true, verified: true, mode: "hosted" });
+    await page.goto("/settings/system/#hybrid");
+    await expect(page.getByTestId("hybrid-github")).toContainText("press Link");
+    await expect(page.getByTestId("hybrid-github")).toContainText("only the repositories you can push to");
+    for (const [outcome, title, fix] of [
+      ["no_write_access", "can't push to any repository in that installation", "get write access on GitHub"],
+      ["declined", "you chose Cancel on Coderhelm's confirmation page", "choose Link"],
+      ["install_off", "verified and active, so nothing was linked", "Press Check again"],
+    ] as const) {
+      await page.goto(`/settings/system/?hybrid_github=${outcome}#hybrid`);
+      const box = page.getByTestId("hybrid-github-outcome");
+      await expect(box).toHaveAttribute("data-outcome", outcome);
+      await expect(box).toContainText(title);
+      await expect(box).toContainText(fix);
+      expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= window.innerWidth)).toBe(true);
+    }
+  });
+}
 
 test("on a phone the Hybrid section fits", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
