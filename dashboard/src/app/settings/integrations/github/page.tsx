@@ -21,6 +21,17 @@ import { buttonClass, linkButton } from "@/components/ui";
 const GITHUB_APP_INSTALL_URL = "https://github.com/apps/coderhelm/installations/new";
 const STATE_STORAGE_KEY = "gh_install_state";
 
+/** `url` when it is an http(s) address, else null. */
+function safeHttpUrl(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function GitHubSettingsPageGuarded() {
   return (
     <RoleGuard need="view_integrations">
@@ -126,6 +137,14 @@ function GitHubSettingsPage() {
       api
         .linkGithubInstallation(id)
         .then((result) => {
+          // A new installation is linked only after GitHub confirms, with the
+          // person's own sign-in, that they can access it.
+          const signIn = result.code === "github_auth_required" ? safeHttpUrl(result.auth_url) : null;
+          if (signIn) {
+            setLinkResult(`One more step: confirm with GitHub that you can access ${result.github_org ?? "this installation"}. Taking you to GitHub now.`);
+            window.location.assign(signIn);
+            return;
+          }
           if (result.error) {
             setError({ title: "Couldn't connect to GitHub", body: "Start again with Install. If it keeps failing, contact support.", details: result.error });
             setStatus("not_connected");
