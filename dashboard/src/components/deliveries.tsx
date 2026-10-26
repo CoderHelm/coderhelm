@@ -11,13 +11,14 @@ import {
   type DeliveryStatusFilter,
 } from "@/lib/api";
 import { HYBRID_HREF } from "@/lib/hybrid";
+import { endpointHref } from "@/lib/webhooks";
 import { Callout } from "./callout";
 import { CodeBlock } from "./code-block";
 import { CopyButton } from "./copy-button";
 import { Drawer } from "./drawer";
 import { EmptyState } from "./empty-state";
 import { FilterSelect } from "./data-source-activity";
-import { AtlassianIcon, BellIcon, ChatIcon, CloudIcon, GitHubIcon, MailIcon, PluginIcon, RepeatIcon, RetryIcon } from "./icons";
+import { AtlassianIcon, BellIcon, ChatIcon, CloudIcon, GitHubIcon, MailIcon, PluginIcon, RepeatIcon, RetryIcon, SendIcon } from "./icons";
 import { Chip, ListEmpty, ListError, ListSkeleton, ListToolbar, StatusDot, TONES, formatDate, formatMs, statusWords, timeAgo, type Tone } from "./list";
 import { SectionHeading } from "./page";
 import { Code } from "./settings/code";
@@ -39,6 +40,7 @@ const SOURCE_NAME: Record<string, string> = {
   teams: "Teams",
   email: "Email",
   hybrid: "Hybrid",
+  webhook: "Webhook",
 };
 
 export function sourceName(source: string): string {
@@ -56,6 +58,7 @@ function SourceIcon({ source }: { source: string }) {
     relay: <RepeatIcon />,
     broker: <CloudIcon />,
     hybrid: <CloudIcon />,
+    webhook: <SendIcon />,
   };
   return (
     <span aria-hidden="true" className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-zinc-300 [&_svg]:h-3.5 [&_svg]:w-3.5">
@@ -190,8 +193,8 @@ export function Deliveries({
 
   return (
     <div className="min-w-0">
-      {data ? <Health data={data} /> : !error && <HealthSkeleton />}
       {data?.sharing?.available && <SharingNote enabled={data.sharing.enabled} payloads={data.sharing.payloads} />}
+      {data ? <Health data={data} /> : !error && <HealthSkeleton />}
 
       <section aria-labelledby="deliveries-heading" className="mt-8 min-w-0">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -327,23 +330,32 @@ function HealthSkeleton() {
   );
 }
 
+/** Where the sharing switch lives: Settings, System, Hybrid, its own row. */
+export const SHARING_HREF = "/settings/system/#hybrid-sharing";
+
+/**
+ * One line at the top: whether this install shares its failed deliveries with
+ * Coderhelm support, and how much (the hybrid section's sharing row says
+ * exactly what is sent). Left out where sharing doesn't apply.
+ */
+export function sharingWords(enabled: boolean, payloads: boolean): string {
+  if (!enabled) return "Not shared with Coderhelm support";
+  return payloads
+    ? "Failed deliveries are shared with Coderhelm support (details and payload previews)"
+    : "Failed deliveries are shared with Coderhelm support (details only)";
+}
+
 function SharingNote({ enabled, payloads }: { enabled: boolean; payloads: boolean }) {
   return (
-    <div className="mt-4 flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-3" data-testid="sharing-note" data-enabled={String(enabled)}>
-      <p className="flex min-w-0 items-center gap-2 text-sm text-zinc-300">
+    <p className="mb-4 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-300" data-testid="sharing-note" data-enabled={String(enabled)} data-payloads={String(payloads)}>
+      <span className="flex min-w-0 items-center gap-2">
         <StatusDot tone={enabled ? "success" : "muted"} />
-        <span className="min-w-0">
-          {enabled
-            ? payloads
-              ? "Failed deliveries, with payload previews, are shared with Coderhelm support."
-              : "Failed deliveries are shared with Coderhelm support, without headers or payloads."
-            : "Sharing with Coderhelm support is off. Only you can see these."}
-        </span>
-      </p>
-      <Link href={HYBRID_HREF} className={`${linkButton} shrink-0`}>
-        {enabled ? "Change what is shared" : "Turn on sharing"}
+        <span className="min-w-0">{sharingWords(enabled, payloads)}</span>
+      </span>
+      <Link href={SHARING_HREF} className={`${linkButton} shrink-0`} aria-label="Change what is shared with Coderhelm support">
+        Change
       </Link>
-    </div>
+    </p>
   );
 }
 
@@ -488,6 +500,7 @@ function httpTone(code?: number): Tone {
 const REDELIVER_WORDS: Record<string, { label: string; confirm: string }> = {
   github: { label: "Redeliver from GitHub", confirm: "GitHub sends this event again, and Coderhelm handles it as if it just arrived. This can start work again." },
   relay: { label: "Redeliver", confirm: "Coderhelm sends this event to your install again. This can start work again." },
+  webhook: { label: "Resend", confirm: "Coderhelm sends the same event, with the same id, to your webhook endpoint again, signed now. Your endpoint may act on it again unless it skips event ids it has seen." },
   notify_test: { label: "Send a test notice", confirm: "Coderhelm sends a test notice to the same place, so you can see that it arrives." },
 };
 
@@ -596,7 +609,7 @@ function DeliveryDetail({ detail, refusal }: { detail: DeliveryDetailReply; refu
   const kept = preview && !/^\[\d+ bytes, not JSON/.test(preview);
   const facts: [string, ReactNode][] = [
     ["Delivery id", <Code key="id">{d.id}</Code>],
-    ...(d.external_id ? ([[d.source === "github" ? "GitHub delivery id" : "Their id", <Code key="ext">{d.external_id}</Code>]] as [string, ReactNode][]) : []),
+    ...(d.external_id ? ([[d.source === "github" ? "GitHub delivery id" : d.source === "webhook" ? "Event id" : "Their id", <Code key="ext">{d.external_id}</Code>]] as [string, ReactNode][]) : []),
     ...(d.repo
       ? ([[
           "Repository",
@@ -610,6 +623,14 @@ function DeliveryDetail({ detail, refusal }: { detail: DeliveryDetailReply; refu
         ]] as [string, ReactNode][])
       : []),
     ...(d.target ? ([["Target", <span key="t" className="wrap-anywhere">{d.target}</span>]] as [string, ReactNode][]) : []),
+    ...(d.source === "webhook" && d.endpoint_id
+      ? ([[
+          "Endpoint",
+          <Link key="ep" href={endpointHref(d.endpoint_id)} className={linkButton} data-testid="delivery-endpoint-link">
+            Open the endpoint
+          </Link>,
+        ]] as [string, ReactNode][])
+      : []),
     ...(d.outcome ? ([["Outcome", <span key="o" className="wrap-anywhere">{d.outcome}</span>]] as [string, ReactNode][]) : []),
     ...(d.duration_ms ? ([["Took", formatMs(d.duration_ms)]] as [string, ReactNode][]) : []),
     ["Received", formatDate(d.created_at, { time: true })],

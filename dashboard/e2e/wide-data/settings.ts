@@ -178,6 +178,30 @@ const WIDE_DELIVERY_ROW = {
   target: LONG_URL, status: "failed", outcome: TOKEN, reason: "handler_error", external_id: SHA, repo: REPO, pr: 12345, created_at: iso(31), duration_ms: 40_000, attempts: 2, next_retry_at: null,
 };
 
+export const WIDE_ENDPOINT = {
+  id: "ep_01jbendpt4a7b0c3d6e9f2g5h8widewide",
+  url: `${API_URL}/coderhelm/webhooks/receive-every-event-with-a-very-long-path-segment`,
+  description: `${SENTENCE} ${TOKEN}`,
+  events: ["run.created", "run.completed", "run.failed", "run.needs_input", "pull_request.opened", "review.completed", "ci_fix.started", "ci_fix.completed", "alert.received", "log_finding.created"],
+  enabled: true,
+  disabled_reason: "",
+  secret_hint: "whsec_…Q2c=",
+  previous_secret_expires_at: iso(-60 * 20),
+  failing_since: iso(60 * 30),
+  last_success_at: iso(60 * 31),
+  last_failure_at: iso(5),
+  created_at: iso(60 * 24 * 10),
+  created_by: EMAIL,
+  updated_at: iso(60),
+};
+
+const WIDE_EVENT_TYPES = [
+  ["run.created", "Runs"], ["run.completed", "Runs"], ["run.failed", "Runs"], ["run.needs_input", "Runs"],
+  ["pull_request.opened", "Pull requests"], ["review.completed", "Reviews"], ["ci_fix.started", "CI fixes"], ["ci_fix.completed", "CI fixes"],
+  ["alert.received", "Alerts"], ["log_finding.created", "Logs"], ["log_finding.resolved", "Logs"], ["release_notes.published", "Releases"],
+  ["plan.approved", "Plans"], ["plugin.run.completed", "Plugins"], ["webhook.test", "Testing"],
+].map(([type, group]) => ({ type, group, summary: SENTENCE, description: SENTENCE, subscribable: type !== "webhook.test", example: {} }));
+
 export const settingsData: Handler = ({ method, path, url }) => {
   if (method !== "GET") return undefined;
   const p = decodeURIComponent(path);
@@ -191,6 +215,19 @@ export const settingsData: Handler = ({ method, path, url }) => {
       reason: { code: "handler_error", message: SENTENCE, fix: `${SENTENCE} ${LONG_URL}` },
       can_redeliver: true,
     };
+  }
+  // Webhooks: a long address, a long description, every event and an unbroken error.
+  if (p === "/api/webhooks/endpoints") return { endpoints: [WIDE_ENDPOINT, { ...WIDE_ENDPOINT, id: "ep_wide2", enabled: false, disabled_reason: "failing", events: ["*"] }], max: 20, disable_after_days: 5, retention_days: 14 };
+  if (p === "/api/webhooks/event-types") return { api_version: "2026-10-26", event_types: WIDE_EVENT_TYPES };
+  if (p === `/api/webhooks/endpoints/${WIDE_ENDPOINT.id}`) return WIDE_ENDPOINT;
+  if (p === `/api/webhooks/endpoints/${WIDE_ENDPOINT.id}/deliveries`) {
+    return { deliveries: [{
+      id: "01JWIDEDELIVERY0000000000001", event_id: "evt_01JBEVNT8M1N4P7Q0R3S6T9V2WWIDEWIDEWIDE", event: "run.needs_input", status: "failed",
+      outcome: "Refused (401)", reason: "webhook_refused", reason_message: SENTENCE, reason_fix: `${SENTENCE} ${LONG_URL}`,
+      attempts: [{ at: iso(30), code: 401, duration_ms: 112, error: TOKEN }, { at: iso(20), duration_ms: 10_000, error: SENTENCE }],
+      next_retry_at: iso(-60), created_at: iso(30), payload_preview: JSON.stringify({ data: { pr_url: LONG_URL, error: TOKEN } }, null, 2),
+      headers: { "webhook-id": "evt_01JBEVNT8M1N4P7Q0R3S6T9V2WWIDEWIDEWIDE", "webhook-signature": "[redacted]", "user-agent": LONG_URL },
+    }] };
   }
   if (p === "/api/users") return { users: USERS };
   // Sign-in (self-hosted): long domains, long names and an unbroken email.

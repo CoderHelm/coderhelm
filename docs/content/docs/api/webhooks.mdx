@@ -1,135 +1,392 @@
 ---
 title: Webhooks
-description: The webhooks CoderHelm receives from GitHub, Jira and AWS, how each is verified, and what each event does.
+description: Get CoderHelm's events in your own systems, signed the Standard Webhooks way, and see which webhooks CoderHelm receives, how it verifies them and what they start.
 ---
 
-CoderHelm receives events on four kinds of webhook. Every one is verified before anything happens; an unverified request is refused and changes nothing.
+CoderHelm sends an HTTP `POST` to your endpoints when it does something: a run starts, finishes, fails or waits for an answer, it opens a pull request, posts a review, fixes CI, takes an alert, finds a problem in your logs, publishes release notes, or someone approves a plan. Every request is signed the [Standard Webhooks](https://www.standardwebhooks.com/) way, retried for about a day when your endpoint can't take it, and recorded on the **Deliveries** page.
 
-| Path | From | Verified by |
-| --- | --- | --- |
-| `POST /webhooks/github` | The CoderHelm GitHub App | `X-Hub-Signature-256` HMAC |
-| `POST /webhooks/jira` | The CoderHelm Jira app | The team's Jira app secret in the body |
-| `POST /webhooks/jira/:token` | A Jira webhook you create | The per-team token in the URL, and optionally `X-Hub-Signature` |
-| `POST /webhooks/alerts/sns` | An AWS SNS topic | The SNS message signature |
-| `POST /webhooks/ci/tests/results` | GitHub Actions | A GitHub OIDC token (see [Authentication](/api/authentication#ci-jobs)) |
+<span id="what-coderhelm-sends" />
 
-All paths are on `https://api.coderhelm.com`.
+CoderHelm also receives webhooks: from its GitHub App, its Jira app, Jira webhooks, AWS SNS alerts and CI test uploads. It verifies each one and decides what it starts; that's at the [end of this page](#webhooks-coderhelm-receives).
 
-## GitHub
+## Quick start
 
-GitHub sends every event of the CoderHelm App here. You don't set this up; installing the app does.
+<Steps>
+<Step>
 
-Each request is signed with the app's webhook secret: `X-Hub-Signature-256: sha256=<hex>` is an HMAC-SHA256 of the raw body, compared in constant time. A missing or wrong signature gets `401`. The event type comes from `X-GitHub-Event`, and the body must name an installation.
+### Add an endpoint
 
-| Event | What CoderHelm does |
-| --- | --- |
-| `installation`, `installation_repositories` | Links the installation and its repositories to your team. |
-| `issues` (`assigned` to the bot, or `labeled` `coderhelm`) | Starts a run. |
-| `issue_comment`, `pull_request_review_comment` | `/coderhelm` or `@coderhelm` starts a run or sends feedback; `@coderhelm re-review` and questions go to the reviewer. |
-| `pull_request` | Reviewer triggers (the review label, new pushes), review requests, and merge tracking. |
-| `pull_request_review` | Feedback on CoderHelm's pull requests. |
-| `push` | A tag writes release notes. A push to the default branch syncs skills, proposes team tools from `.coderhelm/tools/` and updates the code graph. |
-| `check_run`, `check_suite`, `workflow_run` | Records CI results and resumes CI fixing. |
-| `repository` | Follows renames, archives and deletes. |
-
-Other events are accepted with `200` and ignored. An event from an installation that isn't linked to a team is also accepted and ignored.
-
-## Jira app
-
-The CoderHelm Jira app (an Atlassian Forge app) posts events here. The body carries your team id and the secret shown on the Jira page of the dashboard, under `coderhelm.team_id` and `coderhelm.forge_secret`. A wrong secret gets `403`.
-
-## Jira webhook
-
-If you can't install the Jira app, create a plain Jira webhook (see [Connect Jira](/getting-started/jira)). Its URL holds a token generated for your team:
-
-```txt
-https://api.coderhelm.com/webhooks/jira/<token>
-```
-
-An unknown token gets `401`. If you also generated a secret, each request must carry `X-Hub-Signature: sha256=<hex>`, an HMAC-SHA256 of the raw body keyed with that secret. Jira Cloud adds it when you set the secret on the webhook. If you send events from your own automation, sign them the same way:
-
-<Tabs items={['Bash', 'TypeScript', 'Python']}>
-<Tab value="Bash">
+An admin opens **Settings**, then **Webhooks**, and chooses **Add endpoint**: an `https://` address, a description, and the events to send (or all of them). Or use the API with a key that has the `webhooks` scope:
 
 ```bash
-BODY='{"webhookEvent":"jira:issue_updated","issue":{"key":"WEB-42","fields":{"labels":["coderhelm"]}}}'
-SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$JIRA_WEBHOOK_SECRET" -hex | sed 's/^.* //')
-curl -X POST "https://api.coderhelm.com/webhooks/jira/$JIRA_WEBHOOK_TOKEN" \
+curl -X POST https://api.coderhelm.com/api/webhooks/endpoints \
+  -H "Authorization: Bearer $CODERHELM_API_KEY" \
   -H 'Content-Type: application/json' \
-  -H "X-Hub-Signature: sha256=$SIG" \
-  -d "$BODY"
+  -d '{"url": "https://hooks.example.com/coderhelm", "description": "Deploy bot", "events": ["run.completed", "run.failed"]}'
 ```
 
-</Tab>
-<Tab value="TypeScript">
+</Step>
+<Step>
+
+### Keep the signing secret
+
+The answer, and the dashboard right after you add the endpoint, show its signing secret once: `whsec_` followed by 32 random bytes in base64. Store it with your endpoint's other secrets. Admins can reveal it again later, and rotate it.
+
+</Step>
+<Step>
+
+### Verify, then answer quickly
+
+Check the signature and the timestamp of every request ([below](#verifying-signatures)), skip events you already handled (by `webhook-id`), and answer with any `2xx` within 10 seconds. Do slow work after you answer, from a queue.
+
+</Step>
+<Step>
+
+### Send a test event
+
+Choose **Send test event** on the endpoint's page, or call `POST /api/webhooks/endpoints/{endpoint_id}/test`. A `webhook.test` event arrives, signed like every other, and the attempt shows on the page with your endpoint's answer.
+
+</Step>
+</Steps>
+
+## What a request looks like
+
+```http
+POST /coderhelm HTTP/1.1
+Host: hooks.example.com
+Content-Type: application/json
+User-Agent: CoderHelm-Webhooks/1.0 (+https://docs.coderhelm.com/api/webhooks/)
+webhook-id: evt_01JBEVNT8M1N4P7Q0R3S6T9V2W
+webhook-timestamp: 1792420307
+webhook-signature: v1,K5oZfzN95Z9UVu1EsfQmfVNQhnkZ2pj9o9NDN/H/pI4=
+
+{"id":"evt_01JBEVNT8M1N4P7Q0R3S6T9V2W","type":"run.failed","created_at":"2026-10-26T14:31:47.512Z","team_id":"TEAM#7c1f0e2a","api_version":"2026-10-26","data":{...}}
+```
+
+Every event has the same envelope:
+
+| Field | What it is |
+| --- | --- |
+| `id` | The event's id: `evt_` and a ULID. The same on every retry, every endpoint and every resend, and sent as the `webhook-id` header. Use it as an idempotency key. |
+| `type` | The event type, such as `run.completed`. |
+| `created_at` | When it happened (RFC 3339). |
+| `team_id` | Your CoderHelm team, as [`GET /api/me`](/api/reference/account/get-me) returns it. |
+| `api_version` | The version of the event's shape, `2026-10-26` today. See [Versioning](#versioning). |
+| `data` | The event's own fields, listed for each type below. |
+
+The headers:
+
+| Header | What it is |
+| --- | --- |
+| `webhook-id` | The event id. |
+| `webhook-timestamp` | When this attempt was sent, in Unix seconds. A retry has a new timestamp and a new signature. |
+| `webhook-signature` | `v1,` and a base64 signature. While a rotated secret still signs there are two, separated by a space. |
+
+## Verifying signatures
+
+The signature is the HMAC-SHA256 of `<webhook-id>.<webhook-timestamp>.<raw body>`, keyed with your secret's bytes (the part after `whsec_`, base64-decoded), in base64. To check a request:
+
+1. Read the **raw** body, before any JSON parsing. Parsing and printing the JSON again changes the bytes and the signature fails.
+2. Refuse a `webhook-timestamp` more than 5 minutes from your clock, so an old request can't be played again.
+3. Work out the signature and compare it, in constant time, with each `v1,` entry of `webhook-signature`. Accept the request when any entry matches.
+4. Skip a `webhook-id` you already handled. A valid request can be sent again on purpose (retries, Resend, replay) or captured and played again inside the 5 minutes, so keep the ids you handled for at least as long as retries last (two days is plenty) and answer `2xx` to a repeat without acting on it.
+
+Any [Standard Webhooks library](https://github.com/standard-webhooks/standard-webhooks/tree/main/libraries) (JavaScript, Python, Go, Rust, Java, Ruby, PHP, C# and more) does all three; pass it your `whsec_` secret as it is. Or copy one of these:
+
+<Tabs items={['Node.js', 'Python', 'Go', 'Rust']}>
+<Tab value="Node.js">
 
 ```ts
-import { createHmac } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
-const body = JSON.stringify({
-  webhookEvent: 'jira:issue_updated',
-  issue: { key: 'WEB-42', fields: { labels: ['coderhelm'] } },
-});
-const signature = createHmac('sha256', process.env.JIRA_WEBHOOK_SECRET!).update(body).digest('hex');
-await fetch(`https://api.coderhelm.com/webhooks/jira/${process.env.JIRA_WEBHOOK_TOKEN}`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json', 'X-Hub-Signature': `sha256=${signature}` },
-  body, // send exactly the bytes you signed
-});
+const TOLERANCE_SECONDS = 5 * 60;
+
+/** `rawBody` is the request body exactly as it arrived (a Buffer). */
+export function verifyWebhook(
+  rawBody: Buffer,
+  headers: Record<string, string | undefined>,
+  secret: string,
+): boolean {
+  const id = headers['webhook-id'];
+  const timestamp = headers['webhook-timestamp'];
+  const signatures = headers['webhook-signature'];
+  if (!id || !timestamp || !signatures) return false;
+  const ts = Number(timestamp);
+  if (!Number.isInteger(ts) || Math.abs(Date.now() / 1000 - ts) > TOLERANCE_SECONDS) return false;
+  const key = Buffer.from(secret.replace(/^whsec_/, ''), 'base64');
+  const expected = Buffer.from(
+    createHmac('sha256', key).update(`${id}.${timestamp}.`).update(rawBody).digest('base64'),
+  );
+  return signatures.split(' ').some((entry) => {
+    const [version, signature] = entry.split(',');
+    if (version !== 'v1' || !signature) return false;
+    const got = Buffer.from(signature);
+    return got.length === expected.length && timingSafeEqual(got, expected);
+  });
+}
+
+// With Express, keep the raw body for this route:
+// app.post('/coderhelm', express.raw({ type: 'application/json' }), (req, res) => {
+//   if (!verifyWebhook(req.body, req.headers as Record<string, string>, process.env.CODERHELM_WEBHOOK_SECRET!)) {
+//     return res.sendStatus(401);
+//   }
+//   const event = JSON.parse(req.body.toString('utf8'));
+//   res.sendStatus(204); // answer first, then handle `event` from a queue
+// });
 ```
 
 </Tab>
 <Tab value="Python">
 
 ```python
-import hashlib, hmac, json, os
-import requests
+import base64, hashlib, hmac, time
 
-body = json.dumps({
-    "webhookEvent": "jira:issue_updated",
-    "issue": {"key": "WEB-42", "fields": {"labels": ["coderhelm"]}},
-}).encode()
-signature = hmac.new(os.environ["JIRA_WEBHOOK_SECRET"].encode(), body, hashlib.sha256).hexdigest()
-requests.post(
-    f"https://api.coderhelm.com/webhooks/jira/{os.environ['JIRA_WEBHOOK_TOKEN']}",
-    data=body,  # send exactly the bytes you signed
-    headers={"Content-Type": "application/json", "X-Hub-Signature": f"sha256={signature}"},
+TOLERANCE_SECONDS = 5 * 60
+
+def verify_webhook(raw_body: bytes, headers, secret: str) -> bool:
+    """raw_body is the request body exactly as it arrived."""
+    msg_id = headers.get("webhook-id")
+    timestamp = headers.get("webhook-timestamp")
+    signatures = headers.get("webhook-signature")
+    if not (msg_id and timestamp and signatures):
+        return False
+    try:
+        ts = int(timestamp)
+    except ValueError:
+        return False
+    if abs(time.time() - ts) > TOLERANCE_SECONDS:
+        return False
+    key = base64.b64decode(secret.removeprefix("whsec_"))
+    signed = f"{msg_id}.{timestamp}.".encode() + raw_body
+    expected = base64.b64encode(hmac.new(key, signed, hashlib.sha256).digest()).decode()
+    for entry in signatures.split():
+        version, _, signature = entry.partition(",")
+        if version == "v1" and hmac.compare_digest(signature, expected):
+            return True
+    return False
+
+# Flask: verify_webhook(request.get_data(), request.headers, os.environ["CODERHELM_WEBHOOK_SECRET"])
+```
+
+</Tab>
+<Tab value="Go">
+
+```go
+package webhooks
+
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
 )
+
+const tolerance = 5 * time.Minute
+
+// Verify checks a request. rawBody is the body exactly as it arrived.
+func Verify(rawBody []byte, h http.Header, secret string) bool {
+	id, ts, sigs := h.Get("webhook-id"), h.Get("webhook-timestamp"), h.Get("webhook-signature")
+	if id == "" || ts == "" || sigs == "" {
+		return false
+	}
+	sec, err := strconv.ParseInt(ts, 10, 64)
+	if err != nil {
+		return false
+	}
+	if d := time.Since(time.Unix(sec, 0)); d > tolerance || d < -tolerance {
+		return false
+	}
+	key, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(secret, "whsec_"))
+	if err != nil {
+		return false
+	}
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(id + "." + ts + "."))
+	mac.Write(rawBody)
+	expected := []byte(base64.StdEncoding.EncodeToString(mac.Sum(nil)))
+	for _, entry := range strings.Fields(sigs) {
+		version, sig, ok := strings.Cut(entry, ",")
+		if ok && version == "v1" && hmac.Equal([]byte(sig), expected) {
+			return true
+		}
+	}
+	return false
+}
+```
+
+</Tab>
+<Tab value="Rust">
+
+```rust
+// Cargo.toml: base64 = "0.22", hmac = "0.12", sha2 = "0.10"
+use base64::{engine::general_purpose::STANDARD, Engine};
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
+
+const TOLERANCE_SECS: i64 = 5 * 60;
+
+/// `raw_body` is the body exactly as it arrived; `now` is Unix seconds.
+pub fn verify_webhook(
+    raw_body: &[u8],
+    id: &str,
+    timestamp: &str,
+    signatures: &str,
+    secret: &str,
+    now: i64,
+) -> bool {
+    let Ok(ts) = timestamp.parse::<i64>() else { return false };
+    if (now - ts).abs() > TOLERANCE_SECS {
+        return false;
+    }
+    let Ok(key) = STANDARD.decode(secret.strip_prefix("whsec_").unwrap_or(secret)) else {
+        return false;
+    };
+    signatures.split_whitespace().any(|entry| {
+        let Some(sig) = entry.strip_prefix("v1,") else { return false };
+        let Ok(sig) = STANDARD.decode(sig) else { return false };
+        let mut mac = Hmac::<Sha256>::new_from_slice(&key).expect("HMAC takes any key length");
+        mac.update(format!("{id}.{timestamp}.").as_bytes());
+        mac.update(raw_body);
+        mac.verify_slice(&sig).is_ok() // compares in constant time
+    })
+}
 ```
 
 </Tab>
 </Tabs>
 
-Sign the exact bytes you send: re-serializing the JSON after signing changes them and the signature fails.
+To check your code, use the spec's test values: the secret `whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw`, id `msg_p5jXN8AQM9LWM0D4loKWxJek`, timestamp `1614265330` and body `{"test": 2432232314}` sign to `v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=` (pass a clock near that timestamp).
 
-What happens with each event:
+## Event types
 
-- An event whose name contains `comment` retries a failed run, or sends feedback to a run that already opened a pull request.
-- Any other issue event starts a run when the ticket has the label `coderhelm` (or one starting `coderhelm:`), or is assigned to a user whose name contains "CoderHelm", in a project you switched on.
+These are all the events CoderHelm sends. The list is made from the same catalog the platform sends from, and each type is also in the [OpenAPI document](/openapi.json) under `webhooks`, with its schema. An endpoint gets the types it subscribes to; one subscribed to all events (`["*"]`) also gets types added later. Use [`GET /api/webhooks/event-types`](/api/reference/webhook-endpoints/list-webhook-event-types) to read the list from the API.
 
-To pin a ticket to a repository from an automation, add `repo_owner` and `repo_name` to the payload, at the top level or under `coderhelm`:
+<include>../../../.generated/webhook-events.md</include>
 
-```json
-{
-  "webhookEvent": "jira:issue_updated",
-  "issue": { "key": "WEB-42", "fields": { "labels": ["coderhelm"] } },
-  "coderhelm": { "repo_owner": "your-org", "repo_name": "web" }
-}
+## Retries
+
+An attempt counts as delivered when your endpoint answers any `2xx` within **10 seconds**. Redirects are not followed.
+
+| Your endpoint's answer | What CoderHelm does |
+| --- | --- |
+| `2xx` | Delivered. |
+| No answer in 10 seconds, a failed connection, `408`, `429` or any `5xx` | Tries again later. |
+| Any other `4xx`, or a `3xx` | Stops: the answer won't change by itself. Fix it and press **Resend**. |
+
+Retries wait 5 seconds, 1 minute, 5 minutes, 30 minutes, 1 hour, 3 hours, 6 hours, 6 hours and 8 hours: ten attempts in all, over about 24 and a half hours. Every attempt carries the same `webhook-id` and body, with a new timestamp and signature. Events can arrive out of order, so use `created_at` (and the fields in `data`) rather than arrival order.
+
+### Endpoints that keep failing
+
+When every delivery to an endpoint has failed for **5 days**, with no success in between, CoderHelm turns the endpoint off and emails your team's admins. Nothing is sent to it until an admin turns it back on in **Settings**, then **Webhooks** (or with `PUT /api/webhooks/endpoints/{endpoint_id}` and `"enabled": true`). Turning it back on starts the count again. Events from while it was off are not sent by themselves: replay them.
+
+### Resend and replay
+
+CoderHelm keeps each event for **14 days**, as long as its Deliveries record.
+
+- **Resend** sends one delivery's event again, now, whether it was delivered or not: from the endpoint's page, the **Deliveries** page, or `POST /api/webhooks/endpoints/{endpoint_id}/deliveries/{delivery_id}/resend`.
+- **Replay** sends every kept event of a time range again to one endpoint, oldest first, each as a new delivery with retries: `POST /api/webhooks/endpoints/{endpoint_id}/replay` with `since`, `until` and, to send only events that endpoint never got, `"only_failed": true`. At most 500 events per call.
+
+Both send the event with its original `id`, so a receiver that skips ids it has seen handles each event once.
+
+## Testing
+
+- **Send test event** on the endpoint's page (or `POST /api/webhooks/endpoints/{endpoint_id}/test`) sends a `webhook.test` event at once and shows your endpoint's answer. Tests go to that endpoint only, even when it is off or doesn't subscribe to them, and are never retried.
+- Every attempt is on the endpoint's page and on **Deliveries** (source `webhook`), with the request's headers (the signature removed), the body, your endpoint's status code and its answer.
+- **On your own computer:** CoderHelm only sends to public `https://` addresses, so `localhost` can't receive events. Run a tunnel such as `cloudflared tunnel --url http://localhost:3000` or `ngrok http 3000`, add the `https://` address it prints as an endpoint, and send a test event. Delete the endpoint when you're done.
+
+## Security
+
+- **HTTPS only.** Endpoint addresses must start with `https://` and can't hold a username or password.
+- **Public addresses only.** An address that points inside a private network, at the machine itself, at a link-local or carrier-grade NAT range, or at a cloud metadata service (such as `169.254.169.254`) is refused when you save it. The name is resolved and checked again before **every** attempt, and the connection goes to the address that was checked, so a name that later changes its answer can't reach a private network.
+- **Verify every request,** signature and timestamp, and refuse anything that doesn't verify with `401`. Never trust a request because of its source address: CoderHelm's addresses change.
+- **Skip repeats** by `webhook-id`. Retries, Resend and replay send an event again on purpose.
+- **Keep the secret secret.** It is stored encrypted, shown in full only when created, revealed or rotated, and every reveal and rotation is in the team's audit log.
+- **Rotate without a gap.** **Rotate secret** (or `POST /api/webhooks/endpoints/{endpoint_id}/secret/rotate`) makes a new secret. For the next 24 hours (choose 0 to 168 with `overlap_hours`), each request carries two signatures, one per secret, so your endpoint keeps verifying with the old one until you switch it to the new one.
+- **The data is about your team's work.** Events carry titles, repository names, pull request links and short error texts, never code, log lines or credentials. Before an event is sent, anything that looks like a credential (tokens, keys, passwords in addresses, `key=value` pairs that name a secret, private key blocks) is replaced with `[redacted]`, and long text is cut.
+- **Your answer is only read, never acted on.** CoderHelm keeps the status code and at most the first 4 KB of the body, to show on the delivery. Redirects are not followed.
+
+## Threat model
+
+What the design defends against, and what it asks of you.
+
+| Threat | How it's handled |
+|---|---|
+| Someone sends your endpoint a fake event pretending to be CoderHelm | Each endpoint has its own secret: 32 random bytes from a cryptographic generator, stored sealed with AWS KMS and bound to your team and that endpoint. Without it no one can make a valid `webhook-signature`. You must verify every request and compare in constant time. |
+| A real request is captured and sent again later | The signature covers the timestamp, so a changed timestamp fails. Refuse timestamps more than 5 minutes off, and skip `webhook-id`s you already handled. |
+| Your endpoint, or whoever controls it, tries to send events into CoderHelm | Webhooks only go out. There is no inbound route on this path; the endpoint's answer is kept only as a short note on the delivery and is never parsed or acted on. Managing endpoints needs a signed-in admin or an API key with the `webhooks` scope. |
+| An endpoint address is used to reach CoderHelm's own network (SSRF) | `https://` only; private, loopback, link-local, carrier-grade NAT and metadata addresses (and their IPv6 forms, including IPv4-mapped ones) are refused at save and again, after a fresh DNS lookup, before every attempt. The connection is pinned to the checked address, redirects aren't followed, each attempt stops after 10 seconds, and at most 4 KB of the answer is read. |
+| Another team sees or changes your endpoints, deliveries or secrets | Every endpoint, event and delivery is stored under your team and every route reads only the caller's team. Only admins (and API keys with the `webhooks` scope, never more than the admin who made them) can manage endpoints, and every secret reveal and rotation is in the team's audit log. |
+| A secret leaks | Rotate it: the new one signs at once, and the old one keeps signing only for the overlap you choose (0 to 168 hours). Secrets are never written to logs, and a delivery's stored headers have the signature removed. |
+| Sensitive text ends up in an event | Events carry no code, log lines or credentials, and anything shaped like a credential is replaced with `[redacted]` before sending. |
+
+## Versioning
+
+Each event says which shape it has in `api_version`, `2026-10-26` today. Within a version, CoderHelm only adds: new event types, and new fields in `data`. Ignore fields and types you don't know, and don't depend on the order of fields. Renaming or removing a field, or changing what one means, makes a new version, announced in the [changelog](/changelog) beforehand.
+
+## Managing endpoints with the API
+
+The endpoint routes are under [Reference](/api/reference/webhook-endpoints/list-webhook-endpoints), in **Webhook endpoints**, and need a key with the `webhooks` scope (an admin's key). A team has at most 20 endpoints.
+
+| Route | What it does |
+| --- | --- |
+| `GET /api/webhooks/event-types` | The event types, each with an example. |
+| `GET`, `POST /api/webhooks/endpoints` | List the endpoints, add one (the answer has its secret). |
+| `GET`, `PUT`, `DELETE /api/webhooks/endpoints/{endpoint_id}` | Read, change (address, description, events, on or off) or delete one. |
+| `GET /api/webhooks/endpoints/{endpoint_id}/secret` | Reveal the signing secret. |
+| `POST /api/webhooks/endpoints/{endpoint_id}/secret/rotate` | Make a new secret, with an overlap. |
+| `POST /api/webhooks/endpoints/{endpoint_id}/test` | Send a `webhook.test` event now. |
+| `GET /api/webhooks/endpoints/{endpoint_id}/deliveries` | The endpoint's deliveries and their attempts. |
+| `POST /api/webhooks/endpoints/{endpoint_id}/deliveries/{delivery_id}/resend` | Send one delivery's event again. |
+| `POST /api/webhooks/endpoints/{endpoint_id}/replay` | Send a time range's events again. |
+
+## Webhooks CoderHelm receives
+
+CoderHelm listens on these addresses on `https://api.coderhelm.com` (your own domain when self-hosted). It verifies every request before anything happens; one that doesn't verify is refused and changes nothing. Each also has a page under **Reference**, in **Webhooks**, with its headers and the fields CoderHelm reads.
+
+### GitHub
+
+`POST /webhooks/github`, from the CoderHelm GitHub App (installing the app sets it up). **Verified by** `X-Hub-Signature-256: sha256=<hex>`, an HMAC-SHA256 of the raw body with the app's webhook secret, compared in constant time; otherwise `401`. **Triggers:**
+
+- `issues` assigned to the bot or labelled `coderhelm`: a run.
+- `issue_comment`, `pull_request_review_comment` with `/coderhelm` or `@coderhelm`: a run, feedback, a re-review or an answer.
+- `pull_request`, `pull_request_review`: reviews, feedback on CoderHelm's pull requests, merge tracking.
+- `push`: a tag writes release notes; the default branch syncs skills, team tools and the code graph.
+- `check_run`, `check_suite`, `workflow_run`: CI results and CI fixes.
+- `installation`, `installation_repositories`, `repository`: links, renames, archives.
+
+Other events, and events from an installation not linked to a team, are accepted and ignored.
+
+### Jira app
+
+`POST /webhooks/jira`, from the CoderHelm Jira app. **Verified by** the team id and app secret in the body (`coderhelm.team_id`, `coderhelm.forge_secret`); a wrong secret gets `403`. **Triggers** the same work as a Jira webhook, below.
+
+### Jira webhook
+
+`POST /webhooks/jira/<token>`, from a plain Jira webhook you create when you can't install the app ([Connect Jira](/getting-started/jira)). **Verified by** the team's token in the address (unknown: `401`) and, if you generated a secret, `X-Hub-Signature: sha256=<hex>`, an HMAC-SHA256 of the raw body. **Triggers:** an issue labelled `coderhelm` (or `coderhelm:…`), or assigned to a CoderHelm user, in a project you switched on, starts a run; a comment retries a failed run or sends feedback to one with a pull request. Add `repo_owner` and `repo_name` (top level or under `coderhelm`) to pin the repository.
+
+Sending from your own automation? Sign the exact bytes you send:
+
+```bash
+BODY='{"webhookEvent":"jira:issue_updated","issue":{"key":"WEB-42","fields":{"labels":["coderhelm"]}}}'
+SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$JIRA_WEBHOOK_SECRET" -hex | sed 's/^.* //')
+curl -X POST "https://api.coderhelm.com/webhooks/jira/$JIRA_WEBHOOK_TOKEN" \
+  -H 'Content-Type: application/json' -H "X-Hub-Signature: sha256=$SIG" -d "$BODY"
 ```
 
-## Alerts from AWS
+### Alerts from AWS
 
-CoderHelm can turn an alarm into a fix. Subscribe CoderHelm to an SNS topic with an HTTPS subscription to `https://api.coderhelm.com/webhooks/alerts/sns`, and add the topic under **Alert routes** in the dashboard.
+`POST /webhooks/alerts/sns`, from an SNS topic subscribed over HTTPS and added under **Alert routes**. **Verified by** the SNS message signature (versions 1 and 2) with a certificate from SNS; otherwise `403`. The subscription is confirmed once the topic has an enabled route. **Triggers:** a message that matches a route's rule starts a run that opens a pull request; others are posted to your Slack or Teams channel. Every alert is on the **Alerts** page.
 
-- Every message's SNS signature is checked (signature versions 1 and 2), and the signing certificate must come from SNS. Anything else gets `403`.
-- The subscription is confirmed automatically once the topic has an enabled route. Messages from topics without a route are accepted and ignored.
-- Accepted messages: CloudWatch alarm notifications, AWS Chatbot custom notifications, EventBridge events and plain text.
+### CI test results
 
-A message that matches one of the route's rules becomes a run that opens a pull request. Other messages are posted to your team's Slack or Teams channel. Every alert is listed on the **Alerts** page with what CoderHelm did with it.
+`POST /webhooks/ci/tests/results`, from a GitHub Actions job. **Verified by** a GitHub OIDC token for a connected repository ([Authentication](/api/authentication#ci-jobs)); no CoderHelm secret lives in CI. **Triggers:** the test reports are read into the **Tests** page.
 
-## Verifying GitHub's signature
+### Verifying GitHub's signature
 
-If you self-host CoderHelm, or proxy GitHub's events through your own service first, check the signature the same way CoderHelm does: an HMAC-SHA256 of the raw body keyed with the app's webhook secret, compared in constant time.
+Proxying GitHub's events through your own service first, or self-hosting? Check them the way CoderHelm does:
 
 <Tabs items={['TypeScript', 'Python']}>
 <Tab value="TypeScript">
@@ -160,9 +417,3 @@ def verify_github(raw_body: bytes, header: str | None, secret: str) -> bool:
 
 </Tab>
 </Tabs>
-
-## What CoderHelm sends
-
-CoderHelm doesn't send webhooks of its own yet. It posts messages to the Slack and Teams incoming webhooks you set up (alerts, findings, release notes), in the formats those services define, and there are no inbound webhooks for Slack or Teams. To react to CoderHelm's work from your own systems today, poll [`GET /api/runs`](/api/pagination) or a single run.
-
-Each webhook above also has a page under **Reference**, with its headers and the payload fields CoderHelm reads.

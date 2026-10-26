@@ -22,6 +22,18 @@
     "/api/reference/runs/list-runs/",
     "/api/reference/runs/retry-run/",
     "/api/reference/usage/get-usage/",
+    "/api/reference/webhook-endpoints/create-webhook-endpoint/",
+    "/api/reference/webhook-endpoints/delete-webhook-endpoint/",
+    "/api/reference/webhook-endpoints/get-webhook-endpoint/",
+    "/api/reference/webhook-endpoints/get-webhook-secret/",
+    "/api/reference/webhook-endpoints/list-webhook-deliveries/",
+    "/api/reference/webhook-endpoints/list-webhook-endpoints/",
+    "/api/reference/webhook-endpoints/list-webhook-event-types/",
+    "/api/reference/webhook-endpoints/replay-webhook-events/",
+    "/api/reference/webhook-endpoints/resend-webhook-delivery/",
+    "/api/reference/webhook-endpoints/rotate-webhook-secret/",
+    "/api/reference/webhook-endpoints/send-webhook-test/",
+    "/api/reference/webhook-endpoints/update-webhook-endpoint/",
     "/api/reference/webhooks/receive-github-event/",
     "/api/reference/webhooks/receive-jira-webhook/",
     "/api/reference/webhooks/receive-knowledge-webhook/",
@@ -89,6 +101,7 @@
     "/self-host/setup-checks/",
     "/self-host/sign-in/",
     "/self-host/troubleshooting/",
+    "/self-host/updates-security/",
     "/self-host/updates/"
   ]
 }

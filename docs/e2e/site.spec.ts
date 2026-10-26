@@ -165,7 +165,7 @@ test('the API section lists the guides, then every endpoint grouped by resource'
   for (const name of ['Authentication', 'Errors', 'Pagination', 'Rate limits', 'Versioning and idempotency', 'Webhooks']) {
     await expect(nav.getByRole('link', { name, exact: true }).first()).toBeAttached();
   }
-  for (const group of ['Runs', 'Plans', 'Reviews', 'Usage', 'CI']) {
+  for (const group of ['Runs', 'Plans', 'Reviews', 'Usage', 'CI', 'Webhook endpoints', 'Webhooks']) {
     await expect(nav.getByText(group, { exact: true }).first()).toBeAttached();
   }
   // The old dump of every gateway route is gone, internal routes with it.
@@ -268,3 +268,43 @@ for (const scheme of ['dark', 'light'] as const) {
     });
   });
 }
+
+// ── Webhooks ─────────────────────────────────────────────────────────
+
+test('the webhooks page is about the events CoderHelm sends, with every event and signature code', async ({ page }) => {
+  await page.goto('/api/webhooks/');
+  await expect(page.getByRole('heading', { level: 1, name: 'Webhooks' })).toBeVisible();
+  for (const h of ['Quick start', 'Verifying signatures', 'Event types', 'Retries', 'Testing', 'Security', 'Versioning']) {
+    await expect(page.getByRole('heading', { level: 2, name: h })).toBeVisible();
+  }
+  // The catalog comes from the OpenAPI document: one section and one example per event.
+  for (const type of ['run.created', 'run.completed', 'run.failed', 'run.needs_input', 'pull_request.opened', 'review.completed', 'webhook.test']) {
+    await expect(page.locator('h4').filter({ has: page.getByText(type, { exact: true }) })).toHaveCount(1);
+  }
+  await expect(page.getByText('"type": "review.completed"').first()).toBeAttached();
+  for (const tab of ['Node.js', 'Python', 'Go', 'Rust']) {
+    await page.getByRole('tab', { name: tab, exact: true }).first().click();
+    await expect(page.getByRole('tabpanel').filter({ hasText: 'whsec_' }).first()).toBeVisible();
+  }
+  // The threat model and the receiver's replay checks are on the page.
+  await expect(page.getByRole('heading', { name: 'Threat model' })).toBeVisible();
+  for (const text of ['Webhooks only go out', 'Skip a `webhook-id` you already handled'.replace(/`/g, ''), 'at most 4 KB of the answer is read']) {
+    await expect(page.getByText(text, { exact: false }).first()).toBeVisible();
+  }
+  await shot(page, 'webhooks-desktop');
+});
+
+test('the webhooks CoderHelm receives are on the same page, at their old anchors', async ({ page }) => {
+  await page.goto('/api/webhooks/');
+  await expect(page.getByRole('heading', { level: 2, name: 'Webhooks CoderHelm receives' })).toBeVisible();
+  // The anchors the page had before outbound webhooks still land on their sections.
+  for (const id of ['github', 'jira-app', 'jira-webhook', 'alerts-from-aws', 'verifying-githubs-signature', 'what-coderhelm-sends']) {
+    await expect(page.locator(`[id="${id}"]`)).toHaveCount(1);
+  }
+  await expect(page.locator('#ci-test-results')).toHaveCount(1);
+  // One webhooks page: no separate page for received webhooks.
+  expect((await page.request.get('/api/incoming-webhooks/')).status()).toBe(404);
+  // The received webhooks' reference pages stay where they were; the endpoint routes have their own group.
+  expect((await page.request.get('/api/reference/webhooks/receive-github-event/')).status()).toBe(200);
+  expect((await page.request.get('/api/reference/webhook-endpoints/create-webhook-endpoint/')).status()).toBe(200);
+});
