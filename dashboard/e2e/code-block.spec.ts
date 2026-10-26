@@ -169,6 +169,8 @@ test("code block: a plan spec's fences get a language, a filename, prompts that 
   await mockApi(page);
   await page.goto("/plans/detail/?id=PLANA");
   await expect(page.getByTestId("spec")).toBeVisible();
+  // The design and requirements are folded under "Technical plan".
+  await page.getByText("Technical plan").click();
 
   // ```ts title="web/src/lib/classes.ts" {2}
   const ts = page.getByRole("region", { name: "web/src/lib/classes.ts" });
@@ -202,6 +204,7 @@ test("code block: on a phone a long line scrolls inside the block, not the page"
   await mockApi(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/plans/detail/?id=PLANA");
+  await page.getByText("Technical plan").click();
   const ts = page.getByRole("region", { name: "web/src/lib/classes.ts" });
   await expect(ts).toBeVisible();
   await expect(ts.locator("code")).toContainText(LONG_LINE);

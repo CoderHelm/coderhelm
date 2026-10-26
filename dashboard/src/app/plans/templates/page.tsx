@@ -8,7 +8,7 @@ import { api, type Template } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { TrashIcon } from "@/components/icons";
-import { focusRing, linkButton } from "@/components/ui";
+import { buttonClass, focusRing, linkButton } from "@/components/ui";
 import {
   Chip,
   List,
@@ -55,7 +55,14 @@ function TemplatesPage() {
   const shown = kept.filter((t) => templateMatches(t, q));
   const clear = () => setParams({ q: "" });
 
-  const handleUseTemplate = async (templateId: string) => {
+  const handleUseTemplate = async (t: Template) => {
+    const templateId = t.template_id;
+    const ok = await confirm({
+      title: `Start a plan from “${t.title}”?`,
+      message: `This makes a new draft plan with ${t.task_count} step${t.task_count === 1 ? "" : "s"}. You can edit it before anything runs.`,
+      confirmLabel: "Make the draft",
+    });
+    if (ok !== "primary") return;
     setUsingTemplate(templateId);
     try {
       const { plan_id } = await api.useTemplate(templateId, {});
@@ -81,7 +88,7 @@ function TemplatesPage() {
     <Page>
       <PageHeader
         title="Plan templates"
-        lead="Saved plans you can start again with one click."
+        lead="Saved plans you can reuse as a starting point. To make one, open a plan and choose Save as template."
       />
 
       {!loading && !error && kept.length > 0 && (
@@ -126,7 +133,7 @@ function TemplatesPage() {
                 meta={[
                   `${t.task_count} task${t.task_count === 1 ? "" : "s"}`,
                   `Used ${t.usage_count} time${t.usage_count === 1 ? "" : "s"}`,
-                  t.created_by ? `by ${t.created_by}` : null,
+                  t.created_by ? <span key="by" title={t.created_by}>by {t.created_by.split("@")[0]}</span> : null,
                 ]}
                 summary={t.description || undefined}
                 chips={
@@ -145,10 +152,10 @@ function TemplatesPage() {
                   <span className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => handleUseTemplate(t.template_id)}
+                      onClick={() => void handleUseTemplate(t)}
                       disabled={usingTemplate === t.template_id}
                       aria-label={`Use template ${t.title}`}
-                      className={`min-h-7 rounded-md bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-900 transition-colors hover:bg-white disabled:opacity-50 ${focusRing}`}
+                      className={buttonClass("primary", "sm")}
                     >
                       {usingTemplate === t.template_id ? "Creating…" : "Use template"}
                     </button>
@@ -157,7 +164,7 @@ function TemplatesPage() {
                       onClick={() => handleDelete(t)}
                       aria-label={`Delete template ${t.title}`}
                       title="Delete template"
-                      className={`inline-flex min-h-7 items-center rounded-md px-1.5 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-red-400 ${focusRing}`}
+                      className={`${buttonClass("ghost", "sm")} hover:text-red-300`}
                     >
                       <TrashIcon />
                     </button>

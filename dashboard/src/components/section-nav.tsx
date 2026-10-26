@@ -43,7 +43,7 @@ export function SectionNav({ sections, label = "On this page" }: { sections: Nav
   return (
     <nav aria-label={label} className="hidden lg:block">
       <div className="sticky top-8">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">{label}</p>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">{label}</p>
         <ul className="space-y-0.5 border-l border-zinc-800">
           {sections.map((s) => {
             const on = s.id === active;
@@ -58,7 +58,7 @@ export function SectionNav({ sections, label = "On this page" }: { sections: Nav
                   }`}
                 >
                   <span className="truncate">{s.label}</span>
-                  {s.count !== undefined && <span className="text-xs tabular-nums text-zinc-600">{s.count}</span>}
+                  {s.count !== undefined && <span className="text-xs tabular-nums text-zinc-400">{s.count}</span>}
                 </a>
               </li>
             );

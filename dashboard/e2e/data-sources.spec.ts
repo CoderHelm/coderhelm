@@ -1174,7 +1174,7 @@ test("monitoring, docs and MCP connections live on Integrations, not here", asyn
   await expect(page.getByTestId("connection-newrelic")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Monitoring, docs and pipelines" })).toHaveCount(0);
   const pointer = page.getByTestId("integrations-pointer");
-  await expect(pointer.getByRole("link", { name: "Settings → Integrations" })).toHaveAttribute("href", /^\/settings\/integrations\/?$/);
+  await expect(pointer.getByRole("link", { name: "Settings, then Integrations" })).toHaveAttribute("href", /^\/settings\/integrations\/?$/);
 });
 
 test("hub: a database's suggested hidden columns can be hidden or dismissed, never hidden by themselves", async ({ page }) => {
@@ -1383,4 +1383,26 @@ test("hub: a link with ?source= opens that source's row", async ({ page }) => {
   await expect(row.locator("button[aria-controls$='-details']")).toHaveAttribute("aria-expanded", "true");
   await expect(row.getByText("42 tables")).toBeVisible();
   await expect(page.getByRole("article", { name: "App database production" }).getByText("42 tables")).toHaveCount(0);
+});
+
+test("connect with no kind chosen asks what to connect first", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/data-sources/connect");
+  await expect(page.getByRole("heading", { level: 1, name: "What do you want to connect?" })).toBeVisible();
+  const picker = page.getByTestId("connect-kind-picker");
+  await expect(picker.getByRole("link", { name: /A GraphQL API/ })).toHaveAttribute("href", /step=address/);
+  await expect(picker.getByRole("link", { name: /A database in your AWS account/ })).toBeVisible();
+  await expect(page.getByText("Where is your API?")).toHaveCount(0);
+});
+
+test("a broken source offers Test again right on its closed row", async ({ page }) => {
+  await mockApi(page, {
+    sources: [makeSource({ enabled: true, setup_complete: true, status: "error", status_message: "Your API stopped accepting the key.", key_hint: "" })],
+  });
+  await page.goto("/data-sources");
+  const card = page.getByRole("article", { name: "api.yourcompany.com" });
+  await expect(card.getByText("Your API stopped accepting the key.")).toBeVisible();
+  await card.getByRole("button", { name: "Test api.yourcompany.com again" }).click();
+  await expect(card.getByText("Ready", { exact: true })).toBeVisible();
+  await expect(card.getByText("Coderhelm is not using this source until the problem is fixed.")).toHaveCount(0);
 });

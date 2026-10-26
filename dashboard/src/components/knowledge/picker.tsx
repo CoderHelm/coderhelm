@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { inputClass, focusRing, smallSecondaryButton } from "@/components/ui";
 import { errorMessage } from "@/lib/data-sources";
-import { KIND_LABEL, knowledge, type PickerNode, type Selected, type SourceKind } from "@/lib/knowledge";
+import { KIND_LABEL, knowledge, type PickerNode, type Selected, type SourceKind, type Via } from "@/lib/knowledge";
 
 // Picking what to bring in from an app: a tree that opens one level at a
 // time, with a search box. Ticking something takes everything inside it,
@@ -23,6 +23,7 @@ const KIND_ICON: Record<string, string> = {
   database: "M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zm0 0v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
   folder: "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z",
   space: "M4 5h16v14H4z M4 9h16",
+  project: "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M8 13h8",
   repo: "M6 3h11a1 1 0 0 1 1 1v16H7a2 2 0 0 1 0-4h11 M9 7h5",
   dataset: "M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zm0 0v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6",
   type: "M5 5h14v4H5z M5 13h9 M5 17h6",
@@ -51,16 +52,19 @@ export function Picker({
   kind,
   value,
   onChange,
+  via = "team",
 }: {
   kind: SourceKind;
   value: Selected[];
   onChange: (v: Selected[]) => void;
+  /** Browse with your own sign-in (Sanity) instead of the team's connection. */
+  via?: Via;
 }) {
   if (kind === "web") return <AddressPicker value={value} onChange={onChange} />;
-  return <TreePicker kind={kind} value={value} onChange={onChange} />;
+  return <TreePicker kind={kind} value={value} onChange={onChange} via={via} />;
 }
 
-function TreePicker({ kind, value, onChange }: { kind: SourceKind; value: Selected[]; onChange: (v: Selected[]) => void }) {
+function TreePicker({ kind, value, onChange, via }: { kind: SourceKind; value: Selected[]; onChange: (v: Selected[]) => void; via: Via }) {
   const [roots, setRoots] = useState<PickerNode[] | null>(null);
   const [children, setChildren] = useState<Record<string, PickerNode[] | "loading" | { error: string }>>({});
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -72,10 +76,10 @@ function TreePicker({ kind, value, onChange }: { kind: SourceKind; value: Select
   const loadRoots = useCallback(() => {
     setError(null);
     knowledge
-      .browse(kind, null, "")
+      .browse(kind, null, "", via)
       .then((r) => setRoots(r.nodes))
       .catch((e) => setError(errorMessage(e, `Couldn't open ${label}.`)));
-  }, [kind, label]);
+  }, [kind, label, via]);
   useEffect(loadRoots, [loadRoots]);
 
   // Search as you type, a moment after the last key.
@@ -89,12 +93,12 @@ function TreePicker({ kind, value, onChange }: { kind: SourceKind; value: Select
     const mine = ++seq.current;
     const t = setTimeout(() => {
       knowledge
-        .browse(kind, null, term)
+        .browse(kind, null, term, via)
         .then((r) => mine === seq.current && setFound(r.nodes))
         .catch((e) => mine === seq.current && setError(errorMessage(e, "The search didn't work. Try again.")));
     }, 300);
     return () => clearTimeout(t);
-  }, [q, kind]);
+  }, [q, kind, via]);
 
   const toggleOpen = (n: PickerNode) => {
     const next = !open[n.id];
@@ -102,7 +106,7 @@ function TreePicker({ kind, value, onChange }: { kind: SourceKind; value: Select
     if (next && !children[n.id]) {
       setChildren((c) => ({ ...c, [n.id]: "loading" }));
       knowledge
-        .browse(kind, n.id, "")
+        .browse(kind, n.id, "", via)
         .then((r) => setChildren((c) => ({ ...c, [n.id]: r.nodes })))
         .catch((e) => setChildren((c) => ({ ...c, [n.id]: { error: errorMessage(e, "Couldn't open this.") } })));
     }
@@ -207,29 +211,34 @@ function TreePicker({ kind, value, onChange }: { kind: SourceKind; value: Select
                       <span className="w-7 shrink-0" />
                     )}
                     <label className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-md px-1.5 py-1.5 hover:bg-zinc-800/50 ${covered ? "cursor-default" : ""}`}>
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 shrink-0 accent-emerald-500"
-                        checked={checked}
-                        disabled={covered || !node.selectable}
-                        onChange={() => toggle(row)}
-                        data-testid="picker-check"
-                      />
+                      {node.selectable || covered ? (
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 shrink-0 accent-emerald-500"
+                          checked={checked}
+                          disabled={covered || !node.selectable}
+                          onChange={() => toggle(row)}
+                          data-testid="picker-check"
+                        />
+                      ) : (
+                        // A heading (a Sanity project) opens; what is inside it is picked.
+                        <span aria-hidden="true" className="h-4 w-4 shrink-0" />
+                      )}
                       <NodeIcon kind={node.kind} />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm text-zinc-100">{node.title}</span>
                         {(node.detail || covered) && (
-                          <span className="block truncate text-xs text-zinc-500">{covered ? "Included with the page above" : node.detail}</span>
+                          <span className="block truncate text-xs text-zinc-400">{covered ? "Included with the page above" : node.detail}</span>
                         )}
                       </span>
                     </label>
                   </div>
-                  {open[node.id] && kids === "loading" && <p className="py-1.5 text-xs text-zinc-500" style={{ paddingLeft: `${3.5 + row.depth * 1.25}rem` }}>Opening…</p>}
+                  {open[node.id] && kids === "loading" && <p className="py-1.5 text-xs text-zinc-400" style={{ paddingLeft: `${3.5 + row.depth * 1.25}rem` }}>Opening…</p>}
                   {open[node.id] && kids && typeof kids === "object" && !Array.isArray(kids) && (
                     <p className="py-1.5 text-xs text-amber-300" style={{ paddingLeft: `${3.5 + row.depth * 1.25}rem` }}>{kids.error}</p>
                   )}
                   {open[node.id] && Array.isArray(kids) && kids.length === 0 && (
-                    <p className="py-1.5 text-xs text-zinc-500" style={{ paddingLeft: `${3.5 + row.depth * 1.25}rem` }}>Nothing inside</p>
+                    <p className="py-1.5 text-xs text-zinc-400" style={{ paddingLeft: `${3.5 + row.depth * 1.25}rem` }}>Nothing inside</p>
                   )}
                 </li>
               );
@@ -311,7 +320,7 @@ function AddressPicker({ value, onChange }: { value: Selected[]; onChange: (v: S
               <NodeIcon kind={v.kind} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm text-zinc-100">{v.title}</span>
-                <span className="block text-xs text-zinc-500">{v.kind === "sitemap" ? "Every page in this sitemap" : "This page"}</span>
+                <span className="block text-xs text-zinc-400">{v.kind === "sitemap" ? "Every page in this sitemap" : "This page"}</span>
               </span>
               <button type="button" className={smallSecondaryButton} onClick={() => onChange(value.filter((x) => x.id !== v.id))} aria-label={`Remove ${v.title}`}>
                 Remove

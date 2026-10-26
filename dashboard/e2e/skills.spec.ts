@@ -293,7 +293,7 @@ test("no repository yet: the page says what Coderhelm reads and how to connect o
   await page.goto("/skills");
   await expect(page.getByRole("heading", { name: "Skills", exact: true })).toBeVisible();
   await expect(page.getByText("No repository connected.")).toBeVisible();
-  await expect(page.getByLabel("Connect a repository")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Connect repository" })).toBeVisible();
   await shot(page, "skills-empty");
 });
 
@@ -307,10 +307,11 @@ test("repositories in each state, items by kind, agents marked as askable, one o
   await expect(page.getByRole("heading", { name: /^Skills\s*3$/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: /^Agents\s*2$/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: /^Commands\s*2$/ })).toBeVisible();
-  await expect(page.getByText("Agent · can be asked")).toHaveCount(2);
+  // Rows read as names, not machine handles; the handle is the hover text.
+  await expect(page.locator('[data-handle="skill:debug"]').getByRole("link")).toHaveText("Debug");
   await expect(page.getByRole("switch", { name: "Let Coderhelm read copy-tone" })).toHaveAttribute("aria-checked", "false");
 
-  await expect(page.getByRole("link", { name: "skill:debug" })).toHaveAttribute("href", /\/skills\/item\/?\?repo=acme%2Fplaybook&path=skills%2Fdebug%2FSKILL\.md/);
+  await expect(page.getByRole("link", { name: "Debug", exact: true })).toHaveAttribute("href", /\/skills\/item\/?\?repo=acme%2Fplaybook&path=skills%2Fdebug%2FSKILL\.md/);
   await shot(page, "skills-list");
 
   await page.getByRole("switch", { name: "Let Coderhelm read copy-tone" }).click();
@@ -321,22 +322,23 @@ test("repositories in each state, items by kind, agents marked as askable, one o
 test("an item that asks for tools Coderhelm doesn't have says so, and which ones", async ({ page }) => {
   await mockApi(page);
   await page.goto("/skills");
-  const notes = page.getByRole("note");
-  await expect(notes).toHaveCount(2);
-  const command = page.getByRole("listitem").filter({ hasText: "command:release-notes" });
-  await expect(command.getByRole("note")).toContainText("Asks for tools Coderhelm doesn't have: Bash, mcp__tracker__list_issues.");
-  await expect(command.getByRole("note")).toContainText("Coderhelm will run it without those tools.");
-  const agent = page.getByRole("listitem").filter({ hasText: "agent:spec-checker" });
-  await expect(agent.getByRole("note")).toContainText("Lists tools it won't get: Read, Grep, Bash, WebFetch.");
-  await expect(agent.getByRole("note")).toContainText("Team agents answer without tools, so Coderhelm will run it without those tools.");
+  // One status chip per row; the tools are named in its hover text.
+  const chips = page.getByTestId("missing-tools");
+  await expect(chips).toHaveCount(2);
+  const command = page.locator('[data-handle="command:release-notes"]');
+  await expect(command.getByTestId("missing-tools")).toHaveText("Needs tools");
+  await expect(command.getByTestId("missing-tools")).toHaveAttribute("title", "Asks for tools Coderhelm doesn't have: Bash, mcp__tracker__list_issues. Coderhelm runs it without them.");
+  const agent = page.locator('[data-handle="agent:spec-checker"]');
+  await expect(agent.getByTestId("missing-tools")).toHaveAttribute("title", "Lists tools it won't get: Read, Grep, Bash, WebFetch. Coderhelm runs it without them.");
   // An item asking for nothing it lacks shows no warning.
-  await expect(page.getByRole("listitem").filter({ hasText: "skill:debug" }).getByRole("note")).toHaveCount(0);
+  await expect(page.locator('[data-handle="skill:debug"]').getByTestId("missing-tools")).toHaveCount(0);
   await shot(page, "skills-missing-tools");
 });
 
 test("page stats: reads and asks per day, who used them, most used, and what sits unused", async ({ page }) => {
   await mockApi(page);
-  await page.goto("/skills");
+  // Usage lives on the Activity tab; the library opens on the list itself.
+  await page.goto("/skills?tab=activity");
   const usage = page.getByRole("region", { name: "Use in the last 30 days" });
   await expect(usage).toBeVisible();
   await expect(usage.getByRole("paragraph").filter({ hasText: /^Reads$/ })).toBeVisible();
@@ -355,10 +357,10 @@ test("page stats: reads and asks per day, who used them, most used, and what sit
 
 test("page stats: nothing used yet says so, and a failed stats call leaves the page working", async ({ page }) => {
   const db = await mockApi(page, { stats: { ...STATS, reads: 0, asks: 0, answered: 0, no_answer: 0, top: [], days: STATS.days.map((d) => ({ ...d, reads: 0, asks: 0, answered: 0 })) } });
-  await page.goto("/skills");
+  await page.goto("/skills?tab=activity");
   await expect(page.getByText("Coderhelm hasn't read a skill or asked an agent yet.")).toBeVisible();
   db.stats = null;
-  await page.reload();
+  await page.goto("/skills");
   await expect(page.getByRole("heading", { name: /^Skills\s*3$/ })).toBeVisible();
   await expect(page.getByRole("region", { name: "Use in the last 30 days" })).toHaveCount(0);
 });
@@ -366,10 +368,14 @@ test("page stats: nothing used yet says so, and a failed stats call leaves the p
 test("connect a repository and sync another", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/skills");
-  await page.getByLabel("Connect a repository").fill("acme/handbook");
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(page.getByText("acme/handbook", { exact: true })).toBeVisible();
-  expect(db.calls.some((c) => c.method === "POST" && c.path === "/api/skills/repos" && c.body?.repo === "acme/handbook")).toBe(true);
+  // A picker of the team's repositories, in a dialog, instead of a free-text box.
+  await page.getByRole("button", { name: "Connect repository" }).click();
+  const dialog = page.getByTestId("connect-skills-repo");
+  await dialog.getByTestId("repo-picker").click();
+  await page.getByTestId("combo-popover").getByRole("option", { name: /web/ }).first().click();
+  await dialog.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(page.getByTestId("skills-repo").filter({ hasText: "acme/web" })).toBeVisible();
+  expect(db.calls.some((c) => c.method === "POST" && c.path === "/api/skills/repos" && c.body?.repo === "acme/web")).toBe(true);
   await page.getByRole("button", { name: "Sync now" }).first().click();
   await expect.poll(() => db.calls.some((c) => c.path === "/api/skills/repos/acme/playbook/sync")).toBe(true);
 });
@@ -380,7 +386,7 @@ test("members see the items but can't change them", async ({ page }) => {
   await expect(page.getByText("In step")).toBeVisible();
   await expect(page.getByRole("switch")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Sync now" })).toHaveCount(0);
-  await expect(page.getByLabel("Connect a repository")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Connect repository" })).toHaveCount(0);
 });
 
 const AGENT_URL = "/skills/agent?repo=acme%2Fplaybook&path=agents%2Fspec-checker.md";
@@ -389,12 +395,11 @@ test("an agent's page: when it's asked, how it runs, recent asks and its instruc
   await mockApi(page);
   await page.goto("/skills");
   await expect(page.getByText("asked 2 times, last 35 min ago")).toBeVisible();
-  await expect(page.getByText("Short description: Coderhelm's agents decide when to ask it from this line.")).toBeVisible();
-  await page.getByRole("region", { name: /^Agents\s*2$/ }).getByRole("link", { name: "agent:spec-checker" }).click();
+  await page.getByRole("region", { name: /^Agents\s*2$/ }).getByRole("link", { name: "Spec checker", exact: true }).click();
   await expect(page).toHaveURL(/\/skills\/agent\/?\?repo=acme%2Fplaybook&path=agents%2Fspec-checker\.md/);
   await expect(page.getByRole("heading", { name: "spec-checker", level: 1 })).toBeVisible();
   await expect(page.getByText("Coderhelm asks this agent when")).toBeVisible();
-  await expect(page.getByText("A Coderhelm setting. It doesn't change the file.")).toBeVisible();
+  await expect(page.getByText("Turning it off doesn't change the file in your repo.")).toBeVisible();
   await expect(page.getByRole("link", { name: "Open on GitHub" })).toHaveAttribute("href", `https://github.com/acme/playbook/blob/${SHA}/agents/spec-checker.md`);
   // It reads with what its own file lists, mapped to Coderhelm's read-only tools.
   const tools = page.getByTestId("agent-tools");
@@ -404,8 +409,6 @@ test("an agent's page: when it's asked, how it runs, recent asks and its instruc
   await expect(tools).toContainText("Write blocked: Write");
   await expect(page.getByText(/Up to 12 tool calls and 3 minutes/)).toBeVisible();
   await expect(page.getByText("Your team's heavy model")).toBeVisible();
-  // "Not checked yet" once, on the badge; the line under it says when it runs.
-  await expect(page.getByTestId("compat-section").getByText(/Not checked yet/)).toHaveCount(1);
   await shot(page, "agent-page");
 
   // Asks: one list, filtered by the shared toolbar.
@@ -425,6 +428,8 @@ test("an agent's page: when it's asked, how it runs, recent asks and its instruc
   // Instructions render as text, the file's settings fold away.
   await page.getByRole("navigation", { name: "Agent views" }).getByRole("link", { name: "Instructions" }).click();
   await expect(page.getByText("You review specs before work starts.")).toBeVisible();
+  // How it runs sits with its instructions; "Not checked yet" once, on the badge.
+  await expect(page.getByTestId("compat-section").getByText(/Not checked yet/)).toHaveCount(1);
   await expect(page.getByText("tools: Read, Grep, Bash, WebFetch")).toBeHidden();
   await shot(page, "agent-instructions");
 });
@@ -475,7 +480,8 @@ test("an agent with no asks yet, and an unknown agent", async ({ page }) => {
 
 test("a run's page lists the team agents it asked, linked to each agent", async ({ page }) => {
   await mockApi(page);
-  await page.goto("/runs/detail?id=run_77");
+  // Team agent asks are part of the run's Activity.
+  await page.goto("/runs/detail?id=run_77&tab=activity");
   const section = page.getByTestId("team-asks");
   await expect(section.getByRole("heading", { name: "Team agents asked (1)" })).toBeVisible();
   await expect(page.getByTestId("asks-summary")).toHaveText("1 question asked · 1 without an answer");
@@ -493,6 +499,10 @@ test("the overview counts items by how Coderhelm runs them and filters by what t
   await page.goto("/skills");
   const overview = page.getByTestId("compat-overview");
   await expect(overview.getByRole("heading", { name: "How Coderhelm runs your skills" })).toBeVisible();
+  // One line until opened.
+  await expect(overview).toContainText("2 need a tool you haven't connected");
+  await expect(overview.getByRole("button", { name: "1 Ready" })).toBeHidden();
+  await overview.getByText("Review", { exact: true }).click();
   await expect(overview.getByText("4 of 7 checked against what your team has connected · 3 waiting for a check")).toBeVisible();
   await expect(overview.getByRole("button", { name: "1 Ready" })).toBeVisible();
   await expect(overview.getByRole("button", { name: "1 Translated" })).toBeVisible();
@@ -509,20 +519,18 @@ test("the overview counts items by how Coderhelm runs them and filters by what t
   await expect(local.getByText("Reads the repository and the team's connected sources instead")).toBeVisible();
 
   // Each item says where it stands, and its summary line links to its page.
-  const debug = page.getByRole("listitem").filter({ hasText: "skill:debug" });
+  const debug = page.locator('[data-handle="skill:debug"]');
   await expect(debug.getByText("Needs tools", { exact: true })).toBeVisible();
-  await expect(debug.getByRole("link", { name: DEBUG_SUMMARY })).toBeVisible();
-  await expect(page.getByRole("listitem").filter({ hasText: "skill:copy-tone" }).getByText("agents read the translated version")).toBeVisible();
-  await expect(page.getByRole("listitem").filter({ hasText: "agent:tech-debt-manager" }).getByText("Not checked yet")).toBeVisible();
+  await expect(page.locator('[data-handle="agent:tech-debt-manager"]').getByText("Not checked yet")).toBeVisible();
   await shot(page, "skills-compat-overview");
 
   await overview.getByRole("button", { name: "Monitoring needed by 2 items" }).click();
   await expect(page.getByText("Showing 2 of 7 items.")).toBeVisible();
-  await expect(page.getByRole("link", { name: "skill:debug" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "command:deploy" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "skill:api-conventions" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Debug", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Deploy", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Api conventions", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Show all" }).click();
-  await expect(page.getByRole("link", { name: "skill:api-conventions" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Api conventions", exact: true })).toBeVisible();
   await overview.getByRole("button", { name: "1 Ready" }).click();
   await expect(page.getByText("Showing 1 of 7 items.")).toBeVisible();
 });
@@ -533,7 +541,9 @@ test("an item's page: each step, what it relies on, what to connect, and the two
   await expect(page.getByRole("heading", { name: "debug", level: 1, exact: true })).toBeVisible();
   const section = page.getByTestId("compat-section");
   await expect(section.getByTestId("compat-summary")).toHaveText(DEBUG_SUMMARY);
-  await expect(section.getByText(/Checked 30 min ago with light-model · cost \$0\.034\./)).toBeVisible();
+  // When it was checked; never the model or what the check cost.
+  await expect(section.getByText("Checked 30 min ago.")).toBeVisible();
+  await expect(section.getByText(/light-model|cost \$/)).toHaveCount(0);
 
   // What to connect, each with its fix and where.
   const needs = section.getByTestId("compat-needs");
@@ -613,7 +623,7 @@ test("an item not checked yet, a changed one, and an agent's page", async ({ pag
   await page.goto("/skills/item?repo=acme%2Fplaybook&path=skills%2Fapi-conventions%2FSKILL.md");
   await expect(page.getByText("Checking again", { exact: true })).toBeVisible();
   await expect(page.getByText(/The text changed since the check/)).toBeVisible();
-  await page.goto(AGENT_URL);
+  await page.goto(`${AGENT_URL}&tab=instructions`);
   const section = page.getByTestId("compat-section");
   await expect(section.getByText("Not checked yet", { exact: true })).toBeVisible();
   await expect(section.getByText(/For an agent, that is the read-only tools its own file lists/)).toBeVisible();
@@ -649,7 +659,7 @@ test.describe("always apply", () => {
     expect(put?.body).toEqual({ repo: "acme/playbook", path: "skills/debug/SKILL.md", on: true, repos: ["acme/web"], passes: ["coder", "reviewer", "pr"], paths: ["apps/web/", "**/*.tsx"] });
 
     await page.goto("/skills");
-    const row = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "skill:debug" }) });
+    const row = page.locator('[data-handle="skill:debug"]');
     await expect(row.getByTestId("always-badge")).toHaveText("Always applied · web · 3 steps · 2 paths");
     await expect(row.getByTestId("always-badge")).toHaveAttribute("title", /apps\/web\/\*\*, \*\*\/\*\.tsx/);
     await shot(page, "skills-always-list");
@@ -666,8 +676,7 @@ test.describe("always apply", () => {
     items[1].suggestion = { repos: ["acme/web"], passes: ["coder", "reviewer"], paths: [], reason: "Names the web app's framework.", at: ago(10) };
     const db = await mockApi(page, { items });
     await page.goto("/skills");
-    const row = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "skill:api-conventions" }) });
-    await expect(row.getByTestId("always-suggestion-hint")).toHaveText("Suggested: always apply to web for Coder and Reviewer");
+    const row = page.locator('[data-handle="skill:api-conventions"]');
     await expect(row.getByTestId("always-badge")).toHaveCount(0);
 
     await page.goto("/skills/item?repo=acme%2Fplaybook&path=skills%2Fapi-conventions%2FSKILL.md");
@@ -692,7 +701,8 @@ test.describe("always apply", () => {
 
   test("a run's and a review's pages name the team standards they were given", async ({ page }) => {
     await mockApi(page);
-    await page.goto("/runs/detail?id=run_77");
+    // What the run used is part of its Activity.
+    await page.goto("/runs/detail?id=run_77&tab=activity");
     // The same block as a review's page: a quiet line that opens to chips.
     const used = page.getByTestId("work-used");
     await expect(used.getByText("1 skill · 1 agent · 1 data source · 1 standard")).toBeVisible();
@@ -716,10 +726,10 @@ test.describe("always apply", () => {
 test("an agent's review steps: worked out by its check, set by an admin, and back", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/skills");
-  await expect(page.getByRole("listitem").filter({ hasText: "agent:spec-checker" }).getByTestId("reviews-badge")).toHaveText("Reviews: Plan");
+  await expect(page.locator('[data-handle="agent:spec-checker"]').getByTestId("reviews-badge")).toHaveText("Reviews: Plan");
   await page.goto("/skills/agent?repo=acme%2Fplaybook&path=agents%2Fspec-checker.md");
   const section = page.getByTestId("reviews-section");
-  await expect(section.getByRole("heading", { name: "Reviews: plan / code / prose" })).toBeVisible();
+  await expect(section.getByRole("heading", { name: "Ask it to review" })).toBeVisible();
   await expect(section.getByText("Runs in: Plan")).toBeVisible();
   await expect(section.getByText("Worked out by its check from its name and description.")).toBeVisible();
   await section.getByRole("checkbox", { name: /^Code/ }).check();
@@ -738,4 +748,21 @@ test("members see an agent's review steps but can't change them", async ({ page 
   const section = page.getByTestId("reviews-section");
   await expect(section.getByText("Runs in: Plan")).toBeVisible();
   await expect(section.getByRole("checkbox")).toHaveCount(0);
+});
+
+test("the library leads with the list: items come before the usage dashboard and the repositories", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/skills");
+  const firstItem = (await page.getByTestId("skill-item").first().boundingBox())!.y;
+  const repos = (await page.getByRole("heading", { name: /^Repositories/ }).boundingBox())!.y;
+  expect(firstItem).toBeLessThan(repos);
+  // The usage dashboard lives on the Activity tab.
+  await expect(page.getByRole("region", { name: "Use in the last 30 days" })).toHaveCount(0);
+  // The tabs sit right under the header, before any of the library.
+  const tabs = (await page.getByRole("tablist", { name: "Skills" }).boundingBox())!.y;
+  expect(tabs).toBeLessThan(firstItem);
+  // Rows: a readable name, one line of description, and the status chips.
+  const debug = page.locator('[data-handle="skill:debug"]');
+  await expect(debug.getByRole("link", { name: "Debug", exact: true })).toBeVisible();
+  await expect(debug).not.toContainText("skills/debug/SKILL.md");
 });

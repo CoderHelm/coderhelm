@@ -6,21 +6,27 @@ status: coming-soon
 
 This feature is being built and is not on main yet. This page describes it as it is being built and will change before it ships.
 
-**Chat** answers questions from your team's own sources: [knowledge](/concepts/knowledge), connections, repositories and the code graph, memories, data sources and skills. Open it from **Chat** in the sidebar, or press ⌘K and pick **New chat**.
+**Chat** answers questions about your team's work from your own sources: your code (it reads your connected repositories itself), [knowledge](/concepts/knowledge), connections, memories, data sources and skills. Open it from **Chat** in the sidebar, or press ⌘K and pick **New chat**.
 
 ## Asking
 
-The page opens on the question box, ready to type. Under the box are a few suggested questions built from your team's own data: your knowledge, your repositories and your recent runs. Picking one asks it with the sources it needs.
+The page opens on the question box, ready to type. Under it are a few suggested questions built from your team's own repositories, recent runs and knowledge.
 
-- **Sources** sit inside the box as chips. Open **Sources** to turn kinds of sources on or off, pick which knowledge to read, and choose the repository for code, memories and skills. Remove a chip to turn that source off. Chat remembers your picks for next time.
+- **Chat decides what to read.** Every question can use everything you can see: all your connected repositories and the knowledge open to your role. Name a repository in the question ("How is web put together?") and Chat reads that one.
+- **Type @** (or press the **@** button) to point a question at one repository or knowledge collection. It shows as a chip in the box; remove the chip to undo it. Nothing is narrowed unless you choose it.
 - **Attach a file** to a question with the paperclip, or drop it on the box. Up to three files per question.
 - **Enter** sends, **Shift+Enter** starts a new line, **Esc** stops an answer while it is coming in, and **⌘/** (Ctrl+/ on Windows and Linux) starts a new chat.
 
+## How Chat researches
+
+Chat works like a teammate who opens the code: it looks a repository over (its README, the top of its folders, its manifests such as `package.json` or `Cargo.toml`, and agent notes such as `AGENTS.md`), lists folders, searches the code, reads files by line range and checks the code graph, over as many steps as the question needs. Every read is pinned to one commit, so a citation shows exactly the lines it quotes. Chat never asks you to open or paste files its tools can read; an answer that does is sent back to the tools before you see it.
+
 ## Answers
 
-- The answer streams in as it is written. What Chat looked up shows above it, folded once the answer is done.
-- Every claim has a numbered citation. Click the number, or the source card under the answer, to read the passage it rests on, where it comes from and how current it is.
-- When nothing in the chosen sources supports an answer, it says so ("Not in your sources") instead of making one up.
+- What Chat did shows as one quiet line above the answer ("Read 4 files in web, searched the code"). Open it to see each step.
+- Every claim has a small number. Hover or tap it to see the source: the file's path and lines, with a link to them on GitHub at that commit, or the knowledge page's title and date.
+- The sources are listed under the answer, each once by its real name. Open one to read what was quoted.
+- When nothing in your sources supports an answer, it says so instead of making one up.
 - Under each answer: **Copy** (the text without the citation numbers), **Ask again** on the latest answer, and a thumbs up or down. Ratings help tune what Chat reads.
 
 ## Chats

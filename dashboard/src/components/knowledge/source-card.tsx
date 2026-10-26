@@ -9,7 +9,7 @@ import { SourceLogo } from "./logos";
 
 // One connected app of a knowledge base: what it is, how many pages it
 // brought in, whether it is up to date (in plain words), and the one thing
-// to do when it isn't.
+// to do when it isn't. A source read through someone's sign-in says whose.
 
 export function SourceCard({
   source,
@@ -46,9 +46,14 @@ export function SourceCard({
           <h3 className="truncate text-sm font-semibold text-zinc-100" title={source.name}>
             {source.name}
           </h3>
-          <p className="mt-0.5 truncate text-xs text-zinc-500">
+          <p className="mt-0.5 truncate text-xs text-zinc-400">
             {label} · {itemWord(source.kind, source.items)}
           </p>
+          {source.connection === "sign_in" && source.signin && (
+            <p className="mt-1 text-xs text-zinc-400 wrap-anywhere" data-testid="source-signin" title={source.signin.account ? `${label} account: ${source.signin.account}` : undefined}>
+              Synced with {source.signin.name}&apos;s {label} sign-in
+            </p>
+          )}
         </div>
         {canManage && (
           <MoreMenu
@@ -82,9 +87,9 @@ export function SourceCard({
       )}
 
       {source.failed_items > 0 && source.status !== "error" && (
-        <p className="mt-2 text-xs text-zinc-500">{itemWord(source.kind, source.failed_items)} couldn&apos;t be read. They&apos;re tried again on the next check.</p>
+        <p className="mt-2 text-xs text-zinc-400">{itemWord(source.kind, source.failed_items)} couldn&apos;t be read. They&apos;re tried again on the next check.</p>
       )}
-      {source.truncated && <p className="mt-2 text-xs text-zinc-500">Only the first 1,000 are kept. Choose fewer pages to keep everything.</p>}
+      {source.truncated && <p className="mt-2 text-xs text-zinc-400">Only the first 1,000 are kept. Choose fewer pages to keep everything.</p>}
 
       {canManage && (
         <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">

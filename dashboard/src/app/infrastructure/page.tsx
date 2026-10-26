@@ -7,25 +7,20 @@ import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
 import { api, type InfraAnalysis, type InfraFinding, type Repo } from "@/lib/api";
 import { useToast } from "@/components/toast";
-import { Skeleton } from "@/components/skeleton";
-import { Callout } from "@/components/callout";
 import { StatusPill } from "@/components/status-pill";
-import { Segmented } from "@/components/segmented";
-import { RepoCombobox } from "@/components/repo-combobox";
-import { AlertCircleIcon, InfoIcon, WarningIcon } from "@/components/icons";
-import { focusRing, secondaryButton } from "@/components/ui";
-import { Page, PageHeader } from "@/components/page";
+import { AlertCircleIcon, CheckIcon, ExternalLinkIcon, HexagonIcon, InfoIcon, WarningIcon } from "@/components/icons";
+import { buttonClass, focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { cardClass, Page, PageHeader, SectionHeading } from "@/components/page";
+import { EmptyState } from "@/components/empty-state";
+import { Problem } from "@/components/problem";
+import { ListSkeleton, RepoFilter } from "@/components/list";
+import { formatDate } from "@/components/list/time";
+import { Code } from "@/components/settings";
 
-const SEVERITY_STYLES: Record<string, string> = {
-  error: "border-red-500/20 bg-red-500/5 text-red-400",
-  warning: "border-amber-500/20 bg-amber-500/5 text-amber-400",
-  info: "border-zinc-700 bg-zinc-900/50 text-zinc-400",
-};
-
-const SEVERITY_ICONS: Record<string, React.ReactNode> = {
-  error: <AlertCircleIcon />,
-  warning: <WarningIcon />,
-  info: <InfoIcon />,
+const SEVERITY: Record<InfraFinding["severity"], { label: string; tone: "error" | "warning" | "neutral"; icon: React.ReactNode; color: string }> = {
+  error: { label: "Issue", tone: "error", icon: <AlertCircleIcon />, color: "text-red-400" },
+  warning: { label: "Warning", tone: "warning", icon: <WarningIcon />, color: "text-amber-400" },
+  info: { label: "Note", tone: "neutral", icon: <InfoIcon />, color: "text-zinc-400" },
 };
 
 const SEVERITY_GROUPS: { sev: InfraFinding["severity"]; title: string }[] = [
@@ -41,32 +36,52 @@ const CATEGORY_LABELS: Record<string, string> = {
   reliability: "Reliability",
 };
 
-const SCOPES = [
-  { value: "all" as const, label: "All repos" },
-  { value: "repo" as const, label: "One repo" },
-];
+/** A plan prompt that asks Coderhelm to fix one finding. */
+function fixPrompt(f: InfraFinding, repo: string | null): string {
+  return [`Fix this infrastructure ${f.severity === "error" ? "issue" : "finding"}${repo ? ` in ${repo}` : ""}: ${f.title}.`, f.detail, f.file ? `File: ${f.file}` : ""]
+    .filter(Boolean)
+    .join("\n");
+}
 
-function FindingCard({ finding }: { finding: InfraFinding }) {
+function FindingCard({ finding, repo }: { finding: InfraFinding; repo: string | null }) {
+  const sev = SEVERITY[finding.severity] ?? SEVERITY.info;
+  const fileHref = repo && finding.file ? `https://github.com/${repo}/blob/HEAD/${finding.file.replace(/^\/+/, "")}` : null;
   return (
-    <div className={`p-3 rounded-lg border ${SEVERITY_STYLES[finding.severity] || SEVERITY_STYLES.info}`}>
-      <div className="flex items-start gap-2">
-        <span className="mt-0.5 flex-shrink-0 scale-75" aria-hidden="true">{SEVERITY_ICONS[finding.severity] ?? SEVERITY_ICONS.info}</span>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="min-w-0 text-xs font-semibold">{finding.title}</span>
-            <StatusPill>{CATEGORY_LABELS[finding.category] ?? finding.category}</StatusPill>
-          </div>
-          <p className="text-xs text-zinc-400 mt-1 leading-relaxed">{finding.detail}</p>
-          {finding.file && <p className="text-xs text-zinc-500 font-mono mt-1 wrap-anywhere">{finding.file}</p>}
+    <li className={`${cardClass} flex gap-3`} data-testid="infra-finding">
+      <span className={`mt-0.5 shrink-0 ${sev.color}`} aria-hidden="true">{sev.icon}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="min-w-0 text-sm font-semibold text-zinc-100">{finding.title}</span>
+          <StatusPill tone={sev.tone}>{sev.label}</StatusPill>
+          <StatusPill>{CATEGORY_LABELS[finding.category] ?? finding.category}</StatusPill>
+        </div>
+        <p className="mt-1 max-w-prose text-sm leading-relaxed text-zinc-300">{finding.detail}</p>
+        {finding.file && (
+          <p className="mt-1.5 text-sm text-zinc-400">
+            <Code>{finding.file}</Code>
+          </p>
+        )}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link href={`/plans/new?prefill=${encodeURIComponent(fixPrompt(finding, repo))}`} className={buttonClass("secondary", "sm")}>
+            Start a plan to fix
+          </Link>
+          {fileHref && (
+            <a href={fileHref} target="_blank" rel="noreferrer" className={`${buttonClass("ghost", "sm")} gap-1.5`}>
+              Open file
+              <ExternalLinkIcon />
+              <span className="sr-only"> (opens in a new tab)</span>
+            </a>
+          )}
         </div>
       </div>
-    </div>
+    </li>
   );
 }
 
 /** Renders the findings for a given analysis result. */
 function AnalysisView({
   analysis,
+  repo,
   refreshing,
   onRefresh,
   pollStart,
@@ -74,44 +89,62 @@ function AnalysisView({
   canScan,
 }: {
   analysis: InfraAnalysis;
+  /** The repository the findings are for, when it is known (one repo picked, or only one scanned). */
+  repo: string | null;
   refreshing: boolean;
   onRefresh: () => void;
   pollStart: number | null;
   stale: boolean;
   canScan: boolean;
 }) {
-  const askAdmin = <p className="text-zinc-500 text-sm mt-4">Ask a team admin to run a scan.</p>;
+  const whichFiles = (
+    <details className="group mx-auto mt-3 max-w-prose text-left text-sm text-zinc-400">
+      <summary className={`inline-flex cursor-pointer list-none items-center gap-1 rounded text-zinc-300 hover:text-zinc-100 [&::-webkit-details-marker]:hidden ${focusRing}`}>
+        Which files?
+      </summary>
+      <p className="mt-1">AWS CDK stacks, Terraform (.tf) files and Serverless Framework (serverless.yml) files on each repository&apos;s default branch.</p>
+    </details>
+  );
 
   // A record is written by every finished scan (with cached_at). No record
   // means the scope was never scanned, which is not the same as "no infra".
   if (analysis.status === "no_infra" && !analysis.cached_at) {
     return (
-      <div className="max-w-xl mx-auto mt-12 text-center" data-testid="infra-not-scanned">
-        <h2 className="text-lg font-semibold mb-2">Not scanned yet</h2>
-        <p className="text-zinc-500 text-sm">
-          Coderhelm reads your CDK, Terraform and Serverless files and points out security, cost and reliability problems.
-        </p>
-        {canScan ? (
-          <button type="button" onClick={onRefresh} disabled={refreshing} className={`${secondaryButton} mt-5`}>
-            {refreshing ? "Starting..." : "Scan now"}
-          </button>
-        ) : askAdmin}
+      <div data-testid="infra-not-scanned">
+        <EmptyState
+          icon={<HexagonIcon />}
+          title="Not scanned yet"
+          action={
+            canScan ? (
+              <button type="button" onClick={onRefresh} disabled={refreshing} className={primaryButton}>
+                {refreshing ? "Starting…" : "Scan now"}
+              </button>
+            ) : undefined
+          }
+        >
+          Coderhelm reads the code that sets up your cloud servers, databases and storage, and points out security, cost and reliability problems.
+          {!canScan && " Ask a team admin to run a scan."}
+          {whichFiles}
+        </EmptyState>
       </div>
     );
   }
 
   if (analysis.status === "no_infra") {
     return (
-      <div className="max-w-xl mx-auto mt-12 text-center">
-        <h2 className="text-lg font-semibold mb-2">No infrastructure code found</h2>
-        <p className="text-zinc-500 text-sm mb-6">
-          No CDK, Terraform or Serverless files were found{analysis.cached_at ? ` in the scan on ${new Date(analysis.cached_at).toLocaleDateString()}` : ""}.
-          {canScan ? " Scan again after adding some." : ""}
+      <div className="space-y-4">
+        <EmptyState icon={<HexagonIcon />} title="No infrastructure code found">
+          Nothing that sets up cloud resources was found
+          {analysis.cached_at ? <> in the scan on {formatDate(analysis.cached_at)}</> : null}.{canScan ? " Scan again after adding some." : ""}
           {analysis.suggested_prompt ? " To have Coderhelm write it, start a plan from the prompt below." : ""}
-        </p>
+          {whichFiles}
+        </EmptyState>
         {analysis.suggested_prompt && (
-          <div className="text-left">
+          <div className="space-y-3">
             <CodeBlock code={analysis.suggested_prompt} title="Suggested plan prompt" wrap maxHeightClass="max-h-64" />
+            <Link href={`/plans/new?prefill=${encodeURIComponent(analysis.suggested_prompt)}`} className={secondaryButton}>
+              Start a plan from this prompt
+            </Link>
           </div>
         )}
       </div>
@@ -122,23 +155,20 @@ function AnalysisView({
     const elapsed = pollStart ? Date.now() - pollStart : 0;
     const showRetry = canScan && (elapsed > RETRY_SHOW_MS || stale);
     const slow = elapsed > POLL_TIMEOUT_MS || stale;
+    if (slow) {
+      return (
+        <Problem tone="warning" title="The scan is taking longer than expected" onRetry={showRetry ? onRefresh : undefined} retryLabel={refreshing ? "Starting…" : "Try again"}>
+          It may have stalled. {showRetry ? "Start it again; if it keeps stalling, contact support." : "Ask a team admin to start it again."}
+        </Problem>
+      );
+    }
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center" role="status">
-        {!slow && <div aria-hidden="true" className="w-8 h-8 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin mb-4" />}
-        {slow ? (
-          <>
-            <p className="text-amber-400 text-sm font-medium">Taking longer than expected</p>
-            <p className="text-zinc-500 text-xs mt-1">The scan may have stalled.</p>
-          </>
-        ) : (
-          <>
-            <p className="text-zinc-400 text-sm">Scanning your infrastructure...</p>
-            <p className="text-zinc-500 text-xs mt-1">Looking for CDK, Terraform and Serverless code. This takes about 30 seconds.</p>
-          </>
-        )}
+      <div role="status" className="space-y-3">
+        <p className="text-sm text-zinc-300">Scanning your infrastructure... This takes about 30 seconds.</p>
+        <ListSkeleton rows={3} label="Scanning" />
         {showRetry && (
-          <button type="button" onClick={onRefresh} disabled={refreshing} className={`${secondaryButton} mt-4`}>
-            {refreshing ? "Starting..." : "Try again"}
+          <button type="button" onClick={onRefresh} disabled={refreshing} className={secondaryButton}>
+            {refreshing ? "Starting…" : "Try again"}
           </button>
         )}
       </div>
@@ -146,18 +176,18 @@ function AnalysisView({
   }
 
   if (analysis.status === "failed") {
-    const { message, hint } = parseInfraError(analysis.error);
+    const { message, hint, action } = parseInfraError(analysis.error);
     return (
-      <div className="max-w-xl mx-auto mt-12">
-        <Callout variant="error" title={message}>
-          {hint && <p>{hint}</p>}
-          {canScan ? (
-            <button type="button" onClick={onRefresh} disabled={refreshing} className={`mt-2 text-sm font-medium underline rounded disabled:opacity-50 ${focusRing}`}>
-              {refreshing ? "Starting..." : "Try again"}
-            </button>
-          ) : <p>Ask a team admin to run the scan again.</p>}
-        </Callout>
-      </div>
+      <Problem
+        title={message}
+        details={analysis.error}
+        onRetry={canScan ? onRefresh : undefined}
+        retryLabel={refreshing ? "Starting…" : "Try again"}
+        action={action}
+      >
+        {hint}
+        {!canScan && " Ask a team admin to run the scan again."}
+      </Problem>
     );
   }
 
@@ -167,7 +197,7 @@ function AnalysisView({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         {errorCount > 0 && <StatusPill tone="error">{errorCount} issue{errorCount !== 1 ? "s" : ""}</StatusPill>}
         {warnCount > 0 && <StatusPill tone="warning">{warnCount} warning{warnCount !== 1 ? "s" : ""}</StatusPill>}
         {(analysis.cached_at || (analysis.scanned_repos && analysis.scanned_repos.length > 0)) && (
@@ -184,20 +214,22 @@ function AnalysisView({
       </div>
 
       {findings.length === 0 ? (
-        <div className="p-6 text-center text-zinc-400 text-sm border border-zinc-800 rounded-xl">
-          No problems found.
-        </div>
+        <EmptyState icon={<CheckIcon />} title="No problems found">
+          The last scan found nothing to fix in the security, cost or reliability of your infrastructure code.
+        </EmptyState>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-6">
           {SEVERITY_GROUPS.map(({ sev, title }) => {
             const group = findings.filter((f) => f.severity === sev);
             if (group.length === 0) return null;
             return (
               <section key={sev} aria-label={title}>
-                <h2 className="text-xs text-zinc-500 uppercase tracking-wider mb-1.5 mt-3">{title}</h2>
-                <div className="space-y-1.5">
-                  {group.map((finding, i) => <FindingCard key={i} finding={finding} />)}
-                </div>
+                <SectionHeading count={group.length}>{title}</SectionHeading>
+                <ul className="mt-2 space-y-2">
+                  {group.map((finding, i) => (
+                    <FindingCard key={i} finding={finding} repo={repo} />
+                  ))}
+                </ul>
               </section>
             );
           })}
@@ -207,25 +239,33 @@ function AnalysisView({
   );
 }
 
-function parseInfraError(raw: string | undefined): { message: string; hint?: string } {
-  if (!raw) return { message: "The scan failed", hint: "No reason was recorded." };
-  const lower = raw.toLowerCase();
+function parseInfraError(raw: string | undefined): { message: string; hint: string; action?: React.ReactNode } {
+  const lower = (raw ?? "").toLowerCase();
   if (lower.includes("404"))
-    return { message: "Repository not accessible", hint: "Check that the Coderhelm GitHub App has access to this repo." };
+    return {
+      message: "Coderhelm can't open this repo",
+      hint: "Ask an admin to give the Coderhelm GitHub App access to it, then scan again.",
+      action: (
+        <Link href="/settings/repos" className={buttonClass("ghost")}>
+          Open Repositories
+        </Link>
+      ),
+    };
   if (lower.includes("rate limit"))
-    return { message: "GitHub API rate limit reached", hint: "Try again in a few minutes." };
+    return { message: "GitHub is limiting how fast Coderhelm can read", hint: "Try again in a few minutes." };
   if (lower.includes("timeout") || lower.includes("timed out"))
-    return { message: "The scan timed out", hint: "It took too long to finish." };
-  return { message: "The scan failed", hint: raw.slice(0, 200) };
+    return { message: "The scan timed out", hint: "It took too long to finish. Try again; a smaller scope (one repo) is quicker." };
+  return { message: "The scan failed", hint: "Try again, or contact support if it keeps failing." };
 }
 
 const POLL_TIMEOUT_MS = 2 * 60 * 1000;
 const RETRY_SHOW_MS = 30 * 1000;
 
 export default function InfrastructurePage() {
-  const [scope, setScope] = useState<"all" | "repo">("all");
   const [repos, setRepos] = useState<Repo[] | null>(null);
+  // "" means every repository.
   const [selectedRepo, setSelectedRepo] = useState("");
+  const scope: "all" | "repo" = selectedRepo ? "repo" : "all";
   const [analysis, setAnalysis] = useState<InfraAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -238,30 +278,21 @@ export default function InfrastructurePage() {
 
   useEffect(() => {
     // Starting a scan is admin only on the server; members only read.
-    api.listRepos().then((data) => {
-      const enabled = data.repos.filter((r) => r.enabled);
-      setRepos(enabled);
-      if (enabled.length > 0) setSelectedRepo(enabled[0].name);
-    }).catch(() => setRepos([]));
+    api.listRepos().then((data) => setRepos(data.repos.filter((r) => r.enabled))).catch(() => setRepos([]));
   }, []);
 
   const loadAnalysis = useCallback(() => {
-    if (scope === "repo" && !selectedRepo) {
-      setAnalysis(null);
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     setLoadError("");
-    const fetcher = scope === "all" ? api.getInfrastructure() : api.getRepoInfrastructure(selectedRepo);
+    const fetcher = selectedRepo ? api.getRepoInfrastructure(selectedRepo) : api.getInfrastructure();
     fetcher
       .then(setAnalysis)
       .catch((e: unknown) => {
         setAnalysis(null);
-        setLoadError(e instanceof Error ? e.message : "The request failed.");
+        setLoadError(e instanceof Error ? e.message : "");
       })
       .finally(() => setLoading(false));
-  }, [scope, selectedRepo]);
+  }, [selectedRepo]);
 
   useEffect(() => { loadAnalysis(); }, [loadAnalysis]);
 
@@ -276,12 +307,7 @@ export default function InfrastructurePage() {
 
   useEffect(() => {
     if (analysis?.status !== "pending" || pollStale) return;
-    const fetcher = scope === "all"
-      ? () => api.getInfrastructure()
-      : selectedRepo
-        ? () => api.getRepoInfrastructure(selectedRepo)
-        : null;
-    if (!fetcher) return;
+    const fetcher = selectedRepo ? () => api.getRepoInfrastructure(selectedRepo) : () => api.getInfrastructure();
     const timer = setInterval(() => {
       if (pollStart && Date.now() - pollStart > POLL_TIMEOUT_MS) {
         setPollStale(true);
@@ -290,74 +316,72 @@ export default function InfrastructurePage() {
       fetcher().then(setAnalysis).catch(() => {});
     }, 5000);
     return () => clearInterval(timer);
-  }, [analysis?.status, scope, selectedRepo, pollStart, pollStale]);
+  }, [analysis?.status, selectedRepo, pollStart, pollStale]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
       if (scope === "all") {
         await api.refreshInfrastructure();
-      } else if (selectedRepo) {
+      } else {
         await api.refreshRepoInfrastructure(selectedRepo);
       }
       setAnalysis((prev) => ({ ...(prev ?? { has_infra: false }), status: "pending", error: undefined }));
       setPollStart(Date.now());
       setPollStale(false);
       toast("Scan started. It takes about 30 seconds.");
-    } catch (e: unknown) {
-      toast(e instanceof Error ? `Couldn't start the scan: ${e.message}` : "Couldn't start the scan", "error");
+    } catch {
+      toast("Couldn't start the scan. Check your connection and try again.", "error");
     } finally {
       setRefreshing(false);
     }
   };
 
   const refreshLabel = (!analysis || analysis.status === "no_infra") ? "Scan" : "Scan again";
-  const noRepos = scope === "repo" && repos !== null && repos.length === 0;
+  const repoNames = (repos ?? []).map((r) => r.name);
+  // Findings carry a file but no repo: a link to the file is only possible when the repo is known.
+  const knownRepo = selectedRepo || (analysis?.scanned_repos?.length === 1 && repoNames.includes(analysis.scanned_repos[0]) ? analysis.scanned_repos[0] : null);
 
   return (
     <Page>
       <PageHeader
         title="Infrastructure"
-        lead="Security, cost and reliability review of the infrastructure code in your repos."
-        actions={canScan && !noRepos ? (
+        lead="Security, cost and reliability review of the code that sets up your cloud infrastructure."
+        actions={canScan ? (
           <button
             type="button"
             onClick={handleRefresh}
             disabled={refreshing || loading || (analysis?.status === "pending" && !pollStale)}
             className={secondaryButton}
           >
-            {refreshing ? "Starting..." : refreshLabel}
+            {refreshing ? "Starting…" : refreshLabel}
           </button>
         ) : undefined}
       />
 
-      <div className="mt-6 mb-5">
-        <Segmented label="What to review" options={SCOPES} value={scope} onChange={setScope} />
-      </div>
-      {scope === "repo" && repos && repos.length > 0 && (
-        <div className="max-w-md">
-          <RepoCombobox repos={repos} selected={selectedRepo} onSelect={setSelectedRepo} />
+      {repos && repos.length > 1 && (
+        <div className="mt-6">
+          <RepoFilter value={selectedRepo} onChange={setSelectedRepo} repos={repoNames} />
         </div>
       )}
 
-      {noRepos ? (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center text-sm text-zinc-400">
+      <div className="mt-5">
+        {loading ? (
+          <ListSkeleton rows={4} label="Loading the infrastructure review" />
+        ) : loadError || loadError === "" && !analysis ? (
+          <Problem title="Couldn't load the infrastructure review" onRetry={loadAnalysis} details={loadError || undefined}>
+            Nothing has changed. Check your connection and try again.
+          </Problem>
+        ) : analysis ? (
+          <AnalysisView analysis={analysis} repo={knownRepo} refreshing={refreshing} onRefresh={handleRefresh} pollStart={pollStart} stale={pollStale} canScan={canScan} />
+        ) : null}
+      </div>
+      {repos !== null && repos.length === 0 && (
+        <p className="mt-4 text-sm text-zinc-400">
           No repos are turned on yet.{" "}
-          <Link href="/settings/repos" className={`text-zinc-200 underline underline-offset-2 rounded ${focusRing}`}>Turn on a repo</Link>{" "}
-          to review its infrastructure on its own.
-        </div>
-      ) : loading ? (
-        <Skeleton className="h-96 w-full rounded-xl" />
-      ) : loadError ? (
-        <Callout variant="error" title="Couldn't load the infrastructure review">
-          <p>{loadError}</p>
-          <button type="button" onClick={loadAnalysis} className={`mt-2 text-sm font-medium underline rounded ${focusRing}`}>
-            Try again
-          </button>
-        </Callout>
-      ) : analysis ? (
-        <AnalysisView analysis={analysis} refreshing={refreshing} onRefresh={handleRefresh} pollStart={pollStart} stale={pollStale} canScan={canScan} />
-      ) : null}
+          <Link href="/settings/repos" className={linkButton}>Turn on a repo</Link> to review its infrastructure on its own.
+        </p>
+      )}
     </Page>
   );
 }

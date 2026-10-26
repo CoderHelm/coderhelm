@@ -16,7 +16,7 @@ export const monoInputClass = `${inputClass} font-mono`;
 // wider screens (`npm run lint` warns on `w-full` that reaches `sm:`).
 
 export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
-export type ButtonSize = "sm" | "md";
+export type ButtonSize = "sm" | "md" | "lg";
 
 const BUTTON_BASE =
   "inline-flex items-center justify-center rounded-lg font-medium transition-colors motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-50";
@@ -31,6 +31,8 @@ const BUTTON_LOOK: Record<ButtonVariant, string> = {
 const BUTTON_SIZE: Record<ButtonSize, string> = {
   sm: "min-h-8 px-3 py-1 text-xs",
   md: "min-h-9 px-4 py-2 text-sm",
+  // The one large call to action on an empty page.
+  lg: "min-h-11 px-6 py-2 text-base",
 };
 
 /** The class string for a button: `buttonClass("danger", "sm")`. */

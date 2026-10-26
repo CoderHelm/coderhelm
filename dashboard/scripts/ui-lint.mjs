@@ -22,6 +22,17 @@
 //                    <th>, tab or shared button class. It lets a crowded row squeeze the
 //                    control's words to a letter a line ("Rout" over "e"); controls keep
 //                    their words whole (globals.css) and the row wraps instead
+//   low-contrast     text people must read that fails WCAG AA on the dark background:
+//                    `text-zinc-600`, `text-zinc-500` at 12px (`text-xs`), and `text-[10px]`/`text-[11px]`.
+//                    Readable text is zinc-400 or lighter; zinc-500 only at 14px and up;
+//                    zinc-600 is for borders and disabled states
+//   dashed-box       `border-dashed`: a hand-drawn placeholder box reads as an unfinished
+//                    wireframe. Nothing-here states are <EmptyState> (components/empty-state.tsx)
+//   button-copy      a local button style: a `const somethingButton = "…"` outside ui.ts, or
+//                    `!important` size overrides on a shared button class. Buttons come from
+//                    buttonClass(variant, size) in components/ui.ts
+//   arrow-glyph      an arrow character (right, double, heavy or left arrow, or a play triangle) in UI copy. Write the words ("Settings, then
+//                    Team") or use ChevronRightIcon from components/icons.tsx
 // Reports (never fail, counted against the baseline so they can be tightened):
 //   font-mono        `font-mono` outside <Code>, <CodeBlock> and the shared mono input
 //   pre              a hand-rolled <pre> outside <CodeBlock> (a block of code gets its header, Copy and highlighting there)
@@ -67,6 +78,19 @@ const OLD_CHAT_NAME = /(^|[^A-Za-z0-9_/#:.\-])brain([^A-Za-z0-9_/#:.\-]|$)/i;
 const NOT_COPY_ATTRS = new Set(["className", "href", "src", "id", "key", "htmlFor", "data-testid", "testId", "type", "name", "role", "rel", "target", "autoComplete", "inputMode", "d", "viewBox"]);
 /** Files allowed to use font-mono: the Code component and the shared mono input. */
 const MONO_HOMES = new Set(["src/components/settings/code.tsx", "src/components/code-block.tsx", "src/components/ui.ts"]);
+/**
+ * Files the newer rules (low-contrast, dashed-box, button-copy, arrow-glyph)
+ * skip for now: the chat pages, which are being rebuilt in their own pull
+ * request and adopt the rules there.
+ */
+const NEW_RULES_LATER = [/^src\/app\/chat\//, /^src\/components\/(chat-markdown|thinking-block)\.tsx$/];
+const laterFor = (rel) => NEW_RULES_LATER.some((re) => re.test(rel));
+
+/** Arrow characters that must not appear in UI copy. */
+const ARROWS = /[\u2192\u21D2\u279C\u25B6\u2190]/;
+/** The only file that may define button class strings. */
+const BUTTON_HOME = "src/components/ui.ts";
+
 /** The one file that may render a <pre>. */
 const PRE_HOMES = new Set(["src/components/code-block.tsx"]);
 
@@ -204,6 +228,45 @@ for (const file of walk(SRC)) {
     });
   }
 
+  // low-contrast and dashed-box: class strings anywhere in the file.
+  if (/\.(tsx|ts)$/.test(file) && !laterFor(rel)) {
+    const lineAt = (i) => source.slice(source.lastIndexOf("\n", i) + 1, source.indexOf("\n", i));
+    const report = (rule, index, message) => {
+      const lineText = lineAt(index);
+      if (allowed(rule, rel, lineText)) return;
+      const before = source.slice(0, index);
+      errors.push({ rule, file: rel, line: before.split("\n").length, col: index - before.lastIndexOf("\n"), message });
+    };
+    // A class string: the text between quotes or backticks on one line.
+    for (const m of source.matchAll(/(["'`])([^"'`\n]*?)\1/g)) {
+      const cls = m[2];
+      if (!/\b(text|border|bg|rounded|flex|px|py|p|mt|mb|ml|mr|gap|inline|block|font)-/.test(cls)) continue;
+      const tokens = cls.split(/\s+/);
+      const plain = (t) => !t.includes(":") || /^(sm|md|lg|xl|2xl|group-hover|group-open|hover|focus|focus-visible|open|aria-[a-z]+|data-[a-z-]+|\[[^\]]*\]):/.test(t) === false ? !t.includes(":") : !/^(placeholder|disabled|hover|focus|focus-visible|active|group-hover|peer-[a-z-]+):/.test(t);
+      const textTokens = tokens.filter((t) => /(^|:)text-zinc-(500|600)$/.test(t) && plain(t));
+      if (tokens.some((t) => /(^|:)text-zinc-600$/.test(t) && plain(t))) {
+        report("low-contrast", m.index, "text-zinc-600 is about 2.6:1 on the dark background: readable text is text-zinc-400 or lighter (zinc-600 is for borders and disabled states)");
+      } else if (textTokens.some((t) => /text-zinc-500$/.test(t)) && tokens.includes("text-xs")) {
+        report("low-contrast", m.index, "text-zinc-500 at text-xs is under 4.5:1: use text-zinc-400 for small text");
+      }
+      if (tokens.some((t) => /(^|:)text-\[(10|11)px\]$/.test(t))) {
+        report("low-contrast", m.index, "text smaller than 12px: text-xs is the smallest size");
+      }
+      if (tokens.some((t) => /(^|:)border-dashed$/.test(t))) {
+        report("dashed-box", m.index, "a dashed placeholder box reads as unfinished: use <EmptyState> (components/empty-state.tsx) on a solid card");
+      }
+    }
+    // button-copy: a local class string named like a button.
+    if (rel !== BUTTON_HOME) {
+      for (const m of source.matchAll(/\bconst\s+([A-Za-z_]*[Bb]utton[A-Za-z_]*|[A-Za-z_]*[Bb]tn[A-Za-z_]*)\s*(?::\s*string\s*)?=\s*["'`]/g)) {
+        report("button-copy", m.index, `a local button style (${m[1]}): use buttonClass(variant, size) from components/ui.ts`);
+      }
+      for (const m of source.matchAll(/\$\{\s*(primaryButton|secondaryButton|dangerButton|ghostButton|smallPrimaryButton|smallSecondaryButton|smallDangerButton|buttonClass\([^)]*\))\s*\}[^"'`\n]*?\s!(min-h|h|px|py|p|text)-/g)) {
+        report("button-copy", m.index, "an !important size override on a shared button: pick the size with buttonClass(variant, \"sm\")");
+      }
+    }
+  }
+
   // font-mono: counted, outside its homes.
   if (!MONO_HOMES.has(rel)) {
     for (const m of source.matchAll(/\bfont-mono\b/g)) {
@@ -251,6 +314,14 @@ for (const file of walk(SRC)) {
       }
       for (const j of JARGON) {
         if (j.re.test(copy)) hit(errors, "jargon", rel, sf, node.getStart(), `"${copy.match(j.re)[0]}" in UI copy. ${j.say}`, copy);
+      }
+    }
+    // An arrow glyph in anything a person reads, even a one-word string ("→").
+    if (ts.isJsxText(node) || ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) {
+      const text = ts.isJsxText(node) ? node.getText() : node.text;
+      const attr = ts.isJsxText(node) ? null : attrName(node);
+      if (ARROWS.test(text) && !(attr && NOT_COPY_ATTRS.has(attr)) && !inImport(node) && !laterFor(rel)) {
+        hit(errors, "arrow-glyph", rel, sf, node.getStart(), `an arrow glyph ("${text.match(ARROWS)[0]}") in UI copy: write the words, or use ChevronRightIcon`, text);
       }
     }
 

@@ -8,9 +8,11 @@ import { RoleGuard } from "@/components/role-guard";
 import { Callout } from "@/components/callout";
 import { StatusPill } from "@/components/status-pill";
 import { Skeleton } from "@/components/skeleton";
-import { Field } from "@/components/field";
+import { Problem } from "@/components/problem";
+import { Disclosure } from "@/components/disclosure";
 import { TokenMeters } from "@/components/token-meters";
-import { inputClass, primaryButton, secondaryButton } from "@/components/ui";
+import { SaveBar, SettingsRow, SettingsSection, useDirtyForm } from "@/components/settings";
+import { inputClass } from "@/components/ui";
 import { cacheHitRate, FEATURE_LABELS, formatTokens, LIMIT_HELP, LIMIT_LABELS, limitsTone, USAGE_CHANGED, usageBreakdown, usageLimits, usageParts, usageTotal } from "@/lib/usage";
 import { Page, PageHeader } from "@/components/page";
 
@@ -63,9 +65,14 @@ function parseDraft(v: string): number | null {
 
 function TokenLimitPage() {
   const [load, setLoad] = useState<Load>({ state: "loading" });
-  const [drafts, setDrafts] = useState<Drafts>({ new_tokens: "", cache_read: "", cache_write: "" });
   const [saving, setSaving] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
   const { toast } = useToast();
+  // The three limits as typed, against what is saved: one save bar, a mark
+  // on each changed limit, and a warning before leaving with changes.
+  const form = useDirtyForm<Drafts>({ new_tokens: "", cache_read: "", cache_write: "" }, { disabled: load.state !== "ready" });
+  const drafts = form.values;
+  const { reset } = form;
 
   const fetchAll = useCallback(() => {
     setLoad({ state: "loading" });
@@ -73,10 +80,10 @@ function TokenLimitPage() {
     Promise.all([api.getUsage(), api.me()])
       .then(([usage, me]) => {
         setLoad({ state: "ready", usage, canEdit: can(me, "budget") });
-        setDrafts(draftsFrom(usage));
+        reset(draftsFrom(usage));
       })
       .catch(() => setLoad({ state: "error" }));
-  }, []);
+  }, [reset]);
 
   useEffect(fetchAll, [fetchAll]);
 
@@ -88,6 +95,7 @@ function TokenLimitPage() {
   const handleSave = async () => {
     if (load.state !== "ready" || invalid) return;
     setSaving(true);
+    setProblem(null);
     const body: TokenLimitsInput = {
       max_new_tokens: parsed.new_tokens,
       max_cache_read_tokens: parsed.cache_read,
@@ -99,13 +107,15 @@ function TokenLimitPage() {
       const usage = await api.getUsage().catch(() => null);
       if (usage) {
         setLoad({ ...load, usage });
-        setDrafts(draftsFrom(usage));
+        reset(draftsFrom(usage));
+      } else {
+        reset(drafts);
       }
       window.dispatchEvent(new Event(USAGE_CHANGED));
       const set = LIMITS.filter((l) => parsed[l.kind] != null).length;
       toast(set > 0 ? `Token limits saved: ${set} of 3 set` : "Token limits removed");
     } catch (e) {
-      toast(e instanceof Error && e.message ? `Could not save: ${e.message}` : "Could not save the token limits", "error");
+      setProblem(e instanceof Error && e.message ? `The limits weren't saved: ${e.message}` : "The limits weren't saved. Check your connection and try again.");
     } finally {
       setSaving(false);
     }
@@ -128,97 +138,101 @@ function TokenLimitPage() {
       )}
 
       {load.state === "error" && (
-        <Callout variant="error" title="Could not load the token limit">
-          <p>Check your connection and try again.</p>
-          <p className="pt-1">
-            <button type="button" onClick={fetchAll} className={secondaryButton}>
-              Try again
-            </button>
-          </p>
-        </Callout>
+        <Problem title="Couldn't load the token limits" onRetry={fetchAll}>
+          Nothing has changed. Check your connection and try again.
+        </Problem>
       )}
 
       {load.state === "ready" && (
-        <div className="space-y-4">
+        <div className="max-w-3xl space-y-8">
           <UsageCard usage={load.usage} />
 
-          <section aria-labelledby="limit-heading" className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
-            <h2 id="limit-heading" className="text-sm font-semibold text-zinc-100">Monthly limits</h2>
-            <p className="mt-1 text-sm text-zinc-400">Each limit is checked on its own. Leave one empty for no limit of that kind.</p>
-            {allTokens && (
-              <div className="mt-3">
-                <Callout variant="neutral" live={false} title={`Current limit: ${formatTokens(allTokens.max)} tokens of every kind`}>
-                  <p>Your team has one limit that counts new tokens, cache reads and cache writes together. It stays in place until you save the limits below, which replace it.</p>
-                </Callout>
-              </div>
-            )}
-            {load.canEdit ? (
-              <form
-                className="mt-4 space-y-5"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSave();
-                }}
-              >
+          {allTokens && (
+            <Callout variant="neutral" live={false} title={`Current limit: ${formatTokens(allTokens.max)} tokens of every kind`}>
+              <p>Your team has one limit that counts new tokens, cache reads and cache writes together. It stays in place until you save the limits below, which replace it.</p>
+            </Callout>
+          )}
+          {load.canEdit ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSave();
+              }}
+            >
+              <SettingsSection id="limits" title="Monthly limits" description="Each limit is checked on its own. Leave one empty for no limit of that kind.">
                 {LIMITS.map((l) => {
                   const v = parsed[l.kind];
+                  const bad = Number.isNaN(v);
                   return (
-                    <Field
+                    <SettingsRow
                       key={l.kind}
-                      id={l.id}
                       label={FIELD_LABELS[l.kind]}
-                      helper={
+                      unsaved={form.isDirty(l.kind)}
+                      controlClassName="sm:w-48"
+                      help={
                         <>
-                          {LIMIT_HELP[l.kind]}{" "}
-                          {v != null && !Number.isNaN(v) ? `Runs pause after ${formatTokens(v)} in a month.` : "Empty means no limit."}
+                          {LIMIT_HELP[l.kind]} {v != null && !bad ? `Runs pause after ${formatTokens(v)} in a month.` : "Empty means no limit."}
                         </>
                       }
-                      error={Number.isNaN(v) ? "Enter a number of 0 or more." : undefined}
-                    >
-                      {(props) => (
-                        <div className="relative">
-                          <input
-                            {...props}
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            step="0.5"
-                            placeholder="No limit"
-                            value={drafts[l.kind]}
-                            onChange={(e) => setDrafts((d) => ({ ...d, [l.kind]: e.target.value }))}
-                            className={`${inputClass} pr-28`}
-                          />
-                          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">M tokens</span>
+                      control={(ids) => (
+                        <div>
+                          <div className="relative">
+                            <input
+                              id={ids.inputId}
+                              aria-describedby={[bad ? `${l.id}-error` : "", ids.helpId ?? ""].filter(Boolean).join(" ") || undefined}
+                              aria-invalid={bad || undefined}
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              step="0.5"
+                              placeholder="No limit"
+                              value={drafts[l.kind]}
+                              onChange={(e) => form.set(l.kind, e.target.value)}
+                              className={`${inputClass} pr-20`}
+                            />
+                            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">M tokens</span>
+                          </div>
+                          {bad && (
+                            <p id={`${l.id}-error`} role="alert" className="mt-1.5 text-sm text-red-300">
+                              Enter a number of 0 or more.
+                            </p>
+                          )}
                         </div>
                       )}
-                    </Field>
+                    />
                   );
                 })}
-                <div className="flex justify-end pt-1">
-                  <button type="submit" disabled={saving || invalid} className={primaryButton}>
-                    {saving ? "Saving..." : "Save"}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div className="mt-3 space-y-3">
-                <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Monthly limits">
-                  {LIMITS.map((l) => {
-                    const max = usageLimits(load.usage).find((u) => u.kind === l.kind)?.max ?? 0;
-                    return (
-                      <div key={l.kind} data-testid={`limit-${l.kind}`}>
-                        <dt className="text-xs text-zinc-500">{LIMIT_LABELS[l.kind]}</dt>
-                        <dd className="mt-0.5 text-lg font-semibold text-zinc-100">{max > 0 ? `${formatTokens(max)} a month` : "No limit"}</dd>
-                      </div>
-                    );
-                  })}
-                </dl>
-                <Callout variant="neutral" live={false}>
-                  <p>Only admins and the owner can change the limits.</p>
-                </Callout>
-              </div>
-            )}
-          </section>
+              </SettingsSection>
+              {/* Enter in a limit saves, as in any form. */}
+              <button type="submit" className="sr-only" tabIndex={-1} aria-hidden="true">
+                Save
+              </button>
+              <SaveBar
+                count={form.count}
+                onSave={handleSave}
+                onDiscard={() => {
+                  form.discard();
+                  setProblem(null);
+                }}
+                saving={saving}
+                problem={invalid ? "Fix the limits marked in red first." : problem}
+              />
+            </form>
+          ) : (
+            <SettingsSection id="limits" title="Monthly limits" description="Only admins and the owner can change the limits.">
+              <dl className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-3" aria-label="Monthly limits">
+                {LIMITS.map((l) => {
+                  const max = usageLimits(load.usage).find((u) => u.kind === l.kind)?.max ?? 0;
+                  return (
+                    <div key={l.kind} data-testid={`limit-${l.kind}`}>
+                      <dt className="text-sm text-zinc-400">{LIMIT_LABELS[l.kind]}</dt>
+                      <dd className="mt-0.5 text-lg font-semibold text-zinc-100">{max > 0 ? `${formatTokens(max)} a month` : "No limit"}</dd>
+                    </div>
+                  );
+                })}
+              </dl>
+            </SettingsSection>
+          )}
         </div>
       )}
     </Page>
@@ -252,40 +266,44 @@ function UsageCard({ usage }: { usage: UsageInfo }) {
           <TokenMeters limits={limits} testId="usage-limits" />
         </div>
       )}
-      <p className="mt-2 text-xs text-zinc-500">
+      <p className="mt-2 text-sm text-zinc-400">
         {usage.total_runs.toLocaleString()} {usage.total_runs === 1 ? "run" : "runs"} this month
       </p>
 
-      <dl aria-label="Tokens by kind" className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-zinc-800 pt-4 sm:grid-cols-4">
+      <div className="mt-4">
+      <Disclosure summary="Details">
+      <dl aria-label="Tokens by kind" className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
         {parts.map((p) => (
           <div key={p.label} data-testid="usage-part">
-            <dt className="text-xs text-zinc-500">{p.label}</dt>
+            <dt className="text-sm text-zinc-400">{p.label}</dt>
             <dd className="mt-0.5 text-sm font-medium tabular-nums text-zinc-100" data-value={p.value}>
               {formatTokens(p.value)}
             </dd>
           </div>
         ))}
       </dl>
-      <p className="mt-3 text-xs text-zinc-500" data-testid="cache-hit-rate">
+      <p className="mt-3 text-sm text-zinc-400" data-testid="cache-hit-rate">
         Cache hit rate {hitRate}%: the share of input read from the cache instead of sent new or written to it.
       </p>
 
       {features.length > 0 && (
         <div className="mt-4 border-t border-zinc-800 pt-4">
-          <h3 className="text-xs font-medium text-zinc-400">Where the tokens went</h3>
+          <h3 className="text-sm font-medium text-zinc-200">Where the tokens went</h3>
           <ul className="mt-2 space-y-1.5" aria-label="Tokens by feature">
             {features.map((f) => (
               <li key={f.feature} className="flex items-center justify-between gap-3 text-sm" title={usageBreakdown(f)}>
                 <span className="text-zinc-300">{FEATURE_LABELS[f.feature] ?? f.feature}</span>
                 <span className="tabular-nums text-zinc-400">
                   {formatTokens(f.total_tokens)}
-                  <span className="text-zinc-600"> · {used > 0 ? Math.round((f.total_tokens / used) * 100) : 0}%</span>
+                  <span className="text-zinc-500"> · {used > 0 ? Math.round((f.total_tokens / used) * 100) : 0}%</span>
                 </span>
               </li>
             ))}
           </ul>
         </div>
       )}
+      </Disclosure>
+      </div>
     </section>
   );
 }

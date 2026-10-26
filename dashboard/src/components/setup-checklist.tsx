@@ -70,6 +70,6 @@ function StepDot({ state }: { state: SetupStepState }) {
         <span className="scale-[0.6]"><WarningIcon /></span>
       </span>
     );
-  if (state === "unsupported") return <span aria-hidden="true" className={`${base} border-dashed border-zinc-700`} />;
+  if (state === "unsupported") return <span aria-hidden="true" className={`${base} border-zinc-700 bg-zinc-800`} />;
   return <span aria-hidden="true" className={`${base} border-zinc-600`} />;
 }

@@ -9,7 +9,9 @@ import { RoleGuard } from "@/components/role-guard";
 import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { StatusText, Time } from "@/components/list";
-import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { primaryButton, secondaryButton } from "@/components/ui";
+import { ExternalLinkIcon } from "@/components/icons";
+import { Problem } from "@/components/problem";
 import { Page, PageHeader, cardClass } from "@/components/page";
 import { statusLook, stopperName } from "../status";
 import { GATE_ACTION_LABEL } from "../gate-control";
@@ -147,19 +149,16 @@ function GatePage() {
         detail
         crumb={`${gate.repo.split("/").pop()} #${gate.pr_number}`}
         title={gate.pr_title || `${gate.repo} #${gate.pr_number}`}
-        eyebrow={
-          <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span>Auto-merge</span>
-            {gateState || gate.status ? <StatusText look={look} /> : null}
-          </span>
-        }
-        lead={
-          <>
-            {gate.repo} #{gate.pr_number} ·{" "}
-            <a href={prUrl} target="_blank" rel="noreferrer" className={linkButton}>
-              Open on GitHub
-            </a>
-          </>
+        eyebrow="Pull request"
+        // A stopped gate says so once, in the callout below.
+        status={!stopped && (gateState || gate.status) ? <StatusText look={look} /> : undefined}
+        lead={<span className="[overflow-wrap:anywhere]">{gate.repo} #{gate.pr_number}</span>}
+        actions={
+          <a href={prUrl} target="_blank" rel="noreferrer" className={`${secondaryButton} gap-1.5`}>
+            Open on GitHub
+            <span aria-hidden="true" className="inline-flex"><ExternalLinkIcon /></span>
+            <span className="sr-only"> (opens in a new tab)</span>
+          </a>
         }
       />
 
@@ -215,9 +214,11 @@ function GatePage() {
             )}
           </div>
           {failed && (
-            <p role="alert" className="mt-3 text-sm text-red-300">
-              Could not {action === "rearm" ? "re-arm" : "stop"} auto-merge: {failed}
-            </p>
+            <div className="mt-3">
+              <Problem title={`Couldn't ${action === "rearm" ? "re-arm" : "stop"} auto-merge`} details={failed} onRetry={confirm}>
+                Nothing changed on the PR. Try again; if it keeps failing, use a PR comment instead.
+              </Problem>
+            </div>
           )}
         </section>
       )}
@@ -232,13 +233,13 @@ function GatePage() {
                 <li key={i} className="flex gap-2 text-zinc-400">
                   <span aria-hidden="true" className={`w-3 shrink-0 text-center ${m.cls}`}>{m.glyph}</span>
                   <span className="sr-only">{m.sr}</span>
-                  <span className="min-w-0">{c.text}</span>
+                  <span className="min-w-0 [overflow-wrap:anywhere]">{shortShas(c.text)}</span>
                 </li>
               );
             })}
           </ul>
         ) : (
-          <p className="mt-1 text-sm text-zinc-500">
+          <p className="mt-1 text-sm text-zinc-400">
             {g ? "Nothing to show yet for this commit." : "Auto-merge hasn't started on this pull request yet."}
           </p>
         )}
@@ -256,14 +257,19 @@ function GatePage() {
                   </span>
                   {` by ${stopperName(c)}${via(c.via) ? ` ${via(c.via)}` : ""}`}
                 </span>
-                <Time iso={c.at} className="text-zinc-500" />
+                <Time iso={c.at} className="text-zinc-400" />
               </li>
             ))}
           </ol>
         ) : (
-          <p className="mt-1 text-sm text-zinc-500">No one has stopped or re-armed it.</p>
+          <p className="mt-1 text-sm text-zinc-400">No one has stopped or re-armed it.</p>
         )}
       </section>
     </Page>
   );
+}
+
+/** "commit 4f1c2a9e8b7d…" (a full 40-character sha) becomes "commit 4f1c2a9": the short form people read. */
+function shortShas(text: string): string {
+  return text.replace(/\b([0-9a-f]{7})[0-9a-f]{33}\b/g, "$1");
 }

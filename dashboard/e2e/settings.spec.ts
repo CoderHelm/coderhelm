@@ -225,13 +225,19 @@ test(`the ${role} sets and removes each token limit on its own`, async ({ page }
 
   await read.fill("-1");
   await expect(page.getByText("Enter a number of 0 or more.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save" })).toBeDisabled();
+  // One save bar: it counts the change, names what to fix and saves nothing until it is fixed.
+  const bar = page.getByRole("region", { name: "Save changes" });
+  await expect(bar).toContainText("Fix the limits marked in red first.");
+  await bar.getByRole("button", { name: "Save changes" }).click();
+  expect(db.calls.filter((c) => c.method === "PUT" && c.path === "/api/settings/budget")).toHaveLength(0);
 
   await fresh.fill("2.5");
   await read.fill("40");
   await expect(page.getByText("Runs pause after 2.5M in a month.")).toBeVisible();
   await expect(page.getByText("Runs pause after 40M in a month.")).toBeVisible();
-  await page.getByRole("button", { name: "Save" }).click();
+  await expect(bar).toContainText("2 unsaved changes");
+  await bar.getByRole("button", { name: "Save changes" }).click();
+  await expect(bar).toHaveCount(0);
   await expect(page.getByText("Token limits saved: 2 of 3 set")).toBeVisible();
   const puts = db.calls.filter((c) => c.method === "PUT" && c.path === "/api/settings/budget");
   expect(puts.at(-1)?.body).toEqual({ max_new_tokens: 2_500_000, max_cache_read_tokens: 40_000_000, max_cache_write_tokens: null });
@@ -282,7 +288,7 @@ test("an old single limit that counts every kind keeps showing until the new lim
   await expect(page.getByTestId("sidebar-token-meter").getByTestId("token-meter-all_tokens")).toContainText("35.2M / 200M");
   await expect(page.getByLabel("New tokens (input + output)")).toHaveValue("");
   await page.getByLabel("New tokens (input + output)").fill("20");
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("region", { name: "Save changes" }).getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Token limits saved: 1 of 3 set")).toBeVisible();
   expect(db.legacyAllTokens).toBe(0);
   await expect(page.getByText("Current limit: 200M tokens of every kind")).toHaveCount(0);
@@ -358,6 +364,8 @@ test("each meter counts what its limit counts; the page total is all four parts"
   expect(values.reduce((a, b) => a + b, 0)).toBe(usage.total_tokens);
   await expect(page.getByTestId("usage-limits").getByTestId("token-meter-value")).toHaveText(["1.1M / 20M", "61.4M / 200M"]);
   await expect(page.getByTestId("cache-hit-rate")).toContainText("Cache hit rate 87%");
+  // The breakdown by kind and by feature sits behind Details.
+  await page.getByText("Details", { exact: true }).click();
   await expect(page.getByRole("list", { name: "Tokens by feature" })).toContainText("Ticket runs");
   await expect(page.getByRole("list", { name: "Tokens by feature" })).toContainText("PR reviews");
   await expect(page.locator("main")).not.toContainText("$");
@@ -377,7 +385,7 @@ test("the token limit page explains a failed load and retries", async ({ page })
     fail ? route.fulfill({ status: 500, body: "" }) : route.fallback(),
   );
   await page.goto("/settings/budget/");
-  await expect(page.getByText("Could not load the token limit")).toBeVisible();
+  await expect(page.getByText("Couldn't load the token limits")).toBeVisible();
   fail = false;
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(page.getByLabel("New tokens (input + output)")).toHaveValue("5");
@@ -387,14 +395,15 @@ test("the token usage email switch saves and stays off", async ({ page }) => {
   const db = await mockApi(page, { role: "member" });
   await page.goto("/settings/notifications/");
   await expect(page.getByText("Every Monday: runs, reviews, alerts and usage from the past week.")).toBeVisible();
-  const sw = page.getByRole("switch", { name: "Token usage warnings" });
+  const sw = page.getByRole("switch", { name: "Usage warnings" });
   await expect(sw).toHaveAttribute("aria-checked", "true");
   await sw.click();
   await expect(sw).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByTestId("toast").filter({ hasText: "Usage warnings off" })).toBeVisible();
   const put = db.calls.filter((c) => c.method === "PUT" && c.path === "/api/notifications").at(-1);
   expect(put?.body).toMatchObject({ email_token_warning: false, email_weekly_summary: true });
   await page.reload();
-  await expect(page.getByRole("switch", { name: "Token usage warnings" })).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByRole("switch", { name: "Usage warnings" })).toHaveAttribute("aria-checked", "false");
 });
 
 test("a page above your role says why instead of bouncing you", async ({ page }) => {
@@ -421,5 +430,5 @@ test("repositories: the list toolbar filters on and off repos and searches by na
   await page.goBack();
   await page.getByRole("searchbox", { name: "Search repos" }).fill("web");
   await expect(list.getByRole("listitem")).toHaveCount(1);
-  await expect(page.getByRole("button", { name: "Sync repos" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Refresh from GitHub" })).toBeVisible();
 });

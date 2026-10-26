@@ -7,7 +7,11 @@ import { StatusPill } from "@/components/status-pill";
 import { ListEmpty, ListError, ListSkeleton, type StatusLook } from "@/components/list";
 import { ATTEMPT_LABEL, STATE_HELP, STATE_LABEL, STATE_TONE } from "@/lib/tests";
 import { formatDuration } from "@/lib/data-sources";
-import { focusRing, linkButton } from "@/components/ui";
+import { linkButton } from "@/components/ui";
+import { StatTile } from "@/components/stat-tile";
+import { SectionHeading as SharedHeading } from "@/components/page";
+import { TechnicalDetails, firstLine } from "@/components/problem";
+import { selectClass } from "@/components/select";
 
 /** A test state in the shared list vocabulary (dot colour and words). */
 export function stateLook(state: TestState): StatusLook {
@@ -28,7 +32,7 @@ const ATTEMPT_STYLE: Record<TestAttempt["status"], string> = {
   failed: "bg-red-500/80 border-red-400/40",
   timedOut: "bg-red-500/80 border-red-400/40",
   interrupted: "bg-zinc-600 border-zinc-500",
-  skipped: "bg-transparent border-zinc-600 border-dashed",
+  skipped: "bg-transparent border-zinc-500",
 };
 
 /**
@@ -48,23 +52,52 @@ export function AttemptSquares({ attempts, size = "md" }: { attempts: TestAttemp
   );
 }
 
-export function StatCard({ label, value, hint, tone }: { label: string; value: ReactNode; hint?: ReactNode; tone?: "warning" | "error" | "success" }) {
-  const valueColor =
-    tone === "error" ? "text-red-300" : tone === "warning" ? "text-amber-300" : tone === "success" ? "text-emerald-300" : "text-zinc-100";
+/** A legend for AttemptSquares, so the colours never have to be guessed. */
+export function AttemptLegend() {
   return (
-    <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-      <p className="text-xs text-zinc-500">{label}</p>
-      <p className={`mt-1 text-xl font-semibold tabular-nums ${valueColor}`}>{value}</p>
-      {hint && <p className="mt-1 text-xs text-zinc-500">{hint}</p>}
+    <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400" data-testid="attempt-legend">
+      <span className="inline-flex items-center gap-1.5">
+        <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-[3px] border ${ATTEMPT_STYLE.passed}`} />
+        Passed
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-[3px] border ${ATTEMPT_STYLE.failed}`} />
+        Failed
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-[3px] border ${ATTEMPT_STYLE.skipped}`} />
+        Skipped
+      </span>
+    </span>
+  );
+}
+
+/** The shared stat tile, under the name the Tests pages use. */
+export function StatCard({ label, value, hint, tone }: { label: string; value: ReactNode; hint?: ReactNode; tone?: "warning" | "error" | "success" }) {
+  return <StatTile label={label} value={value} note={hint} tone={tone === "error" ? "danger" : tone ?? "neutral"} />;
+}
+
+/** A sentence-case section heading with an optional control on the right. */
+export function SectionHeading({ id, children, aside }: { id: string; children: ReactNode; aside?: ReactNode }) {
+  return (
+    <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+      <SharedHeading id={id}>{children}</SharedHeading>
+      {aside}
     </div>
   );
 }
 
-export function SectionHeading({ id, children, aside }: { id: string; children: ReactNode; aside?: ReactNode }) {
+/**
+ * A test's error, the way people read it: the first line in plain text, the
+ * whole message (stack trace and all) folded under "Full error".
+ */
+export function ErrorSummary({ message }: { message: string }) {
+  const head = firstLine(message, 200);
+  const more = message.trim() !== head;
   return (
-    <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-      <h2 id={id} className="text-xs font-semibold uppercase tracking-wider text-zinc-500">{children}</h2>
-      {aside}
+    <div className="mt-1.5 min-w-0" data-testid="test-error">
+      <p className="text-sm text-red-200 [overflow-wrap:anywhere]">{head}</p>
+      {more && <TechnicalDetails text={message} summary="Full error" />}
     </div>
   );
 }
@@ -135,11 +168,11 @@ export function Select<T extends string>({
 }) {
   return (
     <label className="flex min-w-0 flex-col gap-1">
-      <span className={hideLabel ? "sr-only" : "text-xs text-zinc-500"}>{label}</span>
+      <span className={hideLabel ? "sr-only" : "text-xs text-zinc-400"}>{label}</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value as T)}
-        className={`min-h-9 w-full min-w-0 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100 ${focusRing}`}
+        className={`${selectClass("md")} w-full min-w-0`}
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>

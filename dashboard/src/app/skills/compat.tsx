@@ -12,7 +12,7 @@ import { Markdown } from "@/components/markdown";
 import { Segmented } from "@/components/segmented";
 import { ToolSwitch } from "@/components/tools";
 import { ChevronRightIcon, LockIcon } from "@/components/icons";
-import { Chip as ListChip } from "@/components/list";
+import { Chip as ListChip, type Tone } from "@/components/list";
 import { focusRing, linkButton, secondaryButton } from "@/components/ui";
 import { lineDiff } from "@/lib/line-diff";
 import {
@@ -62,8 +62,8 @@ export const STEP_STATUS: Record<RequirementStatus, { label: string; means: stri
   translated: {
     label: "Translated",
     means: "Coderhelm does this with its own tool, named below.",
-    dot: "border-sky-500/50 bg-sky-500/15 text-sky-300",
-    text: "text-sky-300",
+    dot: "border-blue-500/50 bg-blue-500/15 text-blue-300",
+    text: "text-blue-300",
     icon: <SwapIcon />,
   },
   missing: {
@@ -84,14 +84,16 @@ export const STEP_STATUS: Record<RequirementStatus, { label: string; means: stri
 
 type Badge = "ready" | "translated" | "needs_tools" | "partial" | "unchecked" | "failed" | "stale";
 
-const BADGE: Record<Badge, { label: string; cls: string; title: string }> = {
-  ready: { label: "Ready", cls: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300", title: "Every step runs as written." },
-  translated: { label: "Translated", cls: "border-sky-500/30 bg-sky-500/10 text-sky-300", title: "Some steps use Coderhelm's own tools instead." },
-  needs_tools: { label: "Needs tools", cls: "border-amber-500/30 bg-amber-500/10 text-amber-300", title: "Some steps need a tool the team hasn't connected." },
-  partial: { label: "Partly checked", cls: "border-zinc-600 text-zinc-300", title: "The check couldn't list its steps yet; it's read as written." },
-  unchecked: { label: "Not checked yet", cls: "border-zinc-700 text-zinc-400", title: "Coderhelm checks each item after it syncs." },
-  failed: { label: "Check failed", cls: "border-red-500/30 bg-red-500/10 text-red-300", title: "The last check didn't finish." },
-  stale: { label: "Checking again", cls: "border-zinc-700 text-zinc-400", title: "The text changed since the last check." },
+// The shared tag tones (components/list/status), so a check's state is the
+// same colour as every other tag in the app.
+const BADGE: Record<Badge, { label: string; tone: Tone; title: string }> = {
+  ready: { label: "Ready", tone: "success", title: "Every step runs as written." },
+  translated: { label: "Translated", tone: "info", title: "Some steps use Coderhelm's own tools instead." },
+  needs_tools: { label: "Needs tools", tone: "waiting", title: "Some steps need a tool the team hasn't connected." },
+  partial: { label: "Partly checked", tone: "neutral", title: "The check couldn't list its steps yet; it's read as written." },
+  unchecked: { label: "Not checked yet", tone: "muted", title: "Coderhelm checks each item after it syncs." },
+  failed: { label: "Check failed", tone: "danger", title: "The last check didn't finish." },
+  stale: { label: "Checking again", tone: "muted", title: "The text changed since the last check." },
 };
 
 /** Which badge an item gets from its last check. */
@@ -107,9 +109,9 @@ export function badgeOf(s: Pick<Skill, "compat">): Badge {
 export function CompatBadge({ item }: { item: Pick<Skill, "compat"> }) {
   const b = BADGE[badgeOf(item)];
   return (
-    <span title={b.title} className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ${b.cls}`}>
+    <ListChip tone={b.tone} title={b.title}>
       {b.label}
-    </span>
+    </ListChip>
   );
 }
 
@@ -166,6 +168,8 @@ export function CompatOverview({
   filter: string;
   onFilter: (f: string) => void;
 }) {
+  // Opened by the person, or by a filter they picked; stays open until they close it.
+  const [overviewOpen, setOverviewOpen] = useState(false);
   const counts = useMemo(() => {
     const c: Record<Badge, number> = { ready: 0, translated: 0, needs_tools: 0, partial: 0, unchecked: 0, failed: 0, stale: 0 };
     for (const i of items) c[badgeOf(i)]++;
@@ -201,21 +205,36 @@ export function CompatOverview({
   const waiting = counts.unchecked + counts.stale + counts.failed + counts.partial;
   const tiles: { key: Badge; label: string; n: number; tone: string }[] = [
     { key: "ready", label: "Ready", n: counts.ready, tone: "bg-emerald-400" },
-    { key: "translated", label: "Translated", n: counts.translated, tone: "bg-sky-400" },
+    { key: "translated", label: "Translated", n: counts.translated, tone: "bg-blue-400" },
     { key: "needs_tools", label: "Need tools", n: counts.needs_tools, tone: "bg-amber-400" },
   ];
   const total = Math.max(1, items.length);
   return (
-    <section aria-labelledby="compat-overview-heading" className="mt-8 min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5" data-testid="compat-overview">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="compat-overview-heading" className="text-sm font-semibold text-zinc-100">
-          How Coderhelm runs your skills
-        </h2>
-        <p className="text-xs text-zinc-500">
-          {checked} of {items.length} checked against what your team has connected
-          {waiting > 0 && <> · {waiting} waiting for a check</>}
-        </p>
-      </div>
+    <details
+      open={overviewOpen || !!filter}
+      onToggle={(e) => setOverviewOpen(e.currentTarget.open)}
+      className="group mt-6 min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/40"
+      data-testid="compat-overview"
+      aria-labelledby="compat-overview-heading"
+    >
+      {/* One line until opened: what needs a look, and a way to review it. */}
+      <summary className={`flex min-h-11 cursor-pointer list-none flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg px-4 py-2.5 [&::-webkit-details-marker]:hidden ${focusRing}`}>
+        <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+          <h2 id="compat-overview-heading" className="text-sm font-semibold text-zinc-100">
+            How Coderhelm runs your skills
+          </h2>
+          <span className="text-sm text-zinc-400">
+            {counts.needs_tools > 0 ? `${counts.needs_tools} need a tool you haven't connected` : `${checked} of ${items.length} checked`}
+          </span>
+        </span>
+        <span className="text-sm text-zinc-300 underline underline-offset-4 group-open:hidden">Review</span>
+        <span className="hidden text-sm text-zinc-300 underline underline-offset-4 group-open:inline">Hide</span>
+      </summary>
+      <div className="border-t border-zinc-800 px-4 pb-4 pt-3">
+      <p className="text-xs text-zinc-400">
+        {checked} of {items.length} checked against what your team has connected
+        {waiting > 0 && <> · {waiting} waiting for a check</>}
+      </p>
       <div className="mt-3 flex h-2 w-full overflow-hidden rounded-full bg-zinc-800" aria-hidden="true">
         {tiles.map((t) => (t.n > 0 ? <span key={t.key} className={t.tone} style={{ width: `${(t.n / total) * 100}%` }} /> : null))}
       </div>
@@ -237,7 +256,7 @@ export function CompatOverview({
       </div>
       {needs.length > 0 && (
         <div className="mt-4 border-t border-zinc-800 pt-4">
-          <p className="text-xs font-medium text-zinc-500">Most needed</p>
+          <p className="text-xs font-medium text-zinc-400">Most needed</p>
           <ul className="mt-2 flex flex-wrap gap-2">
             {needs.slice(0, 6).map((n) => {
               const key = `need:${n.name.toLowerCase()}`;
@@ -264,10 +283,10 @@ export function CompatOverview({
       )}
       {local.length > 0 && (
         <details className="mt-4 border-t border-zinc-800 pt-4" data-testid="compat-local">
-          <summary className={`cursor-pointer text-xs font-medium text-zinc-500 hover:text-zinc-300 rounded ${focusRing}`}>
+          <summary className={`cursor-pointer text-xs font-medium text-zinc-400 hover:text-zinc-300 rounded ${focusRing}`}>
             Assumes a local machine ({local.length})
           </summary>
-          <p className="mt-2 text-xs text-zinc-500">Nothing to connect: these only exist on a person&apos;s own computer. What Coderhelm does instead:</p>
+          <p className="mt-2 text-xs text-zinc-400">Nothing to connect: these only exist on a person&apos;s own computer. What Coderhelm does instead:</p>
           <ul className="mt-2 space-y-1.5">
             {local.map((n) => (
               <li key={n.name} className="text-sm text-zinc-300">
@@ -283,7 +302,8 @@ export function CompatOverview({
           </ul>
         </details>
       )}
-    </section>
+      </div>
+    </details>
   );
 }
 
@@ -344,7 +364,7 @@ export function CompatSection({
     <section aria-labelledby="compat-heading" className="min-w-0" data-testid="compat-section">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h2 id="compat-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+          <h2 id="compat-heading" className="text-sm font-semibold text-zinc-100">
             How Coderhelm runs this
           </h2>
           <p className="mt-1 max-w-prose text-sm text-zinc-400">
@@ -366,14 +386,14 @@ export function CompatSection({
               <CompatBadge item={item} />
               {c?.summary && badge !== "unchecked" && <p className="min-w-0 text-sm text-zinc-200 wrap-anywhere" data-testid="compat-summary">{c.summary}</p>}
             </div>
-            <p className="mt-1.5 text-xs text-zinc-500">
+            <p className="mt-1.5 text-xs text-zinc-400">
               {!c
                 ? "Coderhelm checks each item after it syncs, or when an admin asks."
                 : badge === "stale"
                   ? `The text changed since the check ${ago(c.at)}. A new check runs on the next sync, or now with Re-check.`
                   : badge === "failed"
                     ? `The last check didn't finish (${c.error}). Re-check to try again.`
-                    : `Checked ${ago(c.at)}${c.model ? ` with ${c.model}` : ""}${typeof c.cost_usd === "number" && c.cost_usd > 0 ? ` · cost $${c.cost_usd.toFixed(3)}` : ""}.`}
+                    : `Checked ${ago(c.at)}.`}
             </p>
           </div>
         </div>
@@ -412,7 +432,7 @@ export function CompatSection({
 function NeedsList({ needs }: { needs: CompatNeed[] }) {
   return (
     <div className="border-b border-zinc-800 p-5" data-testid="compat-needs">
-      <h3 className="text-xs font-medium text-zinc-500">To run every step</h3>
+      <h3 className="text-xs font-medium text-zinc-400">To run every step</h3>
       <ul className="mt-2 divide-y divide-zinc-800 rounded-lg border border-zinc-800">
         {needs.map((n) => {
           const link = linkFor(n);
@@ -431,7 +451,7 @@ function NeedsList({ needs }: { needs: CompatNeed[] }) {
                   </span>
                 </p>
                 {n.fix && <p className="mt-0.5 text-sm text-zinc-400">{n.fix}</p>}
-                {n.local && n.instead && <p className="mt-0.5 text-xs text-zinc-500">Assumes a local machine. Instead: {n.instead}</p>}
+                {n.local && n.instead && <p className="mt-0.5 text-xs text-zinc-400">Assumes a local machine. Instead: {n.instead}</p>}
               </div>
               {link && (
                 <Link href={link.href} className={`${secondaryButton} min-h-8 px-3 py-1 text-xs`}>
@@ -487,7 +507,7 @@ function StepRow({ step, index, last }: { step: CompatStep; index: number; last:
             </button>
             {open && (
               <div id={id} className="mt-2 overflow-hidden rounded-lg border border-zinc-800">
-                <div className="hidden grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)] gap-2 border-b border-zinc-800 bg-zinc-950/40 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 sm:grid">
+                <div className="hidden grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)] gap-2 border-b border-zinc-800 bg-zinc-950/40 px-3 py-1.5 text-xs font-medium uppercase tracking-wider text-zinc-400 sm:grid">
                   <span>The skill asks for</span>
                   <span />
                   <span>Coderhelm uses</span>
@@ -509,7 +529,7 @@ function StepRow({ step, index, last }: { step: CompatStep; index: number; last:
 function Chip({ children, tone = "zinc" }: { children: ReactNode; tone?: "zinc" | "sky" | "emerald" }) {
   const cls =
     tone === "sky"
-      ? "border-sky-500/30 bg-sky-500/10 text-sky-200"
+      ? "border-blue-500/30 bg-blue-500/10 text-blue-200"
       : tone === "emerald"
         ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
         : "border-zinc-700 bg-zinc-950 text-zinc-300";
@@ -522,15 +542,15 @@ function RequirementRow({ r }: { r: Requirement }) {
   const s = STEP_STATUS[r.status] ?? STEP_STATUS.missing;
   const link = linkFor(r);
   return (
-    <li className="grid gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)] sm:items-start" data-testid="compat-requirement" data-status={r.status}>
+    <li className="grid gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] sm:items-start" data-testid="compat-requirement" data-status={r.status}>
       <div className="min-w-0">
         <span className="sr-only">The skill asks for: </span>
         <Chip>{r.asks}</Chip>
-        <span className="ml-1.5 text-[11px] text-zinc-500">{KIND_WORD[r.kind] ?? r.kind}</span>
-        {r.write === "outside" && <span className="ml-1.5 text-[11px] text-red-300">writes outside</span>}
+        <span className="ml-1.5 text-xs text-zinc-400">{KIND_WORD[r.kind] ?? r.kind}</span>
+        {r.write === "outside" && <span className="ml-1.5 text-xs text-red-300">writes outside</span>}
       </div>
-      <span aria-hidden="true" className="hidden text-zinc-600 sm:block">
-        →
+      <span aria-hidden="true" className="hidden pt-0.5 text-xs text-zinc-400 sm:block">
+        uses
       </span>
       <div className="min-w-0">
         <span className="sr-only">Coderhelm uses: </span>
@@ -543,7 +563,7 @@ function RequirementRow({ r }: { r: Requirement }) {
                 {u}
               </Chip>
             ))}
-            <span className={`ml-1 text-[11px] ${s.text}`}>{r.status === "translated" ? "equivalent" : "same"}</span>
+            <span className={`ml-1 text-xs ${s.text}`}>{r.status === "translated" ? "equivalent" : "same"}</span>
           </div>
         ) : (
           <div>
@@ -591,7 +611,7 @@ function VersionChoice({
           <p className="mt-1 text-xs text-amber-300">The text changed since the translation, so agents read the original until the next check.</p>
         )}
         {item.translated_by && (
-          <p className="mt-1 text-xs text-zinc-500">
+          <p className="mt-1 text-xs text-zinc-400">
             Last switched {on ? "on" : "off"} by {item.translated_by} {item.translated_at ? ago(item.translated_at) : ""}.
           </p>
         )}
@@ -623,15 +643,16 @@ function TextViews({ original, translated }: { original: string; translated: str
   return (
     <div className="mt-6 min-w-0" data-testid="compat-text">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">The text</h3>
+        <h3 className="text-sm font-semibold text-zinc-100">The text</h3>
         {translated && <Segmented label="Which text" options={options} value={view} onChange={setView} />}
       </div>
-      <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
+      {/* A wide table scrolls inside its own box instead of running past the card. */}
+      <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto">
         {view === "original" && <Markdown>{text || "_This file has no text after its settings._"}</Markdown>}
         {view === "translated" && <Markdown>{translated}</Markdown>}
         {view === "changes" && (
           <>
-            <p className="mb-2 text-xs text-zinc-500">
+            <p className="mb-2 text-xs text-zinc-400">
               {changed} line{changed === 1 ? "" : "s"} changed. <span className="text-red-300">Removed lines</span> are from the original,{" "}
               <span className="text-emerald-300">added lines</span> from the translation.
             </p>

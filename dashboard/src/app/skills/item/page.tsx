@@ -11,8 +11,11 @@ import { Page, PageHeader } from "@/components/page";
 import { Skeleton } from "@/components/skeleton";
 import { StatusPill } from "@/components/status-pill";
 import { useToast } from "@/components/toast";
-import { ToolSwitch } from "@/components/tools";
-import { focusRing } from "@/components/ui";
+import { Switch } from "@/components/settings/switch";
+import { SettingsRow } from "@/components/settings";
+import { EmptyState } from "@/components/empty-state";
+import { ExternalLinkIcon } from "@/components/icons";
+import { secondaryButton } from "@/components/ui";
 import { KIND_LABEL, ago, fileUrl, skillsApi, type SkillRepo, type SkillWithBody } from "@/lib/skills";
 import { ItemActivity } from "../skill-activity";
 import { CompatSection } from "../compat";
@@ -78,15 +81,16 @@ function ItemPage() {
   if (missing) {
     return (
       <Page>
-        <div className="rounded-lg border border-zinc-800 p-8 text-center text-zinc-500">
-          <p className="mb-2 text-lg">Skill not found</p>
-          <p className="text-sm">
-            It may have been removed from its repository, or the repository was disconnected.{" "}
-            <Link href="/skills" className="underline">
+        <EmptyState
+          title="Skill not found"
+          action={
+            <Link href="/skills" className={secondaryButton}>
               All skills
             </Link>
-          </p>
-        </div>
+          }
+        >
+          It may have been removed from its repository, or the repository was disconnected.
+        </EmptyState>
       </Page>
     );
   }
@@ -111,38 +115,52 @@ function ItemPage() {
         detail
         crumb={item.name}
         eyebrow={<span className="capitalize">{kindWord}</span>}
-        title={<span className="font-mono [overflow-wrap:anywhere]">{item.name}</span>}
+        title={<span className="[overflow-wrap:anywhere]">{item.name}</span>}
         lead={item.description || undefined}
+        actions={
+          <a href={fileUrl(item.repo, item.sha, item.path)} target="_blank" rel="noreferrer" className={`${secondaryButton} gap-1.5`}>
+            Open on GitHub
+            <ExternalLinkIcon />
+          </a>
+        }
       />
-      <div className="mt-6 flex items-start justify-between gap-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-zinc-200">Let Coderhelm read this {kindWord}</p>
-          <p className="mt-1 text-xs text-zinc-500">A Coderhelm setting. It doesn&apos;t change the file.</p>
-        </div>
-        <div className="shrink-0">
-          {canManage ? (
-            <ToolSwitch on={item.enabled} label={`Let Coderhelm read ${item.name}`} busy={switching} onToggle={toggle} />
-          ) : (
-            <StatusPill tone={item.enabled ? "success" : "neutral"}>{item.enabled ? "On" : "Off"}</StatusPill>
-          )}
-        </div>
+      <div className="mt-6 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/40">
+        <SettingsRow
+          label={`Use this ${kindWord}`}
+          help="Turning it off doesn't change the file in your repo."
+          layout="toggle"
+          control={(ids) =>
+            canManage ? (
+              <Switch id={ids.inputId} checked={item.enabled} labelledBy={ids.labelId} describedBy={ids.helpId} disabled={switching} onChange={() => void toggle()} />
+            ) : (
+              <StatusPill tone={item.enabled ? "success" : "neutral"}>{item.enabled ? "On" : "Off"}</StatusPill>
+            )
+          }
+        />
       </div>
-      <p className="mt-2 text-xs text-zinc-500 [overflow-wrap:anywhere]">
-        From <span className="font-mono text-zinc-400">{item.repo}</span> · {item.path}
-        {item.sha && (
+      <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]" data-testid="skill-facts">
+        <dt className="text-zinc-400">From</dt>
+        <dd className="min-w-0 text-zinc-200 [overflow-wrap:anywhere]">
+          {item.repo} · {item.path}
+          {repo?.synced_at && <span className="text-zinc-400"> · synced {ago(repo.synced_at)}</span>}
+        </dd>
+        <dt className="text-zinc-400">Read</dt>
+        <dd className="text-zinc-200">
+          {item.uses > 0 ? `${item.uses} time${item.uses === 1 ? "" : "s"}, last by the ${item.last_used_by} ${ago(item.last_used_at)}` : "Not read yet"}
+        </dd>
+        {item.files.length > 0 && (
           <>
-            {" "}
-            at <span className="font-mono">{item.sha.slice(0, 7)}</span>
+            <dt className="text-zinc-400">Files with it</dt>
+            <dd className="min-w-0">
+              <ul className="space-y-0.5 text-zinc-200">
+                {item.files.map((f) => (
+                  <li key={f} className="[overflow-wrap:anywhere]">{f}</li>
+                ))}
+              </ul>
+            </dd>
           </>
         )}
-        {repo?.synced_at && <> · synced {ago(repo.synced_at)}</>}
-        {" · "}
-        {item.uses > 0 ? `read ${item.uses} time${item.uses === 1 ? "" : "s"}, last by the ${item.last_used_by} ${ago(item.last_used_at)}` : "not read yet"}
-        {" · "}
-        <a href={fileUrl(item.repo, item.sha, item.path)} target="_blank" rel="noreferrer" className={`underline underline-offset-2 hover:text-zinc-300 rounded ${focusRing}`}>
-          Open on GitHub
-        </a>
-      </p>
+      </dl>
 
       {!item.enabled && (
         <div className="mt-4">
@@ -158,9 +176,6 @@ function ItemPage() {
 
       <AlwaysApplySection item={item} canManage={canManage} onSaved={(a) => setItem({ ...item, always_apply: a })} />
 
-      {item.files.length > 0 && (
-        <p className="mt-3 text-xs text-zinc-500 [overflow-wrap:anywhere]">Files with it, which agents can read: {item.files.join(", ")}</p>
-      )}
 
       <div className="mt-10">
         <ItemActivity item={item} heading="Every read" />

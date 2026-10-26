@@ -11,7 +11,7 @@ import { Callout } from "@/components/callout";
 import { Markdown } from "@/components/markdown";
 import { Skeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
-import { ToolSwitch } from "@/components/tools";
+import { Switch } from "@/components/settings/switch";
 import { buttonClass, focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Chip, List, ListEmpty, ListError, ListRow, ListSkeleton, ListToolbar, type Tone } from "@/components/list";
 import { Code, SettingsMore, SettingsRow } from "@/components/settings";
@@ -51,7 +51,7 @@ export default function AgentPageGuarded() {
 
 /** How long the page waits on a try before it stops checking. */
 const TRY_WAIT_MS = 180_000;
-const sectionHeading = "mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500";
+const sectionHeading = "mb-3 text-sm font-semibold text-zinc-100";
 type AgentTab = "overview" | "asks" | "instructions";
 const TABS: AgentTab[] = ["overview", "asks", "instructions"];
 const card = "rounded-lg border border-zinc-800 bg-zinc-900/50";
@@ -176,21 +176,12 @@ function AgentPage() {
       <PageHeader
         detail
         title={agent.name}
-        status={<Chip tone={agent.enabled ? "success" : "muted"}>{agent.enabled ? "Agent · can be asked" : "Agent · off"}</Chip>}
+        eyebrow="Agent"
+        status={<Chip tone={agent.enabled ? "success" : "muted"}>{agent.enabled ? "On" : "Off"}</Chip>}
         lead={
-          <span className="text-xs text-zinc-500 [overflow-wrap:anywhere]">
-            From {agent.repo} · <Code>{agent.path}</Code>
+          <span className="text-sm text-zinc-400 [overflow-wrap:anywhere]">
+            From {agent.repo}
             {repo?.synced_at && <> · synced {ago(repo.synced_at)}</>}
-            {" · "}
-            <a
-              href={fileUrl(agent.repo, agent.sha, agent.path)}
-              target="_blank"
-              rel="noreferrer"
-              title={agent.sha ? `The file at ${agent.sha.slice(0, 7)}` : undefined}
-              className={`underline underline-offset-2 hover:text-zinc-300 rounded ${focusRing}`}
-            >
-              Open on GitHub
-            </a>
             {!canTry && (
               <span className="mt-1 block">
                 {canManage ? `Switch ${agent.name} on to try it.` : "Admins can try this agent with a question of their own."}
@@ -199,11 +190,22 @@ function AgentPage() {
           </span>
         }
         actions={
-          canTry ? (
-            <button type="button" ref={tryButton} className={buttonClass("primary", "sm")} onClick={() => setTryOpen(true)}>
-              Try it
-            </button>
-          ) : undefined
+          <>
+            {canTry && (
+              <button type="button" ref={tryButton} className={buttonClass("primary")} onClick={() => setTryOpen(true)}>
+                Try it
+              </button>
+            )}
+            <a
+              href={fileUrl(agent.repo, agent.sha, agent.path)}
+              target="_blank"
+              rel="noreferrer"
+              title={agent.sha ? `The file at ${agent.sha.slice(0, 7)}` : undefined}
+              className={buttonClass("secondary")}
+            >
+              Open on GitHub
+            </a>
+          </>
         }
       />
 
@@ -213,7 +215,7 @@ function AgentPage() {
           layout="toggle"
           help={
             <>
-              A Coderhelm setting. It doesn&apos;t change the file.
+              Turning it off doesn&apos;t change the file in your repo.
               {agent.switched_by && (
                 <>
                   {" "}
@@ -224,7 +226,7 @@ function AgentPage() {
           }
           control={() =>
             canManage ? (
-              <ToolSwitch on={agent.enabled} label={`Let Coderhelm ask ${agent.name}`} busy={switching} onToggle={toggle} />
+              <Switch checked={agent.enabled} label={`Let Coderhelm ask ${agent.name}`} disabled={switching} onChange={() => void toggle()} />
             ) : (
               <Chip tone={agent.enabled ? "success" : "muted"}>{agent.enabled ? "On" : "Off"}</Chip>
             )
@@ -258,7 +260,7 @@ function AgentPage() {
             value: "asks",
             label: "Asks",
             href: tabHref("asks"),
-            count: asks && asks.length > 0 ? <span className="text-xs tabular-nums text-zinc-500">{asks.length}</span> : undefined,
+            count: asks && asks.length > 0 ? <span className="text-xs tabular-nums text-zinc-400">{asks.length}</span> : undefined,
             countText: asks && asks.length > 0 ? String(asks.length) : undefined,
           },
           { value: "instructions", label: "Instructions", href: tabHref("instructions") },
@@ -269,7 +271,7 @@ function AgentPage() {
         <div className="mt-6 space-y-8">
           {/* When it's asked: the description is what Coderhelm decides on. */}
           <div className={`${card} p-5`}>
-            <p className="text-xs font-medium text-zinc-500">Coderhelm asks this agent when</p>
+            <p className="text-xs font-medium text-zinc-400">Coderhelm asks this agent when</p>
             {agent.description ? (
               <p className="mt-1 text-sm text-zinc-200">{agent.description}</p>
             ) : (
@@ -281,7 +283,7 @@ function AgentPage() {
                 work it&apos;s for in the file&apos;s <Code>description:</Code>.
               </p>
             )}
-            <p className="mt-3 text-xs text-zinc-500">
+            <p className="mt-3 text-xs text-zinc-400">
               {runAsks.length > 0 || agent.asks > 0 ? (
                 <>
                   Asked {agent.asks || runAsks.length} time{(agent.asks || runAsks.length) === 1 ? "" : "s"}
@@ -313,7 +315,7 @@ function AgentPage() {
               <Fact term="Model">
                 Your team&apos;s {modelFor(settings.model)} model
                 {settings.model && (
-                  <span className="text-zinc-500">
+                  <span className="text-zinc-400">
                     {" "}
                     (the file says <Code>model: {settings.model}</Code>)
                   </span>
@@ -337,6 +339,19 @@ function AgentPage() {
             </dl>
           </section>
 
+
+        </div>
+      )}
+
+      {tab === "asks" && (
+        <div className="mt-6 space-y-10">
+          <RecentAsks asks={asks} error={asksError} agent={agent} canAskAgain={canTry} onAskAgain={askAgain} />
+          <ItemActivity item={agent} heading="Every read and ask" />
+        </div>
+      )}
+
+      {tab === "instructions" && (
+        <div className="mt-6">
           <CompatSection
             item={agent}
             canManage={canManage}
@@ -349,28 +364,21 @@ function AgentPage() {
         </div>
       )}
 
-      {tab === "asks" && (
-        <div className="mt-6 space-y-10">
-          <RecentAsks asks={asks} error={asksError} agent={agent} canAskAgain={canTry} onAskAgain={askAgain} />
-          <ItemActivity item={agent} heading="Every read and ask" />
-        </div>
-      )}
-
       {tab === "instructions" && (
-        <section aria-labelledby="instructions-heading" className="mt-6">
+        <section aria-labelledby="instructions-heading" className="mt-8">
           <h2 id="instructions-heading" className="sr-only">
             Instructions
           </h2>
-          <div className={`${card} p-5`}>
+          <div className={`${card} p-5 [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto`}>
             <Markdown>{text.trim() || "_This file has no instructions after its settings._"}</Markdown>
             {front && (
               <details className="mt-3 border-t border-zinc-800 pt-3">
-                <summary className={`cursor-pointer text-xs text-zinc-500 rounded ${focusRing}`}>File settings</summary>
+                <summary className={`cursor-pointer text-xs text-zinc-400 rounded ${focusRing}`}>Technical details (YAML)</summary>
                 <CodeBlock code={front} lang="yaml" label="File settings" className="mt-2" />
               </details>
             )}
           </div>
-          <p className="mt-2 text-xs text-zinc-500">
+          <p className="mt-2 text-xs text-zinc-400">
             Read from the default branch. To change it, open a pull request to {agent.repo}; Coderhelm reads it again when that merges.
           </p>
         </section>
@@ -438,7 +446,7 @@ function AgentTools({ tools, toolsSet }: { tools?: AgentToolset; toolsSet: boole
 function Fact({ term, children }: { term: string; children: React.ReactNode }) {
   return (
     <div className="grid grid-cols-1 gap-1 p-4 sm:grid-cols-[7rem_minmax(0,1fr)] sm:gap-4">
-      <dt className="text-xs font-medium text-zinc-500 sm:pt-0.5">{term}</dt>
+      <dt className="text-xs font-medium text-zinc-400 sm:pt-0.5">{term}</dt>
       <dd className="min-w-0 text-sm text-zinc-300 wrap-anywhere">{children}</dd>
     </div>
   );
@@ -577,8 +585,8 @@ function AskRow({ ask, currentSha, canAskAgain, onAskAgain }: { ask: AgentAsk; c
           )}
         </div>
       )}
-      {!ask.answer && o === OUTCOME.failed && !lost && <p className="mt-1 text-xs text-zinc-500">{o.means}</p>}
-      <p className="mt-2 text-xs text-zinc-600 [overflow-wrap:anywhere]">
+      {!ask.answer && o === OUTCOME.failed && !lost && <p className="mt-1 text-xs text-zinc-400">{o.means}</p>}
+      <p className="mt-2 text-xs text-zinc-400 [overflow-wrap:anywhere]">
         {[
           ask.sha && (
             <span key="sha">
@@ -713,7 +721,7 @@ function TryIt({
           {triesLeft} of {triesPerDay} tries left today
         </p>
       )}
-      <p className="mt-1 text-xs text-zinc-500">
+      <p className="mt-1 text-xs text-zinc-400">
         Ask it what Coderhelm&apos;s agents would, with your team&apos;s model.{" "}
         {(agent.agent_tools?.granted.length ?? 0) > 0
           ? "A try has no work to read, so it answers without its tools; asked during work, it reads that work's repository."
@@ -759,7 +767,7 @@ function TryIt({
         {showSent && (
           <div className="mt-3">
             <CodeBlock code={sent} lang="markdown" title="What gets sent" wrap maxHeightClass="max-h-72" />
-            <p className="mt-1 text-xs text-zinc-600">About {Math.ceil(sent.length / 4).toLocaleString()} tokens. No tools are sent.</p>
+            <p className="mt-1 text-xs text-zinc-400">About {Math.ceil(sent.length / 4).toLocaleString()} tokens. No tools are sent.</p>
           </div>
         )}
       </form>
@@ -776,7 +784,7 @@ function TryIt({
                 <Markdown>{result.answer}</Markdown>
               </div>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs text-zinc-600">
+                <span className="text-xs text-zinc-400">
                   {(result.input_tokens + result.output_tokens).toLocaleString()} tokens · {(result.ms / 1000).toFixed(1)} s
                 </span>
                 <span className="flex gap-2">

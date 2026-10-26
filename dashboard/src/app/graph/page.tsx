@@ -19,6 +19,10 @@ import {
   type GraphSymbolResult,
 } from "@/lib/api";
 import { Callout } from "@/components/callout";
+import { Problem } from "@/components/problem";
+import { EmptyState } from "@/components/empty-state";
+import { StatGrid, StatTile } from "@/components/stat-tile";
+import { Chip, Time } from "@/components/list";
 import { Skeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -48,13 +52,25 @@ const errText = (e: unknown) => (e instanceof Error ? e.message : "The request f
 
 function ErrorBox({ title, message, onRetry }: { title: string; message: string; onRetry: () => void }) {
   return (
-    <Callout variant="error" title={title}>
-      <p>{message}</p>
-      <button type="button" onClick={onRetry} className={`mt-2 text-sm font-medium underline rounded ${focusRing}`}>
-        Try again
-      </button>
-    </Callout>
+    <Problem title={title} onRetry={onRetry} details={message}>
+      Nothing has changed. Try again in a moment.
+    </Problem>
   );
+}
+
+/** One plain sentence about every repo's map: how many are ready, and what needs a look. */
+function graphSummary(repos: GraphRepo[]): string {
+  const states = repos.map(graphState);
+  const on = states.filter((s) => s !== "off").length;
+  const ready = states.filter((s) => s === "ready").length;
+  const failed = states.filter((s) => s === "failed").length;
+  const building = states.filter((s) => s === "queued" || s === "indexing" || s === "not_built").length;
+  if (on === 0) return "The code graph is off for every repository.";
+  const parts = [`Coderhelm has mapped ${ready} of ${plural(on, "repository", "repositories")}.`];
+  if (building) parts.push(`${plural(building, "is", "are")} being built.`.replace(/^(\d+) (is|are)/, "$1 $2"));
+  if (failed) parts.push(`${plural(failed, "build", "builds")} failed and ${failed === 1 ? "needs" : "need"} a look.`);
+  if (ready === on) parts.push(ready === 1 ? "It is up to date." : "All are up to date.");
+  return parts.join(" ");
 }
 
 /** A repo's state, also from a gateway that predates `state`. */
@@ -226,8 +242,14 @@ export default function GraphPage() {
     <Page className="space-y-6">
       <PageHeader
         title="Code graph"
-        lead="A map of each repo: where things are defined, who calls them and what imports what. The planner, the coding agent, the reviewer and CI fixes all use it. Every repo Coderhelm works in gets one, and it updates on every push to the default branch."
+        lead="A map of each repo: where things are defined, who calls them and what imports what. The planner, the coding agent, the reviewer and CI fixes all use it, and it updates on every push to the default branch."
       />
+
+      {repos && repos.length > 0 && (
+        <p className="text-sm text-zinc-200" data-testid="graph-summary">
+          {graphSummary(repos)}
+        </p>
+      )}
 
       <ListSection id="graph-repos" title="Repositories" count={repos?.length}>
         {reposError ? (
@@ -266,41 +288,41 @@ export default function GraphPage() {
                   summaryTone="danger"
                   chips={<StatusText look={look} />}
                   time={r.indexed ? r.updated_at : null}
+                  className={repo === r.repo ? "bg-zinc-800/40" : ""}
                   actions={
-                    <>
-                      {r.indexed && state !== "off" && (
-                        <button
-                          type="button"
-                          onClick={() => setRepo(r.repo)}
-                          aria-pressed={repo === r.repo}
-                          className={smallSecondaryButton}
-                        >
-                          {repo === r.repo ? "Exploring" : "Explore"}
+                    r.indexed && state !== "off" ? (
+                      repo === r.repo ? (
+                        <Chip tone="info">Exploring</Chip>
+                      ) : (
+                        <button type="button" onClick={() => setRepo(r.repo)} aria-label={`Explore ${r.repo}`} className={smallSecondaryButton}>
+                          Explore
                         </button>
-                      )}
-                      {canManage && state !== "off" && (
-                        <button
-                          type="button"
-                          onClick={() => void rebuild(r)}
-                          disabled={busyRow || state === "queued" || state === "indexing"}
-                          aria-label={`Rebuild the code graph for ${r.repo}`}
-                          className={smallSecondaryButton}
-                        >
-                          Rebuild
-                        </button>
-                      )}
-                      {canManage && (
-                        <button
-                          type="button"
-                          onClick={() => void setEnabled(r, state === "off")}
-                          disabled={busyRow}
-                          aria-label={`${state === "off" ? "Turn on" : "Turn off"} the code graph for ${r.repo}`}
-                          className={smallSecondaryButton}
-                        >
-                          {state === "off" ? "Turn on" : "Turn off"}
-                        </button>
-                      )}
-                    </>
+                      )
+                    ) : undefined
+                  }
+                  menuLabel={`Code graph actions for ${r.repo}`}
+                  menu={
+                    canManage
+                      ? [
+                          ...(state !== "off"
+                            ? [
+                                {
+                                  label: "Rebuild",
+                                  note: "Re-map this repository now",
+                                  disabled: busyRow || state === "queued" || state === "indexing",
+                                  onSelect: () => void rebuild(r),
+                                },
+                              ]
+                            : []),
+                          {
+                            label: state === "off" ? "Turn on" : "Turn off",
+                            note: state === "off" ? "Start mapping this repository" : "Stop mapping it; agents understand it less well",
+                            disabled: busyRow,
+                            danger: state !== "off",
+                            onSelect: () => void setEnabled(r, state === "off"),
+                          },
+                        ]
+                      : undefined
                   }
                 />
               );
@@ -318,39 +340,29 @@ export default function GraphPage() {
       {statusError && <ErrorBox title="Couldn't load the graph" message={statusError} onRetry={loadStatus} />}
 
       {repo && !status && !statusError && (repos?.length ?? 0) > 0 && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" aria-busy="true">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16" />)}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3" aria-busy="true">
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20" />)}
         </div>
       )}
 
       {status?.indexed && (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {[
-              ["Files", status.files],
-              ["Symbols", status.symbols],
-              ["Names referenced", status.names_referenced],
-              ["Branch", status.branch],
-            ].map(([label, val]) => (
-              <div key={String(label)} className="min-w-0 border border-zinc-800 rounded-lg p-3">
-                <div className="text-xs text-zinc-500">{label}</div>
-                <div className="text-lg text-zinc-100 font-medium truncate">
-                  {typeof val === "number" ? val.toLocaleString() : String(val || "—")}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="text-xs text-zinc-500">
-            Indexed at commit <code>{status.indexed_sha?.slice(0, 7) || "—"}</code>
-            {updated && !isNaN(updated.getTime()) ? ` · ${updated.toLocaleString()}` : ""}
-          </div>
+          <StatGrid className="lg:grid-cols-3">
+            <StatTile label="Files" value={(status.files ?? 0).toLocaleString()} />
+            <StatTile label="Symbols" value={(status.symbols ?? 0).toLocaleString()} note="Functions, classes and types defined" />
+            <StatTile label="Names referenced" value={(status.names_referenced ?? 0).toLocaleString()} />
+          </StatGrid>
+          <p className="text-sm text-zinc-400" data-testid="graph-indexed">
+            Indexed {status.branch ? <>from <span className="text-zinc-200 [overflow-wrap:anywhere]">{status.branch}</span> </> : null}at commit <code>{status.indexed_sha?.slice(0, 7) || "—"}</code>
+            {updated && !isNaN(updated.getTime()) ? <> · <Time iso={status.updated_at} /></> : null}
+          </p>
 
           <div className="grid lg:grid-cols-2 gap-6">
             <div className="min-w-0">
               <h2 className="text-sm font-medium text-zinc-300 mb-1">Most connected files</h2>
-              <p className="text-xs text-zinc-500 mb-2">Files the rest of the code leans on most. Pick one to explore it.</p>
+              <p className="text-xs text-zinc-400 mb-2">Files the rest of the code leans on most. Pick one to explore it.</p>
               {(status.top_files ?? []).length === 0 ? (
-                <p className="text-sm text-zinc-500 border border-zinc-800 rounded-lg p-3">No files ranked yet.</p>
+                <p className="text-sm text-zinc-400 border border-zinc-800 rounded-lg p-3">No files ranked yet.</p>
               ) : (
                 <ul className="border border-zinc-800 rounded-lg divide-y divide-zinc-800 max-h-96 overflow-y-auto">
                   {(status.top_files ?? []).slice(0, 25).map((f) => (
@@ -361,7 +373,7 @@ export default function GraphPage() {
                         className={`w-full text-left px-3 py-2 hover:bg-zinc-900 flex items-center justify-between gap-2 ${focusRing}`}
                       >
                         <span className="text-sm text-zinc-300 truncate">{f.path}</span>
-                        <span className="text-xs text-zinc-500 shrink-0">
+                        <span className="text-xs text-zinc-400 shrink-0">
                           {f.defs} definition{f.defs === 1 ? "" : "s"}
                         </span>
                       </button>
@@ -389,14 +401,14 @@ export default function GraphPage() {
                   className={`${inputClass} flex-1 min-w-0`}
                 />
                 <button type="submit" disabled={busy || !query.trim()} className={primaryButton}>
-                  {busy ? "Searching..." : "Search"}
+                  {busy ? "Searching…" : "Search"}
                 </button>
               </form>
               {searchError && <ErrorBox title="Search failed" message={searchError} onRetry={search} />}
               {result && (
                 <div className="border border-zinc-800 rounded-lg p-3 space-y-3 max-h-80 overflow-y-auto">
                   <div>
-                    <h3 className="text-xs text-zinc-500 mb-1">Definitions ({result.definitions.length})</h3>
+                    <h3 className="text-xs text-zinc-400 mb-1">Definitions ({result.definitions.length})</h3>
                     {result.definitions.map((d, i) => (
                       <button
                         type="button"
@@ -405,13 +417,13 @@ export default function GraphPage() {
                         className={`block w-full text-left text-sm text-zinc-300 hover:text-emerald-400 truncate rounded ${focusRing}`}
                       >
                         <span className="text-emerald-500">{d.name}</span> in {d.path}:{d.line}{" "}
-                        <span className="text-zinc-500">({d.kind})</span>
+                        <span className="text-zinc-400">({d.kind})</span>
                       </button>
                     ))}
-                    {result.definitions.length === 0 && <p className="text-sm text-zinc-500">None found.</p>}
+                    {result.definitions.length === 0 && <p className="text-sm text-zinc-400">None found.</p>}
                   </div>
                   <div>
-                    <h3 className="text-xs text-zinc-500 mb-1">
+                    <h3 className="text-xs text-zinc-400 mb-1">
                       Used in ({result.callers.length} file{result.callers.length === 1 ? "" : "s"})
                     </h3>
                     {result.callers.slice(0, 20).map((c) => (
@@ -424,7 +436,7 @@ export default function GraphPage() {
                         {c}
                       </button>
                     ))}
-                    {result.callers.length === 0 && <p className="text-sm text-zinc-500">None found.</p>}
+                    {result.callers.length === 0 && <p className="text-sm text-zinc-400">None found.</p>}
                   </div>
                 </div>
               )}
@@ -433,7 +445,7 @@ export default function GraphPage() {
 
           <div className="min-w-0">
             <h2 className="text-sm font-medium text-zinc-300 mb-2">
-              Explorer{hood && <span className="text-zinc-500 font-normal">: {hood.path}</span>}
+              Explorer{hood && <span className="text-zinc-400 font-normal">: {hood.path}</span>}
             </h2>
             {hoodError && (
               <div className="mb-2">
@@ -456,9 +468,9 @@ export default function GraphPage() {
                 />
               </>
             ) : (
-              <div className="border border-dashed border-zinc-800 rounded-lg h-40 flex items-center justify-center px-4 text-center text-sm text-zinc-500">
-                Pick a file from the list or a search result to see what it connects to.
-              </div>
+              <EmptyState title="Nothing picked yet" testId="graph-explorer-empty">
+                Pick a file from Most connected files, or a search result, to see what it connects to.
+              </EmptyState>
             )}
           </div>
         </>

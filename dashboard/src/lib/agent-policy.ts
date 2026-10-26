@@ -300,9 +300,11 @@ export function ruleWhat(r: Rule): string {
   if (r.kind) parts.push(KIND_LABELS[r.kind].toLowerCase() + "s");
   if (r.server) parts.push(`on ${r.server}`);
   if (r.tool) parts.push(`named ${r.tool}`);
-  if (r.risk) parts.push(`of ${RISK_LABELS[r.risk].toLowerCase()} risk`);
   if (r.command) parts.push(`matching "${r.command}"`);
-  return parts.length ? parts.join(" ") : "everything";
+  // "of write risk" alone was a fragment: a risk reads as "anything with write risk".
+  if (r.risk) parts.push(`with ${RISK_LABELS[r.risk].toLowerCase()} risk`);
+  if (!parts.length) return "everything";
+  return r.kind ? parts.join(" ") : `anything ${parts.join(" ")}`;
 }
 
 /** Where a rule applies, in plain words. */
@@ -320,4 +322,12 @@ export function followUpAfterApproval(approved: boolean): string {
 
 export function followUpAfterSignIn(name: string, connected: boolean): string {
   return connected ? `I've connected ${name}. Please continue.` : `Not now. Carry on without ${name}.`;
+}
+
+/** "agent:coder" becomes "Coder agent"; a person or anything else shows as sent. */
+export function actorLabel(actor: string): string {
+  const m = /^agent:(.+)$/.exec(actor);
+  if (!m) return actor;
+  const label = AGENT_LABELS[m[1] as AgentKey];
+  return label ? `${label} agent` : `${m[1].replace(/_/g, " ")} agent`;
 }

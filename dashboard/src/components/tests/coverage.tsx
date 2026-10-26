@@ -8,7 +8,7 @@ import { errorMessage } from "@/lib/data-sources";
 import { StatusPill } from "@/components/status-pill";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
-import { linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { linkButton, primaryButton, secondaryButton, smallSecondaryButton, smallPrimaryButton } from "@/components/ui";
 import { EmptyBox, LoadError, Loading, SectionHeading } from "./common";
 import { useLoad } from "./use-load";
 
@@ -81,7 +81,7 @@ export function CoverageView({ repo, canEdit }: { repo: string; canEdit: boolean
                   <p className="min-w-0 flex-1 basis-64 text-sm font-medium text-zinc-100">{r.title}</p>
                   <StatusPill tone={r.status === "pr_opened" ? "success" : "neutral"}>{RECOMMENDATION_STATUS[r.status]}</StatusPill>
                 </div>
-                {r.area && <p className="mt-1 text-xs text-zinc-500">Area: {r.area}</p>}
+                {r.area && <p className="mt-1 text-xs text-zinc-400">Area: {r.area}</p>}
                 <p className="mt-2 max-w-prose text-sm text-zinc-300">{r.why}</p>
                 {r.evidence.length > 0 && (
                   <ul aria-label="Evidence" className="mt-2 space-y-1 text-xs text-zinc-400">
@@ -101,10 +101,10 @@ export function CoverageView({ repo, canEdit }: { repo: string; canEdit: boolean
                   {r.pr_url && <a href={r.pr_url} target="_blank" rel="noreferrer" className={linkButton}>Open the PR</a>}
                   {canEdit && r.status === "open" && (
                     <>
-                      <button type="button" onClick={() => accept(r)} disabled={busy === r.id} className={`${primaryButton} !min-h-8 !py-1`}>
+                      <button type="button" onClick={() => accept(r)} disabled={busy === r.id} className={`${smallPrimaryButton}`}>
                         Write this test
                       </button>
-                      <button type="button" onClick={() => dismiss(r)} disabled={busy === r.id} className={`${secondaryButton} !min-h-8 !py-1`}>
+                      <button type="button" onClick={() => dismiss(r)} disabled={busy === r.id} className={`${smallSecondaryButton}`}>
                         Dismiss
                       </button>
                     </>
@@ -153,7 +153,7 @@ function AreaRow({ area }: { area: { area: string; paths: string[]; tests: { id:
         {area.covered ? <StatusPill tone="success">{plural(area.tests.length, "test")}</StatusPill> : <StatusPill tone="warning">No test</StatusPill>}
       </div>
       {area.paths.length > 0 && (
-        <p className="mt-1 wrap-anywhere font-mono text-xs text-zinc-500">{area.paths.slice(0, 4).join("  ")}{area.paths.length > 4 ? `  +${area.paths.length - 4} more` : ""}</p>
+        <p className="mt-1 wrap-anywhere font-mono text-xs text-zinc-400">{area.paths.slice(0, 4).join("  ")}{area.paths.length > 4 ? `  +${area.paths.length - 4} more` : ""}</p>
       )}
       {area.tests.length > 0 && (
         <ul aria-label={`Tests for ${area.area}`} className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
@@ -164,7 +164,7 @@ function AreaRow({ area }: { area: { area: string; paths: string[]; tests: { id:
           ))}
         </ul>
       )}
-      {area.covered && <p className="mt-1 text-xs text-zinc-500">{plural(area.runs_30d, "run")} in the last 30 days</p>}
+      {area.covered && <p className="mt-1 text-xs text-zinc-400">{plural(area.runs_30d, "run")} in the last 30 days</p>}
     </li>
   );
 }

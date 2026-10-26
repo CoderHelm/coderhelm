@@ -116,7 +116,7 @@ export function CloseRunDialog({
             placeholder="e.g. Duplicate of ABC-12"
             className={inputClass}
           />
-          <p className="mt-1 text-xs text-zinc-500">A Jira ticket gets a note saying who closed it and why.</p>
+          <p className="mt-1 text-xs text-zinc-400">A Jira ticket gets a note saying who closed it and why.</p>
         </div>
         {prNumbers.length > 0 && (
           <label className="flex cursor-pointer items-start gap-2 text-sm text-zinc-300">
@@ -128,7 +128,7 @@ export function CloseRunDialog({
             />
             <span>
               {prLabel}
-              <span className="block text-xs text-zinc-500">
+              <span className="block text-xs text-zinc-400">
                 Left open unless ticked. Coderhelm leaves a comment saying who closed it and why.
               </span>
             </span>

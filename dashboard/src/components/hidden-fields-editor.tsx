@@ -120,7 +120,7 @@ export function HiddenFieldsEditor({
             Hide it
           </button>
         </div>
-        <p className="mt-2 text-xs text-zinc-500">
+        <p className="mt-2 text-xs text-zinc-400">
           A name hides every {noun} that contains it (<code>salary</code> also hides <code>base_salary</code>). Start with = to hide only an exact name: <code>=ip</code> hides <code>ip</code> but not <code>membership</code>.
           {noun === "column" ? (
             <> To hide a column in one table only, name the table: <code>person.name</code> or <code>public.person.name</code> hides <code>name</code> in that table and leaves other tables&apos; <code>name</code> alone.</>

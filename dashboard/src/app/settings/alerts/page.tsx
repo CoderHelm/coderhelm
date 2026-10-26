@@ -29,7 +29,11 @@ import { SetupChecklist, type SetupItem } from "@/components/setup-checklist";
 import { Skeleton } from "@/components/skeleton";
 import { Field } from "@/components/field";
 import { MarkdownEditor } from "@/components/markdown-editor";
-import { Page, PageHeader, Section } from "@/components/page";
+import { Page, PageHeader, Section, SectionHeading } from "@/components/page";
+import { EmptyState } from "@/components/empty-state";
+import { Select } from "@/components/select";
+import { Problem } from "@/components/problem";
+import { BellIcon } from "@/components/icons";
 import { Switch as OnOffSwitch } from "@/components/teams-webhook";
 import { Code, SaveBar, SettingsDisclosure, SettingsRow, SettingsSection, Switch, useDirtyForm } from "@/components/settings";
 import { DetailBlock, List, ListRow, ListSkeleton } from "@/components/list";
@@ -127,14 +131,23 @@ const OUTCOME_CHIP: Record<string, { label: string; tone: "success" | "warning" 
   daily_cap: { label: "Daily cap reached", tone: "warning" },
   misconfigured: { label: "Route misconfigured", tone: "error" },
   error: { label: "Error", tone: "error" },
+  posted: { label: "Posted to chat", tone: "info" },
+  deduplicated: { label: "Repeat, skipped", tone: "neutral" },
+  recovery: { label: "Recovered", tone: "success" },
+  recovery_not_posted: { label: "Recovered, not posted", tone: "neutral" },
 };
 
+/**
+ * What happened, in the shared pill tones (info for "told someone"). An
+ * outcome the page doesn't know yet shows as a neutral "Other", with the raw
+ * value on hover, so it never looks like a real state.
+ */
 function OutcomeChip({ outcome }: { outcome: string }) {
-  const chip = OUTCOME_CHIP[outcome] ?? { label: outcome.replace(/[_-]+/g, " "), tone: "neutral" as const };
-  if (chip.tone === "info") {
+  const chip = OUTCOME_CHIP[outcome];
+  if (!chip) {
     return (
-      <span className="inline-flex items-center rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-0.5 text-xs font-medium whitespace-nowrap text-sky-300">
-        {chip.label}
+      <span title={outcome} data-outcome={outcome}>
+        <StatusPill tone="neutral">Other</StatusPill>
       </span>
     );
   }
@@ -319,7 +332,7 @@ function AlertsPage() {
 
       <div className="mt-8 space-y-8">
         <section aria-labelledby="routes-heading" className="min-w-0">
-          <h2 id="routes-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Routes</h2>
+          <SectionHeading id="routes-heading">Routes</SectionHeading>
           <div className="mt-3">
             {load.state === "loading" && <ListSkeleton rows={2} label="Loading the routes" />}
             {load.state === "error" && (
@@ -333,17 +346,19 @@ function AlertsPage() {
               </Callout>
             )}
             {load.state === "ready" && routes.length === 0 && (
-              <div className="rounded-lg border border-dashed border-zinc-700 p-8 text-center">
-                <p className="font-semibold text-zinc-100">No alert routes yet</p>
-                <p className="mx-auto mt-1 max-w-md text-sm text-zinc-400">
-                  A route connects an SNS topic to Coderhelm. Open &ldquo;How to connect a topic&rdquo; below, then add the route.
-                </p>
-                {canEdit && (
-                  <button type="button" onClick={addRoute} className={`${primaryButton} mt-4`}>
-                    Add your first route
-                  </button>
-                )}
-              </div>
+              <EmptyState
+                icon={<BellIcon />}
+                title="No alert routes yet"
+                action={
+                  canEdit ? (
+                    <button type="button" onClick={addRoute} className={primaryButton}>
+                      Add your first route
+                    </button>
+                  ) : undefined
+                }
+              >
+                A route connects an SNS topic to Coderhelm. Open &ldquo;How to connect a topic&rdquo; below, then add the route.
+              </EmptyState>
             )}
             {load.state === "ready" && routes.length > 0 && (
               <List label="Alert routes">
@@ -462,16 +477,13 @@ function RouteRow({
       }
       actions={
         canEdit ? (
-          <>
-            <button type="button" onClick={onEdit} className={buttonClass("secondary", "sm")}>
-              Edit rules
-            </button>
-            <button type="button" onClick={onRemove} disabled={busy} className={buttonClass("ghost", "sm")} aria-label={`Remove the route for ${name}`}>
-              Remove
-            </button>
-          </>
+          <button type="button" onClick={onEdit} className={buttonClass("secondary", "sm")}>
+            Edit rules
+          </button>
         ) : undefined
       }
+      menu={canEdit ? [{ label: "Remove route", onSelect: onRemove, disabled: busy, danger: true }] : undefined}
+      menuLabel={`Actions for ${name}`}
       details={
         <>
           <DetailBlock title="Topic">
@@ -483,16 +495,15 @@ function RouteRow({
                 <li key={rule.id ?? i} className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
                   <span className="w-5 shrink-0 text-zinc-500">{i + 1}.</span>
                   <span className="min-w-0 text-zinc-300">{ruleWhen(rule)}</span>
-                  <span aria-hidden="true" className="text-zinc-600">→</span>
-                  <span className="sr-only">opens a pull request in</span>
+                  <span className="text-zinc-400">opens a PR in</span>
                   <span className="min-w-0 wrap-anywhere text-emerald-300">{rule.repo}</span>
                 </li>
               ))}
               <li className="flex flex-wrap items-baseline gap-x-2 text-zinc-500">
                 <span className="w-5 shrink-0" />
                 <span>{r.rules.length ? "Everything else" : "Every alert"}</span>
-                <span aria-hidden="true" className="text-zinc-600">→</span>
-                <span className="text-sky-300">{mode === "off" ? "recorded only" : "chat only"}</span>
+                <span className="text-zinc-400">goes to</span>
+                <span className="text-blue-300">{mode === "off" ? "recorded only" : "chat only"}</span>
               </li>
             </ol>
           </DetailBlock>
@@ -514,7 +525,7 @@ function RouteRow({
           {connected && <RouteAlarms route={r} />}
         </>
       }
-      detailsLabel="Rules"
+      detailsLabel="Details"
       detailsFor={`rules of ${name}`}
     />
   );
@@ -800,14 +811,14 @@ function AlertSettings() {
         </SettingsRow>
         <SettingsRow
           label="Daily token budget for alert runs"
-          controlClassName="sm:w-40"
+          controlClassName="sm:w-56"
           unsaved={budgetDirty}
           help={`Alert runs stop for the day once they use this many tokens; alerts keep posting to chat. Each rule also starts at most ${budget?.max_runs_per_rule_per_day ?? 5} runs a day. 0 turns alert runs off.`}
           control={(ids) =>
             budgetError ? (
               <p className="text-sm text-red-400">Could not load the budget.</p>
             ) : (
-              <div>
+              <div className="relative">
                 <input
                   id={ids.inputId}
                   value={form.values.budget}
@@ -817,8 +828,9 @@ function AlertSettings() {
                   disabled={!budget}
                   aria-invalid={form.values.budget.trim() && !budgetValid ? true : undefined}
                   aria-describedby={[ids.helpId, budget ? "alert-budget-use" : ""].filter(Boolean).join(" ")}
-                  className={inputClass}
+                  className={`${inputClass} pr-24`}
                 />
+                <span aria-hidden="true" className="pointer-events-none absolute right-3 top-2 text-sm text-zinc-400">tokens a day</span>
                 {form.values.budget.trim() && !budgetValid && (
                   <p role="alert" className="mt-1.5 text-xs text-red-400">Enter a number such as 500k or 2M, up to 100M.</p>
                 )}
@@ -838,7 +850,7 @@ function AlertSettings() {
               >
                 <div className={`h-full ${used >= 100 ? "bg-red-400" : used >= 75 ? "bg-amber-400" : "bg-emerald-400"}`} style={{ width: `${used}%` }} />
               </div>
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="mt-1 text-xs text-zinc-400">
                 {fmtTokens(budget.used_24h_tokens)} of {fmtTokens(budget.daily_tokens)} used in the last 24 hours
                 {budget.open_runs > 0 && `, ${budget.open_runs} run${budget.open_runs > 1 ? "s" : ""} in progress (each counts as ${fmtTokens(budget.open_run_reserve_tokens)})`}
               </p>
@@ -919,30 +931,25 @@ function EventsTimeline({
           onChange={setFilter}
         /></div>
         {routes.length > 1 && (
-          <label className="flex min-w-0 max-w-full items-center gap-2 text-sm text-zinc-400">
-            <span className="shrink-0 whitespace-nowrap">Route</span>
-            <select value={topic} onChange={(e) => setTopic(e.target.value)} className={`${inputClass} w-auto min-w-0 py-1.5`}>
-              <option value="all">Every route</option>
-              {routes.map((r) => (
-                <option key={r.topic_arn} value={r.topic_arn}>{topicName(r.topic_arn)}</option>
-              ))}
-            </select>
-          </label>
+          <Select aria-label="Route" value={topic} onChange={(e) => setTopic(e.target.value)} className="min-w-0 sm:max-w-64">
+            <option value="all">Every route</option>
+            {routes.map((r) => (
+              <option key={r.topic_arn} value={r.topic_arn}>{topicName(r.topic_arn)}</option>
+            ))}
+          </Select>
         )}
       </div>
 
       {error && (
-        <Callout variant="error" title="Could not load the recent alerts">
-          <p><button type="button" onClick={onRetry} className={linkButton}>Try again</button></p>
-        </Callout>
+        <Problem title="Could not load the recent alerts" onRetry={onRetry}>
+          Nothing was changed. Check your connection and try again.
+        </Problem>
       )}
 
       {!error && events.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-zinc-700 p-6 text-center text-sm text-zinc-400">
-          No alerts received yet. They appear here as soon as a subscribed topic sends one.
-        </div>
+        <EmptyState title="No alerts received yet.">They appear here as soon as a subscribed topic sends one.</EmptyState>
       ) : shown.length === 0 && !error ? (
-        <p className="text-sm text-zinc-500">No alerts match. Choose All to see every alert.</p>
+        <p className="text-sm text-zinc-400">No alerts match. Choose All to see every alert.</p>
       ) : (
         <ol aria-label="Recent alerts" className="overflow-hidden rounded-lg border border-zinc-800 divide-y divide-zinc-800">
           {shown.map((e) => {
@@ -950,14 +957,18 @@ function EventsTimeline({
             const recovery = resolvedBy.get(e.id);
             return (
               <li key={e.id} className="flex flex-col gap-1.5 px-4 py-3 sm:flex-row sm:items-start sm:gap-4">
-                <time dateTime={e.received_at ?? undefined} className="shrink-0 text-xs text-zinc-500 sm:w-28 sm:pt-0.5" title={e.received_at ?? ""}>
+                <time dateTime={e.received_at ?? undefined} className="shrink-0 text-xs text-zinc-400 sm:w-28 sm:pt-0.5" title={e.received_at ?? ""}>
                   {e.received_at ? timeAgo(e.received_at) : "Unknown time"}
                 </time>
                 <div className="min-w-0 flex-1">
-                  <Link href={`/alerts/detail?id=${encodeURIComponent(e.id)}`} className={`${linkButton} text-zinc-100`}>
-                    {e.title || "Untitled alert"}
+                  <Link
+                    href={`/alerts/detail?id=${encodeURIComponent(e.id)}`}
+                    title={e.title || undefined}
+                    className={`${linkButton} block min-w-0 max-w-full !text-zinc-100`}
+                  >
+                    <span className="line-clamp-2 [overflow-wrap:anywhere]">{e.title || "Alert with no title"}</span>
                   </Link>
-                  <p className="mt-0.5 text-xs text-zinc-500">
+                  <p className="mt-0.5 text-xs text-zinc-400">
                     {topicName(e.topic_arn)}
                     {e.repo ? <> · {e.repo}</> : null}
                   </p>
@@ -1044,7 +1055,7 @@ function AlarmPicker({ id, alarms, selected, onChange }: { id: string; alarms: T
               {a.state === "missing" ? (
                 <span className="shrink-0 text-xs text-amber-300">not on this topic</span>
               ) : (
-                <span className="shrink-0 text-xs text-zinc-500">{STATE_WORD[a.state ?? ""] ?? ""}</span>
+                <span className="shrink-0 text-xs text-zinc-400">{STATE_WORD[a.state ?? ""] ?? ""}</span>
               )}
             </label>
           </li>
@@ -1106,14 +1117,14 @@ function RuleEditor({
       <legend className="sr-only">Rule {index + 1}</legend>
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-semibold text-zinc-100">Rule {index + 1}</span>
-        <span className="text-xs text-zinc-500">
+        <span className="text-xs text-zinc-400">
           {matches > 0 ? `Takes ${matches} of the recent alerts` : "Takes none of the recent alerts"}
         </span>
         <span className="flex-1" />
-        <button type="button" onClick={() => onMove(-1)} disabled={index === 0} className={`${secondaryButton} !px-2.5`} aria-label={`Move rule ${index + 1} up`}>
+        <button type="button" onClick={() => onMove(-1)} disabled={index === 0} className={buttonClass("secondary", "sm")} aria-label={`Move rule ${index + 1} up`}>
           ↑
         </button>
-        <button type="button" onClick={() => onMove(1)} disabled={index === count - 1} className={`${secondaryButton} !px-2.5`} aria-label={`Move rule ${index + 1} down`}>
+        <button type="button" onClick={() => onMove(1)} disabled={index === count - 1} className={buttonClass("secondary", "sm")} aria-label={`Move rule ${index + 1} down`}>
           ↓
         </button>
         <button type="button" onClick={onRemove} className={`${linkButton} text-red-400`}>
@@ -1371,7 +1382,7 @@ function RouteEditor({
           </Field>
 
           <section aria-labelledby="rules-heading" className="flex flex-col gap-3">
-            <h2 id="rules-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Rules, first match wins</h2>
+            <SectionHeading id="rules-heading">Rules, first match wins</SectionHeading>
             {route.rules.map((rule, i) => (
               <RuleEditor
                 key={keys.current[i]}
@@ -1388,15 +1399,13 @@ function RouteEditor({
                 onMove={(dir) => moveRule(i, dir)}
               />
             ))}
-            <button
-              type="button"
-              onClick={addRule}
-              className={`w-full rounded-lg border border-dashed border-zinc-700 px-3 py-3 text-sm text-zinc-300 hover:border-zinc-500 hover:text-zinc-100 ${focusRing}`}
-            >
-              Add a rule
-            </button>
-            <p className="text-sm text-zinc-500">
-              {route.rules.length ? "Everything else" : "Every alert"} <span aria-hidden="true">→</span> {mode === "off" ? "recorded only" : "chat only"}
+            <div>
+              <button type="button" onClick={addRule} className={secondaryButton}>
+                Add a rule
+              </button>
+            </div>
+            <p className="text-sm text-zinc-400">
+              {route.rules.length ? "Everything else" : "Every alert"} goes to {mode === "off" ? "recorded only" : "chat only"}.
             </p>
           </section>
 
@@ -1492,7 +1501,7 @@ function RouteEditor({
               ))}
             </ul>
           )}
-          <p className="mt-3 text-xs text-zinc-500">
+          <p className="mt-3 text-xs text-zinc-400">
             The preview checks phrases against each alert&apos;s title. When an alert arrives, its full text is checked too.
           </p>
         </aside>

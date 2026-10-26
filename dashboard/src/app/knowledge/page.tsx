@@ -132,7 +132,7 @@ function Empty({ canManage, onStart }: { canManage: boolean; onStart: (k?: AddKi
       {canManage ? (
         <>
           <div className="mt-8">
-            <button type="button" onClick={() => onStart(null)} className={`${buttonClass("primary")} !min-h-11 !px-6 !text-base`} data-testid="start-knowledge">
+            <button type="button" onClick={() => onStart(null)} className={`${buttonClass("primary", "lg")}`} data-testid="start-knowledge">
               Add your first source
             </button>
           </div>

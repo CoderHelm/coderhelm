@@ -8,14 +8,16 @@ import { api, type AlertEventDetail, errorStatus } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
-import { Callout } from "@/components/callout";
 import { RunStatusBadge } from "@/components/run-status";
-import { focusRing, linkButton, secondaryButton } from "@/components/ui";
+import { buttonClass, focusRing, linkButton, secondaryButton } from "@/components/ui";
+import { Problem } from "@/components/problem";
+import { CopyButton } from "@/components/copy-button";
+import { ExternalLinkIcon } from "@/components/icons";
 import { Page, PageHeader, Section, cardClass } from "@/components/page";
-import { Chip, List, ListRow, Time } from "@/components/list";
+import { Chip, List, ListEmpty, ListRow, Time } from "@/components/list";
 import { Code } from "@/components/settings";
 import { Disclosure } from "@/components/disclosure";
-import { KIND_LABEL, OUTCOMES, OutcomeBadge, humanize } from "../outcome";
+import { KIND_LABEL, OutcomeBadge, humanize, outcomeDetail } from "../outcome";
 
 export default function AlertDetailGuarded() {
   return (
@@ -65,30 +67,34 @@ function AlertDetail() {
   if (!id || missing) {
     return (
       <Page>
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-500">
-        <p className="text-lg mb-2">{id ? "Alert not found" : "No alert was named"}</p>
-        <p className="text-sm">
-          {id ? "It may belong to another team, or it is older than 90 days. " : "Pick one from the list. "}
-          <Link href="/alerts" className={linkButton}>
-            All alerts
-          </Link>
-        </p>
-      </div>
+        <ListEmpty
+          title={id ? "Alert not found" : "No alert was named"}
+          action={
+            <Link href="/alerts" className={secondaryButton}>
+              All alerts
+            </Link>
+          }
+        >
+          {id ? "It may belong to another team, or it is older than 90 days." : "Pick one from the list."}
+        </ListEmpty>
       </Page>
     );
   }
   if (error) {
     return (
       <Page>
-        <Callout variant="error" title="We couldn't load this alert">
-          <p>{error}</p>
-          <p>
-            <button type="button" onClick={() => setAttempt((n) => n + 1)} className={linkButton}>
-              Try again
-            </button>{" "}
-            or go back to <Link href="/alerts" className={linkButton}>all alerts</Link>.
-          </p>
-        </Callout>
+        <Problem
+          title="We couldn't load this alert"
+          onRetry={() => setAttempt((n) => n + 1)}
+          details={error}
+          action={
+            <Link href="/alerts" className={buttonClass("ghost")}>
+              All alerts
+            </Link>
+          }
+        >
+          Check your connection and try again.
+        </Problem>
       </Page>
     );
   }
@@ -107,13 +113,12 @@ function AlertDetail() {
     <Page>
       <PageHeader
         detail
-        title={a.title || "(untitled alert)"}
+        title={a.title || "Alert with no title"}
+        status={<OutcomeBadge outcome={a.outcome} />}
         lead={
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-            <OutcomeBadge outcome={a.outcome} />
-            <Time iso={a.received_at} />
-            {a.ticket_id && <Code>{a.ticket_id}</Code>}
-          </div>
+          <>
+            Received <Time iso={a.received_at} />
+          </>
         }
         actions={
           <button type="button" onClick={copyLink} className={`${secondaryButton} shrink-0`}>
@@ -123,20 +128,37 @@ function AlertDetail() {
       />
 
       <div className={`mt-6 text-sm ${cardClass}`}>
-        <p className="text-zinc-300">{OUTCOMES[a.outcome]?.detail ?? a.outcome}</p>
-        <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-xs">
-          <dt className="text-zinc-500">Repo</dt>
-          <dd className="wrap-anywhere text-zinc-300">{a.repo || "—"}</dd>
-          <dt className="text-zinc-500">Topic</dt>
-          <dd className="min-w-0 text-zinc-300">{a.topic_arn ? <Code>{a.topic_arn}</Code> : "—"}</dd>
-          <dt className="text-zinc-500">Source</dt>
-          <dd className="text-zinc-300">{a.kind ? KIND_LABEL[a.kind] ?? humanize(a.kind) : "—"}</dd>
+        <p className="text-zinc-200">{outcomeDetail(a.outcome)}</p>
+        <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm">
+          <dt className="text-zinc-400">Repo</dt>
+          <dd className="wrap-anywhere text-zinc-200">{a.repo || "—"}</dd>
+          <dt className="text-zinc-400">Comes from</dt>
+          <dd className="min-w-0 text-zinc-200">
+            {a.topic_arn ? (
+              <span className="inline-flex flex-wrap items-center gap-2">
+                <Link href="/settings/alerts" title={a.topic_arn} className={linkButton}>
+                  <span className="[overflow-wrap:anywhere]">{topicName(a.topic_arn)}</span>
+                </Link>
+                <CopyButton text={a.topic_arn} label={<>Copy<span className="sr-only"> topic address</span></>} className="!min-h-7" />
+              </span>
+            ) : (
+              "—"
+            )}
+          </dd>
+          <dt className="text-zinc-400">Source</dt>
+          <dd className="text-zinc-200">{a.kind ? KIND_LABEL[a.kind] ?? humanize(a.kind) : "—"}</dd>
+          {a.ticket_id && (
+            <>
+              <dt className="text-zinc-400">Reference</dt>
+              <dd className="min-w-0 text-zinc-200 [overflow-wrap:anywhere]">{a.ticket_id}</dd>
+            </>
+          )}
         </dl>
       </div>
 
       <Section title="Runs for this alert" className="!mt-8">
         {data.runs.length === 0 ? (
-          <p className="text-sm text-zinc-500">No runs.</p>
+          <p className="text-sm text-zinc-400">Coderhelm didn&apos;t start any work for this alert. {outcomeDetail(a.outcome)}</p>
         ) : (
           <List label="Runs for this alert">
             {data.runs.map((r) => (
@@ -147,14 +169,15 @@ function AlertDetail() {
                 chips={
                   <>
                     <RunStatusBadge status={r.status} />
-                    {own?.run_id === r.run_id && <Chip tone="success">started by this alert</Chip>}
+                    {own?.run_id === r.run_id && <Chip tone="success">Started by this alert</Chip>}
                   </>
                 }
                 time={r.created_at}
                 actions={
                   r.pr_url ? (
-                    <a href={r.pr_url} target="_blank" rel="noreferrer" className={`${linkButton} !text-xs`}>
-                      Pull request<span aria-hidden="true"> ↗</span>
+                    <a href={r.pr_url} target="_blank" rel="noreferrer" className={`${buttonClass("secondary", "sm")} gap-1`}>
+                      Pull request
+                      <span aria-hidden="true" className="inline-flex"><ExternalLinkIcon /></span>
                     </a>
                   ) : undefined
                 }
@@ -164,12 +187,12 @@ function AlertDetail() {
         )}
       </Section>
 
-      <Section title="Alert" className="!mt-8">
+      <Section title="What happened" className="!mt-8">
         {fields.length > 0 ? (
           <dl className={`grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-[minmax(8rem,auto)_minmax(0,1fr)] sm:gap-y-2 ${cardClass}`} data-testid="alert-fields">
-            {fields.map((f) => (
+            {keyFields(fields).map((f) => (
               <Fragment key={f.label}>
-                <dt className="text-xs text-zinc-500 sm:pt-0.5">{f.label}</dt>
+                <dt className="text-xs text-zinc-400 sm:pt-0.5">{f.label}</dt>
                 <dd className="mb-2 min-w-0 text-zinc-200 sm:mb-0 [overflow-wrap:anywhere]">
                   {f.when ? <Time iso={f.value} className="!whitespace-normal" /> : f.value}
                 </dd>
@@ -177,7 +200,7 @@ function AlertDetail() {
             ))}
           </dl>
         ) : (
-          <p className={`whitespace-pre-wrap text-sm text-zinc-200 ${cardClass}`}>{a.body || "(empty)"}</p>
+          <p className={`whitespace-pre-wrap text-sm text-zinc-200 [overflow-wrap:anywhere] ${cardClass}`}>{a.body || "The alert had no text."}</p>
         )}
         {fields.length > 0 && a.body && (
           <div className="mt-3">
@@ -189,6 +212,18 @@ function AlertDetail() {
       </Section>
     </Page>
   );
+}
+
+/** The fields that say what happened; the rest wait in the raw alert. */
+const KEY_FIELD = /alarm name|alarm description|state value|state reason|change time|metric name|namespace|region|detail type|source|subject|message/i;
+function keyFields<T extends { label: string }>(fields: T[]): T[] {
+  const key = fields.filter((f) => KEY_FIELD.test(f.label));
+  return (key.length > 0 ? key : fields).slice(0, 8);
+}
+
+/** "arn:aws:sns:us-east-1:123:prod-alerts" -> "prod-alerts". */
+function topicName(arn: string): string {
+  return arn.split(":").pop() || arn;
 }
 
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;

@@ -44,7 +44,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/data-sources/activity": { label: "Activity", parent: "/data-sources", tab: "Data source activity" },
   "/data-sources/connect": { label: "Connect", parent: "/data-sources", tab: "Connect a data source" },
   "/data-sources/connect/aws": { label: "AWS account", parent: "/data-sources", tab: "Connect an AWS account" },
-  "/data-sources/connect/reader": { label: "Read-only access", parent: "/data-sources", tab: "Read-only access" },
+  "/data-sources/connect/reader": { label: "Connect a source", parent: "/data-sources", tab: "Connect a source" },
   "/data-sources/tools": { label: "Team tools", parent: "/data-sources" },
   "/data-sources/tools/new": { label: "New tool", parent: "/data-sources/tools" },
   "/data-sources/tools/tool": { label: "Tool", parent: "/data-sources/tools", detail: true },
@@ -89,7 +89,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/settings/integrations/aws": { label: "AWS", parent: "/settings/integrations", tab: "AWS integration" },
   "/settings/integrations/github": { label: "GitHub", parent: "/settings/integrations", tab: "GitHub integration" },
   "/settings/integrations/jira": { label: "Jira", parent: "/settings/integrations", tab: "Jira integration" },
-  "/settings/integrations/mcp-callback": { label: "Connecting", parent: "/settings/integrations", tab: "Connecting an MCP server" },
+  "/settings/integrations/mcp-callback": { label: "Connect a server", parent: "/settings/integrations", tab: "Connect an MCP server" },
   // Old addresses that redirect to their new place.
   "/settings/aws": { label: "AWS", parent: "/settings/integrations" },
   "/settings/github": { label: "GitHub", parent: "/settings/integrations" },

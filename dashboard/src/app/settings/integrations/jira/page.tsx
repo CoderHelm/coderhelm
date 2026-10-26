@@ -10,13 +10,14 @@ import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Callout } from "@/components/callout";
 import { StatusPill } from "@/components/status-pill";
+import { EmptyState } from "@/components/empty-state";
+import { Disclosure } from "@/components/disclosure";
 import { findCard, INTEGRATION_STATUS } from "@/lib/integration-status";
 import { Stepper } from "@/components/stepper";
 import { Segmented } from "@/components/segmented";
 import { CopyButton } from "@/components/copy-button";
-import { Disclosure } from "@/components/disclosure";
 import { Skeleton } from "@/components/skeleton";
-import { AtlassianIcon, ExternalLinkIcon } from "@/components/icons";
+import { AtlassianIcon, ChevronRightIcon, ExternalLinkIcon } from "@/components/icons";
 import { Page, PageHeader, Section } from "@/components/page";
 import { Code, Field, SaveBar, SettingsRow, SettingsSection, Switch, useDirtyForm } from "@/components/settings";
 import { buttonClass, focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
@@ -50,6 +51,8 @@ function JiraPage() {
   const canDisconnect = can("disconnect");
   const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
+  const canEdit = can("integrations");
 
   const refresh = useCallback(async () => {
     try {
@@ -71,6 +74,27 @@ function JiraPage() {
   const webhookOn = !!check?.webhook_url;
   const connected = appLinked || webhookOn;
   const enabledRepos = check?.configured_repos.enabled ?? 0;
+
+  const unlink = async () => {
+    const ok = await confirm({
+      title: "Disconnect the Jira app?",
+      message: "Tickets stop starting runs through the app, and Coderhelm stops posting to tickets. Your project choices are kept. Save the app's settings in Jira again to reconnect.",
+      confirmLabel: "Disconnect",
+      destructive: true,
+    });
+    if (!ok) return;
+    setUnlinking(true);
+    try {
+      await api.updateJiraConfig({ list_projects_url: "", create_ticket_url: "", add_comment_url: "" });
+      setConfig(config && { ...config, list_projects_url: "", create_ticket_url: "", add_comment_url: "" });
+      toast("Jira app disconnected");
+      refresh();
+    } catch {
+      toast("Could not disconnect. The app is still linked.", "error");
+    } finally {
+      setUnlinking(false);
+    }
+  };
 
   const removeIntegration = async () => {
     const ok = await confirm({
@@ -153,9 +177,16 @@ function JiraPage() {
 
           {appLinked && <ProjectsSection config={config} setConfig={setConfig} />}
 
-          {connected && (
-            <Section id="webhook" title="Jira webhook" description="Optional when the Jira app is linked. A native Jira webhook sends ticket updates to Coderhelm.">
+          {connected && !appLinked && (
+            <Section id="webhook" title="Jira webhook" description="A native Jira webhook sends ticket updates to Coderhelm.">
               <WebhookPanel check={check} onChanged={refresh} revealedSecret={revealedSecret} setRevealedSecret={setRevealedSecret} />
+            </Section>
+          )}
+          {appLinked && (
+            <Section id="webhook">
+              <Disclosure summary="Jira webhook (only needed if you can't use the Jira app)">
+                <WebhookPanel check={check} onChanged={refresh} revealedSecret={revealedSecret} setRevealedSecret={setRevealedSecret} quiet />
+              </Disclosure>
             </Section>
           )}
 
@@ -175,22 +206,33 @@ function JiraPage() {
           </Section>
 
           {(check.secret_configured || appLinked || config.projects.length > 0) && (
-            <Section id="remove" title="Remove the integration">
-              <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-red-500/20 p-4">
-                <p className="max-w-prose text-sm text-zinc-400">
-                  Deletes every Jira setting, the webhook credentials and the event history.
-                  {!canDisconnect && " Only the team owner can do this."}
-                </p>
-                {canDisconnect && (
-                  <button
-                    type="button"
-                    onClick={removeIntegration}
-                    disabled={deleting}
-                    className={buttonClass("danger")}
-                  >
-                    {deleting ? "Removing…" : "Remove integration"}
-                  </button>
+            <Section id="remove" title="Disconnect or remove">
+              <div className="divide-y divide-red-500/20 overflow-hidden rounded-lg border border-red-500/30">
+                {appLinked && canEdit && (
+                  <div className="flex flex-wrap items-center justify-between gap-4 p-4">
+                    <div className="min-w-0 max-w-prose text-sm">
+                      <p className="font-medium text-zinc-100">Disconnect the Jira app</p>
+                      <p className="mt-0.5 text-zinc-400">Tickets stop starting runs through the app. Your project choices and history are kept, so reconnecting picks up where you left off.</p>
+                    </div>
+                    <button type="button" onClick={unlink} disabled={unlinking} className={buttonClass("danger")}>
+                      {unlinking ? "Disconnecting…" : "Disconnect the app"}
+                    </button>
+                  </div>
                 )}
+                <div className="flex flex-wrap items-center justify-between gap-4 p-4">
+                  <div className="min-w-0 max-w-prose text-sm">
+                    <p className="font-medium text-zinc-100">Remove everything</p>
+                    <p className="mt-0.5 text-zinc-400">
+                      Deletes every Jira setting, the webhook credentials and the event history.
+                      {!canDisconnect && " Only the team owner can do this."}
+                    </p>
+                  </div>
+                  {canDisconnect && (
+                    <button type="button" onClick={removeIntegration} disabled={deleting} className={buttonClass("danger")}>
+                      {deleting ? "Removing…" : "Remove integration"}
+                    </button>
+                  )}
+                </div>
               </div>
             </Section>
           )}
@@ -202,9 +244,14 @@ function JiraPage() {
 
 function RelatedLink({ href, title, children }: { href: string; title: string; children: ReactNode }) {
   return (
-    <Link href={href} className={`block rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 hover:border-zinc-600 ${focusRing}`}>
-      <span className="block font-semibold text-zinc-100">{title}</span>
-      <span className="mt-1 block text-sm text-zinc-400">{children}</span>
+    <Link href={href} className={`group flex items-start gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 hover:border-zinc-600 ${focusRing}`}>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold text-zinc-100">{title}</span>
+        <span className="mt-1 block text-sm text-zinc-400">{children}</span>
+      </span>
+      <span aria-hidden="true" className="mt-0.5 shrink-0 text-zinc-500 group-hover:text-zinc-200">
+        <ChevronRightIcon />
+      </span>
     </Link>
   );
 }
@@ -244,7 +291,6 @@ function StatusCard({
   const { confirm } = useConfirm();
   const [testing, setTesting] = useState(false);
   const [test, setTest] = useState<{ ok: boolean; text: string } | null>(null);
-  const [unlinking, setUnlinking] = useState(false);
   const site = config.site_url.replace(/^https?:\/\//, "").replace(/\/$/, "");
   const connected = appLinked || webhookOn;
   const enabled = check.configured_repos.enabled;
@@ -261,27 +307,6 @@ function StatusCard({
       setTest({ ok: false, text: e instanceof Error && e.message ? e.message : "Coderhelm could not reach the Jira app." });
     } finally {
       setTesting(false);
-    }
-  };
-
-  const unlink = async () => {
-    const ok = await confirm({
-      title: "Disconnect the Jira app?",
-      message: "Tickets stop starting runs through the app, and Coderhelm stops posting to tickets. Your project choices are kept. Save the app's settings in Jira again to reconnect.",
-      confirmLabel: "Disconnect",
-      destructive: true,
-    });
-    if (!ok) return;
-    setUnlinking(true);
-    try {
-      await api.updateJiraConfig({ list_projects_url: "", create_ticket_url: "", add_comment_url: "" });
-      setConfig({ ...config, list_projects_url: "", create_ticket_url: "", add_comment_url: "" });
-      toast("Jira app disconnected");
-      onChanged();
-    } catch {
-      toast("Could not disconnect. The app is still linked.", "error");
-    } finally {
-      setUnlinking(false);
     }
   };
 
@@ -320,7 +345,7 @@ function StatusCard({
 
       <ul className="mt-4 flex flex-col gap-2">
         <StatusRow ok={appLinked}>{appLinked ? "Jira app linked" : "Jira app not linked"}</StatusRow>
-        <StatusRow ok={webhookOn}>{webhookOn ? "Webhook credentials made" : "No webhook"}</StatusRow>
+        {(webhookOn || !appLinked) && <StatusRow ok={webhookOn}>{webhookOn ? "Webhook credentials made" : "No webhook"}</StatusRow>}
         <StatusRow ok={enabled > 0}>
           {enabled} of {check.configured_repos.total} repositor{check.configured_repos.total === 1 ? "y" : "ies"} turned on
         </StatusRow>
@@ -352,14 +377,6 @@ function StatusCard({
               <span className="sr-only">(opens in a new tab)</span>
             </a>
           )}
-          <button
-            type="button"
-            onClick={unlink}
-            disabled={unlinking}
-            className={`${buttonClass("danger")} sm:ml-auto`}
-          >
-            {unlinking ? "Disconnecting…" : "Disconnect the app"}
-          </button>
         </div>
       )}
     </section>
@@ -463,11 +480,11 @@ function CopyRow({ label, value, secret }: { label: string; value: string; secre
   const [shown, setShown] = useState(!secret);
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
-      <p className="text-xs text-zinc-500">{label}</p>
+      <p className="text-xs text-zinc-400">{label}</p>
       <div className="mt-1 flex flex-wrap items-center gap-2">
         <Code className="min-w-0 flex-1">{shown ? value : "•".repeat(24)}</Code>
         {secret && (
-          <button type="button" onClick={() => setShown((s) => !s)} aria-pressed={shown} className={`${secondaryButton} !px-3 !py-1 text-xs`}>
+          <button type="button" onClick={() => setShown((s) => !s)} aria-pressed={shown} className={buttonClass("secondary", "sm")}>
             {shown ? "Hide" : "Show"}
           </button>
         )}
@@ -482,11 +499,14 @@ function WebhookPanel({
   onChanged,
   revealedSecret,
   setRevealedSecret,
+  quiet = false,
 }: {
   check: JiraCheck;
   onChanged: () => void;
   revealedSecret: string | null;
   setRevealedSecret: (s: string | null) => void;
+  /** The Jira app is linked, so this is the optional extra: its button is secondary. */
+  quiet?: boolean;
 }) {
   const { toast } = useToast();
   const { confirm } = useConfirm();
@@ -577,7 +597,7 @@ function WebhookPanel({
         <>
           <p>Make a webhook address and signing secret for your team, then add them as a webhook in Jira.</p>
           <div>
-            <button type="button" onClick={make} disabled={!!busy} className={primaryButton}>
+            <button type="button" onClick={make} disabled={!!busy} className={quiet ? secondaryButton : primaryButton}>
               {busy === "make" ? "Making…" : "Make webhook credentials"}
             </button>
           </div>
@@ -697,9 +717,7 @@ function ProjectsSection({ config, setConfig }: { config: JiraConfig; setConfig:
       }
     >
       {projects.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-zinc-700 p-6 text-center text-sm text-zinc-400">
-          No projects listed yet. Press List projects from Jira.
-        </div>
+        <EmptyState title="No projects listed yet">Press List projects from Jira to see them here.</EmptyState>
       ) : (
         <div className="flex flex-col gap-3">
           {projects.length > 8 && (
@@ -741,6 +759,7 @@ function ProjectsSection({ config, setConfig }: { config: JiraConfig; setConfig:
           <SettingsSection id="jira-plans" title="Plans">
             <SettingsRow
               label="Default project for tickets made from plans"
+              help="When you turn a plan into Jira tickets, they go to this project."
               controlClassName="sm:w-72"
               unsaved={form.isDirty("default_project")}
               control={(ids) => (
@@ -811,14 +830,12 @@ function EventsList() {
   }
   if (events.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-zinc-700 p-6 text-center text-sm text-zinc-400">
-        No Jira events yet. Label and assign a ticket to send the first one.
-      </div>
+      <EmptyState title="No Jira events yet.">Label and assign a ticket to send the first one.</EmptyState>
     );
   }
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm text-zinc-500">Showing {events.length} of {total}</p>
+      {total > events.length && <p className="text-sm text-zinc-400">Showing {events.length} of {total}</p>}
       <ul className="overflow-hidden rounded-lg border border-zinc-800 divide-y divide-zinc-800">
         {events.map((e) => {
           const st = EVENT_STATUS[e.status] ?? { tone: "neutral" as const, label: e.status.replace(/[_-]+/g, " ") };
@@ -827,7 +844,7 @@ function EventsList() {
               <span className="shrink-0 text-xs font-medium text-zinc-300 sm:w-24">{e.ticket_key || "No ticket"}</span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm text-zinc-100">{e.title || "Untitled ticket"}</span>
-                <span className="block text-xs text-zinc-500">
+                <span className="block text-xs text-zinc-400">
                   {e.repo || "No repository"} · <time dateTime={e.created_at}>{timeAgo(e.created_at)}</time>
                 </span>
               </span>

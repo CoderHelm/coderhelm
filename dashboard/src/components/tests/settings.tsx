@@ -215,7 +215,7 @@ export function SettingsView({
       <SaveBar count={count} onSave={save} onDiscard={discard} saving={saving} problem={problem} />
 
       <section aria-labelledby="setup-heading">
-        <h2 id="setup-heading" className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">CI setup</h2>
+        <h2 id="setup-heading" className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">CI setup</h2>
         <SetupPointer>
           Each repository&apos;s workflow, the results arriving and a one-click setup PR are in Setup.
         </SetupPointer>

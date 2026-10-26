@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api, type Repo } from "@/lib/api";
 import {
   AGENT_LABELS, AUTONOMY_OPTIONS, DECISION_LABELS, KIND_LABELS, PRESETS, RISK_LABELS,
-  decidedByText, ruleWhat, ruleWhere, rulesFor,
+  actorLabel, decidedByText, ruleWhat, ruleWhere, rulesFor,
   type AgentEvent, type AgentKey, type Autonomy, type CallKind, type Decision, type PolicyView, type Risk, type Rule, type Scope, type TestResult,
 } from "@/lib/agent-policy";
 import { Modal } from "@/components/modal";
@@ -14,11 +14,15 @@ import { Segmented } from "@/components/segmented";
 import { StatusPill } from "@/components/status-pill";
 import { Callout } from "@/components/callout";
 import { RepoCombobox } from "@/components/repo-combobox";
-import { Time } from "@/components/list";
+import { MoreMenu, Time } from "@/components/list";
 import { cardClass } from "@/components/page";
+import { EmptyState } from "@/components/empty-state";
+import { SaveBar, SettingsMore, useDirtyForm } from "@/components/settings";
 import { buttonClass, inputClass, monoInputClass } from "@/components/ui";
 
-type Change = (what: Promise<PolicyView>, done?: string) => Promise<boolean>;
+/** Puts a change back, given the policy version current when Undo is pressed. */
+export type Undo = (version: number) => Promise<PolicyView>;
+type Change = (what: Promise<PolicyView>, done?: string, undo?: Undo) => Promise<boolean>;
 
 const DECISION_TONE = { allow: "success", ask: "warning", deny: "error" } as const;
 
@@ -42,17 +46,39 @@ function untilToIso(local: string): string | undefined {
   return Number.isFinite(t.getTime()) ? t.toISOString() : undefined;
 }
 
+type PauseFor = "resume" | "hour" | "tomorrow" | "custom";
+const PAUSE_FOR: { value: PauseFor; label: string }[] = [
+  { value: "resume", label: "Until I resume" },
+  { value: "hour", label: "1 hour" },
+  { value: "tomorrow", label: "Until tomorrow 9:00" },
+  { value: "custom", label: "Pick a time" },
+];
+
+/** When a quick pick ends, as RFC 3339; undefined pauses until someone resumes. */
+function pauseUntil(pick: PauseFor, custom: string, now = new Date()): string | undefined {
+  if (pick === "hour") return new Date(now.getTime() + 60 * 60_000).toISOString();
+  if (pick === "tomorrow") {
+    const t = new Date(now);
+    t.setDate(t.getDate() + 1);
+    t.setHours(9, 0, 0, 0);
+    return t.toISOString();
+  }
+  if (pick === "custom") return untilToIso(custom);
+  return undefined;
+}
+
 export function PauseBanner({ view, edit, onChange }: { view: PolicyView; edit: boolean; onChange: Change }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [until, setUntil] = useState("");
+  const [pick, setPick] = useState<PauseFor>("resume");
   const p = view.paused;
 
   if (p) {
     return (
       <div data-testid="pause-banner" className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4" role="status">
-        <p className="text-sm font-semibold text-amber-200">All agents are paused</p>
-        <p className="mt-1 text-sm text-amber-100/80">
+        <p className="text-sm font-semibold text-zinc-50">All agents are paused</p>
+        <p className="mt-1 text-sm text-zinc-200">
           {p.reason ? `${p.reason}. ` : ""}Paused by {p.by}
           {p.until ? (
             <>
@@ -88,7 +114,7 @@ export function PauseBanner({ view, edit, onChange }: { view: PolicyView; edit: 
           className="space-y-4"
           onSubmit={async (e) => {
             e.preventDefault();
-            const ok = await onChange(api.pauseAgents(reason.trim(), untilToIso(until)), "All agents are paused.");
+            const ok = await onChange(api.pauseAgents(reason.trim(), pauseUntil(pick, until)), "All agents are paused.");
             if (ok) setOpen(false);
           }}
         >
@@ -99,11 +125,16 @@ export function PauseBanner({ view, edit, onChange }: { view: PolicyView; edit: 
             <input id="pause-reason" className={`${inputClass} mt-1.5`} maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Release freeze" />
           </div>
           <div>
-            <label htmlFor="pause-until" className="block text-sm font-semibold text-zinc-100">
-              Until (optional)
-            </label>
-            <input id="pause-until" type="datetime-local" className={`${inputClass} mt-1.5`} value={until} onChange={(e) => setUntil(e.target.value)} />
-            <p className="mt-1.5 text-xs text-zinc-500">Leave empty to pause until someone resumes them.</p>
+            <p className="mb-1.5 text-sm font-semibold text-zinc-100">For how long</p>
+            <Segmented<PauseFor> label="For how long" options={PAUSE_FOR} value={pick} onChange={setPick} />
+            {pick === "custom" && (
+              <div className="mt-3">
+                <label htmlFor="pause-until" className="block text-sm text-zinc-300">
+                  Until
+                </label>
+                <input id="pause-until" type="datetime-local" className={`${inputClass} mt-1.5`} value={until} onChange={(e) => setUntil(e.target.value)} />
+              </div>
+            )}
           </div>
           <div className="flex justify-end gap-2">
             <button type="button" className={buttonClass("secondary")} onClick={() => setOpen(false)}>
@@ -134,7 +165,7 @@ export function AgentSwitches({ view, edit, repos, onChange }: { view: PolicyVie
             {/* basis-48: on a narrow screen the buttons wrap below the name instead of squeezing it. */}
             <div className="min-w-0 flex-1 basis-48">
               <p className="text-sm font-medium text-zinc-100">{a.label}</p>
-              <p className="text-xs text-zinc-500">{a.summary}</p>
+              <p className="text-sm text-zinc-400">{a.summary}</p>
               {a.repos_off.length > 0 && (
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {a.repos_off.map((r) => (
@@ -144,8 +175,10 @@ export function AgentSwitches({ view, edit, repos, onChange }: { view: PolicyVie
                         <button
                           type="button"
                           aria-label={`Turn the ${a.label.toLowerCase()} back on in ${r}`}
-                          className="text-zinc-500 hover:text-zinc-200"
-                          onClick={() => onChange(api.setAgentSwitch(v, a.key, true, r), `${a.label} is on again in ${r}.`)}
+                          className="rounded px-0.5 text-zinc-400 hover:text-zinc-100"
+                          onClick={() =>
+                            onChange(api.setAgentSwitch(v, a.key, true, r), `${a.label} is on again in ${r}.`, (ver) => api.setAgentSwitch(ver, a.key, false, r))
+                          }
                         >
                           ×
                         </button>
@@ -155,17 +188,23 @@ export function AgentSwitches({ view, edit, repos, onChange }: { view: PolicyVie
                 </div>
               )}
             </div>
-            {edit && repos.length > 0 && (
-              <button type="button" className={buttonClass("ghost", "sm")} onClick={() => setRepoFor(a.key)}>
-                Off in a repository…
-              </button>
-            )}
-            <Switch
-              checked={a.on}
-              label={`${a.label} ${a.on ? "on" : "off"} for the team`}
-              disabled={!edit}
-              onChange={(on) => onChange(api.setAgentSwitch(v, a.key, on), `${a.label} is ${on ? "on" : "off"} for the team.`)}
-            />
+            <div className="flex shrink-0 items-center gap-1">
+              <Switch
+                checked={a.on}
+                label={`${a.label} ${a.on ? "on" : "off"} for the team`}
+                disabled={!edit}
+                onChange={(on) =>
+                  onChange(api.setAgentSwitch(v, a.key, on), `${a.label} is ${on ? "on" : "off"} for the team.`, (ver) => api.setAgentSwitch(ver, a.key, !on))
+                }
+              />
+              {edit && repos.length > 0 && (
+                <MoreMenu
+                  compact
+                  buttonLabel={`Exceptions for the ${a.label.toLowerCase()}`}
+                  items={[{ label: "Turn off in a repository…", onSelect: () => setRepoFor(a.key) }]}
+                />
+              )}
+            </div>
           </li>
         ))}
       </ul>
@@ -181,7 +220,9 @@ export function AgentSwitches({ view, edit, repos, onChange }: { view: PolicyVie
             className={buttonClass("primary")}
             onClick={async () => {
               if (!repoFor) return;
-              if (await onChange(api.setAgentSwitch(v, repoFor, false, repo), `${AGENT_LABELS[repoFor]} is off in ${repo}.`)) setRepoFor(null);
+              const key = repoFor;
+              const where = repo;
+              if (await onChange(api.setAgentSwitch(v, key, false, where), `${AGENT_LABELS[key]} is off in ${where}.`, (ver) => api.setAgentSwitch(ver, key, true, where))) setRepoFor(null);
             }}
           >
             Turn off
@@ -206,7 +247,10 @@ export function AutonomyAndPresets({ view, edit, onChange }: { view: PolicyView;
           options={AUTONOMY_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
           value={view.policy.autonomy}
           disabled={!edit}
-          onChange={(a) => onChange(api.saveAgentSettings({ version: v, autonomy: a }), "Autonomy limit saved.")}
+          onChange={(a) => {
+            const before = view.policy.autonomy;
+            onChange(api.saveAgentSettings({ version: v, autonomy: a }), "Autonomy limit saved.", (ver) => api.saveAgentSettings({ version: ver, autonomy: before }));
+          }}
         />
         {current && <p className="mt-2 text-sm text-zinc-400">{current.help}</p>}
       </div>
@@ -222,7 +266,7 @@ export function AutonomyAndPresets({ view, edit, onChange }: { view: PolicyView;
                   <p className="text-sm font-medium text-zinc-100">{p.label}</p>
                   {on && <StatusPill tone="success">In use</StatusPill>}
                 </div>
-                <p className="mt-1 text-xs text-zinc-400">{p.help}</p>
+                <p className="mt-1 text-sm text-zinc-400">{p.help}</p>
                 {edit && !on && (
                   <button type="button" className={`${buttonClass("secondary", "sm")} mt-3`} onClick={() => onChange(api.applyAgentPreset(v, p.value), `${p.label} preset applied.`)}>
                     Use {p.label.split(" ")[0]}
@@ -254,11 +298,15 @@ export function RulesTable({ view, edit, repos, onChange }: { view: PolicyView; 
   const v = view.policy.version;
   return (
     <section aria-labelledby="rules-heading">
-      <SectionHead
-        id="rules-heading"
-        title="Rules"
-        lead="The narrowest rule that matches decides: an agent in a repository, then an agent, then a repository, then the team. At the same level, deny beats ask and ask beats allow. A locked team rule can't be overridden."
-      />
+      <SectionHead id="rules-heading" title="Rules" lead="Rules make exceptions: allow, ask or deny a kind of call." />
+      <div className="-mt-1 mb-3">
+        <SettingsMore summary="How rules are picked">
+          <p>
+            The narrowest rule that matches decides: an agent in a repository, then an agent, then a repository, then the team. At the same level,
+            deny beats ask and ask beats allow. A locked team rule can&apos;t be overridden.
+          </p>
+        </SettingsMore>
+      </div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <Segmented<Scope> label="Rules for" options={SCOPE_OPTIONS} value={scope} onChange={setScope} />
         {edit && (
@@ -268,13 +316,21 @@ export function RulesTable({ view, edit, repos, onChange }: { view: PolicyView; 
         )}
       </div>
       {rules.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-zinc-800 p-4 text-sm text-zinc-500">
-          No {scope === "team" ? "team" : scope === "repo" ? "repository" : "agent"} rules yet.
-        </p>
+        <EmptyState title={`No ${scope === "team" ? "team" : scope === "repo" ? "repository" : "agent"} rules yet`}>
+          Without a rule, reads run and everything else asks.
+        </EmptyState>
       ) : (
         <ul className="divide-y divide-zinc-800 rounded-lg border border-zinc-800" data-testid="rules-list">
           {rules.map((r) => (
-            <RuleRow key={r.id} rule={r} edit={edit} onRemove={() => onChange(api.removeAgentRule(v, r.id), "Rule removed.")} />
+            <RuleRow
+              key={r.id}
+              rule={r}
+              edit={edit}
+              onRemove={() => {
+                const { id: _id, source: _src, created_by: _by, created_at: _at, ...back } = r;
+                onChange(api.removeAgentRule(v, r.id), "Rule removed.", (ver) => api.addAgentRule(ver, back));
+              }}
+            />
           ))}
         </ul>
       )}
@@ -289,11 +345,11 @@ function RuleRow({ rule, edit, onRemove }: { rule: Rule; edit: boolean; onRemove
       <StatusPill tone={DECISION_TONE[rule.decision]}>{DECISION_LABELS[rule.decision]}</StatusPill>
       <div className="min-w-0 flex-1">
         <p className="text-sm text-zinc-100">{ruleWhat(rule)}</p>
-        <p className="text-xs text-zinc-500">
+        <p className="text-sm text-zinc-400">
           {ruleWhere(rule)} · {SOURCE_LABEL[rule.source ?? "manual"]}
           {rule.created_by ? ` · ${rule.created_by}` : ""}
         </p>
-        {rule.note && <p className="mt-1 text-xs text-zinc-400">{rule.note}</p>}
+        {rule.note && <p className="mt-1 text-sm text-zinc-400">{rule.note}</p>}
       </div>
       {edit && (
         <button type="button" className={buttonClass("ghost", "sm")} onClick={onRemove} aria-label={`Remove rule: ${DECISION_LABELS[rule.decision]} ${ruleWhat(rule)}`}>
@@ -432,7 +488,7 @@ function AddRuleDialog({
             value={decision}
             onChange={setDecision}
           />
-          {capped && <p className="mt-2 text-xs text-amber-300">This is above the team&apos;s autonomy limit, so it would ask instead. Raise the limit first, or make the rule ask.</p>}
+          {capped && <p className="mt-2 text-sm text-amber-300">This is above the team&apos;s autonomy limit, so it would ask instead. Raise the limit first, or make the rule ask.</p>}
         </div>
         {s === "team" && (
           <label className="flex items-center gap-2 text-sm text-zinc-300">
@@ -527,7 +583,7 @@ export function TestCall({ view, repos }: { view: PolicyView; repos: Repo[] }) {
           Test
         </button>
       </form>
-      {error && <p role="alert" className="mt-2 text-sm text-red-400">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-sm text-red-300">{error}</p>}
       {result && (
         <div className="mt-4 space-y-2" data-testid="test-result" data-decision={result.verdict.decision}>
           <div className="flex flex-wrap items-center gap-2">
@@ -542,7 +598,7 @@ export function TestCall({ view, repos }: { view: PolicyView; repos: Repo[] }) {
               <summary className="cursor-pointer text-xs text-zinc-400 hover:text-zinc-200">Every rule looked at ({result.considered.length})</summary>
               <ul className="mt-2 space-y-1">
                 {result.considered.map((c) => (
-                  <li key={c.id} className={`text-xs ${c.matched ? "text-zinc-200" : "text-zinc-500"}`}>
+                  <li key={c.id} className={`text-xs ${c.matched ? "text-zinc-200" : "text-zinc-400"}`}>
                     {c.label}: {c.note}
                   </li>
                 ))}
@@ -557,6 +613,14 @@ export function TestCall({ view, repos }: { view: PolicyView; repos: Repo[] }) {
 
 // ── Sandbox ─────────────────────────────────────────────────────────
 
+type SandboxForm = { commands: string; egress: string; timeout: string };
+
+const lines = (text: string) => text.split("\n").map((l) => l.trim()).filter(Boolean);
+
+/**
+ * The commands, domains and approval timeout save together with one save
+ * bar; the network limit and suggestions are one-click changes with a toast.
+ */
 export function SandboxSettings({ view, edit, repos, onChange }: { view: PolicyView; edit: boolean; repos: Repo[]; onChange: Change }) {
   const sb = view.policy.sandbox;
   const v = view.policy.version;
@@ -566,14 +630,39 @@ export function SandboxSettings({ view, edit, repos, onChange }: { view: PolicyV
   }, [sb]);
   const [repo, setRepo] = useState(repoNames[0] ?? "");
   const key = repo.toLowerCase();
-  const [draft, setDraft] = useState("");
-  useEffect(() => {
-    setDraft((sb.commands[key] ?? []).map((c) => c.command).join("\n"));
-  }, [key, sb.commands]);
-  const [egress, setEgress] = useState(sb.egress.join("\n"));
-  useEffect(() => setEgress(sb.egress.join("\n")), [sb.egress]);
-  const [timeout, setTimeoutMins] = useState(String(Math.round(view.policy.ask_timeout_secs / 60)));
   const suggestions = sb.suggestions[key] ?? [];
+  const [saving, setSaving] = useState(false);
+
+  const savedForm = useMemo<SandboxForm>(
+    () => ({
+      commands: (sb.commands[key] ?? []).map((c) => c.command).join("\n"),
+      egress: sb.egress.join("\n"),
+      timeout: String(Math.round(view.policy.ask_timeout_secs / 60)),
+    }),
+    [sb.commands, sb.egress, key, view.policy.ask_timeout_secs],
+  );
+  const form = useDirtyForm<SandboxForm>(savedForm, { disabled: !edit });
+  const { reset } = form;
+  useEffect(() => reset(savedForm), [savedForm, reset]);
+
+  const save = async () => {
+    setSaving(true);
+    // Each save returns the next policy version; the next request uses it.
+    const run = async (): Promise<PolicyView> => {
+      let next = view;
+      if (repo && form.isDirty("commands")) next = await api.setSandboxCommands(next.policy.version, repo, lines(form.values.commands));
+      if (form.isDirty("egress", "timeout")) {
+        next = await api.saveAgentSettings({
+          version: next.policy.version,
+          egress: form.isDirty("egress") ? lines(form.values.egress) : undefined,
+          ask_timeout_secs: form.isDirty("timeout") ? Math.max(1, Number(form.values.timeout) || 15) * 60 : undefined,
+        });
+      }
+      return next;
+    };
+    await onChange(run(), "Sandbox settings saved.");
+    setSaving(false);
+  };
 
   return (
     <section aria-labelledby="sandbox-heading" className="space-y-6">
@@ -592,16 +681,7 @@ export function SandboxSettings({ view, edit, repos, onChange }: { view: PolicyV
             <label htmlFor="sandbox-commands" className="block text-sm text-zinc-300">
               One command per line. End with * to allow its arguments (npm run test*).
             </label>
-            <textarea id="sandbox-commands" rows={4} className={`${monoInputClass} mt-1.5`} value={draft} disabled={!edit} onChange={(e) => setDraft(e.target.value)} />
-            {edit && (
-              <button
-                type="button"
-                className={`${buttonClass("secondary", "sm")} mt-2`}
-                onClick={() => onChange(api.setSandboxCommands(v, repo, draft.split("\n").map((l) => l.trim()).filter(Boolean)), "Commands saved.")}
-              >
-                Save commands
-              </button>
-            )}
+            <textarea id="sandbox-commands" rows={4} className={`${monoInputClass} mt-1.5`} value={form.values.commands} disabled={!edit} onChange={(e) => form.set("commands", e.target.value)} />
             {suggestions.length > 0 && (
               <div className="mt-4" data-testid="command-suggestions">
                 <p className="text-sm font-medium text-zinc-200">Suggested from the repository</p>
@@ -609,7 +689,7 @@ export function SandboxSettings({ view, edit, repos, onChange }: { view: PolicyV
                   {suggestions.map((s) => (
                     <li key={s.command} className="flex flex-wrap items-center gap-2">
                       <code className="min-w-0 rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-200">{s.command}</code>
-                      <span className="text-xs text-zinc-500">from {s.origin}</span>
+                      <span className="text-xs text-zinc-400">from {s.origin}</span>
                       {edit && (
                         <>
                           <button type="button" className={buttonClass("secondary", "sm")} onClick={() => onChange(api.decideCommandSuggestion(v, repo, s.command, true), "Command allowed.")}>
@@ -627,22 +707,28 @@ export function SandboxSettings({ view, edit, repos, onChange }: { view: PolicyV
             )}
           </>
         ) : (
-          <p className="text-sm text-zinc-500">Pick a repository to see its commands.</p>
+          <p className="text-sm text-zinc-400">Pick a repository to see its commands.</p>
         )}
       </div>
 
       <div className={cardClass}>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold text-zinc-100">Network</h3>
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
-            <input
-              type="checkbox"
+          <h3 id="network-heading" className="text-sm font-semibold text-zinc-100">Network</h3>
+          <div className="flex items-center gap-2">
+            <span id="limit-egress-label" className="text-sm text-zinc-300">Limit the sandbox to these domains</span>
+            <Switch
               checked={sb.limit_egress}
+              labelledBy="limit-egress-label"
               disabled={!edit}
-              onChange={(e) => onChange(api.saveAgentSettings({ version: v, limit_egress: e.target.checked }), e.target.checked ? "Sandbox network limited to the allowlist." : "Sandbox network opened.")}
+              onChange={(on) =>
+                onChange(
+                  api.saveAgentSettings({ version: v, limit_egress: on }),
+                  on ? "Sandbox network limited to the allowlist." : "Sandbox network opened.",
+                  (ver) => api.saveAgentSettings({ version: ver, limit_egress: !on }),
+                )
+              }
             />
-            Limit the sandbox to these domains
-          </label>
+          </div>
         </div>
         {!sb.limit_egress && (
           <div className="mt-3">
@@ -654,34 +740,32 @@ export function SandboxSettings({ view, edit, repos, onChange }: { view: PolicyV
         <label htmlFor="sandbox-egress" className="mt-3 block text-sm text-zinc-300">
           One domain per line. A domain covers its subdomains.
         </label>
-        <textarea id="sandbox-egress" rows={6} className={`${monoInputClass} mt-1.5`} value={egress} disabled={!edit} onChange={(e) => setEgress(e.target.value)} />
+        <textarea id="sandbox-egress" rows={6} className={`${monoInputClass} mt-1.5`} value={form.values.egress} disabled={!edit} onChange={(e) => form.set("egress", e.target.value)} />
         {edit && (
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button type="button" className={buttonClass("secondary", "sm")} onClick={() => onChange(api.saveAgentSettings({ version: v, egress: egress.split("\n").map((l) => l.trim()).filter(Boolean) }), "Network allowlist saved.")}>
-              Save domains
-            </button>
-            <button type="button" className={buttonClass("ghost", "sm")} onClick={() => setEgress(view.default_egress.join("\n"))}>
-              Use the recommended list
-            </button>
-          </div>
+          <button type="button" className={`${buttonClass("ghost", "sm")} mt-2`} onClick={() => form.set("egress", view.default_egress.join("\n"))}>
+            Use the recommended list
+          </button>
         )}
       </div>
 
       <div className={cardClass}>
-        <h3 className="text-sm font-semibold text-zinc-100">Approval timeout</h3>
+        <label htmlFor="ask-timeout" className="text-sm font-semibold text-zinc-100">
+          Approval timeout (minutes)
+        </label>
         <p className="mt-1 text-sm text-zinc-400">How long a run waits for an answer before it stops cleanly with a note. A run never waits longer than it has left.</p>
-        <div className="mt-3 flex flex-wrap items-end gap-2">
-          <div>
-            <label htmlFor="ask-timeout" className="block text-xs text-zinc-400">Minutes</label>
-            <input id="ask-timeout" type="number" min={1} max={10080} className={`${inputClass} mt-1 w-28`} value={timeout} disabled={!edit} onChange={(e) => setTimeoutMins(e.target.value)} />
-          </div>
-          {edit && (
-            <button type="button" className={buttonClass("secondary", "sm")} onClick={() => onChange(api.saveAgentSettings({ version: v, ask_timeout_secs: Math.max(1, Number(timeout) || 15) * 60 }), "Approval timeout saved.")}>
-              Save
-            </button>
-          )}
-        </div>
+        <input
+          id="ask-timeout"
+          type="number"
+          min={1}
+          max={10080}
+          className={`${inputClass} mt-3 w-28`}
+          value={form.values.timeout}
+          disabled={!edit}
+          onChange={(e) => form.set("timeout", e.target.value)}
+        />
       </div>
+
+      {edit && <SaveBar count={form.count} onSave={save} onDiscard={form.discard} saving={saving} />}
     </section>
   );
 }
@@ -697,14 +781,14 @@ export function RecentDecisions({ reload }: { reload: number }) {
     <section aria-labelledby="log-heading">
       <SectionHead id="log-heading" title="Recent decisions" lead="Every ask, deny, approval and change, with the rule that decided it." />
       {events === null ? null : events.length === 0 ? (
-        <p className="text-sm text-zinc-500">Nothing yet.</p>
+        <p className="text-sm text-zinc-400">Nothing yet. Asks, denials, approvals and changes show here as they happen.</p>
       ) : (
         <ul className="divide-y divide-zinc-800 rounded-lg border border-zinc-800" data-testid="agent-log">
           {events.map((e) => (
             <li key={e.id} className="px-4 py-2.5">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
                 <Time iso={e.at} />
-                <span className="min-w-0 wrap-anywhere">{e.actor}</span>
+                <span className="min-w-0 wrap-anywhere">{actorLabel(e.actor)}</span>
                 {e.policy?.decision && <StatusPill tone={DECISION_TONE[e.policy.decision as Decision] ?? "neutral"}>{e.policy.decision}</StatusPill>}
               </div>
               <p className="mt-1 text-sm text-zinc-200">

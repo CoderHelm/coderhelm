@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
 import { RoleGuard } from "@/components/role-guard";
-import { Page, PageHeader, cardClass } from "@/components/page";
+import { Page, PageHeader, SectionHeading, cardClass } from "@/components/page";
 import { Callout } from "@/components/callout";
+import { Problem } from "@/components/problem";
+import { EmptyState } from "@/components/empty-state";
+import { Chip, List, ListRow, StatusText, formatDate } from "@/components/list";
+import { ChevronRightIcon, KeyIcon } from "@/components/icons";
 import { Field } from "@/components/field";
 import { Modal } from "@/components/modal";
 import { CodeBlock } from "@/components/code-block";
@@ -23,6 +27,7 @@ import {
   type ApiKeyList,
 } from "@/lib/api-keys";
 import {
+  buttonClass,
   focusRing,
   fullWidthOnPhone,
   inputClass,
@@ -87,6 +92,8 @@ function ApiKeysPage() {
   };
 
   const live = data?.keys.filter((k) => k.status === "active") ?? [];
+  // Scopes as people read them ("Runs"), not their keys ("runs").
+  const scopeLabels = Object.fromEntries((data?.scopes ?? []).map((sc) => [sc.key, sc.label]));
   const past = data?.keys.filter((k) => k.status !== "active") ?? [];
 
   return (
@@ -96,9 +103,9 @@ function ApiKeysPage() {
         lead={
           <>
             <p>
-              Keys let your own programs and scripts call the Coderhelm API: list runs, retry or cancel them, make and
-              run plans, read reviews and check usage. A key can do only what its scopes allow, and never more than the
-              person who made it.
+              Only needed if someone on your team connects their own scripts to Coderhelm. Keys let those programs call the
+              Coderhelm API: list runs, retry or cancel them, make and run plans, read reviews and check usage. A key can do
+              only what its scopes allow, and never more than the person who made it.
             </p>
             <p className="mt-2">
               <a href={API_DOCS_URL} target="_blank" rel="noreferrer" className={linkButton}>
@@ -118,9 +125,9 @@ function ApiKeysPage() {
 
       <div className="mt-6 space-y-6">
         {error && (
-          <Callout variant="error" title="Could not load the keys">
-            <p>{error}</p>
-          </Callout>
+          <Problem title="Couldn't load the keys" onRetry={load} details={error}>
+            Nothing has changed. Check your connection and try again.
+          </Problem>
         )}
 
         {!data && !error && (
@@ -132,37 +139,66 @@ function ApiKeysPage() {
 
         {data && (
           <section aria-labelledby="keys-live">
-            <h2 id="keys-live" className="mb-3 text-sm font-semibold text-zinc-100">
-              Active keys
-            </h2>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <SectionHeading id="keys-live" count={live.length}>
+                Active keys
+              </SectionHeading>
+              {canManage && live.length > 0 && (
+                <button type="button" className={buttonClass("secondary", "sm")} onClick={() => setCreating(true)}>
+                  Create key
+                </button>
+              )}
+            </div>
             {live.length === 0 ? (
-              <div className={cardClass}>
-                <p className="text-sm text-zinc-300">No active keys.</p>
-                <p className="mt-1 text-sm text-zinc-500">
-                  Create one for each program that calls the API, so you can revoke one without touching the others.
-                </p>
-              </div>
+              <EmptyState
+                icon={<KeyIcon />}
+                title="No active keys."
+                action={
+                  canManage ? (
+                    <button type="button" className={primaryButton} onClick={() => setCreating(true)}>
+                      Create key
+                    </button>
+                  ) : undefined
+                }
+              >
+                Create one for each program that calls the API, so you can revoke one without touching the others.
+              </EmptyState>
             ) : (
-              <ul className="space-y-3" aria-label="Active keys">
+              <List label="Active keys">
                 {live.map((k) => (
-                  <KeyRow key={k.id} apiKey={k} onRevoke={canManage ? () => revoke(k) : undefined} />
+                  <KeyRow key={k.id} apiKey={k} scopeLabels={scopeLabels} onRevoke={canManage ? () => revoke(k) : undefined} />
                 ))}
-              </ul>
+              </List>
             )}
           </section>
         )}
 
         {past.length > 0 && (
-          <section aria-labelledby="keys-past">
-            <h2 id="keys-past" className="mb-3 text-sm font-semibold text-zinc-100">
-              Revoked and expired
-            </h2>
-            <ul className="space-y-3" aria-label="Revoked and expired keys">
+          <details className="group" data-testid="past-keys">
+            <summary className={`inline-flex cursor-pointer list-none items-center gap-2 rounded text-sm font-semibold text-zinc-100 [&::-webkit-details-marker]:hidden ${focusRing}`}>
+              <span aria-hidden="true" className="text-zinc-400 transition-transform group-open:rotate-90 motion-reduce:transition-none">
+                <ChevronRightIcon />
+              </span>
+              Revoked and expired <span className="font-normal tabular-nums text-zinc-400">{past.length}</span>
+            </summary>
+            <ul className="mt-3 divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800" aria-label="Revoked and expired keys">
               {past.map((k) => (
-                <KeyRow key={k.id} apiKey={k} />
+                <li key={k.id} className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2.5 text-sm" data-testid="api-key">
+                  <span className="min-w-0 text-zinc-300 [overflow-wrap:anywhere]">{k.name}</span>
+                  <span className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+                    <StatusText look={{ label: k.status === "revoked" ? "Revoked" : "Expired", tone: k.status === "revoked" ? "danger" : "waiting" }} />
+                    <span>
+                      {k.status === "revoked"
+                        ? relativeTime(k.revoked_at) ?? ""
+                        : k.expires_at
+                          ? formatDate(k.expires_at)
+                          : ""}
+                    </span>
+                  </span>
+                </li>
               ))}
             </ul>
-          </section>
+          </details>
         )}
 
         {data && (
@@ -205,67 +241,48 @@ function ApiKeysPage() {
   );
 }
 
-function KeyRow({ apiKey: k, onRevoke }: { apiKey: ApiKey; onRevoke?: () => void }) {
-  const tone = k.status === "active" ? "success" : k.status === "revoked" ? "error" : "warning";
-  const label = k.status === "active" ? "Active" : k.status === "revoked" ? "Revoked" : "Expired";
+function KeyRow({ apiKey: k, scopeLabels, onRevoke }: { apiKey: ApiKey; scopeLabels: Record<string, string>; onRevoke?: () => void }) {
   const used = relativeTime(k.last_used_at);
   const made = relativeTime(k.created_at);
   return (
-    <li className={cardClass} data-testid="api-key">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-zinc-100">{k.name}</span>
-            <StatusPill tone={tone}>{label}</StatusPill>
-          </div>
-          <p className="mt-1 text-sm text-zinc-400">
-            <Code>{k.hint}</Code>
-          </p>
-        </div>
-        {onRevoke && (
+    <ListRow
+      testId="api-key"
+      status={{ tone: "success" }}
+      title={k.name}
+      titleText={k.name}
+      meta={[
+        <Code key="hint">{k.hint}</Code>,
+        `${k.rate_limit_per_minute.toLocaleString()} requests a minute`,
+        used ? `Last used ${used}` : "Never used",
+        k.expires_at ? `Expires ${formatDate(k.expires_at)}` : "Never expires",
+        <span key="made" title={k.created_by}>
+          Made {made ?? ""}
+        </span>,
+      ]}
+      chips={
+        <span className="flex min-w-0 flex-wrap gap-1.5" aria-label="Scopes">
+          {k.scopes.map((sc) => (
+            <Chip key={sc} title={sc}>
+              {shortScope(scopeLabels[sc] ?? sc)}
+            </Chip>
+          ))}
+        </span>
+      }
+      actions={
+        onRevoke ? (
           <button type="button" className={smallDangerButton} onClick={onRevoke}>
             Revoke
           </button>
-        )}
-      </div>
-      <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-        <div className="min-w-0">
-          <dt className="text-xs text-zinc-500">Scopes</dt>
-          <dd className="mt-0.5 flex flex-wrap gap-1.5">
-            {k.scopes.map((s) => (
-              <Code key={s}>{s}</Code>
-            ))}
-          </dd>
-        </div>
-        <div className="min-w-0">
-          <dt className="text-xs text-zinc-500">Rate limit</dt>
-          <dd className="mt-0.5 text-zinc-300">{k.rate_limit_per_minute.toLocaleString()} requests a minute</dd>
-        </div>
-        <div className="min-w-0">
-          <dt className="text-xs text-zinc-500">Made</dt>
-          <dd className="mt-0.5 text-zinc-300">
-            {made ?? "Unknown"} by {k.created_by}
-          </dd>
-        </div>
-        <div className="min-w-0">
-          <dt className="text-xs text-zinc-500">{k.status === "revoked" ? "Revoked" : "Last used"}</dt>
-          <dd className="mt-0.5 text-zinc-300">
-            {k.status === "revoked"
-              ? `${relativeTime(k.revoked_at) ?? ""}${k.revoked_by ? ` by ${k.revoked_by}` : ""}`
-              : (used ?? "Never")}
-          </dd>
-        </div>
-        <div className="min-w-0">
-          <dt className="text-xs text-zinc-500">Expires</dt>
-          <dd className="mt-0.5 text-zinc-300">
-            {k.expires_at
-              ? new Date(k.expires_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
-              : "Never"}
-          </dd>
-        </div>
-      </dl>
-    </li>
+        ) : undefined
+      }
+    />
   );
+}
+
+/** "Retry, re-run, re-review, cancel…" is a scope's full help; its chip shows the first words. */
+function shortScope(label: string): string {
+  const first = label.split(/[,:(]/)[0].trim();
+  return first.length > 28 ? `${first.slice(0, 27)}…` : first;
 }
 
 function CreateKeyModal({

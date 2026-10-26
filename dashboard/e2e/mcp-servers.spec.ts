@@ -231,7 +231,7 @@ test("adds a server that signs in with OAuth, comes back from the sign-in, and p
   await page.goto("/settings/integrations");
   const section = page.locator("#mcp-servers");
   await expect(section.getByRole("heading", { name: "MCP servers" })).toBeVisible();
-  await expect(section.getByText("None yet.")).toBeVisible();
+  await expect(section.getByText("No MCP servers yet")).toBeVisible();
 
   await page.getByTestId("add-mcp-server-button").click();
   const dialog = page.getByRole("dialog", { name: "Add an MCP server" });
@@ -348,8 +348,8 @@ test("a connection that needs reconnecting says why and reconnects", async ({ pa
   const r = row(page, "mcp:docs");
   await expect(r).toHaveAttribute("data-status", "needs_reconnect");
   await expect(r.getByTestId("integration-status")).toContainText("Needs reconnect");
-  await expect(page.getByTestId("integrations-summary")).toContainText("1 need reconnecting");
-  await r.getByRole("button", { name: /^Docs, Needs reconnect\. Reconnect/ }).click();
+  await expect(page.getByTestId("integrations-summary")).toContainText("1 needs reconnecting");
+  await r.getByRole("button", { name: /^Docs, Needs reconnecting\. Reconnect/ }).click();
   const panel = r.getByTestId("integration-panel");
   await expect(panel.getByTestId("mcp-status-reason")).toHaveText(why);
   await shot(page, "mcp-needs-reconnect");
@@ -395,7 +395,7 @@ test("the callback page explains itself when opened without a sign-in", async ({
   await mockApi(page);
   await page.goto("/settings/integrations/mcp-callback/");
   await expect(page.getByTestId("mcp-callback")).toHaveAttribute("data-state", "idle");
-  await expect(page.getByText("This page finishes a sign-in to an MCP server.")).toBeVisible();
+  await expect(page.getByText(/Nothing to finish here/)).toBeVisible();
 });
 
 test("a sign-in that can't be finished says so and keeps no code in the address", async ({ page }) => {

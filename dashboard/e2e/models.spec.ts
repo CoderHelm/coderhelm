@@ -165,7 +165,7 @@ test("test key: passes inline, and a refused key fails inline without changing w
   await expect(page.getByTestId("key-status")).toContainText("Key saved");
   const getsBefore = db.gets;
 
-  await keyRow(page).getByRole("button", { name: "Test key" }).click();
+  await keyRow(page).getByRole("button", { name: "Save and test key" }).click();
   const result = page.getByTestId("key-test-result");
   await expect(result).toContainText("The key works");
   await expect(page.getByTestId("key-status")).toContainText(/last tested ✓\s*passed\s*just now|last tested.*just now/);
@@ -176,7 +176,7 @@ test("test key: passes inline, and a refused key fails inline without changing w
 
   await keyRow(page).getByRole("button", { name: "Replace key" }).click();
   await keyRow(page).getByLabel("API key").fill("sk-ant-api03-invented-wrong-key-0000");
-  await keyRow(page).getByRole("button", { name: "Test key" }).click();
+  await keyRow(page).getByRole("button", { name: "Save and test key" }).click();
   await expect(result).toContainText("Anthropic did not accept this key");
   expect(db.puts[1]).toEqual({ primary_model: "claude-sonnet-5-5", heavy_model: "claude-opus-5-5", api_key: "sk-ant-api03-invented-wrong-key-0000" });
   // The saved key is untouched and still shown.
@@ -190,7 +190,7 @@ test("no key yet: the box is open, Test waits for a key, Save refuses without on
   await page.goto("/settings/models/");
   await expect(page.getByTestId("key-status")).toContainText("No key saved");
   await expect(keyRow(page).getByLabel("API key")).toBeVisible();
-  await expect(keyRow(page).getByRole("button", { name: "Test key" })).toBeDisabled();
+  await expect(keyRow(page).getByRole("button", { name: "Save and test key" })).toBeDisabled();
   // Unchosen models start on the recommended ones.
   await expect(select(page, "Planning & reviews")).toHaveValue("claude-sonnet-5-5");
   await expect(select(page, "Writing code")).toHaveValue("claude-opus-5-5");

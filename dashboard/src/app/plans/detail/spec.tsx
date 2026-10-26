@@ -50,9 +50,9 @@ export function SpecDocument({
   }
   if (!openspec) {
     return (
-      <div className="rounded-lg border border-dashed border-zinc-800 px-4 py-5" data-testid="spec-empty">
-        <p className="text-sm text-zinc-300">No spec written yet.</p>
-        <p className="mt-1 max-w-prose text-sm text-zinc-500">
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-5" data-testid="spec-empty">
+        <p className="text-sm font-medium text-zinc-100">No spec written yet.</p>
+        <p className="mt-1 max-w-prose text-sm text-zinc-400">
           Coderhelm can write a proposal, a design and a spec from this plan, to read here or commit with the work.
         </p>
         <button type="button" onClick={onWrite} disabled={writing} className={`mt-3 ${secondaryButton}`}>
@@ -62,22 +62,32 @@ export function SpecDocument({
     );
   }
   const parts = PARTS.filter((p) => openspec[p.key]?.trim());
+  // The proposal is the plain summary; the design and requirements are for
+  // engineers, folded away until someone asks for them.
+  const summary = parts.find((p) => p.key === "proposal");
+  const technical = parts.filter((p) => p.key !== "proposal");
+  const part = (p: (typeof PARTS)[number]) => (
+    <div key={p.key} className="min-w-0">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-zinc-200">{p.title}</h3>
+        <CopyButton className="!min-h-7" text={openspec[p.key] ?? ""} label={<>Copy<span className="sr-only"> {p.key}.md</span></>} />
+      </div>
+      <div className="min-w-0 overflow-x-auto">
+        <ChatMarkdown>{stripTitle(openspec[p.key] ?? "")}</ChatMarkdown>
+      </div>
+    </div>
+  );
   return (
-    <div className="space-y-8" data-testid="spec">
-      {parts.length === 0 && <p className="text-sm text-zinc-500">The spec is empty.</p>}
-      {parts.map((p) => (
-        <div key={p.key} className="min-w-0">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-zinc-200">{p.title}</h3>
-            <CopyButton className="!min-h-7" text={openspec[p.key] ?? ""} label={<>Copy<span className="sr-only"> {p.key}.md</span></>} />
-          </div>
-          <div className="min-w-0 overflow-x-auto">
-            <ChatMarkdown>{stripTitle(openspec[p.key] ?? "")}</ChatMarkdown>
-          </div>
-        </div>
-      ))}
+    <div className="space-y-6" data-testid="spec">
+      {parts.length === 0 && <p className="text-sm text-zinc-400">The spec is empty.</p>}
+      {summary && part(summary)}
+      {technical.length > 0 && (
+        <Disclosure summary={<span>Technical plan <span className="text-zinc-400">(for engineers)</span></span>}>
+          <div className="space-y-8 pt-2">{technical.map(part)}</div>
+        </Disclosure>
+      )}
       {openspec.tasks?.trim() && (
-        <Disclosure summary={<span>The spec&apos;s task list <span className="text-zinc-500">tasks.md</span></span>}>
+        <Disclosure summary={<span>The spec&apos;s task list</span>}>
           <div className="flex justify-end">
             <CopyButton className="!min-h-7" text={openspec.tasks} label={<>Copy<span className="sr-only"> tasks.md</span></>} />
           </div>

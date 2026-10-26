@@ -169,12 +169,19 @@ test("findings list with status toggles, filters and the inline detail", async (
 
   const row = page.getByTestId("finding-rec_new");
   await expect(row).toContainText("Checkout times out at the payment step");
-  await expect(row).toContainText("/aws/lambda/shop-checkout");
+  // The service's name in the row; the full log group in its title and details.
+  await expect(row).toContainText("shop-checkout");
+  await expect(row.locator('[title="/aws/lambda/shop-checkout"]')).toBeVisible();
   await expect(row).toContainText("412 lines");
   await expect(row).toContainText("first seen 1 day ago");
   await expect(row).toContainText("Critical");
   await expect(row.getByRole("button", { name: /Create fix PR/ })).toBeVisible();
-  await expect(row.getByRole("link", { name: /Open logs/ })).toHaveAttribute("href", /logsV2:log-groups/);
+  // One visible action; Ignore and Open logs wait in the row's menu.
+  await expect(row.getByRole("button", { name: /^Ignore/ })).toHaveCount(0);
+  await row.getByRole("button", { name: "More actions for Checkout times out at the payment step" }).click();
+  await expect(page.getByRole("menuitem", { name: /Ignore/ })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: /Open logs in CloudWatch/ })).toBeVisible();
+  await page.keyboard.press("Escape");
 
   // The automatic fix that started links its PR; the one that was skipped says why.
   const fixing = page.getByTestId("finding-rec_fixing");
@@ -210,6 +217,7 @@ test("findings list with status toggles, filters and the inline detail", async (
   await expect(row).toContainText("Add a 10 second timeout to the payment client and retry once.");
   await expect(row).toContainText("src/payments/client.ts");
   await expect(row.getByTestId("sample-lines")).toContainText("Task timed out after 30.00 seconds token=[hidden]");
+  await expect(row.getByRole("link", { name: /Open logs/ })).toHaveAttribute("href", /logsV2:log-groups/);
   await shot(page, "logs-1280");
 });
 

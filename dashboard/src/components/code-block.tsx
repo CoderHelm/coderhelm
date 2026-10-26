@@ -161,7 +161,7 @@ export function CodeBlock({
                 }`}
               >
                 {lineNumbers && (
-                  <span aria-hidden="true" className="w-10 shrink-0 select-none pr-3 text-right tabular-nums text-zinc-600">
+                  <span aria-hidden="true" className="w-10 shrink-0 select-none pr-3 text-right tabular-nums text-zinc-400">
                     {n ?? ""}
                   </span>
                 )}

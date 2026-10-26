@@ -20,7 +20,7 @@ import { Page, PageHeader } from "@/components/page";
 import { Field } from "@/components/settings";
 import { MarkdownEditor, clearDraft } from "@/components/markdown-editor";
 import { Segmented } from "@/components/segmented";
-import { focusRing, fullWidthOnPhone, primaryButton, secondaryButton } from "@/components/ui";
+import { buttonClass, focusRing, fullWidthOnPhone, primaryButton, secondaryButton } from "@/components/ui";
 import { List, ListEmpty, ListError, ListRow, ListSkeleton, ListToolbar, StatusText, useListParams } from "@/components/list";
 
 const KINDS: SupportItemKind[] = ["run", "review", "release", "plan", "alert", "data_source"];
@@ -37,7 +37,7 @@ const ISSUE_TEMPLATE = "### What happened\n\n\n### What you expected\n\n\n### St
 const BODY_TIPS = [
   <>Say what you expected, what you saw, and when. A run, review or page attached below helps more than a description of it.</>,
   <>Leave out passwords, keys and code: support never needs them, and likely secrets are hidden before the ticket is saved.</>,
-  <>Paste an error or a log between lines of three backticks to keep it readable.</>,
+  <>Paste error messages as they are. The code button in the toolbar keeps them readable.</>,
   <>Select words and paste a link to make them a link.</>,
 ];
 
@@ -154,7 +154,8 @@ function Tickets() {
                       titleText={t.subject}
                       href={`/support/ticket?id=${encodeURIComponent(t.id)}`}
                       meta={[
-                        filedBy(t),
+                        // The summary already names who wrote last; say the filer only when it's someone else.
+                        t.last_snippet && t.last_author_name === filedBy(t) ? null : filedBy(t),
                         ticketItems(t).length === 1
                           ? itemWords(ticketItems(t)[0])
                           : ticketItems(t).length > 1
@@ -170,7 +171,7 @@ function Tickets() {
                             ? "Coderhelm support answered. Reply when you can."
                             : undefined
                       }
-                      summaryTone={t.status === "waiting" ? "waiting" : undefined}
+                      summaryTone={undefined}
                       chips={<StatusText look={look} />}
                       time={t.updated_at}
                     />
@@ -315,7 +316,7 @@ function NewTicket() {
           </p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <Segmented label="How urgent is it?" options={URGENCY} value={priority} onChange={setPriority} />
-            <span className="text-xs text-zinc-500" data-testid="ticket-urgency-means">
+            <span className="text-xs text-zinc-400" data-testid="ticket-urgency-means">
               {URGENCY.find((u) => u.value === priority)?.means}
             </span>
           </div>
@@ -351,16 +352,16 @@ function NewTicket() {
           data-testid="ticket-attached"
         >
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <h2 id="attached-heading" className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <h2 id="attached-heading" className="text-xs font-medium uppercase tracking-wide text-zinc-400">
               Sent with your ticket
             </h2>
-            <span className="text-zinc-600">Never your code, diffs or settings.</span>
+            <span className="text-zinc-400">Never your code, diffs or settings.</span>
           </div>
           <ul className="mt-2 space-y-1">
             {page && (
               <li className="flex flex-wrap items-center justify-between gap-2">
                 <span className="min-w-0 [overflow-wrap:anywhere]">Page: {pageWords(page)}</span>
-                <button type="button" onClick={() => setPage("")} className={`rounded text-xs text-zinc-500 underline underline-offset-4 hover:text-zinc-300 ${focusRing}`}>
+                <button type="button" onClick={() => setPage("")} className={`rounded text-xs text-zinc-400 underline underline-offset-4 hover:text-zinc-300 ${focusRing}`}>
                   Remove
                 </button>
               </li>
@@ -379,9 +380,10 @@ function NewTicket() {
                 onClick={() => setPicking(true)}
                 disabled={items.length >= MAX_ATTACHMENTS}
                 data-testid="ticket-attach"
-                className={`rounded text-xs text-zinc-300 underline underline-offset-4 hover:text-zinc-100 disabled:opacity-50 ${focusRing}`}
+                className={buttonClass("secondary", "sm")}
+                title="Runs, reviews, releases, plans, alerts or data sources"
               >
-                + Attach runs, reviews, releases, plans, alerts or data sources
+                Attach something
               </button>
             )}
           </div>

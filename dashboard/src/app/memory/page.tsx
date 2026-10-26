@@ -15,12 +15,14 @@ import { Callout } from "@/components/callout";
 import { Modal, modalActions } from "@/components/modal";
 import { RepoCombobox } from "@/components/repo-combobox";
 import { Chip, List, ListEmpty, ListError, ListRow, ListSection, ListSkeleton, ListToolbar, MoreMenu, SortSelect, useListParams } from "@/components/list";
+import { Select } from "@/components/select";
+import { Problem } from "@/components/problem";
 import { SettingsDisclosure } from "@/components/settings";
 import { Skeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { ChatIcon, CodeIcon, MemoryIcon, PinIcon, PlannerIcon, ReviewerIcon } from "@/components/icons";
-import { Page, PageHeader } from "@/components/page";
+import { Page, PageHeader, SectionHeading } from "@/components/page";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 
 // What each memory can be about, in the order they're shown. Mirrors the
@@ -46,7 +48,7 @@ type Show = "all" | "pinned" | "run" | "person";
 type Sort = "newest" | "most_used";
 
 /** A select that sits in a list toolbar. */
-const toolbarSelect = `min-h-9 rounded-lg border border-zinc-700 bg-zinc-900 py-1.5 pl-3 text-sm text-zinc-100 hover:border-zinc-500 ${focusRing}`;
+
 
 
 function errorText(e: unknown, fallback: string) {
@@ -248,30 +250,38 @@ function MemoryPage() {
 
       {repo && (
         <>
+          {/* ── Test what it would remember ──────────────────── */}
+          <div className="mt-6">
+            <SettingsDisclosure summary="Test it: see what Coderhelm would remember for a ticket">
+              <TryIt repo={repo} />
+            </SettingsDisclosure>
+          </div>
+
           {/* ── Memories ─────────────────────────────────────── */}
           <div className="mt-6">
             <ListSection
               id="memories"
               title="Memories"
               count={memories !== null && !listError ? total : undefined}
-              description={<span className="text-xs text-zinc-500">The planner and coding agent get every pinned memory and the five most relevant on each ticket.</span>}
-              actions={
-                <>
-                <select aria-label="Topic" value={topic} onChange={(e) => setParams({ topic: e.target.value })} className={`${toolbarSelect} w-40 min-w-0 max-w-full truncate pr-8`}>
-                    <option value="">Every topic</option>
-                    {TOPICS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
-                <SortSelect
-                  value={sort}
-                  onChange={(v) => setParams({ sort: v })}
-                  options={[{ value: "newest", label: "Newest" }, { value: "most_used", label: "Most used" }]}
-                />
-                </>
-              }
+              description="Pinned memories are used on every ticket; the others when they're relevant to it (the five closest)."
             >
               <ListToolbar
                 className="mb-4"
                 search={{ value: params.q, onChange: (v) => setParams({ q: v }, { replace: true }), placeholder: "Search memories" }}
+                actions={
+                  // Topic and sort stay together, on every width.
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Select aria-label="Topic" value={topic} onChange={(e) => setParams({ topic: e.target.value })} className="w-40 bg-zinc-900">
+                      <option value="">Every topic</option>
+                      {TOPICS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </Select>
+                    <SortSelect
+                      value={sort}
+                      onChange={(v) => setParams({ sort: v })}
+                      options={[{ value: "newest", label: "Newest" }, { value: "most_used", label: "Most used" }]}
+                    />
+                  </div>
+                }
                 status={{
                   label: "Show",
                   value: show,
@@ -331,7 +341,7 @@ function MemoryPage() {
                     );
                   })}
                   {total > memories.length && (
-                    <p className="text-sm text-zinc-500">Showing the first {memories.length} of {total}. Search or filter to find the rest.</p>
+                    <p className="text-sm text-zinc-400">Showing the first {memories.length} of {total}. Search or filter to find the rest.</p>
                   )}
                 </div>
               )}
@@ -339,17 +349,16 @@ function MemoryPage() {
           </div>
           {/* ── Who uses memory ───────────────────────────────── */}
           <section aria-labelledby="agents-heading" className="mt-10">
-            <h2 id="agents-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">Who uses memory</h2>
+            <SectionHeading id="agents-heading" className="mb-3">Who uses memory</SectionHeading>
             {profilesError ? (
-              <Callout variant="error" title="We couldn't load the agents">
-                <p>{profilesError}</p>
-                <p><button type="button" onClick={refresh} className={linkButton}>Try again</button></p>
-              </Callout>
+              <Problem title="Couldn't load the agents" onRetry={refresh} details={profilesError}>
+                Your agents still use their memories. Try again in a moment.
+              </Problem>
             ) : profiles === null ? (
               <Skeleton className="h-24" />
             ) : (
               <>
-                <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-zinc-800 bg-zinc-800 lg:grid-cols-4" data-testid="memory-agents">
+                <div className="grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-zinc-800 bg-zinc-800 sm:grid-cols-2 lg:grid-cols-4" data-testid="memory-agents">
                   {profiles.map((p) => (
                     <button
                       key={p.id}
@@ -369,7 +378,7 @@ function MemoryPage() {
                       <span className="mt-2 block text-xs text-zinc-400">
                         <span className="text-base font-semibold tabular-nums text-zinc-100">{p.activity_count}</span> {p.activity_label}
                       </span>
-                      <span className={`mt-1 block text-xs ${p.uses_repo_memory ? "text-emerald-300/90" : "text-zinc-500"}`}>
+                      <span className={`mt-1 block text-xs ${p.uses_repo_memory ? "text-emerald-300/90" : "text-zinc-400"}`}>
                         {p.uses_repo_memory ? "Uses this repo's memories" : "Doesn't use repo memories"}
                       </span>
                     </button>
@@ -380,12 +389,6 @@ function MemoryPage() {
             )}
           </section>
 
-          {/* ── Preview for a ticket ─────────────────────────── */}
-          <div className="mt-10">
-            <SettingsDisclosure summary="Preview what a ticket would bring along">
-              <TryIt repo={repo} />
-            </SettingsDisclosure>
-          </div>
         </>
       )}
 
@@ -409,7 +412,7 @@ function AgentDetail({ agent }: { agent: AgentProfile }) {
       </div>
       <div className="mt-5 grid gap-6 md:grid-cols-2">
         <div className="min-w-0">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">What it knows</h4>
+          <h4 className="text-sm font-semibold text-zinc-100">What it knows</h4>
           <dl className="mt-2 flex flex-col gap-3">
             {agent.knows.map((k) => (
               <div key={k.label}>
@@ -420,7 +423,7 @@ function AgentDetail({ agent }: { agent: AgentProfile }) {
           </dl>
         </div>
         <div className="min-w-0">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">What it learned</h4>
+          <h4 className="text-sm font-semibold text-zinc-100">What it learned</h4>
           {agent.learned.length === 0 ? (
             <p className="mt-2 text-sm text-zinc-400">
               {agent.id === "feedback"
@@ -434,7 +437,7 @@ function AgentDetail({ agent }: { agent: AgentProfile }) {
               {agent.learned.map((l, i) => (
                 <li key={i} className="rounded-md border border-zinc-800 bg-zinc-950/50 p-3">
                   <p className="text-sm text-zinc-200">{l.text}</p>
-                  <p className="mt-1 text-xs text-zinc-500">
+                  <p className="mt-1 text-xs text-zinc-400">
                     {l.link ? <a href={l.link} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-zinc-300">{l.source}</a> : l.source}
                     {day(l.at) && <><span aria-hidden="true"> · </span>{day(l.at)}</>}
                   </p>
@@ -445,7 +448,7 @@ function AgentDetail({ agent }: { agent: AgentProfile }) {
         </div>
       </div>
       <div className="mt-6">
-        <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Recent work</h4>
+        <h4 className="text-sm font-semibold text-zinc-100">Recent work</h4>
         {agent.recent.length === 0 ? (
           <p className="mt-2 text-sm text-zinc-400">Nothing on this repository yet.</p>
         ) : (
@@ -455,7 +458,7 @@ function AgentDetail({ agent }: { agent: AgentProfile }) {
                 <span className="min-w-0 text-zinc-200">
                   {r.link ? <a href={r.link} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-zinc-100">{r.title || "Untitled"}</a> : r.title || "Untitled"}
                 </span>
-                <span className="text-xs text-zinc-500">{r.outcome}{day(r.at) && <> · {day(r.at)}</>}</span>
+                <span className="text-xs text-zinc-400">{r.outcome}{day(r.at) && <> · {day(r.at)}</>}</span>
               </li>
             ))}
           </ul>
@@ -505,7 +508,7 @@ function MemoryCard({
     <ListRow
       testId="memory"
       status={{ tone: m.pinned ? "waiting" : m.origin?.source === "person" ? "neutral" : "muted" }}
-      title={<InlineMarkdown>{m.content}</InlineMarkdown>}
+      title={<span className="line-clamp-3 whitespace-normal">{<InlineMarkdown>{m.content}</InlineMarkdown>}</span>}
       titleText={m.content}
       meta={[
         showTopic ? <span key="topic" className="text-zinc-400">{topicLabel(m.topic)}</span> : null,
@@ -544,9 +547,9 @@ function MemoryCard({
           <label className="sr-only" htmlFor={`edit-${m.id}`}>Memory</label>
           <textarea id={`edit-${m.id}`} value={content} onChange={(e) => setContent(e.target.value)} rows={3} maxLength={1000} className={inputClass} />
           <div className="flex flex-wrap items-center gap-3">
-            <select aria-label="Topic for this memory" value={topic} onChange={(e) => setTopic(e.target.value)} className={`${inputClass} !w-auto min-w-0 max-w-full`}>
+            <Select aria-label="Topic for this memory" value={topic} onChange={(e) => setTopic(e.target.value)}>
               {TOPICS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
+            </Select>
             <button type="button" onClick={submit} disabled={saving || !content.trim()} className={primaryButton}>{saving ? "Saving…" : "Save"}</button>
             <button type="button" onClick={() => { setEditing(false); setContent(m.content); setTopic(m.topic || "learned"); setError(""); }} className={secondaryButton}>Cancel</button>
           </div>
@@ -593,7 +596,7 @@ function TryIt({ repo }: { repo: string }) {
         />
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <button type="button" onClick={run} disabled={busy || !text.trim()} className={secondaryButton}>{busy ? "Looking…" : "Show what it would remember"}</button>
-          <span className="text-xs text-zinc-500">The planner and coding agent get exactly this. Nothing is saved.</span>
+          <span className="text-xs text-zinc-400">The planner and coding agent get exactly this. Nothing is saved.</span>
         </div>
         {error && <p role="alert" className="mt-3 text-sm text-red-400">{error}</p>}
         {result && (
@@ -611,7 +614,7 @@ function TryIt({ repo }: { repo: string }) {
                 {result.recalled.map(({ memory: m, score }) => (
                   <li key={m.id} className="rounded-md border border-zinc-800 bg-zinc-950/50 p-3">
                     <p className="text-sm text-zinc-200">{m.content}</p>
-                    <p className="mt-1 text-xs text-zinc-500">{topicLabel(m.topic)} · {where(m)} · match {Math.round(Math.min(1, score / 0.08) * 100)}%</p>
+                    <p className="mt-1 text-xs text-zinc-400">{topicLabel(m.topic)} · {where(m)} · match {Math.round(Math.min(1, score / 0.08) * 100)}%</p>
                   </li>
                 ))}
               </ol>
@@ -671,7 +674,7 @@ function TeachDialog({ repo, onClose, onSaved }: { repo: string; onClose: () => 
         placeholder="For example: run the unit tests with pnpm test:unit; the e2e suite needs staging."
         className={`${inputClass} mt-2`}
       />
-      <p className="mt-1 text-right text-xs text-zinc-500">{content.length} / 1000</p>
+      <p className="mt-1 text-right text-xs text-zinc-400">{content.length} / 1000</p>
       <label htmlFor="teach-topic" className="mt-2 block text-sm text-zinc-300">Topic</label>
       <select id="teach-topic" value={topic} onChange={(e) => setTopic(e.target.value)} className={`${inputClass} mt-2`}>
         {TOPICS.map((t) => <option key={t.value} value={t.value}>{t.label}: {t.hint}</option>)}

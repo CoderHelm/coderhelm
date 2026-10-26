@@ -8,6 +8,8 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type SupportAccess, type SupportGrant, type SupportViewStatus } from "@/lib/api";
 import { timeLeft } from "@/lib/support";
 import { Time } from "./list";
+import { Skeleton } from "./skeleton";
+import { Problem } from "./problem";
 import { focusRing, inputClass, primaryButton, secondaryButton } from "./ui";
 
 export const WINDOW_LABEL: Record<number, string> = { 24: "24 hours", 72: "72 hours", 168: "7 days" };
@@ -36,6 +38,8 @@ export function SupportAccessControl({
   const [hours, setHours] = useState(72);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  // What failed, in plain words; `error` keeps the raw text for Technical details.
+  const [failed, setFailed] = useState("");
 
   const load = useCallback(() => {
     api
@@ -44,19 +48,21 @@ export function SupportAccessControl({
         setAccess(a);
         onChange?.(a);
       })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Could not read support access."));
+      .catch((e: unknown) => setError(raw(e) || " "));
   }, [onChange]);
   useEffect(load, [load]);
 
   const grant = async () => {
     setBusy(true);
     setError("");
+    setFailed("");
     try {
       await api.grantSupportAccess({ hours, note: note.trim() || undefined, ticket_id: ticketId });
       setNote("");
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not turn on support access.");
+      setError(raw(e));
+      setFailed("Couldn't turn on support access. Try again.");
     } finally {
       setBusy(false);
     }
@@ -64,11 +70,13 @@ export function SupportAccessControl({
   const revoke = async () => {
     setBusy(true);
     setError("");
+    setFailed("");
     try {
       await api.revokeSupportAccess();
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not end support access.");
+      setError(raw(e));
+      setFailed("Couldn't end support access. Try again.");
     } finally {
       setBusy(false);
     }
@@ -76,11 +84,23 @@ export function SupportAccessControl({
 
   if (!access) {
     return error ? (
-      <p role="alert" className="text-sm text-red-400">
-        {error}
-      </p>
+      <Problem
+        compact
+        title="Couldn't check support access"
+        details={error.trim() || undefined}
+        onRetry={() => {
+          setError("");
+          load();
+        }}
+      >
+        Nothing has changed. Check your connection and try again.
+      </Problem>
     ) : (
-      <p className="text-sm text-zinc-500">Checking support access…</p>
+      <div aria-busy="true" className="space-y-2">
+        <span className="sr-only">Checking support access…</span>
+        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="h-9 w-48" />
+      </div>
     );
   }
   const g = access.grant?.active ? access.grant : null;
@@ -93,7 +113,7 @@ export function SupportAccessControl({
             <span className="text-zinc-500"> ({timeLeft(g.until)})</span>.
           </p>
           {!compact && (
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-zinc-400">
               Turned on by {g.granted_by_email}
               {g.note ? ` · “${g.note}”` : ""}
             </p>
@@ -145,13 +165,56 @@ export function SupportAccessControl({
           </button>
         </>
       )}
-      {error && (
-        <p role="alert" className="text-sm text-red-400">
-          {error}
-        </p>
+      {failed && (
+        <Problem compact title={failed} details={error.trim() || undefined}>
+          Nothing has changed.
+        </Problem>
       )}
     </div>
   );
+}
+
+function raw(e: unknown): string {
+  return e instanceof Error ? e.message : "";
+}
+
+const PAGE_WORDS: Record<string, [string, string]> = {
+  // [the list, one item]
+  runs: ["the runs list", "a run"],
+  reviewer: ["the reviews", "a review"],
+  plans: ["the plans", "a plan"],
+  alerts: ["the alerts", "an alert"],
+  releases: ["the releases", "a release"],
+  tests: ["the tests", "a test"],
+  logs: ["the logs", "a log finding"],
+  memory: ["the memory", "a memory"],
+  skills: ["the skills", "a skill"],
+  "data-sources": ["the data sources", "a data source"],
+  analytics: ["the analytics", "the analytics"],
+  support: ["the support requests", "a support request"],
+  usage: ["the usage", "the usage"],
+};
+
+/**
+ * What a support request looked at, as a page people know ("Viewed the runs
+ * list", "Opened a run"). The raw request stays on hover for platform staff.
+ */
+export function supportRouteWords(method: string, route: string): string {
+  const path = route.split("?")[0].replace(/^\/api(?=\/)/, "");
+  const parts = path.split("/").filter(Boolean);
+  const head = parts[0] ?? "";
+  const words = PAGE_WORDS[head];
+  const write = !!method && method.toUpperCase() !== "GET";
+  if (head === "settings") {
+    const what = (parts[1] ?? "").replace(/-/g, " ");
+    if (write) return `Tried to change ${what || "settings"} (refused)`;
+    return what ? `Viewed settings: ${what}` : "Viewed settings";
+  }
+  if (!head) return write ? "Tried to make a change (refused)" : "Viewed the dashboard";
+  const one = parts.length > 1 || /[?&](id|sk)=/.test(route);
+  const thing = words ? (one ? words[1] : words[0]) : head.replace(/-/g, " ");
+  if (write) return `Tried to change ${thing} (refused)`;
+  return one ? `Opened ${thing}` : `Viewed ${thing}`;
 }
 
 const LOG_WORDS: Record<string, string> = {
@@ -175,12 +238,12 @@ export function SupportAccessLog({ access }: { access: SupportAccess }) {
             {LOG_WORDS[e.kind] ?? e.kind}
           </span>
           {e.route && (
-            <code className="min-w-0 wrap-anywhere font-mono text-xs text-zinc-400">
-              {e.method} {e.route}
-            </code>
+            <span className="min-w-0 text-zinc-300" title={`${e.method} ${e.route}`}>
+              {supportRouteWords(e.method, e.route)}
+            </span>
           )}
-          {e.detail && <span className="min-w-0 text-xs text-zinc-500 [overflow-wrap:anywhere]">{e.detail}</span>}
-          <span className="ml-auto flex min-w-0 items-baseline gap-2 text-xs text-zinc-500">
+          {e.detail && <span className="min-w-0 text-xs text-zinc-400 [overflow-wrap:anywhere]">{e.detail}</span>}
+          <span className="ml-auto flex min-w-0 items-baseline gap-2 text-xs text-zinc-400">
             <span className="min-w-0 [overflow-wrap:anywhere]">{e.actor_email}</span>
             <span className="shrink-0"><Time iso={e.at} /></span>
           </span>

@@ -1,7 +1,7 @@
 {
   "//": "Counts the UI lint tolerates today. Lower them as pages are fixed; `node scripts/ui-lint.mjs --update-baseline` rewrites this file.",
-  "fontMono": 85,
-  "pre": 3,
+  "fontMono": 54,
+  "pre": 2,
   "wideButtons": 0,
   "unlabeledInputs": {}
 }

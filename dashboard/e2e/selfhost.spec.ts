@@ -284,10 +284,11 @@ test("hosted: no System or Setup, no banner, and no install calls", async ({ pag
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await expect(page.getByText("This install")).toHaveCount(0);
   await expect(page.getByTestId("setup-banner")).toHaveCount(0);
+  // Pages only a self-hosted install has send a hosted team back to Settings.
   await page.goto("/settings/system/");
-  await expect(page.getByTestId("system-unavailable")).toBeVisible();
+  await expect(page).toHaveURL(/\/settings\/?$/);
   await page.goto("/settings/setup/");
-  await expect(page.getByTestId("setup-unavailable")).toBeVisible();
+  await expect(page).toHaveURL(/\/settings\/?$/);
   expect(calls.filter((c) => c.includes("/api/system/"))).toEqual([]);
 });
 

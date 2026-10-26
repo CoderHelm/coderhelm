@@ -29,9 +29,12 @@ import type { AlertNotifySettings, ChatChannel } from "@/lib/api";
 import { Disclosure } from "@/components/disclosure";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
-import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { buttonClass, focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { ChevronRightIcon } from "@/components/icons";
 import { BrandIcon } from "@/components/brand-icons";
+import { EmptyState } from "@/components/empty-state";
+import { Problem } from "@/components/problem";
+import { INTEGRATION_STATUS } from "@/lib/integration-status";
 import { AddMcpServerDialog, McpServerPanel, connectCatalogServer } from "@/components/mcp-servers";
 
 // Settings → Integrations: every outside system Coderhelm connects to, as one
@@ -59,13 +62,23 @@ const SECTIONS: { id: IntegrationSection; anchor: string; title: string }[] = [
   { id: "mcp", anchor: "mcp-servers", title: "MCP servers" },
 ];
 
+// The words come from lib/integration-status.ts, so this list, the GitHub
+// page and the Jira page always say the same thing.
 const STATUS: Record<IntegrationStatus, { label: string; dot: string; text: string }> = {
-  connected: { label: "Connected", dot: "bg-emerald-400", text: "text-zinc-200" },
-  needs_credentials: { label: "Needs credentials", dot: "bg-amber-400", text: "text-amber-300" },
-  needs_reconnect: { label: "Needs reconnect", dot: "bg-amber-400", text: "text-amber-300" },
-  not_connected: { label: "Not connected", dot: "bg-zinc-600", text: "text-zinc-500" },
-  error: { label: "Not working", dot: "bg-red-400", text: "text-red-300" },
+  connected: { label: INTEGRATION_STATUS.connected.label, dot: "bg-emerald-400", text: "text-zinc-200" },
+  needs_credentials: { label: INTEGRATION_STATUS.needs_credentials.label, dot: "bg-amber-400", text: "text-amber-300" },
+  needs_reconnect: { label: INTEGRATION_STATUS.needs_reconnect.label, dot: "bg-amber-400", text: "text-amber-300" },
+  not_connected: { label: INTEGRATION_STATUS.not_connected.label, dot: "bg-zinc-600", text: "text-zinc-400" },
+  error: { label: INTEGRATION_STATUS.error.label, dot: "bg-red-400", text: "text-red-300" },
 };
+
+/** "1 needs credentials", "2 need credentials". */
+function needs(n: number, rest: string): string {
+  return `${n} ${n === 1 ? "needs" : "need"} ${rest}`;
+}
+
+/** A row's own check time is worth showing only when it is old or the row has a problem. */
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Problems first, then what works, then what could be added. */
 const ORDER: Record<IntegrationStatus, number> = { needs_credentials: 0, needs_reconnect: 0, error: 1, connected: 2, not_connected: 3 };
@@ -159,6 +172,21 @@ function IntegrationsPage() {
     return c;
   }, [data]);
 
+  // The newest check across every row, said once at the top.
+  const lastCheck = useMemo(() => {
+    const times = (data?.items ?? []).map((i) => (i.last_check ? Date.parse(i.last_check) : NaN)).filter((t) => !Number.isNaN(t));
+    return times.length ? new Date(Math.max(...times)).toISOString() : "";
+  }, [data]);
+  const [rechecking, setRechecking] = useState(false);
+  const recheck = async () => {
+    setRechecking(true);
+    try {
+      await load();
+    } finally {
+      setRechecking(false);
+    }
+  };
+
   const replace = (next: Integration) =>
     setItems((d) => (d ? d.map((i) => (i.id === next.id ? next : i)) : d));
   const [adding, setAdding] = useState(false);
@@ -178,24 +206,29 @@ function IntegrationsPage() {
         }
       />
       {data && (
-        <p className="mt-4 text-sm text-zinc-400" data-testid="integrations-summary">
-          {counts.connected} connected
-          {counts.needs_credentials > 0 && <span className="text-amber-300"> · {counts.needs_credentials} need credentials</span>}
-          {counts.needs_reconnect > 0 && <span className="text-amber-300"> · {counts.needs_reconnect} need reconnecting</span>}
-          {counts.error > 0 && <span className="text-red-400"> · {counts.error} not working</span>}
-          {!data.canEdit && <span> · Only admins can connect or change integrations.</span>}
-        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-zinc-400">
+          <p data-testid="integrations-summary">
+            {counts.connected} connected
+            {counts.needs_credentials > 0 && <span className="text-amber-300"> · {needs(counts.needs_credentials, "credentials")}</span>}
+            {counts.needs_reconnect > 0 && <span className="text-amber-300"> · {needs(counts.needs_reconnect, "reconnecting")}</span>}
+            {counts.error > 0 && <span className="text-red-300"> · {counts.error} not working</span>}
+            {!data.canEdit && <span> · Only admins can connect or change integrations.</span>}
+          </p>
+          {lastCheck && data.canEdit && (
+            <p className="flex flex-wrap items-center gap-x-2" data-testid="integrations-checked">
+              <span>· Checked {timeAgo(lastCheck)}</span>
+              <button type="button" onClick={recheck} disabled={rechecking} className={buttonClass("ghost", "sm")}>
+                {rechecking ? "Checking…" : "Check again"}
+              </button>
+            </p>
+          )}
+        </div>
       )}
       {error && (
         <div className="mt-6">
-          <Callout variant="error" title="We couldn't load your integrations">
-            <p>{error}</p>
-            <p>
-              <button type="button" onClick={load} className={linkButton}>
-                Try again
-              </button>
-            </p>
-          </Callout>
+          <Problem title="We couldn't load your integrations" onRetry={load} details={error}>
+            Nothing has changed. Check your connection and try again.
+          </Problem>
         </div>
       )}
       {!data && !error && (
@@ -242,9 +275,9 @@ function IntegrationsPage() {
               }
             >
               {mcp && items.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-zinc-800 px-4 py-3 text-sm text-zinc-500">
-                  None yet. Servers from the list above that offer OAuth connect from their own row.
-                </p>
+                <EmptyState title="No MCP servers yet" testId="mcp-empty">
+                  Add one by its address. Servers from the lists above that offer a sign-in connect from their own row.
+                </EmptyState>
               ) : (
               <ul
                 aria-labelledby={`${sec.anchor}-heading`}
@@ -288,17 +321,6 @@ function IntegrationsPage() {
           description="Coderhelm can check that links and redirects on these sites work (status and page title only). Each domain covers its subdomains."
         >
           <WebsitesCard canEdit={data.canEdit} />
-        </Section>
-      )}
-      {data && (
-        <Section id="data-sources" title="Data sources">
-          <p className="text-sm text-zinc-400">
-            APIs, databases and log searches agents can query, with hidden fields and an activity log, are on{" "}
-            <Link href="/data-sources" className={linkButton}>
-              Data sources
-            </Link>
-            .
-          </p>
         </Section>
       )}
     </Page>
@@ -354,7 +376,9 @@ function IntegrationRow({
   const href = canEdit ? pageHref : memberHref;
   const opens = Boolean(href) || canEdit || personal;
   const action = actionLabel(item, canEdit || personal, Boolean(href) || personal);
-  const checked = item.last_check ? timeAgo(item.last_check) : "";
+  // The page says when everything was checked; a row repeats it only when its own check is old or found a problem.
+  const stale = item.last_check ? Date.now() - Date.parse(item.last_check) > DAY_MS : false;
+  const checked = item.last_check && (stale || item.status === "error") ? timeAgo(item.last_check) : "";
 
   const checkAgain = async () => {
     setBusy(true);
@@ -383,7 +407,8 @@ function IntegrationRow({
   };
 
   // Same columns on every row: mark · name and line · status · action.
-  // Below 640px the status moves under the name and the action becomes a chevron.
+  // Below 640px the status moves under the name; a row that needs something
+  // keeps its action word, so a phone shows what to do.
   const grid = "grid w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 py-2.5 text-left sm:grid-cols-[2rem_minmax(0,1fr)_10.5rem_8.5rem]";
   const statusText = (
     <span className={`inline-flex items-center gap-1.5 ${st.text}`}>
@@ -396,26 +421,32 @@ function IntegrationRow({
       <BrandIcon id={item.id} name={item.name} />
       <span className="min-w-0">
         <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-          <span className="min-w-0 font-medium text-zinc-100 sm:truncate">{item.name}</span>
+          <span className="font-medium text-zinc-100 sm:min-w-0 sm:truncate">{item.name}</span>
           <span className="shrink-0 text-xs sm:hidden">{statusText}</span>
         </span>
-        <span id={lineId} data-testid="integration-does" title={item.does} className="block text-sm text-zinc-500 sm:truncate">
+        <span id={lineId} data-testid="integration-does" title={item.does} className="block text-sm text-zinc-400 sm:truncate">
           {shortLine(item)}
         </span>
+        {/* A phone keeps the action word, under the name, so the narrow row never squeezes it. */}
+        {action && !open && item.status !== "connected" && canEdit && (
+          <span data-testid="integration-action-phone" className={`${buttonClass("secondary", "sm")} pointer-events-none mt-2 sm:hidden`}>
+            {action}
+          </span>
+        )}
       </span>
       <span data-testid="integration-status" className="hidden text-sm sm:block">
         {statusText}
-        {checked && <span className="block pl-3 text-xs text-zinc-500">Checked {checked}</span>}
+        {checked && <span className="block pl-3 text-xs text-zinc-400">Checked {checked}</span>}
       </span>
       <span className="flex items-center justify-end gap-1 text-sm">
         {action && !open && (
           <span
             data-testid="integration-action"
-            className={`hidden sm:inline ${
+            className={
               item.status === "connected" || !canEdit
-                ? "text-zinc-400 group-hover:text-zinc-100"
-                : "rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-100 group-hover:border-zinc-500"
-            }`}
+                ? "hidden text-zinc-400 group-hover:text-zinc-100 sm:inline"
+                : `${buttonClass("secondary", "sm")} pointer-events-none whitespace-nowrap group-hover:border-zinc-500 max-sm:!hidden`
+            }
           >
             {action}
           </span>
@@ -872,11 +903,17 @@ function WebsitesCard({ canEdit }: { canEdit: boolean }) {
   };
 
   const add = async () => {
-    const entries = draft
+    const raw = draft
       .split(/[\s,]+/)
       .map((d) => d.trim())
       .filter(Boolean);
-    if (!domains || entries.length === 0) return;
+    if (!domains || raw.length === 0) return;
+    const entries = raw.map(hostOf);
+    const bad = entries.filter((d) => !d);
+    if (bad.length) {
+      setError("Use a domain name like example.com, without a path.");
+      return;
+    }
     if (await save([...domains, ...entries], entries.length === 1 ? `${entries[0]} added` : "Websites added")) setDraft("");
   };
 
@@ -899,7 +936,7 @@ function WebsitesCard({ canEdit }: { canEdit: boolean }) {
             <ul aria-label="Your websites" className="flex flex-wrap gap-2">
               {domains.map((d) => (
                 <li key={d} className="inline-flex min-w-0 items-center gap-1 rounded-full border border-zinc-700 bg-zinc-950 py-1 pl-3 pr-1 text-sm text-zinc-200">
-                  <span data-testid="website-name" className="min-w-0 wrap-anywhere font-mono text-xs">{d}</span>
+                  <span data-testid="website-name" className="min-w-0 wrap-anywhere">{d}</span>
                   {canEdit ? (
                     <button
                       type="button"
@@ -957,4 +994,18 @@ function WebsitesCard({ canEdit }: { canEdit: boolean }) {
       )}
     </div>
   );
+}
+
+/** "https://www.example.com/path?q" or "example.com" to "www.example.com"; "" when it isn't a domain name. */
+function hostOf(input: string): string {
+  const text = input.trim().toLowerCase();
+  if (!text) return "";
+  try {
+    const url = new URL(/^[a-z][a-z0-9+.-]*:\/\//.test(text) ? text : `https://${text}`);
+    const host = url.hostname.replace(/\.$/, "");
+    // An address the server refuses (an IP) comes back with its own reason.
+    return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host) ? host : "";
+  } catch {
+    return "";
+  }
 }

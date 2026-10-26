@@ -230,9 +230,9 @@ test("plans list shows plain status words and keeps New plan while a plan runs",
   await expect(page.getByRole("heading", { name: "Plans", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Add a class schedule page" })).toBeVisible();
   await expect(page.getByRole("list", { name: "Plans" }).getByText("Running", { exact: true })).toBeVisible();
-  // A plan is running: both ways forward are offered.
+  // A plan is running: it is pinned to the top of the list, and New plan stays.
   await expect(page.getByRole("link", { name: "New plan" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Continue running plan" })).toHaveAttribute("href", /\/plans\/detail\/?\?id=PLANB/);
+  await expect(page.getByTestId("plan-row").first()).toHaveAttribute("data-status", "executing");
   await shot(page, "plans-list");
   expect(errors).toEqual([]);
 });
@@ -278,7 +278,7 @@ test("plans list empty state", async ({ page }) => {
   await mockApi(page, { plansEmpty: true });
   await page.goto("/plans/");
   await expect(page.getByText("No plans yet")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Create your first plan" })).toHaveAttribute("href", /\/plans\/new/);
+  await expect(page.getByRole("link", { name: "Write your first plan" })).toHaveAttribute("href", /\/plans\/new/);
   await shot(page, "plans-list-empty");
   expect(errors).toEqual([]);
 });
@@ -320,6 +320,9 @@ test("plan detail reads as a document: one summary line, one action, the plan, t
   await expect(page.getByText("Why: add a class schedule page")).toBeVisible();
   await expect(page.getByRole("heading", { level: 3, name: "Proposal" })).toBeVisible();
   await expect(page.getByText("Members ask for the class schedule on the web.")).toBeVisible();
+  // The design and requirements are folded behind "Technical plan".
+  await expect(page.getByRole("button", { name: "Copy design.md" })).toBeHidden();
+  await page.getByText("Technical plan").click();
   await expect(page.getByRole("button", { name: "Copy design.md" })).toBeVisible();
   // Tasks are a checklist: a mark, a number, a title, a status word.
   const tasks = page.getByRole("list", { name: "Tasks" });
@@ -398,7 +401,7 @@ test("a task opens to what it says; edit sends only what changed, add sends the 
   await page.getByLabel("Run after").selectOption("T1");
   await expect.poll(() => db.writes.filter((w) => w.call === "PUT /api/plans/PLANA/tasks/T2").map((w) => w.body)).toEqual([{ depends_on: "T1" }]);
 
-  await page.getByRole("button", { name: "+ Add task" }).click();
+  await page.getByRole("button", { name: "New task" }).click();
   await page.getByLabel("Title").fill("Add a print view");
   await page.getByRole("button", { name: "Add task", exact: true }).click();
   await expect.poll(() => db.writes.find((w) => w.call === "POST /api/plans/PLANA/tasks")?.body).toEqual({
@@ -457,6 +460,16 @@ test("a plan with no spec offers to write one, then shows it", async ({ page }) 
   await expect(page.getByRole("heading", { level: 3, name: "Proposal" })).toBeVisible();
   expect(db.writes.map((w) => w.call)).toContain("POST /api/plans/PLANA/openspec/generate");
   expect(errors).toEqual([]);
+});
+
+test("on a phone the plan's main action is in view, not in a menu", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockApi(page);
+  await page.goto("/plans/detail/?id=PLANA");
+  const approve = page.getByRole("button", { name: "Approve all and start" });
+  await expect(approve).toBeVisible();
+  const box = await approve.boundingBox();
+  expect(box && box.x >= 0 && box.x + box.width <= 390).toBe(true);
 });
 
 test("plan detail without an id says so", async ({ page }) => {

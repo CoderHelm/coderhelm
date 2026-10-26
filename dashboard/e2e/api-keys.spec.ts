@@ -104,6 +104,9 @@ test("an admin sees the team's keys, live and revoked, without any secret", asyn
   await expect(live.getByText("Deploy pipeline")).toBeVisible();
   await expect(live.getByText("chk_01jb8x...ab12")).toBeVisible();
   await expect(live.getByText("600 requests a minute")).toBeVisible();
+  // Revoked and expired keys are folded away under one line with their count.
+  await expect(page.getByRole("list", { name: "Revoked and expired keys" })).toBeHidden();
+  await page.getByTestId("past-keys").locator("summary").click();
   const past = page.getByRole("list", { name: "Revoked and expired keys" });
   await expect(past.getByText("Old script")).toBeVisible();
   await expect(past.getByRole("button", { name: "Revoke" })).toHaveCount(0);
@@ -177,6 +180,7 @@ test("revoking asks first, then the key moves to revoked", async ({ page }) => {
   await expect(confirm).toBeVisible();
   await confirm.getByRole("button", { name: "Revoke key" }).click();
   await expect.poll(() => db.calls.some((c) => c.method === "DELETE" && c.path === "/api/api-keys/01jb8x6f4m2c9qz3t7v5w1k0ha")).toBe(true);
+  await page.getByTestId("past-keys").locator("summary").click();
   await expect(page.getByRole("list", { name: "Revoked and expired keys" }).getByText("Deploy pipeline")).toBeVisible();
   await expect(page.getByText("No active keys.")).toBeVisible();
 });

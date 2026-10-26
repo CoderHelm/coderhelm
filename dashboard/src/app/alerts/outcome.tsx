@@ -1,4 +1,4 @@
-import { TONES, type StatusLook, type Tone } from "@/components/list/status";
+import { Chip, type StatusLook, type Tone } from "@/components/list/status";
 
 /** What Coderhelm did with an alert, in four groups for the list's toggles. */
 export type OutcomeGroup = "started" | "handled" | "ignored" | "problem";
@@ -39,7 +39,19 @@ export const OUTCOMES: Record<
     label: "Posted to Teams",
     detail:
       "The route only notifies: the alert was posted to Teams and no run started.",
-    tone: "neutral",
+    tone: "info",
+    group: "handled",
+  },
+  posted: {
+    label: "Posted to chat",
+    detail: "The alert was posted to the team's chat channel; no run started.",
+    tone: "info",
+    group: "handled",
+  },
+  deduplicated: {
+    label: "Repeat, skipped",
+    detail: "The same alert came in moments ago, so this copy was skipped.",
+    tone: "muted",
     group: "handled",
   },
   no_match: {
@@ -109,20 +121,27 @@ export const OUTCOMES: Record<
   },
 };
 
-/** How an outcome looks; one this page doesn't know yet reads as words. */
-export function outcomeLook(outcome: string): StatusLook {
+/**
+ * How an outcome looks. One this page doesn't know yet is a neutral
+ * "Other", with its own words on hover, so it never passes for a real state.
+ */
+export function outcomeLook(outcome: string): StatusLook & { hover?: string } {
   const o = OUTCOMES[outcome];
-  return o ? { label: o.label, tone: o.tone } : { label: humanize(outcome), tone: "muted" };
+  return o ? { label: o.label, tone: o.tone } : { label: "Other", tone: "neutral", hover: humanize(outcome) };
 }
 
+/** One line on what happened, for a list row. */
+export function outcomeDetail(outcome: string): string {
+  return OUTCOMES[outcome]?.detail ?? `Recorded as “${humanize(outcome)}”.`;
+}
+
+/** The outcome as a tag, in the shared tones. */
 export function OutcomeBadge({ outcome }: { outcome: string }) {
   const o = outcomeLook(outcome);
   return (
-    <span
-      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap ${TONES[o.tone].chip}`}
-    >
+    <Chip tone={o.tone} title={o.hover}>
       {o.label}
-    </span>
+    </Chip>
   );
 }
 

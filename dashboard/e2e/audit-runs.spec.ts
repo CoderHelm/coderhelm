@@ -192,6 +192,18 @@ function watchConsole(page: Page): string[] {
   return errors;
 }
 
+/** Opens one of the run page's tabs. */
+async function openTab(page: Page, name: "Overview" | "Changes" | "Activity" | "Details") {
+  await page.getByRole("navigation", { name: "Run views" }).getByRole("link", { name }).click();
+  await expect(page.getByRole("navigation", { name: "Run views" }).getByRole("link", { name })).toHaveAttribute("aria-current", "page");
+}
+
+/** Opens the page's More menu and picks an item. */
+async function fromMore(page: Page, item: string | RegExp) {
+  await page.getByTestId("page-actions").getByRole("button", { name: "More" }).click();
+  await page.getByRole("menuitem", { name: item }).click();
+}
+
 async function shot(page: Page, name: string) {
   fs.mkdirSync(SHOTS_DIR, { recursive: true });
   await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
@@ -213,17 +225,29 @@ test("a finished run shows its pull request, steps, documents and tasks without 
 
   await expect(page.getByRole("heading", { name: "Show the class schedule on the details page" })).toBeVisible();
   await expect(page.getByText("Done", { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: /Pull request #101/ })).toHaveAttribute("href", "https://github.com/your-team/web/pull/101");
+  // The outcome leads, with the one next step: open the pull request.
+  const outcome = page.getByTestId("run-outcome");
+  await expect(outcome).toContainText("Done. The change is ready for review.");
+  await expect(outcome.getByRole("link", { name: /Open pull request #101/ })).toHaveAttribute("href", "https://github.com/your-team/web/pull/101");
   // Step names are words, not the worker's ids.
   await expect(page.getByRole("list", { name: "Steps" })).toContainText("Pull request");
-  await expect(page.getByText("Build started")).toBeVisible();
-  await expect(page.getByText("Linear")).toBeVisible();
   await expect(page.getByText("Tasks", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("stat-time")).toContainText("12m 34s");
+  // Token parts are technical detail: not on the overview.
+  await expect(page.getByText("Read from cache")).toHaveCount(0);
+  await shot(page, "runs-detail-completed");
 
+  await openTab(page, "Changes");
+  await expect(page).toHaveURL(/tab=changes/);
+  await expect(page.getByText("Linear")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Files changed/ })).toBeVisible();
+  await openTab(page, "Activity");
+  await expect(page.getByText("Build started")).toBeVisible();
+  await openTab(page, "Details");
   // Trace names read as words too ("CI fix #2", not "ci_fix:2").
   await expect(page.getByText("CI fix #2")).toBeVisible();
-
-  await shot(page, "runs-detail-completed");
+  await expect(page.getByText("Read from cache")).toBeVisible();
+  await expect(page.getByText("01RUNDONE000000000000000A")).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -275,12 +299,15 @@ test("a run whose fix is outside the code shows what to change there and opens n
   await expect(report).toContainText("terms where id = 678: available_on_web = false");
   // The box has its own heading; the report's first line is not repeated as text.
   await expect(report.getByText("Needs a change outside the code")).toHaveCount(0);
-  await expect(page.getByRole("link", { name: /Pull request #/ })).toHaveCount(0);
-  await expect(page.getByText("Reported the change to make outside the code")).toBeVisible();
+  await expect(page.getByRole("link", { name: /pull request #/i })).toHaveCount(0);
   // Triage and plan are done; nothing after them ran, on purpose.
   await expect(page.getByRole("list", { name: "Steps" }).locator("svg")).toHaveCount(2);
-  await expect(page.getByRole("button", { name: "Start over from scratch" })).toBeVisible();
   await shot(page, "runs-detail-outside-code");
+  await page.getByTestId("page-actions").getByRole("button", { name: "More" }).click();
+  await expect(page.getByRole("menuitem", { name: /Start over from scratch/ })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await openTab(page, "Activity");
+  await expect(page.getByText("Reported the change to make outside the code")).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -289,14 +316,14 @@ test("a run that learned the fix was elsewhere shows the lesson it saved", async
     run: baseRun({ lesson: "Classes missing from the site are often because their semester is not available on web in the booking system; check that setting first." }),
   });
   await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
-  await expect(page.getByText("Lesson saved for this repository:")).toBeVisible();
+  await expect(page.getByText("Coderhelm learned")).toBeVisible();
   await expect(page.getByText(/semester is not available on web in the booking system/)).toBeVisible();
 });
 
 test("the spec documents open on a document that exists, never an empty tab", async ({ page }) => {
   await mockApi(page);
-  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
-  await expect(page.getByRole("heading", { name: "Spec documents" })).toBeVisible();
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A&tab=changes");
+  await expect(page.getByRole("heading", { name: "Plan", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "design" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText("Add a schedule table to the details page.")).toBeVisible();
   await expect(page.getByText("undefined")).toHaveCount(0);
@@ -308,15 +335,17 @@ test("a merged run offers no start over, since that would close a merged pull re
   await mockApi(page, { run: baseRun({ status: "merged" }) });
   await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
   await expect(page.getByText("Merged", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("Pull request merged")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Start over/ })).toHaveCount(0);
+  await expect(page.getByTestId("run-outcome")).toContainText("The change was merged");
+  await expect(page.getByRole("button", { name: "More" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Review again" })).toHaveCount(0);
+  await openTab(page, "Activity");
+  await expect(page.getByText("Pull request merged")).toBeVisible();
 });
 
 test("start over asks in the app's own dialog, then calls reset", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
-  await page.getByRole("button", { name: "Start over from scratch" }).click();
+  await fromMore(page, /Start over from scratch/);
   await expect(page.getByText("Start this run over?")).toBeVisible();
   await page.getByRole("button", { name: "Start over", exact: true }).click();
   await expect.poll(() => db.posts).toContain("/reset");
@@ -330,7 +359,9 @@ test("a running run can be cancelled and the step list wraps on a phone", async 
   });
   await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
   await expect(page.getByText("Running", { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start over from scratch" })).toHaveCount(0);
+  await expect(page.getByTestId("run-outcome")).toContainText("Coderhelm is working on this");
+  await expect(page.getByTestId("run-outcome")).toContainText("build step");
+  await expect(page.getByRole("menuitem", { name: /Start over/ })).toHaveCount(0);
   await shot(page, "runs-detail-running");
   await page.getByRole("button", { name: "Cancel run" }).click();
   await expect.poll(() => db.posts).toContain("/cancel");
@@ -353,7 +384,13 @@ test("a failed run shows what went wrong with one retry, and a refused retry say
     actionStatus: 429,
   });
   await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
-  await expect(page.getByText("What went wrong")).toBeVisible();
+  // A plain headline and the next step; the raw error waits behind Technical details.
+  const outcome = page.getByTestId("run-outcome");
+  await expect(outcome).toContainText("Coderhelm stopped before it finished");
+  await expect(outcome).toContainText("test step");
+  await expect(outcome.getByText(/ci\.example\.com/)).toBeHidden();
+  await outcome.getByText("Technical details").click();
+  await expect(outcome.getByText(/ci\.example\.com/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Retry" })).toHaveCount(1);
   await shot(page, "runs-detail-failed");
   await page.getByRole("button", { name: "Retry" }).click();
@@ -366,7 +403,7 @@ test("a viewer sees the run but no buttons the server would refuse", async ({ pa
   await mockApi(page, { role: "viewer", run: baseRun({ status: "failed", current_pass: "test" }) });
   await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
   await expect(page.getByRole("heading", { name: "Show the class schedule on the details page" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Pull request #101/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Open pull request #101/ }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Retry" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Start over/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Review again" })).toHaveCount(0);
@@ -399,7 +436,7 @@ test("a run that doesn't exist says so, and a server error offers a retry", asyn
 
 test("the agent log opens with the keyboard state announced, and a failed load can be retried", async ({ page }) => {
   const db = await mockApi(page, { agentLogFail: true });
-  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A&tab=details");
   const toggle = page.getByRole("button", { name: "Agent log" });
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await toggle.click();
@@ -429,7 +466,7 @@ async function asksShot(page: Page, name: string) {
 test("one ask to a team agent is one row: who asked, which agent, its gaps, and what the planner did", async ({ page }) => {
   const errors = watchConsole(page);
   await mockApi(page, { asks: ONE_ASK, traces: [...TRACES, ...ASK_TRACES.slice(0, 1)] });
-  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A&tab=activity");
   const section = page.getByTestId("team-asks");
   await expect(section.getByRole("heading", { name: /Team agents asked/ })).toContainText("(1)");
   await expect(page.getByTestId("asks-summary")).toHaveText("1 team agent reviewed the plan · 3 gaps · plan revised once");
@@ -459,7 +496,7 @@ test("one ask to a team agent is one row: who asked, which agent, its gaps, and 
 test("eight asks group by step, open one at a time, and say what each step did", async ({ page }) => {
   const errors = watchConsole(page);
   await mockApi(page, { asks: MANY_ASKS, traces: [...TRACES, ...ASK_TRACES] });
-  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A&tab=activity");
   const section = page.getByTestId("team-asks");
   await expect(page.getByTestId("asks-summary")).toHaveText(
     "8 asks to 7 team agents · 5 gaps · plan revised · 2 without an answer",
@@ -482,4 +519,27 @@ test("eight asks group by step, open one at a time, and say what each step did",
   await expect(section.locator("strong", { hasText: "full" })).toBeVisible();
   await asksShot(page, "run-asks-many");
   expect(errors).toEqual([]);
+});
+
+test("a finished run with an old error says it's done; the old error waits in Activity", async ({ page }) => {
+  await mockApi(page, { run: baseRun({ status: "completed", error: "TypeError: Cannot read properties of undefined (reading 'times')" }) });
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  await expect(page.getByTestId("run-outcome")).toContainText("Done");
+  await expect(page.getByText(/TypeError/)).toHaveCount(0);
+  await expect(page.getByText("Coderhelm stopped before it finished")).toHaveCount(0);
+  await openTab(page, "Activity");
+  await expect(page.getByText("A problem earlier in this run")).toBeVisible();
+});
+
+test("the run tabs fit a phone, and the tasks sit right under the progress", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockApi(page);
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  const steps = await page.getByRole("list", { name: "Steps" }).boundingBox();
+  const tasks = await page.getByText("Tasks", { exact: true }).boundingBox();
+  const time = await page.getByTestId("stat-time").boundingBox();
+  expect(tasks!.y).toBeGreaterThan(steps!.y);
+  expect(tasks!.y).toBeLessThan(time!.y);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
 });

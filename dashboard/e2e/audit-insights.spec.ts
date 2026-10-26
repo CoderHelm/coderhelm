@@ -72,7 +72,7 @@ const HOODS: Record<string, unknown> = {
   "src/app/page.tsx": { path: "src/app/page.tsx", imports: ["src/lib/api.ts", "src/lib/format.ts"], importers: [], symbols: [] },
 };
 
-// One organisation per team, in the shape the admin page reads since it groups teams.
+// One organization per team, in the shape the admin page reads since it groups teams.
 function adminOrg(id: string, name: string, runs: number, reviews: number, cost: number, created: string) {
   const t = {
     team_id: id, name, status: "active", plan: "", created_at: created, members: 1, invites: 0, repos: 1,
@@ -250,8 +250,9 @@ test("infrastructure says 'not scanned yet' instead of 'no infrastructure found'
 test("infrastructure shows a finished empty scan as 'no infrastructure code found'", async ({ page }) => {
   await mockApi(page, { infra: { status: "no_infra", has_infra: false, cached_at: NOW, suggested_prompt: "Create a stack" } });
   await page.goto("/infrastructure");
-  await expect(page.getByRole("heading", { name: "No infrastructure code found" })).toBeVisible();
+  await expect(page.getByText("No infrastructure code found")).toBeVisible();
   await expect(page.getByText("Create a stack")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Start a plan from this prompt" })).toHaveAttribute("href", /\/plans\/new\/?\?prefill=Create%20a%20stack/);
 });
 
 test("infrastructure load failure offers a retry instead of an empty page", async ({ page }) => {
@@ -265,10 +266,9 @@ test("infrastructure load failure offers a retry instead of an empty page", asyn
   expect(errors).toEqual([]);
 });
 
-test("infrastructure one repo view with no repos turned on points to the repos page", async ({ page }) => {
+test("infrastructure with no repos turned on points to the repos page", async ({ page }) => {
   await mockApi(page, { repos: [] });
   await page.goto("/infrastructure");
-  await page.getByRole("button", { name: "One repo" }).click();
   await expect(page.getByRole("link", { name: "Turn on a repo" })).toHaveAttribute("href", /\/settings\/repos/);
 });
 
@@ -332,7 +332,7 @@ test("admin allowlist adds once in lower case and asks before removing", async (
   const db = await mockApi(page, { email: "admin@coderhelm.com", role: "owner" });
   await page.goto("/admin");
   await expect(page.getByRole("heading", { name: "Platform admin" })).toBeVisible();
-  // Teams are one row per organisation, the busiest first.
+  // Teams are one row per organization, the busiest first.
   const orgs = page.getByTestId("admin-org");
   await expect(orgs).toHaveCount(2);
   await expect(orgs.first()).toContainText("beta-co");
@@ -412,7 +412,8 @@ test("code graph shows stats, search and the explorer", async ({ page }) => {
 test("code graph asks before turning a repo's graph off and hides the switch from members", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/graph");
-  await page.getByRole("button", { name: "Turn off the code graph for your-team/web" }).click();
+  await page.getByRole("button", { name: "Code graph actions for your-team/web" }).click();
+  await page.getByRole("menuitem", { name: /^Turn off/ }).click();
   await expect(page.getByText("Turn off the code graph for your-team/web?")).toBeVisible();
   await page.getByRole("button", { name: "Cancel" }).click();
   expect(db.calls.some((c) => c.startsWith("PUT /api/graph/config/"))).toBe(false);
@@ -421,7 +422,7 @@ test("code graph asks before turning a repo's graph off and hides the switch fro
   await mockApi(page, { role: "member" });
   await page.reload();
   await expect(page.getByText("3,400")).toBeVisible();
-  await expect(page.getByRole("button", { name: /(Turn (off|on)|Rebuild) the code graph/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Code graph actions/ })).toHaveCount(0);
 });
 
 test("code graph with no repos explains how to get one", async ({ page }) => {

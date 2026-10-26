@@ -63,7 +63,11 @@ test("guardrails: your rules come first and each add or remove saves the whole l
   await expect(page.getByRole("heading", { name: "Your rules" })).toBeVisible();
   await expect(page.getByText("Platform Security")).toHaveCount(0);
   await expect(page.getByText(/no shell/i)).toHaveCount(0);
-  await expect(page.getByTestId("built-in-rules")).toContainText("never pushing to your default branch");
+  // Coderhelm's own rules are a read-only "Always on" list above the team's.
+  await expect(page.getByRole("heading", { name: "Always on" })).toBeVisible();
+  await expect(page.getByTestId("built-in-rules").getByRole("listitem")).toHaveCount(3);
+  await expect(page.getByTestId("built-in-rules")).toContainText("Never push to your default branch");
+  await expect(page.getByTestId("built-in-rules").getByRole("button")).toHaveCount(0);
   await shot(page, "settings-guardrails");
 
   await page.getByLabel("Add a rule").fill("Keep migrations reversible");
@@ -172,7 +176,7 @@ test("voice: a failed load shows no editor, so nothing can be overwritten", asyn
   const db = await mockApi(page);
   db.fail.add("/api/voice/global");
   await page.goto("/settings/voice/");
-  await expect(page.getByText("Could not load the voice")).toBeVisible();
+  await expect(page.getByText("Couldn't load the voice")).toBeVisible();
   await expect(page.getByLabel("Voice", { exact: true })).toHaveCount(0);
   db.fail.clear();
   await page.getByRole("button", { name: "Try again" }).click();
@@ -269,11 +273,15 @@ test("aws: account settings are rows with one save; actions sit in the account's
   const db = await mockApi(page);
   await page.goto("/settings/integrations/aws/");
   const account = page.getByRole("article", { name: `AWS account ${ACCOUNT}` });
+  // The saved role reads as words, with no error on load; Change opens the raw ARN.
+  await expect(account.getByText("CoderHelmLogReader", { exact: true })).toBeVisible();
+  await expect(account.getByText(/The role must be named/)).toHaveCount(0);
+  await account.getByRole("button", { name: "Change" }).click();
   await expect(account.getByLabel("Role")).toHaveValue(ROLE_ARN);
   await expect(account.getByRole("button", { name: "Disconnect" })).toHaveCount(0);
   await shot(page, "settings-aws");
 
-  await account.getByLabel("Region").fill("eu-west-1");
+  await account.getByLabel("Region").selectOption("eu-west-1");
   await account.getByRole("button", { name: "Choose log groups" }).click();
   await account.getByRole("checkbox", { name: "/ecs/worker" }).check();
   await account.getByRole("switch", { name: "Metrics" }).click();
@@ -302,6 +310,7 @@ test("aws: a role name that is wrong keeps the save bar up and sends nothing", a
   const db = await mockApi(page);
   await page.goto("/settings/integrations/aws/");
   const account = page.getByRole("article", { name: `AWS account ${ACCOUNT}` });
+  await account.getByRole("button", { name: "Change" }).click();
   await account.getByLabel("Role").fill(`arn:aws:iam::${ACCOUNT}:role/SomethingElse`);
   await saveChanges(page).click();
   await expect(saveBar(page)).toContainText("must be named CoderHelmLogReader");

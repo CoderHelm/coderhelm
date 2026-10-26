@@ -6,7 +6,9 @@ import { DetailBlock, List, ListRow, StatusText, TONES } from "@/components/list
 import { Markdown } from "@/components/markdown";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { RepoCombobox } from "@/components/repo-combobox";
-import { focusRing, inputClass, primaryButton, secondaryButton } from "@/components/ui";
+import { buttonClass, focusRing, inputClass, primaryButton, secondaryButton, smallSecondaryButton, smallPrimaryButton } from "@/components/ui";
+import { EmptyState } from "@/components/empty-state";
+import { selectClass } from "@/components/select";
 import { TASK_ORDER, taskInfo, taskStatusLook } from "../status";
 
 // The plan's tasks as a checklist: one row per task with a mark for where it
@@ -47,8 +49,8 @@ const taskFields = (t: Task): NewTask => ({
 /** Tasks above this get a search box and status filters. */
 const FILTER_OVER = 6;
 
-const smallButton = `inline-flex min-h-7 items-center rounded-md border px-2.5 text-xs font-medium disabled:opacity-50 ${focusRing}`;
-const quietButton = `${smallButton} border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700`;
+const quietButton = buttonClass("secondary", "sm");
+const ghostSmall = buttonClass("ghost", "sm");
 
 export function TaskChecklist({
   tasks,
@@ -119,7 +121,7 @@ export function TaskChecklist({
               );
             })}
             {filters.size > 0 && (
-              <button type="button" onClick={() => setFilters(new Set())} className={`rounded text-xs text-zinc-500 hover:text-zinc-300 ${focusRing}`}>
+              <button type="button" onClick={() => setFilters(new Set())} className={`rounded text-xs text-zinc-400 hover:text-zinc-300 ${focusRing}`}>
                 Clear
               </button>
             )}
@@ -128,11 +130,9 @@ export function TaskChecklist({
       )}
 
       {tasks.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-zinc-800 px-4 py-6 text-center text-sm text-zinc-500">
-          No tasks yet.{draft ? " Add the first one below." : ""}
-        </p>
+        <EmptyState title="No tasks yet">{draft ? "Add the first one below." : "This plan has no tasks."}</EmptyState>
       ) : shown.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-zinc-800 px-4 py-6 text-center text-sm text-zinc-500">No tasks match.</p>
+        <EmptyState title="No tasks match." onClear={() => { setQuery(""); setFilters(new Set()); }} />
       ) : (
         <List label="Tasks">
           {shown.map((task) => {
@@ -237,7 +237,7 @@ export function TaskChecklist({
                               <select
                                 value={task.depends_on ?? ""}
                                 onChange={(e) => actions.setDependency(task.task_id, e.target.value)}
-                                className={`${inputClass} !py-1.5 text-xs`}
+                                className={`${selectClass("sm")} w-full`}
                               >
                                 <option value="">No dependency</option>
                                 {others.map((t) => (
@@ -257,7 +257,7 @@ export function TaskChecklist({
                               onClick={() => actions.remove(task.task_id)}
                               disabled={!!actions.busy}
                               aria-label={`Remove task ${task.title}`}
-                              className={`${smallButton} border-zinc-800 text-zinc-400 hover:border-red-500/40 hover:text-red-300`}
+                              className={`${ghostSmall} hover:text-red-300`}
                             >
                               Remove
                             </button>
@@ -275,7 +275,7 @@ export function TaskChecklist({
 
       {draft &&
         (adding ? (
-          <div className="rounded-lg border border-dashed border-zinc-700 p-4">
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
             <TaskForm
               initial={EMPTY_TASK}
               others={tasks}
@@ -292,12 +292,11 @@ export function TaskChecklist({
             />
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className={`flex min-h-9 w-full items-center justify-center rounded-lg border border-dashed border-zinc-800 text-sm text-zinc-500 hover:border-zinc-700 hover:text-zinc-300 ${focusRing}`}
-          >
-            + Add task
+          <button type="button" onClick={() => setAdding(true)} className={`${secondaryButton} gap-1.5`}>
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            New task
           </button>
         ))}
     </div>
@@ -339,11 +338,11 @@ function RowActions({
           type="button"
           onClick={() => actions.approve(task.task_id)}
           disabled={any}
-          className={`${smallButton} ${TONES.success.chip} hover:bg-emerald-500/20`}
+          className={buttonClass("primary", "sm")}
         >
           Approve
         </button>
-        <button type="button" onClick={() => actions.reject(task.task_id)} disabled={any} className={quietButton}>
+        <button type="button" onClick={() => actions.reject(task.task_id)} disabled={any} className={ghostSmall}>
           Skip
         </button>
       </>
@@ -499,10 +498,10 @@ function TaskForm({
         </div>
       </details>
       <div className="flex gap-2">
-        <button type="submit" disabled={!v.title.trim() || saving} className={`${primaryButton} !min-h-8 !px-3 text-xs`}>
+        <button type="submit" disabled={!v.title.trim() || saving} className={`${smallPrimaryButton}`}>
           {saving ? "Saving…" : submitLabel}
         </button>
-        <button type="button" onClick={onCancel} className={`${secondaryButton} !min-h-8 !px-3 text-xs`}>
+        <button type="button" onClick={onCancel} className={`${smallSecondaryButton}`}>
           Cancel
         </button>
       </div>

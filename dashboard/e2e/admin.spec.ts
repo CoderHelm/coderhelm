@@ -187,13 +187,13 @@ async function shot(page: Page, name: string) {
 const orgRows = (page: Page) => page.getByTestId("admin-org");
 const orgRow = (page: Page, name: string) => orgRows(page).filter({ hasText: name });
 
-test("teams read as one row per organisation, active teams first, empty ones behind a filter", async ({ page }) => {
+test("teams read as one row per organization, active teams first, empty ones behind a filter", async ({ page }) => {
   await mockApi(page);
   await page.goto("/admin");
   await expect(page.getByRole("heading", { name: "Platform admin" })).toBeVisible();
-  await expect(page.getByText("3 organisations with 11 teams")).toBeVisible();
+  await expect(page.getByText("3 organizations with 11 teams")).toBeVisible();
 
-  // Active by default: two organisations, the busy one first, empty teams counted, not listed.
+  // Active by default: two organizations, the busy one first, empty teams counted, not listed.
   await expect(orgRows(page)).toHaveCount(2);
   await expect(orgRows(page).first()).toContainText("acme-labs");
   const acme = orgRow(page, "acme-labs");
@@ -201,7 +201,7 @@ test("teams read as one row per organisation, active teams first, empty ones beh
   await expect(acme).toContainText("6 more teams with no activity");
   await expect(page.getByRole("button", { name: /No activity/ })).toContainText("8");
 
-  // Open the organisation: its active teams, with why each one is there.
+  // Open the organization: its active teams, with why each one is there.
   await acme.getByRole("button", { name: "Show teams of acme-labs" }).click();
   const teams = acme.getByTestId("admin-team");
   await expect(teams).toHaveCount(2);
@@ -212,7 +212,7 @@ test("teams read as one row per organisation, active teams first, empty ones beh
   await page.getByRole("button", { name: /No activity/ }).click();
   await expect(page).toHaveURL(/status=inactive/);
   await expect(orgRows(page)).toHaveCount(3);
-  // The organisation stays open across the filter change.
+  // The organization stays open across the filter change.
   await expect(orgRow(page, "acme-labs").getByRole("button", { name: "Hide teams of acme-labs" })).toBeVisible();
   await expect(orgRow(page, "acme-labs").getByTestId("admin-team")).toHaveCount(6);
   await expect(orgRow(page, "acme-labs").getByText("Personal", { exact: true }).first()).toBeVisible();

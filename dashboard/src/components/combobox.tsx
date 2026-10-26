@@ -153,9 +153,9 @@ export function Combobox({
       className="flex min-h-9 cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-zinc-200 data-[selected=true]:bg-zinc-800 data-[selected=true]:text-zinc-100 sm:min-h-8"
     >
       <span className="min-w-0 truncate">{o.label}</span>
-      {o.sub && <span className="min-w-0 shrink truncate text-xs text-zinc-500">{o.sub}</span>}
+      {o.sub && <span className="min-w-0 shrink truncate text-xs text-zinc-400">{o.sub}</span>}
       <span className="ml-auto flex shrink-0 items-center gap-2">
-        {o.hint && <span className="text-xs text-zinc-500">{o.hint}</span>}
+        {o.hint && <span className="text-xs text-zinc-400">{o.hint}</span>}
         <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className={o.value === value ? "text-zinc-300" : "invisible"}>
           <polyline points="20 6 9 17 4 12" />
         </svg>

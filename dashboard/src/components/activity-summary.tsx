@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronRightIcon } from "./icons";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { activityApi, type ActivitySummary } from "@/lib/activity";
@@ -20,12 +21,12 @@ function SummaryTile({ href, label, value, note, tone = "plain" }: { href: strin
       href={href}
       className={`group block rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 transition-colors hover:border-zinc-600 hover:bg-zinc-900 motion-reduce:transition-none ${focusRing}`}
     >
-      <span className="block text-xs text-zinc-500 group-hover:text-zinc-400">{label}</span>
+      <span className="block text-sm text-zinc-400 group-hover:text-zinc-300">{label}</span>
       <span className={`mt-1 block text-2xl font-semibold tabular-nums ${VALUE_TONE[value > 0 ? tone : "plain"]}`}>{value.toLocaleString()}</span>
-      <span className="mt-0.5 block text-xs text-zinc-500">
+      <span className="mt-0.5 block text-xs text-zinc-400">
         {note}
-        <span aria-hidden="true" className="ml-1 inline-block transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none">
-          →
+        <span aria-hidden="true" className="ml-0.5 inline-flex scale-75 align-middle transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none">
+          <ChevronRightIcon />
         </span>
       </span>
     </Link>
@@ -56,7 +57,7 @@ export function ActivitySummaryStrip({ days = 7 }: { days?: number }) {
   const lookupLog = "/data-sources/activity/";
   return (
     <section aria-labelledby="summary-heading" className="mt-6" data-testid="activity-summary">
-      <h2 id="summary-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+      <h2 id="summary-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-400">
         Last {days} days
       </h2>
       {summary === undefined ? (

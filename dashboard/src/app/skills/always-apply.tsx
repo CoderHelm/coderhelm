@@ -1,5 +1,8 @@
 "use client";
 
+import { SaveBar } from "@/components/settings";
+import { formatDate } from "@/components/list/time";
+
 import { useEffect, useMemo, useState } from "react";
 import { Section } from "@/components/page";
 import { StatusPill } from "@/components/status-pill";
@@ -38,7 +41,7 @@ export function AlwaysApplyBadge({ item, short = false }: { item: Pick<Skill, "a
 export function SuggestionHint({ item }: { item: Pick<Skill, "suggestion" | "always_apply" | "kind"> }) {
   if (!item.suggestion || item.always_apply?.on || item.kind === "agent") return null;
   return (
-    <p data-testid="always-suggestion-hint" className="mt-1 text-xs text-sky-300">
+    <p data-testid="always-suggestion-hint" className="mt-1 text-xs text-blue-300">
       {suggestionLabel(item.suggestion)}
     </p>
   );
@@ -102,7 +105,7 @@ export function AlwaysApplySection({
   const save = async (next: Draft) => {
     setError("");
     if (next.on && next.passes.length === 0) {
-      setError("Pick at least one pass.");
+      setError("Pick at least one moment for Coderhelm to use it.");
       return;
     }
     setSaving(true);
@@ -142,8 +145,8 @@ export function AlwaysApplySection({
           <div className="min-w-0">
             {saved?.on ? <AlwaysApplyBadge item={item} /> : <StatusPill>Read on demand</StatusPill>}
             {saved?.by && saved.at && (
-              <p className="mt-1.5 text-xs text-zinc-500">
-                Set by {saved.by} {new Date(saved.at).toLocaleDateString()}
+              <p className="mt-1.5 text-xs text-zinc-400">
+                Set by {saved.by} {formatDate(saved.at)}
               </p>
             )}
           </div>
@@ -163,9 +166,9 @@ export function AlwaysApplySection({
         </div>
 
         {suggestion && !saved?.on && (
-          <div className="mt-4 rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-sm text-sky-200" data-testid="always-suggestion">
+          <div className="mt-4 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-sm text-blue-200" data-testid="always-suggestion">
             <p>{suggestionLabel(suggestion)}</p>
-            {suggestion.reason && <p className="mt-0.5 text-xs text-sky-200/80">{suggestion.reason}</p>}
+            {suggestion.reason && <p className="mt-0.5 text-xs text-blue-200/80">{suggestion.reason}</p>}
             {canManage && (
               <button
                 type="button"
@@ -182,12 +185,12 @@ export function AlwaysApplySection({
           <div className="mt-5 grid gap-5 md:grid-cols-3">
             <fieldset className="min-w-0">
               <legend className="text-sm font-medium text-zinc-200">Repositories</legend>
-              <p className="mt-0.5 text-xs text-zinc-500">None picked means every repository.</p>
+              <p className="mt-0.5 text-xs text-zinc-400">None picked means every repository.</p>
               <div className="mt-2 max-h-56 space-y-1.5 overflow-y-auto pr-1">
                 {teamRepos === null ? (
-                  <p role="status" className="text-xs text-zinc-500">Loading…</p>
+                  <p role="status" className="text-xs text-zinc-400">Loading…</p>
                 ) : teamRepos.length === 0 ? (
-                  <p className="text-xs text-zinc-500">No repositories switched on.</p>
+                  <p className="text-xs text-zinc-400">No repositories switched on.</p>
                 ) : (
                   teamRepos.map((r) => (
                     <label key={r} className="flex items-center gap-2 text-sm text-zinc-300">
@@ -206,8 +209,7 @@ export function AlwaysApplySection({
               </div>
             </fieldset>
             <fieldset className="min-w-0">
-              <legend className="text-sm font-medium text-zinc-200">Passes</legend>
-              <p className="mt-0.5 text-xs text-zinc-500">Where Coderhelm works or writes.</p>
+              <legend className="text-sm font-medium text-zinc-200">Use it when Coderhelm is…</legend>
               <div className="mt-2 space-y-1.5">
                 {PASSES.map((p) => (
                   <label key={p.id} className="flex items-center gap-2 text-sm text-zinc-300">
@@ -225,15 +227,15 @@ export function AlwaysApplySection({
               </div>
             </fieldset>
             <label className="min-w-0 text-sm font-medium text-zinc-200">
-              Paths <span className="font-normal text-zinc-500">(optional)</span>
-              <span className="mt-0.5 block text-xs font-normal text-zinc-500">
-                Only when the change touches one, one glob a line: apps/web/** or **/*.tsx.
+              Only for certain folders <span className="font-normal text-zinc-400">(optional)</span>
+              <span className="mt-0.5 block text-xs font-normal text-zinc-400">
+                One folder a line, like apps/web. Patterns such as **/*.tsx work too.
               </span>
               <textarea
                 className={`${inputClass} mt-2 h-28 font-mono`}
                 value={draft.paths}
                 onChange={(e) => setDraft({ ...draft, paths: e.target.value })}
-                placeholder={"apps/web/**\n**/*.tsx"}
+                placeholder={"apps/web\npackages/ui"}
                 spellCheck={false}
                 aria-label="Paths"
               />
@@ -246,15 +248,18 @@ export function AlwaysApplySection({
             {error}
           </p>
         )}
-        {canManage && dirty && (draft.on || saved?.on) && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button type="button" className={primaryButton} disabled={saving} onClick={() => save(draft)}>
-              {saving ? "Saving…" : draft.on ? "Save" : "Turn off"}
-            </button>
-            <button type="button" className={secondaryButton} disabled={saving} onClick={() => setDraft(draftOf(saved))}>
-              Cancel
-            </button>
-          </div>
+        {canManage && (draft.on || saved?.on) && (
+          <SaveBar
+            count={dirty ? 1 : 0}
+            saving={saving}
+            saveLabel={draft.on ? "Save" : "Turn off"}
+            onSave={() => save(draft)}
+            onDiscard={() => {
+              setDraft(draftOf(saved));
+              setError("");
+            }}
+            testId="always-save-bar"
+          />
         )}
       </div>
     </Section>

@@ -8,8 +8,11 @@ import { ANY_CHANGE } from "@/lib/capabilities";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { api, type Repo } from "@/lib/api";
 import { RoleGuard } from "@/components/role-guard";
+import { useToast } from "@/components/toast";
 import { Page, PageHeader } from "@/components/page";
-import { focusRing, secondaryButton } from "@/components/ui";
+import { buttonClass, secondaryButton } from "@/components/ui";
+import { Select } from "@/components/select";
+import { StatusText } from "@/components/list";
 import {
   List,
   ListEmpty,
@@ -25,20 +28,21 @@ import {
 /** Rows shown at first, and added by each "Load more". */
 const PAGE_SIZE = 25;
 
-function parseOnboardError(raw: string | undefined): string {
-  if (!raw) return "Analysis failed";
-  const lower = raw.toLowerCase();
-  if (lower.includes("404")) return "Not accessible — configure GitHub App access";
-  if (lower.includes("rate limit")) return "Rate limited — will retry automatically";
-  if (lower.includes("timeout")) return "Analysis timed out — click to retry";
-  return "Analysis failed — click to retry";
+/** Why Coderhelm couldn't read a repository, in a sentence, and whether Try again can help. */
+function readProblem(raw: string | undefined): { text: string; fixInGitHub: boolean } {
+  const lower = (raw ?? "").toLowerCase();
+  if (lower.includes("404")) return { text: "Coderhelm can't see this repository in GitHub.", fixInGitHub: true };
+  if (lower.includes("rate limit")) return { text: "GitHub is limiting how fast Coderhelm can read. It tries again by itself.", fixInGitHub: false };
+  if (lower.includes("timeout")) return { text: "Reading this repository took too long.", fixInGitHub: false };
+  return { text: "Couldn't read this repository.", fixInGitHub: false };
 }
 
 /** The row's dot: off, being read, ready, or failed. */
 function repoLook(repo: Repo): StatusLook {
   if (!repo.enabled) return { label: "Off", tone: "muted" };
-  if (repo.onboard_status === "pending") return { label: "Analyzing", tone: "live", live: true };
-  if (repo.onboard_status === "failed") return { label: "Analysis failed", tone: "danger" };
+  if (repo.onboard_status === "pending") return { label: "Reading…", tone: "live", live: true };
+  if (repo.onboard_status === "failed") return { label: "Couldn't read", tone: "danger" };
+  if (repo.onboard_status === "ready") return { label: "Ready", tone: "success" };
   return { label: "On", tone: "success" };
 }
 
@@ -52,7 +56,15 @@ export default function ReposPageGuarded() {
   );
 }
 
-const ROLE_NAMES: Record<string, string> = { web: "Web", backend: "Backend", mobile: "Mobile", cms: "CMS", infra: "Infra", data: "Data" };
+/** What each repository type is called; the type decides which tickets go to it. */
+const ROLE_NAMES: Record<string, string> = {
+  web: "Website",
+  backend: "Server",
+  mobile: "Mobile app",
+  cms: "Content site",
+  infra: "Infrastructure",
+  data: "Data",
+};
 
 function ReposPage() {
   const [repos, setRepos] = useState<Repo[]>([]);
@@ -65,6 +77,7 @@ function ReposPage() {
   // Turning repos on or off, syncing and routing roles need `repos`.
   const { ready, can } = useCan();
   const canManage = can("repos");
+  const { toast } = useToast();
   const [params, setParams] = useListParams({ q: "", status: "all" });
   const q = params.q.trim().toLowerCase();
   const status = params.status === "on" || params.status === "off" ? params.status : "all";
@@ -95,12 +108,20 @@ function ReposPage() {
   // Back to the first rows when the filters change.
   useEffect(() => setShownCount(PAGE_SIZE), [q, status]);
 
-  const handleToggle = async (repo: Repo) => {
+  const handleToggle = async (repo: Repo, undo = true) => {
+    const on = !repo.enabled;
     setToggling(repo.name);
     try {
-      await api.toggleRepo(repo.name, !repo.enabled);
-      setRepos((prev) => prev.map((r) => r.name === repo.name ? { ...r, enabled: !r.enabled, onboard_status: !repo.enabled ? "pending" : undefined } : r));
-    } catch { /* ignore */ }
+      await api.toggleRepo(repo.name, on);
+      setRepos((prev) => prev.map((r) => r.name === repo.name ? { ...r, enabled: on, onboard_status: on ? "pending" : undefined } : r));
+      toast(
+        on ? `Coderhelm can work on ${repo.name}` : `${repo.name} turned off`,
+        "success",
+        undo ? { action: { label: "Undo", onClick: () => void handleToggle({ ...repo, enabled: on }, false) } } : undefined,
+      );
+    } catch {
+      toast(`Couldn't turn ${repo.name} ${on ? "on" : "off"}. Try again.`, "error");
+    }
     setToggling(null);
   };
 
@@ -111,8 +132,10 @@ function ReposPage() {
     setRepos((prev) => prev.map((r) => r.name === repo.name ? { ...r, role: role || undefined } : r));
     try {
       await api.setRepoRole(repo.name, role);
+      toast("Saved");
     } catch {
       setRepos((prev) => prev.map((r) => r.name === repo.name ? { ...r, role: prevRole } : r));
+      toast("Couldn't change the type. Try again.", "error");
     }
     setSavingRole(null);
   };
@@ -146,7 +169,7 @@ function ReposPage() {
     <Page>
       <PageHeader
         title="Repositories"
-        lead="Repos connected via the GitHub App. Enable the ones you want Coderhelm to work on, and set a role (web, backend, …) so Jira tickets route to the right repo."
+        lead="Turn on the code projects Coderhelm should work in. Give each one a type (website, server, mobile app…) so new tickets go to the right place; with no type, Coderhelm picks."
       />
       {ready && !canManage && (
         <div className="mt-6" data-testid="repos-read-only">
@@ -176,13 +199,13 @@ function ReposPage() {
           }}
           actions={
             canManage ? (
-              <button type="button" onClick={sync} disabled={syncing} className={secondaryButton} title="Pull latest repos from GitHub">
-                {syncing ? "Syncing..." : "Sync repos"}
+              <button type="button" onClick={sync} disabled={syncing} className={secondaryButton} title="Added a repository in GitHub? Refresh to see it here.">
+                {syncing ? "Refreshing…" : "Refresh from GitHub"}
               </button>
             ) : undefined
           }
           onClear={anyFilter ? clear : undefined}
-          summary={`${filtered.length} repo${filtered.length !== 1 ? "s" : ""}${q ? ` matching "${params.q.trim()}"` : ""}`}
+          summary={q ? `${filtered.length} repo${filtered.length !== 1 ? "s" : ""} matching "${params.q.trim()}"` : undefined}
         />
       )}
 
@@ -190,10 +213,12 @@ function ReposPage() {
         {loading ? (
           <ListSkeleton rows={3} label="Loading repos" />
         ) : error ? (
-          <ListError title="Couldn't load your repos" onRetry={load} />
+          <ListError title="Couldn't load your repositories" onRetry={load}>
+            Nothing has changed. Check your connection and try again.
+          </ListError>
         ) : repos.length === 0 ? (
           <ListEmpty
-            title="No repos connected yet."
+            title="No repositories connected yet"
             action={
               <>
                 <a href="https://github.com/apps/coderhelm" className={secondaryButton}>
@@ -201,7 +226,7 @@ function ReposPage() {
                 </a>
                 {canManage && (
                   <button type="button" onClick={sync} disabled={syncing} className={secondaryButton}>
-                    {syncing ? "Syncing..." : "Sync repos"}
+                    {syncing ? "Refreshing…" : "Refresh from GitHub"}
                   </button>
                 )}
               </>
@@ -230,51 +255,46 @@ function ReposPage() {
                   titleText={repo.name}
                   quiet={!repo.enabled}
                   summary={
-                    repo.enabled && repo.onboard_status === "pending" ? (
-                      <span className="inline-flex items-center gap-1">
-                        <span className="inline-block h-3 w-3 animate-spin rounded-full border border-sky-400/60 border-t-sky-300 motion-reduce:animate-none" />
-                        Analyzing...
-                      </span>
-                    ) : repo.enabled && repo.onboard_status === "failed" ? (
+                    repo.enabled && repo.onboard_status === "failed" ? (
                       <span className="inline-flex flex-wrap items-center gap-2">
-                        <span title={repo.onboard_error}>✕ {parseOnboardError(repo.onboard_error)}</span>
-                        {canManage && <button
-                          type="button"
-                          onClick={() => retry(repo)}
-                          disabled={toggling === repo.name}
-                          className={`rounded text-xs text-zinc-400 underline underline-offset-2 hover:text-zinc-200 disabled:opacity-50 ${focusRing}`}
-                        >
-                          Retry
-                        </button>}
+                        <span>{readProblem(repo.onboard_error).text}</span>
+                        {canManage &&
+                          (readProblem(repo.onboard_error).fixInGitHub ? (
+                            <a href="https://github.com/apps/coderhelm/installations/new" target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
+                              Fix access in GitHub
+                            </a>
+                          ) : (
+                            <button type="button" onClick={() => retry(repo)} disabled={toggling === repo.name} className={buttonClass("secondary", "sm")}>
+                              Try again
+                            </button>
+                          ))}
                       </span>
-                    ) : repo.enabled && repo.onboard_status === "ready" ? (
-                      "✓ Ready"
                     ) : undefined
                   }
                   summaryTone={look.tone}
                   chips={
-                    repo.enabled && !canManage ? (
-                      repo.role ? <span className="rounded-md border border-zinc-800 px-2.5 py-1 text-xs text-zinc-400">{ROLE_NAMES[repo.role] ?? repo.role}</span> : undefined
-                    ) : repo.enabled ? (
-                      <span className="relative" title="Primary role for this repo — routes matching Jira tickets here">
-                        <select
+                    <>
+                      {repo.enabled && <StatusText look={look} />}
+                      {repo.enabled && !canManage ? (
+                        repo.role ? <span className="text-xs text-zinc-400">{ROLE_NAMES[repo.role] ?? repo.role}</span> : undefined
+                      ) : repo.enabled ? (
+                        <Select
+                          size="sm"
                           aria-label={`Role of ${repo.name}`}
+                          title="Which tickets go to this repository"
                           value={repo.role || ""}
                           onChange={(e) => handleRoleChange(repo, e.target.value)}
                           disabled={savingRole === repo.name}
-                          className={`appearance-none rounded-md border border-zinc-700 bg-zinc-900 py-1 pl-2.5 pr-7 text-xs font-medium text-zinc-300 focus:border-zinc-500 focus:outline-none disabled:opacity-50 ${focusRing}`}
                         >
-                          <option value="">No role</option>
-                          <option value="web">Web</option>
-                          <option value="backend">Backend</option>
-                          <option value="mobile">Mobile</option>
-                          <option value="cms">CMS</option>
-                          <option value="infra">Infra</option>
-                          <option value="data">Data</option>
-                        </select>
-                        <svg aria-hidden="true" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500"><polyline points="6 9 12 15 18 9" /></svg>
-                      </span>
-                    ) : undefined
+                          <option value="">No type (Coderhelm picks)</option>
+                          {Object.entries(ROLE_NAMES).map(([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : undefined}
+                    </>
                   }
                 />
               );

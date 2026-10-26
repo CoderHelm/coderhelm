@@ -6,7 +6,15 @@ import path from "node:path";
 // Every API call is answered here. Nothing reaches a real backend.
 
 const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots");
-const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
+// The page groups rows by day, so every test runs at midday: offsets like
+// "26 hours ago" then always land on yesterday, whatever the real time is.
+const NOW = new Date();
+NOW.setHours(12, 0, 0, 0);
+const ago = (min: number) => new Date(NOW.getTime() - min * 60_000).toISOString();
+
+test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(NOW);
+});
 
 type Ev = Record<string, unknown> & { id: string; at: string; by: string; action: string; outcome: string; repo: string; path: string };
 type Lookup = Record<string, unknown> & { at: string; cursor: string; outcome: string; actor: string; source_id: string };
@@ -305,7 +313,7 @@ test("an item's own activity: an opened skill and an agent's page show only thei
   const db = await mockApi(page);
   await page.goto("/skills");
   await expect(page.getByRole("tab", { name: "Library" })).toHaveAttribute("aria-selected", "true");
-  await page.getByRole("link", { name: "skill:debug" }).click();
+  await page.locator('[data-handle="skill:debug"]').getByRole("link").first().click();
   const recent = page.locator("#skill-activity");
   // The skill opens on its own page, whose log is the full one for that skill.
   await expect(page).toHaveURL(/\/skills\/item\/?\?repo=acme%2Fplaybook&path=skills%2Fdebug%2FSKILL\.md$/);

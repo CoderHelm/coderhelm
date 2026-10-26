@@ -15,6 +15,9 @@ import { Field } from "@/components/field";
 import { Segmented } from "@/components/segmented";
 import { CodeBlock } from "@/components/code-block";
 import { Skeleton } from "@/components/skeleton";
+import { EmptyState } from "@/components/empty-state";
+import { Disclosure } from "@/components/disclosure";
+import { Select } from "@/components/select";
 import { AwsIcon, ExternalLinkIcon } from "@/components/icons";
 import { Page, PageHeader, Section } from "@/components/page";
 import { buttonClass, inputClass, linkButton, monoInputClass, primaryButton, secondaryButton } from "@/components/ui";
@@ -134,7 +137,7 @@ function AwsPage() {
         lead="Connect an AWS account and Coderhelm reads its CloudWatch logs every 6 hours, groups the errors it finds and suggests fixes you can turn into plans. It can only read."
         actions={
           canEdit && connections.length > 0 && !adding ? (
-            <button type="button" onClick={() => setAdding(true)} className={primaryButton}>
+            <button type="button" onClick={() => setAdding(true)} className={secondaryButton}>
               Connect another account
             </button>
           ) : undefined
@@ -172,6 +175,12 @@ function AwsPage() {
       {load.state === "ready" && (
         <div className="mt-8 grid items-start gap-6 lg:grid-cols-3">
           <div className="flex min-w-0 flex-col gap-8 lg:col-span-2">
+            {/* On a phone the "what it can do" panel sits up here, folded, not 1,500px down. */}
+            <div className="lg:hidden">
+              <Disclosure summary="What Coderhelm can do with it">
+                <ScopeCard bare />
+              </Disclosure>
+            </div>
             {showConnect && (
               <ConnectPanel
                 first={empty}
@@ -183,16 +192,15 @@ function AwsPage() {
               />
             )}
             {empty && !canEdit && (
-              <div className="rounded-lg border border-dashed border-zinc-700 p-8 text-center">
-                <p className="font-semibold text-zinc-100">No AWS account is connected</p>
-                <p className="mt-1 text-sm text-zinc-400">Ask an admin or the owner to connect one.</p>
-              </div>
+              <EmptyState title="No AWS account is connected">Ask an admin or the owner to connect one.</EmptyState>
             )}
             {connections.map((c) => (
               <AccountSettings key={c.connection_id} connection={c} canEdit={canEdit} form={form} onChanged={refresh} />
             ))}
           </div>
-          <ScopeCard />
+          <div className="hidden min-w-0 lg:block">
+            <ScopeCard />
+          </div>
         </div>
       )}
 
@@ -293,6 +301,12 @@ function AccountSettings({
   const healthy = c.status !== "error";
   const lastAnalysisFailed = !!c.error_message && healthy;
   const arnOk = ROLE_ARN_RE.test(v.role_arn.trim());
+  // A saved role is shown as words; the raw ARN field opens on Change. A
+  // saved role that breaks the naming rule gets one warning at the top, not
+  // a red field error on page load.
+  const [editRole, setEditRole] = useState(false);
+  const savedRoleBad = !dirty("role_arn") && !ROLE_ARN_RE.test(c.role_arn.trim());
+  const roleName = c.role_arn.split("/").pop() || c.role_arn;
   const regionOk = REGION_RE.test(v.region.trim());
   const missing = (a?.missing ?? []).map((m) => (m === "metrics" ? "CloudWatch metrics" : "Airflow"));
 
@@ -374,6 +388,11 @@ function AccountSettings({
       </div>
 
       <div className="mt-3 flex flex-col gap-3 empty:hidden">
+        {savedRoleBad && healthy && (
+          <Callout variant="warning" title={`The role should be named ${ROLE_NAME}`} live={false}>
+            <p>Coderhelm may stop reading logs if the role isn&apos;t renamed. Change it below, or recreate the role with that name in AWS.</p>
+          </Callout>
+        )}
         {!healthy && (
           <Callout variant="error" title="Coderhelm cannot use the role" live={false}>
             <p>{c.error_message || "The last check failed."}</p>
@@ -407,7 +426,7 @@ function AccountSettings({
           unsaved={dirty("role_arn")}
           help={`The read only role Coderhelm takes on. It must be named ${ROLE_NAME}.`}
           control={(ids) =>
-            canEdit ? (
+            canEdit && (editRole || dirty("role_arn")) ? (
               <div>
                 <input
                   id={ids.inputId}
@@ -416,10 +435,19 @@ function AccountSettings({
                   spellCheck={false}
                   autoComplete="off"
                   aria-describedby={ids.helpId}
-                  aria-invalid={arnOk ? undefined : true}
-                  className={inputClass}
+                  aria-invalid={arnOk || !dirty("role_arn") ? undefined : true}
+                  className={monoInputClass}
                 />
-                {!arnOk && <p role="alert" className="mt-1.5 text-xs text-red-400">The role must be named {ROLE_NAME}.</p>}
+                {dirty("role_arn") && !arnOk && <p role="alert" className="mt-1.5 text-sm text-red-300">The role must be named {ROLE_NAME}.</p>}
+              </div>
+            ) : canEdit ? (
+              <div className="flex min-w-0 flex-wrap items-center gap-3">
+                <p className="min-w-0 text-sm text-zinc-200" title={c.role_arn}>
+                  <span className="font-medium [overflow-wrap:anywhere]">{roleName}</span> in account {id}
+                </p>
+                <button type="button" onClick={() => setEditRole(true)} className={buttonClass("secondary", "sm")}>
+                  Change
+                </button>
               </div>
             ) : (
               <p id={ids.inputId} className="wrap-anywhere text-sm text-zinc-200">{c.role_arn}</p>
@@ -434,21 +462,21 @@ function AccountSettings({
           control={(ids) =>
             canEdit ? (
               <div>
-                <input
+                <Select
                   id={ids.inputId}
                   value={v.region}
                   onChange={(e) => set("region", e.target.value)}
-                  list={`aws-regions-${id}`}
-                  spellCheck={false}
-                  autoComplete="off"
                   aria-describedby={ids.helpId}
                   aria-invalid={regionOk ? undefined : true}
-                  className={inputClass}
-                />
-                <datalist id={`aws-regions-${id}`}>
-                  {COMMON_REGIONS.map((r) => <option key={r} value={r} />)}
-                </datalist>
-                {!regionOk && <p role="alert" className="mt-1.5 text-xs text-red-400">Enter an AWS region such as us-east-1.</p>}
+                  className="w-full"
+                >
+                  {(COMMON_REGIONS.includes(v.region) || !v.region ? COMMON_REGIONS : [v.region, ...COMMON_REGIONS]).map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </Select>
+                {!regionOk && <p role="alert" className="mt-1.5 text-sm text-red-300">Choose an AWS region.</p>}
               </div>
             ) : (
               <p id={ids.inputId} className="text-sm text-zinc-200">{c.region}</p>
@@ -553,13 +581,16 @@ function AccountSettings({
             <p>
               The role can&apos;t read {missing.join(" or ")} yet. One click adds read only access as a small stack in your account
               ({a.stack_name ?? "CoderHelmLogReaderOps"}); it doesn&apos;t change your existing stack, and deleting it takes the access away.
-              Then choose &ldquo;Check what the role can do&rdquo; under Actions.
+              Then press Check again.
             </p>
             {canEdit && (
-              <p className="mt-2">
+              <p className="mt-2 flex flex-wrap gap-2">
                 <a href={a.update_url} target="_blank" rel="noreferrer" className={primaryButton}>
                   Add access in AWS
                 </a>
+                <button type="button" onClick={checkAbilities} disabled={checking} className={secondaryButton}>
+                  {checking ? "Checking…" : "Check again"}
+                </button>
               </p>
             )}
           </Callout>
@@ -633,7 +664,7 @@ function LogGroupsPicker({ connection, chosen, onChange }: { connection: AwsConn
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm text-zinc-200">{g.name}</span>
                   {g.stored_bytes !== undefined ? (
-                    <span className="block text-xs text-zinc-500">
+                    <span className="block text-xs text-zinc-400">
                       {formatBytes(g.stored_bytes)}
                       {g.retention_days ? ` · kept ${g.retention_days} days` : ""}
                     </span>
@@ -657,10 +688,10 @@ function LogGroupsPicker({ connection, chosen, onChange }: { connection: AwsConn
 
 // ── What the role allows ─────────────────────────────────────────────
 
-function ScopeCard() {
+function ScopeCard({ bare = false }: { bare?: boolean }) {
   return (
-    <aside aria-labelledby="scope-heading" className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm">
-      <h2 id="scope-heading" className="font-semibold text-zinc-100">What Coderhelm can do with it</h2>
+    <aside aria-labelledby={bare ? undefined : "scope-heading"} aria-label={bare ? "What Coderhelm can do with it" : undefined} className={`min-w-0 text-sm ${bare ? "" : "rounded-lg border border-zinc-800 bg-zinc-900/50 p-5"}`}>
+      {!bare && <h2 id="scope-heading" className="font-semibold text-zinc-100">What Coderhelm can do with it</h2>}
       <p className="mt-1 text-zinc-400">
         The role is read only. Its policy allows exactly this, and the External ID means only your team&apos;s Coderhelm can use it.
       </p>
@@ -670,7 +701,7 @@ function ScopeCard() {
             <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
             <span>
               <span className="block text-zinc-200">{s.title}</span>
-              <span className="block text-zinc-500">{s.detail}</span>
+              <span className="block text-zinc-400">{s.detail}</span>
             </span>
           </li>
         ))}
@@ -684,7 +715,7 @@ function ScopeCard() {
           </li>
         ))}
       </ul>
-      <p className="mt-4 text-zinc-500">
+      <p className="mt-4 text-zinc-400">
         Questions? Write to{" "}
         <a href={`mailto:${securityEmail()}`} className={`${linkButton} text-zinc-300`}>
           {securityEmail()}
@@ -827,9 +858,9 @@ function ConnectPanel({ first, onCancel, onConnected }: { first: boolean; onCanc
               {cfn ? (
                 <CodeBlock code={cfn.external_id} title="Your External ID" testId="external-id" />
               ) : (
-                <p className="text-xs text-zinc-500">{cfnError ? "Your External ID couldn't load." : "Loading your External ID…"}</p>
+                <p className="text-xs text-zinc-400">{cfnError ? "Your External ID couldn't load." : "Loading your External ID…"}</p>
               )}
-              <p className="mt-1.5 text-xs text-zinc-500">It stops anyone else using Coderhelm from assuming your role. The stack fills it in for you.</p>
+              <p className="mt-1.5 text-xs text-zinc-400">It stops anyone else using Coderhelm from assuming your role. The stack fills it in for you.</p>
             </div>
           </div>
 

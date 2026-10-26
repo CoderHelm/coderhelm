@@ -46,14 +46,14 @@ export function ToolCallCard({ tool }: ToolCallCardProps) {
 
         {/* Server badge */}
         {serverName && (
-          <span className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-500 text-[10px] font-medium flex-shrink-0">
+          <span className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 text-xs font-medium flex-shrink-0">
             {serverName}
           </span>
         )}
 
         {/* Summary (when collapsed and done) */}
         {!expanded && tool.summary && tool.status !== "running" && (
-          <span className="text-zinc-600 truncate ml-auto">{tool.summary}</span>
+          <span className="text-zinc-400 truncate ml-auto">{tool.summary}</span>
         )}
 
         {/* Expand chevron */}
@@ -68,7 +68,7 @@ export function ToolCallCard({ tool }: ToolCallCardProps) {
         <div className="mt-1 ml-5 pl-2.5 border-l border-zinc-800 text-xs space-y-1.5">
           {tool.input && (
             <div>
-              <span className="text-zinc-600 text-[10px] uppercase tracking-wider">Input</span>
+              <span className="text-zinc-400 text-xs uppercase tracking-wider">Input</span>
               <pre className="text-zinc-500 font-mono whitespace-pre-wrap wrap-anywhere mt-0.5 max-h-32 overflow-y-auto">
                 {formatToolInput(tool.input)}
               </pre>
@@ -76,7 +76,7 @@ export function ToolCallCard({ tool }: ToolCallCardProps) {
           )}
           {tool.summary && (
             <div>
-              <span className="text-zinc-600 text-[10px] uppercase tracking-wider">Result</span>
+              <span className="text-zinc-400 text-xs uppercase tracking-wider">Result</span>
               <p className="text-zinc-400 mt-0.5">{tool.summary}</p>
             </div>
           )}
