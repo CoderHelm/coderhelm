@@ -2,15 +2,25 @@
 // docs/api/openapi.json. Do not edit; run `npm run openapi:fields` instead.
 
 /** The platform commit this was generated from. */
-export const OPENAPI_REF = "8cf10f5b89cfeea3f26166b526303146019b7ccc";
+export const OPENAPI_REF = "a28e8731edfe06d68e05d8c0f842139ccd241096";
 
 /** The fields each public API schema has. */
 export interface OpenApiFields {
+  AnswerRun: "answers";
+  AnswerRunResult: "comment_url" | "posted" | "run_id" | "status";
+  Backfill: "complete";
   CiUploadResult: "ok";
+  CreateEndpointBody: "description" | "enabled" | "events" | "url";
   CreatePlan: "description" | "destination" | "repo" | "tasks" | "title";
+  CreatedEndpoint: "endpoint" | "secret";
   CreatedPlan: "plan_id";
   CustomRoleRef: "id" | "name";
+  DeliveryAnalytics: "backfill" | "endpoints" | "events" | "from" | "granularity" | "kept_days" | "period" | "previous" | "previous_from" | "previous_to" | "reasons" | "records_kept_days" | "seen_sources" | "series" | "sources" | "summary" | "to";
+  DeliveryAttempt: "at" | "code" | "duration_ms" | "error";
+  EndpointRow: "deleted" | "deliveries" | "description" | "disabled_reason" | "enabled" | "failed" | "failing_since" | "id" | "last_failure_at" | "last_failure_message" | "last_failure_reason" | "last_success_at" | "ok" | "p50_ms" | "p95_ms" | "streak" | "success_rate" | "url";
   ErrorBody: "code" | "error" | "scope";
+  EventRow: "event" | "failed" | "source";
+  GivenAnswer: "answer" | "question_id";
   JiraComment: "author" | "body";
   JiraIssue: "fields" | "key";
   JiraIssueFields: "assignee" | "description" | "labels" | "project" | "summary";
@@ -29,22 +39,36 @@ export interface OpenApiFields {
   PlanTask: "acceptance_criteria" | "approved_at" | "approved_by" | "created_at" | "depends_on" | "description" | "destination" | "issue_number" | "issue_url" | "jira_project" | "jira_ticket_key" | "jira_ticket_url" | "order" | "plan_id" | "pr_url" | "rejected_at" | "rejected_by" | "repo" | "run_id" | "status" | "task_id" | "title";
   PlanWithTasks: "chat_id" | "created_at" | "description" | "destination" | "executed_at" | "executed_by" | "mcp_servers" | "plan_id" | "repo" | "status" | "task_count" | "tasks" | "title" | "tokens_in" | "tokens_out" | "updated_at";
   PlansPage: "next" | "next_cursor" | "plans";
+  Point: "deliveries" | "end" | "failed" | "ok" | "p95_ms" | "previous_deliveries" | "start" | "success_rate";
   Quarantine: "playwright_grep_invert" | "tests";
   QuarantinedTest: "file" | "framework" | "id" | "project" | "title";
   RatingComment: "at" | "by" | "rating" | "text";
+  ReasonRow: "code" | "count" | "fix" | "message" | "previous_count" | "sources";
+  ReplayBody: "only_failed" | "since" | "until";
+  ReplayResult: "capped" | "found" | "queued";
   Repo: "enabled" | "name" | "onboard_error" | "onboard_status" | "role" | "ticket_source";
   ReposList: "repos";
   Review: "action_summary" | "applied_standards" | "body" | "created_at" | "findings" | "head_sha" | "posted_as" | "pr_number" | "pr_title" | "rating_comments" | "repo" | "risk" | "sk" | "thumbs_down" | "thumbs_up" | "trigger" | "verdict";
   ReviewFinding: "blocks" | "body" | "category" | "end_line" | "evidence" | "file" | "line" | "lookups" | "severity" | "suggestion" | "title";
   ReviewsPage: "next" | "reviews";
-  Run: "applied_standards" | "branch" | "branches" | "cache_read_tokens" | "cache_write_tokens" | "close_reason" | "closed_at" | "closed_by" | "closed_from" | "cost_usd" | "created_at" | "current_pass" | "duration_s" | "error" | "files_modified" | "fix_location" | "lesson" | "mcp_servers" | "outside_change_report" | "pass_history" | "policy_approval" | "policy_note" | "pr_number" | "pr_numbers" | "pr_url" | "pr_urls" | "progress_notes" | "repo" | "run_id" | "sign_in_prompts" | "status" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out" | "updated_at";
+  RotateBody: "overlap_hours";
+  RotatedSecret: "previous_secret_expires_at" | "secret";
+  Run: "answers" | "answers_url" | "applied_standards" | "branch" | "branches" | "cache_read_tokens" | "cache_write_tokens" | "close_reason" | "closed_at" | "closed_by" | "closed_from" | "continued_run_id" | "cost_usd" | "created_at" | "current_pass" | "duration_s" | "error" | "files_modified" | "fix_location" | "lesson" | "mcp_servers" | "outside_change_report" | "pass_history" | "policy_approval" | "policy_note" | "pr_number" | "pr_numbers" | "pr_url" | "pr_urls" | "progress_notes" | "questions" | "questions_url" | "repo" | "run_id" | "sign_in_prompts" | "status" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out" | "updated_at";
   RunActionResult: "status";
+  RunAnswer: "answer" | "answered_at" | "author" | "question" | "question_id";
   RunNote: "message" | "timestamp";
   RunPass: "pass" | "started_at";
+  RunQuestion: "decision" | "id" | "question" | "suggestions" | "why";
   RunSummary: "cost_usd" | "created_at" | "current_pass" | "duration_s" | "pr_number" | "pr_url" | "repo" | "run_id" | "status" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out";
   RunsPage: "next" | "runs" | "scanned";
+  SecretView: "previous_secret_expires_at" | "secret";
   SnsEnvelope: "Message" | "MessageId" | "Signature" | "SignatureVersion" | "SigningCertURL" | "Subject" | "SubscribeURL" | "Timestamp" | "TopicArn" | "Type";
+  SourceRow: "deliveries" | "direction" | "failed" | "ok" | "p95_ms" | "previous_deliveries" | "previous_success_rate" | "source" | "success_rate";
+  Totals: "deliveries" | "failed" | "handled" | "ignored" | "p50_ms" | "p95_ms" | "p99_ms" | "retried" | "retried_ok" | "retries" | "success_rate";
+  UpdateEndpointBody: "description" | "enabled" | "events" | "url";
   Usage: "cache_hit_rate" | "cache_read_tokens" | "cache_write_tokens" | "counted_tokens" | "features" | "limit_counts_cache" | "limits" | "limits_legacy" | "max_tokens" | "month" | "new_tokens" | "tokens_in" | "tokens_out" | "total_runs" | "total_tokens";
   UsageFeature: "cache_read_tokens" | "cache_write_tokens" | "feature" | "tokens_in" | "tokens_out" | "total_tokens";
   UsageLimit: "kind" | "max" | "used";
+  WebhookDelivery: "attempts" | "created_at" | "event" | "event_id" | "headers" | "id" | "next_retry_at" | "outcome" | "payload_preview" | "reason" | "reason_fix" | "reason_message" | "status";
+  WebhookEndpoint: "created_at" | "created_by" | "description" | "disabled_reason" | "enabled" | "events" | "failing_since" | "id" | "last_failure_at" | "last_success_at" | "previous_secret_expires_at" | "secret_hint" | "updated_at" | "url";
 }

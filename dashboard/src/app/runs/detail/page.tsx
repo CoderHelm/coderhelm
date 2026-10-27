@@ -11,7 +11,7 @@ import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Callout } from "@/components/callout";
 import { InlineMarkdown, Markdown } from "@/components/markdown";
-import { buttonClass, dangerButton, focusRing, primaryButton, secondaryButton } from "@/components/ui";
+import { buttonClass, dangerButton, focusRing, fullWidthOnPhone, primaryButton, secondaryButton } from "@/components/ui";
 import { Page, PageHeader, SectionHeading } from "@/components/page";
 import { RunStatusBadge, runCanClose, runCloseIsLikely, runIsLive, runStatusLabel } from "@/components/run-status";
 import { CloseRunDialog } from "@/components/close-run-dialog";
@@ -19,6 +19,7 @@ import { Chip, Time, formatDuration as sharedDuration, formatMs } from "@/compon
 import { usePaletteActions, type PageAction } from "@/components/command-palette";
 import type { CloseRunRequest } from "@/lib/api";
 import { TeamAgentAsks } from "./team-asks";
+import { RunAnswered, RunQuestions } from "./run-questions";
 import { AsksHistory, WaitingOnYou, useRunApprovals } from "./agent-asks";
 import { WorkUsedLine } from "@/components/work-used";
 import { HelpLink } from "@/components/support";
@@ -690,7 +691,8 @@ function RunDetailInner() {
       </OutcomeCard>
     );
   } else {
-    const look: { tone: OutcomeTone; title: string; body: React.ReactNode; actions?: React.ReactNode } =
+    // `body` is one sentence; `content` is a block of its own (a form, a list).
+    const look: { tone: OutcomeTone; title: string; body: React.ReactNode; content?: React.ReactNode; actions?: React.ReactNode } =
       run.status === "merged"
         ? { tone: "success", title: "Done. The change was merged.", body: "The pull request is merged, so the change is in.", actions: openPrButtons("secondary") }
         : done
@@ -707,12 +709,42 @@ function RunDetailInner() {
             }
           : run.status === "awaiting_ci"
             ? { tone: "waiting", title: "Waiting for the automated checks", body: "The change is ready. Coderhelm fixes the checks if they fail, then hands it over for review.", actions: openPrButtons("secondary") }
-            : run.status === "needs_input"
+            : run.status === "needs_input" && run.questions?.length
+              ? {
+                  tone: "waiting",
+                  title: "Coderhelm needs your answer",
+                  body: null,
+                  content: (
+                    <RunQuestions
+                      run={run}
+                      canAnswer={canAct}
+                      limitTitle={limitTitle}
+                      retry={
+                        canAct && canRetry ? (
+                          <button type="button" onClick={retry} disabled={busy !== null || tokensExceeded} title={limitTitle} className={`${secondaryButton} ${fullWidthOnPhone}`}>
+                            {busy === "retry" ? "Starting…" : "Retry"}
+                          </button>
+                        ) : undefined
+                      }
+                      onAnswered={fetchRun}
+                    />
+                  ),
+                  actions: undefined,
+                }
+              : run.status === "needs_input"
               ? {
                   tone: "waiting",
                   title: "Coderhelm needs more detail",
                   body: run.error ? <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{sanitizeError(run.error)}</span> : "Add the missing detail to the ticket, then retry.",
                   actions: retryButton,
+                }
+              : run.status === "retried" && run.answers?.length
+              ? {
+                  tone: "neutral",
+                  title: "Answered. Coderhelm is continuing in a new run.",
+                  body: null,
+                  content: <RunAnswered run={run} />,
+                  actions: undefined,
                 }
               : run.status === "needs_outside_change"
                 ? { tone: "attention", title: "The fix is a change outside the code", body: "The code works as designed. What to change, and where, is below.", actions: undefined }
@@ -734,6 +766,7 @@ function RunDetailInner() {
     outcome = (
       <OutcomeCard tone={look.tone} title={look.title} testId="run-outcome" actions={look.actions}>
         {look.body && <p>{look.body}</p>}
+        {look.content}
       </OutcomeCard>
     );
   }
