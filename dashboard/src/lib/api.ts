@@ -418,6 +418,15 @@ export const api = {
     }),
   deleteRepo: (repo: string) =>
     request<void>(`/api/repos/${repo}`, { method: "DELETE" }),
+  /** The repository's staging-only CMS write connection (never its token). */
+  getStagingCms: (repo: string) => request<StagingCms>(`/api/repos/${repo}/staging-cms`),
+  saveStagingCms: (repo: string, body: StagingCmsInput) =>
+    request<StagingCms>(`/api/repos/${repo}/staging-cms`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  deleteStagingCms: (repo: string) =>
+    request<StagingCms>(`/api/repos/${repo}/staging-cms`, { method: "DELETE" }),
 
   // Stats
   getStats: () => request<{ month: Stats; all_time: Stats }>("/api/stats"),
@@ -1980,6 +1989,27 @@ export interface Repo {
   onboard_error?: string;
   /** Human-assigned role used to disambiguate Jira ticket routing. */
   role?: string;
+}
+
+/** A repository's staging CMS write connection, as the gateway shows it. */
+export interface StagingCms {
+  configured: boolean;
+  repo: string;
+  provider?: string;
+  project_id?: string;
+  dataset?: string;
+  production_dataset?: string;
+  /** Whether a token is saved; the token itself is never returned. */
+  token_set?: boolean;
+}
+
+export interface StagingCmsInput {
+  provider: "sanity";
+  project_id: string;
+  dataset: string;
+  production_dataset?: string;
+  /** Left out to keep the saved token. */
+  token?: string;
 }
 
 export interface Stats {

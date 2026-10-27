@@ -9,6 +9,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { api, type Repo } from "@/lib/api";
 import { githubAppUrl } from "@/lib/runtime-config";
 import { RoleGuard } from "@/components/role-guard";
+import { StagingCmsDialog } from "@/components/staging-cms-dialog";
 import { useToast } from "@/components/toast";
 import { Page, PageHeader } from "@/components/page";
 import { buttonClass, secondaryButton } from "@/components/ui";
@@ -75,6 +76,8 @@ function ReposPage() {
   const [toggling, setToggling] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [savingRole, setSavingRole] = useState<string | null>(null);
+  // The repository whose staging CMS connection is open, if any.
+  const [stagingRepo, setStagingRepo] = useState<string | null>(null);
   // Turning repos on or off, syncing and routing roles need `repos`.
   const { ready, can } = useCan();
   const canManage = can("repos");
@@ -295,6 +298,17 @@ function ReposPage() {
                           ))}
                         </Select>
                       ) : undefined}
+                      {repo.enabled && canManage && (
+                        <button
+                          type="button"
+                          onClick={() => setStagingRepo(repo.name)}
+                          className={buttonClass("secondary", "sm")}
+                          aria-label={`Staging content connection for ${repo.name}`}
+                          title="Let Coderhelm update the staging CMS content your end-to-end tests read"
+                        >
+                          Staging content
+                        </button>
+                      )}
                     </>
                   }
                 />
@@ -304,6 +318,13 @@ function ReposPage() {
         )}
         <LoadMore hasMore={!loading && filtered.length > shownCount} loading={false} onClick={() => setShownCount((n) => n + PAGE_SIZE)} />
       </div>
+      {stagingRepo && (
+        <StagingCmsDialog
+          repo={stagingRepo}
+          open={!!stagingRepo}
+          onOpenChange={(v) => !v && setStagingRepo(null)}
+        />
+      )}
     </Page>
   );
 }
