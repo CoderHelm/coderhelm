@@ -932,10 +932,12 @@ function trustPolicy(setup: AwsRoleSetup): string {
 /** Every action this release's role allows, scoped as the template scopes them. */
 function permissionsPolicy(setup: AwsRoleSetup): string {
   const all = [...new Set(setup.abilities.flatMap((g) => g.actions))];
-  const special = ["airflow:InvokeRestApi", "iam:SimulatePrincipalPolicy"];
+  const special = ["airflow:InvokeRestApi", "iam:SimulatePrincipalPolicy", "cloudformation:DescribeStacks"];
   const statements: Record<string, unknown>[] = [{ Effect: "Allow", Action: all.filter((a) => !special.includes(a)), Resource: "*" }];
   if (all.includes("airflow:InvokeRestApi")) statements.push({ Effect: "Allow", Action: "airflow:InvokeRestApi", Resource: "arn:aws:airflow:*:*:role/*/Viewer" });
   if (all.includes("iam:SimulatePrincipalPolicy")) statements.push({ Effect: "Allow", Action: "iam:SimulatePrincipalPolicy", Resource: "arn:aws:iam::<this account>:role/CoderHelmLogReader" });
+  // Only Coderhelm's own update stacks: another stack's parameters aren't read.
+  if (all.includes("cloudformation:DescribeStacks")) statements.push({ Effect: "Allow", Action: "cloudformation:DescribeStacks", Resource: "arn:aws:cloudformation:*:<this account>:stack/CoderHelmLogReaderUpdate-*/*" });
   return JSON.stringify({ Version: "2012-10-17", Statement: statements }, null, 2);
 }
 

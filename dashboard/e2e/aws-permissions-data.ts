@@ -3,11 +3,11 @@
 
 const GROUPS = [
   { key: "logs", name: "CloudWatch logs and alarms", why: "Reads error lines and alarm states so Coderhelm can find what broke and propose a fix.", actions: ["logs:DescribeLogGroups", "logs:StartQuery", "logs:GetQueryResults", "logs:StopQuery", "logs:FilterLogEvents", "logs:GetLogEvents", "cloudwatch:DescribeAlarms", "sts:GetCallerIdentity"] },
-  { key: "check", name: "Checking its own permissions", why: "Asks IAM which of these permissions the role has, so this page can say when an update is needed. It only looks at this one role.", actions: ["iam:SimulatePrincipalPolicy"] },
+  { key: "check", name: "Checking its own permissions", why: "Asks IAM which of these permissions the role has, and whether CoderHelm's own update stack finished, so this page can say when an update is needed. It only looks at this one role and CoderHelm's update stacks.", actions: ["iam:SimulatePrincipalPolicy", "cloudformation:DescribeStacks"] },
   { key: "metrics", name: "CloudWatch metrics", why: "Reads error rate, latency and other metrics before and after a deploy.", actions: ["cloudwatch:GetMetricData", "cloudwatch:ListMetrics"] },
   { key: "airflow", name: "Airflow", why: "Reads DAG runs, task logs and import errors as Airflow's Viewer role, which can't trigger or change anything.", actions: ["airflow:ListEnvironments", "airflow:GetEnvironment", "airflow:InvokeRestApi"] },
   { key: "ecs", name: "ECS services and tasks", why: "Sees which tasks behind a failing log group are running, since when and how they start, as evidence before a fix.", actions: ["ecs:ListClusters", "ecs:ListServices", "ecs:DescribeServices", "ecs:DescribeTaskDefinition", "ecs:ListTasks", "ecs:DescribeTasks"] },
-  { key: "code", name: "Finding the code behind a log group", why: "Reads function, image and stack tags to work out which repository a log group's code lives in, so a fix goes to the right repo.", actions: ["lambda:GetFunction", "lambda:GetFunctionConfiguration", "lambda:ListFunctions", "lambda:ListTags", "logs:ListTagsForResource", "cloudformation:DescribeStacks", "ecr:BatchGetImage", "ecr:ListTagsForResource"] },
+  { key: "code", name: "Finding the code behind a log group", why: "Reads function, image and log group tags, the names in a stack's resource list and image manifests to work out which repository a log group's code lives in, so a fix goes to the right repo. Never a function's configuration or code, or a stack's parameters.", actions: ["lambda:ListTags", "logs:ListTagsForResource", "cloudformation:ListStackResources", "ecr:BatchGetImage", "ecr:ListTagsForResource"] },
 ];
 
 export const UPDATE_STACK = "CoderHelmLogReaderUpdate-3f9a1c2e";

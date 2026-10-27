@@ -298,7 +298,7 @@ function SignInSettingsPage() {
         <SettingsSection
           id="api-keys"
           title="API keys"
-          description="API keys aren't people, so two-factor sign-in doesn't apply to them. Revoke any you don't need."
+          description="API keys aren't people: a key never signs in, so two-factor sign-in doesn't hold it back. Keys made before the rule may have been made without a second factor; revoke any you don't recognize or need."
         >
           <div className="space-y-2 px-4 py-4">
             {keys.length === 0 ? (
@@ -309,6 +309,18 @@ function SignInSettingsPage() {
                   <li key={k.id} className="[overflow-wrap:anywhere]">
                     {k.name}
                     {k.created_by && <span className="text-zinc-400">, made by {k.created_by}</span>}
+                    {k.made_before_rule && (
+                      <span className="text-amber-300" data-testid="key-review">
+                        {" "}
+                        (made before two-factor sign-in was required
+                        {k.maker_on_team === false
+                          ? ", by someone no longer on the team"
+                          : !k.maker_two_factor
+                            ? ", by someone who still has no second factor"
+                            : ""}
+                        )
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>

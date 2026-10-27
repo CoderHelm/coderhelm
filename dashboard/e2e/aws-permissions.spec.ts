@@ -150,7 +150,10 @@ test("connecting: the role trusts this install's own account, never CoderHelm's"
   await expect(trust).toContainText(EXTERNAL_ID);
   await expect(trust).toContainText(`arn:aws:iam::${INSTALL_ACCOUNT}:role/coderhelm-prod-*`);
   const policy = manual.getByTestId("aws-permissions-policy");
-  for (const a of ["ecs:DescribeTasks", "iam:SimulatePrincipalPolicy", "lambda:GetFunction", "airflow:InvokeRestApi"]) await expect(policy).toContainText(a);
+  for (const a of ["ecs:DescribeTasks", "iam:SimulatePrincipalPolicy", "lambda:ListTags", "airflow:InvokeRestApi"]) await expect(policy).toContainText(a);
+  // The one stack read is scoped to CoderHelm's own update stacks; nothing reads function configuration.
+  await expect(policy).toContainText("stack/CoderHelmLogReaderUpdate-*/*");
+  await expect(policy).not.toContainText("lambda:GetFunction");
   await expect(page.getByText(HOSTED_ACCOUNT)).toHaveCount(0);
 
   const download = page.waitForEvent("download");
@@ -167,7 +170,7 @@ test("up to date: a quiet line, checked live", async ({ page }) => {
   await page.goto("/settings/integrations/aws/");
   const panel = page.getByTestId(`aws-perms-${A}`);
   await expect(panel.getByText("Permissions up to date")).toBeVisible();
-  await expect(panel).toContainText("All 28 read-only permissions this release uses");
+  await expect(panel).toContainText("All 26 read-only permissions this release uses");
   expect(db.checks.some((c) => c.account === A)).toBe(true);
   await expect(page.getByRole("link", { name: /Update in AWS/ })).toHaveCount(0);
   await shot(page, "aws-perms-up-to-date");

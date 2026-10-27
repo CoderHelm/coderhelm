@@ -21,6 +21,7 @@ interface Key {
   revoked_at: string | null;
   revoked_by: string | null;
   status: string;
+  two_factor_review?: { made_before_rule: boolean; maker_on_team: boolean; maker_two_factor: string | null };
 }
 
 const iso = (minsAgo: number) => new Date(Date.now() - minsAgo * 60_000).toISOString();
@@ -39,9 +40,9 @@ interface Db {
   me: Record<string, unknown>;
 }
 
-async function mockApi(page: Page, me: Record<string, unknown> = { role: "admin" }): Promise<Db> {
+async function mockApi(page: Page, me: Record<string, unknown> = { role: "admin" }, extra: Key[] = []): Promise<Db> {
   const db: Db = {
-    keys: [key("01jb8x6f4m2c9qz3t7v5w1k0ha", "Deploy pipeline"), key("01jb8w0000000000000000000a", "Old script", { status: "revoked", revoked_at: iso(60), revoked_by: "admin@example.com" })],
+    keys: [...extra, key("01jb8x6f4m2c9qz3t7v5w1k0ha", "Deploy pipeline"), key("01jb8w0000000000000000000a", "Old script", { status: "revoked", revoked_at: iso(60), revoked_by: "admin@example.com" })],
     calls: [],
     me,
   };
@@ -183,6 +184,26 @@ test("revoking asks first, then the key moves to revoked", async ({ page }) => {
   await page.getByTestId("past-keys").locator("summary").click();
   await expect(page.getByRole("list", { name: "Revoked and expired keys" }).getByText("Deploy pipeline")).toBeVisible();
   await expect(page.getByText("No active keys.")).toBeVisible();
+});
+
+test("with two-factor sign-in required, keys made before it are marked and can be revoked", async ({ page }) => {
+  const db = await mockApi(page, { role: "admin" }, [
+    key("01jb7old000000000000000000", "Old export", {
+      created_by: "bo@example.com",
+      two_factor_review: { made_before_rule: true, maker_on_team: true, maker_two_factor: null },
+    }),
+  ]);
+  await page.goto("/settings/api-keys/");
+  await expect(page.getByTestId("keys-before-2fa")).toContainText("One key was made before your organization required two-factor sign-in");
+  const live = page.getByRole("list", { name: "Active keys" });
+  const old = live.getByTestId("api-key").filter({ hasText: "Old export" });
+  await expect(old.getByTestId("key-review")).toHaveText("Made before two-factor sign-in was required, by someone who still has no second factor");
+  // A key made after the rule isn't marked.
+  await expect(live.getByTestId("api-key").filter({ hasText: "Deploy pipeline" }).getByTestId("key-review")).toHaveCount(0);
+  await shot(page, "api-keys-before-2fa.png");
+  await old.getByRole("button", { name: "Revoke" }).click();
+  await page.getByRole("alertdialog").filter({ hasText: 'Revoke "Old export"?' }).getByRole("button", { name: "Revoke key" }).click();
+  await expect.poll(() => db.calls.some((c) => c.method === "DELETE" && c.path === "/api/api-keys/01jb7old000000000000000000")).toBe(true);
 });
 
 test("a member can't open the page and isn't offered it", async ({ page }) => {
