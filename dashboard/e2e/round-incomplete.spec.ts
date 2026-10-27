@@ -40,6 +40,7 @@ const RUN = {
       { sha: "9b0c4d2a1e6f", message: "ABC-7: Add the tab tests" },
     ],
     files: ["src/blocks/gallery/tabs.tsx", "src/blocks/gallery/tabs.test.tsx"],
+    wip_branch: "coderhelm-wip/abc-7-gallery-block",
     at: iso(5),
     can_resume: true,
   },
@@ -87,7 +88,7 @@ for (const [label, width, height] of [
     const outcome = page.getByTestId("run-outcome");
     await expect(outcome).toContainText("Pull request open; the last fix round didn't finish");
     await expect(outcome).toContainText("The review fix round ran out of its time budget 3 times in a row.");
-    await expect(page.getByTestId("round-incomplete")).toContainText("It pushed 2 commits to the pull request first (4f2a9c1, 9b0c4d2)");
+    await expect(page.getByTestId("round-incomplete")).toContainText("The pull request is unchanged. Its work so far (2 checkpoint commits) is saved on branch coderhelm-wip/abc-7-gallery-block.");
     await expect(outcome).not.toContainText(/failed/i);
     await expect(page.getByText("PR open, fix unfinished")).toBeVisible();
     await expect(outcome.getByRole("link", { name: /Open pull request #41/ })).toBeVisible();
