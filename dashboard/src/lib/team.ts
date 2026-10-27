@@ -54,8 +54,30 @@ export interface RoleInfo {
 
 export interface Capability {
   key: string;
+  /** The full sentence: everything it lets someone do. */
   label: string;
+  /** Two to five words for a checkbox or a list. Missing from a gateway older than it. */
+  short_label?: string;
   min_role: string;
+}
+
+/** A capability's name in a list: its short label, else the full one. */
+export function shortLabel(c: Capability): string {
+  return c.short_label || c.label;
+}
+
+/**
+ * One entry per key, in the table's order. The gateway may describe one key
+ * in more than one row (the routes it covers differ by install); a role
+ * holds the key, so the editor shows it once with the rows' sentences joined.
+ */
+export function uniqueCapabilities(caps: Capability[]): Capability[] {
+  const byKey = new Map<string, Capability>();
+  for (const c of caps) {
+    const seen = byKey.get(c.key);
+    byKey.set(c.key, seen ? { ...seen, label: `${seen.label}. ${c.label}` } : c);
+  }
+  return [...byKey.values()];
 }
 
 /** Served by the gateway from the same table it enforces (permissions.rs). */

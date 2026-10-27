@@ -541,18 +541,20 @@ test("an admin creates a role from a template, gives it to a member, and the cha
 
   const editor = page.getByTestId("role-editor");
   await expect(editor).toBeVisible();
+  await editor.getByRole("button", { name: "Expand all" }).click();
   // Owner-only abilities and role management are never offered.
   await expect(editor.getByRole("checkbox", { name: /Make someone an admin or owner/ })).toHaveCount(0);
   await expect(editor.getByRole("checkbox", { name: /custom roles/ })).toHaveCount(0);
   await expect(page.getByTestId("role-left-out")).toContainText("make someone an admin or owner");
   await expect(page.getByTestId("role-left-out")).toContainText("custom roles");
-  // Everyone can see the team: always on, can't be unticked.
-  await expect(editor.getByRole("checkbox", { name: /See who is on the team/ })).toBeChecked();
-  await expect(editor.getByRole("checkbox", { name: /See who is on the team/ })).toBeDisabled();
+  // Everyone can see the team: said once, not a checkbox to untick.
+  await expect(editor.getByRole("checkbox", { name: /See who is on the team/ })).toHaveCount(0);
+  await expect(editor.getByTestId("role-everyone")).toContainText("see who is on the team");
 
-  await editor.getByLabel("Name").fill("QA lead");
-  await editor.getByLabel("Description").fill("Plans and runs, plus repositories.");
-  await editor.getByLabel("Start from").selectOption("member");
+  await editor.getByRole("textbox", { name: "Name" }).fill("QA lead");
+  await editor.getByRole("button", { name: "Add a description" }).click();
+  await editor.getByRole("textbox", { name: "Description" }).fill("Plans and runs, plus repositories.");
+  await expect(editor.getByRole("radio", { name: /Member/ })).toBeChecked();
   await expect(editor.getByRole("checkbox", { name: /Create, edit, approve and run plans/ })).toBeChecked();
   await expect(editor.getByRole("checkbox", { name: /Manage repositories/ })).not.toBeChecked();
   await editor.getByRole("checkbox", { name: /Manage repositories/ }).check();
@@ -631,7 +633,7 @@ test("refusals from the server show in the editor", async ({ page }) => {
   await editor.getByRole("button", { name: "Create role" }).click();
   await expect(editor.getByRole("alert")).toHaveText("Give the role a name.");
   // A taken name: the server's answer.
-  await editor.getByLabel("Name").fill("release manager");
+  await editor.getByRole("textbox", { name: "Name" }).fill("release manager");
   await editor.getByRole("button", { name: "Create role" }).click();
   await expect(editor.getByRole("alert")).toHaveText("Another role already has that name.");
   await expect(editor).toBeVisible();

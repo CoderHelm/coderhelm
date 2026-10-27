@@ -40,10 +40,11 @@ export const modalActions = "flex flex-col-reverse gap-2 sm:flex-row sm:items-ce
  *
  * Layout: the title row and the `footer` stay put; only the body scrolls, so
  * the main button is always on screen however long the form is. From `sm:`
- * up it is a centred card no taller than the screen less a margin; on a
- * phone it fills the screen with the footer above the home indicator, or,
- * with `sheet`, rises from the bottom only as tall as its content (a short
- * question that would look lost on a whole screen).
+   * up it is a centred card no taller than the screen less a margin (or, with
+   * `side`, a full-height panel on the right); on a phone it fills the screen
+   * with the footer above the home indicator, or, with `sheet`, rises from the
+   * bottom only as tall as its content (a short question that would look lost
+   * on a whole screen).
  *
  * Pass `onSubmit` and the body and footer become one <form>: Enter submits,
  * and a `type="submit"` button in the footer submits it.
@@ -56,6 +57,7 @@ export function Modal({
   returnFocus,
   wide = false,
   sheet = false,
+  side = false,
   footer,
   onSubmit,
   testId,
@@ -74,6 +76,9 @@ export function Modal({
   /** A short form: on a phone a bottom sheet as tall as its content instead of the whole screen, and
    * no rules between the title, the body and the buttons (nothing long enough to scroll under them). */
   sheet?: boolean;
+  /** A full-height panel on the right instead of a centred card (a phone still gets the whole
+   * screen): for an editor long enough to need the height, beside the page it changes. */
+  side?: boolean;
   /** Where focus goes on close when the dialog was not opened by a Radix trigger (e.g. from the address). */
   returnFocus?: React.RefObject<HTMLElement | null>;
   /** The button row, laid out with `modalActions`. Always visible. */
@@ -168,7 +173,11 @@ export function Modal({
             e.preventDefault();
             returnFocus.current.focus();
           }}
-          className={`fixed z-[61] flex flex-col overflow-hidden bg-zinc-900 shadow-2xl sm:inset-x-4 sm:bottom-auto sm:top-[8dvh] sm:mx-auto sm:h-auto sm:max-h-[84dvh] sm:rounded-xl sm:border sm:border-zinc-800 ${sheet ? "inset-x-0 bottom-0 max-h-[92dvh] rounded-t-2xl border-t border-zinc-800" : "inset-0 h-[100dvh]"} ${wide === "xl" ? "sm:max-w-2xl lg:max-w-4xl" : wide === "md" ? "sm:max-w-lg" : wide ? "sm:max-w-2xl" : "sm:max-w-md"}`}
+          className={`fixed z-[61] flex flex-col overflow-hidden bg-zinc-900 shadow-2xl ${sheet ? "inset-x-0 bottom-0 max-h-[92dvh] rounded-t-2xl border-t border-zinc-800" : "inset-0 h-[100dvh]"} ${
+            side
+              ? "sm:inset-y-0 sm:left-auto sm:right-0 sm:h-[100dvh] sm:max-h-none sm:w-[min(44rem,100vw)] sm:rounded-none sm:border-0 sm:border-l sm:border-zinc-800 xl:w-[min(68rem,100vw)]"
+              : `sm:inset-x-4 sm:bottom-auto sm:top-[8dvh] sm:mx-auto sm:h-auto sm:max-h-[84dvh] sm:rounded-xl sm:border sm:border-zinc-800 ${wide === "xl" ? "sm:max-w-2xl lg:max-w-4xl" : wide === "md" ? "sm:max-w-lg" : wide ? "sm:max-w-2xl" : "sm:max-w-md"}`
+          }`}
         >
           <div className={`flex shrink-0 items-start justify-between gap-3 px-5 ${sheet ? "pb-1 pt-5" : "border-b border-zinc-800 pb-3 pt-[max(1rem,env(safe-area-inset-top))] sm:pt-4"}`}>
             <div className="min-w-0">
