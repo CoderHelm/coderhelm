@@ -143,7 +143,7 @@ async function noSideScroll(page: Page) {
 }
 
 test.describe("closing one run", () => {
-  test("a running run closes from its button with a reason; the PR stays open unless ticked", async ({ page }) => {
+  test("a running run closes from its button with a reason; the PR stays open unless turned on", async ({ page }) => {
     const db = await mockApi(page);
     await page.goto("/runs/detail?id=01RUNA");
     await expect(page.getByRole("heading", { name: "Fix the login page" })).toBeVisible();
@@ -151,10 +151,23 @@ test.describe("closing one run", () => {
 
     const dialog = page.getByRole("dialog", { name: "Close this run?" });
     await expect(dialog).toBeVisible();
-    const prBox = dialog.getByRole("checkbox", { name: /Also close PR #41 on GitHub/ });
-    await expect(prBox).not.toBeChecked();
-    await dialog.getByRole("radio", { name: "Duplicate" }).check();
-    await dialog.getByRole("textbox", { name: /Note/ }).fill("Same as ABC-9");
+    const prSwitch = dialog.getByRole("switch", { name: "Also close PR #41 on GitHub" });
+    await expect(prSwitch).not.toBeChecked();
+    await expect(prSwitch).toHaveAccessibleDescription(/stays open on GitHub/);
+    // Each reason is one row with its own line; the first is picked and focused.
+    const reasons = dialog.getByRole("radio");
+    await expect(reasons).toHaveCount(4);
+    await expect(dialog.getByRole("radio", { name: "Not needed", exact: true })).toBeChecked();
+    await expect(dialog.getByRole("radio", { name: "Not needed", exact: true })).toBeFocused();
+    await expect(dialog.getByRole("radio", { name: "Duplicate", exact: true })).toHaveAccessibleDescription("Name the other ticket in the note.");
+    // The note names where it goes: this run came from a Jira ticket.
+    const noteBox = dialog.getByRole("textbox", { name: /Note/ });
+    await expect(noteBox).toHaveAccessibleDescription("Jira ticket ABC-1 gets a comment saying who closed it and why.");
+    // Arrow keys move through the reasons; the example note follows the reason.
+    await page.keyboard.press("ArrowDown");
+    await expect(dialog.getByRole("radio", { name: "Duplicate", exact: true })).toBeChecked();
+    await expect(noteBox).toHaveAttribute("placeholder", "e.g. Same as ABC-12");
+    await noteBox.fill("Same as ABC-9");
     await shot(page, "close-run-dialog");
     await dialog.getByRole("button", { name: "Close run" }).click();
 
@@ -171,12 +184,15 @@ test.describe("closing one run", () => {
     await shot(page, "run-closed");
   });
 
-  test("ticking the box closes the PR too", async ({ page }) => {
+  test("turning the option on closes the PR too", async ({ page }) => {
     const db = await mockApi(page);
     await page.goto("/runs/detail?id=01RUNA");
     await page.getByRole("button", { name: "Close run" }).click();
     const dialog = page.getByRole("dialog", { name: "Close this run?" });
-    await dialog.getByRole("checkbox", { name: /Also close PR #41/ }).check();
+    const prSwitch = dialog.getByRole("switch", { name: /Also close PR #41/ });
+    await prSwitch.click();
+    await expect(prSwitch).toBeChecked();
+    await expect(prSwitch).toHaveAccessibleDescription("Closed with a comment giving the reason.");
     await dialog.getByRole("button", { name: "Close run" }).click();
     await expect(page.getByTestId("closed-note")).toBeVisible();
     expect(db.bodies.find((b) => b.path === "/api/runs/01RUNA/close")).toMatchObject({ close_pr: true, reason: "Not needed" });
@@ -201,6 +217,18 @@ test.describe("closing one run", () => {
     await palette.getByRole("option", { name: /Close this run/ }).click();
     await expect(palette).toBeHidden();
     await expect(page.getByRole("dialog", { name: "Close this run?" })).toBeVisible();
+  });
+
+  test("a run from a GitHub issue says the issue is left as it is", async ({ page }) => {
+    await mockApi(page, {
+      runs: [run({ run_id: "01RUNG", status: "running", ticket_source: "github", ticket_id: "your-team/web#7", title: "Fix the footer" })],
+    });
+    await page.goto("/runs/detail?id=01RUNG");
+    await page.getByRole("button", { name: "Close run" }).click();
+    const dialog = page.getByRole("dialog", { name: "Close this run?" });
+    await expect(dialog.getByRole("textbox", { name: /Note/ })).toHaveAccessibleDescription("Kept with the run. The GitHub issue isn't changed.");
+    // No pull request yet: no option to close one.
+    await expect(dialog.getByRole("switch")).toHaveCount(0);
   });
 
   test("Reopen shows the run as it was, without restarting it", async ({ page }) => {
@@ -253,8 +281,9 @@ test.describe("closing several runs", () => {
     await bar.getByRole("button", { name: "Close" }).click();
     const dialog = page.getByRole("dialog", { name: "Close 3 runs?" });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole("checkbox", { name: /Also close their 2 pull requests on GitHub/ })).not.toBeChecked();
-    await dialog.getByRole("radio", { name: "Wrong ticket" }).check();
+    await expect(dialog.getByRole("switch", { name: "Also close their 2 pull requests on GitHub" })).not.toBeChecked();
+    await expect(dialog.getByRole("textbox", { name: /Note/ })).toHaveAccessibleDescription(/^Their 3 Jira tickets each get a comment/);
+    await dialog.getByRole("radio", { name: "Wrong ticket", exact: true }).check();
     await dialog.getByRole("button", { name: "Close 3 runs" }).click();
 
     const sent = db.bodies.find((b) => b.path === "/api/runs/close");
@@ -329,6 +358,11 @@ test.describe("closing several runs", () => {
     const box = await dialog.boundingBox();
     expect(box!.x).toBeGreaterThanOrEqual(0);
     expect(box!.x + box!.width).toBeLessThanOrEqual(375);
+    // A bottom sheet as tall as the form, not the whole screen, with both buttons on screen.
+    expect(box!.y).toBeGreaterThan(0);
+    expect(Math.round(box!.y + box!.height)).toBe(760);
+    await expect(dialog.getByRole("button", { name: "Close 2 runs" })).toBeInViewport();
+    await expect(dialog.getByRole("button", { name: "Keep them open" })).toBeInViewport();
     await noSideScroll(page);
     await shot(page, "close-dialog-phone");
   });

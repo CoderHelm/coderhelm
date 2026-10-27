@@ -41,7 +41,9 @@ export const modalActions = "flex flex-col-reverse gap-2 sm:flex-row sm:items-ce
  * Layout: the title row and the `footer` stay put; only the body scrolls, so
  * the main button is always on screen however long the form is. From `sm:`
  * up it is a centred card no taller than the screen less a margin; on a
- * phone it fills the screen with the footer above the home indicator.
+ * phone it fills the screen with the footer above the home indicator, or,
+ * with `sheet`, rises from the bottom only as tall as its content (a short
+ * question that would look lost on a whole screen).
  *
  * Pass `onSubmit` and the body and footer become one <form>: Enter submits,
  * and a `type="submit"` button in the footer submits it.
@@ -53,6 +55,7 @@ export function Modal({
   description,
   returnFocus,
   wide = false,
+  sheet = false,
   footer,
   onSubmit,
   testId,
@@ -65,8 +68,12 @@ export function Modal({
   title: ReactNode;
   description?: ReactNode;
   /** Room for a longer form (a list of checkboxes): wider from `sm:` up. `"xl"` widens it again
-   * from `lg:` up, for a body with two columns (a picker beside what is picked). */
-  wide?: boolean | "xl";
+   * from `lg:` up, for a body with two columns (a picker beside what is picked). `"md"` is a little
+   * wider than the default, for options with a line of help each. */
+  wide?: boolean | "md" | "xl";
+  /** A short form: on a phone a bottom sheet as tall as its content instead of the whole screen, and
+   * no rules between the title, the body and the buttons (nothing long enough to scroll under them). */
+  sheet?: boolean;
   /** Where focus goes on close when the dialog was not opened by a Radix trigger (e.g. from the address). */
   returnFocus?: React.RefObject<HTMLElement | null>;
   /** The button row, laid out with `modalActions`. Always visible. */
@@ -102,8 +109,21 @@ export function Modal({
     };
   }, [open, returnFocus]);
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
+  // A sheet draws no rule above its buttons, unless the body is taller than
+  // the screen and scrolls under them: then the rule shows where it is cut.
+  const [bodyEl, setBodyEl] = useState<HTMLDivElement | null>(null);
+  const [overflows, setOverflows] = useState(false);
+  useEffect(() => {
+    if (!sheet || !bodyEl) return;
+    const measure = () => setOverflows(bodyEl.scrollHeight > bodyEl.clientHeight + 1);
+    const ro = new ResizeObserver(measure);
+    ro.observe(bodyEl);
+    for (const c of Array.from(bodyEl.children)) ro.observe(c);
+    measure();
+    return () => ro.disconnect();
+  }, [sheet, bodyEl]);
   const body = (
-    <div data-modal-body className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+    <div ref={setBodyEl} data-modal-body className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
       {children}
     </div>
   );
@@ -113,7 +133,7 @@ export function Modal({
     <div
       ref={setSlot}
       data-modal-footer
-      className="shrink-0 border-t border-zinc-800 bg-zinc-900 px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] empty:hidden sm:pb-3"
+      className={`shrink-0 bg-zinc-900 px-5 empty:hidden ${sheet ? `border-t pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5 ${overflows ? "border-zinc-800" : "border-transparent"}` : "border-t border-zinc-800 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3"}`}
     >
       {footer}
     </div>
@@ -148,9 +168,9 @@ export function Modal({
             e.preventDefault();
             returnFocus.current.focus();
           }}
-          className={`fixed inset-0 z-[61] flex h-[100dvh] flex-col overflow-hidden bg-zinc-900 shadow-2xl sm:inset-x-4 sm:bottom-auto sm:top-[8dvh] sm:mx-auto sm:h-auto sm:max-h-[84dvh] sm:rounded-xl sm:border sm:border-zinc-800 ${wide === "xl" ? "sm:max-w-2xl lg:max-w-4xl" : wide ? "sm:max-w-2xl" : "sm:max-w-md"}`}
+          className={`fixed z-[61] flex flex-col overflow-hidden bg-zinc-900 shadow-2xl sm:inset-x-4 sm:bottom-auto sm:top-[8dvh] sm:mx-auto sm:h-auto sm:max-h-[84dvh] sm:rounded-xl sm:border sm:border-zinc-800 ${sheet ? "inset-x-0 bottom-0 max-h-[92dvh] rounded-t-2xl border-t border-zinc-800" : "inset-0 h-[100dvh]"} ${wide === "xl" ? "sm:max-w-2xl lg:max-w-4xl" : wide === "md" ? "sm:max-w-lg" : wide ? "sm:max-w-2xl" : "sm:max-w-md"}`}
         >
-          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-zinc-800 px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))] sm:pt-4">
+          <div className={`flex shrink-0 items-start justify-between gap-3 px-5 ${sheet ? "pb-1 pt-5" : "border-b border-zinc-800 pb-3 pt-[max(1rem,env(safe-area-inset-top))] sm:pt-4"}`}>
             <div className="min-w-0">
               <Dialog.Title className="text-base font-semibold text-zinc-100">{title}</Dialog.Title>
               {description && <Dialog.Description className="mt-1 text-sm text-zinc-400">{description}</Dialog.Description>}
