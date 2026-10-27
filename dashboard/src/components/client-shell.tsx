@@ -4,7 +4,7 @@ import { can } from "@/lib/capabilities";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { api, ApiError, type UsageInfo, type Banner, type TeamInfo } from "@/lib/api";
+import { api, ApiError, TWO_FACTOR_REQUIRED, type UsageInfo, type Banner, type TeamInfo } from "@/lib/api";
 import { pushToDataLayer } from "@/lib/gtm";
 import { BETA_SIGNUPS_CHANGED } from "@/lib/admin";
 import { formatTokens, limitName, reachedLimit, USAGE_CHANGED, usageBreakdown, usageLimits } from "@/lib/usage";
@@ -156,13 +156,26 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     });
   };
   const [authChecked, setAuthChecked] = useState(false);
-  // A self-hosted install that requires two-factor sign-in: a session
-  // without a second factor sees only the setup screen.
+  // A team (a self-hosted install: the organization) that requires
+  // two-factor sign-in: a session without a second factor sees only the
+  // setup screen. A self-hosted install asks up front, as before; hosted
+  // learns it from the server's answer (`two_factor_required`) to the first
+  // request it holds, so a session that isn't held pays for no extra call.
   const [twoFactor, setTwoFactor] = useState<MyTwoFactor | null>(null);
+  const fetchTwoFactor = () => api.myTwoFactor().then(setTwoFactor, () => setTwoFactor(null));
   const loadTwoFactor = () => {
-    if (!isSelfHosted()) return Promise.resolve();
-    return api.myTwoFactor().then(setTwoFactor, () => setTwoFactor(null));
+    if (isSelfHosted()) return fetchTwoFactor();
+    return api.getUsage().then(setUsage, (e) =>
+      e instanceof ApiError && e.code === "two_factor_required" ? fetchTwoFactor() : undefined,
+    );
   };
+  useEffect(() => {
+    const held = () => {
+      fetchTwoFactor();
+    };
+    window.addEventListener(TWO_FACTOR_REQUIRED, held);
+    return () => window.removeEventListener(TWO_FACTOR_REQUIRED, held);
+  }, []);
   // A self-hosted install's callback from Coderhelm's GitHub App or an OAuth
   // sign-in (lib/hybrid.ts): passed on before sign-in, since the person here
   // usually has no hosted account.
@@ -251,7 +264,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         pushToDataLayer({ event: "identify", user_id: u.user_id, team_id: u.team_id });
         await loadTwoFactor();
         setAuthChecked(true);
-        api.getUsage().then(setUsage).catch(() => {});
+        // Hosted read the usage already, on the way.
+        if (isSelfHosted()) api.getUsage().then(setUsage).catch(() => {});
         api.getBanners().then((r) => setBanners(r.banners)).catch(() => {});
         api.listTeams().then((r) => setTeams(r.teams)).catch(() => {});
       })
@@ -323,7 +337,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       await loadTwoFactor();
       setUser(u);
       pushToDataLayer({ event: "identify", user_id: u.user_id, team_id: u.team_id });
-      api.getUsage().then(setUsage).catch(() => {});
+      if (isSelfHosted()) api.getUsage().then(setUsage).catch(() => {});
       api.getBanners().then((r) => setBanners(r.banners)).catch(() => {});
       api.listTeams().then((r) => setTeams(r.teams)).catch(() => {});
     }} /></>;
@@ -815,13 +829,15 @@ function SignInProblemNotice({ problem }: { problem: SignInProblem }) {
 }
 
 /**
- * The organization requires two-factor sign-in and this session has none:
- * set it up (or, when it is set up already, sign in again with the code).
- * The server refuses everything else until then.
+ * The organization (hosted: the team this session acts in) requires
+ * two-factor sign-in and this session has none: set it up (or, when it is
+ * set up already, sign in again with the code). The server refuses
+ * everything else until then.
  */
 function TwoFactorGate({ status, email, onDone }: { status: MyTwoFactor; email: string; onDone: () => void }) {
   const fits = status.fits ?? "cognito";
-  const hasIt = status.set_up === fits;
+  const hasIt = !!status.set_up;
+  const who = status.self_hosted ? "Your organization" : "This team";
   return (
     <div className="flex min-h-dvh items-center justify-center bg-zinc-950 px-4 py-10">
       <main className="w-full max-w-md space-y-6" data-testid="two-factor-gate">
@@ -834,8 +850,10 @@ function TwoFactorGate({ status, email, onDone }: { status: MyTwoFactor; email: 
             {hasIt ? "Sign in again with your code" : "Set up two-factor sign-in"}
           </h1>
           <p className="text-sm text-zinc-300">
-            Your organization requires two-factor sign-in. {hasIt
-              ? "You have it set up, but this session started without your code. Sign out, then sign in again and enter the code from your authenticator app."
+            {who} requires two-factor sign-in. {hasIt
+              ? status.set_up === "cognito" && fits === "app"
+                ? "Your code is on your password account. Sign out, then sign in with your email and password and enter the code from your authenticator app."
+                : "You have it set up, but this session started without your code. Sign out, then sign in again and enter the code from your authenticator app."
               : "Before you go on, set up an authenticator app: every sign-in will then ask for the 6-digit code it shows."}
           </p>
           {email && <p className="text-sm text-zinc-400 [overflow-wrap:anywhere]">Signed in as {email}</p>}

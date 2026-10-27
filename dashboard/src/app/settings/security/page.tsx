@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { api } from "@/lib/api";
+import { api, errorStatus } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Skeleton } from "@/components/skeleton";
@@ -51,13 +51,13 @@ export default function SecurityPage() {
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [mfaLoading, setMfaLoading] = useState(false);
 
-  // A self-hosted install: Google and GitHub sign-ins get Coderhelm's own
-  // authenticator-app codes.
+  // Google and GitHub sign-ins get Coderhelm's own authenticator-app codes;
+  // a person has one second factor, asked for however they sign in.
   const [mine, setMine] = useState<MyTwoFactor | null>(null);
   const [appStep, setAppStep] = useState<"idle" | "setup" | "off">("idle");
   const [offCode, setOffCode] = useState("");
   const loadMine = useCallback(() => {
-    if (isSelfHosted()) api.myTwoFactor().then(setMine, () => setMine(null));
+    api.myTwoFactor().then(setMine, () => setMine(null));
   }, []);
   useEffect(loadMine, [loadMine]);
 
@@ -80,6 +80,11 @@ export default function SecurityPage() {
   useEffect(loadMe, [loadMe]);
 
   const isOAuth = authProvider === "github" || authProvider === "google";
+  // It stays on while a team they're on (self-hosted: the organization) requires it.
+  const mustKeep = !!(mine?.must_keep ?? mine?.required);
+  const keepWords = isSelfHosted()
+    ? "Your organization requires it, so it stays on."
+    : "A team you're on requires it, so it stays on.";
   const header = (
     <div className="mb-6">
       <PageHeader title="Security" lead={`Your password and ${TWO_STEP.toLowerCase()}.`} />
@@ -191,8 +196,17 @@ export default function SecurityPage() {
       await api.mfaDisable();
       setMfaEnabled(false);
       toast(`${TWO_STEP} is off`);
-    } catch {
-      toast(`Could not turn off ${TWO_STEP.toLowerCase()}`, "error");
+      loadMine();
+    } catch (e) {
+      const status = errorStatus(e);
+      toast(
+        status === 403
+          ? `To turn it off, sign out and sign in again with your code first.`
+          : status === 409
+            ? keepWords
+            : `Could not turn off ${TWO_STEP.toLowerCase()}`,
+        "error",
+      );
     } finally {
       setMfaLoading(false);
     }
@@ -218,7 +232,7 @@ export default function SecurityPage() {
                   {login ? <span className="font-normal text-zinc-400"> as {login}</span> : null}
                 </p>
                 <p className="mt-0.5 text-sm text-zinc-400">
-                  Your password and {TWO_STEP.toLowerCase()} are managed in your {provider.name} account.
+                  Your password and {provider.name}&apos;s own {TWO_STEP.toLowerCase()} are managed in your {provider.name} account.
                 </p>
               </div>
               {provider.settings && (
@@ -230,26 +244,33 @@ export default function SecurityPage() {
               )}
             </div>
           </SettingsSection>
-          {mine?.self_hosted && (
+          {mine && (
             <div className="mt-8">
               <SettingsSection
                 id="app-two-step"
                 title="Two-factor sign-in"
-                description={`After ${provider.name}, Coderhelm asks for a code from an authenticator app on your phone.${mine.required ? " Your organization requires it." : ""}`}
+                description={`After ${provider.name}, Coderhelm asks for a code from an authenticator app on your phone.${mustKeep ? ` ${keepWords.replace(", so it stays on.", ".")}` : ""}`}
               >
                 <div className="space-y-4 px-4 py-4">
-                  <p className="flex items-center gap-2 text-sm" data-testid="app-two-step-status">
-                    <StatusDot tone={mine.set_up === "app" ? "success" : "muted"} />
-                    <span className={mine.set_up === "app" ? "text-zinc-200" : "text-zinc-400"}>
-                      {mine.set_up === "app" ? "Two-factor sign-in is on" : "Two-factor sign-in is off"}
-                    </span>
-                  </p>
-                  {mine.set_up !== "app" && appStep === "idle" && (
+                  {mine.set_up === "cognito" && (
+                    <p className="text-sm text-zinc-300" data-testid="code-on-password-account">
+                      Your two-factor code is on your password account. Sign in with your email and password, then enter the code from your authenticator app.
+                    </p>
+                  )}
+                  {mine.set_up !== "cognito" && (
+                    <p className="flex items-center gap-2 text-sm" data-testid="app-two-step-status">
+                      <StatusDot tone={mine.set_up === "app" ? "success" : "muted"} />
+                      <span className={mine.set_up === "app" ? "text-zinc-200" : "text-zinc-400"}>
+                        {mine.set_up === "app" ? "Two-factor sign-in is on" : "Two-factor sign-in is off"}
+                      </span>
+                    </p>
+                  )}
+                  {!mine.set_up && appStep === "idle" && (
                     <button type="button" onClick={() => setAppStep("setup")} className={primaryButton}>
                       Turn on two-factor sign-in
                     </button>
                   )}
-                  {mine.set_up !== "app" && appStep === "setup" && (
+                  {!mine.set_up && appStep === "setup" && (
                     <TwoFactorSetup
                       kind="app"
                       onCancel={() => setAppStep("idle")}
@@ -260,7 +281,10 @@ export default function SecurityPage() {
                       }}
                     />
                   )}
-                  {mine.set_up === "app" && !mine.required && appStep !== "off" && (
+                  {mine.set_up === "app" && mustKeep && (
+                    <p className="text-sm text-zinc-400">{keepWords}</p>
+                  )}
+                  {mine.set_up === "app" && !mustKeep && appStep !== "off" && (
                     <button type="button" onClick={() => setAppStep("off")} className={dangerButton}>
                       Turn off two-factor sign-in
                     </button>
@@ -371,17 +395,23 @@ export default function SecurityPage() {
               <span className={mfaEnabled ? "text-zinc-200" : "text-zinc-400"}>{mfaEnabled ? `${TWO_STEP} is on` : `${TWO_STEP} is off`}</span>
             </p>
 
-            {mfaStep === "idle" && !mfaEnabled && (
+            {mfaStep === "idle" && !mfaEnabled && mine?.set_up === "app" && (
+              <p className="text-sm text-zinc-300" data-testid="code-from-app">
+                You have two-factor sign-in with an authenticator app, set up after Google or GitHub. Signing in with your password asks for that code too.
+              </p>
+            )}
+
+            {mfaStep === "idle" && !mfaEnabled && mine?.set_up !== "app" && (
               <button type="button" onClick={() => setMfaStep("password")} disabled={mfaLoading} className={primaryButton}>
                 Turn on {TWO_STEP.toLowerCase()}
               </button>
             )}
 
-            {mfaStep === "idle" && mfaEnabled && mine?.required && (
-              <p className="text-sm text-zinc-400">Your organization requires it, so it stays on.</p>
+            {mfaStep === "idle" && mfaEnabled && mustKeep && (
+              <p className="text-sm text-zinc-400">{keepWords}</p>
             )}
 
-            {mfaStep === "idle" && mfaEnabled && !mine?.required && (
+            {mfaStep === "idle" && mfaEnabled && !mustKeep && (
               <button type="button" onClick={handleMfaDisable} disabled={mfaLoading} className={dangerButton}>
                 {mfaLoading ? "Turning off…" : `Turn off ${TWO_STEP.toLowerCase()}`}
               </button>

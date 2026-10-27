@@ -1,0 +1,47 @@
+---
+title: Sign-in and two-factor
+description: How people sign in to CoderHelm, the one second factor each person has, and how a team's admins require two-factor sign-in.
+---
+
+People sign in to CoderHelm with an email and password, with Google, or with GitHub. All three lead to the same person (by email), on every team they are on. This page is about the hosted CoderHelm at app.coderhelm.com; a self-hosted install has its own [sign-in page](/self-host/sign-in/).
+
+## Your second factor
+
+Anyone can turn on two-factor sign-in for themselves in **Settings, Security**. Each person has **one** second factor, and CoderHelm asks for it however they sign in, whether or not a team requires it:
+
+- **People who sign in with a password** use the password account's own codes: the sign-in asks for a code from your authenticator app (any TOTP app: 1Password, Google Authenticator, Authy and so on) after your password.
+- **People who sign in with Google or GitHub** don't pass through that step, so CoderHelm asks for its own authenticator-app code right after Google or GitHub. The secret is encrypted with AWS KMS.
+- **A code set up after Google or GitHub** is asked for after a password sign-in too.
+- **A code on the password account** can only be checked at the password sign-in: signing in with Google or GitHub sends you back to sign in with your email and password.
+- **Neither kind can be set up while you have one.** To change it, turn the current one off first: the app code takes a current code to turn off, and the password account's code can be turned off only from a session that signed in with it.
+
+Your second factor is yours, not a team's: the same one is asked for on every team you are on. Turning it off ends your other sessions on every team.
+
+## Requiring it for a team
+
+A team's admins and owners can require two-factor sign-in for that team: **Settings, Sign-in, Require two-factor sign-in for this team**.
+
+- **Set it up for yourself first**, then sign out and sign in again with your code. The switch waits until your own session used a code, so you can't lock yourself out.
+- **Settings, Sign-in shows how many people haven't set it up**, and who. When you turn it on, each of them gets an email with a link to set it up.
+- **With it on, someone without a second factor in this session sees only a setup screen** in this team: they can set one up (if they have none), sign out, or read why. Nothing else in the team works until they finish. Sessions from before the switch are checked at their next request. The rule is read on every request.
+- **The rule applies to the team you are acting in.** If you are on several teams, a team without the rule isn't held back by another team's rule. Your second factor stays on while any team you are on requires it.
+- **API keys** are not people and keep working: a key never signs in. **Settings, Sign-in** and **Settings, API keys** mark each live key made before the rule was turned on, with whether the person who made it has a second factor now (or has left the team). Check those and revoke any you don't recognize.
+
+Turning the rule on or off goes in the log under **Settings, Roles**.
+
+## A lost phone
+
+If someone loses their phone, an admin resets their two-factor sign-in in **Settings, Sign-in** after checking it's really them (a video call, say). The admin writes how they checked; the reset and the reason go in the log under **Settings, Roles** before anything changes.
+
+- Their second factor is the same on every team, so it is reset everywhere, and their sessions on every team end.
+- They get an email saying their two-factor sign-in was reset, so a reset they didn't ask for doesn't go unnoticed.
+- They set it up again at their next sign-in (straight away, if a team they're on requires it).
+- Only an owner can reset an admin's or another owner's. Nobody can reset their own.
+
+## Wrong codes
+
+Wrong codes count against the person, by email, across every way in. Ten wrong codes in 15 minutes pause sign-in with a code for 15 minutes; each pause after that is twice as long, up to a day, and the count starts over after a quiet day. One Google or GitHub sign-in allows five wrong codes before you start again from the sign-in screen.
+
+## Sessions that end
+
+Your existing sessions end when an admin resets your two-factor sign-in, removes you from the team or changes your role, and when you turn your own two-factor sign-in off (the session you did it from keeps working).

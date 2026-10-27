@@ -52,7 +52,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     label: "Team",
     items: [
       { href: "/settings/team", title: "Team", description: "Who is on the team, their roles and what each role can do.", icon: <UsersIcon />, view: "view_team", edit: "people", status: "team" },
-      { href: "/settings/sign-in", title: "Sign-in", description: "Who may join this install, and whether everyone must use two-factor sign-in.", icon: <LockIcon />, view: "sign_in", edit: "sign_in", selfHosted: true },
+      { href: "/settings/sign-in", title: "Sign-in", description: "Whether everyone must use two-factor sign-in, and who has it set up.", icon: <LockIcon />, view: "sign_in", edit: "sign_in" },
       { href: "/settings/support-access", title: "Support access", description: "Let Coderhelm support look at your workspace for a while, without changing anything. See every page they open.", icon: <LifeBuoyIcon />, view: "support", edit: "support" },
       { href: "/settings/api-keys", title: "API keys", description: "Let your own scripts and tools use Coderhelm. For developers.", icon: <KeyIcon />, view: "api_keys", edit: "api_keys" },
     ],
