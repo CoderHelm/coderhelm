@@ -10,6 +10,7 @@
     "/api/reference/account/get-me/",
     "/api/reference/ci/list-quarantined-tests/",
     "/api/reference/ci/upload-test-results/",
+    "/api/reference/deliveries/get-delivery-analytics/",
     "/api/reference/plans/approve-and-execute-plan/",
     "/api/reference/plans/create-plan/",
     "/api/reference/plans/get-plan/",
