@@ -411,6 +411,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ enabled }),
     }),
+  /** A repository's public codegen environment (admins). */
+  getCodegenEnv: (repo: string) =>
+    request<{ repo: string; vars: CodegenVar[] }>(`/api/repos/${repo}/codegen-env`),
+  /** Replaces it; the gateway refuses anything that looks like a secret, with the reason. */
+  setCodegenEnv: (repo: string, vars: CodegenVar[]) =>
+    request<{ repo: string; count: number }>(`/api/repos/${repo}/codegen-env`, {
+      method: "PUT",
+      body: JSON.stringify({ vars }),
+    }),
   setRepoRole: (repo: string, role: string) =>
     request<void>(`/api/repos/${repo}/role`, {
       method: "POST",
@@ -1838,6 +1847,38 @@ export interface BulkCloseAnswer {
   failed: number;
 }
 
+/** One public value a repository's code generators read in the sandbox. */
+export interface CodegenVar {
+  name: string;
+  value: string;
+}
+
+/** A run stopped before its pull request: a generator needed public values the repo doesn't set. */
+export interface CodegenEnvMissing {
+  repo: string;
+  command: string;
+  vars: string[];
+}
+
+/** The last fix round on a run's open pull request that didn't finish. */
+export interface RoundIncomplete {
+  /** `ci_fix`, `review_fix` or `feedback`. */
+  kind?: string | null;
+  number: number;
+  /** Why it stopped, in plain words. */
+  reason: string;
+  /** "Pull request open; the last fix round didn't finish: …" */
+  summary: string;
+  /** Checkpoint commits it saved on `wip_branch` before it stopped, oldest first. */
+  pushed: { sha: string; message: string }[];
+  files: string[];
+  /** The branch holding its work so far; the pull request itself is unchanged. */
+  wip_branch: string;
+  at: string;
+  /** Retry resumes the round on the same pull request. */
+  can_resume: boolean;
+}
+
 export interface RunDetail extends Run {
   /** Why an agent loop stopped (agents paused, an approval nobody answered). */
   policy_note?: string | null;
@@ -1860,6 +1901,10 @@ export interface RunDetail extends Run {
   /** Team standards the run's passes were given in full ("Always apply"). */
   applied_standards?: string[];
   progress_notes?: { message: string; timestamp: string }[];
+  /** Set when the pull request is open but the last fix round on it didn't finish. */
+  round_incomplete?: RoundIncomplete | null;
+  /** The run stopped before its pull request: a generator needed these public values. */
+  codegen_env_missing?: CodegenEnvMissing | null;
   /** Where the planner decided the fix belongs: code, outside_code, both or unknown. */
   fix_location?: string | null;
   /** Markdown report when the fix is (partly) a change outside the code. */

@@ -520,6 +520,22 @@ function RunDetailInner() {
   const openPrs = run.pr_number && run.status !== "merged" ? [...new Set([run.pr_number, ...(run.pr_numbers ?? [])])] : [];
   const limitTitle = limitHit ? `The monthly ${limitName(limitHit.kind)} limit is reached` : undefined;
 
+  // The pull request is open but its last fix round didn't finish: Retry
+  // resumes that round on the same run (the gateway's retry path).
+  const unfinished = run.round_incomplete ?? null;
+  const canResume = !!unfinished?.can_resume;
+  const resumeRound = async () => {
+    setBusy("retry");
+    try {
+      await api.retryRun(runId);
+      setRun((r) => (r ? { ...r, status: "awaiting_ci", round_incomplete: null } : r));
+      toast("Resuming the fix round on the same pull request");
+    } catch (e) {
+      toast(actionError(e, "resume this fix round"), "error");
+    } finally {
+      setBusy(null);
+    }
+  };
   const retry = async () => {
     setBusy("retry");
     try {
@@ -654,7 +670,76 @@ function RunDetailInner() {
   );
 
   let outcome: React.ReactNode;
-  if (run.status === "failed") {
+  if (done && unfinished) {
+    outcome = (
+      <OutcomeCard
+        tone="attention"
+        title="Pull request open; the last fix round didn't finish"
+        testId="run-outcome"
+        actions={
+          <>
+            {canAct && canResume && (
+              <button type="button" onClick={resumeRound} disabled={busy !== null || tokensExceeded} title={limitTitle} className={primaryButton} data-testid="resume-round">
+                {busy === "retry" ? "Resuming…" : "Resume"}
+              </button>
+            )}
+            {openPrButtons("secondary")}
+          </>
+        }
+      >
+        <div className="space-y-1" data-testid="round-incomplete">
+          <p className="[overflow-wrap:anywhere]">{unfinished.reason ? `${unfinished.reason.charAt(0).toUpperCase()}${unfinished.reason.slice(1)}.` : "It stopped before it finished."}</p>
+          <p className="text-zinc-400">
+            {unfinished.pushed.length && unfinished.wip_branch
+              ? `The pull request is unchanged. Its work so far (${unfinished.pushed.length} checkpoint commit${unfinished.pushed.length === 1 ? "" : "s"}) is saved on branch ${unfinished.wip_branch}.`
+              : "The pull request is unchanged; the round saved no work before it stopped."}{" "}
+            {canAct && canResume ? "Resume continues the round from there with a fresh time budget and pushes it to the pull request as one commit when it's done." : "Ask someone with member access to resume it."}
+          </p>
+        </div>
+      </OutcomeCard>
+    );
+  } else if (run.status === "failed" && run.codegen_env_missing?.vars.length) {
+    // A generator needed public values the repository doesn't set: say which,
+    // and where to set them; Retry once they're in.
+    const missing = run.codegen_env_missing;
+    outcome = (
+      <OutcomeCard
+        tone="attention"
+        title="Generated files couldn't be regenerated"
+        testId="run-outcome"
+        actions={
+          <>
+            {canAct && (
+              <a
+                href={`/settings/repos/codegen?repo=${encodeURIComponent(missing.repo)}&need=${encodeURIComponent(missing.vars.join(","))}`}
+                className={primaryButton}
+                data-testid="codegen-env-link"
+              >
+                Set the values
+              </a>
+            )}
+            {retryButton}
+          </>
+        }
+      >
+        <div className="space-y-2" data-testid="codegen-env-missing">
+          <p className="[overflow-wrap:anywhere]">
+            The pull request didn&apos;t open: <Code>{missing.command}</Code> needs public values {missing.repo} doesn&apos;t set for Coderhelm&apos;s sandbox:
+          </p>
+          <ul className="list-disc space-y-1 pl-5 text-sm">
+            {missing.vars.map((v) => (
+              <li key={v}>
+                <Code>{v}</Code>
+              </li>
+            ))}
+          </ul>
+          <p className="text-zinc-400">
+            Set them in Settings, Repositories, {missing.repo}, Codegen environment (public values only, never secrets), then retry.
+          </p>
+        </div>
+      </OutcomeCard>
+    );
+  } else if (run.status === "failed") {
     outcome = (
       <Problem
         testId="run-outcome"
@@ -792,7 +877,7 @@ function RunDetailInner() {
       <PageHeader
         detail
         title={run.title || "Untitled run"}
-        status={<RunStatusBadge status={run.status} />}
+        status={<RunStatusBadge status={run.status} unfinishedRound={!!run.round_incomplete && ["completed", "success"].includes(run.status)} />}
         lead={
           <span className="[overflow-wrap:anywhere]">
             {run.repo || "Choosing a repository…"}

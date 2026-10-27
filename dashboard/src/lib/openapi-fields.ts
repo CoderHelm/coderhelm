@@ -2,7 +2,7 @@
 // docs/api/openapi.json. Do not edit; run `npm run openapi:fields` instead.
 
 /** The platform commit this was generated from. */
-export const OPENAPI_REF = "3d0ddc4ab9a1acd97adbcf713032bb3a9b625212";
+export const OPENAPI_REF = "2be1858fafcf8530adf42ee3a01167ca8bd6e434";
 
 /** The fields each public API schema has. */
 export interface OpenApiFields {
@@ -10,6 +10,7 @@ export interface OpenApiFields {
   AnswerRunResult: "comment_url" | "posted" | "run_id" | "status";
   Backfill: "complete";
   CiUploadResult: "ok";
+  CodegenEnvMissing: "command" | "repo" | "vars";
   CreateEndpointBody: "description" | "enabled" | "events" | "url";
   CreatePlan: "description" | "destination" | "repo" | "tasks" | "title";
   CreatedEndpoint: "endpoint" | "secret";
@@ -40,6 +41,7 @@ export interface OpenApiFields {
   PlanWithTasks: "chat_id" | "created_at" | "description" | "destination" | "executed_at" | "executed_by" | "mcp_servers" | "plan_id" | "repo" | "status" | "task_count" | "tasks" | "title" | "tokens_in" | "tokens_out" | "updated_at";
   PlansPage: "next" | "next_cursor" | "plans";
   Point: "deliveries" | "end" | "failed" | "ok" | "p95_ms" | "previous_deliveries" | "start" | "success_rate";
+  PushedCommit: "message" | "sha";
   Quarantine: "playwright_grep_invert" | "tests";
   QuarantinedTest: "file" | "framework" | "id" | "project" | "title";
   RatingComment: "at" | "by" | "rating" | "text";
@@ -53,7 +55,8 @@ export interface OpenApiFields {
   ReviewsPage: "next" | "reviews";
   RotateBody: "overlap_hours";
   RotatedSecret: "previous_secret_expires_at" | "secret";
-  Run: "answers" | "answers_url" | "applied_standards" | "branch" | "branches" | "cache_read_tokens" | "cache_write_tokens" | "close_reason" | "closed_at" | "closed_by" | "closed_from" | "continued_run_id" | "cost_usd" | "created_at" | "current_pass" | "duration_s" | "error" | "files_modified" | "fix_location" | "lesson" | "mcp_servers" | "outside_change_report" | "pass_history" | "policy_approval" | "policy_note" | "pr_number" | "pr_numbers" | "pr_url" | "pr_urls" | "progress_notes" | "questions" | "questions_url" | "repo" | "run_id" | "sign_in_prompts" | "status" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out" | "trigger" | "updated_at";
+  RoundIncomplete: "at" | "can_resume" | "files" | "kind" | "number" | "pushed" | "reason" | "summary" | "wip_branch";
+  Run: "answers" | "answers_url" | "applied_standards" | "branch" | "branches" | "cache_read_tokens" | "cache_write_tokens" | "close_reason" | "closed_at" | "closed_by" | "closed_from" | "codegen_env_missing" | "continued_run_id" | "cost_usd" | "created_at" | "current_pass" | "duration_s" | "error" | "files_modified" | "fix_location" | "lesson" | "mcp_servers" | "outside_change_report" | "pass_history" | "policy_approval" | "policy_note" | "pr_number" | "pr_numbers" | "pr_url" | "pr_urls" | "progress_notes" | "questions" | "questions_url" | "repo" | "round_incomplete" | "run_id" | "sign_in_prompts" | "status" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out" | "trigger" | "updated_at";
   RunActionResult: "status";
   RunAnswer: "answer" | "answered_at" | "author" | "question" | "question_id";
   RunNote: "message" | "timestamp";

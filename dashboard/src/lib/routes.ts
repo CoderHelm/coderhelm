@@ -85,6 +85,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/settings/sign-in": { label: "Sign-in", parent: "/settings" },
   "/settings/support-access": { label: "Support access", parent: "/settings" },
   "/settings/repos": { label: "Repositories", parent: "/settings" },
+  "/settings/repos/codegen": { label: "Codegen environment", parent: "/settings/repos" },
   "/settings/workflow": { label: "Workflow", parent: "/settings" },
   "/settings/agents": { label: "Agent permissions", parent: "/settings" },
   "/settings/guardrails": { label: "Guardrails", parent: "/settings" },

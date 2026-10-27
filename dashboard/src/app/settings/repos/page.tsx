@@ -276,6 +276,15 @@ function ReposPage() {
                   chips={
                     <>
                       {repo.enabled && <StatusText look={look} />}
+                      {repo.enabled && canManage && (
+                        <a
+                          href={`/settings/repos/codegen?repo=${encodeURIComponent(repo.name)}`}
+                          className={buttonClass("secondary", "sm")}
+                          title="Public values its code generators need in the sandbox"
+                        >
+                          Codegen environment
+                        </a>
+                      )}
                       {repo.enabled && !canManage ? (
                         repo.role ? <span className="text-xs text-zinc-400">{ROLE_NAMES[repo.role] ?? repo.role}</span> : undefined
                       ) : repo.enabled ? (
