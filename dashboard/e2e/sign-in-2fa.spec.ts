@@ -3,8 +3,9 @@ import path from "node:path";
 
 // A self-hosted install: one organization, who may join, and two-factor
 // sign-in. Settings, Sign-in (domains, the switch, who has it, reset), the
-// setup screen a held session sees, the code after Google or GitHub, and the
-// sign-in screen's words for someone who isn't invited. Every API call is
+// setup screen a held session sees, the code after Google, GitHub or a
+// password (whichever second factor the person has), and the sign-in
+// screen's words for someone who isn't invited. Every API call is
 // mocked; screenshots at 1440 and 390 go to E2E_SHOTS_DIR.
 
 const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots");
@@ -53,7 +54,10 @@ async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
       require_2fa_since: null,
       pending_invites: 2,
       people: PEOPLE,
-      api_keys: [{ id: "k1", name: "Nightly report", created_by: "Olu Owner" }],
+      api_keys: [
+        { id: "k1", name: "Nightly report", created_by: "Olu Owner" },
+        { id: "k2", name: "Old export", created_by: "bo-codes", made_before_rule: true, maker_on_team: true, maker_two_factor: null },
+      ],
       your_session_has_2fa: true,
     },
     puts: [],
@@ -119,6 +123,8 @@ async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
       state.mine = { ...state.mine, held: false, session_has_2fa: true, signed_in_with: "github", set_up: "app", fits: "app" };
       return json(route, { status: "ok", team_id: "TEAM#org" });
     }
+    // A member whose second factor is the app code: the code screen comes next.
+    if (p === "/auth/login" && body().email === "ann@example.org") return json(route, { status: "second_step" });
     if (p === "/auth/login") return json(route, { error: "This Coderhelm is private to one organization.", code: "not_invited" }, 403);
     if (p === "/auth/signup") return json(route, { error: "private", code: "not_invited" }, 403);
     if (p === "/auth/logout") return json(route, {});
@@ -152,6 +158,10 @@ for (const width of WIDTHS) {
       await expect(page.getByTestId("people-2fa")).toContainText("Not set up");
       await expect(page.getByText("3 of 4 set up.", { exact: false })).toBeVisible();
       await expect(page.getByTestId("api-keys")).toContainText("Nightly report");
+      // A key made before the rule, by someone without a second factor, is marked.
+      await expect(page.getByTestId("api-keys").getByTestId("key-review")).toHaveText(
+        "(made before two-factor sign-in was required, by someone who still has no second factor)",
+      );
       await noSidewaysScroll(page);
       await shot(page, "sign-in-settings", width);
 
@@ -270,6 +280,28 @@ for (const width of WIDTHS) {
       await page.getByTestId("second-step").getByLabel("Six digit code").fill("555555");
       await page.getByTestId("second-step").getByRole("button", { name: "Sign in", exact: true }).click();
       await expect(page.getByRole("alert").filter({ hasText: "Too many wrong codes for this sign-in" })).toBeVisible();
+    });
+
+    test("a password sign-in for someone with the app code goes on to the code screen", async ({ page }) => {
+      const state = await mock(page, { me: null });
+      await page.goto("/settings/security");
+      await page.getByLabel("Email").fill("ann@example.org");
+      await page.getByLabel("Password").fill("Secret123!");
+      await page.getByRole("button", { name: "Sign in", exact: true }).click();
+      const form = page.getByTestId("second-step");
+      await expect(form).toContainText("Enter the code from your authenticator app to finish signing in.");
+      await form.getByLabel("Six digit code").fill("123456");
+      await form.getByRole("button", { name: "Sign in", exact: true }).click();
+      await expect.poll(() => state.verified).toEqual(["123456"]);
+    });
+
+    test("Google or GitHub for someone whose code is on their password account sends them to the password sign-in", async ({ page }) => {
+      await mock(page, { me: null });
+      await page.goto("/?error=two_factor_use_password");
+      await expect(page.getByRole("alert").filter({ hasText: "Sign in with your email and password" })).toBeVisible();
+      await expect(page.getByLabel("Email")).toBeVisible();
+      await noSidewaysScroll(page);
+      await shot(page, "use-password", width);
     });
 
     test("someone who isn't invited reads why, with no waitlist or closed beta", async ({ page }) => {

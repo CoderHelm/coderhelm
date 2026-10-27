@@ -21,6 +21,26 @@ export interface ApiKey {
   revoked_at: string | null;
   revoked_by: string | null;
   status: "active" | "expired" | "revoked";
+  /**
+   * Set while two-factor sign-in is required, on a live key made before the
+   * rule: a key never signs in, so the rule doesn't hold it back.
+   */
+  two_factor_review?: KeyTwoFactorReview;
+}
+
+export interface KeyTwoFactorReview {
+  made_before_rule: boolean;
+  /** Whether the person who made it is still on the team. */
+  maker_on_team: boolean;
+  /** The second factor the person who made it has now. */
+  maker_two_factor: "cognito" | "app" | null;
+}
+
+/** What to say about a key made before two-factor sign-in was required. */
+export function reviewText(r: KeyTwoFactorReview): string {
+  if (!r.maker_on_team) return "Made before two-factor sign-in was required, by someone no longer on the team";
+  if (!r.maker_two_factor) return "Made before two-factor sign-in was required, by someone who still has no second factor";
+  return "Made before two-factor sign-in was required";
 }
 
 export interface ApiKeyScope {

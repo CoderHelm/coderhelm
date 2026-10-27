@@ -452,7 +452,7 @@ for (const width of [1440, 390]) {
     });
 
     test("none: the picker, with why", async ({ page }) => {
-      await mockApi(page, { resolutions: { rec_new: { ...NO_REPO, permissions: ["ecs:ListClusters", "lambda:GetFunction"] } } });
+      await mockApi(page, { resolutions: { rec_new: { ...NO_REPO, permissions: ["ecs:ListClusters", "lambda:ListTags"] } } });
       const dialog = await openFix(page);
       const picker = dialog.getByTestId("resolved-repo");
       await expect(picker).toHaveAttribute("data-state", "none");

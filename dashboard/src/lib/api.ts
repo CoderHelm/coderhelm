@@ -119,7 +119,18 @@ export interface SignInSettings {
     two_factor: "cognito" | "app" | null;
     is_self: boolean;
   }[];
-  api_keys?: { id: string; name: string; created_by: string }[];
+  api_keys?: {
+    id: string;
+    name: string;
+    created_by: string;
+    created_at?: string;
+    /** Made before two-factor sign-in was required (a key never signs in). */
+    made_before_rule?: boolean;
+    /** Whether the person who made it is still on the team. */
+    maker_on_team?: boolean;
+    /** The second factor the person who made it has now. */
+    maker_two_factor?: "cognito" | "app" | null;
+  }[];
   your_session_has_2fa?: boolean;
 }
 

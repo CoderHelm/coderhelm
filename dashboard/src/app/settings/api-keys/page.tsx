@@ -24,6 +24,7 @@ import {
   API_DOCS_URL,
   apiKeysApi,
   curlExample,
+  reviewText,
   type ApiKey,
   type ApiKeyList,
 } from "@/lib/api-keys";
@@ -93,6 +94,8 @@ function ApiKeysPage() {
   };
 
   const live = data?.keys.filter((k) => k.status === "active") ?? [];
+  // Live keys made before two-factor sign-in was required.
+  const reviewed = live.filter((k) => k.two_factor_review);
   // Scopes as people read them ("Runs"), not their keys ("runs").
   const scopeLabels = Object.fromEntries((data?.scopes ?? []).map((sc) => [sc.key, sc.label]));
   const past = data?.keys.filter((k) => k.status !== "active") ?? [];
@@ -150,6 +153,16 @@ function ApiKeysPage() {
                 </button>
               )}
             </div>
+            {reviewed.length > 0 && (
+              <div className="mb-3">
+                <Callout variant="warning" title="Keys made before two-factor sign-in was required" testId="keys-before-2fa">
+                  {reviewed.length === 1 ? "One key was" : `${reviewed.length} keys were`} made before your organization
+                  required two-factor sign-in. A key never signs in, so the rule doesn&apos;t hold it back, and it may have
+                  been made from a session without a second factor. Check {reviewed.length === 1 ? "it" : "them"} and revoke
+                  any you don&apos;t recognize.
+                </Callout>
+              </div>
+            )}
             {live.length === 0 ? (
               <EmptyState
                 icon={<KeyIcon />}
@@ -248,7 +261,7 @@ function KeyRow({ apiKey: k, scopeLabels, onRevoke }: { apiKey: ApiKey; scopeLab
   return (
     <ListRow
       testId="api-key"
-      status={{ tone: "success" }}
+      status={{ tone: k.two_factor_review ? "waiting" : "success" }}
       title={k.name}
       titleText={k.name}
       meta={[
@@ -259,6 +272,13 @@ function KeyRow({ apiKey: k, scopeLabels, onRevoke }: { apiKey: ApiKey; scopeLab
         <span key="made" title={k.created_by}>
           Made {made ?? ""}
         </span>,
+        ...(k.two_factor_review
+          ? [
+              <span key="review" className="text-amber-300" data-testid="key-review">
+                {reviewText(k.two_factor_review)}
+              </span>,
+            ]
+          : []),
       ]}
       chips={
         <span className="flex min-w-0 flex-wrap gap-1.5" aria-label="Scopes">

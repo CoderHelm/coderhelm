@@ -866,6 +866,11 @@ type AuthView = "login" | "signup" | "waitlist" | "verify" | "forgot" | "reset" 
 const NOT_INVITED =
   "This Coderhelm is private to one organization. Ask one of its admins to invite you, or sign in with your work email if your company's domain is allowed.";
 
+/** Google or GitHub for someone whose second factor is the code on their password account (only Cognito checks it). */
+const USE_PASSWORD = "two_factor_use_password";
+const USE_PASSWORD_MESSAGE =
+  "Your two-factor code is on your password account. Sign in with your email and password, then enter the code from your authenticator app.";
+
 function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const [view, setView] = useState<AuthView>("login");
   const [email, setEmail] = useState("");
@@ -905,6 +910,11 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
     }
     if (params.get("error") === "not_invited") {
       setError(NOT_INVITED);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    // Google or GitHub for someone whose second factor is the code on their password account.
+    if (params.get("error") === USE_PASSWORD) {
+      setError(USE_PASSWORD_MESSAGE);
       window.history.replaceState({}, "", window.location.pathname);
     }
     // The installer's first-admin link opens the sign-up form.
@@ -964,6 +974,9 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
       if (result.status === "mfa_required" && result.session) {
         setMfaSession(result.session);
         setView("mfa");
+      } else if (result.status === "second_step") {
+        // Their second factor is the authenticator-app code set up in Coderhelm.
+        setView("second_step");
       } else {
         const u = await api.me();
         onAuth(u);
@@ -971,6 +984,8 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
     } catch (e: unknown) {
       if (e instanceof ApiError && e.code === "not_invited") {
         setError(NOT_INVITED);
+      } else if (e instanceof ApiError && e.code === USE_PASSWORD) {
+        setError(e.message);
       } else if (e instanceof Error && e.message.includes("403")) {
         setError("Please verify your email first.");
         setView("verify");
@@ -992,6 +1007,8 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
           if (result.status === "mfa_required" && result.session) {
             setMfaSession(result.session);
             setView("mfa");
+          } else if (result.status === "second_step") {
+            setView("second_step");
           } else {
             const u = await api.me();
             onAuth(u);
