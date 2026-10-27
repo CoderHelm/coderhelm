@@ -43,9 +43,9 @@ function Permissions({ list }: { list: string[] }) {
           <Code>{p}</Code>
         </span>
       ))}
-      . Allowing {list.length === 1 ? "it" : "them"} would help find the repo.{" "}
+      , so it worked with what it could read. An admin can add {list.length === 1 ? "it" : "them"} in one click.{" "}
       <Link href="/settings/integrations/aws" className={`${linkButton} !text-xs`}>
-        AWS settings
+        Update permissions
       </Link>
     </p>
   );

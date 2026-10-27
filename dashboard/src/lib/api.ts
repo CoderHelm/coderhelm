@@ -891,10 +891,13 @@ export const api = {
     request<{ log_groups: LogGroup[] }>(
       `/api/aws-connections/${id}/log-groups`,
     ),
-  getCfnUrl: () =>
-    request<{ cfn_url: string; external_id: string }>(
-      "/api/aws-connections/cfn-url",
-    ),
+  getCfnUrl: () => request<AwsRoleSetup>("/api/aws-connections/cfn-url"),
+  /** The role template built into this install's release, with its account filled in. */
+  downloadAwsTemplate: async (which: "role" | "update" = "role") => {
+    const res = await fetch(`${apiBase()}/api/aws-connections/template?which=${which}`, { credentials: "include", cache: "no-store" });
+    if (!res.ok) throw new ApiError(httpErrorMessage(res.status), res.status);
+    return res.text();
+  },
 
   // Recommendations
   listRecommendations: (params?: { status?: string; severity?: string }) =>
@@ -1328,6 +1331,12 @@ export const api = {
     }),
   getMcpActivity: (id: string) =>
     request<{ calls: McpCall[] }>(`/api/mcp-servers/${encodeURIComponent(id)}/activity`),
+  /** Live check of the role against this release's permissions. `pressed`: someone pressed Update, so name a missing or failed stack. */
+  checkAwsPermissions: (account: string, pressed = false) =>
+    request<AwsAbilityReply & { permissions: AwsPermissions | null }>(
+      `/api/aws-connections/${encodeURIComponent(account)}/permissions/check`,
+      { method: "POST", body: JSON.stringify({ pressed }) },
+    ),
   checkAwsAbilities: (account: string) =>
     request<AwsAbilityReply>(`/api/aws-connections/${encodeURIComponent(account)}/abilities/check`, { method: "POST" }),
   setAwsAbilities: (account: string, body: { metrics?: boolean; airflow?: boolean; airflow_environments?: string[] }) =>
@@ -3323,6 +3332,49 @@ export interface AwsAccountAbilities {
   missing?: string[];
   update_url?: string | null;
   stack_name?: string;
+  /** The last live check of this release's permissions. */
+  permissions?: AwsPermissions | null;
+}
+
+/** One group of the role's permissions: what Coderhelm reads with them, and which are missing. */
+export interface AwsPermissionGroup {
+  key: string;
+  name: string;
+  why: string;
+  actions: string[];
+  missing: string[];
+}
+
+/** A live check of a connected account's role against this release's permissions. */
+export interface AwsPermissions {
+  account: string;
+  region: string;
+  status: "up_to_date" | "update_needed" | "error";
+  /** `simulate` (IAM's policy simulator) or `probe` (one read of each kind). */
+  method: string;
+  checked_at: string;
+  permissions_id: string;
+  /** Checked against this release's permissions. */
+  current: boolean;
+  missing_count: number;
+  missing: { action: string; ability: string | null; ability_name: string | null }[];
+  missing_abilities: string[];
+  abilities: AwsPermissionGroup[];
+  update: { url: string; stack_name: string; template_url: string; sign_in_account: string; stacks_url: string } | null;
+  problem: { code: string; message: string; fix: string } | null;
+}
+
+/** What the connect panel needs to make the role: the Launch Stack link and the manual details. */
+export interface AwsRoleSetup {
+  cfn_url: string;
+  external_id: string;
+  template_url: string;
+  /** The account the role trusts: this install's own on a self-hosted install. */
+  account_id: string;
+  trusted_role_prefix: string;
+  self_hosted: boolean;
+  abilities: { key: string; name: string; why: string; actions: string[] }[];
+  permissions_id: string;
 }
 
 export interface AwsAbilityReply {

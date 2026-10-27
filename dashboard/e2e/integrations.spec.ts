@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { ECS_MISSING, permissionsView } from "./aws-permissions-data";
 
 // The AWS, Alert routes and Jira settings pages. Every API call is answered
 // here; nothing reaches a real backend. Role checks mirror the gateway's
@@ -39,6 +40,8 @@ interface Backend {
   calls: { method: string; path: string; body: Record<string, unknown> | null }[];
   /** What the Coderhelm role can't read yet (metrics, airflow). */
   roleMissing?: string[];
+  /** IAM actions of this release the role lacks (the live permissions check). */
+  permMissing?: string[];
 }
 
 function abilities(missing: string[] = []) {
@@ -136,6 +139,10 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       return json(r, { connection_id: ACCOUNT, external_id: EXTERNAL_ID, status: "active" });
     }
     if (p === "/api/aws-connections/cfn-url") return at("admin") ? json(r, { cfn_url: "https://console.aws.amazon.com/cloudformation/home#/stacks/quickcreate?stackName=CoderHelmLogReader", external_id: EXTERNAL_ID }) : forbidden();
+    if (p === `/api/aws-connections/${ACCOUNT}/permissions/check`) {
+      if (!at("admin")) return forbidden();
+      return json(r, { account: abilities(), status: "connected", reason: "", last_check: ago(0), permissions: permissionsView(ACCOUNT, { missing: db.permMissing ?? [] }) });
+    }
     if (p === `/api/aws-connections/${ACCOUNT}/test`) {
       if (!at("admin")) return forbidden();
       return json(r, db.assumeFails ? { status: "error", message: "Could not assume role: AccessDenied" } : { status: "connected", message: "Successfully assumed role" });
@@ -358,13 +365,13 @@ test.describe("AWS", () => {
 // ── Alert routes ─────────────────────────────────────────────────────
 
 test.describe("AWS role access", () => {
-  test("a role that can't read metrics or Airflow shows the one-click stack link", async ({ page }) => {
-    await mockApi(page, { connections: [connection({}, ["metrics", "airflow"])] });
+  test("a role missing this release's permissions shows the one-click update", async ({ page }) => {
+    await mockApi(page, { connections: [connection({}, ["metrics", "airflow"])], permMissing: ECS_MISSING });
     await page.goto("/settings/integrations/aws/");
     const box = page.getByRole("article", { name: `AWS account ${ACCOUNT}` });
-    await expect(box.getByText("Add CloudWatch metrics and Airflow to your Coderhelm role")).toBeVisible();
-    const link = box.getByRole("link", { name: "Add access in AWS" });
-    await expect(link).toHaveAttribute("href", /stacks\/quickcreate\?stackName=CoderHelmLogReaderOps/);
+    await expect(box.getByText("Update needed: 3 new read-only permissions")).toBeVisible();
+    const link = box.getByRole("link", { name: /Update in AWS/ });
+    await expect(link).toHaveAttribute("href", /stacks\/quickcreate\?stackName=CoderHelmLogReaderUpdate-/);
     await expect(box.getByRole("switch", { name: "Metrics" })).toBeDisabled();
   });
 
@@ -375,7 +382,8 @@ test.describe("AWS role access", () => {
     await expect(box.getByRole("switch", { name: "Metrics" })).toHaveAttribute("aria-checked", "true");
     await expect(box.getByRole("switch", { name: "Airflow" })).toHaveAttribute("aria-checked", "true");
     await expect(box.getByRole("checkbox", { name: "prod-airflow" })).toBeChecked();
-    await expect(box.getByRole("link", { name: "Add access in AWS" })).toHaveCount(0);
+    await expect(box.getByText("Permissions up to date")).toBeVisible();
+    await expect(box.getByRole("link", { name: /Update in AWS/ })).toHaveCount(0);
   });
 });
 

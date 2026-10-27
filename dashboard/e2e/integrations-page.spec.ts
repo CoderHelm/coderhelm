@@ -351,7 +351,7 @@ test("an AWS role without the permissions offers the one-click stack", async ({ 
   const aws = row(page, `aws-${ACCOUNT}`);
   await control(page, `aws-${ACCOUNT}`, `AWS account ${ACCOUNT}`).click();
   await expect(aws.getByTestId(`aws-abilities-${ACCOUNT}`).getByText("No access yet")).toHaveCount(2);
-  await expect(aws.getByRole("link", { name: "Add access in AWS" })).toHaveAttribute("href", /stackName=CoderHelmLogReaderOps/);
+  await expect(aws.getByRole("link", { name: "Update in AWS" })).toHaveAttribute("href", /stackName=CoderHelmLogReaderOps/);
   await expect(aws.getByRole("switch", { name: "Let agents read Airflow" })).toBeDisabled();
 });
 

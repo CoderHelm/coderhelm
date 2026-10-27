@@ -1,0 +1,71 @@
+---
+title: AWS accounts
+description: Connect an AWS account read-only so CoderHelm can read logs, alarms, metrics, Airflow and ECS, and keep the role's permissions up to date in one click.
+---
+
+Connect an AWS account and CoderHelm reads its CloudWatch logs every 6 hours, groups the errors it finds and suggests fixes. The same connection lets agents read alarms, CloudWatch metrics, Airflow (MWAA) and the ECS services behind a log group while they work. Everything stays read-only: CoderHelm can list, describe and query, never change anything in your account.
+
+## Connect an account
+
+Open **Settings**, then **Integrations**, then **AWS** (admins only). You need permission to create an IAM role in the account.
+
+<Steps>
+<Step>
+
+### Create the role
+
+**Open the stack in AWS** opens CloudFormation with a stack that creates one role, `CoderHelmLogReader`, and nothing else. Review it and press **Create stack**. The role trusts CoderHelm's AWS account only with your team's **External ID**, which the stack fills in, so no one else using CoderHelm can take it on.
+
+Prefer to make it yourself? Choose **I'll make it myself**: the page lists the account to trust, your External ID and every action the role needs, grouped by what CoderHelm reads with it. You can also download the template.
+
+</Step>
+<Step>
+
+### Paste its ARN and region
+
+Copy **RoleArn** from the stack's **Outputs** tab, paste it with the region of your logs, and press **Check and connect**. CoderHelm takes on the role once to check it before saving.
+
+</Step>
+</Steps>
+
+## What the role can read
+
+- **CloudWatch logs and alarms**\
+  Error lines and alarm states, so CoderHelm can find what broke and propose a fix.
+- **CloudWatch metrics**\
+  Error rate, latency and other metrics before and after a deploy.
+- **Airflow**\
+  DAG runs, task logs and import errors, as Airflow's Viewer role, which can't trigger or change anything.
+- **ECS services and tasks**\
+  Which tasks behind a failing log group are running, since when and how they start, as evidence before a fix.
+- **Finding the code behind a log group**\
+  Function, image and stack tags, to work out which repository a log group's code lives in.
+- **Checking its own permissions**\
+  IAM's policy simulator, on this one role only, so the page can say when an update is needed.
+
+CoderHelm keeps only the findings and their error patterns, never raw log lines.
+
+## Keeping permissions up to date
+
+When a CoderHelm release reads something new, the role needs the matching read-only permission. Each connected account shows its state:
+
+- **Permissions up to date**\
+  The role has every permission this release uses.
+- **Update needed: N new read-only permissions**\
+  The page lists what each new permission lets CoderHelm read, and why.
+
+To update, sign in to the AWS account the role is in and press **Update in AWS**. It opens a small stack, `CoderHelmLogReaderUpdate-<id>`, that adds exactly the new permissions to your existing role. Review it and press **Create stack**. When you come back, the page checks again by itself and shows the result. If something went wrong, it says why in one sentence with the fix, for example:
+
+- the stack was created in a different AWS account from the role's;
+- the stack failed (the stack's **Events** tab has the cause);
+- a permissions boundary on the role, or an organization policy (SCP), blocks the permissions.
+
+With several accounts, the page lists every account's state with an update link for each. Admins hear once in the team's Slack or Teams channel when a release needs an update. Until then, steps that need a missing permission are skipped and say so, and everything else keeps working.
+
+## Alerts from AWS
+
+To start work from CloudWatch alarms, add an alert route under **Settings**, then **Alerts**, and subscribe your SNS topic to the address it shows. Save and turn on the route first: CoderHelm only confirms subscriptions for topics with a route that's on. See [Webhooks](/api/webhooks) for how messages are verified.
+
+## Running your own install
+
+On a self-hosted install, the role trusts **your install's own AWS account**, never CoderHelm's, and the stack links come from your install's release. Reading the install's own account works the same way. See [Integrations](/self-host/integrations) in the self-hosting guide.

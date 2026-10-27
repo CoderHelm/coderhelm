@@ -3,7 +3,7 @@
 import { useCan } from "@/hooks/use-can";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { api, type AwsAccountAbilities, type AwsConnection, type LogGroup } from "@/lib/api";
+import { api, type AwsAccountAbilities, type AwsConnection, type AwsRoleSetup, type LogGroup } from "@/lib/api";
 import { timeAgo } from "@/lib/data-sources";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
@@ -24,6 +24,7 @@ import { buttonClass, inputClass, linkButton, monoInputClass, primaryButton, sec
 import { Code, SaveBar, SettingsRow, Switch, useDirtyForm, type DirtyForm } from "@/components/settings";
 import { Chip, MoreMenu } from "@/components/list";
 import { securityEmail } from "@/lib/runtime-config";
+import { PermissionsOverview, PermissionsPanel, useAwsPermissions, type AwsPermissionsApi } from "@/components/aws-permissions";
 
 export default function AwsPageGuarded() {
   return (
@@ -33,8 +34,6 @@ export default function AwsPageGuarded() {
   );
 }
 
-/** The account Coderhelm assumes the role from. Shown in the manual setup. */
-const CODERHELM_ACCOUNT = "654654210434";
 const ROLE_NAME = "CoderHelmLogReader";
 const ROLE_ARN_RE = /^arn:aws:iam::\d{12}:role\/CoderHelmLogReader$/;
 const REGION_RE = /^[a-z]{2}(-[a-z0-9]+)+-\d+$/;
@@ -45,13 +44,14 @@ const COMMON_REGIONS = [
 
 /** What the role lets Coderhelm do, from the CloudFormation template it ships. */
 const SCOPES: { title: string; detail: string }[] = [
-  { title: "List your log groups", detail: "Names, sizes and how long each keeps logs." },
-  { title: "Search logs", detail: "Run Logs Insights queries and read matching lines, in the log groups you choose." },
-  { title: "Read alarm settings", detail: "So alert routes can list the alarms on a topic." },
+  { title: "Search logs and read alarms", detail: "Logs Insights queries and matching lines in the log groups you choose, and alarm states for alert routes." },
+  { title: "Read metrics and Airflow", detail: "CloudWatch metrics around a deploy, and Airflow runs and task logs as its Viewer role." },
+  { title: "Describe ECS services and tasks", detail: "Which tasks behind a failing log group run, since when and how they start." },
+  { title: "Find the code behind a log group", detail: "Function, image and stack tags, so a fix goes to the right repository." },
 ];
 const CANNOT = [
   "Change, delete or write anything in your account",
-  "Read anything outside CloudWatch Logs and alarms",
+  "Read your data stores, secrets or function code",
   "Keep raw log lines. Only the finding and its error pattern are saved.",
 ];
 
@@ -84,6 +84,7 @@ function AwsPage() {
   }, [refresh]);
 
   const connections = load.state === "ready" ? load.connections : [];
+  const perms = useAwsPermissions(connections);
   const empty = load.state === "ready" && connections.length === 0;
   const showConnect = canEdit && (adding || empty);
 
@@ -194,8 +195,9 @@ function AwsPage() {
             {empty && !canEdit && (
               <EmptyState title="No AWS account is connected">Ask an admin or the owner to connect one.</EmptyState>
             )}
+            {connections.length > 1 && <PermissionsOverview connections={connections} perms={perms} canEdit={canEdit} />}
             {connections.map((c) => (
-              <AccountSettings key={c.connection_id} connection={c} canEdit={canEdit} form={form} onChanged={refresh} />
+              <AccountSettings key={c.connection_id} connection={c} canEdit={canEdit} form={form} onChanged={refresh} perms={perms} />
             ))}
           </div>
           <div className="hidden min-w-0 lg:block">
@@ -279,11 +281,13 @@ function AccountSettings({
   canEdit,
   form,
   onChanged,
+  perms,
 }: {
   connection: AwsConnection;
   canEdit: boolean;
   form: DirtyForm<AccountsForm>;
   onChanged: () => void;
+  perms: AwsPermissionsApi;
 }) {
   const [testing, setTesting] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -308,7 +312,7 @@ function AccountSettings({
   const savedRoleBad = !dirty("role_arn") && !ROLE_ARN_RE.test(c.role_arn.trim());
   const roleName = c.role_arn.split("/").pop() || c.role_arn;
   const regionOk = REGION_RE.test(v.region.trim());
-  const missing = (a?.missing ?? []).map((m) => (m === "metrics" ? "CloudWatch metrics" : "Airflow"));
+  const account = a?.account ?? id;
 
   const runTest = async () => {
     setTesting(true);
@@ -328,7 +332,7 @@ function AccountSettings({
     if (!a) return;
     setChecking(true);
     try {
-      await api.checkAwsAbilities(a.account);
+      await perms.check(a.account);
       toast("Checked what the role can do");
       onChanged();
     } catch (e) {
@@ -360,7 +364,7 @@ function AccountSettings({
   const groupsText = v.log_groups.length > 0 ? `${v.log_groups.length} chosen` : "All log groups";
 
   return (
-    <article aria-label={`AWS account ${id}`} className="min-w-0">
+    <article id={`aws-account-${account}`} aria-label={`AWS account ${id}`} className="min-w-0 scroll-mt-20">
       <div className="flex flex-wrap items-start gap-3">
         <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-orange-400">
           <AwsIcon />
@@ -418,6 +422,12 @@ function AccountSettings({
           </Callout>
         )}
       </div>
+
+      {healthy && !a?.check_error && (
+        <div className="mt-3">
+          <PermissionsPanel account={account} perms={perms} canEdit={canEdit} />
+        </div>
+      )}
 
       <div className="mt-3 divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/40" data-testid={`aws-panel-${a?.account ?? id}`}>
         <SettingsRow
@@ -575,27 +585,6 @@ function AccountSettings({
         )}
       </div>
 
-      {a && missing.length > 0 && a.update_url && (
-        <div className="mt-3">
-          <Callout variant="warning" title={`Add ${missing.join(" and ")} to your Coderhelm role`} live={false}>
-            <p>
-              The role can&apos;t read {missing.join(" or ")} yet. One click adds read only access as a small stack in your account
-              ({a.stack_name ?? "CoderHelmLogReaderOps"}); it doesn&apos;t change your existing stack, and deleting it takes the access away.
-              Then press Check again.
-            </p>
-            {canEdit && (
-              <p className="mt-2 flex flex-wrap gap-2">
-                <a href={a.update_url} target="_blank" rel="noreferrer" className={primaryButton}>
-                  Add access in AWS
-                </a>
-                <button type="button" onClick={checkAbilities} disabled={checking} className={secondaryButton}>
-                  {checking ? "Checking…" : "Check again"}
-                </button>
-              </p>
-            )}
-          </Callout>
-        </div>
-      )}
     </article>
   );
 }
@@ -736,8 +725,8 @@ const CONNECT_STEPS = [
 
 function ConnectPanel({ first, onCancel, onConnected }: { first: boolean; onCancel?: () => void; onConnected: () => void }) {
   const [how, setHow] = useState<"stack" | "manual">("stack");
-  const [cfn, setCfn] = useState<{ cfn_url: string; external_id: string } | null>(null);
-  const [cfnError, setCfnError] = useState(false);
+  const [cfn, setCfn] = useState<AwsRoleSetup | null>(null);
+  const [cfnError, setCfnError] = useState<string | null>(null);
   const [launched, setLaunched] = useState(false);
   const [roleArn, setRoleArn] = useState("");
   const [region, setRegion] = useState("us-east-1");
@@ -748,7 +737,10 @@ function ConnectPanel({ first, onCancel, onConnected }: { first: boolean; onCanc
   // The External ID is stored per team, so both ways of setting up agree on it.
   useEffect(() => {
     let live = true;
-    api.getCfnUrl().then((d) => live && setCfn(d)).catch(() => live && setCfnError(true));
+    api
+      .getCfnUrl()
+      .then((d) => live && setCfn(d))
+      .catch((e) => live && setCfnError(e instanceof Error && e.message ? e.message : "Reload the page, or create the role yourself with the other option."));
     return () => {
       live = false;
     };
@@ -833,26 +825,12 @@ function ConnectPanel({ first, onCancel, onConnected }: { first: boolean; onCanc
                 </div>
                 {cfnError && (
                   <Callout variant="error" title="Could not prepare the stack link">
-                    <p>Reload the page, or create the role yourself with the other option.</p>
+                    <p>{cfnError}</p>
                   </Callout>
                 )}
               </div>
             ) : (
-              <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm text-zinc-400">
-                <li>
-                  Create an IAM role named <code className="text-zinc-200">{ROLE_NAME}</code>.
-                </li>
-                <li>
-                  Let account <code className="text-zinc-200">{CODERHELM_ACCOUNT}</code> assume it, on the condition that{" "}
-                  <code className="text-zinc-200">sts:ExternalId</code> equals your External ID below.
-                </li>
-                <li>
-                  Allow <code className="text-zinc-200">logs:DescribeLogGroups</code>, <code className="text-zinc-200">logs:StartQuery</code>,{" "}
-                  <code className="text-zinc-200">logs:GetQueryResults</code>, <code className="text-zinc-200">logs:StopQuery</code>,{" "}
-                  <code className="text-zinc-200">logs:FilterLogEvents</code>, <code className="text-zinc-200">logs:GetLogEvents</code>,{" "}
-                  <code className="text-zinc-200">cloudwatch:DescribeAlarms</code> and <code className="text-zinc-200">sts:GetCallerIdentity</code>. Nothing else.
-                </li>
-              </ol>
+              <ManualRole setup={cfn} />
             )}
             <div>
               {cfn ? (
@@ -860,7 +838,9 @@ function ConnectPanel({ first, onCancel, onConnected }: { first: boolean; onCanc
               ) : (
                 <p className="text-xs text-zinc-400">{cfnError ? "Your External ID couldn't load." : "Loading your External ID…"}</p>
               )}
-              <p className="mt-1.5 text-xs text-zinc-400">It stops anyone else using Coderhelm from assuming your role. The stack fills it in for you.</p>
+              <p className="mt-1.5 text-xs text-zinc-400">
+                It stops anyone else{cfn?.self_hosted ? " with access to this install's AWS account" : " using Coderhelm"} from assuming your role. The stack fills it in for you.
+              </p>
             </div>
           </div>
 
@@ -919,7 +899,9 @@ function ConnectPanel({ first, onCancel, onConnected }: { first: boolean; onCanc
             {result && !result.ok && (
               <Callout variant="error" title="Coderhelm could not use the role">
                 <p>{result.message}</p>
-                <p>Check that the trust policy names account {CODERHELM_ACCOUNT} and your External ID, then try again.</p>
+                <p>
+                  Check that the trust policy names account {cfn?.account_id ?? "shown in step 1"} and your External ID, then try again.
+                </p>
               </Callout>
             )}
             <div>
@@ -931,6 +913,83 @@ function ConnectPanel({ first, onCancel, onConnected }: { first: boolean; onCanc
         </div>
       </div>
     </section>
+  );
+}
+
+// ── Making the role by hand ──────────────────────────────────────────
+
+/** The role's trust policy, as the template writes it. */
+function trustPolicy(setup: AwsRoleSetup): string {
+  const condition: Record<string, unknown> = { StringEquals: { "sts:ExternalId": setup.external_id } };
+  if (setup.trusted_role_prefix) condition.ArnLike = { "aws:PrincipalArn": `arn:aws:iam::${setup.account_id}:role/${setup.trusted_role_prefix}*` };
+  return JSON.stringify(
+    { Version: "2012-10-17", Statement: [{ Effect: "Allow", Principal: { AWS: `arn:aws:iam::${setup.account_id}:root` }, Action: "sts:AssumeRole", Condition: condition }] },
+    null,
+    2,
+  );
+}
+
+/** Every action this release's role allows, scoped as the template scopes them. */
+function permissionsPolicy(setup: AwsRoleSetup): string {
+  const all = [...new Set(setup.abilities.flatMap((g) => g.actions))];
+  const special = ["airflow:InvokeRestApi", "iam:SimulatePrincipalPolicy"];
+  const statements: Record<string, unknown>[] = [{ Effect: "Allow", Action: all.filter((a) => !special.includes(a)), Resource: "*" }];
+  if (all.includes("airflow:InvokeRestApi")) statements.push({ Effect: "Allow", Action: "airflow:InvokeRestApi", Resource: "arn:aws:airflow:*:*:role/*/Viewer" });
+  if (all.includes("iam:SimulatePrincipalPolicy")) statements.push({ Effect: "Allow", Action: "iam:SimulatePrincipalPolicy", Resource: "arn:aws:iam::<this account>:role/CoderHelmLogReader" });
+  return JSON.stringify({ Version: "2012-10-17", Statement: statements }, null, 2);
+}
+
+/** The trust and every action the role needs, from the install itself (its own account, this release's permissions). */
+function ManualRole({ setup }: { setup: AwsRoleSetup | null }) {
+  const { toast } = useToast();
+  const [downloading, setDownloading] = useState(false);
+  if (!setup) return <p className="text-sm text-zinc-400">Loading what the role needs…</p>;
+  const download = async () => {
+    setDownloading(true);
+    try {
+      const text = await api.downloadAwsTemplate("role");
+      const url = URL.createObjectURL(new Blob([text], { type: "text/yaml" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "coderhelm-log-reader.yaml";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast("Could not download the template. Try again.", "error");
+    } finally {
+      setDownloading(false);
+    }
+  };
+  return (
+    <div className="flex flex-col gap-3 text-sm text-zinc-400" data-testid="aws-manual-role">
+      <ol className="flex list-decimal flex-col gap-2 pl-5">
+        <li>
+          Create an IAM role named <code className="text-zinc-200">{ROLE_NAME}</code> with this trust policy. It lets account{" "}
+          <code className="text-zinc-200" data-testid="aws-trusted-account">{setup.account_id}</code>
+          {setup.self_hosted ? " (this install's own AWS account)" : ""} take it on only with your External ID
+          {setup.trusted_role_prefix ? (
+            <>
+              , and only from its roles named <code className="text-zinc-200">{setup.trusted_role_prefix}*</code>
+            </>
+          ) : null}
+          .
+        </li>
+      </ol>
+      <CodeBlock code={trustPolicy(setup)} lang="json" title="Trust policy" testId="aws-trust-policy" />
+      <ol start={2} className="flex list-decimal flex-col gap-2 pl-5">
+        <li>
+          Add this as the role&apos;s permissions policy. Every action only reads. It covers{" "}
+          {setup.abilities.map((g) => g.name).join(", ")}.
+        </li>
+      </ol>
+      <CodeBlock code={permissionsPolicy(setup)} lang="json" title="Permissions policy" testId="aws-permissions-policy" />
+      <div>
+        <button type="button" onClick={download} disabled={downloading} className={secondaryButton}>
+          {downloading ? "Downloading…" : "Download the template"}
+        </button>
+        <p className="mt-1.5 text-xs text-zinc-400">The CloudFormation template this install uses, with its account filled in. Upload it in CloudFormation instead of the link.</p>
+      </div>
+    </div>
   );
 }
 

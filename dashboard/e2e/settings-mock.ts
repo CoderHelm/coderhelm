@@ -1,6 +1,7 @@
 import { expect, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { permissionsView } from "./aws-permissions-data";
 
 // One mocked backend for the settings pages in settings-pages.spec.ts. Every
 // API call is answered here; nothing reaches a real backend. All names,
@@ -190,6 +191,9 @@ export async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<
       if (b.airflow !== undefined) a.airflow.on = b.airflow;
       if (b.airflow_environments) a.airflow.skipped = a.airflow.found.filter((e) => !b.airflow_environments!.includes(e)) as never[];
       return json(r, { account: a, status: "connected", reason: "", last_check: ago(0) });
+    }
+    if (p === `/api/aws-connections/${ACCOUNT}/permissions/check`) {
+      return json(r, { account: abilities(), status: "connected", reason: "", last_check: ago(0), permissions: permissionsView(ACCOUNT) });
     }
     if (p === `/api/aws-connections/${ACCOUNT}/abilities/check`) return json(r, { account: abilities(), status: "connected", reason: "", last_check: ago(0) });
     if (p === "/api/recommendations") return json(r, { recommendations: [
