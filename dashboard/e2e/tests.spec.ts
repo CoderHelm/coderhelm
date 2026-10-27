@@ -63,7 +63,7 @@ const ATTEMPT_PASS = { retry: 1, status: "passed", duration_ms: 13_000 };
 interface Call { method: string; path: string; body: Record<string, unknown> | null }
 interface Backend {
   role: string;
-  settings: { enabled: boolean; auto_quarantine: boolean; fix_prs: boolean; tickets: string; burn_in: boolean; repos: string[]; ticket_after_days: number };
+  settings: { enabled: boolean; auto_quarantine: boolean; fix_prs: boolean; tickets: string; burn_in: boolean; repos: string[]; ticket_after_days: number; report_sources?: { repo: string; location: string; target_url: string }[] };
   tests: TestRow[];
   runs: Record<string, unknown>[];
   empty: boolean;
@@ -617,9 +617,50 @@ test("tests: settings save every choice", async ({ page }) => {
   await bar.getByRole("button", { name: "Save changes" }).click();
   await expect(bar).toHaveCount(0);
   expect(callsTo(db, "PUT", /\/api\/tests\/settings/)[0].body).toEqual({
-    enabled: true, auto_quarantine: false, fix_prs: true, tickets: "jira", burn_in: true, repos: [WEB], ticket_after_days: 5,
+    enabled: true, auto_quarantine: false, fix_prs: true, tickets: "jira", burn_in: true, repos: [WEB], ticket_after_days: 5, report_sources: [],
   });
   await expect(page.getByRole("heading", { name: "CI setup" })).toBeVisible();
+});
+
+test("tests: each repository says where its test reports are stored", async ({ page }) => {
+  const db = await mockApi(page);
+  await page.goto("/tests?view=settings");
+  const reports = page.getByRole("list", { name: "Test report locations" });
+  await expect(reports.getByRole("listitem")).toHaveCount(2);
+  const web = page.getByTestId(`report-source-${WEB.replace(/[^a-zA-Z0-9]+/g, "-")}`);
+  const location = web.getByLabel("Where test reports are stored");
+  await location.fill("s3://test-reports/web/latest/");
+  await expect(web.getByRole("alert")).toContainText("needs {run_id}");
+  const bar = page.getByRole("region", { name: "Save changes" });
+  await bar.getByRole("button", { name: "Save changes" }).click();
+  await expect(bar).toContainText("needs {run_id}");
+  expect(callsTo(db, "PUT", /\/api\/tests\/settings/)).toHaveLength(0);
+  await location.fill("s3://test-reports/web/{run_id}/{attempt}/");
+  await expect(web.getByRole("alert")).toHaveCount(0);
+  await expect(web.getByText("Unsaved")).toBeVisible();
+  // The role's read access is shown for the bucket and folder entered.
+  await web.getByText("Read access for the AWS role").click();
+  const statement = web.getByTestId("report-read-statement");
+  await expect(statement).toContainText("arn:aws:s3:::test-reports/web/*");
+  await expect(statement).toContainText("s3:GetObject");
+  await web.getByLabel("Test address (optional)").fill("staging.example.com");
+  await expect(web.getByRole("alert")).toContainText("Enter the address the tests run against");
+  await web.getByLabel("Test address (optional)").fill("https://pr-{pr}.preview.example.com");
+  await shot(page, "settings-report-sources");
+  await bar.getByRole("button", { name: "Save changes" }).click();
+  await expect(bar).toHaveCount(0);
+  expect(callsTo(db, "PUT", /\/api\/tests\/settings/)[0].body).toMatchObject({
+    report_sources: [{ repo: WEB, location: "s3://test-reports/web/{run_id}/{attempt}/", target_url: "https://pr-{pr}.preview.example.com" }],
+  });
+  // Clearing both fields drops the repository's entry.
+  await location.fill("");
+  await web.getByLabel("Test address (optional)").fill("");
+  await bar.getByRole("button", { name: "Save changes" }).click();
+  await expect(bar).toHaveCount(0);
+  expect(callsTo(db, "PUT", /\/api\/tests\/settings/)[1].body).toMatchObject({ report_sources: [] });
+  // CI artifacts need no path and no AWS access.
+  await location.fill("ci");
+  await expect(web.getByText("Read access for the AWS role")).toHaveCount(0);
 });
 
 test("tests: a failed load says so and retries", async ({ page }) => {

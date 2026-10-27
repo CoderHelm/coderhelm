@@ -3,12 +3,14 @@
 import { Switch as SharedSwitch } from "../settings/switch";
 
 import { useEffect, useState } from "react";
-import { api, type Repo, type TestSettings } from "@/lib/api";
+import { api, type Repo, type TestReportSource, type TestSettings } from "@/lib/api";
+import { parseLocation, readStatement, targetError } from "@/lib/report-source";
+import { CodeBlock } from "@/components/code-block";
 import { errorMessage } from "@/lib/data-sources";
 import { SetupPointer } from "./setup";
 import { useToast } from "@/components/toast";
 import { focusRing, inputClass } from "@/components/ui";
-import { SaveBar, SettingsRow, SettingsSection, Switch as RowSwitch, useDirtyForm } from "@/components/settings";
+import { Code, RowMarks, SaveBar, SettingsRow, SettingsSection, Switch as RowSwitch, useDirtyForm } from "@/components/settings";
 
 /** The shared switch, under the name this file's callers use. */
 export function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
@@ -18,6 +20,84 @@ export function Switch({ checked, onChange, label, disabled }: { checked: boolea
 /** The repositories part of the form: every repository, or only the ticked ones. */
 type RepoMode = "all" | "some";
 
+/** Settings as the form edits them: an older gateway sends no report sources. */
+function normalized(s: TestSettings): TestSettings {
+  return { ...s, report_sources: s.report_sources ?? [] };
+}
+
+/** One repository's report location and test address. */
+function ReportSourceRow({
+  repo,
+  source,
+  unsaved,
+  onChange,
+}: {
+  repo: string;
+  source: TestReportSource | undefined;
+  unsaved: boolean;
+  onChange: (next: TestReportSource) => void;
+}) {
+  const location = source?.location ?? "";
+  const target = source?.target_url ?? "";
+  const parsed = parseLocation(location);
+  const tErr = targetError(target);
+  const statement = parsed.ok && parsed.location ? readStatement(parsed.location) : null;
+  const slug = repo.replace(/[^a-zA-Z0-9]+/g, "-");
+  return (
+    <li className="min-w-0 space-y-3 py-4 first:pt-0 last:pb-0" data-testid={`report-source-${slug}`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="wrap-anywhere text-sm font-medium text-zinc-100">{repo}</p>
+        <RowMarks unsaved={unsaved} />
+      </div>
+      <div className="min-w-0">
+        <label htmlFor={`loc-${slug}`} className="text-sm text-zinc-300">Where test reports are stored</label>
+        <input
+          id={`loc-${slug}`}
+          type="text"
+          spellCheck={false}
+          autoComplete="off"
+          placeholder="s3://bucket/prefix/{run_id}/{attempt}/ or ci"
+          aria-describedby={`loc-${slug}-help`}
+          aria-invalid={parsed.ok ? undefined : true}
+          value={location}
+          onChange={(e) => onChange({ repo, location: e.target.value, target_url: target })}
+          className={`${inputClass} mt-1 w-full`}
+        />
+        <p id={`loc-${slug}-help`} className="mt-1 text-xs text-zinc-400">
+          An S3 folder per CI run, read through your read-only AWS connection, or <Code>ci</Code> for the run&apos;s GitHub Actions artifacts. Empty: Coderhelm only reads artifacts of runs a ticket links to.
+        </p>
+        {!parsed.ok && <p role="alert" className="mt-1.5 text-xs text-red-400">{parsed.error}</p>}
+      </div>
+      <div className="min-w-0">
+        <label htmlFor={`target-${slug}`} className="text-sm text-zinc-300">Test address (optional)</label>
+        <input
+          id={`target-${slug}`}
+          type="text"
+          spellCheck={false}
+          autoComplete="off"
+          placeholder="https://staging.example.com"
+          aria-invalid={tErr ? true : undefined}
+          value={target}
+          onChange={(e) => onChange({ repo, location, target_url: e.target.value })}
+          className={`${inputClass} mt-1 w-full`}
+        />
+        {tErr && <p role="alert" className="mt-1.5 text-xs text-red-400">{tErr}</p>}
+      </div>
+      {statement && (
+        <details className="group min-w-0 rounded-lg border border-zinc-800">
+          <summary className={`cursor-pointer list-none px-3 py-2 text-xs text-zinc-300 hover:text-zinc-100 [&::-webkit-details-marker]:hidden ${focusRing}`}>
+            Read access for the AWS role
+          </summary>
+          <div className="space-y-2 border-t border-zinc-800 px-3 py-3 text-xs text-zinc-400">
+            <p>Add this statement to the CoderHelmLogReader role in the account that owns the bucket. Coderhelm only lists and reads reports there.</p>
+            <CodeBlock code={statement} lang="json" title="IAM statement" testId="report-read-statement" />
+          </div>
+        </details>
+      )}
+    </li>
+  );
+}
+
 export function SettingsView({
   settings,
   onSaved,
@@ -26,7 +106,7 @@ export function SettingsView({
   onSaved: (s: TestSettings) => void;
 }) {
   const { toast } = useToast();
-  const form = useDirtyForm<TestSettings>(settings);
+  const form = useDirtyForm<TestSettings>(normalized(settings));
   const { reset } = form;
   const draft = form.values;
   const [repos, setRepos] = useState<Repo[] | null>(null);
@@ -36,7 +116,7 @@ export function SettingsView({
   const [problem, setProblem] = useState<string | null>(null);
 
   useEffect(() => {
-    reset(settings);
+    reset(normalized(settings));
     setMode(settings.repos.length ? "some" : "all");
   }, [settings, reset]);
   useEffect(() => {
@@ -50,6 +130,31 @@ export function SettingsView({
   const count = form.count + (modeChanged && !form.isDirty("repos") ? 1 : 0);
   const toggleRepo = (name: string) =>
     form.update((d) => ({ ...d, repos: d.repos.includes(name) ? d.repos.filter((r) => r !== name) : [...d.repos, name] }));
+  const sources = draft.report_sources ?? [];
+  const savedSources = form.saved.report_sources ?? [];
+  const sourceOf = (repo: string) => sources.find((x) => x.repo === repo);
+  const setSource = (next: TestReportSource) =>
+    form.update((d) => {
+      const rest = (d.report_sources ?? []).filter((x) => x.repo !== next.repo);
+      const keep = next.location.trim() !== "" || next.target_url.trim() !== "";
+      return { ...d, report_sources: keep ? [...rest, next] : rest };
+    });
+  const sourceUnsaved = (repo: string) => {
+    const a = sourceOf(repo);
+    const b = savedSources.find((x) => x.repo === repo);
+    return (a?.location ?? "") !== (b?.location ?? "") || (a?.target_url ?? "") !== (b?.target_url ?? "");
+  };
+  const sourceProblem = sources
+    .map((x) => {
+      const p = parseLocation(x.location);
+      if (!p.ok) return `${x.repo}: ${p.error}`;
+      if (!x.location.trim() && x.target_url.trim()) return `${x.repo}: say where its test reports are stored, or clear the test address.`;
+      const t = targetError(x.target_url);
+      return t ? `${x.repo}: ${t}` : null;
+    })
+    .find((x) => x !== null);
+  const reportRepos = (repos ?? []).map((r) => r.name).filter((n) => mode === "all" || draft.repos.includes(n));
+
   const chooseMode = (m: RepoMode) => {
     setMode(m);
     if (m === "all") form.set("repos", []);
@@ -62,6 +167,10 @@ export function SettingsView({
     }
     if (noneTicked) {
       setProblem("Tick at least one repository, or choose every repository.");
+      return;
+    }
+    if (sourceProblem) {
+      setProblem(sourceProblem);
       return;
     }
     setSaving(true);
@@ -208,6 +317,26 @@ export function SettingsView({
                     : `${draft.repos.length} of ${repos.length} repositor${repos.length === 1 ? "y is" : "ies are"} tracked.`}
               </p>
             </fieldset>
+          )}
+        </div>
+      </SettingsSection>
+
+      <SettingsSection
+        id="test-reports"
+        title="Test reports"
+        description="Where each repository's test reports are kept. When a ticket or pull request is about a failing or flaky test, Coderhelm reads the failing run's report first and counts passes across the reports kept."
+      >
+        <div className="px-4 py-4">
+          {repos === null ? (
+            <p role="status" className="text-sm text-zinc-500">Loading repositories…</p>
+          ) : reportRepos.length === 0 ? (
+            <p className="text-sm text-zinc-500">Track a repository above to say where its reports are.</p>
+          ) : (
+            <ul aria-label="Test report locations" className="divide-y divide-zinc-800">
+              {reportRepos.map((name) => (
+                <ReportSourceRow key={name} repo={name} source={sourceOf(name)} unsaved={sourceUnsaved(name)} onChange={setSource} />
+              ))}
+            </ul>
           )}
         </div>
       </SettingsSection>
