@@ -83,7 +83,7 @@ test.describe("the source picker", () => {
     const panel = page.getByTestId("picked-summary");
     await expect(panel.getByTestId("picked-item")).toHaveCount(1);
     await expect(panel).toContainText("1 selected");
-    await expect(panel.getByTestId("picked-brings")).toHaveText("Includes 8 subpages");
+    await expect(panel.getByTestId("picked-brings")).toHaveText("8 pages inside");
 
     await row(page, "page:eng").getByTestId("picker-check").check();
     await row(page, "database:roadmap").getByTestId("picker-check").check();
@@ -249,7 +249,7 @@ test.describe("the source picker", () => {
     const sheet = page.getByTestId("picked-sheet");
     await expect(sheet).toBeVisible();
     await expect(sheet.getByTestId("picked-item")).toHaveCount(2);
-    await expect(sheet.locator('[data-id="page:eng"]').getByTestId("picked-brings")).toHaveText("Includes 139 subpages");
+    await expect(sheet.locator('[data-id="page:eng"]').getByTestId("picked-brings")).toHaveText("139 pages inside");
     await shot(page, "phone-sheet", [390]);
     await page.setViewportSize({ width: 390, height: 844 });
     await sheet.getByRole("button", { name: "Remove Engineering" }).click();

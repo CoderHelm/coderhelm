@@ -952,6 +952,9 @@ function brings(v: Selected, n: PickerNode | undefined): string {
   if (n.has_children && v.include_children) {
     if (inside == null) return "With everything inside";
     if (inside === 0) return n.kind === "page" ? "Just this page" : "Nothing inside yet";
+    // A page counts everything inside it, not just its own subpages (the
+    // row's "3 subpages"), so say "pages inside" rather than "subpages".
+    if (n.kind === "page") return `${count(inside, ["page", "pages"])} inside`;
     return `Includes ${count(inside, insideNoun(n))}`;
   }
   return [typeOf(n), n.bytes != null ? fileSize(n.bytes) : ""].filter(Boolean).join(" · ");
