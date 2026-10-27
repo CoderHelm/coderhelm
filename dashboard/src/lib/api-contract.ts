@@ -6,7 +6,7 @@
 // Nothing here runs; it is checked by the compiler only.
 
 import type { OpenApiFields } from "./openapi-fields";
-import type { Plan, Run, RunDetail, Task, api } from "./api";
+import type { AnswerRunResult, Plan, Run, RunAnswer, RunDetail, RunQuestion, Task, api } from "./api";
 
 type Answer<K extends keyof typeof api> = Awaited<ReturnType<(typeof api)[K]>>;
 
@@ -20,6 +20,10 @@ type None<T extends never> = T;
 export type RunsPageContract = None<Undocumented<Answer<"listRuns">, "RunsPage">>;
 export type RunListContract = None<Undocumented<Run, "RunSummary">>;
 export type RunContract = None<Undocumented<RunDetail, "Run">>;
+// What a run asked, the answers given in Coderhelm, and answering.
+export type RunQuestionContract = None<Undocumented<RunQuestion, "RunQuestion">>;
+export type RunAnswerContract = None<Undocumented<RunAnswer, "RunAnswer">>;
+export type AnswerRunContract = None<Undocumented<AnswerRunResult, "AnswerRunResult">>;
 
 // Plans and their tasks (the plan pages and the runs they start).
 export type PlansPageContract = None<Undocumented<Answer<"listPlans">, "PlansPage">>;

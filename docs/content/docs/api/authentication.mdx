@@ -35,7 +35,7 @@ A scope is a capability from the team's [role table](/concepts/roles#capabilitie
 | Scope | Lets the key | Endpoints |
 | --- | --- | --- |
 | `view` | Read runs, plans, reviews, repositories and usage. Every key has it. | All `GET` endpoints |
-| `runs` | Retry and cancel runs. | `POST /api/runs/{run_id}/retry`, `POST /api/runs/{run_id}/cancel` |
+| `runs` | Retry and cancel runs, and answer a run's questions. | `POST /api/runs/{run_id}/retry`, `POST /api/runs/{run_id}/answer`, `POST /api/runs/{run_id}/cancel` |
 | `plans` | Create plans and run them. | `POST /api/plans`, `POST /api/plans/{plan_id}/approve-and-execute` |
 
 Each endpoint page names the scope it needs. A key without it gets `403` with the code `missing_scope` and the scope in `scope`.

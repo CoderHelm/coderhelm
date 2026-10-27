@@ -353,6 +353,11 @@ export const api = {
     }>(`/api/runs/${id}/agent-log`),
   retryRun: (id: string) =>
     request<{ status: string }>(`/api/runs/${id}/retry`, { method: "POST" }),
+  answerRun: (id: string, answers: { question_id: string; answer: string }[]) =>
+    request<AnswerRunResult>(`/api/runs/${id}/answer`, {
+      method: "POST",
+      body: JSON.stringify({ answers }),
+    }),
   resetRun: (id: string) =>
     request<{ status: string }>(`/api/runs/${id}/reset`, { method: "POST" }),
   reReviewRun: (id: string) =>
@@ -1835,6 +1840,48 @@ export interface RunDetail extends Run {
   close_reason?: string | null;
   /** The status it had when it was closed. */
   closed_from?: string | null;
+  /** What the run asked when it stopped to wait on a person (`needs_input`). */
+  questions?: RunQuestion[];
+  /** The comment with those questions on the ticket or issue. */
+  questions_url?: string | null;
+  /** Answers people gave to them in Coderhelm. */
+  answers?: RunAnswer[];
+  /** The reply with the answers on the ticket or issue. */
+  answers_url?: string | null;
+  /** The run that picked the answers up. */
+  continued_run_id?: string | null;
+}
+
+/** A question a run asked a person. */
+export interface RunQuestion {
+  id: string;
+  question: string;
+  /** Why it matters: what it blocks. */
+  why?: string | null;
+  /** Candidate answers the run found in the code or the data; the choices when `decision` is set. */
+  suggestions?: string[];
+  /** Set when the question is a choice Coderhelm records on the ticket (e.g. an open pull request: work on it, or open its own). */
+  decision?: string | null;
+}
+
+/** An answer given in Coderhelm to a run's question. */
+export interface RunAnswer {
+  question_id: string;
+  question: string;
+  answer: string;
+  /** Who answered, as the ticket shows them. */
+  author: string;
+  answered_at: string;
+}
+
+/** What answering a run's questions did. */
+export interface AnswerRunResult {
+  status: string;
+  /** The run that continues the work. */
+  run_id: string;
+  /** Whether the answers were posted on the ticket or issue. */
+  posted: boolean;
+  comment_url?: string | null;
 }
 
 export interface PassTrace {

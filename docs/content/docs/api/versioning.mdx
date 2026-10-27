@@ -30,5 +30,6 @@ The API doesn't take an `Idempotency-Key` header yet. Here is what repeating eac
 | `POST /api/plans` | Makes another plan. If a request times out, list plans before sending it again. |
 | `POST /api/plans/{plan_id}/approve-and-execute` | Safe. Once the plan runs, its tasks are queued, so a repeat finds nothing to run and answers `400`. |
 | `POST /api/runs/{run_id}/retry` | Safe. The old run becomes `retried`, so a repeat answers `400` and starts nothing. |
+| `POST /api/runs/{run_id}/answer` | Safe. The run becomes `retried` with the answers, so a repeat answers `409`, posts nothing and starts nothing. |
 | `POST /api/runs/{run_id}/cancel` | Safe. A run that is no longer running answers `400`. |
 | `POST /webhooks/ci/tests/results` | Stores the report again and reads it again for the same workflow run. |
