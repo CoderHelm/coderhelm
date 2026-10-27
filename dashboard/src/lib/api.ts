@@ -2537,6 +2537,14 @@ export interface LogFinding {
   } | null;
   /** What the automatic sweep decided, when it looked at it. */
   auto?: { status: "started" | "skipped" | "waiting"; reason: string } | null;
+  /** The log streams in its log group its lines came from, most lines first. */
+  log_streams?: { log_stream: string; lines: number }[];
+  /** Other log groups the same error was counted in (each its own finding). */
+  also_in?: { log_group: string; lines: number }[];
+  /** When it came back after it was resolved (null if it never did). */
+  reopened_at?: string | null;
+  /** How many times it came back after it was resolved. */
+  reopen_count?: number;
 }
 
 /** Which repo a log group's (or alarm's) code lives in, how sure, and why. */

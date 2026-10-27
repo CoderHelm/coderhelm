@@ -481,6 +481,7 @@ function FindingRow({
         typeof f.error_count === "number" && f.error_count > 0 ? `${plural(f.error_count, "line")} in the last analysis` : null,
         f.first_seen ? `first seen ${timeAgo(f.first_seen)}` : null,
         f.last_seen ? `last seen ${timeAgo(f.last_seen)}` : null,
+        f.reopened_at ? `seen again ${timeAgo(f.reopened_at)} after it was resolved` : null,
         f.repo ? <span key="r">{f.repo}</span> : null,
       ]}
       summary={fixWords(f) ?? autoNote ?? undefined}
@@ -555,7 +556,27 @@ function FindingDetail({
             </a>
           )}
         </div>
+        {!!f.log_streams?.length && (
+          <ul className="mt-2 space-y-0.5 text-xs text-zinc-400" aria-label="Log streams with matching lines">
+            {f.log_streams.map((s) => (
+              <li key={s.log_stream} className="min-w-0 break-words">
+                <Code>{s.log_stream}</Code> {plural(s.lines, "line")}
+              </li>
+            ))}
+          </ul>
+        )}
       </DetailBlock>
+      {!!f.also_in?.length && (
+        <DetailBlock title="Same error in other log groups">
+          <ul className="space-y-0.5 text-xs text-zinc-400">
+            {f.also_in.map((g) => (
+              <li key={g.log_group} className="min-w-0 break-words">
+                <Code>{g.log_group}</Code> {plural(g.lines, "line")}
+              </li>
+            ))}
+          </ul>
+        </DetailBlock>
+      )}
       {f.suggested_action && (
         <DetailBlock title="Recommendation">
           <p className="text-zinc-300">{f.suggested_action}</p>
