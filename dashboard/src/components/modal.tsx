@@ -64,8 +64,9 @@ export function Modal({
   onOpenChange: (open: boolean) => void;
   title: ReactNode;
   description?: ReactNode;
-  /** Room for a longer form (a list of checkboxes): wider from `sm:` up. */
-  wide?: boolean;
+  /** Room for a longer form (a list of checkboxes): wider from `sm:` up. `"xl"` widens it again
+   * from `lg:` up, for a body with two columns (a picker beside what is picked). */
+  wide?: boolean | "xl";
   /** Where focus goes on close when the dialog was not opened by a Radix trigger (e.g. from the address). */
   returnFocus?: React.RefObject<HTMLElement | null>;
   /** The button row, laid out with `modalActions`. Always visible. */
@@ -147,7 +148,7 @@ export function Modal({
             e.preventDefault();
             returnFocus.current.focus();
           }}
-          className={`fixed inset-0 z-[61] flex h-[100dvh] flex-col overflow-hidden bg-zinc-900 shadow-2xl sm:inset-x-4 sm:bottom-auto sm:top-[8dvh] sm:mx-auto sm:h-auto sm:max-h-[84dvh] sm:rounded-xl sm:border sm:border-zinc-800 ${wide ? "sm:max-w-2xl" : "sm:max-w-md"}`}
+          className={`fixed inset-0 z-[61] flex h-[100dvh] flex-col overflow-hidden bg-zinc-900 shadow-2xl sm:inset-x-4 sm:bottom-auto sm:top-[8dvh] sm:mx-auto sm:h-auto sm:max-h-[84dvh] sm:rounded-xl sm:border sm:border-zinc-800 ${wide === "xl" ? "sm:max-w-2xl lg:max-w-4xl" : wide ? "sm:max-w-2xl" : "sm:max-w-md"}`}
         >
           <div className="flex shrink-0 items-start justify-between gap-3 border-b border-zinc-800 px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))] sm:pt-4">
             <div className="min-w-0">

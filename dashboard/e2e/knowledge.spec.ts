@@ -365,7 +365,7 @@ test.describe("creating a knowledge base", () => {
     const child = tree.locator('[data-id="page:runbooks"]');
     await expect(child.getByTestId("picker-check")).toBeChecked();
     await expect(child.getByTestId("picker-check")).toBeDisabled();
-    await expect(child).toContainText("Included with the page above");
+    await expect(child).toContainText("Included with Engineering");
     await expect(flow.getByTestId("picked-summary")).toContainText("1 selected");
     await shot(page, "flow-2-pick");
 

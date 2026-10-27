@@ -32,7 +32,7 @@ import {
 import { useCan } from "@/hooks/use-can";
 import { SourceLogo } from "./logos";
 import { HybridAppChoice } from "@/components/hybrid-app-choice";
-import { Picker } from "./picker";
+import { Picker, continueLabel } from "./picker";
 import { AskAdmin, ConfluenceSteps, ConnectLoading, IntegrationsLink, NoTokenPath, NotionSteps, TokenForm } from "./token-connect";
 
 // The one way to add to Knowledge, for a new knowledge base or an existing
@@ -362,7 +362,7 @@ export function AddFlow({
         </button>
         {step === "pick" && (
           <button type="button" onClick={afterPick} className={primaryButton} disabled={!picked.length} data-testid="flow-continue">
-            Continue
+            {kind === "web" ? "Continue" : continueLabel(picked)}
           </button>
         )}
         {step === "upload" && (
@@ -379,7 +379,7 @@ export function AddFlow({
     );
 
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title={title} wide footer={footer} testId="add-flow">
+    <Modal open={open} onOpenChange={onOpenChange} title={title} wide={step === "pick" && kind !== "web" ? "xl" : true} footer={footer} testId="add-flow">
       <div data-step={step} data-testid="flow-step" className="animate-[kn-fade_160ms_ease-out] motion-reduce:animate-none">
         {step === "choose" && (
           <ChooseStep connectors={connectors} loadError={loadError} onRetry={loadConnectors} onChoose={(k) => choose(k)} />

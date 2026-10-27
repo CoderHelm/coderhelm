@@ -144,6 +144,16 @@ export interface PickerNode {
   url: string;
   updated_at: string;
   detail: string;
+  /** The provider's icon: an emoji, or an https image address. Absent when it has none. */
+  icon?: string;
+  /** Entries directly inside it, when the provider says. */
+  child_count?: number;
+  /** Items picking it brings in (itself and everything inside), when known. */
+  item_count?: number;
+  /** A file's size in bytes, when the provider reports one. */
+  bytes?: number;
+  /** Titles above it, top first: given for search results. */
+  path?: string[];
 }
 
 export interface SourceInput {
