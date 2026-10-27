@@ -1,0 +1,113 @@
+---
+title: Failing and flaky tests
+description: How CoderHelm fixes a failing or flaky test from a ticket or pull request, starting from the failing run's report, and where to tell it your reports are kept.
+---
+
+When a ticket or pull request is about a failing or flaky test, CoderHelm works the way a careful engineer would: it reads the failure first, measures how often the test fails before and after, and keeps the pull request a draft until the test has been run enough times to show the fix holds. A model reads each ticket to decide whether it is about a failing test; nothing is decided from keywords.
+
+## Tell CoderHelm where your test reports are
+
+Open **Tests**, then **Settings** (admins only). Under **Test reports**, set for each repository:
+
+| Field | What to enter |
+|---|---|
+| **Where test reports are stored** | An S3 location with `{run_id}` and, if your CI keeps one report per attempt, `{attempt}`. For example `s3://your-bucket/your-prefix/{run_id}/{attempt}/`. Enter `ci` to read each run's GitHub Actions artifacts instead. |
+| **Test address** (optional) | The preview or staging address the end-to-end tests run against when CoderHelm repeats them, such as `https://staging.your-domain.example`. `{pr}` is replaced with the pull request number. |
+
+`{run_id}` is the GitHub Actions run id (the number in `/actions/runs/<run id>`) and `{attempt}` is the run's attempt number. Each run's folder holds the report as your CI wrote it: a Playwright HTML report (`index.html` with its `data/` and `trace/` folders), a Playwright JSON report, JUnit XML or Cucumber JSON.
+
+### Give the read-only role access to the bucket
+
+S3 reports are read through your team's existing read-only AWS connection (see [AWS accounts](/concepts/aws-accounts)). Add this statement to the `CoderHelmLogReader` role in the account that owns the bucket, with your bucket and prefix. The settings page shows it filled in for the location you enter.
+
+```json
+{
+  "Effect": "Allow",
+  "Action": ["s3:GetObject", "s3:ListBucket"],
+  "Resource": [
+    "arn:aws:s3:::your-bucket",
+    "arn:aws:s3:::your-bucket/your-prefix/*"
+  ]
+}
+```
+
+CoderHelm only lists and reads objects under that prefix. Nothing in your account is changed.
+
+## What happens on a failing-test ticket
+
+<Steps>
+<Step>
+
+### The failure is read first
+
+As soon as the ticket arrives (CI often keeps reports for only a day), CoderHelm reads the failing run's report: the run the ticket links to, or the newest failing run it can find. From a Playwright HTML report it takes the real error, the line and step the test stopped at, and the page and any open dialog at the failure (the report's `error-context` file). The extract is stored on the run and quoted in the pull request. Agents can read more runs with the `test_report` tool.
+
+</Step>
+<Step>
+
+### The flake rate is measured
+
+CoderHelm counts the test's passes and failures across every report kept, for example "36/36 passed in the last 25 runs". If the test isn't failing now, it looks at the recent history of the spec and the files it imports for a change that already explains it before writing any code.
+
+</Step>
+<Step>
+
+### No evidence means diagnostics only
+
+Without a report of a failing run, the change may only make the next failure easier to read: clearer assertion messages, the page state captured at the failure. A diff that adds a fixed wait (`waitForTimeout`, `cy.wait(500)`, `sleep`, `setTimeout` in a test), a poll (`expect.poll`, `toPass`, `waitUntil`), more retries or a longer timeout to test code is sent back and then refused, unless the report shows the test failed on time (a timeout, or waiting for something that never came).
+
+</Step>
+<Step>
+
+### Shared helpers stay cheap
+
+A page object, fixture or support file that gains a loop or poll over every row or card (`.all()`, `$$`, `findElements`, `.each`, `allTextContents`) is refused whatever the evidence: the helper should wait on the one element it reads.
+
+</Step>
+<Step>
+
+### Test code is checked where it lives
+
+When the changed files sit in a package of their own (their own `package.json`, `tsconfig.json` or lockfile, outside the main workspace), CoderHelm installs that package on its own, type-checks it and lints the changed files there. Then it runs the affected spec 20 times in a row (Playwright's `--repeat-each`, or a loop for other runners) against the test address, and records the pass count in the pull request.
+
+</Step>
+<Step>
+
+### The pull request stays a draft until it is tested
+
+CoderHelm reads the repository's required checks and its test-related checks (end-to-end, deploy preview, integration) on the pull request's head commit. A deploy-preview or end-to-end check that was skipped or neutral is started again. The pull request leaves draft only when those checks are green on the head and a repeat run of the affected test passed, either the one above or one CoderHelm starts on CI when the workflow has a `workflow_dispatch` input named `repeat_each` (and optionally `grep`). While it waits, it checks again every ten minutes and says once per commit why it is still a draft.
+
+</Step>
+<Step>
+
+### The description stays proportionate
+
+For a small change (one or two files, or one test helper), the description is four sections: the problem, the observed error, the change, and the evidence with run counts. There are no open items or questions sections.
+
+</Step>
+</Steps>
+
+## Let CoderHelm repeat tests on CI
+
+Add a `repeat_each` input to your end-to-end workflow so CoderHelm can start a repeat run on the pull request's branch:
+
+```yaml
+on:
+  workflow_dispatch:
+    inputs:
+      repeat_each:
+        description: Times to run each test
+        default: "1"
+      grep:
+        description: Only tests matching this pattern
+        default: ""
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci && npx playwright install --with-deps
+      - run: npx playwright test --repeat-each=${{ inputs.repeat_each || 1 }} ${{ inputs.grep && format('--grep "{0}"', inputs.grep) || '' }}
+```
+
+Without it, and without a test address, CoderHelm says on the pull request that no repeat run could start; run the affected test about 20 times yourself and mark it ready.

@@ -3024,6 +3024,17 @@ export interface TestSettings {
   repos: string[];
   /** Days a test stays quarantined before its owner gets a ticket (1–30). */
   ticket_after_days: number;
+  /** Where each repository's test reports are kept, for fixes of failing and flaky tests. */
+  report_sources?: TestReportSource[];
+}
+
+export interface TestReportSource {
+  /** `owner/name`. */
+  repo: string;
+  /** `s3://bucket/prefix/{run_id}/{attempt}/`, or `ci` for the run's GitHub Actions artifacts. */
+  location: string;
+  /** The preview or staging address the tests run against when repeated; `{pr}` is the PR number. Empty: none. */
+  target_url: string;
 }
 
 export type TestRunner = "playwright" | "jest" | "vitest" | "cypress" | "junit";
