@@ -51,11 +51,19 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
       serverMsg = parsed.error || "";
       serverCode = typeof parsed.code === "string" ? parsed.code : undefined;
     } catch {}
+    // The team (or a self-hosted organization) requires two-factor sign-in
+    // and this session has none: the shell shows the setup screen.
+    if (res.status === 403 && serverCode === "two_factor_required" && typeof window !== "undefined") {
+      window.dispatchEvent(new Event(TWO_FACTOR_REQUIRED));
+    }
     throw new ApiError(serverMsg || httpErrorMessage(res.status), res.status, serverCode);
   }
   const text = await res.text();
   return text ? JSON.parse(text) : (undefined as T);
 }
+
+/** Fired when the server holds this session until it has a second factor. */
+export const TWO_FACTOR_REQUIRED = "coderhelm:two-factor-required";
 
 /**
  * Like `request`, but a non-2xx response with a JSON body is returned instead of
@@ -87,13 +95,15 @@ async function requestWithBody<T, E>(
   return { ...(body as T), ok: true };
 }
 
-/** A person's own two-factor sign-in (self-hosted installs). */
+/** A person's own two-factor sign-in (both deployments). */
 export interface MyTwoFactor {
   self_hosted: boolean;
-  /** The organization requires it. */
+  /** The organization (hosted: the team this session acts in) requires it. */
   required: boolean;
   /** This session can only set it up until it has a second factor. */
   held: boolean;
+  /** A team they're on (or the organization) requires it, so it can't be turned off. */
+  must_keep?: boolean;
   session_has_2fa?: boolean;
   signed_in_with?: "password" | "google" | "github";
   /** What they have set up: Cognito's codes (password sign-in) or Coderhelm's (Google, GitHub). */
@@ -102,7 +112,7 @@ export interface MyTwoFactor {
   fits?: "cognito" | "app";
 }
 
-/** Settings, Sign-in (self-hosted installs). */
+/** Settings, Sign-in: the two-factor rule (hosted: this team's), and on a self-hosted install who may join. */
 export interface SignInSettings {
   self_hosted: boolean;
   is_org?: boolean;
@@ -119,6 +129,8 @@ export interface SignInSettings {
     two_factor: "cognito" | "app" | null;
     is_self: boolean;
   }[];
+  /** How many people on the team have no second factor yet. */
+  without_2fa?: number;
   api_keys?: {
     id: string;
     name: string;
@@ -788,7 +800,7 @@ export const api = {
     }),
   mfaDisable: () =>
     request<{ status: string }>("/api/users/mfa", { method: "DELETE" }),
-  // Self-hosted: one organization, who may join, and two-factor sign-in.
+  // Two-factor sign-in (both deployments); on a self-hosted install, who may join too.
   myTwoFactor: () => request<MyTwoFactor>("/api/users/2fa"),
   appTwoFactorSetup: () =>
     request<{ secret: string; qr_uri: string }>("/api/users/2fa/app/setup", { method: "POST" }),
@@ -800,7 +812,7 @@ export const api = {
     request<{ status: string; team_id: string }>("/auth/2fa/verify", { method: "POST", body: JSON.stringify({ code }) }),
   signInSettings: () => request<SignInSettings>("/api/sign-in"),
   updateSignInSettings: (body: { domains?: string[]; require_2fa?: boolean }) =>
-    request<{ domains: string[]; require_2fa: boolean; require_2fa_since: string | null }>("/api/sign-in", {
+    request<{ domains: string[]; require_2fa: boolean; require_2fa_since: string | null; notified?: number }>("/api/sign-in", {
       method: "PUT",
       body: JSON.stringify(body),
     }),

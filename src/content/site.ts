@@ -777,6 +777,7 @@ const security: Page = {
             { title: "Encrypted with AWS KMS", text: "Stored tokens, keys and connection details are encrypted with AWS KMS. Data source secrets carry your team in the encryption context, so they cannot be read for another team." },
             { title: "Signed webhooks", text: "GitHub webhooks are checked with HMAC and SNS messages by signature before anything runs." },
             { title: "Team scoped", text: "Every request is scoped to your team, and roles (owner, admin, billing, member, viewer) decide who can change what." },
+            { title: "Two-factor sign-in", text: "Each person has one second factor, asked for after a password, Google or GitHub alike. A team's admins can require it: people without one see only a setup screen until they set it up." },
             { title: "Read only data sources", text: "Database, API and log lookups are read only, enforced at several independent points.", href: "/data-sources/" },
           ],
         },

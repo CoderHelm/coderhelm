@@ -1,4 +1,4 @@
 {
   "title": "Concepts",
-  "pages": ["index", "agents", "agent-permissions", "skills", "memories", "code-graph", "data-sources", "aws-accounts", "test-fixes", "connections", "knowledge", "knowledge-sources", "chat", "roles", "token-limits", "usage-and-audit"]
+  "pages": ["index", "agents", "agent-permissions", "skills", "memories", "code-graph", "data-sources", "aws-accounts", "test-fixes", "connections", "knowledge", "knowledge-sources", "chat", "roles", "sign-in", "token-limits", "usage-and-audit"]
 }

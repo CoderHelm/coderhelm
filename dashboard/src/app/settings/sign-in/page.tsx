@@ -12,6 +12,7 @@ import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Field, SettingsSection, Switch } from "@/components/settings";
 import { api, errorStatus, type SignInSettings } from "@/lib/api";
+import { isSelfHosted } from "@/lib/runtime-config";
 import { buttonClass, fullWidthOnPhone, linkButton, smallSecondaryButton } from "@/components/ui";
 
 export default function SignInSettingsGuarded() {
@@ -44,11 +45,18 @@ function SignInSettingsPage() {
   }, []);
   useEffect(load, [load]);
 
+  // A self-hosted install is one organization (who may join, and one rule);
+  // on hosted each team has its own rule.
+  const selfHosted = data ? data.self_hosted : isSelfHosted();
   const header = (
     <div className="mb-6">
       <PageHeader
         title="Sign-in"
-        lead="This install is for one organization. Choose who may join and whether everyone must use two-factor sign-in."
+        lead={
+          selfHosted
+            ? "This install is for one organization. Choose who may join and whether everyone must use two-factor sign-in."
+            : "Choose whether everyone on this team must use two-factor sign-in, and see who has it set up."
+        }
       />
     </div>
   );
@@ -76,20 +84,13 @@ function SignInSettingsPage() {
       </Page>
     );
   }
-  if (!data.self_hosted) {
-    return (
-      <Page>
-        {header}
-        <p className="max-w-3xl text-sm text-zinc-400">These settings are for self-hosted installs.</p>
-      </Page>
-    );
-  }
-
   const domains = data.domains ?? [];
   const people = data.people ?? [];
   const keys = data.api_keys ?? [];
   const required = !!data.require_2fa;
   const withFactor = people.filter((p) => p.two_factor).length;
+  const without = data.without_2fa ?? people.length - withFactor;
+  const everyone = selfHosted ? "everyone" : "everyone on this team";
 
   const saveDomains = async (next: string[]) => {
     setSaving(true);
@@ -129,12 +130,11 @@ function SignInSettingsPage() {
 
   const setRequired = async (on: boolean) => {
     if (on) {
-      const missing = people.length - withFactor;
       const ok = await confirm({
-        title: "Require two-factor sign-in for everyone?",
+        title: `Require two-factor sign-in for ${everyone}?`,
         message:
-          missing > 0
-            ? `${missing} ${missing === 1 ? "person hasn't" : "people haven't"} set it up yet. At their next request they'll see a setup screen, and nothing else works until they finish. API keys keep working.`
+          without > 0
+            ? `${without} ${without === 1 ? "person hasn't" : "people haven't"} set it up yet. We'll email ${without === 1 ? "them" : "each of them"} now. At their next request they'll see a setup screen, and nothing else works until they finish. API keys keep working.`
             : "Everyone has set it up. Anyone who joins later sets it up at their first sign-in. API keys keep working.",
         confirmLabel: "Require it",
       });
@@ -152,7 +152,13 @@ function SignInSettingsPage() {
     try {
       const r = await api.updateSignInSettings({ require_2fa: on });
       setData({ ...data, require_2fa: r.require_2fa, require_2fa_since: r.require_2fa_since });
-      toast(on ? "Two-factor sign-in is required" : "Two-factor sign-in is no longer required");
+      toast(
+        !on
+          ? "Two-factor sign-in is no longer required"
+          : r.notified
+            ? `Two-factor sign-in is required. Emailed ${r.notified} ${r.notified === 1 ? "person who hasn't" : "people who haven't"} set it up.`
+            : "Two-factor sign-in is required",
+      );
     } catch (e) {
       toast(e instanceof Error ? e.message : "Couldn't save. Try again.", "error");
     } finally {
@@ -166,67 +172,69 @@ function SignInSettingsPage() {
     <Page>
       {header}
       <div className="max-w-3xl space-y-8">
-        <SettingsSection
-          id="who-may-join"
-          title="Who may join"
-          description="Nobody can sign up on their own. People join with an invite, or with an email at a domain you allow here."
-        >
-          <div className="space-y-4 px-4 py-4">
-            <p className="text-sm text-zinc-300">
-              {data.pending_invites
-                ? `${data.pending_invites} ${data.pending_invites === 1 ? "invite is" : "invites are"} waiting. `
-                : ""}
-              <Link href="/settings/team" className={linkButton}>
-                Invite people in Team
-              </Link>
-            </p>
-            <div>
-              <h3 className="text-sm font-medium text-zinc-200">Allowed email domains</h3>
-              {domains.length === 0 ? (
-                <p className="mt-1 text-sm text-zinc-400" data-testid="domains-empty">
-                  None: only people you invite can join.
-                </p>
-              ) : (
-                <ul className="mt-2 flex flex-wrap gap-2" data-testid="domains">
-                  {domains.map((d) => (
-                    <li key={d} className="flex min-w-0 items-center gap-1 rounded-full border border-zinc-700 bg-zinc-800/60 py-0.5 pl-3 pr-1 text-sm text-zinc-200">
-                      <span className="[overflow-wrap:anywhere]">{d}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeDomain(d)}
-                        disabled={saving}
-                        aria-label={`Remove ${d}`}
-                        className={buttonClass("ghost", "sm")}
-                      >
-                        Remove
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+        {selfHosted && (
+          <SettingsSection
+            id="who-may-join"
+            title="Who may join"
+            description="Nobody can sign up on their own. People join with an invite, or with an email at a domain you allow here."
+          >
+            <div className="space-y-4 px-4 py-4">
+              <p className="text-sm text-zinc-300">
+                {data.pending_invites
+                  ? `${data.pending_invites} ${data.pending_invites === 1 ? "invite is" : "invites are"} waiting. `
+                  : ""}
+                <Link href="/settings/team" className={linkButton}>
+                  Invite people in Team
+                </Link>
+              </p>
+              <div>
+                <h3 className="text-sm font-medium text-zinc-200">Allowed email domains</h3>
+                {domains.length === 0 ? (
+                  <p className="mt-1 text-sm text-zinc-400" data-testid="domains-empty">
+                    None: only people you invite can join.
+                  </p>
+                ) : (
+                  <ul className="mt-2 flex flex-wrap gap-2" data-testid="domains">
+                    {domains.map((d) => (
+                      <li key={d} className="flex min-w-0 items-center gap-1 rounded-full border border-zinc-700 bg-zinc-800/60 py-0.5 pl-3 pr-1 text-sm text-zinc-200">
+                        <span className="[overflow-wrap:anywhere]">{d}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeDomain(d)}
+                          disabled={saving}
+                          aria-label={`Remove ${d}`}
+                          className={buttonClass("ghost", "sm")}
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <form onSubmit={addDomain} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                <Field
+                  id="add-domain"
+                  className="flex-1"
+                  label="Let anyone with an email at"
+                  help="Your company's domain, such as example.com. They join as members. Public email services can't be allowed."
+                  placeholder="example.com"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={domain}
+                  error={domainError || undefined}
+                  onChange={(e) => {
+                    setDomain(e.target.value);
+                    setDomainError("");
+                  }}
+                />
+                <button type="submit" disabled={saving || !domain.trim()} className={`${buttonClass("secondary")} ${fullWidthOnPhone} sm:mb-[1.85rem]`}>
+                  Allow
+                </button>
+              </form>
             </div>
-            <form onSubmit={addDomain} className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <Field
-                id="add-domain"
-                className="flex-1"
-                label="Let anyone with an email at"
-                help="Your company's domain, such as example.com. They join as members. Public email services can't be allowed."
-                placeholder="example.com"
-                autoComplete="off"
-                spellCheck={false}
-                value={domain}
-                error={domainError || undefined}
-                onChange={(e) => {
-                  setDomain(e.target.value);
-                  setDomainError("");
-                }}
-              />
-              <button type="submit" disabled={saving || !domain.trim()} className={`${buttonClass("secondary")} ${fullWidthOnPhone} sm:mb-[1.85rem]`}>
-                Allow
-              </button>
-            </form>
-          </div>
-        </SettingsSection>
+          </SettingsSection>
+        )}
 
         <SettingsSection
           id="two-factor"
@@ -237,12 +245,20 @@ function SignInSettingsPage() {
             <div className="flex min-w-0 items-start justify-between gap-4">
               <div className="min-w-0">
                 <p id="require-2fa-label" className="text-sm font-medium text-zinc-100">
-                  Require two-factor sign-in
+                  {selfHosted ? "Require two-factor sign-in" : "Require two-factor sign-in for this team"}
                 </p>
                 <p id="require-2fa-help" className="mt-0.5 text-sm text-zinc-400">
                   {required
                     ? `Required${data.require_2fa_since ? ` since ${new Date(data.require_2fa_since).toLocaleDateString()}` : ""}. People without it see a setup screen and nothing else.`
                     : "Off: each person chooses for themselves in Settings, Security."}
+                </p>
+                <p className="mt-1.5 flex items-center gap-2 text-sm" data-testid="without-2fa">
+                  <StatusDot tone={without === 0 ? "success" : required ? "attention" : "muted"} />
+                  <span className={without === 0 ? "text-zinc-300" : "text-zinc-200"}>
+                    {without === 0
+                      ? "Everyone has set it up."
+                      : `${without} of ${people.length} ${people.length === 1 ? "person" : "people"} ${without === 1 ? "hasn't" : "haven't"} set it up yet.`}
+                  </span>
                 </p>
               </div>
               <Switch
@@ -260,7 +276,7 @@ function SignInSettingsPage() {
                 <Link href="/settings/security" className={linkButton}>
                   Settings, Security
                 </Link>
-                , then sign out and sign in again with your code. Then you can require it for everyone.
+                , then sign out and sign in again with your code. Then you can require it for {everyone}.
               </p>
             )}
           </div>
@@ -335,6 +351,7 @@ function SignInSettingsPage() {
       {resetting && (
         <ResetDialog
           person={resetting}
+          selfHosted={selfHosted}
           onClose={() => setResetting(null)}
           onDone={() => {
             toast(`Two-factor sign-in reset for ${who(resetting)}`);
@@ -347,7 +364,17 @@ function SignInSettingsPage() {
   );
 }
 
-function ResetDialog({ person, onClose, onDone }: { person: Person; onClose: () => void; onDone: () => void }) {
+function ResetDialog({
+  person,
+  selfHosted,
+  onClose,
+  onDone,
+}: {
+  person: Person;
+  selfHosted: boolean;
+  onClose: () => void;
+  onDone: () => void;
+}) {
   const [how, setHow] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -378,7 +405,11 @@ function ResetDialog({ person, onClose, onDone }: { person: Person; onClose: () 
       open
       onOpenChange={(o) => !o && onClose()}
       title={`Reset two-factor sign-in for ${who(person)}?`}
-      description="Only after you've checked it's really them, for example on a video call. Their next sign-in asks them to set it up again. This goes in the log under Settings, Roles."
+      description={
+        selfHosted
+          ? "Only after you've checked it's really them, for example on a video call. Their next sign-in asks them to set it up again. This goes in the log under Settings, Roles."
+          : "Only after you've checked it's really them, for example on a video call. Their second factor is the same on every team they're on, so it's reset everywhere and they're signed out; they get an email saying so. This goes in the log under Settings, Roles."
+      }
       onSubmit={submit}
       testId="reset-2fa-dialog"
       footer={

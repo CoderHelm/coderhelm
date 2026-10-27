@@ -22,7 +22,7 @@ Every request to CoderHelm is checked in one place, on the server, against the c
 | --- | --- |
 | Viewer | `view`, `view_team`, `own_account` |
 | Member | `plans`, `runs`, `reviews`, `recommendations`, `view_alerts`, `view_integrations` |
-| Admin | `people`, `roles`, `delete_plans`, `repos`, `agent_settings`, `memory`, `integrations`, `data_sources` (includes team tools and skills), `tests`, `alerts`, `model_provider`, `system`, `budget`, `support` |
+| Admin | `people`, `roles`, `sign_in`, `delete_plans`, `repos`, `agent_settings`, `memory`, `integrations`, `data_sources` (includes team tools and skills), `tests`, `alerts`, `model_provider`, `system`, `budget`, `support` |
 | Owner | `manage_admins`, `team_name`, `disconnect` (removes Jira or the model key), `reset` |
 
 A request without the capability it needs gets `403`, with the name of the missing capability.
@@ -48,5 +48,7 @@ Everyone else on the team can see the custom roles and what each one can do. A c
 ## Invites and approvals
 
 Invites expire after 30 days; admins can resend them.
+
+Admins can also require two-factor sign-in for the team (`sign_in`, never in a custom role); see [Sign-in and two-factor](/concepts/sign-in/).
 
 Some actions need a second person, even an admin: approving a new version of a [team tool](/concepts/skills#team-tools) needs another admin when the team has more than one.

@@ -230,6 +230,10 @@ export const settingsData: Handler = ({ method, path, url }) => {
     }] };
   }
   if (p === "/api/users") return { users: USERS };
+  // Your own two-factor sign-in (both deployments): kept on by a team's rule.
+  if (p === "/api/users/2fa") {
+    return { self_hosted: false, required: false, held: false, must_keep: true, session_has_2fa: true, signed_in_with: "password", set_up: "cognito", fits: "cognito" };
+  }
   // Sign-in (self-hosted): long domains, long names and an unbroken email.
   if (p === "/api/sign-in") {
     return {
