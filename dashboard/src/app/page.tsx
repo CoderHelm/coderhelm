@@ -317,6 +317,7 @@ function RunsPage() {
         onOpenChange={setDialogOpen}
         count={pickedRuns.length}
         prNumbers={pickedPrs}
+        tickets={pickedRuns.map((r) => ({ source: r.ticket_source, id: r.ticket_id }))}
         busy={closing}
         onConfirm={closePicked}
       />

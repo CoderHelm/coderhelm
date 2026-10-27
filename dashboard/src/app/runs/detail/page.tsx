@@ -821,7 +821,7 @@ function RunDetailInner() {
         items={RUN_TABS.map((t) => ({ value: t, label: RUN_TAB_LABEL[t], href: tabHref(t) }))}
       />
 
-      <CloseRunDialog open={closeOpen} onOpenChange={setCloseOpen} count={1} prNumbers={openPrs} busy={busy === "close"} onConfirm={closeRun} />
+      <CloseRunDialog open={closeOpen} onOpenChange={setCloseOpen} count={1} prNumbers={openPrs} tickets={[{ source: run.ticket_source, id: run.ticket_id }]} busy={busy === "close"} onConfirm={closeRun} />
 
       {tab === "overview" && (
         <div className={`mt-6 ${tasksCard ? "grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]" : ""}`} data-testid="run-tab-overview">
