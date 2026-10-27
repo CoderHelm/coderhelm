@@ -331,13 +331,14 @@ export const api = {
   /**
    * One page of runs, newest first. `q` searches ticket key or number, title,
    * repo, PR number and status; `status` is comma-separated exact statuses;
-   * `repo` keeps one repo (older backends ignore it).
+   * `repo` keeps one repo and `started_by` the runs started one of these
+   * ways (comma-separated `RunTriggerKind`s); older backends ignore both.
    * The server reads a bounded number of runs per call, so a filtered page
    * can be short or empty while `next` is still set.
    */
-  listRuns: (cursor?: string, filters: { q?: string; status?: string; repo?: string } = {}) =>
+  listRuns: (cursor?: string, filters: { q?: string; status?: string; repo?: string; started_by?: string } = {}) =>
     request<{ runs: Run[]; next?: string | null }>(
-      `/api/runs${qs({ cursor, q: filters.q, status: filters.status, repo: filters.repo })}`,
+      `/api/runs${qs({ cursor, q: filters.q, status: filters.status, repo: filters.repo, started_by: filters.started_by })}`,
     ),
   /**
    * The command palette's search: a few runs, reviewed PRs, releases and plans
@@ -1793,6 +1794,25 @@ export interface Run {
   duration_s?: number;
   created_at: string;
   current_pass?: string;
+  /** How the run was started and by whom; older backends leave it out. */
+  trigger?: RunTrigger;
+}
+
+/** What started a run, as the runs list filters it. */
+export type RunTriggerKind = "jira" | "github" | "coderhelm" | "alert" | "plan" | "dashboard" | "chat";
+
+/** How a run was started, worked out by the gateway. */
+export interface RunTrigger {
+  /** A kind this dashboard doesn't know reads as Coderhelm's own work. */
+  kind: RunTriggerKind | (string & {});
+  /** "Jira", "GitHub issue", "Started by Coderhelm · flaky test", … */
+  label: string;
+  /** The ticket key, "#42", or a plan's, alert's or log group's name. */
+  ref?: string | null;
+  /** A dashboard path ("/tests/test?id=…") or an https address. */
+  ref_url?: string | null;
+  /** The person who started it; null for Coderhelm's own work. */
+  by?: string | null;
 }
 
 export interface CloseRunRequest {

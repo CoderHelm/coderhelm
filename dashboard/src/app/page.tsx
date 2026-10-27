@@ -13,6 +13,8 @@ import { Page, PageHeader } from "@/components/page";
 import { EmptyState } from "@/components/empty-state";
 import { Code } from "@/components/settings/code";
 import { PlayIcon } from "@/components/icons";
+import { RunTriggerLine, STARTED_BY, startedByValue } from "@/components/run-trigger";
+import { Select } from "@/components/select";
 import {
   GROUP_LABEL,
   List,
@@ -78,18 +80,19 @@ export default function RunsPageWithParams() {
 
 function RunsPage() {
   // The address holds the search, so a search can be shared or reloaded.
-  const [params, setParams] = useListParams({ q: "", status: "all", repo: "" });
+  const [params, setParams] = useListParams({ q: "", status: "all", repo: "", started_by: "" });
   const { q, repo } = params;
+  const startedBy = startedByValue(params.started_by);
   // Older links carry exact statuses (`?status=failed`); those still filter.
   const tab: StatusTab = (TABS as string[]).includes(params.status) ? (params.status as StatusTab) : "all";
   const status = tab === "all" ? (params.status === "all" ? "" : params.status) : RUN_GROUP_STATUSES[tab];
   const teamRepos = useTeamRepos();
-  const filtered = !!(q || status || repo);
-  const clear = () => setParams({ q: "", status: "all", repo: "" });
+  const filtered = !!(q || status || repo || startedBy);
+  const clear = () => setParams({ q: "", status: "all", repo: "", started_by: "" });
 
   const { items: runs, next, loading, loadingMore, error, moreFailed, loadMore, reload } = usePagedList<Run>(
-    (cursor) => api.listRuns(cursor, { q, status, repo }).then((d) => ({ items: d.runs, next: d.next })),
-    [q, status, repo],
+    (cursor) => api.listRuns(cursor, { q, status, repo, started_by: startedBy || undefined }).then((d) => ({ items: d.runs, next: d.next })),
+    [q, status, repo, startedBy],
   );
 
   const groups = groupRunsByTicket(runs);
@@ -192,6 +195,22 @@ function RunsPage() {
           onChange: (v) => setParams({ status: v }),
           options: TABS.map((t) => ({ value: t, label: GROUP_LABEL[t], tone: t === "all" ? undefined : TAB_TONE[t] })),
         }}
+        filters={
+          <Select
+            aria-label="Started by"
+            data-testid="started-by-filter"
+            value={startedBy}
+            onChange={(e) => setParams({ started_by: e.target.value })}
+            className={`bg-zinc-900 ${startedBy ? "border-zinc-500" : ""}`}
+          >
+            <option value="">Started by anyone</option>
+            {STARTED_BY.map((o) => (
+              <option key={o.value} value={o.value}>
+                Started by {o.label}
+              </option>
+            ))}
+          </Select>
+        }
         repo={{ value: repo, onChange: (v) => setParams({ repo: v }), repos: teamRepos }}
         onClear={filtered ? clear : undefined}
       />
@@ -204,7 +223,11 @@ function RunsPage() {
       ) : runs.length === 0 && filtered ? (
         <ListEmpty title="No runs match" onClear={clear}>
           {/* Each request reads a bounded number of runs; older ones may still match. */}
-          {next ? "None of the most recent runs match. Load more to search older runs." : "Try a ticket number, part of a title, or a repo."}
+          {next
+            ? "None of the most recent runs match. Load more to search older runs."
+            : startedBy
+              ? "No runs were started that way. Try another choice in Started by."
+              : "Try a ticket number, part of a title, or a repo."}
         </ListEmpty>
       ) : runs.length === 0 ? (
         <EmptyState
@@ -344,6 +367,14 @@ function RunItem({ group, showRepo, select, spacer }: { group: RunGroup; showRep
   const title = runTitle(latest);
   const ticket = ticketWords(latest, showRepo);
   const isPlugin = latest.ticket_source === "plugin";
+  // How it started, from the gateway; older backends get the ticket as before.
+  const source = latest.trigger ? (
+    <RunTriggerLine trigger={latest.trigger} title={title} />
+  ) : isPlugin ? (
+    `Plugin ${latest.ticket_id?.replace(/^plugin:/, "") ?? ""}`
+  ) : ticket && ticket !== title ? (
+    ticket
+  ) : null;
   return (
     <ListRow
       select={select}
@@ -362,7 +393,7 @@ function RunItem({ group, showRepo, select, spacer }: { group: RunGroup; showRep
       titleText={title}
       href={runPage(latest)}
       meta={[
-        isPlugin ? `Plugin ${latest.ticket_id?.replace(/^plugin:/, "") ?? ""}` : ticket && ticket !== title ? ticket : null,
+        source,
         showRepo ? latest.repo : null,
         latest.duration_s ? `took ${formatDuration(latest.duration_s)}` : null,
       ]}
