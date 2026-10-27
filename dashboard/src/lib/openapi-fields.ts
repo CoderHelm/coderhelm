@@ -2,7 +2,7 @@
 // docs/api/openapi.json. Do not edit; run `npm run openapi:fields` instead.
 
 /** The platform commit this was generated from. */
-export const OPENAPI_REF = "a28e8731edfe06d68e05d8c0f842139ccd241096";
+export const OPENAPI_REF = "3d0ddc4ab9a1acd97adbcf713032bb3a9b625212";
 
 /** The fields each public API schema has. */
 export interface OpenApiFields {
@@ -53,18 +53,20 @@ export interface OpenApiFields {
   ReviewsPage: "next" | "reviews";
   RotateBody: "overlap_hours";
   RotatedSecret: "previous_secret_expires_at" | "secret";
-  Run: "answers" | "answers_url" | "applied_standards" | "branch" | "branches" | "cache_read_tokens" | "cache_write_tokens" | "close_reason" | "closed_at" | "closed_by" | "closed_from" | "continued_run_id" | "cost_usd" | "created_at" | "current_pass" | "duration_s" | "error" | "files_modified" | "fix_location" | "lesson" | "mcp_servers" | "outside_change_report" | "pass_history" | "policy_approval" | "policy_note" | "pr_number" | "pr_numbers" | "pr_url" | "pr_urls" | "progress_notes" | "questions" | "questions_url" | "repo" | "run_id" | "sign_in_prompts" | "status" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out" | "updated_at";
+  Run: "answers" | "answers_url" | "applied_standards" | "branch" | "branches" | "cache_read_tokens" | "cache_write_tokens" | "close_reason" | "closed_at" | "closed_by" | "closed_from" | "continued_run_id" | "cost_usd" | "created_at" | "current_pass" | "duration_s" | "error" | "files_modified" | "fix_location" | "lesson" | "mcp_servers" | "outside_change_report" | "pass_history" | "policy_approval" | "policy_note" | "pr_number" | "pr_numbers" | "pr_url" | "pr_urls" | "progress_notes" | "questions" | "questions_url" | "repo" | "run_id" | "sign_in_prompts" | "status" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out" | "trigger" | "updated_at";
   RunActionResult: "status";
   RunAnswer: "answer" | "answered_at" | "author" | "question" | "question_id";
   RunNote: "message" | "timestamp";
   RunPass: "pass" | "started_at";
   RunQuestion: "decision" | "id" | "question" | "suggestions" | "why";
-  RunSummary: "cost_usd" | "created_at" | "current_pass" | "duration_s" | "pr_number" | "pr_url" | "repo" | "run_id" | "status" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out";
+  RunSummary: "cost_usd" | "created_at" | "current_pass" | "duration_s" | "pr_number" | "pr_url" | "repo" | "run_id" | "status" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out" | "trigger";
+  RunTrigger: "by" | "kind" | "label" | "ref" | "ref_url";
   RunsPage: "next" | "runs" | "scanned";
   SecretView: "previous_secret_expires_at" | "secret";
   SnsEnvelope: "Message" | "MessageId" | "Signature" | "SignatureVersion" | "SigningCertURL" | "Subject" | "SubscribeURL" | "Timestamp" | "TopicArn" | "Type";
   SourceRow: "deliveries" | "direction" | "failed" | "ok" | "p95_ms" | "previous_deliveries" | "previous_success_rate" | "source" | "success_rate";
   Totals: "deliveries" | "failed" | "handled" | "ignored" | "p50_ms" | "p95_ms" | "p99_ms" | "retried" | "retried_ok" | "retries" | "success_rate";
+  TriggerKind: never;
   UpdateEndpointBody: "description" | "enabled" | "events" | "url";
   Usage: "cache_hit_rate" | "cache_read_tokens" | "cache_write_tokens" | "counted_tokens" | "features" | "limit_counts_cache" | "limits" | "limits_legacy" | "max_tokens" | "month" | "new_tokens" | "tokens_in" | "tokens_out" | "total_runs" | "total_tokens";
   UsageFeature: "cache_read_tokens" | "cache_write_tokens" | "feature" | "tokens_in" | "tokens_out" | "total_tokens";

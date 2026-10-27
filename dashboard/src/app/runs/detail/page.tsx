@@ -30,6 +30,7 @@ import { Problem, TechnicalDetails } from "@/components/problem";
 import { CopyButton } from "@/components/copy-button";
 import { Code } from "@/components/settings/code";
 import { ChevronRightIcon, ExternalLinkIcon } from "@/components/icons";
+import { RunTriggerLine } from "@/components/run-trigger";
 
 const PASSES = ["triage", "plan", "implement", "test", "security", "pr", "review"];
 
@@ -795,7 +796,16 @@ function RunDetailInner() {
         lead={
           <span className="[overflow-wrap:anywhere]">
             {run.repo || "Choosing a repository…"}
-            {ticketShort ? ` · ${sourceWord} ${ticketShort}` : ""}
+            {run.trigger ? (
+              <>
+                {" · "}
+                <RunTriggerLine trigger={run.trigger} title={run.title} className="align-baseline" />
+              </>
+            ) : ticketShort ? (
+              ` · ${sourceWord} ${ticketShort}`
+            ) : (
+              ""
+            )}
             {run.created_at ? <> · started <Time iso={run.created_at} /></> : null}
           </span>
         }
@@ -1057,7 +1067,8 @@ function RunDetailInner() {
               )}
               {run.ticket_id && (
                 <>
-                  <dt className="text-zinc-400">Ticket</dt>
+                  {/* Coderhelm's own tickets (a flaky test, a log finding) have an internal id, not a ticket people know. */}
+                  <dt className="text-zinc-400">{!run.trigger || ["jira", "github", "plan"].includes(run.trigger.kind) ? "Ticket" : "Internal ID"}</dt>
                   <dd className="min-w-0 [overflow-wrap:anywhere] text-zinc-200">{run.ticket_id}</dd>
                 </>
               )}

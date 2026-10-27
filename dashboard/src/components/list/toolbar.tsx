@@ -50,6 +50,8 @@ export interface ListToolbarProps {
     onChange: (value: string) => void;
     options: { value: string; label: string }[];
   };
+  /** More filters of the page's own, after the status toggles (a select). */
+  filters?: ReactNode;
   /** Secondary actions at the end of the bar (a "More" menu, a small button). */
   actions?: ReactNode;
   /** Shown as "Clear filters" while any filter is set. */
@@ -59,13 +61,14 @@ export interface ListToolbarProps {
   className?: string;
 }
 
-export function ListToolbar({ search, status, repo, sort, actions, onClear, summary, className = "" }: ListToolbarProps) {
+export function ListToolbar({ search, status, repo, sort, filters, actions, onClear, summary, className = "" }: ListToolbarProps) {
   const showRepo = !!repo && (repo.repos.length > 1 || !!repo.value);
   return (
     <div className={`min-w-0 ${className}`} data-testid="list-toolbar">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         {search && <SearchField {...search} />}
         {status && <StatusToggles {...status} />}
+        {filters}
         {showRepo && <RepoFilter {...repo} />}
         {sort && <SortSelect {...sort} />}
         {actions && <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div>}
