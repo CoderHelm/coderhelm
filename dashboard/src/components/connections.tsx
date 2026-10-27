@@ -378,17 +378,24 @@ export function AwsAbilitiesPanel({
           </fieldset>
         )}
       </div>
-      {missing.length > 0 && a.update_url && (
-        <Callout variant="warning" title={`Add ${missing.join(" and ")} to your Coderhelm role`} live={false}>
+      {(missing.length > 0 || a.permissions?.status === "update_needed") && a.update_url && (
+        <Callout
+          variant="warning"
+          title={
+            a.permissions?.status === "update_needed"
+              ? `Update needed: ${a.permissions.missing_count} new read-only permission${a.permissions.missing_count === 1 ? "" : "s"}`
+              : `Add ${missing.join(" and ")} to your Coderhelm role`
+          }
+          live={false}
+        >
           <p>
-            The role can&apos;t read {missing.join(" or ")} yet. One click adds read-only access as a small stack in your account
-            ({a.stack_name ?? "CoderHelmLogReaderOps"}); it doesn&apos;t change your existing stack, and deleting it takes the access away. Then
-            check again.
+            One click adds exactly the new read-only permissions to your existing role, as a small stack in your account ({a.stack_name}). Everything
+            stays read-only. Sign in to account {a.account} first, then check again.
           </p>
           {canEdit && (
             <p className="mt-2">
               <a href={a.update_url} target="_blank" rel="noreferrer" className={primaryButton}>
-                Add access in AWS
+                Update in AWS
               </a>
             </p>
           )}
