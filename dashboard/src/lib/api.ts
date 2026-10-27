@@ -1838,6 +1838,23 @@ export interface BulkCloseAnswer {
   failed: number;
 }
 
+/** The last fix round on a run's open pull request that didn't finish. */
+export interface RoundIncomplete {
+  /** `ci_fix`, `review_fix` or `feedback`. */
+  kind?: string | null;
+  number: number;
+  /** Why it stopped, in plain words. */
+  reason: string;
+  /** "Pull request open; the last fix round didn't finish: …" */
+  summary: string;
+  /** Commits it pushed before it stopped, oldest first. */
+  pushed: { sha: string; message: string }[];
+  files: string[];
+  at: string;
+  /** Retry resumes the round on the same pull request. */
+  can_resume: boolean;
+}
+
 export interface RunDetail extends Run {
   /** Why an agent loop stopped (agents paused, an approval nobody answered). */
   policy_note?: string | null;
@@ -1860,6 +1877,8 @@ export interface RunDetail extends Run {
   /** Team standards the run's passes were given in full ("Always apply"). */
   applied_standards?: string[];
   progress_notes?: { message: string; timestamp: string }[];
+  /** Set when the pull request is open but the last fix round on it didn't finish. */
+  round_incomplete?: RoundIncomplete | null;
   /** Where the planner decided the fix belongs: code, outside_code, both or unknown. */
   fix_location?: string | null;
   /** Markdown report when the fix is (partly) a change outside the code. */

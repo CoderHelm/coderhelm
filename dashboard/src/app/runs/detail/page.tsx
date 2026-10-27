@@ -520,6 +520,22 @@ function RunDetailInner() {
   const openPrs = run.pr_number && run.status !== "merged" ? [...new Set([run.pr_number, ...(run.pr_numbers ?? [])])] : [];
   const limitTitle = limitHit ? `The monthly ${limitName(limitHit.kind)} limit is reached` : undefined;
 
+  // The pull request is open but its last fix round didn't finish: Retry
+  // resumes that round on the same run (the gateway's retry path).
+  const unfinished = run.round_incomplete ?? null;
+  const canResume = !!unfinished?.can_resume;
+  const resumeRound = async () => {
+    setBusy("retry");
+    try {
+      await api.retryRun(runId);
+      setRun((r) => (r ? { ...r, status: "awaiting_ci", round_incomplete: null } : r));
+      toast("Resuming the fix round on the same pull request");
+    } catch (e) {
+      toast(actionError(e, "resume this fix round"), "error");
+    } finally {
+      setBusy(null);
+    }
+  };
   const retry = async () => {
     setBusy("retry");
     try {
@@ -654,7 +670,35 @@ function RunDetailInner() {
   );
 
   let outcome: React.ReactNode;
-  if (run.status === "failed") {
+  if (done && unfinished) {
+    outcome = (
+      <OutcomeCard
+        tone="attention"
+        title="Pull request open; the last fix round didn't finish"
+        testId="run-outcome"
+        actions={
+          <>
+            {canAct && canResume && (
+              <button type="button" onClick={resumeRound} disabled={busy !== null || tokensExceeded} title={limitTitle} className={primaryButton} data-testid="resume-round">
+                {busy === "retry" ? "Resuming…" : "Resume"}
+              </button>
+            )}
+            {openPrButtons("secondary")}
+          </>
+        }
+      >
+        <div className="space-y-1" data-testid="round-incomplete">
+          <p className="[overflow-wrap:anywhere]">{unfinished.reason ? `${unfinished.reason.charAt(0).toUpperCase()}${unfinished.reason.slice(1)}.` : "It stopped before it finished."}</p>
+          <p className="text-zinc-400">
+            {unfinished.pushed.length
+              ? `It pushed ${unfinished.pushed.length} commit${unfinished.pushed.length === 1 ? "" : "s"} to the pull request first (${unfinished.pushed.map((p) => p.sha.slice(0, 7)).join(", ")}). Nothing it wrote was lost.`
+              : "It pushed no commits before it stopped."}{" "}
+            {canAct && canResume ? "Resume runs the round again on the same pull request with a fresh time budget." : "Ask someone with member access to resume it."}
+          </p>
+        </div>
+      </OutcomeCard>
+    );
+  } else if (run.status === "failed") {
     outcome = (
       <Problem
         testId="run-outcome"
@@ -792,7 +836,7 @@ function RunDetailInner() {
       <PageHeader
         detail
         title={run.title || "Untitled run"}
-        status={<RunStatusBadge status={run.status} />}
+        status={<RunStatusBadge status={run.status} unfinishedRound={!!run.round_incomplete && ["completed", "success"].includes(run.status)} />}
         lead={
           <span className="[overflow-wrap:anywhere]">
             {run.repo || "Choosing a repository…"}

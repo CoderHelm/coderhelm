@@ -65,8 +65,11 @@ export function runIsLive(status: string | null | undefined): boolean {
   return !!status && !!LOOKS[status]?.live;
 }
 
-export function RunStatusBadge({ status }: { status: string | null | undefined }) {
-  const look = runStatusLook(status);
+/** A finished run whose pull request is open while its last fix round didn't finish. */
+const UNFINISHED_ROUND: RunLook = { label: "PR open, fix unfinished", tone: "attention", group: "done" };
+
+export function RunStatusBadge({ status, unfinishedRound }: { status: string | null | undefined; unfinishedRound?: boolean }) {
+  const look = unfinishedRound ? UNFINISHED_ROUND : runStatusLook(status);
   return (
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${TONES[look.tone].chip}`}>
       <StatusDot tone={look.tone} live={look.live} className="!h-1.5 !w-1.5" />
