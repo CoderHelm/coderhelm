@@ -109,7 +109,7 @@ test("shows rewards, categories, changes with evidence, examples and variants", 
   await expect(style).toContainText("PR #12345");
 
   await expect(page.locator("#exemplars")).toContainText("To follow");
-  await expect(page.locator("#exemplars")).toContainText("Ask for a test of the retry path");
+  await expect(page.getByTestId("example-ex1")).toContainText("Ask for a test of the retry path");
   await expect(page.getByTestId("bandit-reviewer")).toContainText("Gathering outcomes");
   // Scoring rules fold away under Advanced.
   await expect(page.getByRole("table", { name: "Signal weights" })).toBeHidden();
@@ -256,6 +256,8 @@ test("with no outcomes yet it says what it needs", async ({ page }) => {
   await expect(page.getByText("Nothing learned yet")).toBeVisible();
   await expect(page.getByText(/needs 8 outcomes in a repository before anything changes/)).toBeVisible();
   await expect(page.getByText(/No changes yet/)).toBeVisible();
+  await expect(page.locator("#exemplars").getByText("No examples yet")).toBeVisible();
+  await expect(page.getByRole("group", { name: "Show examples" })).toHaveCount(0);
   await expect(page.getByTestId("reward-chart")).toHaveCount(0);
 });
 
@@ -285,4 +287,155 @@ test("fits a phone without sideways scroll, and pictures at both widths", async 
     await noSideways(page);
     await page.screenshot({ path: path.join(SHOTS_DIR, `learning-${width > 500 ? "desktop" : "phone"}.png`), fullPage: true });
   }
+});
+
+// ── Examples in use ──────────────────────────────────────────────────────
+
+test("examples are one compact row each, most used first, ten at a time", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/learning");
+  const section = page.locator("#exemplars");
+  const toggles = section.getByRole("group", { name: "Show examples" });
+  await expect(toggles.getByRole("button", { name: /To follow/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(toggles.getByRole("button", { name: /To follow/ })).toContainText("13");
+  await expect(toggles.getByRole("button", { name: /To avoid/ })).toContainText("2");
+
+  const list = section.getByRole("list", { name: "Examples to follow" });
+  const rows = list.getByRole("listitem");
+  await expect(rows).toHaveCount(10);
+  // Most used first: 6 uses, then 4, then the rest by reward.
+  await expect(rows.nth(0)).toHaveAttribute("data-testid", "example-ex2");
+  await expect(rows.nth(1)).toHaveAttribute("data-testid", "example-ex1");
+  await expect(rows.nth(2)).toContainText("step 11");
+
+  // A row: title, reason, kind and path tags, repo with the PR link, reward and uses.
+  const ex2 = page.getByTestId("example-ex2");
+  await expect(ex2).toContainText("Retry the import once with the same key");
+  await expect(ex2.getByTestId("example-reason")).toHaveText("CI passed on the first try, merged without changes");
+  await expect(ex2).toContainText("Code change");
+  await expect(ex2).toContainText("services/payments");
+  await expect(ex2.getByRole("link", { name: /#12340/ })).toHaveAttribute("href", `https://github.com/${REPO_2}/pull/12340`);
+  await expect(ex2).toContainText("+1.50");
+  await expect(ex2).toContainText("6×");
+  // The summary waits for the panel: no long text in the list.
+  await expect(ex2).not.toContainText("idempotency key");
+  await expect(section).toContainText("Showing 10 of 13, most used first");
+
+  await section.getByRole("button", { name: "Show 3 more" }).click();
+  await expect(rows).toHaveCount(13);
+  await expect(section.getByRole("button", { name: /Show \d+ more/ })).toHaveCount(0);
+  await noSideways(page);
+});
+
+test("examples to avoid read clean, even ones kept with GitHub markup", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/learning");
+  const section = page.locator("#exemplars");
+  await section.getByRole("group", { name: "Show examples" }).getByRole("button", { name: /To avoid/ }).click();
+  const list = section.getByRole("list", { name: "Examples to avoid" });
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+  const legacy = page.getByTestId("example-ex_legacy");
+  await expect(legacy.getByRole("button")).toHaveText("fix(checkout): cache the cart");
+  await expect(legacy.getByTestId("example-reason")).toHaveText("Closed, rewritten or reverted");
+  for (const raw of ["<!--", "Source ticket", "[!WARNING]", "**", "##"]) await expect(section).not.toContainText(raw);
+  await legacy.getByRole("button").click();
+  const panel = page.getByTestId("example-panel");
+  await expect(panel.getByTestId("example-summary")).toContainText("Cache the cart for five minutes.");
+  for (const raw of ["<!--", "Source ticket", "[!WARNING]", "**"]) await expect(panel).not.toContainText(raw);
+});
+
+test("search, repository and kind narrow the examples and can be cleared", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/learning");
+  const section = page.locator("#exemplars");
+  const toggles = section.getByRole("group", { name: "Show examples" });
+  await section.getByRole("searchbox", { name: "Search examples" }).fill("idempotency");
+  await expect(section.getByRole("list", { name: "Examples to follow" }).getByRole("listitem")).toHaveCount(2);
+  await expect(toggles.getByRole("button", { name: /To avoid/ })).toContainText("0");
+
+  await section.getByRole("button", { name: "Clear filters" }).first().click();
+  await section.getByLabel("Filter examples by kind").selectOption("fix");
+  const rows = section.getByRole("list", { name: "Examples to follow" }).getByRole("listitem");
+  await expect(rows).toHaveCount(5);
+  for (const t of await rows.allTextContents()) expect(t).toContain("Code change");
+
+  await section.getByLabel("Filter examples by repository").selectOption(REPO);
+  await expect(rows).toHaveCount(2);
+  await section.getByRole("searchbox", { name: "Search examples" }).fill("nothing like this");
+  await expect(section.getByTestId("list-empty")).toContainText("No examples match");
+  await section.getByTestId("list-empty").getByRole("button", { name: "Clear filters" }).click();
+  await expect(rows).toHaveCount(10);
+});
+
+test("a row opens the whole example beside the list", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/learning");
+  await page.getByTestId("example-ex1").getByRole("button").click();
+  const panel = page.getByTestId("example-panel");
+  await expect(panel.getByRole("heading", { name: "Ask for a test of the retry path in the payments client." })).toBeVisible();
+  await expect(panel).toContainText("The author changed the code it pointed at");
+  // Markdown is drawn, not shown as marks.
+  await expect(panel.getByTestId("example-summary").locator("strong")).toHaveText("no test");
+  await expect(panel.getByTestId("example-summary").locator("li")).toHaveCount(2);
+  await expect(panel.getByRole("link", { name: /#12345 on GitHub/ })).toHaveAttribute("href", `https://github.com/${REPO}/pull/12345`);
+  await expect(panel).toContainText("from 2 outcomes");
+  await expect(panel).toContainText("Used 4 times");
+  const uses = panel.getByTestId("example-uses").getByRole("listitem");
+  await expect(uses).toHaveCount(2);
+  // Latest first.
+  await expect(uses.first()).toContainText("Review of #12361");
+  await page.keyboard.press("Escape");
+  await expect(panel).toHaveCount(0);
+  // Focus goes back to the row that opened it.
+  await expect(page.getByTestId("example-ex1").getByRole("button")).toBeFocused();
+
+  // A code change links its run and the runs that used it.
+  await page.getByTestId("example-ex2").getByRole("button").click();
+  await expect(panel.getByRole("link", { name: "The run that wrote it" })).toHaveAttribute("href", /^\/runs\/detail\/?\?id=01JRUNEXAMPLE0000000000042$/);
+  await expect(panel.getByRole("link", { name: /Coding run/ })).toHaveAttribute("href", /^\/runs\/detail\/?\?id=01JRUNUSEDBY00000000000007$/);
+  await expect(panel.locator("pre")).toContainText("await importOnce(key);");
+});
+
+test("examples at 1440 and 390, list and panel", async ({ page }) => {
+  await mockApi(page);
+  fs.mkdirSync(SHOTS_DIR, { recursive: true });
+  for (const width of [1440, 390]) {
+    const name = width > 500 ? "desktop" : "phone";
+    await page.setViewportSize({ width, height: width > 500 ? 900 : 844 });
+    await page.goto("/learning");
+    const section = page.locator("#exemplars");
+    await expect(page.getByTestId("example-ex2")).toBeVisible();
+    await noSideways(page);
+    // Tall enough that the section needs no scrolling, so the sticky top bar stays out of the picture.
+    await page.setViewportSize({ width, height: 6000 });
+    await section.screenshot({ path: path.join(SHOTS_DIR, `learning-examples-${name}.png`) });
+    await page.setViewportSize({ width, height: width > 500 ? 900 : 844 });
+    await page.getByTestId("example-ex1").getByRole("button").click();
+    const panel = page.getByTestId("example-panel");
+    await expect(panel).toBeVisible();
+    const box = await panel.boundingBox();
+    // A side panel on a wide screen, the whole screen on a phone.
+    if (width > 500) expect(box!.width).toBeLessThanOrEqual(width / 2);
+    else expect(Math.round(box!.width)).toBe(width);
+    await page.waitForTimeout(200);
+    await page.screenshot({ path: path.join(SHOTS_DIR, `learning-example-panel-${name}.png`) });
+    await page.keyboard.press("Escape");
+  }
+});
+
+test("examples show a skeleton while another repository loads", async ({ page }) => {
+  await mockApi(page);
+  let release: () => void = () => {};
+  const held = new Promise<void>((r) => (release = r));
+  await page.goto("/learning");
+  await expect(page.getByTestId("example-ex2")).toBeVisible();
+  await page.route("**/api/learning?*", async (route) => {
+    if (route.request().url().includes("repo=")) await held;
+    await route.fallback();
+  });
+  await page.getByTestId("repo-filter").click();
+  await page.getByTestId("combo-popover").getByRole("option", { name: REPO, exact: true }).first().click();
+  await expect(page.locator("#exemplars").getByTestId("list-skeleton")).toBeVisible();
+  release();
+  await expect(page.locator("#exemplars").getByTestId("list-skeleton")).toHaveCount(0);
 });

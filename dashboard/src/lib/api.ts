@@ -3712,6 +3712,14 @@ export interface LearningCategory {
   reason: string;
 }
 
+/** One time an example was given to an agent: a coding run, or a review of a pull request. */
+export interface LearningExemplarUse {
+  at: string;
+  agent: "reviewer" | "coder" | (string & {});
+  run_id?: string;
+  pr?: number;
+}
+
 export interface LearningExemplar {
   id: string;
   repo: string;
@@ -3719,11 +3727,24 @@ export interface LearningExemplar {
   polarity: "good" | "avoid";
   category: string;
   area: string;
+  /** One clean line; older gateways send only `text`. */
+  title?: string;
+  /** Short markdown, markup and boilerplate removed. */
+  summary?: string;
+  /** Why it is an example ("CI passed on the first try, merged without changes"). */
+  reason?: string;
   text: string;
   reward: number;
+  /** Outcomes its reward adds up. */
+  events?: number;
   uses: number;
   created_at: string;
   pr?: number;
+  /** The run that made the change (code changes). */
+  run_id?: string;
+  last_used_at?: string;
+  /** The latest uses, oldest first. */
+  used_by?: LearningExemplarUse[];
 }
 
 export interface LearningArm {

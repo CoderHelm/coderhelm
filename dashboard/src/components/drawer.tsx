@@ -1,7 +1,7 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import { focusRing } from "./ui";
 
 /**
@@ -11,6 +11,9 @@ import { focusRing } from "./ui";
  * to the row that opened it, as for <Modal>.
  *
  * The header (title, `actions`) and `footer` stay put; only the body scrolls.
+ *
+ * A drawer opened without a Radix trigger (a row's own button) passes that
+ * button as `returnFocusTo`, so closing it puts focus back on the row.
  */
 export function Drawer({
   open,
@@ -20,6 +23,7 @@ export function Drawer({
   actions,
   footer,
   testId,
+  returnFocusTo,
   children,
 }: {
   open: boolean;
@@ -31,6 +35,8 @@ export function Drawer({
   actions?: ReactNode;
   footer?: ReactNode;
   testId?: string;
+  /** Where focus goes on close when nothing else claims it (the row that opened it). */
+  returnFocusTo?: RefObject<HTMLElement | null>;
   children?: ReactNode;
 }) {
   return (
@@ -39,6 +45,13 @@ export function Drawer({
         <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/60" />
         <Dialog.Content
           data-testid={testId}
+          onCloseAutoFocus={(e) => {
+            const el = returnFocusTo?.current;
+            if (el?.isConnected) {
+              e.preventDefault();
+              el.focus();
+            }
+          }}
           {...(description ? {} : { "aria-describedby": undefined })}
           className="fixed inset-0 z-[61] flex h-[100dvh] flex-col overflow-hidden bg-zinc-900 shadow-2xl sm:left-auto sm:w-[min(40rem,100vw)] sm:border-l sm:border-zinc-800"
         >

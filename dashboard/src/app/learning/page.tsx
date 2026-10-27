@@ -9,14 +9,14 @@ import {
   type LearningBandit,
   type LearningCategory,
   type LearningChange,
-  type LearningExemplar,
 } from "@/lib/api";
 import { CardSkeleton, ChartSkeleton } from "@/components/skeleton";
+import { Examples } from "./examples";
 import { StatGrid, StatTile } from "@/components/stat-tile";
 import { DataTable, type Column } from "@/components/data-table";
 import { Problem } from "@/components/problem";
 import { Segmented } from "@/components/segmented";
-import { RepoFilter } from "@/components/list";
+import { ListSkeleton, RepoFilter } from "@/components/list";
 import { Callout } from "@/components/callout";
 import { Disclosure } from "@/components/disclosure";
 import { ChevronRightIcon } from "@/components/icons";
@@ -363,46 +363,6 @@ function ChangeItem({
 }
 
 
-function Exemplar({ e }: { e: LearningExemplar }) {
-  return (
-    <li className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
-      <p className="text-xs text-zinc-400">
-        {e.kind === "fix" ? "Code change" : "Review comment"}
-        {e.category ? ` · ${e.category}` : ""}
-        {e.area ? ` · ${e.area}` : ""}
-      </p>
-      <p className="mt-1 text-sm text-zinc-200">{e.text}</p>
-      <p className="mt-1 text-xs text-zinc-400">
-        {e.repo}
-        {e.pr ? ` · PR #${e.pr}` : ""} · reward {signed(e.reward)} · {e.uses === 0 ? "not used yet" : `used ${plural(e.uses, "time")}`}
-      </p>
-    </li>
-  );
-}
-
-function Exemplars({ list }: { list: LearningExemplar[] }) {
-  const good = list.filter((e) => e.polarity === "good");
-  const avoid = list.filter((e) => e.polarity === "avoid");
-  return (
-    <Section
-      title="Examples in use"
-      id="exemplars"
-      description="Past work with the best and worst outcomes in each repository. The agents read the closest ones before they write a review or a change: the first to follow, the second to avoid."
-    >
-      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-        <div className="min-w-0">
-          <h3 className="mb-2 text-sm font-medium text-zinc-200">To follow</h3>
-          {good.length ? <ul className="space-y-2">{good.map((e) => <Exemplar key={e.id} e={e} />)}</ul> : <p className="text-sm text-zinc-400">None yet.</p>}
-        </div>
-        <div className="min-w-0">
-          <h3 className="mb-2 text-sm font-medium text-zinc-200">To avoid</h3>
-          {avoid.length ? <ul className="space-y-2">{avoid.map((e) => <Exemplar key={e.id} e={e} />)}</ul> : <p className="text-sm text-zinc-400">None yet.</p>}
-        </div>
-      </div>
-    </Section>
-  );
-}
-
 function BanditCard({ b, canManage, busy, minSamples, onPin }: { b: LearningBandit; canManage: boolean; busy: boolean; minSamples: number; onPin: (agent: string, arm: string | null) => void }) {
   const refusal = canManage ? undefined : "Only an admin or the owner can pin a variant";
   return (
@@ -642,6 +602,7 @@ export default function LearningPage() {
             {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
           </div>
           <ChartSkeleton />
+          <ListSkeleton rows={4} label="Loading what Coderhelm learned" />
         </div>
       ) : data ? (
         <div aria-busy={loading || busy}>
@@ -740,7 +701,7 @@ export default function LearningPage() {
             )}
           </Section>
 
-          <Exemplars list={data.exemplars} />
+          <Examples list={data.exemplars} loading={loading && (data.repo ?? "") !== repo} />
 
           <Section
             title="Variants"
