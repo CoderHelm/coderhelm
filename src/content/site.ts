@@ -37,6 +37,7 @@ export const SITE = {
     "Works with: GitHub (GitHub App), Jira (Forge app), Microsoft Teams, AWS (CloudWatch alarms through SNS, CloudWatch Logs, PostgreSQL, Redshift), GraphQL APIs, Playwright, JUnit and Cucumber reports, and 17 MCP servers.",
     "Starts a run when: a GitHub issue is assigned to CoderHelm, gets the `coderhelm` label, or gets a `/coderhelm` or `@coderhelm` comment; a Jira ticket is assigned to CoderHelm or gets the `coderhelm` label.",
     "Reviews any pull request that gets the review label (`ch-review` by default) once a repository turns the reviewer on.",
+    "Learning: it scores its own work from what happens next (a pull request merged as written or edited, closed or reverted; CI passing on the first try or needing fixes; review comments acted on or dismissed; thumbs up or down), reads the best and worst past examples from the repository before a change or a review, and turns justified pushback on a review into a lesson. Lessons, memories, examples and behavior changes are listed with their evidence, and admins can delete or turn off any of them.",
     "Not: a code editor or IDE plugin. It works through issues, tickets and pull requests.",
   ],
   featureList: [
@@ -45,6 +46,9 @@ export const SITE = {
     "AI code review on any GitHub pull request",
     "Fixes failing CI on its own pull requests",
     "Answers review comments and pushes fixes",
+    "Learns from pull request outcomes, CI results and review feedback",
+    "Reads its best and worst past work in a repository before it writes",
+    "Lessons and memories your admins can read, edit and delete",
     "CloudWatch alarm to pull request through SNS",
     "Flaky test detection and quarantine",
     "Read only lookups in GraphQL APIs, CloudWatch Logs, PostgreSQL and Redshift",
@@ -61,8 +65,8 @@ export const SITE = {
   ],
   sameAs: ["https://github.com/CoderHelm"],
   ctaNote: "CoderHelm is in closed beta. Sign in to request access; you bring your own Anthropic API key.",
-  updated: "2026-10-26",
-  updatedLabel: "October 26, 2026",
+  updated: "2026-10-27",
+  updatedLabel: "October 27, 2026",
   year: 2026,
 } as const;
 
@@ -245,6 +249,47 @@ const home: Page = {
         {
           type: "p",
           text: "Works with GitHub, Jira, Microsoft Teams, AWS, Playwright, JUnit and Cucumber reports, 17 MCP servers, and Claude models through your own Anthropic API key or Amazon Bedrock. Build on it with the [public API](https://docs.coderhelm.com/api/) and [signed webhooks](https://docs.coderhelm.com/api/webhooks/) that tell your systems what it did.",
+        },
+      ],
+    },
+    {
+      id: "learning",
+      eyebrow: "Learning",
+      heading: "Gets better with your team.",
+      blocks: [
+        {
+          type: "p",
+          text: "CoderHelm learns from what happens to its work on your repositories, and everything it learns is written down where you can read it.",
+        },
+        {
+          type: "cards",
+          items: [
+            {
+              title: "Learns from what happens next",
+              text: "A pull request merged as written or after edits, closed or reverted. CI passing on the first try or needing fixes. Review comments acted on or dismissed, and a thumbs up or down on a review. Each outcome scores the work.",
+            },
+            {
+              title: "Reads past work before it writes",
+              text: "Before a change or a review, it reads the closest past examples from that repository: the ones that went best, to follow, and the ones that went worst, to avoid.",
+            },
+            {
+              title: "The reviewer learns from pushback",
+              text: "When someone dismisses a review, argues a comment or merges anyway, it checks whether the review was wrong. If it was, it writes one lesson for later reviews and shows what it changed and why.",
+              href: "/reviewer/",
+            },
+            {
+              title: "Everything it learns, you can see",
+              text: "Lessons, memories, examples and each change to how it works are listed with the evidence behind them. Admins can delete a lesson, edit or forget a memory, and turn off any change.",
+              href: "/skills/#memory",
+            },
+          ],
+        },
+        {
+          type: "actions",
+          items: [
+            { label: "How the reviewer learns", href: "https://docs.coderhelm.com/getting-started/reviewer/#it-learns-from-pushback" },
+            { label: "Memories in the docs", href: "https://docs.coderhelm.com/concepts/memories/" },
+          ],
         },
       ],
     },
