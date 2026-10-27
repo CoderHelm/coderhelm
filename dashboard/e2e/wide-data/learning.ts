@@ -111,13 +111,7 @@ export function learningFixture(o: LearningOpts) {
           change("chg_tests", o.repo, "calibration", "tests", "none", "raise", "Acted on 18 of 20 test comments in this repository (accept rate 90%)."),
           change("chg_naming", o.repo2, "calibration", "naming", "none", "downgrade", "Dismissed 5 of 10 naming comments in this repository."),
         ],
-    exemplars: o.empty
-      ? []
-      : [
-          { id: "ex1", repo: o.repo, kind: "finding", polarity: "good", category: "tests", area: o.file, text: o.text, reward: 1.6, uses: 4, created_at: iso(5 * DAY), pr: 12345 },
-          { id: "ex2", repo: o.repo2, kind: "fix", polarity: "good", category: "", area: "services/payments", text: "Retry the import once with the same key, then stop.", reward: 1.5, uses: 0, created_at: iso(6 * DAY), pr: 12340 },
-          { id: "ex3", repo: o.repo, kind: "finding", polarity: "avoid", category: "style", area: "src/app", text: "Asked to rename a variable the team names this way on purpose.", reward: -1.2, uses: 2, created_at: iso(7 * DAY), pr: 12330 },
-        ],
+    exemplars: o.empty ? [] : exemplarsFixture(o),
     bandit: [
       {
         agent: "reviewer",
@@ -132,6 +126,47 @@ export function learningFixture(o: LearningOpts) {
       },
     ],
   };
+}
+
+/**
+ * Examples as the gateway sends them: a clean title, a short summary, the
+ * reason, uses. `ex_legacy` is one kept before titles were stored (only
+ * `text`, with the markup GitHub bodies carry), read by the page the same way.
+ */
+export function exemplarsFixture(o: Pick<LearningOpts, "repo" | "repo2" | "text" | "file">) {
+  const run = "01JRUNEXAMPLE0000000000042";
+  const base = [
+    {
+      id: "ex1", repo: o.repo, kind: "finding", polarity: "good", category: "tests", area: o.file,
+      title: o.text, summary: "The retry path in the payments client had **no test**.\n\n- Add a test that fails the first call\n- Assert the second call reuses the `idempotency_key`",
+      reason: "The author changed the code it pointed at", text: o.text, reward: 1.6, events: 2, uses: 4, created_at: iso(5 * DAY), pr: 12345,
+      last_used_at: iso(DAY / 4), used_by: [{ at: iso(3 * DAY), agent: "reviewer", pr: 12350 }, { at: iso(DAY / 4), agent: "reviewer", pr: 12361 }],
+    },
+    {
+      id: "ex2", repo: o.repo2, kind: "fix", polarity: "good", category: "", area: "services/payments",
+      title: "Retry the import once with the same key", summary: "Retries the import once with the same idempotency key, then stops and reports the failure.\n\n```ts\nawait importOnce(key);\n```",
+      reason: "CI passed on the first try, merged without changes", text: "Retry the import once with the same key", reward: 1.5, events: 3, uses: 6, created_at: iso(6 * DAY), pr: 12340, run_id: run,
+      last_used_at: iso(DAY / 2), used_by: [{ at: iso(DAY / 2), agent: "coder", run_id: "01JRUNUSEDBY00000000000007" }],
+    },
+    {
+      id: "ex3", repo: o.repo, kind: "finding", polarity: "avoid", category: "style", area: "src/app",
+      title: "Asked to rename a variable the team names this way on purpose", summary: "The team keeps `ctx` for request context across the app.",
+      reason: "The team pushed back and the comment was judged wrong", text: "Asked to rename a variable the team names this way on purpose.", reward: -1.2, events: 1, uses: 2, created_at: iso(7 * DAY), pr: 12330,
+    },
+    {
+      id: "ex_legacy", repo: o.repo2, kind: "fix", polarity: "avoid", category: "", area: "web/checkout",
+      text: "fix(checkout): cache the cart: Source ticket: OPS-7\n\n<!-- coderhelm:unverified -->\n> [!WARNING]\n> **Not yet verified**\n<!-- /coderhelm:unverified -->\n\n## Summary\n**Summary** Cache the cart for five minutes.",
+      reward: -1.8, uses: 1, created_at: iso(9 * DAY), pr: 12301,
+    },
+  ];
+  // More to follow than one page holds, so "Show more" has work to do.
+  const more = Array.from({ length: 11 }, (_, i) => ({
+    id: `exm${i}`, repo: i % 2 ? o.repo2 : o.repo, kind: i % 3 ? "finding" : "fix", polarity: "good", category: i % 3 ? "correctness" : "", area: `src/module${i}`,
+    title: `Check the return value of step ${i + 1}`, summary: `Step ${i + 1} can fail quietly; the comment asked for the error to be returned.`,
+    reason: i % 3 ? "The author changed the code it pointed at" : "Merged after people changed 20% of it", text: `Check the return value of step ${i + 1}`,
+    reward: 1 + i / 10, events: 1, uses: i % 4 === 0 ? 0 : 1, created_at: iso((10 + i) * DAY), pr: 12200 + i,
+  }));
+  return [...base, ...more];
 }
 
 export const learningData: Handler = ({ method, path }) => {
