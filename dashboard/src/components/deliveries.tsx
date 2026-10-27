@@ -127,6 +127,24 @@ export interface DeliveryFilters {
   status: string;
   range: string;
   q: string;
+  /** One hour or day from the overview (RFC 3339, `until` exclusive); replaces `range`. */
+  from?: string;
+  until?: string;
+  /** One webhook endpoint, or one failure reason, from the overview. */
+  endpoint?: string;
+  reason?: string;
+}
+
+/** "Oct 24, 10:00 to 11:00", or "Oct 24" for a whole day. */
+export function windowWords(from: string, until: string): string {
+  const a = new Date(from);
+  const b = new Date(until);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return "the chosen time";
+  const day = (d: Date) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const time = (d: Date) => d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  const hours = (b.getTime() - a.getTime()) / 3_600_000;
+  if (hours >= 23.5 && hours <= 24.5 && a.getHours() === 0) return day(a);
+  return `${day(a)}, ${time(a)} to ${time(b)}`;
 }
 
 // ── The list ────────────────────────────────────────────────────────
@@ -149,6 +167,10 @@ export function Deliveries({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const { source, status, range, q } = filters;
+  const from = filters.from ?? "";
+  const until = filters.until ?? "";
+  const endpoint = filters.endpoint ?? "";
+  const reason = filters.reason ?? "";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -156,8 +178,11 @@ export function Deliveries({
       const r = await api.listDeliveries({
         source: source === "all" ? undefined : source,
         status: status === "all" ? undefined : (status as DeliveryStatusFilter),
-        since: sinceFor(range),
+        since: from || sinceFor(range),
+        until: from ? until || undefined : undefined,
         q: q.trim() || undefined,
+        endpoint: endpoint || undefined,
+        reason: reason || undefined,
         limit: 200,
       });
       setData(r);
@@ -167,7 +192,7 @@ export function Deliveries({
     } finally {
       setLoading(false);
     }
-  }, [source, status, range, q]);
+  }, [source, status, range, q, from, until, endpoint, reason]);
 
   useEffect(() => {
     void load();
@@ -187,8 +212,9 @@ export function Deliveries({
     if (source !== "all") all.add(source);
     return [...all].sort((a, b) => sourceName(a).localeCompare(sourceName(b)));
   }, [data?.sources, source]);
-  const filtering = source !== "all" || status !== "all" || range !== DEFAULT_RANGE || !!q;
-  const clear = () => onFilters({ source: "all", status: "all", range: DEFAULT_RANGE, q: "" });
+  const narrowed = !!from || !!endpoint || !!reason;
+  const filtering = source !== "all" || status !== "all" || range !== DEFAULT_RANGE || !!q || narrowed;
+  const clear = () => onFilters({ source: "all", status: "all", range: DEFAULT_RANGE, q: "", from: "", until: "", endpoint: "", reason: "" });
   const retention = data?.retention_days ?? 14;
 
   return (
@@ -228,12 +254,23 @@ export function Deliveries({
               <option key={s} value={s}>{sourceName(s)}</option>
             ))}
           </FilterSelect>
-          <FilterSelect label="Time range" value={range} onChange={(v) => onFilters({ range: v })}>
-            {RANGES.map((r) => (
-              <option key={r.value} value={r.value}>{r.label}</option>
-            ))}
-          </FilterSelect>
+          {!from && (
+            <FilterSelect label="Time range" value={range} onChange={(v) => onFilters({ range: v })}>
+              {RANGES.map((r) => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </FilterSelect>
+          )}
         </div>
+        {narrowed && (
+          <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2" data-testid="deliveries-narrowed">
+            {from && (
+              <NarrowChip label={`Time: ${windowWords(from, until)}`} onClear={() => onFilters({ from: "", until: "" })} testId="narrow-time" />
+            )}
+            {endpoint && <NarrowChip label={`Endpoint: ${endpoint}`} onClear={() => onFilters({ endpoint: "" })} testId="narrow-endpoint" />}
+            {reason && <NarrowChip label={`Reason: ${statusWords(reason)}`} onClear={() => onFilters({ reason: "" })} testId="narrow-reason" />}
+          </div>
+        )}
         </>
         )}
 
@@ -272,6 +309,18 @@ export function Deliveries({
 
       <DeliveryDrawer id={openId} onClose={() => onOpen("")} onChanged={() => void load()} />
     </div>
+  );
+}
+
+/** One narrowing from the overview, with a button that takes it off. */
+function NarrowChip({ label, onClear, testId }: { label: string; onClear: () => void; testId: string }) {
+  return (
+    <span data-testid={testId} className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-900 py-0.5 pl-3 pr-1 text-xs text-zinc-200">
+      <span className="min-w-0 truncate">{label}</span>
+      <button type="button" onClick={onClear} aria-label={`Remove ${label}`} className={`rounded-full px-1.5 py-0.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 ${focusRing}`}>
+        Remove
+      </button>
+    </span>
   );
 }
 

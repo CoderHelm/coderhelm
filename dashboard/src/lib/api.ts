@@ -1211,6 +1211,13 @@ export const api = {
     return request<DeliveriesReply>(`/api/deliveries${s ? `?${s}` : ""}`);
   },
   getDelivery: (id: string) => request<DeliveryDetailReply>(`/api/deliveries/${encodeURIComponent(id)}`),
+  /** The Deliveries overview: counts per hour or day for a period, against the period before. */
+  getDeliveryAnalytics: (f: DeliveryAnalyticsFilter = {}) => {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(f)) if (v !== undefined && v !== "" && v !== "all") q.set(k, String(v));
+    const s = q.toString();
+    return request<DeliveryAnalytics>(`/api/deliveries/analytics${s ? `?${s}` : ""}`);
+  },
   redeliver: (id: string) =>
     requestWithBody<{ message?: string }, { code?: string }>(`/api/deliveries/${encodeURIComponent(id)}/redeliver`, { method: "POST", body: "{}" }),
 
@@ -3809,7 +3816,13 @@ export interface DeliveryFilter {
   status?: DeliveryStatusFilter;
   /** RFC 3339. */
   since?: string;
+  /** RFC 3339, exclusive: with `since`, one hour or day of the overview. */
+  until?: string;
   q?: string;
+  /** Only deliveries to this webhook endpoint. */
+  endpoint?: string;
+  /** Only failures with this reason code. */
+  reason?: string;
   limit?: number;
 }
 
@@ -3877,6 +3890,112 @@ export interface DeliveryDetailReply {
   delivery: DeliveryFull;
   reason: { code: string; message: string; fix: string } | null;
   can_redeliver: boolean;
+}
+
+export type DeliveryPeriod = "24h" | "7d" | "30d";
+
+export interface DeliveryAnalyticsFilter {
+  period?: DeliveryPeriod;
+  source?: string;
+  /** Retrying deliveries count once they finish, so there is no `pending`. */
+  status?: Exclude<DeliveryStatusFilter, "pending">;
+  endpoint?: string;
+}
+
+export interface DeliveryTotals {
+  deliveries: number;
+  handled: number;
+  ignored: number;
+  failed: number;
+  /** 0..1, or null with nothing finished. */
+  success_rate: number | null;
+  retried: number;
+  retried_ok: number;
+  /** Null while a status filter is on. */
+  retries: number | null;
+  p50_ms: number | null;
+  p95_ms: number | null;
+  p99_ms: number | null;
+}
+
+export interface DeliveryPoint {
+  start: string;
+  end: string;
+  deliveries: number;
+  ok: number;
+  failed: number;
+  success_rate: number | null;
+  p95_ms: number | null;
+  previous_deliveries: number;
+}
+
+export interface DeliverySourceRow {
+  source: string;
+  direction: "inbound" | "outbound";
+  deliveries: number;
+  ok: number;
+  failed: number;
+  success_rate: number | null;
+  p95_ms: number | null;
+  previous_deliveries: number;
+  previous_success_rate: number | null;
+}
+
+export interface DeliveryReasonRow {
+  code: string;
+  message: string;
+  fix: string;
+  count: number;
+  previous_count: number;
+  sources: string[];
+}
+
+export interface DeliveryEventRow {
+  event: string;
+  source: string;
+  failed: number;
+}
+
+export interface DeliveryEndpointRow {
+  id: string;
+  url: string;
+  description: string;
+  deleted: boolean;
+  enabled: boolean;
+  /** "manual" or "failing"; empty while on. */
+  disabled_reason: string;
+  deliveries: number;
+  ok: number;
+  failed: number;
+  success_rate: number | null;
+  p50_ms: number | null;
+  p95_ms: number | null;
+  streak: number;
+  last_failure_at: string | null;
+  last_failure_reason: string | null;
+  last_failure_message: string | null;
+  failing_since: string | null;
+  last_success_at: string | null;
+}
+
+export interface DeliveryAnalytics {
+  period: DeliveryPeriod;
+  granularity: "hour" | "day";
+  from: string;
+  to: string;
+  previous_from: string;
+  previous_to: string;
+  summary: DeliveryTotals;
+  previous: DeliveryTotals;
+  series: DeliveryPoint[];
+  sources: DeliverySourceRow[];
+  reasons: DeliveryReasonRow[];
+  events: DeliveryEventRow[];
+  endpoints: DeliveryEndpointRow[];
+  seen_sources: string[];
+  backfill: { complete: boolean };
+  kept_days: number;
+  records_kept_days: number;
 }
 
 // ── Hybrid (self-hosted) ────────────────────────────────────────────────
