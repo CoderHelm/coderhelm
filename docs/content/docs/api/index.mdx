@@ -20,6 +20,8 @@ Every endpoint is listed under **Reference** in the sidebar, grouped by resource
 https://api.coderhelm.com
 ```
 
+On a [self-hosted install](/self-host/integrations), use your install's own address instead (for example `https://coderhelm.example.com`): its **API keys** page shows it, and it serves its own OpenAPI document at `/openapi.json`. Every path on this site is the same there.
+
 All requests use HTTPS. Bodies are JSON (`Content-Type: application/json`), except the CI report upload, which takes the report file as it is.
 
 ## Your first request

@@ -623,7 +623,7 @@ function SetupSteps({
       id: "subscription",
       label: "Subscription",
       state: lastEvent ? "done" : "missing",
-      detail: lastEvent ? `Working: the last alert arrived ${timeAgo(lastEvent)}.` : "No alert received yet. Subscribe this HTTPS endpoint to the topic; Coderhelm confirms the subscription by itself.",
+      detail: lastEvent ? `Working: the last alert arrived ${timeAgo(lastEvent)}.` : "No alert received yet. Save and turn on the route first, then subscribe this HTTPS endpoint to the topic: Coderhelm confirms the subscription by itself. Subscribed before the route was on? Press Request confirmation on the subscription in SNS.",
     },
   ];
   const allDone = items.every((i) => i.state === "done");

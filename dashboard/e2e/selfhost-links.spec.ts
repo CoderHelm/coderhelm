@@ -23,7 +23,23 @@ const KEYS = {
   limits: { default_rate_per_minute: 60, min_rate_per_minute: 1, max_rate_per_minute: 600, max_expiry_days: 365, max_keys: 20 },
 };
 
-async function selfHosted(page: Page) {
+const JIRA_CHECK = {
+  ready: false, secret_configured: false, configured_repos: { total: 1, enabled: 1 }, enabled_repos: ["your-team/web"], jira_events_seen: false,
+  last_jira_event_at: null, jira_event_count: 0, installation_id: 7, team_id: "t_1", forge_secret: "forge-secret-value",
+};
+const JIRA_CONFIG = { default_project: "", trigger_label: "coderhelm", list_projects_url: "", create_ticket_url: "", add_comment_url: "", site_url: "", projects: [] };
+
+/** Hybrid with CoderHelm's Jira relay on (Settings, System, Hybrid). */
+function hybridWithJira(jira: boolean) {
+  return {
+    available: true, hosted_url: "", registered: true, install_id: "ins_abcdefghijklmnopqrstuvwx", cloudfront: "d111test.cloudfront.net", verified: true, name: null,
+    github: { mode: "own", links: [], app_slug: null },
+    integrations: [{ id: "jira", name: "Jira (Forge app)", mode: "hosted", through_coderhelm: "Ticket events.", stays_with_you: "Ticket contents.", uses_coderhelm: jira }],
+    sharing: { enabled: false, payloads: false }, checks: [],
+  };
+}
+
+async function selfHosted(page: Page, extra: (p: string) => unknown = () => undefined) {
   const outside: string[] = [];
   const calls: string[] = [];
   const json = (route: Route, body: unknown, status = 200) =>
@@ -42,6 +58,8 @@ async function selfHosted(page: Page) {
     const u = new URL(route.request().url());
     calls.push(u.pathname);
     const p = u.pathname;
+    const answer = extra(p);
+    if (answer !== undefined) return json(route, answer);
     if (p === "/api/me") return json(route, ME);
     if (p === "/api/usage") return json(route, { month: "2026-01", total_tokens: 0, tokens_in: 0, tokens_out: 0, total_runs: 0, max_tokens: 0 });
     if (p === "/api/banners") return json(route, { banners: [] });
@@ -99,4 +117,30 @@ test("GitHub settings: Install goes through the install, with its state", async 
   expect(await hostedLinks(page)).toEqual([]);
   await button.click();
   await expect.poll(() => opened).toContain(`${new URL(baseURL!).origin}/auth/github/app?state=`);
+});
+
+test("Jira: without hybrid, the webhook comes first and the app means the install's own copy", async ({ page }) => {
+  const { outside } = await selfHosted(page, (p) =>
+    p === "/api/integrations/jira/check" ? JIRA_CHECK : p === "/api/integrations/jira/config" ? JIRA_CONFIG : p === "/api/integrations/jira/events" ? { events: [], total: 0 } : p === "/api/system/hybrid" ? { available: false } : undefined,
+  );
+  await page.goto("/settings/integrations/jira");
+  await expect(page.getByRole("button", { name: "Jira webhook (recommended)" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Your own copy of the Jira app" }).click();
+  const own = page.getByTestId("jira-own-app");
+  await expect(own).toContainText("sends events to Coderhelm's hosted service, not to this install");
+  await expect(own.getByRole("link", { name: /How to deploy your own copy/ })).toHaveAttribute("href", /docs\.coderhelm\.com\/self-host\/integrations/);
+  await expect(page.locator('a[href*="developer.atlassian.com"]')).toHaveCount(0);
+  expect(await hostedLinks(page)).toEqual([]);
+  expect(outside.filter((u) => u.includes("coderhelm.com"))).toEqual([]);
+});
+
+test("Jira: with hybrid's Jira relay, Coderhelm's app and the install ID", async ({ page }) => {
+  await selfHosted(page, (p) =>
+    p === "/api/integrations/jira/check" ? JIRA_CHECK : p === "/api/integrations/jira/config" ? JIRA_CONFIG : p === "/api/integrations/jira/events" ? { events: [], total: 0 } : p === "/api/system/hybrid" ? hybridWithJira(true) : undefined,
+  );
+  await page.goto("/settings/integrations/jira");
+  await expect(page.getByRole("button", { name: "Jira app (recommended)" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("jira-install-id-note")).toBeVisible();
+  await expect(page.getByText("ins_abcdefghijklmnopqrstuvwx")).toBeVisible();
+  await expect(page.locator('a[href*="developer.atlassian.com"]')).toHaveCount(1);
 });
