@@ -1708,7 +1708,7 @@ export interface LivePr {
   repo: string;
   pr_number: number;
   pr_title?: string;
-  /** reviewing · queued · retrying · waiting_ci · ci_failing · waiting_people · merge_blocked · paused · failed · stalled · merged · closed · new_commits · skipped · reviewed */
+  /** reviewing · queued · retrying · waiting_ci · ci_failing · waiting_people · merge_blocked · merge_conflict · paused · failed · stalled · merged · closed · new_commits · skipped · reviewed */
   status?: string;
   /** active (being reviewed or queued) · waiting · done */
   group?: "active" | "waiting" | "done" | string;
@@ -1888,6 +1888,16 @@ export interface RoundIncomplete {
   can_resume: boolean;
 }
 
+/** One pull request a run opened. */
+export interface RunPr {
+  repo: string;
+  pr_number: number;
+  branch: string;
+  url: string;
+  /** "merged" or "closed" once it ended. */
+  outcome?: string;
+}
+
 export interface RunDetail extends Run {
   /** Why an agent loop stopped (agents paused, an approval nobody answered). */
   policy_note?: string | null;
@@ -1900,6 +1910,9 @@ export interface RunDetail extends Run {
   pr_urls?: string[];
   pr_numbers?: number[];
   branches?: string[];
+  /** Every pull request, each with its own repository (a run across several
+   *  repositories pairs `repo` with only one of them). */
+  prs?: RunPr[];
   files_modified?: string[];
   mcp_servers?: string[];
   cache_read_tokens?: number;

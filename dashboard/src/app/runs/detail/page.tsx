@@ -517,7 +517,9 @@ function RunDetailInner() {
   const closeAsButton = closable && runCloseIsLikely(run.status);
   const closeInMenu = closable && !closeAsButton;
   // The PR the dialog offers to close as well: open, so not merged or closed already.
-  const openPrs = run.pr_number && run.status !== "merged" ? [...new Set([run.pr_number, ...(run.pr_numbers ?? [])])] : [];
+  // Each with its own repository: two repositories can each have a #12.
+  const runPrs = run.prs ?? [];
+  const openPrs = run.status === "merged" ? [] : runPrs.length > 0 ? runPrs.filter((p) => !p.outcome).map((p) => p.pr_number) : run.pr_number ? [...new Set([run.pr_number, ...(run.pr_numbers ?? [])])] : [];
   const limitTitle = limitHit ? `The monthly ${limitName(limitHit.kind)} limit is reached` : undefined;
 
   // The pull request is open but its last fix round didn't finish: Retry
@@ -625,7 +627,9 @@ function RunDetailInner() {
 
   // ── What happened, in one sentence, and the one thing to do next ──
   const prLinks: { url: string; label: string }[] =
-    run.pr_urls && run.pr_urls.length > 1
+    runPrs.length > 1
+      ? runPrs.map((p) => ({ url: p.url, label: `Open ${p.repo}#${p.pr_number}` }))
+      : run.pr_urls && run.pr_urls.length > 1
       ? run.pr_urls.map((url, i) => ({ url, label: `Open pull request #${run.pr_numbers?.[i] ?? i + 1}` }))
       : run.pr_url
         ? [{ url: run.pr_url, label: run.pr_number ? `Open pull request #${run.pr_number}` : "Open pull request" }]

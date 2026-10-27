@@ -18,6 +18,7 @@ const LOOKS: Record<string, StatusLook> = {
   waiting_people: { label: "Waiting for approval", tone: "waiting" },
   ci_failing: { label: "CI failing", tone: "danger" },
   merge_blocked: { label: "Merge blocked", tone: "danger" },
+  merge_conflict: { label: "Merge conflict", tone: "danger" },
   paused: { label: "Auto-merge paused", tone: "neutral" },
   stopped: { label: "Auto-merge stopped", tone: "neutral" },
   failed: { label: "Review failed", tone: "danger" },
@@ -121,6 +122,8 @@ export function summaryLine(pr: LivePr | undefined): string {
       return gateSummary(pr);
     case "merge_blocked":
       return `GitHub refused the merge${pr.gate?.detail ? ` · ${pr.gate.detail}` : ""}`;
+    case "merge_conflict":
+      return pr.gate?.detail || "The pull request conflicts with its base · auto-merge starts again with the review of the next commit";
     case "paused":
       return "Auto-merge paused · picks up on the next CI run or review";
     case "stopped": {
