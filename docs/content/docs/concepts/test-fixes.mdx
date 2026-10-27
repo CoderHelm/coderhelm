@@ -87,6 +87,22 @@ For a small change (one or two files, or one test helper), the description is fo
 </Step>
 </Steps>
 
+## When the test fails every time
+
+Before planning, CoderHelm runs the failing test 20 times in a row with retries off on your base branch. It runs it again on the pull request's branch before the pull request opens. If the test fails every run (for example 0/20 on both branches), it is not flaky. The run becomes a bug investigation, and the run's status and the pull request say so:
+
+* Waits, retries and longer timeouts are refused, even when the report shows a timeout. They can't fix a test that never passes.
+* The fix goes in the app, with a unit test that reproduces the bug. CoderHelm runs that unit test in the sandbox on the code before the fix, where it must fail, and on the fix, where it must pass.
+* When the failing assertion checks that two views agree (a filtered list and the unfiltered one, a list and a detail page, a page and an API) and they don't, the agent compares what each view requests from the backend: the operation or query, its variables, limits and page size, the date range and time zone. It reads these from the app's network code or the requests captured in the trace. It then looks up the records involved through your read-only [data sources](/concepts/data-sources). Both comparisons go in the pull request's evidence.
+
+## Tests are never loosened
+
+A change that makes a test ask less of the app gets one round to put the test back, and then the pull request is blocked. That means removing an assertion, skipping a test or marking it as expected to fail, swapping an exact matcher for a looser one, lowering an expected count, or catching a failing assertion. The one exception is when a lookup shows the expectation itself was wrong, for example because the data or the product changed on purpose. The agent must cite that lookup.
+
+## Only changes that matter stay
+
+After the fix passes, CoderHelm takes each wait, navigation wait or timeout change back out, one at a time, on a temporary branch, and repeats the test. A change the test still passes without is dropped from the pull request. The description lists what was dropped and what was kept, with the counts.
+
 ## Let CoderHelm repeat tests on CI
 
 Add a `repeat_each` input to your end-to-end workflow so CoderHelm can start a repeat run on the pull request's branch:
