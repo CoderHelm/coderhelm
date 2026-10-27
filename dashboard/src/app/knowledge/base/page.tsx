@@ -605,7 +605,7 @@ function BaseView() {
           open
           onOpenChange={(o) => !o && setEditing(null)}
           title={`Choose ${KIND_LABEL[editing.source.kind]} pages`}
-          wide
+          wide={editing.source.kind === "web" ? true : "xl"}
           footer={
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <button type="button" className={secondaryButton} onClick={() => setEditing(null)}>
