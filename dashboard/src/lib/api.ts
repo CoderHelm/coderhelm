@@ -1205,6 +1205,20 @@ export const api = {
   setSystemDomain: (hostname: string) =>
     request<DomainView>("/api/system/domain", { method: "PUT", body: JSON.stringify({ hostname }) }),
   removeSystemDomain: () => request<DomainView>("/api/system/domain", { method: "DELETE" }),
+  // Settings, Emails (self-hosted installs, install admins): optional emails and how the install sends.
+  getSystemEmails: () => request<SystemEmails>("/api/system/emails"),
+  setSystemEmails: (change: { optional?: Record<string, boolean>; transport?: EmailTransport }) =>
+    request<SystemEmails>("/api/system/emails", { method: "PUT", body: JSON.stringify(change) }),
+  // Self-hosted installs on Coderhelm's hosted parts (platform admins, hosted deployment).
+  adminSelfHostSummary: () => request<SelfHostSummary>("/api/admin/hybrid/summary"),
+  adminSelfHostInstall: (id: string) => request<SelfHostDetail>(`/api/admin/hybrid/${encodeURIComponent(id)}`),
+  adminPauseInstallEmail: (id: string, paused: boolean, reason = "") =>
+    request<{ ok: boolean; paused: boolean }>(`/api/admin/hybrid/${encodeURIComponent(id)}/email/pause`, {
+      method: "POST",
+      body: JSON.stringify({ paused, reason }),
+    }),
+  adminRevokeInstall: (id: string, reason = "") =>
+    request<unknown>(`/api/admin/hybrid/${encodeURIComponent(id)}/revoke`, { method: "POST", body: JSON.stringify({ reason }) }),
 
   // Deliveries (team admins): every webhook and notice in and out, with why each failed.
   listDeliveries: (f: DeliveryFilter = {}) => {
@@ -4108,4 +4122,85 @@ export interface HybridSettingsPatch {
   /** The hosted-app integrations among jira, notion, confluence, google_drive (github follows github_mode). */
   integrations?: string[];
   sharing?: { enabled: boolean; payloads: boolean };
+}
+
+
+// ── Settings, Emails (self-hosted installs) ──────────────────────────────
+
+export type EmailTransport = "ses" | "coderhelm";
+
+export interface SystemEmails {
+  self_hosted: true;
+  optional: { id: string; label: string; description: string; on: boolean }[];
+  essential: { id: string; label: string; why: string }[];
+  transport: EmailTransport;
+  ses: { from: string; check: string; note: string };
+  relay: {
+    available: boolean;
+    registered: boolean;
+    turned_off: boolean;
+    /** What Coderhelm sees when email goes through it. */
+    trust: string;
+    status:
+      | null
+      | { error: string; message: string }
+      | { paused: { reason: string; at: string } | null; sent_today: number; quota: number; display_name: string; from: string | null };
+  };
+  updated_by?: string;
+  updated_at?: string;
+}
+
+// ── Self-host admin (platform admins) ─────────────────────────────────────
+
+export interface SelfHostRow {
+  install_id: string;
+  name: string | null;
+  hostname: string | null;
+  cloudfront: string;
+  version: string;
+  registered_at: string;
+  last_seen: string;
+  status: "active" | "paused" | "revoked";
+  verified: boolean;
+  name_live: boolean;
+  sharing: boolean;
+  integrations: string[];
+  github_links: number;
+  relay_24h: number;
+  relay_7d: number;
+  relay_failed_7d: number;
+  broker_7d: number;
+  email_opted_in: boolean;
+  email_paused: boolean;
+  emails_24h: number;
+  emails_7d: number;
+  bounced_7d: number;
+  complained_7d: number;
+  listed_recipients: number;
+  parts: string[];
+}
+
+export interface SelfHostTrendDay {
+  day: string;
+  events: number;
+  emails: number;
+}
+
+export interface SelfHostSummary {
+  installs: { total: number; active_7d: number; revoked: number };
+  address: { claimed: number; live: number };
+  github: { installs: number; linked_installations: number; relayed_24h: number; relayed_7d: number; failure_rate_7d: number };
+  integrations: Record<string, number>;
+  broker: { installs: number; tokens_7d: number; tokens_per_day: number };
+  email: { opted_in: number; sent_24h: number; sent_7d: number; bounce_rate_7d: number; complaint_rate_7d: number; paused: number; recipients: number };
+  sharing: number;
+  trend: SelfHostTrendDay[];
+  rows: SelfHostRow[];
+  generated_at: string;
+}
+
+export interface SelfHostDetail {
+  install: SelfHostRow;
+  trend: SelfHostTrendDay[];
+  audit: { action: string; at: string; detail: string }[];
 }

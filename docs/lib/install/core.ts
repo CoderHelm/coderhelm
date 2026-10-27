@@ -165,7 +165,13 @@ export interface InstallState {
   hostname: string;
   /** They chose to finish on the AWS address and add the domain later. */
   domainSkipped: boolean;
-  /** Who sends CoderHelm's email; empty uses their own address. */
+  /**
+   * How the install sends email: its own Amazon SES, or CoderHelm's mail
+   * service (hybrid). Empty: not chosen yet, so the stack's default (SES)
+   * until an admin picks in Settings, Emails.
+   */
+  emailTransport: '' | 'ses' | 'coderhelm';
+  /** Who sends CoderHelm's email through SES; empty uses their own address. */
   emailFrom: string;
   /**
    * Who may join the install's one organization besides the people its
@@ -234,6 +240,7 @@ export function newState(over: Partial<InstallState> = {}): InstallState {
     sharing: false,
     hostname: '',
     domainSkipped: false,
+    emailTransport: '',
     emailFrom: '',
     joinDomain: false,
     signupDomain: '',
@@ -266,7 +273,7 @@ export function validate(s: Pick<InstallState, 'email' | 'stage' | 'region'> & P
     if (!HOST_RE.test(h)) p.hostname = 'Enter a hostname such as coderhelm.example.com.';
     else if (/\.(cloudfront\.net|amazonaws\.com)$/.test(h)) p.hostname = 'Enter a domain you own, not an AWS address.';
   }
-  if (s.emailFrom && !EMAIL_RE.test(s.emailFrom.trim())) p.emailFrom = 'Enter an email address, or leave it empty to use yours.';
+  if (s.emailTransport !== 'coderhelm' && s.emailFrom && !EMAIL_RE.test(s.emailFrom.trim())) p.emailFrom = 'Enter an email address, or leave it empty to use yours.';
   if (joinsByDomain(s)) {
     const d = (s.signupDomain ?? '').trim().toLowerCase().replace(/^@/, '');
     if (!d) p.signupDomain = 'Enter your company\'s email domain, such as example.com, or pick Only people I invite.';
@@ -313,7 +320,8 @@ export function quickCreateUrl(s: InstallState): string {
   ];
   // The optional ones only when set, so the link stays short and older templates still open.
   if (s.domainChoice === 'own' && s.hostname) params.push(['param_Hostname', cleanHostname(s.hostname)]);
-  if (s.emailFrom?.trim()) params.push(['param_EmailFrom', s.emailFrom.trim().toLowerCase()]);
+  if (s.emailTransport === 'coderhelm') params.push(['param_EmailTransport', 'coderhelm']);
+  else if (s.emailFrom?.trim()) params.push(['param_EmailFrom', s.emailFrom.trim().toLowerCase()]);
   if (joinsByDomain(s) && s.signupDomain?.trim()) params.push(['param_SignupDomain', s.signupDomain.trim().toLowerCase().replace(/^@/, '')]);
   if (s.requireTwoFactor) params.push(['param_RequireTwoFactor', 'on']);
   if (s.autoUpdate) {
@@ -912,7 +920,7 @@ export interface OptionalItem {
 }
 
 /** Everything else a person can set up, each with its check (when the install reports one) and one action. */
-export function optionalSetup(s: Pick<InstallState, 'url' | 'region' | 'provider' | 'domainChoice'>, setup: SetupStatus | null): OptionalItem[] {
+export function optionalSetup(s: Pick<InstallState, 'url' | 'region' | 'provider' | 'domainChoice'> & Partial<Pick<InstallState, 'emailTransport'>>, setup: SetupStatus | null): OptionalItem[] {
   const url = s.url.replace(/\/+$/, '');
   const at = (path: string) => (url ? `${url}${path}` : path);
   const check = (id: string) => findCheck(setup, id);
@@ -933,14 +941,22 @@ export function optionalSetup(s: Pick<InstallState, 'url' | 'region' | 'provider
       doc: '/self-host/domains/',
     });
   }
+  // Through CoderHelm's mail service there is no SES to set up.
+  if (s.emailTransport !== 'coderhelm') {
+    items.push({
+      id: 'email', title: 'Email reaches your whole team', why: 'So invites and run results reach everyone on your team, not only confirmed addresses.',
+      state: email ? (email.status === 'pass' ? 'done' : 'todo') : 'unknown',
+      action: email?.code === 'identity_unverified'
+        ? { label: 'Open SES identities', href: `https://${s.region}.console.aws.amazon.com/ses/home?region=${s.region}#/identities` }
+        : { label: 'Request production access', href: sesConsoleUrl(s.region) },
+      fix: email && email.status !== 'pass' ? checkText(email).fix : undefined,
+      doc: '/self-host/email/',
+    });
+  }
   items.push({
-    id: 'email', title: 'Email reaches your whole team', why: 'So invites and run results reach everyone on your team, not only confirmed addresses.',
-    state: email ? (email.status === 'pass' ? 'done' : 'todo') : 'unknown',
-    action: email?.code === 'identity_unverified'
-      ? { label: 'Open SES identities', href: `https://${s.region}.console.aws.amazon.com/ses/home?region=${s.region}#/identities` }
-      : { label: 'Request production access', href: sesConsoleUrl(s.region) },
-    fix: email && email.status !== 'pass' ? checkText(email).fix : undefined,
-    doc: '/self-host/email/',
+    id: 'optional_emails', title: 'Weekly summary email (off; turn on in Settings)',
+    why: 'Optional emails start off on your install; turn on the ones your team wants.',
+    state: 'unknown', action: { label: 'Open Settings, Emails', href: at('/settings/emails/') }, doc: '/self-host/email/',
   });
   items.push({
     id: 'invite', title: 'Invite your team', why: 'Only you can sign in until you invite people or allow an email domain.',

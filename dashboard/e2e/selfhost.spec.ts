@@ -294,7 +294,8 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
       const { systemCalls } = await setup(page, SELF, { signedIn: true, provider: "bedrock" });
       await page.goto("/settings/setup/");
       const list = page.getByTestId("setup-checklist");
-      await expect(list.locator("li")).toHaveCount(8);
+      await expect(list.locator("li")).toHaveCount(9);
+      await expect(list.locator("#emails")).toContainText("Optional");
       await expect(list.locator("#domain")).toContainText("Optional");
       await expect(list.locator("#domain").getByRole("link", { name: "Add a domain" })).toHaveAttribute("href", /\/settings\/system\/?#domain$/);
       await expect(list.locator("#github")).toHaveAttribute("data-done", "yes");

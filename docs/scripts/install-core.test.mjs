@@ -225,6 +225,13 @@ test('more options: domain, sender, sign-up domain and updates go into the quick
   assert.equal(all.get('param_AutoUpdate'), 'on');
   assert.equal(all.get('param_UpdateWindow'), 'daily 02:00');
   assert.equal(all.get('param_UpdateTimezone'), 'Europe/Berlin');
+  // Email: through CoderHelm only when picked, and then no sender address; never by default.
+  assert.equal(plain.get('param_EmailTransport'), null);
+  assert.equal(all.get('param_EmailTransport'), null);
+  const relay = q({ ...S, emailTransport: 'coderhelm', emailFrom: 'bot@example.com' });
+  assert.equal(relay.get('param_EmailTransport'), 'coderhelm');
+  assert.equal(relay.get('param_EmailFrom'), null);
+  assert.deepEqual(c.validate({ ...S, emailTransport: 'coderhelm', emailFrom: 'not an address' }).emailFrom, undefined);
   // The AWS address chosen: a typed hostname is not sent.
   assert.equal(q({ ...S, domainChoice: 'aws', hostname: 'coderhelm.example.com' }).get('param_Hostname'), null);
   // Defaults stay out of the link.
@@ -330,7 +337,7 @@ test('optional setup: each item has one action, its check where the install repo
   const withChecks = { ...setup(), checks: [...setup().checks, { id: 'domain', status: 'skip', code: 'none' }, { id: 'google_sign_in', status: 'skip', code: 'off' }, { id: 'updates', status: 'pass', code: 'ok' }] };
   const items = c.optionalSetup(st, withChecks);
   const by = Object.fromEntries(items.map((i) => [i.id, i]));
-  assert.deepEqual(items.map((i) => i.id), ['domain', 'email', 'invite', 'chat', 'jira', 'google_sign_in', 'updates', 'hybrid_apps', 'deliveries', 'backups']);
+  assert.deepEqual(items.map((i) => i.id), ['domain', 'email', 'optional_emails', 'invite', 'chat', 'jira', 'google_sign_in', 'updates', 'hybrid_apps', 'deliveries', 'backups']);
   assert.equal(by.domain.state, 'todo');
   assert.equal(by.domain.action.href, 'https://coderhelm.example.com/settings/system/#domain');
   assert.equal(by.email.state, 'todo');
@@ -350,6 +357,11 @@ test('optional setup: each item has one action, its check where the install repo
   // An unverified sender links to the identities page.
   const unverified = c.optionalSetup(st, setup({ email: { status: 'warn', code: 'identity_unverified', required: false } }));
   assert.match(unverified.find((i) => i.id === 'email').action.href, /#\/identities$/);
+  // Optional emails start off and are turned on in Settings, Emails.
+  assert.equal(by.optional_emails.title, 'Weekly summary email (off; turn on in Settings)');
+  assert.equal(by.optional_emails.action.href, 'https://coderhelm.example.com/settings/emails/');
+  // Email through CoderHelm: no SES to set up, so no SES item.
+  assert.ok(!c.optionalSetup({ ...st, emailTransport: 'coderhelm' }, withChecks).some((i) => i.id === 'email'));
 });
 
 test('setups: fully private and hybrid, each with what it gives and its trade-off', () => {

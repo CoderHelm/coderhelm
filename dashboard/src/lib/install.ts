@@ -23,7 +23,7 @@ export function useInstallAdmin(): { ready: boolean; allowed: boolean } {
   return state;
 }
 
-export type SetupKey = "github" | "repos" | "models" | "email" | "domain" | "chat" | "updates" | "run";
+export type SetupKey = "github" | "repos" | "models" | "email" | "emails" | "domain" | "chat" | "updates" | "run";
 
 export interface SetupCheck {
   key: SetupKey;
@@ -49,14 +49,16 @@ function emailOk(): boolean {
 /** Every setup item, each from its own live call; one failing leaves its item unknown. */
 export async function loadSetupChecks(): Promise<SetupCheck[]> {
   const settle = async <T,>(p: Promise<T>): Promise<T | null> => p.catch(() => null);
-  const [integrations, repos, model, system, runs, domain] = await Promise.all([
+  const [integrations, repos, model, system, runs, domain, emails] = await Promise.all([
     settle(api.getIntegrations()),
     settle(api.listRepos()),
     settle(api.getModelProvider()),
     settle(api.getSystemVersion()),
     settle(api.listRuns()),
     settle(api.getSystemDomain()),
+    settle(api.getSystemEmails()),
   ]);
+  const optionalOn = Array.isArray(emails?.optional) ? emails.optional.filter((o) => o.on) : [];
   const domainLive = domain?.available ? domain.code === "ok" : null;
   const item = (id: string) => integrations?.items.find((i) => i.id === id);
   const github = item("github");
@@ -108,6 +110,17 @@ export async function loadSetupChecks(): Promise<SetupCheck[]> {
           : "Optional: an address that's easy to share; Google sign-in needs one.",
       href: "/settings/system#domain",
       action: domain?.domain?.hostname ? "See its records" : "Add a domain",
+    },
+    {
+      key: "emails",
+      label: "Optional emails chosen",
+      optional: true,
+      done: Array.isArray(emails?.optional) ? optionalOn.length > 0 : null,
+      detail: optionalOn.length
+        ? `On: ${optionalOn.map((o) => o.label).join(", ")}.`
+        : "Optional: the weekly summary and the welcome email start off. Turn on the ones your team wants.",
+      href: "/settings/emails",
+      action: "Choose emails",
     },
     {
       key: "chat",

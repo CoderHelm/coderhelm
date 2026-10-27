@@ -53,6 +53,8 @@ const BUILT_IN_MIN: Record<string, "viewer" | "member" | "admin" | "owner"> = {
   alerts: "admin",
   model_provider: "admin",
   system: "admin",
+  emails: "admin",
+  platform_admin: "admin",
   budget: "admin",
   support: "admin",
   "plugins.view": "viewer",

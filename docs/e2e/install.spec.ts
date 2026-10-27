@@ -389,6 +389,7 @@ test('more options: domain, sender, sign-up and updates go to AWS; a bad hostnam
   expect(q.get('param_AutoUpdate')).toBe('on');
   expect(q.get('param_UpdateWindow')).toBe('daily 02:00');
   expect(q.get('param_UpdateTimezone')).toBe('Europe/Berlin');
+  expect(q.get('param_EmailTransport')).toBeNull();
   // The steps now include the domain.
   await expect(page.getByRole('list', { name: 'Install steps' })).toContainText('Domain');
 });
@@ -478,7 +479,9 @@ test('ready: the optional setup list, each with its check and one action', async
   await seeded(page, m, { url: INSTALL, region: 'eu-west-1' });
   await expect(page.getByTestId('screen-ready')).toBeVisible();
   const list = page.getByTestId('optional-setup');
-  await expect(list.locator('[data-optional]')).toHaveCount(10);
+  await expect(list.locator('[data-optional]')).toHaveCount(11);
+  await expect(list.locator('[data-optional="optional_emails"]')).toContainText('Weekly summary email (off; turn on in Settings)');
+  await expect(page.getByTestId('optional-optional_emails-action')).toHaveAttribute('href', `${INSTALL}/settings/emails/`);
   await expect(list.locator('[data-optional="domain"]')).toHaveAttribute('data-state', 'todo');
   await expect(page.getByTestId('optional-domain-action')).toHaveAttribute('href', `${INSTALL}/settings/system/#domain`);
   await expect(list.locator('[data-optional="email"]')).toHaveAttribute('data-state', 'todo');
@@ -881,4 +884,27 @@ test('hybrid screenshots at 1440 and 390', async ({ page }) => {
     await expect(page.getByTestId('hybrid-error')).toBeVisible();
     await at('25-github-hosted-refused');
   }
+});
+
+
+test('email: through CoderHelm only when picked, and then no From address', async ({ page }) => {
+  const m = newMock();
+  await mock(page, m);
+  await page.goto('/self-host/install/');
+  await page.getByLabel('Your email').fill('ada@example.com');
+  await page.getByRole('button', { name: 'More options' }).click();
+  const choice = page.getByTestId('email-choice');
+  // Neither is picked for you.
+  await expect(choice.getByRole('radio', { checked: true })).toHaveCount(0);
+  await expect(choice).toContainText('Not chosen');
+  await expect(choice).toContainText('weekly summary start off');
+  await expect(page.getByLabel('Send email from')).toBeVisible();
+  await choice.getByLabel('Send email through CoderHelm (easiest)').check();
+  await expect(page.getByLabel('Send email from')).toHaveCount(0);
+  await expect(choice).toContainText('keeps only delivery records');
+  await page.getByTestId('launch').click();
+  const [link] = await opened(page);
+  const q = new URLSearchParams(new URL(link).hash.split('?')[1]);
+  expect(q.get('param_EmailTransport')).toBe('coderhelm');
+  expect(q.get('param_EmailFrom')).toBeNull();
 });
