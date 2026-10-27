@@ -4,8 +4,9 @@
 // the GitHub App come from lib/runtime-config.ts (apiBase, apiOrigin,
 // githubAppUrl), never from a literal. Runs with `npm run lint`.
 //
-// Flags app., api., stream. and auth.coderhelm.com, the marketing site, and
-// github.com/apps/coderhelm (the hosted GitHub App) anywhere in src/ outside
+// Flags app., api., stream., auth. and status.coderhelm.com, the marketing
+// site, CoderHelm's mail addresses, github.com/apps/coderhelm (the hosted
+// GitHub App) and the hosted Jira (Forge) app's id anywhere in src/ outside
 // the files below. Comments are not checked. docs.coderhelm.com is always fine.
 import fs from "node:fs";
 import path from "node:path";
@@ -17,9 +18,22 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ALLOWED = {
   "src/lib/runtime-config.ts": "the hosted defaults, used only when no runtime config says otherwise",
   "src/components/google-analytics.tsx": "a hostname check that keeps the hosted dashboard's analytics off every other host; not a link",
+  "src/components/client-shell.tsx": "the hosted service's own admin account, checked only when not self-hosted; not a link",
+  "src/app/settings/integrations/jira/page.tsx": "CoderHelm's published Jira app: shown on the hosted service, and on a self-hosted install only when hybrid's Jira relay is on (otherwise the page offers the webhook and the install's own copy)",
 };
 
-const PATTERN = /\b(?:app|api|stream|auth)\.coderhelm\.com|:\/\/(?:www\.)?coderhelm\.com|github\.com\/apps\/coderhelm\b/i;
+/** The hosted Jira (Forge) app's id. */
+const FORGE_APP_ID = "de730821-2955-4d78-836e-55b6e7c23c88";
+const PATTERN = new RegExp(
+  [
+    String.raw`\b(?:app|api|stream|auth|status)\.coderhelm\.com`,
+    String.raw`:\/\/(?:www\.)?coderhelm\.com`,
+    String.raw`\b(?:notifications|support|admin)@coderhelm\.com`,
+    String.raw`github\.com\/apps\/coderhelm\b`,
+    FORGE_APP_ID,
+  ].join("|"),
+  "i",
+);
 
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

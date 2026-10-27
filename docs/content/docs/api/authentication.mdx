@@ -93,6 +93,7 @@ steps:
 - `name` is the report's file name and must end in `.json` (Playwright or Cucumber JSON) or `.xml` (JUnit XML). One report of at most 6 MB per request.
 - CoderHelm checks the token was issued by GitHub for one run of a repository connected to your team, with E2E results turned on under **Tests**.
 - The same token can ask which tests are quarantined: `GET /webhooks/ci/tests/quarantine`.
+- On a self-hosted install, post to your install's address instead of `api.coderhelm.com`. The audience stays `coderhelm`, and only repositories connected to that install are accepted.
 
 ## The dashboard's session
 

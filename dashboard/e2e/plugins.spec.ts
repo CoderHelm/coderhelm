@@ -551,7 +551,10 @@ test("chat settings: a Slack workspace and secret, a Teams secret, and the webho
   await form.getByLabel("Slack signing secret").fill("slack-secret-value");
   await form.getByLabel("Teams outgoing webhook secret").fill("teams-secret-value");
   await form.getByRole("button", { name: "Save chat settings" }).click();
-  await expect(page.getByTestId("teams-webhook-path")).toContainText("/webhooks/teams/plugins/t_1");
+  // Full addresses to paste, on this deployment's own API.
+  const origin = new URL(page.url()).origin;
+  await expect(page.getByTestId("teams-webhook-path")).toContainText(`${origin}/webhooks/teams/plugins/t_1`);
+  await expect(page.getByTestId("slack-command-url")).toContainText(`${origin}/webhooks/slack/plugins`);
   const sent = db.calls.filter((c) => c.path === "/api/plugins/settings" && c.method === "PUT").pop();
   expect(sent?.body).toEqual({ slack_team_id: "T0123ABCD", slack_signing_secret: "slack-secret-value", teams_secret: "teams-secret-value" });
   // Secrets are never shown again: the boxes clear and say they are saved.

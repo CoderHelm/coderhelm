@@ -20,6 +20,8 @@ import { Skeleton } from "@/components/skeleton";
 import { AtlassianIcon, ChevronRightIcon, ExternalLinkIcon } from "@/components/icons";
 import { Page, PageHeader, Section } from "@/components/page";
 import { HybridAppChoice } from "@/components/hybrid-app-choice";
+import { isSelfHosted } from "@/lib/runtime-config";
+import { useHybrid } from "@/lib/hybrid";
 import { Code, Field, SaveBar, SettingsRow, SettingsSection, Switch, useDirtyForm } from "@/components/settings";
 import { buttonClass, focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 
@@ -33,7 +35,14 @@ export default function JiraPageGuarded() {
 
 const TRIGGER_LABEL = "coderhelm";
 
-/** The Coderhelm Jira app's install page. */
+/** Running your own copy of the Jira app on a self-hosted install. */
+const OWN_APP_DOCS = "https://docs.coderhelm.com/self-host/integrations/#jira";
+
+/**
+ * Coderhelm's published Jira app's install page. It talks to Coderhelm's
+ * hosted API, so a self-hosted install offers it only through hybrid's Jira
+ * relay (the install ID then stands in for the Team ID).
+ */
 const INSTALL_URL =
   "https://developer.atlassian.com/console/install/de730821-2955-4d78-836e-55b6e7c23c88?signature=AYABePrR09vSK2DTVLCCzK%2Bt04oAAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4IOp8r3eKNYw8z2v%2FEq3%2FfvrZguoGsXpNSaDveR%2FF%2Fo0BXAmH88tVaInK7U6E2MFkZAAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDJMQ6B1ogvNrk2X41AIBEIA7UEnUW%2FGBqNgbzivPOfH9txPwU4gjvklvkmwbZWb%2FmZoMMd5lsRvkJ7OzWCYtJAbfrF2hZZcREGnfeoMAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHijmwVTMt6Oj3F%2B0%2B0cVrojrS8yZ9ktpdfDxqPMSIkvHAEGa2reJg8L%2FrWqEbgFRPADAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMThkIkAaI7FAPWkeTAgEQgDtGtXT7SzNrjUqpB8Pm474FMrk2aPj2FtBDtjW9vNYK3NZ0oNloPH9XPGbn1uS7YTPJZPTB561JZvBdcgAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeLKa7Dfn9BgbXaQmJGrkKztjV4vrreTkqr7wGwhqIYs5AaBDJ8FvKCFfzHTyolwIyC8AAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAyQ9HvoMmjskgnJCTUCARCAO%2FkpeTKd8IIamduK2tZFv2a8kDZoP7FTtAuky6S0LNmrEoIuYnHoMEyydCQLXHgjex%2FsD71J9OlNG%2Bx9AgAAAAAMAAAQAAAAAAAAAAAAAAAAAMx%2BPlN5fhsnaG9wdl169OP%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADLtyR6xQ9Nnc2%2F0GV7Dz3xCvKwGrAD%2BuvAz%2FU5KYYo7ZAgS%2FpCTSkiLEvuK6Ij5gvJQHM4oYSv%2FXgh40M6Ouxvc4a8%3D&product=jira";
 
@@ -420,20 +429,59 @@ function SetupGuide({
   revealedSecret: string | null;
   setRevealedSecret: (s: string | null) => void;
 }) {
-  const [how, setHow] = useState<"app" | "webhook">("app");
+  // A self-hosted install can only use Coderhelm's published app through
+  // hybrid's Jira relay; otherwise the webhook comes first and "Jira app"
+  // means the install's own copy.
+  const self = isSelfHosted();
+  const hybrid = useHybrid();
+  const relayed =
+    self && !!hybrid.status?.registered && !!hybrid.status.install_id && hybrid.status.integrations.some((i) => i.id === "jira" && i.uses_coderhelm);
+  const ownCopy = self && !relayed;
+  const [picked, setPicked] = useState<"app" | "webhook" | null>(null);
+  const how = picked ?? (ownCopy ? "webhook" : "app");
   const [installed, setInstalled] = useState(false);
+  const teamId = relayed ? hybrid.status!.install_id! : check.team_id;
   return (
     <div className="flex flex-col gap-4">
       <div className="max-w-full"><Segmented
         label="How to connect"
-        options={[
-          { value: "app", label: "Jira app (recommended)" },
-          { value: "webhook", label: "Jira webhook" },
-        ]}
+        options={
+          ownCopy
+            ? [
+                { value: "webhook", label: "Jira webhook (recommended)" },
+                { value: "app", label: "Your own copy of the Jira app" },
+              ]
+            : [
+                { value: "app", label: "Jira app (recommended)" },
+                { value: "webhook", label: "Jira webhook" },
+              ]
+        }
         value={how}
-        onChange={setHow}
+        onChange={setPicked}
       /></div>
-      {how === "app" ? (
+      {how === "app" && ownCopy ? (
+        <div className="flex flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm text-zinc-400" data-testid="jira-own-app">
+          <h3 className="font-semibold text-zinc-100">Deploy your own copy of the Jira app</h3>
+          <p>
+            Coderhelm&apos;s published Jira app sends events to Coderhelm&apos;s hosted service, not to this install. To get the settings page inside Jira and
+            Confluence publishing, an install admin deploys the app from the <Code>coderhelm-jira</Code> folder pointed at this install, then installs it on
+            your Jira site. The webhook works with nothing to install.
+          </p>
+          <p>
+            <a href={OWN_APP_DOCS} target="_blank" rel="noopener noreferrer" className={`${linkButton} inline-flex items-center gap-1`}>
+              How to deploy your own copy
+              <span aria-hidden="true" className="scale-90"><ExternalLinkIcon /></span>
+              <span className="sr-only">(opens in a new tab)</span>
+            </a>
+          </p>
+          <p>Once it&apos;s installed, open it in Jira and paste these:</p>
+          <CopyRow label="Team ID" value={check.team_id} />
+          {check.forge_secret && <CopyRow label="Secret" value={check.forge_secret} secret />}
+          <p>
+            <button type="button" onClick={onChanged} className={linkButton}>I saved it in Jira, check again</button>
+          </p>
+        </div>
+      ) : how === "app" ? (
         <div className="grid gap-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 md:grid-cols-[220px_minmax(0,1fr)]">
           <Stepper steps={APP_STEPS} current={installed ? "configure" : "install"} label="Jira app steps" />
           <div className="flex min-w-0 flex-col gap-6 text-sm text-zinc-400">
@@ -454,7 +502,12 @@ function SetupGuide({
                 In Jira, open <span className="text-zinc-200">Apps, Manage your apps, Coderhelm</span>, paste both values and press Save. Coderhelm
                 registers itself; this page then shows the app as linked.
               </p>
-              <CopyRow label="Team ID" value={check.team_id} />
+              {relayed && (
+                <p data-testid="jira-install-id-note">
+                  This install uses Coderhelm&apos;s Jira relay, so the Team ID is your install ID. Coderhelm passes the events on to this install.
+                </p>
+              )}
+              <CopyRow label={relayed ? "Team ID (your install ID)" : "Team ID"} value={teamId} />
               {check.forge_secret && <CopyRow label="Secret" value={check.forge_secret} secret />}
               <p>
                 <button type="button" onClick={onChanged} className={linkButton}>I saved it in Jira, check again</button>

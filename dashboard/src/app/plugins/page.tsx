@@ -24,6 +24,7 @@ import { useToast } from "@/components/toast";
 import { inputClass, linkButton, monoInputClass, primaryButton, secondaryButton } from "@/components/ui";
 import { SecretInput } from "@/components/field";
 import { Code } from "@/components/settings/code";
+import { apiOrigin } from "@/lib/runtime-config";
 
 // Plugins: what the team installed, what its sources offer, and where the
 // plugins come from. A plugin is text plus approved tools: nothing a plugin
@@ -457,9 +458,12 @@ function TeamSettings({ settings, onSaved }: { settings: TeamPluginSettings; onS
                 <SecretInput {...props} className={inputClass} value={teamsSecret} onChange={(e) => setTeamsSecret(e.target.value)} placeholder={settings.teams_webhook_set ? "Saved" : ""} autoComplete="off" />
               )}
             </Field>
+            <p className="text-sm text-zinc-400" data-testid="slack-command-url">
+              In your Slack app, set the slash command&apos;s Request URL to <Code>{`${apiOrigin()}/webhooks/slack/plugins`}</Code>
+            </p>
             {path && (
               <p className="text-sm text-zinc-400" data-testid="teams-webhook-path">
-                In Teams, paste this as the outgoing webhook&apos;s address: <Code>{path}</Code>
+                In Teams, paste this as the outgoing webhook&apos;s address: <Code>{path.startsWith("http") ? path : `${apiOrigin()}${path}`}</Code>
               </p>
             )}
             {error && <Refusal code={error.code} message={error.message} title="Not saved" />}
