@@ -12,7 +12,8 @@ import { SourceLogo } from "./logos";
 // the app's sign-in (no OAuth app set up), or for anyone who prefers it.
 // The token is checked with the app before it is saved, and saved exactly as
 // the Integrations page saves it, so the flow goes straight on to the pages.
-// Google Drive has no token path: it says so plainly.
+// Google Drive has no token path: it says so plainly, and tells whoever runs
+// Coderhelm where the steps are.
 
 /** Where each app's saved token lives on the Integrations page. */
 export const INTEGRATIONS_HREF: Partial<Record<SourceKind, string>> = {
@@ -174,17 +175,31 @@ export function AskAdmin({ kind }: { kind: SourceKind }) {
   );
 }
 
-/** Google Drive without Google sign-in: there is no other way, said plainly. */
-export function NoTokenPath({ kind }: { kind: SourceKind }) {
+/** Where the steps for each provider's sign-in app are. */
+export const SIGN_IN_STEPS: Partial<Record<SourceKind, string>> = {
+  google_drive: `${SELF_HOST_DOCS}#google-drive`,
+};
+
+/**
+ * Google Drive without its sign-in app: there is no other way in, said in
+ * one sentence, with who can fix it. Someone who runs this Coderhelm (a
+ * platform admin) also gets the steps and the Sign-in apps section.
+ */
+export function NoTokenPath({ kind, installAdmin = false }: { kind: SourceKind; installAdmin?: boolean }) {
   const label = KIND_LABEL[kind];
+  const steps = SIGN_IN_STEPS[kind] ?? SELF_HOST_DOCS;
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4 text-left text-sm leading-relaxed text-zinc-300" data-testid="no-token-path">
-      <p>
-        {label} connects only through Google sign-in, and that isn&apos;t set up on this Coderhelm yet. There&apos;s no token to paste instead.
-      </p>
-      <p className="mt-2 text-zinc-400">
-        Ask whoever runs Coderhelm to add a Google OAuth client. The steps are in the <Ext href={SELF_HOST_DOCS}>knowledge sources guide</Ext>.
-      </p>
+    <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4 text-left text-sm leading-relaxed text-zinc-300" data-testid="no-token-path" data-admin={installAdmin ? "yes" : "no"}>
+      <p>{label} sign-in isn&apos;t set up on this Coderhelm yet.</p>
+      <p className="mt-2 text-zinc-400">Ask whoever runs Coderhelm to set up {label} sign-in.</p>
+      {installAdmin && (
+        <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1" data-testid="sign-in-steps">
+          <Ext href={steps}>Steps to set up {label} sign-in</Ext>
+          <Link href="/admin/#sign-in-apps" className={linkButton}>
+            Open Sign-in apps
+          </Link>
+        </p>
+      )}
     </div>
   );
 }

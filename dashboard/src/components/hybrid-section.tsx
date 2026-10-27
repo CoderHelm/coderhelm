@@ -644,11 +644,14 @@ function IntegrationsRow({ hybrid, s }: RowProps) {
 function IntegrationItem({ i, hybrid, s }: { i: HybridIntegration } & RowProps) {
   const { busy, act } = useAct();
   const value = i.uses_coderhelm ? "coderhelm" : "own";
+  const notOffered = i.mode === "hosted" && i.offered === false;
   return (
     <li className="min-w-0 px-4 py-4" data-testid={`hybrid-integration-${i.id}`} data-mode={i.mode}>
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <p className="text-sm font-medium text-zinc-100">{i.name}</p>
-        {i.mode === "hosted" ? (
+        {notOffered ? (
+          <Chip tone="muted">Coderhelm&apos;s app isn&apos;t set up yet</Chip>
+        ) : i.mode === "hosted" ? (
           <Segmented<"coderhelm" | "own">
             label={`Which ${i.name} app to use`}
             value={value}
@@ -667,7 +670,8 @@ function IntegrationItem({ i, hybrid, s }: { i: HybridIntegration } & RowProps) 
           <Chip tone="muted">Not available</Chip>
         )}
       </div>
-      {i.mode === "hosted" && (i.through_coderhelm || i.stays_with_you) && (
+      {notOffered && <p className="mt-1 text-sm text-zinc-400">Use your own {i.name} app for now.</p>}
+      {i.mode === "hosted" && !notOffered && (i.through_coderhelm || i.stays_with_you) && (
         <dl className="mt-2 grid min-w-0 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
           {i.through_coderhelm && (
             <div className={`min-w-0 ${value === "coderhelm" ? "" : "opacity-60"}`}>

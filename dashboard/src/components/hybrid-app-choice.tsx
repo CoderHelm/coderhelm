@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { HYBRID_HREF, hostedIntegrations, useHybrid } from "@/lib/hybrid";
+import { HYBRID_HREF, canUseCoderhelm, hostedIntegrations, useHybrid } from "@/lib/hybrid";
 import { Segmented } from "./segmented";
 import { useToast } from "./toast";
 import { linkButton } from "./ui";
@@ -36,7 +36,8 @@ export function HybridAppChoice({ id, name, className = "" }: { id: string; name
   }
 
   const integration = s.integrations.find((i) => i.id === id);
-  if (id !== "github" && integration?.mode !== "hosted") return null;
+  // Not hosted, or Coderhelm's app for it isn't set up: there is no choice.
+  if (id !== "github" && !canUseCoderhelm(integration)) return null;
   const value: Choice = id === "github" ? (s.github.mode === "hosted" ? "coderhelm" : "own") : integration?.uses_coderhelm ? "coderhelm" : "own";
 
   const change = async (next: Choice) => {

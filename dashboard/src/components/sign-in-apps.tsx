@@ -17,7 +17,7 @@ export interface SignInApp {
   name: string;
   app: string;
   configured: boolean;
-  /** The key the app was read from (`google_client_id` when Drive reuses the Google sign-in client). */
+  /** The key the app was read from: always the provider's own id key (Drive never reuses the Google sign-in client). */
   source: string;
   id_key: string;
   secret_key: string;
@@ -25,6 +25,15 @@ export interface SignInApp {
   scopes: string[];
   redirect_uri: string;
 }
+
+const GUIDE = "https://docs.coderhelm.com/self-host/knowledge-sources/";
+
+/** Each app's section in the knowledge sources guide. */
+const STEPS: Record<string, string> = {
+  notion: `${GUIDE}#notion`,
+  confluence: `${GUIDE}#confluence-atlassian`,
+  google_drive: `${GUIDE}#google-drive`,
+};
 
 export const signInAppsApi = {
   list: () => request<{ apps: SignInApp[]; secret_name: string }>("/api/admin/sign-in-apps"),
@@ -86,6 +95,12 @@ export function SignInAppsPanel() {
                     <dd className="min-w-0 text-zinc-300">
                       <Code className="wrap-anywhere">{a.id_key}</Code> and <Code className="wrap-anywhere">{a.secret_key}</Code> in{" "}
                       <Code className="wrap-anywhere">{data.secret_name}</Code>
+                    </dd>
+                    <dt className="text-zinc-400">Steps</dt>
+                    <dd className="min-w-0">
+                      <a href={STEPS[a.kind] ?? GUIDE} target="_blank" rel="noopener noreferrer" className="text-sky-300 underline-offset-2 hover:underline" data-testid="sign-in-app-steps">
+                        Knowledge sources guide
+                      </a>
                     </dd>
                     <dt className="text-zinc-400">Register at</dt>
                     <dd className="min-w-0">
