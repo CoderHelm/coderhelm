@@ -21,9 +21,9 @@ test("the main menu is a handful of destinations with one Settings entry, Chat a
   await mockWideApi(page);
   await page.goto("/");
   const main = page.getByTestId("main-nav");
-  const labels = (await main.getByRole("link").allInnerTexts()).map((t) => t.trim());
   // Plugins shows only while the team's plugins flag is on (the wide data turns it on).
-  expect(labels).toEqual(["Runs", "Plans", "Code review", "Logs", "Chat", "Knowledge", "Plugins", "Insights", "Settings"]);
+  // toHaveText waits for the menu to render; a one-time read can run before it does.
+  await expect(main.getByRole("link")).toHaveText(["Runs", "Plans", "Code review", "Logs", "Chat", "Knowledge", "Plugins", "Insights", "Settings"]);
   await expect(main.getByRole("link", { name: "Runs" })).toHaveAttribute("aria-current", "page");
   // "Brain" is never a word people see in the menu.
   await expect(page.getByRole("navigation", { name: "Main" })).not.toContainText("Brain");
