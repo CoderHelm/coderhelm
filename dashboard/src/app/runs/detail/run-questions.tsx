@@ -116,6 +116,17 @@ export function RunQuestions({
                 {q.question}
               </p>
               {q.why && <p className="mt-1 text-zinc-400 [overflow-wrap:anywhere]" data-testid="run-question-why">{q.why}</p>}
+              {!!q.evidence?.length && (
+                <p className="mt-1 text-sm text-zinc-400 [overflow-wrap:anywhere]" data-testid="run-question-evidence">
+                  Evidence:{" "}
+                  {q.evidence.map((e, j) => (
+                    <span key={e}>
+                      {j > 0 && ", "}
+                      <code className="rounded bg-zinc-800 px-1 py-0.5 text-xs text-zinc-200">{e}</code>
+                    </span>
+                  ))}
+                </p>
+              )}
               {canAnswer && (
                 <div className="mt-3">
                   <label htmlFor={boxId} className="mb-1 block text-sm font-medium text-zinc-200">

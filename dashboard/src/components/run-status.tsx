@@ -15,6 +15,8 @@ const LOOKS: Record<string, RunLook> = {
   needs_input: { label: "Needs your answer", tone: "waiting", group: "waiting" },
   // The code works as designed; the fix is a change in another system's data or settings.
   needs_outside_change: { label: "Needs a change outside the code", tone: "attention", group: "waiting" },
+  // An open pull request (anyone's) already does the work; the run linked it and built no second fix.
+  covered_by_pr: { label: "Covered by an open PR", tone: "muted", group: "done" },
   completed: { label: "Done", tone: "success", group: "done" },
   merged: { label: "Merged", tone: "merged", group: "done" },
   failed: { label: "Failed", tone: "danger", group: "failed" },
@@ -32,7 +34,7 @@ const LOOKS: Record<string, RunLook> = {
 export const RUN_GROUP_STATUSES: Record<"active" | "waiting" | "done" | "failed" | "closed", string> = {
   active: "pending,queued,running",
   waiting: "awaiting_ci,needs_input,needs_outside_change",
-  done: "completed,success,merged",
+  done: "completed,success,merged,covered_by_pr",
   failed: "failed,cancelled",
   closed: "closed",
 };
