@@ -1,0 +1,54 @@
+---
+title: Review comment fixes
+description: What CoderHelm checks before it pushes a fix for a review comment, and how it respects what the person who asked said not to do.
+---
+
+When someone leaves a review comment on one of CoderHelm's pull requests, CoderHelm answers it and, when the comment asks for a change, fixes the code. The fix is not pushed straight away. CoderHelm holds the changed files, checks them, and pushes them once, as one commit, only when the checks pass. These rules are the same for every team.
+
+## Only what the comment asks
+
+A fix changes only what the comment asks for. Code nearby that looks the same but that the comment did not point at stays as it is.
+
+After the fix, a check reads every changed hunk against the comments and decides, for each one, whether a comment asked for it. Hunks nobody asked for are taken back out before the push. The pull request description lists what was taken out and why.
+
+## Log levels
+
+A log that fires on every run of a scheduled or repeated job when nothing changed belongs at DEBUG. INFO is for runs where something happened, such as rows changed. When a fix adds an INFO log to a scheduled job, a sync, a poller or a queue consumer, CoderHelm checks whether it fires on every run and flags it when it does.
+
+## Log text other things read
+
+A log message's wording can be matched by metric filters, alarms, alert rules, scripts, runbooks and tests. Before a fix changes or removes an existing message, CoderHelm searches the repository and the team's other connected repositories (infrastructure first) for its text. When anything uses it, the wording stays and only what the comment asked for changes. What the search found, or that it found nothing, is recorded in the pull request description.
+
+## A test for every log change
+
+Changing a log's level or wording is a change in behaviour, so the fix includes a test that asserts the new level and text, written the way the repository already writes its tests (for example `caplog` in pytest, `assertLogs` in unittest, a spy on the logger in Jest or Vitest). A fix that changes a log without such a test is not pushed. Repositories with no tests at all are the exception, and the description says so.
+
+## The whole test suite, the repository's way
+
+Before pushing, CoderHelm runs the repository's full test suite, not only the tests the fix touched. It finds out how the repository runs it from the repository itself: the CI workflow's test job, AGENTS.md or CONTRIBUTING, a Makefile target, package scripts, tox or nox, or a script that loops over test files with its environment (such as `PYTHONHASHSEED`). The suite runs in the sandbox against the held files, under your team's [agent permissions](/concepts/agent-permissions).
+
+Every test must pass. When something fails, CoderHelm gets one more turn to fix it and checks again. If the suite still fails, nothing is pushed and the reply on the comment says why. The exact command, where it came from and the counts (passed, failed, skipped) are recorded in the pull request description.
+
+## One push, in your commit style
+
+Each round of fixes goes out as one commit in one push. The commit message follows your team's commit template when you set one in Settings; otherwise it follows the repository's recent history: a ticket key prefix when your commits start with one, one line when your commits are one line, and no co-author lines unless your commits carry them.
+
+## Approvals the push dismissed
+
+If the pull request was approved and your branch rules dismiss stale approvals, the push removes them. CoderHelm checks the reviews after every push. When an approval was dismissed, it tells the person who asked for the change, on the run page and on the ticket they used (the Jira ticket or the GitHub issue), naming who has to approve again. It never merges a pull request nobody asked it to merge.
+
+## What the person who asked said not to do
+
+People sometimes say how CoderHelm should work, not only what to change: "don't comment on the PR", "don't merge it, I will", "one push only". CoderHelm reads these from the ticket and the review thread and keeps them for the rest of the work:
+
+| Said | What CoderHelm does |
+| --- | --- |
+| Don't comment on the pull request | Posts nothing on the pull request. Its replies go to the run page and the ticket instead. |
+| Don't merge | Never merges the pull request, even when auto-merge is on. The merge status says why. |
+| One push | Pushes once for the request. It skips the extra push that would merge the base branch in first. |
+
+Each one is kept with the words it came from, and the pull request description lists the ones it followed.
+
+## Where to see it
+
+The pull request description has a **Review fixes** section with one entry per round: the commit, what the scope check took out, what the log checks found, the test suite's command and counts, the commit message's style, and any approval the push dismissed.
