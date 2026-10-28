@@ -248,18 +248,14 @@ export function Deliveries({
           onClear={filtering ? clear : undefined}
         />
         <div className="mb-3 mt-2 flex min-w-0 flex-wrap items-center gap-2">
-          <FilterSelect label="Source" value={source} onChange={(v) => onFilters({ source: v })}>
-            <option value="all">All sources</option>
-            {sources.map((s) => (
-              <option key={s} value={s}>{sourceName(s)}</option>
-            ))}
-          </FilterSelect>
+          <FilterSelect
+            label="Source"
+            value={source}
+            onChange={(v) => onFilters({ source: v })}
+            options={[{ value: "all", label: "All sources" }, ...sources.map((s) => ({ value: s, label: sourceName(s) }))]}
+          />
           {!from && (
-            <FilterSelect label="Time range" value={range} onChange={(v) => onFilters({ range: v })}>
-              {RANGES.map((r) => (
-                <option key={r.value} value={r.value}>{r.label}</option>
-              ))}
-            </FilterSelect>
+            <FilterSelect label="Time range" value={range} onChange={(v) => onFilters({ range: v })} options={RANGES.map((r) => ({ value: r.value, label: r.label }))} />
           )}
         </div>
         {narrowed && (

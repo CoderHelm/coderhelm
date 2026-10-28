@@ -8,7 +8,7 @@ import { MarkdownEditor } from "@/components/markdown-editor";
 import { RepoCombobox } from "@/components/repo-combobox";
 import { buttonClass, focusRing, inputClass, primaryButton, secondaryButton, smallSecondaryButton, smallPrimaryButton } from "@/components/ui";
 import { EmptyState } from "@/components/empty-state";
-import { selectClass } from "@/components/select";
+import { Select } from "@/components/select";
 import { TASK_ORDER, taskInfo, taskStatusLook } from "../status";
 
 // The plan's tasks as a checklist: one row per task with a mark for where it
@@ -234,18 +234,16 @@ export function TaskChecklist({
                           {others.length > 0 && (
                             <label className="min-w-0 flex-1 basis-56">
                               <span className="mb-1 block text-zinc-500">Run after</span>
-                              <select
+                              <Select
+                                size="sm"
                                 value={task.depends_on ?? ""}
-                                onChange={(e) => actions.setDependency(task.task_id, e.target.value)}
-                                className={`${selectClass("sm")} w-full`}
-                              >
-                                <option value="">No dependency</option>
-                                {others.map((t) => (
-                                  <option key={t.task_id} value={t.task_id}>
-                                    {number(t.task_id)}. {t.title}
-                                  </option>
-                                ))}
-                              </select>
+                                onChange={(v) => actions.setDependency(task.task_id, v)}
+                                className="w-full"
+                                options={[
+                                  { value: "", label: "No dependency" },
+                                  ...others.map((t) => ({ value: t.task_id, label: `${number(t.task_id)}. ${t.title}` })),
+                                ]}
+                              />
                             </label>
                           )}
                           <div className="flex gap-2">
@@ -485,14 +483,15 @@ function TaskForm({
           {others.length > 0 && (
             <label className="block">
               <span className="mb-1 block text-xs text-zinc-400">Run after (starts once that task&apos;s PR merges)</span>
-              <select value={v.depends_on} onChange={(e) => set("depends_on")(e.target.value)} className={inputClass}>
-                <option value="">No dependency</option>
-                {others.map((t) => (
-                  <option key={t.task_id} value={t.task_id}>
-                    {numberOf(t.task_id)}. {t.title}
-                  </option>
-                ))}
-              </select>
+              <Select
+                value={v.depends_on}
+                onChange={(next) => set("depends_on")(next)}
+                className="w-full"
+                options={[
+                  { value: "", label: "No dependency" },
+                  ...others.map((t) => ({ value: t.task_id, label: `${numberOf(t.task_id)}. ${t.title}` })),
+                ]}
+              />
             </label>
           )}
         </div>

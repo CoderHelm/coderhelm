@@ -332,20 +332,25 @@ export function Examples({ list, loading = false }: { list: LearningExemplar[]; 
                   server; this one narrows the examples already here. */}
               <div className="flex min-w-0 basis-full gap-2 sm:basis-auto">
                 {repos.length > 1 && (
-                  <Select aria-label="Filter examples by repository" value={repo} onChange={(ev) => reset(() => setRepo(ev.target.value))} className="min-w-0 flex-1 bg-zinc-900 sm:max-w-[14rem] sm:flex-none">
-                    <option value="">All repositories</option>
-                    {repos.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
-                  </Select>
+                  <Select
+                    aria-label="Filter examples by repository"
+                    value={repo}
+                    onChange={(v) => reset(() => setRepo(v))}
+                    options={[{ value: "", label: "All repositories" }, ...repos.map((r) => ({ value: r, label: r }))]}
+                    className="min-w-0 flex-1 bg-zinc-900 sm:max-w-[14rem] sm:flex-none"
+                  />
                 )}
-                <Select aria-label="Filter examples by kind" value={kind} onChange={(ev) => reset(() => setKind(ev.target.value as KindFilter))} className="min-w-0 flex-1 bg-zinc-900 sm:flex-none">
-                  <option value="">All kinds</option>
-                  <option value="fix">Code changes</option>
-                  <option value="finding">Review comments</option>
-                </Select>
+                <Select
+                  aria-label="Filter examples by kind"
+                  value={kind}
+                  onChange={(v) => reset(() => setKind(v as KindFilter))}
+                  options={[
+                    { value: "", label: "All kinds" },
+                    { value: "fix", label: "Code changes" },
+                    { value: "finding", label: "Review comments" },
+                  ]}
+                  className="min-w-0 flex-1 bg-zinc-900 sm:flex-none"
+                />
               </div>
             </div>
             <div className="mt-2 flex min-h-5 flex-wrap items-center gap-x-3 text-xs text-zinc-400">

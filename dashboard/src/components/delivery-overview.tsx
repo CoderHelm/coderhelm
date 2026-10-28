@@ -148,20 +148,23 @@ export function DeliveryOverview({ filters, onFilters }: { filters: OverviewFilt
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <Segmented label="Period" options={PERIODS.map((p) => ({ value: p.value, label: p.label }))} value={period} onChange={(v) => onFilters({ period: v })} />
         <Segmented label="Show" options={STATUSES.map((s) => ({ value: s.value, label: s.label }))} value={status} onChange={(v) => onFilters({ status: v })} />
-        <FilterSelect label="Source" value={source} onChange={(v) => onFilters({ source: v, endpoint: v === "all" || v === "webhook" ? endpoint : "" })}>
-          <option value="all">All sources</option>
-          {sources.map((s) => (
-            <option key={s} value={s}>{sourceName(s)}</option>
-          ))}
-        </FilterSelect>
+        <FilterSelect
+          label="Source"
+          value={source}
+          onChange={(v) => onFilters({ source: v, endpoint: v === "all" || v === "webhook" ? endpoint : "" })}
+          options={[{ value: "all", label: "All sources" }, ...sources.map((s) => ({ value: s, label: sourceName(s) }))]}
+        />
         {(data?.endpoints.length ?? 0) > 0 || endpoint ? (
-          <FilterSelect label="Endpoint" value={endpoint} onChange={(v) => onFilters({ endpoint: v })}>
-            <option value="">All endpoints</option>
-            {(data?.endpoints ?? []).map((e) => (
-              <option key={e.id} value={e.id}>{endpointName(e)}</option>
-            ))}
-            {endpoint && !data?.endpoints.some((e) => e.id === endpoint) && <option value={endpoint}>{endpoint}</option>}
-          </FilterSelect>
+          <FilterSelect
+            label="Endpoint"
+            value={endpoint}
+            onChange={(v) => onFilters({ endpoint: v })}
+            options={[
+              { value: "", label: "All endpoints" },
+              ...(data?.endpoints ?? []).map((e) => ({ value: e.id, label: endpointName(e) })),
+              ...(endpoint && !data?.endpoints.some((e) => e.id === endpoint) ? [{ value: endpoint, label: endpoint }] : []),
+            ]}
+          />
         ) : null}
         {filtering && (
           <button type="button" onClick={clear} className={buttonClass("ghost", "sm")} data-testid="overview-clear">

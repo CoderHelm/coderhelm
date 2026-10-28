@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { pickOption } from "./select";
 
 // The API keys page: list, create (the key is shown once), revoke, and who
 // may open it. Every API call is answered here.
@@ -131,7 +132,7 @@ test("creating a key sends its scopes, expiry and rate limit, and shows the key 
 
   await dialog.getByLabel("Name").fill("Nightly report");
   await dialog.getByRole("checkbox", { name: /^plans / }).check();
-  await dialog.getByLabel("Expires after").selectOption("30");
+  await pickOption(dialog.getByLabel("Expires after"), "30");
   await dialog.getByLabel("Requests a minute").fill("120");
   await dialog.getByRole("button", { name: "Create key" }).click();
 

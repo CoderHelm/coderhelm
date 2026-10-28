@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { pickOption, expectSelectValue } from "./select";
 
 // Support tickets: filing from the menu, from ⌘K and from a run, the team's
 // list and thread, and the platform admin's queue. Every API call is
@@ -373,9 +374,9 @@ test.describe("the platform admin's support queue", () => {
     await expect(page.getByTestId("support-message")).toHaveCount(2);
     const reply = db.posts.find((x) => x.path.endsWith("/reply"))!;
     expect(reply.body).toEqual({ body: "We posted the notes again.", status: "resolved" });
-    await expect(page.getByTestId("ticket-status")).toHaveValue("resolved");
+    await expectSelectValue(page.getByTestId("ticket-status"), "resolved");
 
-    await page.getByTestId("ticket-status").selectOption("open");
+    await pickOption(page.getByTestId("ticket-status"), "open");
     await expect.poll(() => db.posts.filter((x) => x.path.endsWith("/status")).length).toBe(1);
     expect(db.posts.find((x) => x.path.endsWith("/status"))!.body).toEqual({ status: "open" });
   });
@@ -419,8 +420,8 @@ test.describe("moving to your own AWS account", () => {
       await expect(page).toHaveURL(/\/support\/?\?new=1&type=selfhost/);
       await expect(page.getByRole("heading", { level: 1, name: "Move to your own AWS account" })).toBeVisible();
       await expect(page.getByLabel("Subject")).toHaveValue("Move to self-host");
-      await page.getByLabel("Team size").selectOption("11 to 50 people");
-      await page.getByLabel("AWS region").selectOption("eu-west-1");
+      await pickOption(page.getByLabel("Team size"), "11 to 50 people");
+      await pickOption(page.getByLabel("AWS region"), "eu-west-1");
       await page.getByLabel("Settings and instructions").check();
       await page.getByLabel("Knowledge and data sources").check();
       await noSideScroll(page);

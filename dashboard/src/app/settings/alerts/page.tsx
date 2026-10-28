@@ -933,12 +933,13 @@ function EventsTimeline({
           onChange={setFilter}
         /></div>
         {routes.length > 1 && (
-          <Select aria-label="Route" value={topic} onChange={(e) => setTopic(e.target.value)} className="min-w-0 sm:max-w-64">
-            <option value="all">Every route</option>
-            {routes.map((r) => (
-              <option key={r.topic_arn} value={r.topic_arn}>{topicName(r.topic_arn)}</option>
-            ))}
-          </Select>
+          <Select
+            aria-label="Route"
+            value={topic}
+            onChange={setTopic}
+            className="min-w-0 sm:max-w-64"
+            options={[{ value: "all", label: "Every route" }, ...routes.map((r) => ({ value: r.topic_arn, label: topicName(r.topic_arn) }))]}
+          />
         )}
       </div>
 

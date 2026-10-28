@@ -8,9 +8,10 @@ import { DetailBlock, List, ListEmpty, ListError, ListRow, ListSection, ListSkel
 import { Modal, ModalFooter } from "./modal";
 import { RoleEditor, type Editing as EditorMode } from "./role-editor";
 import { useToast } from "./toast";
-import { dangerButton, focusRing, inputClass, secondaryButton, smallSecondaryButton } from "./ui";
+import { dangerButton, focusRing, secondaryButton, smallSecondaryButton } from "./ui";
 import { groupCapabilities } from "@/lib/permission-groups";
 import { relativeTime, shortLabel, teamApi, uniqueCapabilities, type Capability, type CustomRole, type Permissions, type RoleChange, type RolesInfo } from "@/lib/team";
+import { Select } from "@/components/select";
 
 // "Custom roles" on Settings → Team: the team's own roles under the built-in
 // ones. Everyone sees them and what each can do; built-in admins and owners
@@ -275,22 +276,16 @@ function DeleteRole({
             </p>
             <Field id="replacement-role" label="Move them to">
               {(p) => (
-                <select
+                <Select
                   {...p}
                   value={replacement}
-                  onChange={(e) => {
-                    setReplacement(e.target.value);
+                  onChange={(v) => {
+                    setReplacement(v);
                     if (error) setError("");
                   }}
-                  className={inputClass}
-                >
-                  <option value="">Pick a role</option>
-                  {options.map((o) => (
-                    <option key={o.key} value={o.key}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
+                  className="w-full"
+                  options={[{ value: "", label: "Pick a role" }, ...options.map((o) => ({ value: o.key, label: o.label }))]}
+                />
               )}
             </Field>
           </>

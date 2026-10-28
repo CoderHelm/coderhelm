@@ -2,6 +2,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { MODELS, MODEL_ROLES } from "../src/lib/models";
+import { expectSelectValue, pickOption, selectLabels } from "./select";
 
 // Settings → AI models. Every API call is answered here with invented data;
 // nothing reaches a real backend.
@@ -68,11 +69,11 @@ async function shot(page: Page, name: string) {
   await page.screenshot({ path: path.join(SHOTS_DIR, name), fullPage: true });
 }
 
-/** All words on the page except the inside of the selects (their options are the list itself). */
+/** All words on the page except the selects (their options are the list itself; the trigger shows the chosen one). */
 const prose = (page: Page) =>
   page.locator("[data-page]").evaluate((el) => {
     const c = el.cloneNode(true) as HTMLElement;
-    c.querySelectorAll("select").forEach((s) => s.remove());
+    c.querySelectorAll('[role="combobox"], [role="listbox"]').forEach((s) => s.remove());
     return c.textContent || "";
   });
 
@@ -100,12 +101,13 @@ test("a saved key shows as one status line, models are named once, nothing stale
     await expect(row).toContainText(role.label);
     await expect(row).toContainText(role.does);
   }
-  await expect(select(page, "Planning & reviews")).toHaveValue("claude-sonnet-5-5");
-  await expect(select(page, "Writing code")).toHaveValue("claude-opus-5-5");
+  await expectSelectValue(select(page, "Planning & reviews"), "claude-sonnet-5-5");
+  await expectSelectValue(select(page, "Writing code"), "claude-opus-5-5");
   await expect(page.getByTestId("model-row-heavy_model").getByText("Recommended", { exact: true })).toBeVisible();
 
   // Options are plain model names: no dash-joined taglines.
-  const options = await page.locator("select option").allTextContents();
+  const options: string[] = [];
+  for (const role of MODEL_ROLES) options.push(...(await selectLabels(select(page, role.label))));
   expect(options.length).toBeGreaterThan(0);
   for (const o of options) expect(o).not.toMatch(/—|-\s/);
   expect(options).toEqual(expect.arrayContaining(MODELS.map((m) => m.name)));
@@ -124,25 +126,25 @@ test("a saved key shows as one status line, models are named once, nothing stale
 test("changing a model shows the save bar and PUTs exactly the same body as before", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/settings/models/");
-  await select(page, "Writing code").selectOption("claude-fable-5-1");
+  await pickOption(select(page, "Writing code"), "claude-fable-5-1");
   const bar = page.getByTestId("save-bar");
   await expect(bar).toContainText("1 unsaved change");
   await expect(page.getByTestId("model-row-heavy_model").getByText("Unsaved")).toBeVisible();
 
   // Discard puts it back and the bar goes away.
   await bar.getByRole("button", { name: "Discard" }).click();
-  await expect(select(page, "Writing code")).toHaveValue("claude-opus-5-5");
+  await expectSelectValue(select(page, "Writing code"), "claude-opus-5-5");
   await expect(bar).toHaveCount(0);
 
-  await select(page, "Writing code").selectOption("claude-fable-5-1");
-  await select(page, "Planning & reviews").selectOption("claude-haiku-4-5");
+  await pickOption(select(page, "Writing code"), "claude-fable-5-1");
+  await pickOption(select(page, "Planning & reviews"), "claude-haiku-4-5");
   await expect(bar).toContainText("2 unsaved changes");
   await bar.getByRole("button", { name: "Save changes" }).click();
   await expect(bar).toHaveCount(0);
   // No key typed: the body has the two models and no api_key, as before.
   expect(db.puts).toEqual([{ primary_model: "claude-haiku-4-5", heavy_model: "claude-fable-5-1" }]);
   expect(JSON.stringify(db.puts[0])).toBe('{"primary_model":"claude-haiku-4-5","heavy_model":"claude-fable-5-1"}');
-  await expect(select(page, "Writing code")).toHaveValue("claude-fable-5-1");
+  await expectSelectValue(select(page, "Writing code"), "claude-fable-5-1");
   await expect(page.getByTestId("key-status")).toContainText("last tested");
 });
 
@@ -192,16 +194,16 @@ test("no key yet: the box is open, Test waits for a key, Save refuses without on
   await expect(keyRow(page).getByLabel("API key")).toBeVisible();
   await expect(keyRow(page).getByRole("button", { name: "Save and test key" })).toBeDisabled();
   // Unchosen models start on the recommended ones.
-  await expect(select(page, "Planning & reviews")).toHaveValue("claude-sonnet-5-5");
-  await expect(select(page, "Writing code")).toHaveValue("claude-opus-5-5");
+  await expectSelectValue(select(page, "Planning & reviews"), "claude-sonnet-5-5");
+  await expectSelectValue(select(page, "Writing code"), "claude-opus-5-5");
 
-  await select(page, "Writing code").selectOption("claude-sonnet-5-5");
+  await pickOption(select(page, "Writing code"), "claude-sonnet-5-5");
   await page.getByTestId("save-bar").getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByTestId("save-bar")).toContainText("Add your Anthropic API key first");
   expect(db.puts).toEqual([]);
   // The "Use recommended" link puts the role back on its recommended model.
   await page.getByTestId("model-row-heavy_model").getByRole("button", { name: /Use recommended/ }).click();
-  await expect(select(page, "Writing code")).toHaveValue("claude-opus-5-5");
+  await expectSelectValue(select(page, "Writing code"), "claude-opus-5-5");
   await shot(page, "models-no-key-1280.png");
 });
 
@@ -221,7 +223,7 @@ test("phone width: no sideways scroll, and the save bar fits", async ({ page }) 
   await page.goto("/settings/models/");
   await expect(page.getByTestId("key-status")).toContainText("Key saved");
   await shot(page, "models-saved-390.png");
-  await select(page, "Writing code").selectOption("claude-fable-5-1");
+  await pickOption(select(page, "Writing code"), "claude-fable-5-1");
   await keyRow(page).getByRole("button", { name: "Replace key" }).click();
   await expect(page.getByTestId("save-bar")).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

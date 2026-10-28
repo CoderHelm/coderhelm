@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { ACCOUNT, API, ROLE_ARN, SLACK_HOOK, TOPIC, WEB, callsTo, mockApi, shot } from "./settings-mock";
+import { pickOption, expectSelectValue } from "./select";
 
 // The settings pages on the shared settings pieces: one save bar per page,
 // labelled fields, plain words. Every request body is checked exactly, so the
@@ -22,7 +23,7 @@ test("workflow: pull request and plan settings save with one bar, each through i
   await shot(page, "settings-workflow");
 
   await page.getByRole("switch", { name: "Add the plan to the pull request" }).click();
-  await page.getByLabel("Where plan tasks go").selectOption("jira");
+  await pickOption(page.getByLabel("Where plan tasks go"), "jira");
   await page.getByLabel("Branch name").fill("feature/{ticket}-{slug}");
   await expect(page.getByTestId("git-branch-preview")).toContainText("feature/ABC-123-fix-the-login-redirect-after-single-sign");
   await expect(saveBar(page)).toContainText("3 unsaved changes");
@@ -281,7 +282,7 @@ test("aws: account settings are rows with one save; actions sit in the account's
   await expect(account.getByRole("button", { name: "Disconnect" })).toHaveCount(0);
   await shot(page, "settings-aws");
 
-  await account.getByLabel("Region").selectOption("eu-west-1");
+  await pickOption(account.getByLabel("Region"), "eu-west-1");
   await account.getByRole("button", { name: "Choose log groups" }).click();
   await account.getByRole("checkbox", { name: "/ecs/worker" }).check();
   await account.getByRole("switch", { name: "Metrics" }).click();
@@ -336,8 +337,8 @@ test("jira: projects, their repositories and the default project save with one b
   await shot(page, "settings-jira");
 
   await page.getByRole("switch", { name: "Operations (OPS)" }).click();
-  await page.getByTestId("project-WEB").getByLabel("Repository").selectOption(WEB);
-  await page.getByLabel("Default project for tickets made from plans").selectOption("OPS");
+  await pickOption(page.getByTestId("project-WEB").getByLabel("Repository"), WEB);
+  await pickOption(page.getByLabel("Default project for tickets made from plans"), "OPS");
   await expect(saveBar(page)).toContainText("3 unsaved changes");
   expect(callsTo(db, "PUT", /jira\/(projects|config)$/)).toHaveLength(0);
 
@@ -349,7 +350,7 @@ test("jira: projects, their repositories and the default project save with one b
   expect(callsTo(db, "PUT", /jira\/config$/).map((c) => c.body)).toEqual([{ default_project: "OPS" }]);
 
   // Discard puts the saved choices back.
-  await page.getByTestId("project-OPS").getByLabel("Repository").selectOption(API);
+  await pickOption(page.getByTestId("project-OPS").getByLabel("Repository"), API);
   await saveBar(page).getByRole("button", { name: "Discard" }).click();
-  await expect(page.getByTestId("project-OPS").getByLabel("Repository")).toHaveValue("");
+  await expectSelectValue(page.getByTestId("project-OPS").getByLabel("Repository"), "");
 });

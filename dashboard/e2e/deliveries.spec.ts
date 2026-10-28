@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { pickOption } from "./select";
 
 // Settings, then Deliveries: every webhook in and notice out. Every API call
 // is answered here; nothing reaches a real backend. Names are made up.
@@ -147,18 +148,18 @@ test("filters: source, status, time range and search go to the server and the ad
   await page.goto("/settings/deliveries/");
   await expect(page.getByTestId("delivery-row")).toHaveCount(4);
 
-  await page.getByRole("combobox", { name: "Source" }).selectOption("github");
+  await pickOption(page.getByRole("combobox", { name: "Source" }), "github");
   await expect.poll(() => db.lists.at(-1)?.get("source")).toBe("github");
   await expect(page).toHaveURL(/source=github/);
   await expect(page.getByTestId("delivery-row")).toHaveCount(1);
 
-  await page.getByRole("combobox", { name: "Source" }).selectOption("all");
+  await pickOption(page.getByRole("combobox", { name: "Source" }), "all");
   await page.getByRole("group", { name: "Show" }).getByRole("button", { name: "Failed" }).click();
   await expect.poll(() => db.lists.at(-1)?.get("status")).toBe("failed");
   await expect.poll(() => db.lists.at(-1)?.get("source")).toBeNull();
   await expect(page).toHaveURL(/status=failed/);
 
-  await page.getByRole("combobox", { name: "Time range" }).selectOption("1h");
+  await pickOption(page.getByRole("combobox", { name: "Time range" }), "1h");
   await expect.poll(() => db.lists.at(-1)?.get("since") ?? "").toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/);
   const since = Date.parse(db.lists.at(-1)!.get("since")!);
   expect(Math.abs(Date.now() - 3_600_000 - since)).toBeLessThan(5 * MIN);

@@ -2,6 +2,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { learningFixture } from "./wide-data/learning";
+import { pickOption } from "./select";
 
 // The Learning page: what Coderhelm learned from outcomes, the behavior it
 // changed and why, and the admin controls (pin, turn off, turn back on).
@@ -354,12 +355,12 @@ test("search, repository and kind narrow the examples and can be cleared", async
   await expect(toggles.getByRole("button", { name: /To avoid/ })).toContainText("0");
 
   await section.getByRole("button", { name: "Clear filters" }).first().click();
-  await section.getByLabel("Filter examples by kind").selectOption("fix");
+  await pickOption(section.getByLabel("Filter examples by kind"), "fix");
   const rows = section.getByRole("list", { name: "Examples to follow" }).getByRole("listitem");
   await expect(rows).toHaveCount(5);
   for (const t of await rows.allTextContents()) expect(t).toContain("Code change");
 
-  await section.getByLabel("Filter examples by repository").selectOption(REPO);
+  await pickOption(section.getByLabel("Filter examples by repository"), REPO);
   await expect(rows).toHaveCount(2);
   await section.getByRole("searchbox", { name: "Search examples" }).fill("nothing like this");
   await expect(section.getByTestId("list-empty")).toContainText("No examples match");

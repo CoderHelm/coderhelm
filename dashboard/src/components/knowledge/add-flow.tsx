@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "@/components/modal";
 import { Code } from "@/components/settings/code";
+import { Select } from "@/components/select";
 import { buttonClass, focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { errorMessage } from "@/lib/data-sources";
 import {
@@ -453,11 +454,17 @@ export function AddFlow({
                 ) : (
                   <label className="block">
                     <span className="mb-2 block text-sm text-zinc-300">Who can read it</span>
-                    <select className={inputClass} value={readRole} onChange={(e) => setReadRole(e.target.value as typeof readRole)} data-testid="read-select">
-                      <option value="viewer">Everyone on the team</option>
-                      <option value="member">Members, admins and owners</option>
-                      <option value="admin">Only admins and owners</option>
-                    </select>
+                    <Select
+                      className="w-full"
+                      value={readRole}
+                      onChange={(r) => setReadRole(r as typeof readRole)}
+                      data-testid="read-select"
+                      options={[
+                        { value: "viewer", label: "Everyone on the team" },
+                        { value: "member", label: "Members, admins and owners" },
+                        { value: "admin", label: "Only admins and owners" },
+                      ]}
+                    />
                   </label>
                 )}
               </div>

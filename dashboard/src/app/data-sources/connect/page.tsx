@@ -23,6 +23,7 @@ import { Field, SecretInput } from "@/components/field";
 import { HiddenFieldsEditor } from "@/components/hidden-fields-editor";
 import { Segmented } from "@/components/segmented";
 import { FlowShell as BaseFlowShell } from "@/components/data-source-flow-shell";
+import { Select } from "@/components/select";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 
 export default function ConnectDataSourcePageGuarded() {
@@ -803,14 +804,13 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
           <div className="min-w-56 flex-1">
             <label htmlFor="try-group" className="block mb-1.5 text-sm font-semibold text-zinc-100">Log group</label>
             {exactGroups.length > 0 ? (
-              <select
+              <Select
                 id="try-group"
                 value={group}
-                onChange={(e) => setGroup(e.target.value)}
-                className={`${inputClass} font-mono text-xs`}
-              >
-                {exactGroups.map((g) => <option key={g} value={g}>{g}</option>)}
-              </select>
+                onChange={setGroup}
+                className="w-full font-mono text-xs"
+                options={exactGroups.map((g) => ({ value: g, label: g }))}
+              />
             ) : (
               <p className="text-sm text-amber-200">
                 This source only names groups by prefix. Choose exact log groups on the data sources page to try a search here.
@@ -827,14 +827,13 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
       {warehouse && databases.length > 0 && (
         <div className="max-w-sm">
           <label htmlFor="try-database" className="block mb-1.5 text-sm font-semibold text-zinc-100">Database</label>
-          <select
+          <Select
             id="try-database"
             value={database}
-            onChange={(e) => setDatabase(e.target.value)}
-            className={`${inputClass} font-mono text-xs`}
-          >
-            {databases.map((d) => <option key={d} value={d}>{d}</option>)}
-          </select>
+            onChange={setDatabase}
+            className="w-full font-mono text-xs"
+            options={databases.map((d) => ({ value: d, label: d }))}
+          />
         </div>
       )}
 

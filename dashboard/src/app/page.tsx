@@ -13,7 +13,7 @@ import { Page, PageHeader } from "@/components/page";
 import { EmptyState } from "@/components/empty-state";
 import { Code } from "@/components/settings/code";
 import { PlayIcon } from "@/components/icons";
-import { RunTriggerLine, STARTED_BY, startedByValue } from "@/components/run-trigger";
+import { RunTriggerLine, startedByOptions, startedByValue } from "@/components/run-trigger";
 import { Select } from "@/components/select";
 import {
   GROUP_LABEL,
@@ -39,6 +39,7 @@ import {
 // and All, never under Active. Archived and started-again runs show under All
 // only.
 type StatusTab = "all" | keyof typeof RUN_GROUP_STATUSES;
+const STARTED_BY_OPTIONS = startedByOptions();
 const TABS: StatusTab[] = ["all", "active", "waiting", "done", "failed", "closed"];
 const TAB_TONE = { active: "live", waiting: "waiting", done: "success", failed: "danger", closed: "muted" } as const;
 
@@ -200,16 +201,10 @@ function RunsPage() {
             aria-label="Started by"
             data-testid="started-by-filter"
             value={startedBy}
-            onChange={(e) => setParams({ started_by: e.target.value })}
+            onChange={(v) => setParams({ started_by: v })}
+            options={STARTED_BY_OPTIONS}
             className={`bg-zinc-900 ${startedBy ? "border-zinc-500" : ""}`}
-          >
-            <option value="">Started by anyone</option>
-            {STARTED_BY.map((o) => (
-              <option key={o.value} value={o.value}>
-                Started by {o.label}
-              </option>
-            ))}
-          </Select>
+          />
         }
         repo={{ value: repo, onChange: (v) => setParams({ repo: v }), repos: teamRepos }}
         onClear={filtered ? clear : undefined}

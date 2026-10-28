@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/skeleton";
 import { EmptyState } from "@/components/empty-state";
 import { Disclosure } from "@/components/disclosure";
 import { Select } from "@/components/select";
+import { SuggestInput } from "@/components/suggest-input";
 import { AwsIcon, ExternalLinkIcon } from "@/components/icons";
 import { Page, PageHeader, Section } from "@/components/page";
 import { buttonClass, inputClass, linkButton, monoInputClass, primaryButton, secondaryButton } from "@/components/ui";
@@ -475,17 +476,12 @@ function AccountSettings({
                 <Select
                   id={ids.inputId}
                   value={v.region}
-                  onChange={(e) => set("region", e.target.value)}
+                  onChange={(r) => set("region", r)}
                   aria-describedby={ids.helpId}
                   aria-invalid={regionOk ? undefined : true}
                   className="w-full"
-                >
-                  {(COMMON_REGIONS.includes(v.region) || !v.region ? COMMON_REGIONS : [v.region, ...COMMON_REGIONS]).map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </Select>
+                  options={(COMMON_REGIONS.includes(v.region) || !v.region ? COMMON_REGIONS : [v.region, ...COMMON_REGIONS]).map((r) => ({ value: r, label: r }))}
+                />
                 {!regionOk && <p role="alert" className="mt-1.5 text-sm text-red-300">Choose an AWS region.</p>}
               </div>
             ) : (
@@ -877,20 +873,15 @@ function ConnectPanel({ first, onCancel, onConnected }: { first: boolean; onCanc
               error={region.trim() && !regionOk ? "Enter an AWS region such as us-east-1." : undefined}
             >
               {(props) => (
-                <>
-                  <input
-                    {...props}
-                    value={region}
-                    onChange={(e) => { setRegion(e.target.value); setResult(null); }}
-                    list="aws-regions"
-                    spellCheck={false}
-                    autoComplete="off"
-                    className={`${inputClass} max-w-xs`}
-                  />
-                  <datalist id="aws-regions">
-                    {COMMON_REGIONS.map((r) => <option key={r} value={r} />)}
-                  </datalist>
-                </>
+                <SuggestInput
+                  {...props}
+                  value={region}
+                  onChange={(v) => { setRegion(v); setResult(null); }}
+                  suggestions={COMMON_REGIONS}
+                  spellCheck={false}
+                  autoComplete="off"
+                  className={`${inputClass} max-w-xs`}
+                />
               )}
             </Field>
 

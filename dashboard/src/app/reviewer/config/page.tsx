@@ -449,19 +449,19 @@ function ReviewerConfigPage() {
             <label htmlFor="rc-section" className="mb-1.5 block text-sm font-medium text-zinc-200">
               Section
             </label>
-            <Select id="rc-section" value={view} onChange={(e) => goTo(e.target.value as View)} className="w-full">
-              {navItems
-                .filter((s) => s.id !== "stop")
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.title}
-                    {s.word ? ` (${s.word})` : ""}
-                    {s.unsaved ? " · unsaved" : ""}
-                  </option>
-                ))}
-              <option value="standards">Every repository{orgDirty ? " · unsaved" : ""}</option>
-              <option value="stop">Stop everything{stopItem?.word ? ` (${stopItem.word})` : ""}</option>
-            </Select>
+            <Select<string>
+              id="rc-section"
+              value={view}
+              onChange={(v) => goTo(v as View)}
+              className="w-full"
+              options={[
+                ...navItems
+                  .filter((s) => s.id !== "stop")
+                  .map((s) => ({ value: s.id, label: `${s.title}${s.word ? ` (${s.word})` : ""}${s.unsaved ? " · unsaved" : ""}` })),
+                { value: "standards", label: `Every repository${orgDirty ? " · unsaved" : ""}` },
+                { value: "stop", label: `Stop everything${stopItem?.word ? ` (${stopItem.word})` : ""}` },
+              ]}
+            />
           </div>
           <ul className="hidden flex-col gap-0.5 lg:flex">
             {navItems

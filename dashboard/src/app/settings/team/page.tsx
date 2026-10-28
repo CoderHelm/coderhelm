@@ -312,11 +312,18 @@ function TeamPage() {
                 ],
               }}
               actions={
-                <SharedSelect aria-label="Filter by sign-in" title="How they sign in" value={statusFilter} onChange={(e) => setParams({ signin: e.target.value })} className="bg-zinc-900">
-                  <option value="all">Any way of signing in</option>
-                  <option value="active">Signs in with email</option>
-                  <option value="github">Signs in with GitHub only</option>
-                </SharedSelect>
+                <SharedSelect
+                  aria-label="Filter by sign-in"
+                  title="How they sign in"
+                  value={statusFilter}
+                  onChange={(v) => setParams({ signin: v })}
+                  className="bg-zinc-900"
+                  options={[
+                    { value: "all", label: "Any way of signing in" },
+                    { value: "active", label: "Signs in with email" },
+                    { value: "github", label: "Signs in with GitHub only" },
+                  ]}
+                />
               }
               onClear={query || roleFilter !== "all" || statusFilter !== "all" ? clearFilters : undefined}
             />
@@ -554,13 +561,14 @@ function MemberRow({
       chips={
         <>
           {manageable && !lastOwner ? (
-            <SharedSelect size="sm" aria-label={`Role for ${name}`} value={m.role} disabled={busy} onChange={(e) => onRole(e.target.value)}>
-              {options.map((r) => (
-                <option key={r.key} value={r.key}>
-                  {r.label}
-                </option>
-              ))}
-            </SharedSelect>
+            <SharedSelect
+              size="sm"
+              aria-label={`Role for ${name}`}
+              value={m.role}
+              disabled={busy}
+              onChange={(v) => onRole(v)}
+              options={options.map((r) => ({ value: r.key, label: r.label }))}
+            />
           ) : (
             <span title={lastOwner && manageable ? "Make someone else an owner before changing this role" : "You can't change this role"}>
               <RoleChip role={m.role} label={roleLabel(m.role)} />
@@ -811,13 +819,13 @@ function InviteForm({ roles, onInvited }: { roles: RoleInfo[]; onInvited: (email
           />
         </div>
         <div className="flex gap-2">
-          <SharedSelect aria-label="Role" value={role} onChange={(e) => setRole(e.target.value)} className="flex-1 sm:w-36 sm:flex-none">
-            {roles.map((r) => (
-              <option key={r.key} value={r.key}>
-                {r.label}
-              </option>
-            ))}
-          </SharedSelect>
+          <SharedSelect
+            aria-label="Role"
+            value={role}
+            onChange={setRole}
+            className="flex-1 sm:w-36 sm:flex-none"
+            options={roles.map((r) => ({ value: r.key, label: r.label }))}
+          />
           <button type="submit" className={`${primaryButton} shrink-0`} disabled={sending}>
             {sending ? "Sending…" : "Send invite"}
           </button>

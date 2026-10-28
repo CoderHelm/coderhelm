@@ -333,18 +333,22 @@ function NewTicket() {
           <fieldset className="space-y-4" data-testid="move-form">
             <legend className="sr-only">About your move</legend>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field as="select" id="move-size" label="Team size" value={size} onChange={(e) => setSize(e.target.value)}>
-                <option value="">Choose one</option>
-                {TEAM_SIZES.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </Field>
-              <Field as="select" id="move-region" label="AWS region" value={region} onChange={(e) => setRegion(e.target.value)}>
-                <option value="">Not sure yet</option>
-                {AWS_REGIONS.map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </Field>
+              <Field
+                as="select"
+                id="move-size"
+                label="Team size"
+                value={size}
+                onChange={setSize}
+                options={[{ value: "", label: "Choose one" }, ...TEAM_SIZES.map((t) => ({ value: t, label: t }))]}
+              />
+              <Field
+                as="select"
+                id="move-region"
+                label="AWS region"
+                value={region}
+                onChange={setRegion}
+                options={[{ value: "", label: "Not sure yet" }, ...AWS_REGIONS.map((r) => ({ value: r, label: r }))]}
+              />
             </div>
             <div>
               <p className="mb-1.5 text-sm font-medium text-zinc-200">What to bring over</p>

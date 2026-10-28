@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { expectSelectValue, pickOption, selectLabels } from "./select";
 
 // How each run was started, on the runs list and the run page: one run of
 // every kind the gateway sends (`trigger` on a run), the "Started by" filter
@@ -210,8 +211,8 @@ test("Started by filters on the server and stays in the address", async ({ page 
   await expect(page.getByTestId("run-row")).toHaveCount(RUNS.length);
 
   const filter = page.getByRole("combobox", { name: "Started by" });
-  await expect(filter).toHaveValue("");
-  const options = await filter.locator("option").allTextContents();
+  await expectSelectValue(filter, "");
+  const options = await selectLabels(filter);
   expect(options).toEqual([
     "Started by anyone",
     "Started by Jira",
@@ -223,7 +224,8 @@ test("Started by filters on the server and stays in the address", async ({ page 
     "Started by Chat",
   ]);
 
-  await filter.selectOption("coderhelm");
+  await pickOption(filter, "coderhelm");
+  await expect(filter).toHaveText("Started by Coderhelm");
   await expect(page).toHaveURL(/[?&]started_by=coderhelm/);
   await expect(page.getByTestId("run-row")).toHaveCount(2);
   expect(db.calls.some((c) => c.startsWith("GET /api/runs?") && c.includes("started_by=coderhelm"))).toBe(true);
@@ -231,7 +233,7 @@ test("Started by filters on the server and stays in the address", async ({ page 
 
   // A reload keeps it; with the status filter it narrows further.
   await page.reload();
-  await expect(page.getByRole("combobox", { name: "Started by" })).toHaveValue("coderhelm");
+  await expectSelectValue(page.getByRole("combobox", { name: "Started by" }), "coderhelm");
   await expect(page.getByTestId("run-row")).toHaveCount(2);
   await page.getByRole("group", { name: "Show runs" }).getByRole("button", { name: "Active" }).click();
   await expect(page).toHaveURL(/status=active/);
@@ -247,13 +249,13 @@ test("Started by filters on the server and stays in the address", async ({ page 
   await expect(page.getByTestId("run-row")).toHaveCount(1);
   await expect(page.getByTestId("run-row")).toContainText("Store request counts");
   await page.goto("/?started_by=nope");
-  await expect(page.getByRole("combobox", { name: "Started by" })).toHaveValue("");
+  await expectSelectValue(page.getByRole("combobox", { name: "Started by" }), "");
   await expect(page.getByTestId("run-row")).toHaveCount(RUNS.length);
 
   // Nothing started that way: the empty state says so.
   db.runs = RUNS.filter((r) => r.trigger?.kind !== "chat");
   await page.goto("/");
-  await page.getByRole("combobox", { name: "Started by" }).selectOption("chat");
+  await pickOption(page.getByRole("combobox", { name: "Started by" }), "chat");
   await expect(page.getByTestId("run-row")).toHaveCount(0);
   await expect(page.getByText("No runs were started that way.", { exact: false })).toBeVisible();
   expect(errors).toEqual([]);

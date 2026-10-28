@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { pickOption } from "./select";
 
 // Settings, System, Models on a self-hosted install: switching between
 // Claude on Amazon Bedrock and Anthropic API keys (every model answers a
@@ -147,7 +148,7 @@ for (const width of [1440, 390]) {
       await expect(section.getByTestId("models-current")).toContainText("Anthropic API keys");
       await expect(section.getByTestId("models-current")).toContainText("From the install config");
       await section.getByRole("radio", { name: /Claude on Amazon Bedrock/ }).check();
-      await section.getByRole("combobox", { name: "Inference profile prefix" }).selectOption("eu.");
+      await pickOption(section.getByRole("combobox", { name: "Inference profile prefix" }), "eu.");
       await section.getByText("Advanced: exact Bedrock ids").click();
       await expect(section.getByRole("textbox", { name: /Bedrock id for claude-opus-5-5/ })).toHaveAttribute("placeholder", "eu.anthropic.claude-opus-5-5");
       await section.getByRole("button", { name: "Check and switch to Claude on Amazon Bedrock" }).click();

@@ -2,6 +2,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { mockWideApi } from "./wide-data";
+import { pickOption } from "./select";
 
 // The Tests area against a mocked backend. Nothing reaches a real server.
 
@@ -596,7 +597,7 @@ test("tests: settings save every choice", async ({ page }) => {
   await shot(page, "settings");
   await page.getByRole("switch", { name: "Check new tests before merge" }).click();
   await page.getByRole("switch", { name: "Quarantine flaky tests" }).click();
-  await page.getByLabel("Tickets for long quarantines").selectOption("jira");
+  await pickOption(page.getByLabel("Tickets for long quarantines"), "jira");
   const days = page.getByRole("spinbutton", { name: "Days before a ticket" });
   await expect(days).toHaveValue("2");
   await expect(page.getByText("File a ticket after a test has been quarantined this many days.", { exact: false })).toBeVisible();

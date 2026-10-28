@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { pickOption } from "./select";
 
 // Infrastructure, Health, Admin and Code graph pages. Every API call is
 // answered here; nothing reaches a real backend.
@@ -367,7 +368,7 @@ test("admin teams: search, status and sort sit above the table and live in the a
   await page.goto("/admin");
   const orgs = page.getByTestId("admin-org");
   await expect(orgs).toHaveCount(2);
-  await page.getByRole("combobox", { name: "Sort" }).selectOption("name");
+  await pickOption(page.getByRole("combobox", { name: "Sort" }), "name");
   await expect(page).toHaveURL(/sort=name/);
   await expect(orgs.first()).toContainText("acme");
   await page.getByRole("searchbox", { name: "Search teams" }).fill("beta");

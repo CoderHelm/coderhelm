@@ -230,36 +230,38 @@ export function SkillActivity({
       />
       <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2">
         {!item && (
-          <FilterSelect label="Item" value={filters.item} onChange={(v) => set({ item: v })}>
-            <option value="">Every item</option>
-            {itemOptions.map((s) => (
-              <option key={itemKey(s)} value={itemKey(s)}>
-                {s.kind}:{s.name}
-              </option>
-            ))}
-          </FilterSelect>
+          <FilterSelect
+            label="Item"
+            value={filters.item}
+            onChange={(v) => set({ item: v })}
+            options={[{ value: "", label: "Every item" }, ...itemOptions.map((s) => ({ value: itemKey(s), label: `${s.kind}:${s.name}` }))]}
+          />
         )}
-        <FilterSelect label="Who" value={filters.by} onChange={(v) => set({ by: v })}>
-          <option value="">Everyone</option>
-          <option value="planner">Planner</option>
-          <option value="coder">Coder</option>
-          <option value="reviewer">Reviewer</option>
-          <option value="writer">Writer (PR descriptions, release notes)</option>
-          <option value="people">People trying an agent</option>
-        </FilterSelect>
-        <FilterSelect label="What" value={filters.action} onChange={(v) => set({ action: v as ActivityFilters["action"] })}>
-          <option value="">Reads and asks</option>
-          <option value="read">Reads</option>
-          <option value="ask">Asks</option>
-          <option value="apply">Always applied</option>
-        </FilterSelect>
-        <FilterSelect label="When" value={filters.range} onChange={(v) => set({ range: v as Range })}>
-          {RANGES.map((r) => (
-            <option key={r.value} value={r.value}>
-              {r.label}
-            </option>
-          ))}
-        </FilterSelect>
+        <FilterSelect
+          label="Who"
+          value={filters.by}
+          onChange={(v) => set({ by: v })}
+          options={[
+            { value: "", label: "Everyone" },
+            { value: "planner", label: "Planner" },
+            { value: "coder", label: "Coder" },
+            { value: "reviewer", label: "Reviewer" },
+            { value: "writer", label: "Writer (PR descriptions, release notes)" },
+            { value: "people", label: "People trying an agent" },
+          ]}
+        />
+        <FilterSelect
+          label="What"
+          value={filters.action}
+          onChange={(v) => set({ action: v as ActivityFilters["action"] })}
+          options={[
+            { value: "", label: "Reads and asks" },
+            { value: "read", label: "Reads" },
+            { value: "ask", label: "Asks" },
+            { value: "apply", label: "Always applied" },
+          ]}
+        />
+        <FilterSelect label="When" value={filters.range} onChange={(v) => set({ range: v as Range })} options={RANGES.map((r) => ({ value: r.value, label: r.label }))} />
       </div>
       </>
       )}

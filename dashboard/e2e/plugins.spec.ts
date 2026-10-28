@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { pickOption } from "./select";
 
 // Plugins end to end against an invented backend that keeps the same rules
 // the gateway does: a second admin approves installs and widening updates,
@@ -588,10 +589,10 @@ test("the audit log filters by plugin and action and loads more", async ({ page 
   ];
   await page.goto("/audit");
   await expect(page.getByTestId("audit-event")).toHaveCount(2);
-  await page.getByLabel("What happened").selectOption("draft.approved");
+  await pickOption(page.getByLabel("What happened"), "draft.approved");
   await expect(page.getByTestId("audit-event")).toHaveCount(1);
   await expect(page.getByTestId("audit-event")).toContainText("Draft approved");
-  await page.getByLabel("What happened").selectOption("");
+  await pickOption(page.getByLabel("What happened"), "");
   await expect(page.getByTestId("audit-event")).toHaveCount(2);
   await page.getByRole("button", { name: /load more/i }).click();
   await expect(page.getByTestId("audit-event")).toHaveCount(3);

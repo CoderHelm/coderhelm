@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { pickOption } from "./select";
 
 // Attaching items to tickets, the team's support access setting, and the
 // platform admin's read-only support view with its banner. Every API call is
@@ -263,7 +264,7 @@ test.describe("support access", () => {
     await expect(page.getByTestId("support-access-log")).toContainText("Viewed the runs list");
     await expect(page.getByTestId("support-access-log")).not.toContainText("GET /runs");
 
-    await page.getByLabel("For how long").selectOption("24");
+    await pickOption(page.getByLabel("For how long"), "24");
     await page.getByLabel(/Note for support/).fill("Look at the failed run");
     await page.getByTestId("support-access-grant").click();
     await expect(control).toHaveAttribute("data-active", "true");
@@ -291,7 +292,7 @@ test.describe("support access", () => {
     const db = await mockApi(page);
     await page.goto("/support/ticket/?id=01TICKET0001");
     const box = page.getByTestId("ticket-support-access");
-    await box.getByLabel("For how long").selectOption("168");
+    await pickOption(box.getByLabel("For how long"), "168");
     await box.getByRole("button", { name: "Let support look at this" }).click();
     await expect(box.getByTestId("support-access-control")).toHaveAttribute("data-active", "true");
     expect(db.posts.find((x) => x.path === "/api/support/access")!.body).toEqual({ hours: 168, ticket_id: "01TICKET0001" });
