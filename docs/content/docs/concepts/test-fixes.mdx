@@ -103,6 +103,18 @@ A change that makes a test ask less of the app gets one round to put the test ba
 
 After the fix passes, CoderHelm takes each wait, navigation wait or timeout change back out, one at a time, on a temporary branch, and repeats the test. A change the test still passes without is dropped from the pull request. The description lists what was dropped and what was kept, with the counts.
 
+## When an end-to-end test fails on CoderHelm's own pull request
+
+CoderHelm doesn't assume a failing test was broken by its change. For each failing test it:
+
+1. Reads what the page actually showed: the failing attempt's screenshot and its page snapshot from the report, not only the error text.
+2. Maps the failing steps to the app code they run: the test ids, roles and texts the step and its page objects use, and the requests the trace recorded, found in your app's code. Then it checks whether the change edits that code, and writes "Diff touches failing path: yes" or "no" with the evidence. A spec or helper file the change shares with the test is not evidence.
+3. Checks whether the page behaved correctly for its data. Shared test environments move on: a registration window not open yet, a full class, a season that ended. When the page was right for its data, the test is wrong, not the app.
+
+When the failure is unrelated to the change, CoderHelm spends no fix rounds on the pull request. It opens a separate small pull request that fixes the test, citing the page snapshot as the evidence that the expectation was wrong, and says on the original: "Unrelated to this change; fixed in #N. Re-run E2E after it merges." The original pull request's run and auto-merge show it as blocked on that fix, not as failing.
+
+When CoderHelm writes or fixes a check like "a way to register", it accepts every valid state of the page (open, full with a waitlist, not open yet, restricted), or it picks test data in the state it needs instead of the first item listed. The reviewer checks the same in every review.
+
 ## Let CoderHelm repeat tests on CI
 
 Add a `repeat_each` input to your end-to-end workflow so CoderHelm can start a repeat run on the pull request's branch:
