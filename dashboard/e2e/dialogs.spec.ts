@@ -174,7 +174,7 @@ test("the role editor on a short laptop screen keeps Cancel and Create role on s
   await expectReachable(page, editor.getByRole("button", { name: "Create role" }), "role editor");
   await expectReachable(page, editor.getByRole("button", { name: "Cancel" }), "role editor cancel");
   // Focus starts in the form and stays in the dialog.
-  await expect(editor.getByLabel("Name")).toBeFocused();
+  await expect(editor.getByRole("textbox", { name: "Name" })).toBeFocused();
   for (let i = 0; i < 40; i++) await page.keyboard.press("Tab");
   expect(await editor.evaluate((el) => el.contains(document.activeElement))).toBe(true);
   // The page behind doesn't scroll while it is open.

@@ -23,14 +23,25 @@ export interface CapabilityGroup {
 export const CAPABILITY_GROUPS: CapabilityGroup[] = [
   { id: "runs", label: "Runs & plans", keys: ["view", "plans", "runs", "recommendations", "delete_plans"] },
   { id: "reviews", label: "Reviews, releases & tests", keys: ["reviews", "tests"] },
+  { id: "chat", label: "Chat & knowledge", keys: ["brain_read", "brain_ask", "knowledge_manage"] },
   {
     id: "connections",
     label: "Repos & integrations",
-    keys: ["repos", "view_integrations", "integrations", "data_sources", "view_alerts", "alerts"],
+    keys: ["repos", "view_integrations", "integrations", "mcp_connect", "data_sources", "view_alerts", "alerts"],
   },
-  { id: "agent", label: "Agent settings", keys: ["agent_settings", "agents.permissions", "agents.approve", "memory", "model_provider"] },
-  { id: "people", label: "People & team", keys: ["view_team", "people", "roles", "support", "manage_admins", "team_name"] },
-  { id: "account", label: "Billing & account", keys: ["own_account", "budget", "system", "disconnect", "reset"] },
+  {
+    id: "agent",
+    label: "Agent settings",
+    keys: ["agent_settings", "agents.permissions", "agents.approve", "memory", "learning", "model_provider"],
+  },
+  { id: "plugins", label: "Plugins", keys: ["plugins.view", "plugins.run", "plugins.approve", "plugins.install", "plugins.audit"] },
+  { id: "api", label: "API keys & events", keys: ["api_keys", "webhooks", "deliveries"] },
+  { id: "people", label: "People & team", keys: ["view_team", "people", "sign_in", "roles", "support", "manage_admins", "team_name"] },
+  {
+    id: "account",
+    label: "Billing & account",
+    keys: ["own_account", "budget", "system", "system.models", "emails", "platform_admin", "disconnect", "reset"],
+  },
 ];
 
 export const OTHER_GROUP = { id: "other", label: "Other" };

@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckIcon, LockIcon } from "./icons";
+import { CheckIcon } from "./icons";
 import { Callout } from "./callout";
 import { Field } from "./field";
 import { DetailBlock, List, ListEmpty, ListError, ListRow, ListSection, ListSkeleton } from "./list";
 import { Modal, ModalFooter } from "./modal";
+import { RoleEditor, type Editing as EditorMode } from "./role-editor";
 import { useToast } from "./toast";
-import { dangerButton, focusRing, inputClass, primaryButton, secondaryButton, smallSecondaryButton } from "./ui";
+import { dangerButton, focusRing, inputClass, secondaryButton, smallSecondaryButton } from "./ui";
 import { groupCapabilities } from "@/lib/permission-groups";
-import { relativeTime, teamApi, type Capability, type CustomRole, type Permissions, type RoleChange, type RolesInfo } from "@/lib/team";
+import { relativeTime, shortLabel, teamApi, uniqueCapabilities, type Capability, type CustomRole, type Permissions, type RoleChange, type RolesInfo } from "@/lib/team";
 
 // "Custom roles" on Settings → Team: the team's own roles under the built-in
 // ones. Everyone sees them and what each can do; built-in admins and owners
@@ -17,7 +18,7 @@ import { relativeTime, teamApi, type Capability, type CustomRole, type Permissio
 // capabilities offered come from the gateway's table (GET /api/roles), so one
 // added there shows up in the editor by itself.
 
-type Editing = { mode: "new" } | { mode: "edit"; role: CustomRole } | null;
+type Editing = EditorMode | null;
 
 export function CustomRoles({
   perms,
@@ -36,7 +37,7 @@ export function CustomRoles({
   const [deleting, setDeleting] = useState<CustomRole | null>(null);
   const manage = !!info?.can_manage;
   const full = !!info && info.roles.length >= info.max_roles;
-  const capByKey = useMemo(() => new Map(perms.capabilities.map((c) => [c.key, c])), [perms.capabilities]);
+  const capByKey = useMemo(() => new Map(uniqueCapabilities(perms.capabilities).map((c) => [c.key, c])), [perms.capabilities]);
 
   return (
     <div className="mt-10" data-testid="custom-roles">
@@ -183,7 +184,7 @@ function RoleRow({
                     <span className="mt-0.5 shrink-0 scale-75 text-emerald-400" aria-hidden="true">
                       <CheckIcon />
                     </span>
-                    <span>{c.label}</span>
+                    <span title={c.label}>{shortLabel(c)}</span>
                   </li>
                 ))}
               </ul>
@@ -210,201 +211,6 @@ function RoleRow({
         ) : undefined
       }
     />
-  );
-}
-
-// ── Editor ───────────────────────────────────────────────────────────
-
-const TEMPLATE_LABEL: Record<string, string> = { viewer: "Viewer", member: "Member", admin: "Admin" };
-
-function RoleEditor({
-  editing,
-  perms,
-  info,
-  onClose,
-  onSaved,
-}: {
-  editing: NonNullable<Editing>;
-  perms: Permissions;
-  info: RolesInfo;
-  onClose: () => void;
-  onSaved: () => Promise<void>;
-}) {
-  const { toast } = useToast();
-  const existing = editing.mode === "edit" ? editing.role : null;
-  const [name, setName] = useState(existing?.name ?? "");
-  const [description, setDescription] = useState(existing?.description ?? "");
-  const [template, setTemplate] = useState<string>(existing?.template ?? "");
-  const baseline = useMemo(() => new Set(info.baseline), [info.baseline]);
-  const yours = useMemo(() => new Set(info.yours), [info.yours]);
-  const [picked, setPicked] = useState<Set<string>>(() => new Set((existing?.capabilities ?? info.templates.member ?? []).filter((k) => !baseline.has(k))));
-  const [nameError, setNameError] = useState("");
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  // Only what a custom role may hold, grouped as on the matrix above.
-  const offered = useMemo(() => {
-    const allowed = new Set([...info.customizable, ...info.baseline]);
-    return groupCapabilities(perms.capabilities.filter((c) => allowed.has(c.key)));
-  }, [perms.capabilities, info.customizable, info.baseline]);
-  const leftOut = perms.capabilities.filter((c) => !info.customizable.includes(c.key) && !baseline.has(c.key));
-
-  const startFrom = (t: string) => {
-    setTemplate(t);
-    if (t) setPicked(new Set((info.templates[t] ?? []).filter((k) => !baseline.has(k) && yours.has(k))));
-  };
-  const toggle = (key: string, on: boolean) =>
-    setPicked((prev) => {
-      const next = new Set(prev);
-      if (on) next.add(key);
-      else next.delete(key);
-      return next;
-    });
-
-  const save = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      setNameError("Give the role a name.");
-      return;
-    }
-    setSaving(true);
-    setError("");
-    try {
-      const capabilities = [...picked];
-      if (existing) {
-        await teamApi.updateRole(existing.id, { name: name.trim(), description: description.trim(), capabilities });
-        toast(`${name.trim()} saved`);
-      } else {
-        await teamApi.createRole({ name: name.trim(), description: description.trim(), capabilities, template: template || null });
-        toast(`${name.trim()} created`);
-      }
-      await onSaved();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "The request failed.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Modal
-      open
-      wide
-      onOpenChange={(o) => !o && onClose()}
-      testId="role-editor"
-      title={existing ? `Edit ${existing.name}` : "New role"}
-      description={
-        existing && existing.member_count > 0
-          ? `${existing.member_count} ${existing.member_count === 1 ? "person has" : "people have"} this role. Changes reach them within a minute.`
-          : "Pick what people with this role can do."
-      }
-    >
-      <form id="role-editor-form" onSubmit={save} noValidate className="space-y-5">
-        <Field id="role-name" label="Name" error={nameError}>
-          {(p) => (
-            <input
-              {...p}
-              value={name}
-              maxLength={40}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (nameError) setNameError("");
-              }}
-              placeholder="Release manager"
-              className={inputClass}
-              autoFocus
-            />
-          )}
-        </Field>
-        <Field id="role-description" label="Description" helper="Optional. Shown to the team next to the role.">
-          {(p) => (
-            <textarea
-              {...p}
-              value={description}
-              maxLength={300}
-              rows={2}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Runs plans and looks after tests, nothing else."
-              className={inputClass}
-            />
-          )}
-        </Field>
-        {!existing && (
-          <Field id="role-template" label="Start from" helper="Ticks what that built-in role can do. Change anything after.">
-            {(p) => (
-              <select {...p} value={template} onChange={(e) => startFrom(e.target.value)} className={`${inputClass} sm:w-56`}>
-                <option value="">Nothing ticked</option>
-                {Object.keys(info.templates).map((t) => (
-                  <option key={t} value={t}>
-                    {TEMPLATE_LABEL[t] ?? t}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
-        )}
-
-        <fieldset>
-          <legend className="text-sm font-semibold text-zinc-100">What it can do</legend>
-          <div className="mt-2 divide-y divide-zinc-800 rounded-lg border border-zinc-800">
-            {offered.map((g) => (
-              <div key={g.id} className="px-3 py-2.5" data-testid={`role-group-${g.id}`}>
-                <p className="text-sm font-semibold text-zinc-100">{g.label}</p>
-                <ul className="mt-1.5 space-y-1">
-                  {g.items.map((c) => {
-                    const always = baseline.has(c.key);
-                    const notYours = !always && !yours.has(c.key);
-                    const checked = always || picked.has(c.key);
-                    const note = always ? "Everyone on the team can do this" : notYours ? "Your own role doesn't include this" : "";
-                    const id = `cap-${c.key}`;
-                    return (
-                      <li key={c.key}>
-                        <label htmlFor={id} className={`flex gap-2.5 rounded-md px-1 py-1 text-sm ${always || notYours ? "cursor-not-allowed text-zinc-500" : "cursor-pointer text-zinc-200 hover:bg-zinc-800/50"}`}>
-                          <input
-                            id={id}
-                            type="checkbox"
-                            checked={checked}
-                            disabled={always || notYours}
-                            onChange={(e) => toggle(c.key, e.target.checked)}
-                            className={`mt-0.5 h-4 w-4 shrink-0 accent-zinc-100 disabled:opacity-50 ${focusRing}`}
-                          />
-                          <span className="min-w-0">
-                            {c.label}
-                            {note && <span className="block text-xs text-zinc-400">{note}</span>}
-                          </span>
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
-          </div>
-          {leftOut.length > 0 && (
-            <p className="mt-2 flex gap-1.5 text-xs text-zinc-400" data-testid="role-left-out">
-              <span aria-hidden="true" className="mt-px shrink-0 scale-75">
-                <LockIcon />
-              </span>
-              <span>Never in a custom role: {leftOut.map((c) => c.label.charAt(0).toLowerCase() + c.label.slice(1)).join("; ")}.</span>
-            </p>
-          )}
-        </fieldset>
-
-        {error && (
-          <p role="alert" className="text-sm text-red-400">
-            {error}
-          </p>
-        )}
-        <ModalFooter>
-          <button type="button" className={secondaryButton} onClick={onClose}>
-            Cancel
-          </button>
-          <button type="submit" form="role-editor-form" className={primaryButton} disabled={saving}>
-            {saving ? "Saving…" : existing ? "Save role" : "Create role"}
-          </button>
-        </ModalFooter>
-      </form>
-    </Modal>
   );
 }
 
