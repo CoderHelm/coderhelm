@@ -379,11 +379,28 @@ export function Select<T extends string>({
 
   const hidden = name ? <input type="hidden" name={name} value={value} /> : null;
 
-  if (phone) {
-    return (
-      <>
-        {button}
-        {hidden}
+  // One tree at every width: the trigger stays mounted when the screen
+  // crosses the phone breakpoint, and only what opens changes (a popover, or
+  // on a phone a bottom sheet). The trigger's own click opens the sheet.
+  return (
+    <>
+      <Popover open={open && !phone} onOpenChange={(v) => !phone && show(v)}>
+        <PopoverTrigger asChild>{button}</PopoverTrigger>
+        {!phone && (
+          <PopoverContent
+            data-testid="select-popover"
+            onOpenAutoFocus={(e) => {
+              e.preventDefault();
+              list.current?.focus();
+            }}
+            className="flex w-max min-w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-1rem)] flex-col overflow-hidden"
+          >
+            {listbox}
+          </PopoverContent>
+        )}
+      </Popover>
+      {hidden}
+      {phone && (
         <Dialog.Root open={open} onOpenChange={(v) => show(v)}>
           <Dialog.Portal>
             <Dialog.Overlay className="fixed inset-0 z-[79] bg-black/60" />
@@ -408,26 +425,7 @@ export function Select<T extends string>({
             </Dialog.Content>
           </Dialog.Portal>
         </Dialog.Root>
-      </>
-    );
-  }
-
-  return (
-    <>
-      <Popover open={open} onOpenChange={(v) => show(v)}>
-        <PopoverTrigger asChild>{button}</PopoverTrigger>
-        <PopoverContent
-          data-testid="select-popover"
-          onOpenAutoFocus={(e) => {
-            e.preventDefault();
-            list.current?.focus();
-          }}
-          className="flex w-max min-w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-1rem)] flex-col overflow-hidden"
-        >
-          {listbox}
-        </PopoverContent>
-      </Popover>
-      {hidden}
+      )}
     </>
   );
 }
