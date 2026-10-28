@@ -2,7 +2,7 @@
 // docs/api/openapi.json. Do not edit; run `npm run openapi:fields` instead.
 
 /** The platform commit this was generated from. */
-export const OPENAPI_REF = "a24df100f84bb755cfe15a3dc7f1e1a62fdeb7fb";
+export const OPENAPI_REF = "d4eb86838dabe04a3d9fa0096bf7a17dcb6e54de";
 
 /** The fields each public API schema has. */
 export interface OpenApiFields {
@@ -56,13 +56,15 @@ export interface OpenApiFields {
   RotateBody: "overlap_hours";
   RotatedSecret: "previous_secret_expires_at" | "secret";
   RoundIncomplete: "at" | "can_resume" | "files" | "kind" | "number" | "pushed" | "reason" | "summary" | "wip_branch";
-  Run: "answers" | "answers_url" | "applied_standards" | "branch" | "branches" | "cache_read_tokens" | "cache_write_tokens" | "close_reason" | "closed_at" | "closed_by" | "closed_from" | "codegen_env_missing" | "continued_run_id" | "cost_usd" | "created_at" | "current_pass" | "duration_s" | "error" | "files_modified" | "fix_location" | "lesson" | "mcp_servers" | "outside_change_report" | "pass_history" | "policy_approval" | "policy_note" | "pr_number" | "pr_numbers" | "pr_url" | "pr_urls" | "progress_notes" | "prs" | "questions" | "questions_url" | "repo" | "round_incomplete" | "run_id" | "sign_in_prompts" | "status" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out" | "trigger" | "updated_at";
+  Run: "answers" | "answers_url" | "applied_standards" | "branch" | "branches" | "cache_read_tokens" | "cache_write_tokens" | "close_reason" | "closed_at" | "closed_by" | "closed_from" | "codegen_env_missing" | "continued_run_id" | "cost_usd" | "covered_by" | "created_at" | "current_pass" | "duration_s" | "error" | "files_modified" | "fix_location" | "lesson" | "mcp_servers" | "outside_change_report" | "pass_history" | "policy_approval" | "policy_note" | "pr_number" | "pr_numbers" | "pr_url" | "pr_urls" | "progress_notes" | "prs" | "questions" | "questions_url" | "repo" | "round_incomplete" | "run_id" | "sign_in_prompts" | "status" | "stop_kind" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out" | "tooling_failure" | "trigger" | "updated_at";
   RunActionResult: "status";
   RunAnswer: "answer" | "answered_at" | "author" | "question" | "question_id";
+  RunCoveredBy: "author" | "number" | "reason" | "repo" | "title" | "url";
   RunNote: "message" | "timestamp";
   RunPass: "pass" | "started_at";
-  RunQuestion: "decision" | "id" | "question" | "suggestions" | "why";
+  RunQuestion: "decision" | "evidence" | "id" | "question" | "suggestions" | "why";
   RunSummary: "cost_usd" | "created_at" | "current_pass" | "duration_s" | "pr_number" | "pr_url" | "repo" | "run_id" | "status" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out" | "trigger";
+  RunToolingFailure: "command" | "error" | "tried";
   RunTrigger: "by" | "kind" | "label" | "ref" | "ref_url";
   RunsPage: "next" | "runs" | "scanned";
   SecretView: "previous_secret_expires_at" | "secret";

@@ -29,6 +29,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Problem, TechnicalDetails } from "@/components/problem";
 import { CopyButton } from "@/components/copy-button";
 import { Code } from "@/components/settings/code";
+import { CodeBlock } from "@/components/code-block";
 import { ChevronRightIcon, ExternalLinkIcon } from "@/components/icons";
 import { RunTriggerLine } from "@/components/run-trigger";
 
@@ -508,11 +509,11 @@ function RunDetailInner() {
   const doneCount = taskItems.filter((t) => isTaskDone(t, filesModified, run.status, maxPassIdx)).length;
 
   // What each action is allowed for, matching the gateway's own checks.
-  const canRetry = ["failed", "needs_input", "needs_outside_change", "cancelled", "closed"].includes(run.status) && run.current_pass !== "feedback";
+  const canRetry = ["failed", "needs_input", "needs_outside_change", "covered_by_pr", "cancelled", "closed"].includes(run.status) && run.current_pass !== "feedback";
   // A closed run is reopened first; the gateway refuses a re-review of it.
   const canReview = !!run.pr_url && !["running", "queued", "merged", "closed"].includes(run.status);
   // Starting over closes the pull request: never offered once it is merged.
-  const canReset = ["completed", "failed", "needs_input", "needs_outside_change", "cancelled", "closed", "success"].includes(run.status);
+  const canReset = ["completed", "failed", "needs_input", "needs_outside_change", "covered_by_pr", "cancelled", "closed", "success"].includes(run.status);
   // Close is a button while the run works or waits on an answer; otherwise it sits in More.
   const closeAsButton = closable && runCloseIsLikely(run.status);
   const closeInMenu = closable && !closeAsButton;
@@ -740,6 +741,71 @@ function RunDetailInner() {
           <p className="text-zinc-400">
             Set them in Settings, Repositories, {missing.repo}, Codegen environment (public values only, never secrets), then retry.
           </p>
+        </div>
+      </OutcomeCard>
+    );
+  } else if (run.status === "failed" && run.stop_kind === "tooling" && run.tooling_failure) {
+    // The run's own environment failed (a missing dependency or tool): never
+    // a question for the ticket. Say exactly which command and what it printed.
+    const tf = run.tooling_failure;
+    outcome = (
+      <OutcomeCard
+        tone="attention"
+        title="Tooling failure: Coderhelm's own environment failed"
+        testId="run-outcome"
+        actions={
+          <>
+            {retryButton}
+            {helpLink}
+          </>
+        }
+      >
+        <div className="min-w-0 space-y-2" data-testid="tooling-failure">
+          <p>This is not a question for the ticket. A command Coderhelm ran failed for want of a dependency or a tool, and installing and trying again didn&apos;t fix it.</p>
+          <CodeBlock code={tf.command} lang="bash" title="Command" wrap testId="tooling-command" />
+          <CodeBlock code={tf.error} title="Error" wrap testId="tooling-error" />
+          {!!tf.tried?.length && (
+            <>
+              <p className="text-sm font-medium text-zinc-200">Tried first</p>
+              <ul className="list-disc space-y-1 pl-5 text-sm [overflow-wrap:anywhere]">
+                {tf.tried.map((t) => (
+                  <li key={t}>
+                    <InlineMarkdown>{t}</InlineMarkdown>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      </OutcomeCard>
+    );
+  } else if (run.status === "covered_by_pr") {
+    const cb = run.covered_by;
+    outcome = (
+      <OutcomeCard
+        tone="neutral"
+        title={cb ? `Already being fixed in #${cb.number}` : "Already being fixed in an open pull request"}
+        testId="run-outcome"
+        actions={
+          <>
+            {cb?.url && (
+              <a href={cb.url} target="_blank" rel="noopener noreferrer" className={secondaryButton} data-testid="covered-by-link">
+                Open #{cb.number}
+              </a>
+            )}
+            {retryButton}
+          </>
+        }
+      >
+        <div className="min-w-0 space-y-1 [overflow-wrap:anywhere]" data-testid="covered-by">
+          {cb && (
+            <p>
+              <span className="font-medium text-zinc-100">{cb.title || `${cb.repo}#${cb.number}`}</span>
+              {cb.author ? <> by {cb.author}</> : null}
+            </p>
+          )}
+          {cb?.reason && <p className="text-zinc-300">{cb.reason}</p>}
+          <p className="text-zinc-400">Coderhelm built no second fix and linked this pull request on the ticket. If the ticket needs a separate change, say so on the ticket, then retry.</p>
         </div>
       </OutcomeCard>
     );

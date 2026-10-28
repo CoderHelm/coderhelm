@@ -1931,6 +1931,12 @@ export interface RunDetail extends Run {
   fix_location?: string | null;
   /** Markdown report when the fix is (partly) a change outside the code. */
   outside_change_report?: string | null;
+  /** `tooling` when the run stopped on its own environment (a command failed for want of a dependency or tool), not a question. */
+  stop_kind?: string | null;
+  /** For a tooling failure: the exact command, the error it printed and what the run tried first. */
+  tooling_failure?: RunToolingFailure | null;
+  /** For a `covered_by_pr` run: the open pull request that already does the work, and why. */
+  covered_by?: RunCoveredBy | null;
   /** The lesson saved for the repository when people said the fix was elsewhere. */
   lesson?: string | null;
   /** Who closed the run on purpose (their name, login or email), when and why. */
@@ -1961,6 +1967,25 @@ export interface RunQuestion {
   suggestions?: string[];
   /** Set when the question is a choice Coderhelm records on the ticket (e.g. an open pull request: work on it, or open its own). */
   decision?: string | null;
+  /** The evidence the question cites: a `path:line` in the code or a lookup the run made. */
+  evidence?: string[];
+}
+
+/** A command the run itself ran that failed for want of a dependency or tool. */
+export interface RunToolingFailure {
+  command: string;
+  error: string;
+  tried?: string[];
+}
+
+/** The open pull request that already does a run's work. */
+export interface RunCoveredBy {
+  repo: string;
+  number: number;
+  url?: string;
+  title?: string;
+  author?: string;
+  reason?: string;
 }
 
 /** An answer given in Coderhelm to a run's question. */
