@@ -478,7 +478,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             {inSettings(pathname) ? (
               <div data-settings-layout="" className="mx-auto flex w-full min-w-0 max-w-6xl flex-col xl:flex-row xl:gap-10">
                 <SettingsNav visible={(item) => can(user, item.view) && offered(item, isSelfHosted(), user.platform_admin === true)} />
-                <div className="min-w-0 flex-1">{children}</div>
+                <div className="min-w-0 flex-1 pb-24 md:pb-32" data-testid="settings-content">{children}</div>
               </div>
             ) : (
               <>
