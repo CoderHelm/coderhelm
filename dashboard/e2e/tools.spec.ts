@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { expectSelectValue, pickOption } from "./select";
 
 // Every API call is answered here. Nothing reaches a real backend.
 
@@ -162,12 +163,12 @@ test("write a tool: the live check shows what will be sent, saving runs the exam
   await page.goto("/data-sources/tools/new");
   await page.getByLabel("Name", { exact: true }).fill("find_order_by_number");
   await page.getByLabel("When to use it").fill("A ticket mentions an order number and you need its status.");
-  await page.getByLabel("Source").selectOption("Orders database");
+  await pickOption(page.getByLabel("Source"), "Orders database");
   await page.getByLabel("The read").fill("SELECT o.id, o.status FROM orders o WHERE o.number = :order_number");
   // Each input's fields have labels, not only placeholders.
   const input1 = page.getByRole("group", { name: "Input 1" });
   await input1.getByLabel("Input name").fill("order_number");
-  await expect(input1.getByLabel("Type")).toHaveValue("string");
+  await expectSelectValue(input1.getByLabel("Type"), "string");
   // A text input with no pattern is caught by the check.
   await input1.getByLabel("Example").fill("OR-102938");
   await expect(page.getByText("needs a pattern or a list of allowed values")).toBeVisible();
@@ -208,7 +209,7 @@ test("a tool that would write never passes the check", async ({ page }) => {
   await mockApi(page);
   await page.goto("/data-sources/tools/new");
   await page.getByLabel("Name", { exact: true }).fill("wipe_orders");
-  await page.getByLabel("Source").selectOption("Orders database");
+  await pickOption(page.getByLabel("Source"), "Orders database");
   await page.getByLabel("The read").fill("DELETE FROM orders WHERE id = :id");
   await expect(page.getByText("That lookup would change something or is not a query.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Save and run the example" })).toBeDisabled();

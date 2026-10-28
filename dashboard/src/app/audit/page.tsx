@@ -6,7 +6,7 @@ import { AuditList, PluginsGate } from "@/components/plugins";
 import { RoleGuard } from "@/components/role-guard";
 import { Page, PageHeader } from "@/components/page";
 import { ListEmpty, ListError, ListSkeleton, LoadMore, useListParams } from "@/components/list";
-import { inputClass } from "@/components/ui";
+import { Select } from "@/components/select";
 
 // The audit log: one stream of who or what triggered each plugin run, the
 // plugin version, every tool and its risk, approvals and results.
@@ -91,26 +91,19 @@ function AuditPage() {
           <label htmlFor="audit-plugin" className="mb-1.5 block text-sm font-semibold text-zinc-100">
             Plugin
           </label>
-          <select id="audit-plugin" className={`${inputClass} max-w-xs`} value={params.plugin} onChange={(e) => setParams({ plugin: e.target.value })}>
-            <option value="">All plugins</option>
-            {plugins.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <Select
+            id="audit-plugin"
+            className="w-full max-w-xs"
+            value={params.plugin}
+            onChange={(v) => setParams({ plugin: v })}
+            options={[{ value: "", label: "All plugins" }, ...plugins.map((p) => ({ value: p.id, label: p.name }))]}
+          />
         </div>
         <div className="min-w-0">
           <label htmlFor="audit-action" className="mb-1.5 block text-sm font-semibold text-zinc-100">
             What happened
           </label>
-          <select id="audit-action" className={`${inputClass} max-w-xs`} value={params.action} onChange={(e) => setParams({ action: e.target.value })}>
-            {ACTIONS.map((a) => (
-              <option key={a.value} value={a.value}>
-                {a.label}
-              </option>
-            ))}
-          </select>
+          <Select id="audit-action" className="w-full max-w-xs" value={params.action} onChange={(v) => setParams({ action: v })} options={ACTIONS} />
         </div>
       </div>
       {error && (

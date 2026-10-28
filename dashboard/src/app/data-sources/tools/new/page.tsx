@@ -11,6 +11,7 @@ import { Field } from "@/components/field";
 import { Segmented } from "@/components/segmented";
 import { RunResult } from "@/components/tools";
 import { useToast } from "@/components/toast";
+import { Select } from "@/components/select";
 import { buttonClass, inputClass, linkButton, monoInputClass, primaryButton, secondaryButton } from "@/components/ui";
 import { Code, Field as LabeledField } from "@/components/settings";
 import { Chip, useTeamRepos } from "@/components/list";
@@ -234,12 +235,13 @@ function NewToolPage() {
           </Field>
           <Field id="tool-source" label="Source">
             {(p) => (
-              <select {...p} value={source} onChange={(e) => setSource(e.target.value)} className={inputClass}>
-                <option value="">Choose a connected source</option>
-                {sources.map((s) => (
-                  <option key={s.id} value={s.name}>{s.name}</option>
-                ))}
-              </select>
+              <Select
+                {...p}
+                value={source}
+                onChange={setSource}
+                className="w-full"
+                options={[{ value: "", label: "Choose a connected source" }, ...sources.map((s) => ({ value: s.name, label: s.name }))]}
+              />
             )}
           </Field>
           {kinds.length > 1 && (
@@ -259,17 +261,29 @@ function NewToolPage() {
                 <fieldset key={i} className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3" aria-label={`Input ${i + 1}`}>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <LabeledField label="Input name" mono value={r.name} onChange={(e) => setRow(i, { name: e.target.value })} placeholder="order_number" />
-                    <LabeledField as="select" label="Type" value={r.type} onChange={(e) => setRow(i, { type: e.target.value as InputType })}>
-                      <option value="string">Text</option>
-                      <option value="integer">Whole number</option>
-                      <option value="date">Date</option>
-                    </LabeledField>
+                    <LabeledField
+                      as="select"
+                      label="Type"
+                      value={r.type}
+                      onChange={(v) => setRow(i, { type: v as InputType })}
+                      options={[
+                        { value: "string", label: "Text" },
+                        { value: "integer", label: "Whole number" },
+                        { value: "date", label: "Date" },
+                      ]}
+                    />
                     {r.type === "string" && (
                       <>
-                        <LabeledField as="select" label="Rule" value={r.rule} onChange={(e) => setRow(i, { rule: e.target.value as InputRow["rule"] })}>
-                          <option value="pattern">Must match a pattern</option>
-                          <option value="allowed">One of a list</option>
-                        </LabeledField>
+                        <LabeledField
+                          as="select"
+                          label="Rule"
+                          value={r.rule}
+                          onChange={(v) => setRow(i, { rule: v as InputRow["rule"] })}
+                          options={[
+                            { value: "pattern", label: "Must match a pattern" },
+                            { value: "allowed", label: "One of a list" },
+                          ]}
+                        />
                         {r.rule === "pattern" ? (
                           <LabeledField label="Pattern" mono value={r.pattern} onChange={(e) => setRow(i, { pattern: e.target.value })} placeholder="[A-Z]{2}-[0-9]{4,10}" />
                         ) : (
@@ -313,10 +327,13 @@ function NewToolPage() {
           {src?.aws?.engine === "redshift" && (src.aws.databases?.length ?? 0) > 1 && (
             <Field id="tool-db" label="Warehouse database">
               {(p) => (
-                <select {...p} value={database} onChange={(e) => setDatabase(e.target.value)} className={inputClass}>
-                  <option value="">Choose one</option>
-                  {src.aws?.databases?.map((d) => <option key={d} value={d}>{d}</option>)}
-                </select>
+                <Select
+                  {...p}
+                  value={database}
+                  onChange={setDatabase}
+                  className="w-full"
+                  options={[{ value: "", label: "Choose one" }, ...(src.aws?.databases ?? []).map((d) => ({ value: d, label: d }))]}
+                />
               )}
             </Field>
           )}

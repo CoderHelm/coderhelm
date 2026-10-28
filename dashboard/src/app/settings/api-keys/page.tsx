@@ -38,6 +38,7 @@ import {
   secondaryButton,
   smallDangerButton,
 } from "@/components/ui";
+import { Select } from "@/components/select";
 
 export default function ApiKeysPageGuarded() {
   return (
@@ -443,13 +444,7 @@ function CreateKeyModal({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field id={`${ids}-expiry`} label="Expires after">
             {(p) => (
-              <select {...p} className={inputClass} value={expiry} onChange={(e) => setExpiry(e.target.value)}>
-                {EXPIRY_CHOICES.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
+              <Select {...p} className="w-full" value={expiry} onChange={setExpiry} options={EXPIRY_CHOICES.map((c) => ({ value: c.value, label: c.label }))} />
             )}
           </Field>
           <Field

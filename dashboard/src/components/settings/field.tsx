@@ -4,9 +4,9 @@ import {
   useId,
   type InputHTMLAttributes,
   type ReactNode,
-  type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
+import { Select, type SelectItem } from "../select";
 import { inputClass, monoInputClass } from "../ui";
 import { RowMarks } from "./row";
 
@@ -43,7 +43,16 @@ type Native<E> = Omit<E, "id" | "className" | "children">;
 export type FieldProps =
   | (FieldBase & { as?: "input" } & Native<InputHTMLAttributes<HTMLInputElement>>)
   | (FieldBase & { as: "textarea" } & Native<TextareaHTMLAttributes<HTMLTextAreaElement>>)
-  | (FieldBase & { as: "select"; children: ReactNode } & Native<SelectHTMLAttributes<HTMLSelectElement>>)
+  | (FieldBase & {
+      as: "select";
+      value: string;
+      onChange: (value: string) => void;
+      options: readonly SelectItem[];
+      name?: string;
+      disabled?: boolean;
+      required?: boolean;
+      placeholder?: string;
+    })
   | (FieldBase & { as: "custom"; children: (ids: FieldIds) => ReactNode });
 
 /**
@@ -52,7 +61,7 @@ export type FieldProps =
  * own options and in plain forms.
  *
  *   <Field label="Tag prefix" help="Tags look like v1.2.4" mono value={v} onChange={...} />
- *   <Field as="select" label="Model" value={m} onChange={...}><option ...></Field>
+ *   <Field as="select" label="Model" value={m} onChange={setM} options={[{ value, label }]} />
  */
 export function Field(props: FieldProps) {
   const generated = useId();
@@ -74,12 +83,8 @@ export function Field(props: FieldProps) {
     const { as: _as, label: _l, help: _h, error: _e, unsaved: _u, notDefault: _n, mono: _m, controlClassName: _c, className: _w, id: _i, ...rest } = props;
     control = <textarea {...rest} {...ids} className={cls} />;
   } else if (props.as === "select") {
-    const { as: _as, label: _l, help: _h, error: _e, unsaved: _u, notDefault: _n, mono: _m, controlClassName: _c, className: _w, id: _i, children, ...rest } = props;
-    control = (
-      <select {...rest} {...ids} className={cls}>
-        {children}
-      </select>
-    );
+    const { as: _as, label: _l, help: _h, error: _e, unsaved: _u, notDefault: _n, mono: _m, controlClassName: _c, className: _w, id: _i, ...rest } = props;
+    control = <Select {...rest} {...ids} className={`w-full ${controlClassName}`.trim()} />;
   } else {
     const { as: _as, label: _l, help: _h, error: _e, unsaved: _u, notDefault: _n, mono: _m, controlClassName: _c, className: _w, id: _i, ...rest } = props;
     control = <input {...rest} {...ids} className={cls} />;

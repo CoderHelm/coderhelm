@@ -263,12 +263,13 @@ function WorkflowPage() {
                 id={ids.inputId}
                 aria-describedby={ids.helpId}
                 value={v.default_destination}
-                onChange={(e) => form.set("default_destination", e.target.value as Form["default_destination"])}
+                onChange={(d) => form.set("default_destination", d)}
                 className="w-full"
-              >
-                <option value="github">GitHub issues</option>
-                {(jiraConnected || v.default_destination === "jira") && <option value="jira">Jira tickets</option>}
-              </Select>
+                options={[
+                  { value: "github" as const, label: "GitHub issues" },
+                  ...(jiraConnected || v.default_destination === "jira" ? [{ value: "jira" as const, label: "Jira tickets" }] : []),
+                ]}
+              />
             )}
           />
           <SettingsRow

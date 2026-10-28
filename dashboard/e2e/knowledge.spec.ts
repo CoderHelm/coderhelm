@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { pickOption } from "./select";
 
 // Knowledge: the guided flow that makes a knowledge base from an app (or
 // files), signing in to an app and coming back, the picker, sync status and
@@ -377,7 +378,7 @@ test.describe("creating a knowledge base", () => {
     await shot(page, "flow-3-name");
     await name.fill("Engineering wiki");
     await page.getByTestId("change-read").click();
-    await page.getByTestId("read-select").selectOption("member");
+    await pickOption(page.getByTestId("read-select"), "member");
 
     await page.getByTestId("flow-finish").click();
     await expect(page.getByTestId("flow-step")).toHaveAttribute("data-step", "progress");

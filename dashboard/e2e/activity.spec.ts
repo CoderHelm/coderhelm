@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { expectSelectValue, pickOption } from "./select";
 
 // The access log on the Skills page and the lookup log on Data sources.
 // Every API call is answered here. Nothing reaches a real backend.
@@ -233,22 +234,22 @@ test("skills activity: filters go to the server, stay in the address, and clear"
   const rows = page.getByTestId("skill-activity-row");
   await expect(rows).toHaveCount(7);
 
-  await page.getByLabel("Who").selectOption("coder");
+  await pickOption(page.getByLabel("Who"), "coder");
   await expect(rows).toHaveCount(2);
   expect(lastCall(db, "/api/skills/activity")?.params.get("by")).toBe("coder");
   await expect(page).toHaveURL(/by=coder/);
 
-  await page.getByLabel("Who").selectOption("");
+  await pickOption(page.getByLabel("Who"), "");
   await page.getByRole("group", { name: "Result" }).getByRole("button", { name: "Went wrong" }).click();
   await expect(rows).toHaveCount(3);
   expect(lastCall(db, "/api/skills/activity")?.params.get("outcome")).toBe("problems");
 
   await page.getByRole("group", { name: "Result" }).getByRole("button", { name: "All", exact: true }).click();
-  await page.getByLabel("Item").selectOption({ label: "agent:spec-checker" });
+  await pickOption(page.getByLabel("Item"), "agent:spec-checker");
   await expect(rows).toHaveCount(2);
   expect(lastCall(db, "/api/skills/activity")?.params.get("path")).toBe("agents/spec-checker.md");
 
-  await page.getByLabel("Item").selectOption("");
+  await pickOption(page.getByLabel("Item"), "");
   await page.getByRole("searchbox", { name: "Search" }).fill("partial refunds");
   await expect(rows).toHaveCount(2);
   expect(lastCall(db, "/api/skills/activity")?.params.get("q")).toBe("partial refunds");
@@ -266,7 +267,7 @@ test("skills activity: filters go to the server, stay in the address, and clear"
   await expect(rows).toHaveCount(7);
   await expect(page.getByRole("searchbox", { name: "Search" })).toHaveValue("");
 
-  await page.getByLabel("When").selectOption("24h");
+  await pickOption(page.getByLabel("When"), "24h");
   await expect(rows).toHaveCount(5);
   expect(lastCall(db, "/api/skills/activity")?.params.get("since")).toBeTruthy();
 });
@@ -276,7 +277,7 @@ test("skills activity: a summary count opens the log filtered to it", async ({ p
   await page.goto("/skills/?tab=activity");
   await page.getByTestId("activity-summary").getByRole("link", { name: /went wrong/ }).click();
   await expect(page.getByRole("group", { name: "Result" }).getByRole("button", { name: "Went wrong" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByLabel("When")).toHaveValue("7d");
+  await expectSelectValue(page.getByLabel("When"), "7d");
   await expect(page.getByTestId("skill-activity-row")).toHaveCount(3);
 });
 
@@ -301,7 +302,7 @@ test("skills activity: nothing yet, and a failed load offers to try again", asyn
   await shot(page, "skills-activity-nothing-yet");
 
   db.failLog = true;
-  await page.getByLabel("Who").selectOption("planner");
+  await pickOption(page.getByLabel("Who"), "planner");
   await expect(page.getByText("We couldn't load the activity")).toBeVisible();
   db.failLog = false;
   db.events = structuredClone(EVENTS);
@@ -374,7 +375,7 @@ test("lookup log: filters from the address are applied and sent, search goes to 
   await page.goto("/data-sources/activity/?outcome=refused&range=7d");
   const activity = page.locator("#activity");
   await expect(activity.getByRole("group", { name: "Result" }).getByRole("button", { name: "Refused" })).toHaveAttribute("aria-pressed", "true");
-  await expect(activity.getByLabel("When")).toHaveValue("7d");
+  await expectSelectValue(activity.getByLabel("When"), "7d");
   await expect(activity.getByTestId("activity-row")).toHaveCount(1);
   const call = lastCall(db, "/api/data-sources/activity");
   expect(call?.params.get("outcome")).toBe("refused");

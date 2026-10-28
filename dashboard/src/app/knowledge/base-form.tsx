@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Select } from "@/components/select";
 import { inputClass, primaryButton, secondaryButton } from "@/components/ui";
 import type { BaseInput, KnowledgeLimits } from "@/lib/knowledge";
 
@@ -66,13 +67,12 @@ export function BaseForm({
       </label>
       <label className="block">
         <span className="mb-1 block text-xs font-medium text-zinc-400">Who can read it</span>
-        <select className={inputClass} value={v.read_role} onChange={(e) => setV({ ...v, read_role: e.target.value })}>
-          {(limits?.read_roles ?? ["viewer", "member", "admin"]).map((r) => (
-            <option key={r} value={r}>
-              {ROLE_WORDS[r] ?? r}
-            </option>
-          ))}
-        </select>
+        <Select
+          className="w-full"
+          value={v.read_role}
+          onChange={(r) => setV({ ...v, read_role: r })}
+          options={(limits?.read_roles ?? ["viewer", "member", "admin"]).map((r) => ({ value: r, label: ROLE_WORDS[r] ?? r }))}
+        />
       </label>
       <fieldset className="space-y-2">
         <legend className="mb-1 text-xs font-medium text-zinc-400">Agents that search it</legend>

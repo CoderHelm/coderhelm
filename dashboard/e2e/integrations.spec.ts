@@ -2,6 +2,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { ECS_MISSING, permissionsView } from "./aws-permissions-data";
+import { pickOption } from "./select";
 
 // The AWS, Alert routes and Jira settings pages. Every API call is answered
 // here; nothing reaches a real backend. Role checks mirror the gateway's
@@ -607,7 +608,7 @@ test.describe("Jira", () => {
     await expect(page.getByText("Coderhelm reached your-team.atlassian.net and can see 3 projects.")).toBeVisible();
 
     await page.getByRole("switch", { name: "Operations (OPS)" }).click();
-    await page.getByTestId("project-WEB").getByLabel("Repository").selectOption("your-team/web");
+    await pickOption(page.getByTestId("project-WEB").getByLabel("Repository"), "your-team/web");
     await page.getByRole("region", { name: "Save changes" }).getByRole("button", { name: "Save changes" }).click();
     await expect.poll(() => (callsTo(db, "PUT", /jira\/projects$/).at(-1)?.body as { projects: { key: string; enabled: boolean }[] })?.projects.find((p) => p.key === "OPS")?.enabled).toBe(true);
     await expect.poll(() => (callsTo(db, "PUT", /jira\/projects$/).at(-1)?.body as { projects: { key: string; repo: string }[] })?.projects.find((p) => p.key === "WEB")?.repo).toBe("your-team/web");

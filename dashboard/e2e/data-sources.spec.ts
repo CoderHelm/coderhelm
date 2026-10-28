@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { expectSelectValue, pickOption } from "./select";
 
 // Every API call is answered here. Nothing reaches a real backend.
 
@@ -960,7 +961,7 @@ test("try logs: the search names its log group and time range", async ({ page })
   await expect(page.getByRole("button", { name: "Try a write, to see it refused" })).toHaveCount(0);
   await page.getByRole("button", { name: "Errors in the last day" }).click();
   await expect(page.getByRole("button", { name: "Last day", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await page.getByLabel("Log group").selectOption("/ecs/worker");
+  await pickOption(page.getByLabel("Log group"), "/ecs/worker");
   await page.getByRole("button", { name: "Last 7 days" }).click();
   await page.getByRole("button", { name: "Run", exact: true }).click();
 
@@ -1025,19 +1026,19 @@ test("activity: filters, and a row opens to the full lookup and its pull request
   const activity = page.locator("#activity");
   await expect(activity.getByTestId("activity-row")).toHaveCount(3);
 
-  await activity.getByLabel("Who").selectOption("reviewer");
+  await pickOption(activity.getByLabel("Who"), "reviewer");
   await expect(activity.getByTestId("activity-row")).toHaveCount(1);
   await expect(activity.getByText("40 lines from /ecs/api")).toBeVisible();
-  await activity.getByLabel("Who").selectOption("people");
+  await pickOption(activity.getByLabel("Who"), "people");
   await expect(activity.getByTestId("activity-row")).toHaveCount(1);
   await expect(activity.getByText("That lookup would change something or is not a query.")).toBeVisible();
-  await activity.getByLabel("Who").selectOption("all");
+  await pickOption(activity.getByLabel("Who"), "all");
   await activity.getByRole("group", { name: "Result" }).getByRole("button", { name: "Refused" }).click();
   await expect(activity.getByTestId("activity-row")).toHaveCount(1);
   await activity.getByRole("group", { name: "Result" }).getByRole("button", { name: "All", exact: true }).click();
-  await activity.getByLabel("Source").selectOption({ label: "orders-db database" });
+  await pickOption(activity.getByLabel("Source"), "orders-db database");
   await expect(activity.getByTestId("activity-row")).toHaveCount(2);
-  await activity.getByLabel("Source").selectOption("all");
+  await pickOption(activity.getByLabel("Source"), "all");
 
   const row = activity.getByTestId("activity-row").first();
   await row.getByRole("button").first().click();
@@ -1119,9 +1120,9 @@ test("try a warehouse: pick a database, samples set it, and it is sent", async (
 
   await page.goto("/data-sources/connect?step=try&id=ds_wh");
   const select = page.getByLabel("Database");
-  await expect(select).toHaveValue("dev");
+  await expectSelectValue(select, "dev");
   await page.getByRole("button", { name: "Count rows in marts.daily (database marts)" }).click();
-  await expect(select).toHaveValue("marts");
+  await expectSelectValue(select, "marts");
   await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect(page.getByText("1 row in marts")).toBeVisible();
   expect(callsTo(db, "POST", /\/try$/)[0].body).toEqual({ query: "SELECT count(*) FROM marts.daily", database: "marts" });

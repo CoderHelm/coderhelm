@@ -285,12 +285,13 @@ function System() {
             help="The only hour an automatic update may start."
             control={(ids) => (
               <div className="flex flex-wrap gap-2">
-                <Select id={ids.inputId} aria-label="Day" value={v.day} onChange={(e) => set("day", e.target.value)}>
-                  {DAYS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-                </Select>
-                <Select aria-label="Hour" value={v.hour} onChange={(e) => set("hour", Number(e.target.value))}>
-                  {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{`${String(h).padStart(2, "0")}:00`}</option>)}
-                </Select>
+                <Select id={ids.inputId} aria-label="Day" value={v.day} onChange={(d) => set("day", d)} options={DAYS.map(([k, label]) => ({ value: k, label }))} />
+                <Select
+                  aria-label="Hour"
+                  value={String(v.hour)}
+                  onChange={(h) => set("hour", Number(h))}
+                  options={Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: `${String(h).padStart(2, "0")}:00` }))}
+                />
               </div>
             )}
           />
@@ -315,20 +316,30 @@ function System() {
             label="Channel"
             help="Preview: get new versions earlier, before they are fully tested."
             control={(ids) => (
-              <Select id={ids.inputId} value={v.channel} onChange={(e) => set("channel", e.target.value as AutoUpdateSettings["channel"])}>
-                <option value="stable">Stable</option>
-                <option value="preview">Preview</option>
-              </Select>
+              <Select
+                id={ids.inputId}
+                value={v.channel}
+                onChange={(c) => set("channel", c)}
+                options={[
+                  { value: "stable", label: "Stable" },
+                  { value: "preview", label: "Preview" },
+                ]}
+              />
             )}
           />
           <SettingsRow
             label="Major releases"
             help="Big updates sometimes need an admin to do something first. Choose Ask me to approve them yourself."
             control={(ids) => (
-              <Select id={ids.inputId} value={v.majors} onChange={(e) => set("majors", e.target.value as AutoUpdateSettings["majors"])}>
-                <option value="ask">Ask me</option>
-                <option value="auto">Install them too</option>
-              </Select>
+              <Select
+                id={ids.inputId}
+                value={v.majors}
+                onChange={(m) => set("majors", m)}
+                options={[
+                  { value: "ask", label: "Ask me" },
+                  { value: "auto", label: "Install them too" },
+                ]}
+              />
             )}
           />
         </SettingsSection>

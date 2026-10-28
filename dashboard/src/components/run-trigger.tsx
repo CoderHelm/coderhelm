@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { RunTrigger, RunTriggerKind } from "@/lib/api";
 import { focusRing } from "./ui";
 import { AtlassianIcon, BellIcon, ChatIcon, GitHubIcon, LayersIcon, PlanIcon } from "./icons";
+import type { SelectOption } from "./select";
 
 // How a run was started and by whom: "Jira · ABC-123 · by Dana",
 // "Started by Coderhelm · flaky test". The gateway works the words and the
@@ -35,7 +36,8 @@ const CoderhelmMark = () => (
   </svg>
 );
 
-function KindIcon({ kind }: { kind: string }) {
+/** The icon of what started a run: Jira, GitHub, an alert, a plan, … */
+export function KindIcon({ kind }: { kind: string }) {
   switch (kind) {
     case "jira":
       return <AtlassianIcon />;
@@ -52,6 +54,14 @@ function KindIcon({ kind }: { kind: string }) {
     default:
       return <CoderhelmMark />;
   }
+}
+
+/** The "Started by" filter's choices for a <Select>, each with its source's icon; "" is anyone. */
+export function startedByOptions(): SelectOption<RunTriggerKind | "">[] {
+  return [
+    { value: "", label: "Started by anyone" },
+    ...STARTED_BY.map((o) => ({ value: o.value, label: `Started by ${o.label}`, icon: <KindIcon kind={o.value} /> })),
+  ];
 }
 
 /** A link the gateway sent: a dashboard path, or an https address. Anything else is shown as text. */

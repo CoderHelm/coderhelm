@@ -24,6 +24,7 @@ import { isSelfHosted } from "@/lib/runtime-config";
 import { useHybrid } from "@/lib/hybrid";
 import { Code, Field, SaveBar, SettingsRow, SettingsSection, Switch, useDirtyForm } from "@/components/settings";
 import { buttonClass, focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
+import { Select } from "@/components/select";
 
 export default function JiraPageGuarded() {
   return (
@@ -795,12 +796,14 @@ function ProjectsSection({ config, setConfig }: { config: JiraConfig; setConfig:
                 )}
               >
                 {p.enabled && repos.length > 0 ? (
-                  <Field as="select" label="Repository" controlClassName="sm:w-72" value={p.repo ?? ""} onChange={(e) => setProject(p.key, { repo: e.target.value })}>
-                    <option value="">Coderhelm picks</option>
-                    {repos.map((r) => (
-                      <option key={r.name} value={r.name}>{r.name}</option>
-                    ))}
-                  </Field>
+                  <Field
+                    as="select"
+                    label="Repository"
+                    controlClassName="sm:w-72"
+                    value={p.repo ?? ""}
+                    onChange={(v) => setProject(p.key, { repo: v })}
+                    options={[{ value: "", label: "Coderhelm picks" }, ...repos.map((r) => ({ value: r.name, label: r.name }))]}
+                  />
                 ) : null}
               </SettingsRow>
             ))}
@@ -818,17 +821,13 @@ function ProjectsSection({ config, setConfig }: { config: JiraConfig; setConfig:
               controlClassName="sm:w-72"
               unsaved={form.isDirty("default_project")}
               control={(ids) => (
-                <select
+                <Select
                   id={ids.inputId}
                   value={form.values.default_project}
-                  onChange={(e) => form.set("default_project", e.target.value)}
-                  className={inputClass}
-                >
-                  <option value="">None</option>
-                  {enabledProjects.map((p) => (
-                    <option key={p.key} value={p.key}>{p.name} ({p.key})</option>
-                  ))}
-                </select>
+                  onChange={(v) => form.set("default_project", v)}
+                  className="w-full"
+                  options={[{ value: "", label: "None" }, ...enabledProjects.map((p) => ({ value: p.key, label: `${p.name} (${p.key})` }))]}
+                />
               )}
             />
           </SettingsSection>

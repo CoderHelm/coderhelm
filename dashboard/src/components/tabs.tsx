@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { ScrollFade } from "./scroll-fade";
-import { focusRing, inputClass } from "./ui";
+import { Select } from "./select";
+import { focusRing } from "./ui";
 
 export interface TabItem {
   value: string;
@@ -68,21 +69,16 @@ export function Tabs({
     <nav aria-label={label} className={`border-b border-zinc-800 ${className}`}>
       {asSelect && (
         <div className="pb-3 sm:hidden">
-          <select
+          <Select
             aria-label={label}
             value={current?.value ?? ""}
-            onChange={(e) => {
-              const next = items.find((t) => t.value === e.target.value);
+            onChange={(v) => {
+              const next = items.find((t) => t.value === v);
               if (next) router.push(next.href);
             }}
-            className={inputClass}
-          >
-            {items.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.countText ? `${t.label} (${t.countText})` : t.label}
-              </option>
-            ))}
-          </select>
+            className="w-full"
+            options={items.map((t) => ({ value: t.value, label: t.countText ? `${t.label} (${t.countText})` : t.label }))}
+          />
         </div>
       )}
       <ScrollFade axis="x" className={asSelect ? "hidden sm:block" : ""}>

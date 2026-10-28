@@ -9,8 +9,9 @@ import { Page, PageHeader } from "@/components/page";
 import { Problem } from "@/components/problem";
 import { Skeleton } from "@/components/skeleton";
 import { Chip, StatusDot, timeAgo } from "@/components/list";
-import { inputClass, linkButton, monoInputClass, secondaryButton } from "@/components/ui";
+import { linkButton, monoInputClass, secondaryButton } from "@/components/ui";
 import { Code, SaveBar, SettingsRow, SettingsSection, useDirtyForm } from "@/components/settings";
+import { Select } from "@/components/select";
 
 export default function ModelProviderPageGuarded() {
   return <RoleGuard need="model_provider"><ModelProviderPage /></RoleGuard>;
@@ -329,25 +330,18 @@ function ModelRow({ role, value, unsaved, onChange }: { role: ModelRole; value: 
       unsaved={unsaved}
       control={(ids) => (
         <div className="min-w-0">
-          <select
+          <Select
             id={ids.inputId}
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={onChange}
             aria-describedby={[ids.helpId, `${ids.inputId}-about`].filter(Boolean).join(" ")}
-            className={inputClass}
-          >
-            {!info && <option value={value}>{value} (no longer listed)</option>}
-            {current.map((m) => (
-              <option key={m.id} value={m.id}>{m.name}</option>
-            ))}
-            {older.length > 0 && (
-              <optgroup label="Older models">
-                {older.map((m) => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-              </optgroup>
-            )}
-          </select>
+            className="w-full"
+            options={[
+              ...(!info ? [{ value, label: `${value} (no longer listed)` }] : []),
+              ...current.map((m) => ({ value: m.id, label: m.name })),
+              ...(older.length > 0 ? [{ group: "Older models", options: older.map((m) => ({ value: m.id, label: m.name })) }] : []),
+            ]}
+          />
           <p id={`${ids.inputId}-about`} className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400">
             {value === role.recommended && <Chip tone="success">Recommended</Chip>}
             <span>{info ? info.blurb : "Not on the current list. Pick another model to move off it."}</span>

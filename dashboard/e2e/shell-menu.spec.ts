@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { mockWideApi } from "./wide-data";
 import { SAMPLE_QUERY } from "./wide-data/addresses";
+import { pickOption } from "./select";
 
 const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots");
 
@@ -83,7 +84,7 @@ test("settings pages show Settings' own list, and destinations with several page
   await page.goto("/settings/security");
   const select = page.getByTestId("settings-nav-select");
   await expect(select).toBeVisible();
-  await select.selectOption("/settings/team");
+  await pickOption(select, "/settings/team");
   await expect(page).toHaveURL(/\/settings\/team\/?$/);
 });
 

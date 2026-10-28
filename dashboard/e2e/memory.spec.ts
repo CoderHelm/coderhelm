@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { pickOption } from "./select";
 
 // Every API call is answered here. Nothing reaches a real backend.
 
@@ -209,11 +210,11 @@ test("filters, sort and search ask the server", async ({ page }) => {
   await expect(page.getByTestId("memory")).toHaveCount(2);
   await expect.poll(() => db.calls.some((c) => c.includes("source=run"))).toBe(true);
   await page.getByRole("group", { name: "Show" }).getByRole("button", { name: "All" }).click();
-  await page.getByRole("combobox", { name: "Topic" }).selectOption("code-style");
+  await pickOption(page.getByRole("combobox", { name: "Topic" }), "code-style");
   await expect(page.getByTestId("memory")).toHaveCount(1);
-  await page.getByRole("combobox", { name: "Topic" }).selectOption("");
+  await pickOption(page.getByRole("combobox", { name: "Topic" }), "");
   // The first row can read the same before and after the sort, so wait for the call itself.
-  await page.getByRole("combobox", { name: "Sort" }).selectOption("most_used");
+  await pickOption(page.getByRole("combobox", { name: "Sort" }), "most_used");
   await expect(page.getByTestId("memory").first()).toContainText("pnpm test:unit");
   await expect.poll(() => db.calls.some((c) => c.includes("sort=most_used"))).toBe(true);
   await page.getByRole("searchbox", { name: "Search memories" }).fill("nothing like this");
@@ -239,7 +240,7 @@ test("an admin can pin, edit and forget a memory", async ({ page }) => {
   await page.getByRole("menuitem", { name: "Edit" }).click();
   const editor = page.getByTestId("memory").filter({ has: page.getByLabel("Memory", { exact: true }) });
   await editor.getByLabel("Memory", { exact: true }).fill("Components live in src/components and use the shared Button and Card.");
-  await editor.getByRole("combobox", { name: "Topic for this memory" }).selectOption("architecture");
+  await pickOption(editor.getByRole("combobox", { name: "Topic for this memory" }), "architecture");
   await editor.getByRole("button", { name: "Save", exact: true }).click();
   const edited = page.getByTestId("memory").filter({ hasText: "Button and Card" });
   await expect(edited).toContainText("Edited by admin@example.com");
@@ -262,7 +263,7 @@ test("teach it something adds a pinned memory", async ({ page }) => {
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Remember this" })).toBeDisabled();
   await dialog.getByLabel("What should it remember?").fill("Feature flags live in LaunchDarkly; never read env vars for them.");
-  await dialog.getByLabel("Topic").selectOption("architecture");
+  await pickOption(dialog.getByLabel("Topic"), "architecture");
   await dialog.getByLabel(/Pin it/).check();
   await shot(page, "memory-teach");
   await dialog.getByRole("button", { name: "Remember this" }).click();

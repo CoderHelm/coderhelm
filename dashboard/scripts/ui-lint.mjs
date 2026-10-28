@@ -31,6 +31,12 @@
 //   button-copy      a local button style: a `const somethingButton = "…"` outside ui.ts, or
 //                    `!important` size overrides on a shared button class. Buttons come from
 //                    buttonClass(variant, size) in components/ui.ts
+//   native-select    a native <select> or <datalist>. The browser draws its list in the
+//                    system's own look (a white menu of checkmarks on a Mac); choices are
+//                    <Select> (components/select.tsx), searchable lists <Combobox>, and
+//                    suggestions for a free-text input <SuggestInput>. A rare case that
+//                    must stay native says why in a comment on the line above:
+//                    `{/* ui-lint-allow native-select: <reason> */}`
 //   arrow-glyph      an arrow character (right, double, heavy or left arrow, or a play triangle) in UI copy. Write the words ("Settings, then
 //                    Team") or use ChevronRightIcon from components/icons.tsx
 // Reports (never fail, counted against the baseline so they can be tightened):
@@ -350,6 +356,13 @@ for (const file of walk(SRC)) {
           /\b(primaryButton|secondaryButton|dangerButton|ghostButton|smallPrimaryButton|smallSecondaryButton|smallDangerButton|buttonClass|linkButton)\b/.test(raw);
         if (control && /(\bwrap-anywhere\b|overflow-wrap:anywhere)/.test(raw)) {
           hit(errors, "anywhere-on-control", rel, sf, node.getStart(), `wrap-anywhere on a <${el.tag}>: a squeezed row would cut its words mid-word. Put it on the inner element that holds the long string, keep the words whole`, el.opening.getText());
+        }
+      }
+      if (el.tag === "select" || el.tag === "datalist") {
+        const start = node.getStart();
+        const above = source.slice(source.lastIndexOf("\n", source.lastIndexOf("\n", start - 1) - 1) + 1, start);
+        if (!/ui-lint-allow native-select:\s*\S/.test(above)) {
+          hit(errors, "native-select", rel, sf, start, `a native <${el.tag}>: the browser draws its list in the system's look. Use <Select> (components/select.tsx), <Combobox> or <SuggestInput>; a case that must stay native needs \`ui-lint-allow native-select: <reason>\` in a comment on the line above`, el.opening.getText());
         }
       }
       if (el.tag === "pre" && !PRE_HOMES.has(rel)) {

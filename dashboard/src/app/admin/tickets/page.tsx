@@ -12,7 +12,7 @@ import { AvatarStack, Composer, PanelSection, SupportThread, TicketContext, Tick
 import type { SupportItem } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { focusRing, inputClass, primaryButton, secondaryButton, smallSecondaryButton } from "@/components/ui";
-import { selectClass } from "@/components/select";
+import { Select } from "@/components/select";
 
 /**
  * Opens a read-only support view of the team (leaving any other one first),
@@ -319,32 +319,34 @@ function AdminTicket({ id }: { id: string }) {
               <div className="grid grid-cols-2 gap-3 @min-[860px]:grid-cols-1">
                 <div className="text-sm">
                   <label htmlFor="ticket-status-select" className="mb-1.5 block font-medium text-zinc-300">Status</label>
-                  <select
+                  <Select
                     id="ticket-status-select"
                     value={t.status}
                     disabled={busy}
-                    onChange={(e) => void change({ status: e.target.value as SupportStatus })}
-                    className={`${selectClass("md")} w-full`}
+                    onChange={(v) => void change({ status: v as SupportStatus })}
+                    className="w-full"
                     data-testid="ticket-status"
-                  >
-                    <option value="open">Needs reply</option>
-                    <option value="waiting">Waiting on customer</option>
-                    <option value="resolved">Resolved</option>
-                  </select>
+                    options={[
+                      { value: "open", label: "Needs reply" },
+                      { value: "waiting", label: "Waiting on customer" },
+                      { value: "resolved", label: "Resolved" },
+                    ]}
+                  />
                 </div>
                 <div className="text-sm">
                   <label htmlFor="ticket-priority-select" className="mb-1.5 block font-medium text-zinc-300">Priority</label>
-                  <select
+                  <Select
                     id="ticket-priority-select"
                     value={t.priority}
                     disabled={busy}
-                    onChange={(e) => void change({ priority: e.target.value as SupportPriority })}
-                    className={`${selectClass("md")} w-full`}
-                  >
-                    <option value="normal">Normal</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
-                  </select>
+                    onChange={(v) => void change({ priority: v as SupportPriority })}
+                    className="w-full"
+                    options={[
+                      { value: "normal", label: "Normal" },
+                      { value: "high", label: "High" },
+                      { value: "urgent", label: "Urgent" },
+                    ]}
+                  />
                 </div>
               </div>
             </PanelSection>

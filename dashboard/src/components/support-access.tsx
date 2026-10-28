@@ -11,6 +11,7 @@ import { Time } from "./list";
 import { Skeleton } from "./skeleton";
 import { Problem } from "./problem";
 import { focusRing, inputClass, primaryButton, secondaryButton } from "./ui";
+import { Select } from "@/components/select";
 
 export const WINDOW_LABEL: Record<number, string> = { 24: "24 hours", 72: "72 hours", 168: "7 days" };
 const WINDOWS = [24, 72, 168];
@@ -130,18 +131,13 @@ export function SupportAccessControl({
               <label htmlFor={`support-hours${ticketId ? "-t" : ""}`} className="mb-1.5 block text-sm font-medium text-zinc-300">
                 For how long
               </label>
-              <select
+              <Select
                 id={`support-hours${ticketId ? "-t" : ""}`}
-                value={hours}
-                onChange={(e) => setHours(Number(e.target.value))}
-                className={inputClass}
-              >
-                {(access.windows?.length ? access.windows : WINDOWS).map((h) => (
-                  <option key={h} value={h}>
-                    {WINDOW_LABEL[h] ?? `${h} hours`}
-                  </option>
-                ))}
-              </select>
+                value={String(hours)}
+                onChange={(h) => setHours(Number(h))}
+                className="w-full"
+                options={(access.windows?.length ? access.windows : WINDOWS).map((h) => ({ value: String(h), label: WINDOW_LABEL[h] ?? `${h} hours` }))}
+              />
             </div>
             {!compact && (
               <div className="min-w-0">

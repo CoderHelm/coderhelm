@@ -297,13 +297,7 @@ export function SortSelect({
   options: { value: string; label: string }[];
 }) {
   return (
-    <Select aria-label="Sort" value={value} onChange={(e) => onChange(e.target.value)} className="bg-zinc-900">
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </Select>
+    <Select aria-label="Sort" value={value} onChange={onChange} options={options} className="bg-zinc-900" />
   );
 }
 

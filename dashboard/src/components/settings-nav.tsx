@@ -36,21 +36,14 @@ export function SettingsNav({ visible }: { visible: (item: SettingsItem) => bool
         <Select
           id="settings-nav-select"
           value={current}
-          onChange={(e) => router.push(e.target.value)}
+          onChange={(href) => router.push(href)}
           className="w-full"
           data-testid="settings-nav-select"
-        >
-          <option value="/settings">Overview</option>
-          {groups.map((g) => (
-            <optgroup key={g.id} label={g.label}>
-              {g.items.map((i) => (
-                <option key={i.href} value={i.href}>
-                  {i.title}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </Select>
+          options={[
+            { value: "/settings", label: "Overview" },
+            ...groups.map((g) => ({ group: g.label, options: g.items.map((i) => ({ value: i.href, label: i.title })) })),
+          ]}
+        />
       </div>
       {/* Wide screens: a list on the left. */}
       <nav aria-label="Settings" className="hidden w-52 shrink-0 xl:block" data-testid="settings-nav">

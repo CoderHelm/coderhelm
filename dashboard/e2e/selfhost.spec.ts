@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { pickOption, selectLabels } from "./select";
 
 // A self-hosted install: the dashboard reads where its API is from
 // /runtime-config.js (written by the platform's web stack), not from the
@@ -245,8 +246,8 @@ test("on Bedrock the AI models page needs no key and saves the models alone", as
   await expect(page.getByTestId("bedrock-note")).toContainText("Amazon Bedrock");
   await expect(page.getByTestId("key-row")).toHaveCount(0);
   const primary = page.getByRole("combobox").first();
-  const options = await primary.locator("option").allTextContents();
-  await primary.selectOption({ index: options.length > 1 ? 1 : 0 });
+  const options = await selectLabels(primary);
+  await pickOption(primary, options[options.length > 1 ? 1 : 0]);
   const save = page.getByRole("button", { name: /^Save/ });
   if (await save.isEnabled()) {
     await save.click();
@@ -277,8 +278,8 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
       expect(systemCalls.find((c) => c.path === "/api/system/update")!.body).toEqual({ version: "v2.0.0" });
 
       await page.getByRole("switch", { name: "Install updates automatically" }).click();
-      await page.getByRole("combobox", { name: "Day" }).selectOption("sat");
-      await page.getByRole("combobox", { name: "Hour" }).selectOption("22");
+      await pickOption(page.getByRole("combobox", { name: "Day" }), "sat");
+      await pickOption(page.getByRole("combobox", { name: "Hour" }), "22");
       await page.getByRole("button", { name: "Save changes" }).click();
       await expect.poll(() => systemCalls.find((c) => c.path === "/api/system/auto-update")?.body).toMatchObject({ auto: true, day: "sat", hour: 22, majors: "ask" });
 

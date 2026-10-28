@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import type { TestAttempt, TestState, TestRunExecution } from "@/lib/api";
 import { StatusPill } from "@/components/status-pill";
 import { ListEmpty, ListError, ListSkeleton, type StatusLook } from "@/components/list";
@@ -11,7 +11,7 @@ import { linkButton } from "@/components/ui";
 import { StatTile } from "@/components/stat-tile";
 import { SectionHeading as SharedHeading } from "@/components/page";
 import { TechnicalDetails, firstLine } from "@/components/problem";
-import { selectClass } from "@/components/select";
+import { Select as SharedSelect } from "@/components/select";
 
 /** A test state in the shared list vocabulary (dot colour and words). */
 export function stateLook(state: TestState): StatusLook {
@@ -166,18 +166,11 @@ export function Select<T extends string>({
   options: { value: T; label: string }[];
   hideLabel?: boolean;
 }) {
+  const labelId = useId();
   return (
-    <label className="flex min-w-0 flex-col gap-1">
-      <span className={hideLabel ? "sr-only" : "text-xs text-zinc-400"}>{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value as T)}
-        className={`${selectClass("md")} w-full min-w-0`}
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
-    </label>
+    <div className="flex min-w-0 flex-col gap-1">
+      <span id={labelId} className={hideLabel ? "sr-only" : "text-xs text-zinc-400"}>{label}</span>
+      <SharedSelect aria-labelledby={labelId} sheetTitle={label} value={value} onChange={onChange} options={options} className="w-full min-w-0" />
+    </div>
   );
 }

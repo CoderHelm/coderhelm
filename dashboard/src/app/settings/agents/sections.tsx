@@ -19,6 +19,7 @@ import { cardClass } from "@/components/page";
 import { EmptyState } from "@/components/empty-state";
 import { SaveBar, SettingsMore, useDirtyForm } from "@/components/settings";
 import { buttonClass, inputClass, monoInputClass } from "@/components/ui";
+import { Select } from "@/components/select";
 
 /** Puts a change back, given the policy version current when Undo is pressed. */
 export type Undo = (version: number) => Promise<PolicyView>;
@@ -435,31 +436,35 @@ function AddRuleDialog({
         {s === "agent" && (
           <div>
             <label htmlFor="rule-agent" className="block text-sm font-semibold text-zinc-100">Agent</label>
-            <select id="rule-agent" className={`${inputClass} mt-1.5`} value={agent} onChange={(e) => setAgent(e.target.value as AgentKey)}>
-              {Object.entries(AGENT_LABELS).map(([k, l]) => (
-                <option key={k} value={k}>{l}</option>
-              ))}
-            </select>
+            <Select
+              id="rule-agent"
+              className="mt-1.5 w-full"
+              value={agent}
+              onChange={(v) => setAgent(v as AgentKey)}
+              options={Object.entries(AGENT_LABELS).map(([k, l]) => ({ value: k, label: l }))}
+            />
           </div>
         )}
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="rule-kind" className="block text-sm font-semibold text-zinc-100">Kind of call</label>
-            <select id="rule-kind" className={`${inputClass} mt-1.5`} value={kind} onChange={(e) => setKind(e.target.value as CallKind | "")}>
-              <option value="">Any</option>
-              {view.kinds.map((k) => (
-                <option key={k} value={k}>{KIND_LABELS[k]}</option>
-              ))}
-            </select>
+            <Select
+              id="rule-kind"
+              className="mt-1.5 w-full"
+              value={kind}
+              onChange={(v) => setKind(v as CallKind | "")}
+              options={[{ value: "", label: "Any" }, ...view.kinds.map((k) => ({ value: k, label: KIND_LABELS[k] }))]}
+            />
           </div>
           <div>
             <label htmlFor="rule-risk" className="block text-sm font-semibold text-zinc-100">Risk</label>
-            <select id="rule-risk" className={`${inputClass} mt-1.5`} value={risk} onChange={(e) => setRisk(e.target.value as Risk | "")}>
-              <option value="">Any</option>
-              {(Object.keys(RISK_LABELS) as Risk[]).map((r) => (
-                <option key={r} value={r}>{RISK_LABELS[r]}</option>
-              ))}
-            </select>
+            <Select
+              id="rule-risk"
+              className="mt-1.5 w-full"
+              value={risk}
+              onChange={(v) => setRisk(v as Risk | "")}
+              options={[{ value: "", label: "Any" }, ...(Object.keys(RISK_LABELS) as Risk[]).map((r) => ({ value: r, label: RISK_LABELS[r] }))]}
+            />
           </div>
           <div>
             <label htmlFor="rule-server" className="block text-sm font-semibold text-zinc-100">Server or data source</label>
@@ -539,11 +544,13 @@ export function TestCall({ view, repos }: { view: PolicyView; repos: Repo[] }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="test-agent" className="block text-sm font-semibold text-zinc-100">Agent</label>
-          <select id="test-agent" className={`${inputClass} mt-1.5`} value={agent} onChange={(e) => setAgent(e.target.value as AgentKey)}>
-            {view.agents.map((a) => (
-              <option key={a.key} value={a.key}>{a.label}</option>
-            ))}
-          </select>
+          <Select
+            id="test-agent"
+            className="mt-1.5 w-full"
+            value={agent}
+            onChange={(v) => setAgent(v as AgentKey)}
+            options={view.agents.map((a) => ({ value: a.key, label: a.label }))}
+          />
         </div>
         <div>
           <p className="mb-1.5 text-sm font-semibold text-zinc-100">Repository (optional)</p>

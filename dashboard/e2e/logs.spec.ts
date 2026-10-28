@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { pickOption } from "./select";
 
 // The Logs page against a mocked backend. Nothing reaches a real server.
 
@@ -212,10 +213,10 @@ test("findings list with status toggles, filters and the inline detail", async (
   await expect(page.locator("[data-testid^=finding-]")).toHaveCount(1);
   await group.getByRole("button", { name: /^All/ }).click();
 
-  await page.getByRole("combobox", { name: "Severity" }).selectOption("warning");
+  await pickOption(page.getByRole("combobox", { name: "Severity" }), "warning");
   await expect(page.locator("[data-testid^=finding-]")).toHaveCount(1);
-  await page.getByRole("combobox", { name: "Severity" }).selectOption("");
-  await page.getByRole("combobox", { name: "Log group" }).selectOption("/aws/lambda/image-resizer");
+  await pickOption(page.getByRole("combobox", { name: "Severity" }), "");
+  await pickOption(page.getByRole("combobox", { name: "Log group" }), "/aws/lambda/image-resizer");
   await expect(page.locator("[data-testid^=finding-]")).toHaveCount(1);
   await page.getByRole("button", { name: "Clear filters" }).first().click();
 
@@ -283,14 +284,14 @@ test("the automatic fix PR setting saves exactly what was chosen", async ({ page
   await panel.getByRole("group", { name: "Minimum severity" }).getByRole("button", { name: "Warning and up" }).click();
   await panel.getByLabel("Most automatic runs per day").fill("2");
   await panel.getByRole("checkbox", { name: "Quiet hours" }).check();
-  await panel.getByRole("combobox", { name: "Quiet hours start" }).selectOption("23");
-  await panel.getByRole("combobox", { name: "Quiet hours end" }).selectOption("7");
+  await pickOption(panel.getByRole("combobox", { name: "Quiet hours start" }), "23");
+  await pickOption(panel.getByRole("combobox", { name: "Quiet hours end" }), "7");
 
   const checkout = panel.getByTestId("group-/aws/lambda/shop-checkout");
   await checkout.getByRole("button", { name: /Repo for \/aws\/lambda\/shop-checkout/ }).click();
   await page.getByTestId("combo-popover").getByRole("option", { name: WEB, exact: true }).click();
-  await panel.getByRole("combobox", { name: "Automatic fixes for /ecs/web" }).selectOption("off");
-  await panel.getByRole("combobox", { name: "Minimum severity for /aws/lambda/shop-checkout" }).selectOption("critical");
+  await pickOption(panel.getByRole("combobox", { name: "Automatic fixes for /ecs/web" }), "off");
+  await pickOption(panel.getByRole("combobox", { name: "Minimum severity for /aws/lambda/shop-checkout" }), "critical");
   await shot(page, "logs-autofix-1280");
 
   await panel.getByTestId("autofix-save").click();

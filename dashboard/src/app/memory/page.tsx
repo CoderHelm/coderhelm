@@ -271,10 +271,13 @@ function MemoryPage() {
                 actions={
                   // Topic and sort stay together, on every width.
                   <div className="flex flex-wrap items-center gap-2">
-                    <Select aria-label="Topic" value={topic} onChange={(e) => setParams({ topic: e.target.value })} className="w-40 bg-zinc-900">
-                      <option value="">Every topic</option>
-                      {TOPICS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                    </Select>
+                    <Select
+                      aria-label="Topic"
+                      value={topic}
+                      onChange={(v) => setParams({ topic: v })}
+                      options={[{ value: "", label: "Every topic" }, ...TOPICS.map((t) => ({ value: t.value, label: t.label }))]}
+                      className="w-40 bg-zinc-900"
+                    />
                     <SortSelect
                       value={sort}
                       onChange={(v) => setParams({ sort: v })}
@@ -547,9 +550,12 @@ function MemoryCard({
           <label className="sr-only" htmlFor={`edit-${m.id}`}>Memory</label>
           <textarea id={`edit-${m.id}`} value={content} onChange={(e) => setContent(e.target.value)} rows={3} maxLength={1000} className={inputClass} />
           <div className="flex flex-wrap items-center gap-3">
-            <Select aria-label="Topic for this memory" value={topic} onChange={(e) => setTopic(e.target.value)}>
-              {TOPICS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </Select>
+            <Select
+              aria-label="Topic for this memory"
+              value={topic}
+              onChange={setTopic}
+              options={TOPICS.map((t) => ({ value: t.value, label: t.label }))}
+            />
             <button type="button" onClick={submit} disabled={saving || !content.trim()} className={primaryButton}>{saving ? "Saving…" : "Save"}</button>
             <button type="button" onClick={() => { setEditing(false); setContent(m.content); setTopic(m.topic || "learned"); setError(""); }} className={secondaryButton}>Cancel</button>
           </div>
@@ -676,9 +682,13 @@ function TeachDialog({ repo, onClose, onSaved }: { repo: string; onClose: () => 
       />
       <p className="mt-1 text-right text-xs text-zinc-400">{content.length} / 1000</p>
       <label htmlFor="teach-topic" className="mt-2 block text-sm text-zinc-300">Topic</label>
-      <select id="teach-topic" value={topic} onChange={(e) => setTopic(e.target.value)} className={`${inputClass} mt-2`}>
-        {TOPICS.map((t) => <option key={t.value} value={t.value}>{t.label}: {t.hint}</option>)}
-      </select>
+      <Select
+        id="teach-topic"
+        value={topic}
+        onChange={setTopic}
+        options={TOPICS.map((t) => ({ value: t.value, label: `${t.label}: ${t.hint}` }))}
+        className="mt-2 w-full"
+      />
       <label className="mt-4 flex items-start gap-2 text-sm text-zinc-300">
         <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} className="mt-1" />
         <span>Pin it: the planner and coding agent get it on every ticket, not only when it seems relevant.</span>

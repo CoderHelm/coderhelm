@@ -9,6 +9,7 @@ import { MarkdownEditor } from "./markdown-editor";
 import { Switch } from "./teams-webhook";
 import { useToast } from "./toast";
 import { inputClass, linkButton, primaryButton, secondaryButton } from "./ui";
+import { Select } from "@/components/select";
 
 /** `via` of a Confluence connection that goes through the team's Coderhelm Jira app. */
 export const JIRA_APP = "jira_app";
@@ -164,10 +165,16 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
         <>
           <Field id={id("region")} label="Region">
             {(p) => (
-              <select {...p} className={inputClass} value={region} onChange={(e) => setRegion(e.target.value)}>
-                <option value="us">US</option>
-                <option value="eu">EU</option>
-              </select>
+              <Select
+                {...p}
+                className="w-full"
+                value={region}
+                onChange={setRegion}
+                options={[
+                  { value: "us", label: "US" },
+                  { value: "eu", label: "EU" },
+                ]}
+              />
             )}
           </Field>
           {text("accounts", "Account ids", accountIds, setAccountIds, "Only these accounts are queried. Leave empty for every account the key can see.", "1234567")}

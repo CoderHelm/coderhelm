@@ -11,6 +11,7 @@ import { SetupPointer } from "./setup";
 import { useToast } from "@/components/toast";
 import { focusRing, inputClass } from "@/components/ui";
 import { Code, RowMarks, SaveBar, SettingsRow, SettingsSection, Switch as RowSwitch, useDirtyForm } from "@/components/settings";
+import { Select } from "@/components/select";
 
 /** The shared switch, under the name this file's callers use. */
 export function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
@@ -237,17 +238,18 @@ export function SettingsView({
           unsaved={form.isDirty("tickets")}
           help="When a test stays quarantined without a fix, its owner gets a ticket with its history and likely cause."
           control={(ids) => (
-            <select
+            <Select
               id={ids.inputId}
               aria-describedby={ids.helpId}
               value={draft.tickets}
-              onChange={(e) => form.set("tickets", e.target.value as TestSettings["tickets"])}
-              className={inputClass}
-            >
-              <option value="github">GitHub issue</option>
-              <option value="jira">Jira</option>
-              <option value="off">Off</option>
-            </select>
+              onChange={(t) => form.set("tickets", t as TestSettings["tickets"])}
+              className="w-full"
+              options={[
+                { value: "github", label: "GitHub issue" },
+                { value: "jira", label: "Jira" },
+                { value: "off", label: "Off" },
+              ]}
+            />
           )}
         />
         <SettingsRow

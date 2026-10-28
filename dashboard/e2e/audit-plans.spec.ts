@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { pickOption } from "./select";
 
 // Plans pages: list, detail, new and templates. Every API call is answered
 // here; nothing reaches a real backend.
@@ -398,7 +399,7 @@ test("a task opens to what it says; edit sends only what changed, add sends the 
 
   // Run after, from the open task.
   await page.getByRole("button", { name: "Show details of Show the schedule on the page" }).click();
-  await page.getByLabel("Run after").selectOption("T1");
+  await pickOption(page.getByLabel("Run after"), "T1");
   await expect.poll(() => db.writes.filter((w) => w.call === "PUT /api/plans/PLANA/tasks/T2").map((w) => w.body)).toEqual([{ depends_on: "T1" }]);
 
   await page.getByRole("button", { name: "New task" }).click();

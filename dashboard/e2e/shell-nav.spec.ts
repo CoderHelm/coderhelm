@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { pickOption, expectSelectValue } from "./select";
 
 // The menu on a short window and on a phone: every link can be reached, the
 // menu shows that it scrolls, and help and the person stay in view. The
@@ -104,9 +105,9 @@ test("390 wide: more than five tabs become a select; chips that don't fit wrap",
   const select = views.getByRole("combobox", { name: "Tests views" });
   await expect(select).toBeVisible();
   await expect(views.getByRole("link")).toHaveCount(0);
-  await select.selectOption({ label: "Trends" });
+  await pickOption(select, "Trends");
   await expect(page).toHaveURL(/view=trends/);
-  await expect(select).toHaveValue("trends");
+  await expectSelectValue(select, "trends");
   await shot(page, "tabs-390-select");
 
   // Filter chips wider than a phone wrap onto a second line: every option

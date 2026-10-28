@@ -7,6 +7,7 @@ import { api, type DataSource, type DataSourceActivityEvent, type DataSourceActi
 import { actorLabel, errorMessage, formatDuration } from "@/lib/data-sources";
 import { RANGES, originHref, rangeSince, type Range } from "@/lib/activity";
 import { StatusPill } from "./status-pill";
+import { Select, type SelectItem } from "./select";
 import { buttonClass, focusRing, linkButton, secondaryButton } from "./ui";
 import { SectionHeading } from "./page";
 import { List, ListEmpty, ListError, ListRow, ListSkeleton, ListToolbar, LoadMore, Time, type Tone } from "./list";
@@ -111,23 +112,14 @@ export function FilterSelect({
   label,
   value,
   onChange,
-  children,
+  options,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  children: React.ReactNode;
+  options: readonly SelectItem[];
 }) {
-  return (
-    <select
-      aria-label={label}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`min-h-9 min-w-0 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 py-1.5 pl-3 text-sm text-zinc-100 transition-colors hover:border-zinc-500 motion-reduce:transition-none ${focusRing}`}
-    >
-      {children}
-    </select>
-  );
+  return <Select aria-label={label} value={value} onChange={onChange} options={options} className="min-w-0 bg-zinc-900" />;
 }
 
 const subtleLink = `text-zinc-400 underline underline-offset-2 hover:text-zinc-200 rounded ${focusRing}`;
@@ -341,20 +333,25 @@ export function ActivityFeed({
         onClear={filtering ? clear : undefined}
       />
       <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2">
-        <FilterSelect label="Source" value={source} onChange={(v) => setFilter({ source: v })}>
-          <option value="all">All sources</option>
-          {sourceOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-        </FilterSelect>
-        <FilterSelect label="Who" value={who} onChange={(v) => setFilter({ who: v as Who })}>
-          <option value="all">Everyone</option>
-          <option value="reviewer">Reviewer</option>
-          <option value="planner">Planner</option>
-          <option value="coder">Coding agent</option>
-          <option value="people">People</option>
-        </FilterSelect>
-        <FilterSelect label="When" value={range} onChange={(v) => setFilter({ range: v as Range })}>
-          {RANGES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-        </FilterSelect>
+        <FilterSelect
+          label="Source"
+          value={source}
+          onChange={(v) => setFilter({ source: v })}
+          options={[{ value: "all", label: "All sources" }, ...sourceOptions.map(([id, name]) => ({ value: id, label: name }))]}
+        />
+        <FilterSelect
+          label="Who"
+          value={who}
+          onChange={(v) => setFilter({ who: v as Who })}
+          options={[
+            { value: "all", label: "Everyone" },
+            { value: "reviewer", label: "Reviewer" },
+            { value: "planner", label: "Planner" },
+            { value: "coder", label: "Coding agent" },
+            { value: "people", label: "People" },
+          ]}
+        />
+        <FilterSelect label="When" value={range} onChange={(v) => setFilter({ range: v as Range })} options={RANGES.map((r) => ({ value: r.value, label: r.label }))} />
       </div>
 
       {error && (

@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { pickOption } from "./select";
 
 // Settings, then Deliveries, then Overview: how deliveries went over a
 // period, against the one before. Every API call is answered here; nothing
@@ -192,10 +193,10 @@ test("filters: period, status, source and endpoint go to the server and the addr
   await page.getByRole("group", { name: "Show" }).getByRole("button", { name: "Failed" }).click();
   await expect.poll(() => db.asks.at(-1)?.get("status")).toBe("failed");
 
-  await page.getByRole("combobox", { name: "Source" }).selectOption("webhook");
+  await pickOption(page.getByRole("combobox", { name: "Source" }), "webhook");
   await expect.poll(() => db.asks.at(-1)?.get("source")).toBe("webhook");
 
-  await page.getByRole("combobox", { name: "Endpoint" }).selectOption("ep_ops");
+  await pickOption(page.getByRole("combobox", { name: "Endpoint" }), "ep_ops");
   await expect.poll(() => db.asks.at(-1)?.get("endpoint")).toBe("ep_ops");
   await expect(page).toHaveURL(/endpoint=ep_ops/);
 

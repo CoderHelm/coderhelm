@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { pickOption, expectSelectValue, selectLabels } from "./select";
 
 // Every API call is answered here. Nothing reaches a real backend.
 
@@ -308,7 +309,7 @@ test("admin sees one row per person, GitHub logins, statuses and the permissions
   await expect(row(page, "Alex Admin").getByRole("combobox")).toHaveCount(0);
   // Admins can grant viewer/member only.
   const select = row(page, "Sam Rivera").getByRole("combobox", { name: "Role for Sam Rivera" });
-  await expect(select.locator("option")).toHaveText(["Viewer", "Member"]);
+  expect(await selectLabels(select)).toEqual(["Viewer", "Member"]);
   // Pending invites have their own section.
   const invites = page.getByRole("list", { name: /Pending invites/ });
   await expect(invites.getByText("new.hire@example.com")).toBeVisible();
@@ -366,13 +367,13 @@ test("link from a GitHub-only row's menu; cancel leaves everything as it was", a
 test("changing a role asks first and sends the new role", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/settings/team");
-  await row(page, "Sam Rivera").getByRole("combobox", { name: "Role for Sam Rivera" }).selectOption("viewer");
+  await pickOption(row(page, "Sam Rivera").getByRole("combobox", { name: "Role for Sam Rivera" }), "viewer");
   await expect(page.getByRole("heading", { name: "Make Sam Rivera a Viewer?" })).toBeVisible();
   await page.getByRole("button", { name: "Cancel" }).click();
   expect(db.calls.some((c) => c.method === "PUT")).toBe(false);
-  await expect(row(page, "Sam Rivera").getByRole("combobox")).toHaveValue("member");
+  await expectSelectValue(row(page, "Sam Rivera").getByRole("combobox"), "member");
 
-  await row(page, "Sam Rivera").getByRole("combobox").selectOption("viewer");
+  await pickOption(row(page, "Sam Rivera").getByRole("combobox"), "viewer");
   await page.getByRole("button", { name: "Make Viewer" }).click();
   await expect(page.getByText("Sam Rivera is now a Viewer")).toBeVisible();
   const put = db.calls.find((c) => c.method === "PUT");
@@ -383,7 +384,7 @@ test("changing a role asks first and sends the new role", async ({ page }) => {
 test("an owner can make admins and owners, but the last owner's role is locked", async ({ page }) => {
   await mockApi(page, "owner");
   await page.goto("/settings/team");
-  await expect(row(page, "Alex Admin").getByRole("combobox").locator("option")).toHaveText(["Viewer", "Member", "Admin", "Owner"]);
+  expect(await selectLabels(row(page, "Alex Admin").getByRole("combobox"))).toEqual(["Viewer", "Member", "Admin", "Owner"]);
   // Olivia is the only owner and it's you: no selector, no remove.
   await expect(row(page, "Olivia Owner").getByRole("combobox")).toHaveCount(0);
   await expect(row(page, "Olivia Owner").getByRole("button", { name: /More actions/ })).toHaveCount(0);
@@ -393,14 +394,14 @@ test("invite: validates the email, then shows the invite as pending; resend and 
   const db = await mockApi(page);
   await page.goto("/settings/team");
   const form = page.getByRole("form", { name: "Invite someone" });
-  await expect(form.getByRole("combobox", { name: "Role" }).locator("option")).toHaveText(["Viewer", "Member"]);
+  expect(await selectLabels(form.getByRole("combobox", { name: "Role" }))).toEqual(["Viewer", "Member"]);
   await form.getByPlaceholder("name@example.com").fill("not-an-email");
   await form.getByRole("button", { name: "Send invite" }).click();
   await expect(form.getByRole("alert")).toHaveText(/Enter a valid email address/);
   expect(db.calls.some((c) => c.path === "/api/users/invite")).toBe(false);
 
   await form.getByPlaceholder("name@example.com").fill("dev@example.com");
-  await form.getByRole("combobox", { name: "Role" }).selectOption("viewer");
+  await pickOption(form.getByRole("combobox", { name: "Role" }), "viewer");
   await form.getByRole("button", { name: "Send invite" }).click();
   await expect(page.getByText("Invite sent to dev@example.com")).toBeVisible();
   expect(db.calls.find((c) => c.path === "/api/users/invite")?.body).toEqual({ email: "dev@example.com", role: "viewer" });
@@ -472,9 +473,9 @@ test("remove a member from the actions menu", async ({ page }) => {
 test("search and filters narrow the list, with a way back", async ({ page }) => {
   await mockApi(page);
   await page.goto("/settings/team");
-  await page.getByRole("combobox", { name: "Filter by sign-in" }).selectOption("github");
+  await pickOption(page.getByRole("combobox", { name: "Filter by sign-in" }), "github");
   await expect(members(page).getByRole("listitem")).toHaveCount(2);
-  await page.getByRole("combobox", { name: "Filter by sign-in" }).selectOption("all");
+  await pickOption(page.getByRole("combobox", { name: "Filter by sign-in" }), "all");
   await page.getByRole("group", { name: "Filter by role" }).getByRole("button", { name: /Viewer/ }).click();
   await expect(page).toHaveURL(/role=viewer/);
   await expect(members(page).getByRole("listitem")).toHaveCount(2);
@@ -571,12 +572,12 @@ test("an admin creates a role from a template, gives it to a member, and the cha
   await expect(roleRow(page, "QA lead")).toContainText("Manage repositories");
 
   // Give it to Sam.
-  await row(page, "Sam Rivera").getByRole("combobox", { name: "Role for Sam Rivera" }).selectOption({ label: "QA lead" });
+  await pickOption(row(page, "Sam Rivera").getByRole("combobox", { name: "Role for Sam Rivera" }), "QA lead");
   await page.getByRole("button", { name: "Make QA lead" }).click();
   await expect(page.getByText("Sam Rivera is now a QA lead")).toBeVisible();
   const put = db.calls.find((c) => c.method === "PUT" && c.path === "/api/users/u-sam/role");
   expect(put?.body).toEqual({ role: "custom:r1" });
-  await expect(row(page, "Sam Rivera").getByRole("combobox")).toHaveValue("custom:r1");
+  await expectSelectValue(row(page, "Sam Rivera").getByRole("combobox"), "custom:r1");
   await expect(roleRow(page, "QA lead")).toContainText("1 person");
 
   // The role log shows the change.
@@ -596,16 +597,16 @@ test("deleting a role people have needs a replacement role for them", async ({ p
   const go = dialog.getByRole("button", { name: "Move them and delete" });
   await expect(go).toBeDisabled();
   // Owner is never offered; the role being deleted isn't either.
-  await expect(dialog.getByLabel("Move them to").locator("option")).toHaveText(["Pick a role", "Viewer", "Member", "Ops"]);
+  expect(await selectLabels(dialog.getByLabel("Move them to"))).toEqual(["Pick a role", "Viewer", "Member", "Ops"]);
   await shotAt(page, "custom-role-delete");
-  await dialog.getByLabel("Move them to").selectOption("member");
+  await pickOption(dialog.getByLabel("Move them to"), "member");
   await go.click();
 
   await expect(page.getByText("Release manager deleted. 1 moved to Member.")).toBeVisible();
   const del = db.calls.find((c) => c.method === "DELETE" && c.path === "/api/roles/r1");
   expect(del?.search).toBe("?replacement=member");
   await expect(roleRow(page, "Release manager")).toHaveCount(0);
-  await expect(row(page, "Mia Member").getByRole("combobox")).toHaveValue("member");
+  await expectSelectValue(row(page, "Mia Member").getByRole("combobox"), "member");
 });
 
 test("a role nobody has is deleted at once; one given out meanwhile asks for a replacement", async ({ page }) => {
@@ -619,7 +620,7 @@ test("a role nobody has is deleted at once; one given out meanwhile asks for a r
   await dialog.getByRole("button", { name: "Delete role" }).click();
   await expect(dialog.getByRole("alert")).toContainText("1 person has this role. Pick the role they get instead");
   await expect(dialog.getByLabel("Move them to")).toBeVisible();
-  await dialog.getByLabel("Move them to").selectOption("viewer");
+  await pickOption(dialog.getByLabel("Move them to"), "viewer");
   await dialog.getByRole("button", { name: "Move them and delete" }).click();
   await expect(roleRow(page, "Release manager")).toHaveCount(0);
 });

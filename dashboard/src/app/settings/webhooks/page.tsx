@@ -800,13 +800,18 @@ function SecretSection({ ep, onChanged }: { ep: WebhookEndpoint; onChanged: () =
             <label htmlFor={`${ids}-overlap`} className="mb-1 block text-sm text-zinc-300">
               Keep the old secret signing for
             </label>
-            <Select id={`${ids}-overlap`} value={overlap} onChange={(e) => setOverlap(e.target.value)}>
-              <option value="0">No time (stop at once)</option>
-              <option value="1">1 hour</option>
-              <option value="24">24 hours</option>
-              <option value="72">3 days</option>
-              <option value="168">7 days</option>
-            </Select>
+            <Select
+              id={`${ids}-overlap`}
+              value={overlap}
+              onChange={setOverlap}
+              options={[
+                { value: "0", label: "No time (stop at once)" },
+                { value: "1", label: "1 hour" },
+                { value: "24", label: "24 hours" },
+                { value: "72", label: "3 days" },
+                { value: "168", label: "7 days" },
+              ]}
+            />
           </div>
           <button type="button" className={secondaryButton} onClick={() => void rotate()} disabled={busy}>
             Rotate secret
@@ -954,12 +959,18 @@ function DeliveriesSection({ ep, refreshKey }: { ep: WebhookEndpoint; refreshKey
           <label htmlFor={`${ids}-status`} className="text-sm text-zinc-400">
             Show
           </label>
-          <Select id={`${ids}-status`} size="sm" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="all">All</option>
-            <option value="failed">Failed</option>
-            <option value="pending">Retrying</option>
-            <option value="ok">Delivered</option>
-          </Select>
+          <Select
+            id={`${ids}-status`}
+            size="sm"
+            value={status}
+            onChange={setStatus}
+            options={[
+              { value: "all", label: "All" },
+              { value: "failed", label: "Failed" },
+              { value: "pending", label: "Retrying" },
+              { value: "ok", label: "Delivered" },
+            ]}
+          />
         </div>
       </div>
       <div className="mt-3">

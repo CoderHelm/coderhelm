@@ -178,9 +178,14 @@ export function ModelsSection() {
         <div className="min-w-0 space-y-3">
           <Field as="custom" label="Inference profile prefix" help={`Pick the one for this install's region (${current.region}).`}>
             {(ids) => (
-              <Select id={ids.id} aria-describedby={ids["aria-describedby"]} value={prefix} onChange={(e) => { setPrefix(e.target.value); setResults(null); }} className="sm:w-72">
-                {current.prefixes.map((p) => <option key={p || "none"} value={p}>{PREFIX_LABEL[p] ?? p}</option>)}
-              </Select>
+              <Select
+                id={ids.id}
+                aria-describedby={ids["aria-describedby"]}
+                value={prefix}
+                onChange={(v) => { setPrefix(v); setResults(null); }}
+                className="sm:w-72"
+                options={current.prefixes.map((p) => ({ value: p, label: PREFIX_LABEL[p] ?? p }))}
+              />
             )}
           </Field>
           <SettingsDisclosure summary="Advanced: exact Bedrock ids" defaultOpen={Object.keys(current.model_ids ?? {}).length > 0}>

@@ -27,7 +27,7 @@ import { CodeBlock } from "@/components/code-block";
 import { Code } from "@/components/settings/code";
 import { Page, PageHeader } from "@/components/page";
 import { buttonClass, focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
-import { selectClass } from "@/components/select";
+import { Select } from "@/components/select";
 import {
   Chip,
   DetailBlock,
@@ -70,7 +70,7 @@ const SEVERITY_OPTIONS: { value: LogSeverity; label: string }[] = [
 ];
 
 const rowActionClass = `${buttonClass("secondary", "sm")} gap-1`;
-const selectBox = selectClass("md");
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: hourLabel(h) }));
 
 /** "/aws/lambda/shop-checkout" -> "shop-checkout": the part of a log group people recognise. */
 function serviceName(group: string): string {
@@ -307,31 +307,25 @@ function LogsPage() {
           {/* Severity and log group: the list's second row of filters, right under the toolbar. */}
           <div className="-mt-2 mb-4" data-testid="logs-filters">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <select
+              <Select
                 aria-label="Severity"
                 value={severity}
-                onChange={(e) => setParams({ severity: e.target.value })}
-                className={selectBox}
-              >
-                <option value="">All severities</option>
-                <option value="critical">Critical</option>
-                <option value="warning">Warning</option>
-                <option value="info">Info</option>
-              </select>
+                onChange={(v) => setParams({ severity: v })}
+                options={[
+                  { value: "", label: "All severities" },
+                  { value: "critical", label: "Critical" },
+                  { value: "warning", label: "Warning" },
+                  { value: "info", label: "Info" },
+                ]}
+              />
               {groups.length > 1 && (
-                <select
+                <Select
                   aria-label="Log group"
                   value={params.group}
-                  onChange={(e) => setParams({ group: e.target.value })}
-                  className={`${selectBox} sm:max-w-[20rem]`}
-                >
-                  <option value="">All log groups</option>
-                  {groups.map((g) => (
-                    <option key={g} value={g}>
-                      {g}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => setParams({ group: v })}
+                  options={[{ value: "", label: "All log groups" }, ...groups.map((g) => ({ value: g, label: g }))]}
+                  className="sm:max-w-[20rem]"
+                />
               )}
             </div>
           </div>
@@ -933,33 +927,21 @@ function AutofixPanel({
             </label>
             {a.quiet_hours && (
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-zinc-400">
-                <select
+                <Select
                   aria-label="Quiet hours start"
-                  value={a.quiet_hours.start_hour}
+                  value={String(a.quiet_hours.start_hour)}
                   disabled={disabled}
-                  onChange={(e) => set({ quiet_hours: { ...a.quiet_hours!, start_hour: Number(e.target.value) } })}
-                  className={selectBox}
-                >
-                  {Array.from({ length: 24 }, (_, h) => (
-                    <option key={h} value={h}>
-                      {hourLabel(h)}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => set({ quiet_hours: { ...a.quiet_hours!, start_hour: Number(v) } })}
+                  options={HOUR_OPTIONS}
+                />
                 to
-                <select
+                <Select
                   aria-label="Quiet hours end"
-                  value={a.quiet_hours.end_hour}
+                  value={String(a.quiet_hours.end_hour)}
                   disabled={disabled}
-                  onChange={(e) => set({ quiet_hours: { ...a.quiet_hours!, end_hour: Number(e.target.value) } })}
-                  className={selectBox}
-                >
-                  {Array.from({ length: 24 }, (_, h) => (
-                    <option key={h} value={h}>
-                      {hourLabel(h)}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => set({ quiet_hours: { ...a.quiet_hours!, end_hour: Number(v) } })}
+                  options={HOUR_OPTIONS}
+                />
                 <p className="w-full text-xs text-zinc-400">Findings that arrive then start when the quiet hours end.</p>
               </div>
             )}
@@ -994,29 +976,29 @@ function AutofixPanel({
                     />
                   )}
                 </div>
-                <select
+                <Select
                   aria-label={`Automatic fixes for ${r.log_group}`}
                   value={r.auto === null ? "" : r.auto ? "on" : "off"}
                   disabled={disabled}
-                  onChange={(e) => setRow(r.log_group, { auto: e.target.value === "" ? null : e.target.value === "on" })}
-                  className={selectBox}
-                >
-                  <option value="">Team default</option>
-                  <option value="on">On</option>
-                  <option value="off">Off</option>
-                </select>
-                <select
+                  onChange={(v) => setRow(r.log_group, { auto: v === "" ? null : v === "on" })}
+                  options={[
+                    { value: "", label: "Team default" },
+                    { value: "on", label: "On" },
+                    { value: "off", label: "Off" },
+                  ]}
+                />
+                <Select
                   aria-label={`Minimum severity for ${r.log_group}`}
                   value={r.min_severity ?? ""}
                   disabled={disabled}
-                  onChange={(e) => setRow(r.log_group, { min_severity: (e.target.value || null) as LogSeverity | null })}
-                  className={selectBox}
-                >
-                  <option value="">Team severity</option>
-                  <option value="critical">Critical</option>
-                  <option value="warning">Warning and up</option>
-                  <option value="info">Everything</option>
-                </select>
+                  onChange={(v) => setRow(r.log_group, { min_severity: (v || null) as LogSeverity | null })}
+                  options={[
+                    { value: "", label: "Team severity" },
+                    { value: "critical", label: "Critical" },
+                    { value: "warning", label: "Warning and up" },
+                    { value: "info", label: "Everything" },
+                  ]}
+                />
               </li>
             ))}
           </ul>

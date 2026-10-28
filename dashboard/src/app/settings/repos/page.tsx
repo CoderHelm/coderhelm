@@ -296,16 +296,10 @@ function ReposPage() {
                           aria-label={`Role of ${repo.name}`}
                           title="Which tickets go to this repository"
                           value={repo.role || ""}
-                          onChange={(e) => handleRoleChange(repo, e.target.value)}
+                          onChange={(v) => handleRoleChange(repo, v)}
                           disabled={savingRole === repo.name}
-                        >
-                          <option value="">No type (Coderhelm picks)</option>
-                          {Object.entries(ROLE_NAMES).map(([value, label]) => (
-                            <option key={value} value={value}>
-                              {label}
-                            </option>
-                          ))}
-                        </Select>
+                          options={[{ value: "", label: "No type (Coderhelm picks)" }, ...Object.entries(ROLE_NAMES).map(([value, label]) => ({ value, label }))]}
+                        />
                       ) : undefined}
                       {repo.enabled && canManage && (
                         <button
