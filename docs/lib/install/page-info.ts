@@ -29,6 +29,10 @@ The guide is an interactive page. It talks to AWS, GitHub and your own CoderHelm
 
 Each check comes from your install's own \`GET /api/setup/status\` ([the contract](https://github.com/CoderHelm/coderhelm-platform/blob/main/docs/self-host/setup-checks.md)).
 
+## What it does in your AWS account
+
+The stack's installer runs in CodeBuild with full administrator rights (the AWS managed AdministratorAccess policy). It checks the release's signatures and checksums before it runs any of it, then deploys CoderHelm's own stacks, each service with a narrow role of its own. A small progress bucket, \`coderhelm-setup-<id>\`, holds one file the guide reads: the install's progress and address, public if the account allows it. Nothing gives CoderHelm the company access to the account. The AWS link holds the one-time setup key, so don't share it. Every resource and role, the risks and how to remove it all: [What CoderHelm does in your AWS account](${SITE.url}/self-host/aws-account/).
+
 ## Without the guide
 
 - The terminal install: [Quick start](${SITE.url}/self-host/quick-start.md).

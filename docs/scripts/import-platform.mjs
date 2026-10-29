@@ -78,6 +78,36 @@ const plain = (s) =>
 const SELF_HOST_SRC = 'docs/self-host';
 /** The install guide's sidebar entry (a Fumadocs link item). */
 export const INSTALL_GUIDE_LINK = '[Install from your browser](/self-host/install/)';
+/**
+ * Self-hosting pages that belong to this site rather than to the platform:
+ * the install guide's own pages, such as what its Launch Stack does in the
+ * AWS account. Committed here, copied in next to the imported guides, and
+ * listed right after the install guide.
+ */
+const SITE_PAGES_DIR = path.join(ROOT, 'content/self-host-site');
+
+/** The site's own self-host pages, by name (no extension), in file order. */
+export function sitePages(dir = SITE_PAGES_DIR) {
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).filter((f) => /\.mdx?$/i.test(f)).sort().map((f) => f.replace(/\.mdx?$/i, ''));
+}
+
+/** The top of the self-host sidebar: the overview, the install guide, then the site's own pages. */
+export function selfHostLead(site) {
+  return ['index', INSTALL_GUIDE_LINK, ...site];
+}
+
+/** Copies the site's own pages in; a platform guide of the same name is a mistake, not an override. */
+function copySitePages(out, imported) {
+  const site = sitePages();
+  for (const name of site) {
+    if (imported.has(name)) throw new Error(`content/self-host-site/${name} and the platform's docs/self-host/${name} would be the same page. Rename one.`);
+    const file = fs.readdirSync(SITE_PAGES_DIR).find((f) => f.replace(/\.mdx?$/i, '') === name);
+    fs.mkdirSync(out, { recursive: true });
+    fs.copyFileSync(path.join(SITE_PAGES_DIR, file), path.join(out, file));
+  }
+  return site;
+}
 
 function importSelfHost(platform) {
   const out = path.join(CONTENT, 'self-host');
@@ -85,9 +115,12 @@ function importSelfHost(platform) {
   const src = path.join(platform.dir, SELF_HOST_SRC);
   if (!fs.existsSync(src)) {
     writeSelfHostStub(platform.ref);
+    copySitePages(out, new Set());
     return { imported: 0 };
   }
   let imported = 0;
+  const top = new Set(fs.readdirSync(src).filter((f) => /\.mdx?$/i.test(f)).map((f) => f.replace(/\.mdx?$/i, '')));
+  const site = copySitePages(out, top);
   const walk = (dir, rel) => {
     const entries = fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
     const pages = [];
@@ -123,7 +156,7 @@ function importSelfHost(platform) {
     }
     // The browser install guide (app/self-host/install) sits right under the
     // section's overview: it is the fastest way in.
-    const lead = rel === '' ? ['index', INSTALL_GUIDE_LINK] : ['index'];
+    const lead = rel === '' ? selfHostLead(site) : ['index'];
     fs.writeFileSync(path.join(out, rel, 'meta.json'), JSON.stringify({ ...(metaTitle ? { title: metaTitle } : {}), pages: [...lead, ...pages] }, null, 2) + '\n');
   };
   walk(src, '');

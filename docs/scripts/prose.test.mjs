@@ -28,6 +28,12 @@ test('no page draws a diagram in a code fence or puts an arrow glyph in prose', 
       found.push(`content/docs/${rel}:${p.line} ${p.rule}: ${p.text}`);
     }
   }
+  // The site's own self-host pages, copied in at build time (scripts/import-platform.mjs).
+  const site = path.join(ROOT, 'content/self-host-site');
+  for (const file of fs.existsSync(site) ? pages(site) : []) {
+    const rel = path.relative(ROOT, file).split(path.sep).join('/');
+    for (const p of proseProblems(fs.readFileSync(file, 'utf8'), { file: rel, allow: ALLOW })) found.push(`${rel}:${p.line} ${p.rule}: ${p.text}`);
+  }
   assert.deepEqual(found, [], `use <Diagram> for pictures and words for menu paths ("Settings, then Team"):\n${found.join('\n')}`);
 });
 

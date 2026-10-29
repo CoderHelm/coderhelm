@@ -357,6 +357,63 @@ test('resume: a refresh keeps the place; another device resumes from the link an
   await other.close();
 });
 
+test('before launch: what the stack creates in the AWS account, the risks behind a fold, and the full page', async ({ page }) => {
+  const m = newMock();
+  await mock(page, m);
+  await page.goto('/self-host/install/');
+  const panel = page.getByTestId('account-disclosure');
+  await expect(panel).toBeVisible();
+  await expect(panel.getByRole('heading', { name: 'What this creates in your AWS account' })).toBeVisible();
+  // Above the button that opens AWS, so it is read first.
+  const panelBox = await panel.boundingBox();
+  const launchBox = await page.getByTestId('launch').boundingBox();
+  expect(panelBox && launchBox && panelBox.y + panelBox.height <= launchBox.y).toBeTruthy();
+  await expect(panel).toContainText('A CloudFormation stack, coderhelm-prod, that runs the installer once.');
+  await expect(panel.getByTestId('disclosure-admin')).toContainText('An installer in CodeBuild with full administrator rights (the AWS managed AdministratorAccess policy).');
+  await expect(panel).toContainText('coderhelm-setup-<id>');
+  await expect(panel).toContainText('No access for CoderHelm the company.');
+  // The risks are folded until asked for, then name each one.
+  const risks = panel.getByTestId('disclosure-risks');
+  await expect(risks).toBeHidden();
+  await panel.getByText('Risks and how to reduce them').click();
+  await expect(risks).toBeVisible();
+  for (const t of [
+    'The installer has full admin rights.',
+    'Updates deploy new release code with broad rights.',
+    'The progress file is public while the install runs.',
+    'The AWS link holds your one-time setup key.',
+  ]) await expect(risks).toContainText(t);
+  await expect(risks).toContainText('you can turn them off any time in Settings, System');
+  await expect(risks).toContainText('If your account blocks public access to S3, that\'s fine');
+  // The full page, with every resource, role, risk and how to remove it.
+  const link = panel.getByTestId('disclosure-page');
+  await expect(link).toHaveAttribute('href', '/self-host/aws-account/');
+  await link.click();
+  await expect(page).toHaveURL(/\/self-host\/aws-account\/$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('What CoderHelm does in your AWS account');
+  for (const h of ['What gets created', 'What CoderHelm the company can do', 'Risks and how to reduce them', 'Remove everything']) {
+    await expect(page.getByRole('heading', { level: 2, name: h })).toBeVisible();
+  }
+});
+
+test('the account panel fits a phone and says hybrid adds no AWS access', async ({ page }) => {
+  const m = newMock();
+  const h = newHybrid();
+  await mock(page, m);
+  await mockHybrid(page, h);
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.goto('/self-host/install/');
+  await page.locator('[data-setup="hybrid"]').click();
+  const panel = page.getByTestId('account-disclosure');
+  await expect(panel).toContainText('Hybrid adds no AWS access either');
+  await expect(panel.getByRole('link', { name: 'what CoderHelm sees' })).toHaveAttribute('href', '/self-host/hybrid/#trust-model');
+  await panel.getByText('Risks and how to reduce them').click();
+  const width = await page.evaluate(() => document.documentElement.scrollWidth);
+  expect(width).toBeLessThanOrEqual(360);
+  const box = await panel.boundingBox();
+  expect(box && box.x >= 0 && box.x + box.width <= 360).toBeTruthy();
+});
+
 test('once someone has signed up (setup window closed), the guide shows the install as ready', async ({ page }) => {
   const m = newMock({ setup: setupDoc(NO_APP) });
   await seeded(page, m, { url: INSTALL });

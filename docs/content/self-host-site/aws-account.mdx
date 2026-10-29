@@ -1,0 +1,121 @@
+---
+title: What CoderHelm does in your AWS account
+description: Every resource and role the install guide's Launch Stack creates in your AWS account, what each one can do, the risks, how to reduce them and how to remove it all.
+# Describes infra/cfn/coderhelm-selfhost-launch.yaml in CoderHelm/coderhelm-platform.
+# The install guide shows a short version (components/install/wizard.tsx, AccountDisclosure).
+# ADMIN ROLE: the installer role is the AWS managed AdministratorAccess policy
+# today. A scoped installer role with a permissions boundary is being built in
+# coderhelm-platform. When it ships, update the parts that say so: "The installer:
+# a CodeBuild project and its role" (What it can do), "The installer has full
+# administrator rights" under Risks, and the summary line under the title.
+# (Notes live here because a comment in the body would print in the Markdown twin.)
+---
+
+The [install guide](/self-host/install/) opens AWS on a CloudFormation stack, the Launch Stack. This page lists everything that stack and the installer create in your account, what each part is allowed to do, and what that means for you. Read it before you press **Create stack**.
+
+In short: CoderHelm runs entirely in your account. The installer needs full administrator rights to set it up. CoderHelm the company gets no access to your account.
+
+## What gets created
+
+### The Launch Stack
+
+A CloudFormation stack named `coderhelm-<name>` (the name in your AWS account, `prod` unless you change it). It holds the installer, the function that starts it, and the progress bucket. It finishes when CoderHelm is running and shows your address in its **Outputs**.
+
+### The installer: a CodeBuild project and its role
+
+- **What it is.** A CodeBuild project, `<stack name>-installer`, and an IAM role, `InstallerRole`, that only CodeBuild can take on.
+- **What it can do.** Anything in your account. The role has the AWS managed **AdministratorAccess** policy, because it creates CoderHelm's own IAM roles and prepares the account for CDK.
+- **What it does.**
+  1. Downloads the CoderHelm release you picked from GitHub.
+  2. Checks the release before it runs any of it. The release's tag must be on `main`, and either signed with a CoderHelm maintainer key written into the template or attested by CoderHelm's automatic release workflow on `main` for that exact tag and commit. The file of checksums must be signed (Sigstore, logged publicly in Rekor) by exactly CoderHelm's release workflow, on that tag and from that commit. Every file must match its checksum. Anything else stops the install before it starts. [How updates are kept safe](/self-host/updates-security/) has the details and the commands to check a release yourself.
+  3. Deploys CoderHelm's stacks with AWS CDK.
+- **Its log** is in CloudWatch under `/aws/codebuild/<stack name>-installer`. The log stays when the stack is deleted.
+
+### The starter function and its role
+
+A small Lambda function that runs once, when the stack is created. It opens the progress file to the install guide and starts the installer. Its role can only start that one CodeBuild project, set the policy on `coderhelm-setup-*` buckets, write their `status.json`, and write its own logs.
+
+### The progress bucket
+
+An S3 bucket, `coderhelm-setup-<id>`, with one file, `status.json`. The id is the random progress ID from the install guide.
+
+- **What the file holds.** The step the install is on, a short message (or why it stopped and how to fix it), the release, the install name, the region, a link to the installer's log in your console and, at the end, your install's address. With your own domain, also the DNS records to add, which are public in DNS anyway. No emails, keys or account numbers.
+- **Who can read it.** Anyone, if your account allows it: the starter function adds a policy that lets anyone read that one file, so the guide in your browser can follow along. Nobody else can list the bucket or read anything else in it.
+- **How long it stays.** The file expires after 30 days. The bucket stays when you delete the stack, so a failed install's reason stays readable. Delete it by hand when you no longer need it.
+
+### CoderHelm itself
+
+The installer deploys CoderHelm's own stacks, all named `coderhelm-<name>-*`:
+
+- Lambda functions and an HTTP API: CoderHelm itself, paid per use.
+- DynamoDB tables, an S3 data bucket, SQS queues, KMS keys and a Secrets Manager secret: your runs, settings and files, encrypted.
+- CloudFront and a Cognito user pool: the web address and sign in.
+- CodeBuild projects: a build sandbox for your repositories' own build scripts, the update build and the release check.
+- An updater function that looks for new releases every hour and emails your admins about them.
+- An IAM role for each service, with only the tables, queues, keys and actions that service uses. [Security model](/self-host/security/) lists them.
+
+If the region has none yet, the installer also runs CDK's own setup, which creates the `CDKToolkit` stack: a bucket and a container repository for deploy files, and the roles CDK deploys through. One of them, the role CloudFormation runs as, has administrator rights; that is CDK's default.
+
+### What it costs
+
+The install guide shows the monthly AWS estimate for your choices before you launch. Most of it scales with use. Model calls are extra: on this AWS bill with Bedrock, or on each team's Anthropic bill with API keys.
+
+## What CoderHelm the company can do
+
+Nothing in your account. The stack creates no role for another account, and nothing it creates trusts an account outside yours. There is no support login and no license check.
+
+What reaches CoderHelm depends only on what you turn on:
+
+- **Anonymous install pings** are off unless you turn them on. Then the installer sends a random install id, the release, the region and the model provider, never an account id, domain or email. See [Security model](/self-host/security/).
+- **Hybrid** (a CoderHelm address, CoderHelm's GitHub App, or email through CoderHelm) adds no AWS access either. CoderHelm passes GitHub and Jira events to your install and points your address at your CloudFront. [What CoderHelm sees](/self-host/hybrid/#trust-model) lists each part and what CoderHelm keeps.
+- **Other AWS accounts a team connects later** trust your install's own account, never CoderHelm's. See [Integrations](/self-host/integrations/).
+
+## The setup key and the two links
+
+The install guide makes two random values and puts them in the link that opens AWS:
+
+- **The progress ID** names the progress bucket. The guide's own link (`/self-host/install/?id=...`) holds only this ID, the region and the install name. It is not a secret: with it, someone can see the install's progress and address, nothing more.
+- **The setup key** is one-time. It lets the guide hand your new GitHub App's keys straight to your install. It stops working once the app exists.
+
+The AWS link holds the setup key, and your email. Don't share that link or paste it anywhere. People in your account who can read the stack's parameters or the installer's settings can see the key too, until it stops working.
+
+## Risks and how to reduce them
+
+### The installer has full administrator rights
+
+Anyone in your account who can start or change the installer's CodeBuild project, or edit its role, can act with administrator rights.
+
+- Keep CodeBuild and IAM rights to the people who already administer the account.
+- Once CoderHelm is running, the Launch Stack has done its job. You can delete it: that removes the installer, its role and the starter function. CoderHelm keeps running, and updates keep working, because they run in their own build. A new Launch Stack with the same install name updates the install, if you ever need the installer again.
+- Install in an AWS account of its own, if you can. It keeps CoderHelm apart from your other workloads.
+
+### Updates deploy new release code with broad rights
+
+Updates run in the update build, `coderhelm-<name>-update`. Its own role is narrow, but it deploys through the CDK roles, and those can change anything in the account. So a release you install can change anything in your account. The protection is the release check: every update makes the same checks as the installer, against the maintainer keys of the release you already run, before any of the new release runs. [How updates are kept safe](/self-host/updates-security/) explains each check.
+
+If CoderHelm's release pipeline were ever broken into, an automatic update would bring that into your account.
+
+- Automatic updates are off unless you turn them on in the install guide's **More options**. You can turn them on or off any time in **Settings, then System**. With them off, admins get an email about each release and an admin starts each update.
+- You can [check a release yourself](/self-host/updates-security/) before you install it, or deploy from source after reviewing the code. [Updates](/self-host/updates/) covers the settings.
+
+### The progress file is public while the install runs
+
+It holds only the install's progress and address, as listed above: no emails, keys or account numbers. It expires after 30 days.
+
+- If your account blocks public access to S3 (S3 Block Public Access), that's fine. The install still runs. The guide then asks for your install's address, which you copy from the stack's **Outputs** tab.
+- Delete the `coderhelm-setup-<id>` bucket once the install is done, if you'd rather not keep it.
+
+### A leaked AWS link exposes the setup key
+
+Until your GitHub App exists, someone with the setup key could give your install a GitHub App of their own.
+
+- Don't share the AWS link or paste it in chats or tickets. Share the guide's own link instead; it holds no secret.
+- Finish the GitHub step soon after the install answers. The key stops working once your app exists.
+
+## Remove everything
+
+1. **Uninstall CoderHelm.** From a computer with AWS credentials for the account, run `npx -y github:CoderHelm/coderhelm-platform uninstall`. It deletes CoderHelm's stacks. By default it keeps your data on purpose: the DynamoDB tables, the data bucket, their KMS keys, the Cognito user pool and the secret. Delete those in the AWS console when you are sure. See [FAQ](/self-host/faq/).
+2. **Delete the Launch Stack** in CloudFormation, if you haven't already. Deleting it alone does not remove CoderHelm.
+3. **Delete the progress bucket**, `coderhelm-setup-<id>`, and the installer's log group, `/aws/codebuild/<stack name>-installer`. Both outlive the stack.
+4. **Uninstall and delete your GitHub App** on GitHub.
+5. **Leave the `CDKToolkit` stack** unless nothing else in the account uses CDK. Other projects may deploy through it.
