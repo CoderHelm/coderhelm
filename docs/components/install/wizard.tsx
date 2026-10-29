@@ -812,6 +812,7 @@ export function InstallWizard() {
     if (!window.confirm('Start a new install? This browser forgets the current one (your AWS install is not changed).')) return;
     try {
       localStorage.removeItem(STORAGE_LAST);
+      localStorage.removeItem(STORAGE_PREFIX + s.statusId);
     } catch {
       /* ignore */
     }
@@ -1166,6 +1167,7 @@ export function InstallWizard() {
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               <Secondary href={quickCreateUrl(s)} newTab testId="reopen-aws">Open AWS again</Secondary>
               <Secondary href={stacksConsoleUrl(s.region)} newTab>See your stacks</Secondary>
+              <Secondary onClick={startOver} testId="start-over-no-sign">Start over</Secondary>
             </div>
           </Notice>
         ) : null}
@@ -1186,6 +1188,7 @@ export function InstallWizard() {
             {!s.url ? (
               <Secondary onClick={() => setPasteOpen((v) => !v)} testId="paste-toggle">I have my install’s address</Secondary>
             ) : null}
+            {s.launchedAt && !s.url ? <Secondary onClick={startOver} testId="start-over-waiting">Start over</Secondary> : null}
           </div>
         ) : null}
         {(pasteOpen || noSign) && !s.url ? (
