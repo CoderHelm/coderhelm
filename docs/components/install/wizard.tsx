@@ -36,11 +36,16 @@ import {
   nameCheckUrl,
   nameProblem,
   LATEST_URL,
+  GITHUB_LATEST_URL,
+  notPublishedText,
+  templateUrl,
+  versionFromGithub,
   PERMISSION_REASONS,
   GITHUB_PERMISSIONS,
   REGIONS,
   STORAGE_LAST,
   STORAGE_PREFIX,
+  TAG_RE,
   parseSetupStatus,
   checkText,
   baseDomain,
@@ -183,6 +188,31 @@ async function getJson(url: string): Promise<{ ok: boolean; status: number; body
     return { ok: false, status: 0, body: null };
   }
 }
+
+/**
+ * Whether a release's template is in the public bucket. The bucket answers
+ * 403 for a key that isn't there, which CloudFormation would show as a bare
+ * "S3 Access Denied", so the guide asks first.
+ */
+async function templateExists(url: string): Promise<boolean> {
+  try {
+    const r = await fetch(url, { method: 'HEAD', cache: 'no-store', credentials: 'omit' });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** The newest release: launch/latest.json, else GitHub's latest release; null when neither names one. */
+async function newestRelease(): Promise<string | null> {
+  const latest = await getJson(LATEST_URL);
+  const fromFile = latest.ok ? pickVersion(latest.body) : null;
+  if (fromFile) return fromFile;
+  const gh = await getJson(GITHUB_LATEST_URL);
+  return gh.ok ? versionFromGithub(gh.body) : null;
+}
+
+type Release = { state: 'checking' } | { state: 'ready'; version: string } | { state: 'missing'; version: string | null };
 
 /** The install's own checks: its public GET /api/setup/status (shared with the CLI and the dashboard). */
 async function readInstall(url: string, region: string, fresh = false): Promise<SetupStatus | null> {
@@ -601,6 +631,8 @@ export function InstallWizard() {
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteError, setPasteError] = useState('');
   const [orgMode, setOrgMode] = useState(false);
+  const [release, setRelease] = useState<Release>({ state: 'checking' });
+  const [releaseTry, setReleaseTry] = useState(0);
   const [, tick] = useState(0);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -623,18 +655,30 @@ export function InstallWizard() {
     if (next !== `${window.location.pathname}${window.location.search}`) window.history.replaceState(null, '', next);
   }, [s]);
 
-  // The newest release (before launch only).
+  // The newest release, and whether its template is published: before launch, and
+  // for an install resumed from its link on another device (which doesn't know
+  // its release). No hard-coded fallback: a version without a template can't launch.
+  const knowsRelease = !!s && TAG_RE.test(s.version);
   useEffect(() => {
-    if (!s || s.launchedAt) return;
+    if (!s || (s.launchedAt && knowsRelease)) return;
     let live = true;
-    void getJson(LATEST_URL).then((r) => {
-      if (live && r.ok) setS((p) => (p && !p.launchedAt ? { ...p, version: pickVersion(r.body) } : p));
-    });
+    setRelease({ state: 'checking' });
+    void (async () => {
+      const version = await newestRelease();
+      const ok = version ? await templateExists(templateUrl(version)) : false;
+      if (!live) return;
+      if (version && ok) {
+        setRelease({ state: 'ready', version });
+        setS((p) => (p && (!p.launchedAt || !TAG_RE.test(p.version)) ? { ...p, version } : p));
+      } else {
+        setRelease({ state: 'missing', version });
+      }
+    })();
     return () => {
       live = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [s?.launchedAt]);
+  }, [s?.launchedAt, knowsRelease, releaseTry]);
 
   const update = useCallback((patch: Partial<InstallState>) => setS((p) => (p ? { ...p, ...patch } : p)), []);
 
@@ -774,6 +818,7 @@ export function InstallWizard() {
   // ── Screens ──
 
   const launch = () => {
+    if (release.state !== 'ready') return;
     setTouched(true);
     const problems = Object.keys(validate(s));
     if (problems.length) {
@@ -781,7 +826,7 @@ export function InstallWizard() {
       if (problems.some((k) => k !== 'email' && k !== 'region')) setShowMore(true);
       return;
     }
-    const next = { ...s, email: s.email.trim(), hostname: s.domainChoice === 'own' ? cleanHostname(s.hostname) : '', domainDoc: null, domainSkipped: false, launchedAt: Date.now() };
+    const next = { ...s, version: release.version, email: s.email.trim(), hostname: s.domainChoice === 'own' ? cleanHostname(s.hostname) : '', domainDoc: null, domainSkipped: false, launchedAt: Date.now() };
     setS(next);
     setDoc(null);
     setManual(null);
@@ -789,6 +834,7 @@ export function InstallWizard() {
   };
 
   const relaunch = () => {
+    if (!TAG_RE.test(s.version)) return;
     // A failed stack keeps its name and its progress bucket: new ones for the new try.
     const next = { ...s, statusId: randomId(16), setupToken: newState().setupToken, attempt: s.attempt + 1, launchedAt: Date.now(), url: '' };
     setS(next);
@@ -1095,17 +1141,26 @@ export function InstallWizard() {
 
           <Summary s={s} cost={cost} />
 
-          <div>
-            <Primary type="submit" testId="launch" brand="aws">
-              <AwsColorLogo size={30} />
-              Open AWS with everything filled in
-              <svg viewBox="0 0 16 16" width="14" height="14" className="opacity-60 transition group-hover/btn:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6 3.5l4.5 4.5L6 12.5" /></svg>
-            </Primary>
-            <p className="mt-3 text-sm text-fd-muted-foreground">Sign in to AWS if it asks. Then tick the box at the bottom of the page and press <b className="text-fd-foreground">Create stack</b>.</p>
-          </div>
+          {release.state === 'missing' ? (
+            <div data-testid="release-missing">
+              <Notice tone="warn" title={notPublishedText(release.version)} />
+              <div className="mt-3">
+                <Secondary onClick={() => setReleaseTry((n) => n + 1)} testId="release-retry">Try again</Secondary>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <Primary type="submit" testId="launch" brand="aws" disabled={release.state !== 'ready'}>
+                <AwsColorLogo size={30} />
+                {release.state === 'ready' ? 'Open AWS with everything filled in' : 'Checking the newest release…'}
+                <svg viewBox="0 0 16 16" width="14" height="14" className="opacity-60 transition group-hover/btn:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6 3.5l4.5 4.5L6 12.5" /></svg>
+              </Primary>
+              <p className="mt-3 text-sm text-fd-muted-foreground">Sign in to AWS if it asks. Then tick the box at the bottom of the page and press <b className="text-fd-foreground">Create stack</b>.</p>
+            </div>
+          )}
         </form>
         <Details summary="What happens in AWS">
-          <p>A CloudFormation stack starts the installer in CodeBuild, inside your account. It downloads CoderHelm {s.version}, checks its signature and deploys CoderHelm: Lambda functions, DynamoDB tables, an S3 bucket, CloudFront and Cognito sign-in. Nothing to install on your computer.</p>
+          <p>A CloudFormation stack starts the installer in CodeBuild, inside your account. It downloads CoderHelm {release.state === 'ready' ? release.version : 'the newest release'}, checks its signature and deploys CoderHelm: Lambda functions, DynamoDB tables, an S3 bucket, CloudFront and Cognito sign-in. Nothing to install on your computer.</p>
           <p>Everything it creates is named after the name in your AWS account, {s.stage}: the stack is {stackName(s)}, and every resource name starts with coderhelm-{s.stage}, so you can find them in the AWS console.</p>
           <p>The box you tick lets the stack create IAM roles. The installer needs administrator rights in your account to create CoderHelm&apos;s own, narrower roles.</p>
           <p>{s.domainChoice === 'own' ? `Your domain: when its zone is in Route 53 in this account, the install makes the certificate and the records. Anywhere else, CoderHelm starts on its free cloudfront.net address and this page shows the two records to add; it moves to ${cleanHostname(s.hostname) || 'your domain'} once they work.` : s.domainChoice === 'coderhelm' ? `Your CoderHelm address: once your install answers, this page registers it with CoderHelm and claims ${cleanName(s.coderhelmName) || 'your name'}.${NAME_ZONE}. Your install requests the certificate in your account; CoderHelm adds the DNS records. Nothing for you to do.` : 'No domain or DNS work: CoderHelm gets a free cloudfront.net address. You can add your own domain later, in More options or in CoderHelm.'}</p>
@@ -1152,9 +1207,16 @@ export function InstallWizard() {
           <Notice tone="fail" title={doc?.message || 'The install stopped.'} testId="failure">
             {doc?.fix ? <p>{doc.fix}</p> : null}
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-              <Primary onClick={relaunch} testId="relaunch">
-                <AwsLogo size={24} /> Launch again
-              </Primary>
+              {knowsRelease ? (
+                <Primary onClick={relaunch} testId="relaunch">
+                  <AwsLogo size={24} /> Launch again
+                </Primary>
+              ) : release.state === 'missing' ? (
+                <>
+                  <p data-testid="release-missing">{notPublishedText(release.version)}</p>
+                  <Secondary onClick={() => setReleaseTry((n) => n + 1)} testId="release-retry">Try again</Secondary>
+                </>
+              ) : null}
               {doc?.logUrl ? <Secondary href={doc.logUrl} newTab>Open the log</Secondary> : null}
             </div>
             <p className="mt-3">The new try uses the stack name {stackName({ stage: s.stage, attempt: s.attempt + 1 })}. You can delete the failed stack in CloudFormation afterwards.</p>
@@ -1165,7 +1227,7 @@ export function InstallWizard() {
           <Notice tone="warn" title="No sign of the install yet" testId="no-sign">
             <p>Did you press Create stack? If not, open AWS again. If you did, your account may keep the progress file private (S3 Block Public Access). The install still runs: when the stack says CREATE_COMPLETE, copy your install’s address from its Outputs tab and paste it below.</p>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-              <Secondary href={quickCreateUrl(s)} newTab testId="reopen-aws">Open AWS again</Secondary>
+              {knowsRelease ? <Secondary href={quickCreateUrl(s)} newTab testId="reopen-aws">Open AWS again</Secondary> : null}
               <Secondary href={stacksConsoleUrl(s.region)} newTab>See your stacks</Secondary>
               <Secondary onClick={startOver} testId="start-over-no-sign">Start over</Secondary>
             </div>
@@ -1184,7 +1246,7 @@ export function InstallWizard() {
 
         {!failed && !answering && !noSign ? (
           <div className="mt-6 flex flex-wrap gap-3">
-            {!doc && !s.url ? <Secondary href={quickCreateUrl(s)} newTab testId="reopen-aws">Open AWS again</Secondary> : null}
+            {!doc && !s.url && knowsRelease ? <Secondary href={quickCreateUrl(s)} newTab testId="reopen-aws">Open AWS again</Secondary> : null}
             {!s.url ? (
               <Secondary onClick={() => setPasteOpen((v) => !v)} testId="paste-toggle">I have my install’s address</Secondary>
             ) : null}

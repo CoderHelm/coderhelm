@@ -22,6 +22,12 @@ interface Mock {
   domainSetup?: Json | number | null;
   posted?: string;
   requests: string[];
+  /** launch/latest.json: readable (default) or not (403, as the bucket answers for a missing key). */
+  latest?: 'ok' | 'unreadable';
+  /** GitHub's releases/latest tag, or null for "no release" (404). */
+  githubTag?: string | null;
+  /** Release templates in the bucket (default: v0.7.0's). */
+  templates?: string[];
 }
 
 /**
@@ -85,7 +91,21 @@ async function mock(page: Page, m: Mock) {
   });
   page.on('request', (r) => m.requests.push(r.url()));
   await page.route('https://coderhelm-public.s3.amazonaws.com/launch/latest.json', (r) =>
-    r.fulfill({ json: { version: 'v0.7.0', templateUrl: 'https://coderhelm-public.s3.amazonaws.com/launch/v0.7.0/coderhelm-launch.yaml' }, headers: CORS }),
+    m.latest === 'unreadable'
+      ? r.fulfill({ status: 403, body: 'AccessDenied', headers: CORS })
+      : r.fulfill({ json: { version: 'v0.7.0', templateUrl: 'https://coderhelm-public.s3.amazonaws.com/launch/v0.7.0/coderhelm-launch.yaml' }, headers: CORS }),
+  );
+  // The bucket answers 403 for a key that isn't there.
+  await page.route(/^https:\/\/coderhelm-public\.s3\.amazonaws\.com\/launch\/(v[^/]+)\/coderhelm-launch\.yaml$/, (r) => {
+    const v = /\/launch\/(v[^/]+)\//.exec(r.request().url())![1];
+    return (m.templates ?? ['v0.7.0']).includes(v)
+      ? r.fulfill({ status: 200, contentType: 'text/yaml', body: 'AWSTemplateFormatVersion: 2010-09-09\n', headers: CORS })
+      : r.fulfill({ status: 403, body: 'AccessDenied', headers: CORS });
+  });
+  await page.route('https://api.github.com/repos/CoderHelm/coderhelm-platform/releases/latest', (r) =>
+    m.githubTag
+      ? r.fulfill({ json: { tag_name: m.githubTag }, headers: CORS })
+      : r.fulfill({ status: 404, json: { message: 'Not Found' }, headers: CORS }),
   );
   await page.route(/^https:\/\/coderhelm-setup-[a-z0-9]{16}\.s3\.[a-z0-9-]+\.amazonaws\.com\/status\.json/, (r) =>
     m.status ? r.fulfill({ json: m.status, headers: CORS }) : r.fulfill({ status: 403, body: 'AccessDenied', headers: CORS }),
@@ -141,7 +161,7 @@ const newMock = (over: Partial<Mock> = {}): Mock => ({ status: null, setup: null
 function assertPrivate(m: Mock) {
   for (const u of m.requests) {
     const h = new URL(u).hostname;
-    const ok = h === 'localhost' || h.endsWith('.amazonaws.com') || h === 'github.com' || h === new URL(INSTALL).hostname || h === new URL(DOMAIN).hostname;
+    const ok = h === 'localhost' || h.endsWith('.amazonaws.com') || h === 'github.com' || h === 'api.github.com' || h === new URL(INSTALL).hostname || h === new URL(DOMAIN).hostname;
     expect(ok, `unexpected request to ${u}`).toBe(true);
   }
 }
@@ -926,4 +946,54 @@ test('email: through CoderHelm only when picked, and then no From address', asyn
   const q = new URLSearchParams(new URL(link).hash.split('?')[1]);
   expect(q.get('param_EmailTransport')).toBe('coderhelm');
   expect(q.get('param_EmailFrom')).toBeNull();
+});
+
+
+// ── The release to launch: never a hard-coded version, never a missing template ──
+
+test('release: latest.json unreadable falls back to GitHub’s latest release, and launches it', async ({ page }) => {
+  const m = newMock({ latest: 'unreadable', githubTag: 'v0.9.2', templates: ['v0.9.2'] });
+  await mock(page, m);
+  await page.goto('/self-host/install/');
+  await page.getByLabel('Your email').fill('ada@example.com');
+  await expect(page.getByTestId('launch')).toBeEnabled();
+  await expect(page.getByTestId('release-missing')).toHaveCount(0);
+  await page.getByTestId('launch').click();
+  const [link] = await opened(page);
+  const q = new URLSearchParams(new URL(link).hash.split('?')[1]);
+  expect(q.get('templateURL')).toBe('https://coderhelm-public.s3.amazonaws.com/launch/v0.9.2/coderhelm-launch.yaml');
+  expect(q.get('param_Version')).toBe('v0.9.2');
+  expect(m.requests).toContain('https://api.github.com/repos/CoderHelm/coderhelm-platform/releases/latest');
+  expect(m.requests.some((u) => u.includes('/launch/v0.7.0/'))).toBe(false);
+  assertPrivate(m);
+});
+
+test('release: a template that isn’t published shows the message and no launch, then Try again launches once it is', async ({ page }) => {
+  const m = newMock({ templates: [] });
+  await mock(page, m);
+  await page.goto('/self-host/install/');
+  await page.getByLabel('Your email').fill('ada@example.com');
+  const missing = page.getByTestId('release-missing');
+  await expect(missing).toContainText("CoderHelm v0.7.0 isn't published yet. Releases publish automatically after each update; try again in a few minutes.");
+  await expect(page.getByTestId('launch')).toHaveCount(0);
+  expect(await opened(page)).toEqual([]);
+  // Published a few minutes later: Try again checks again and the launch comes back.
+  m.templates = ['v0.7.0'];
+  await page.getByTestId('release-retry').click();
+  await expect(missing).toHaveCount(0);
+  await expect(page.getByTestId('launch')).toBeEnabled();
+  await page.getByTestId('launch').click();
+  const [link] = await opened(page);
+  expect(new URLSearchParams(new URL(link).hash.split('?')[1]).get('templateURL')).toBe('https://coderhelm-public.s3.amazonaws.com/launch/v0.7.0/coderhelm-launch.yaml');
+});
+
+test('release: no release anywhere shows the same message instead of a broken launch link', async ({ page }) => {
+  const m = newMock({ latest: 'unreadable', githubTag: null });
+  await mock(page, m);
+  await page.goto('/self-host/install/');
+  await expect(page.getByTestId('release-missing')).toContainText("CoderHelm isn't published yet. Releases publish automatically after each update; try again in a few minutes.");
+  await expect(page.getByTestId('launch')).toHaveCount(0);
+  await expect(page.getByTestId('release-retry')).toBeVisible();
+  // No template is asked for: there is no version to ask about.
+  expect(m.requests.some((u) => /\/launch\/v[^/]+\/coderhelm-launch\.yaml$/.test(u))).toBe(false);
 });

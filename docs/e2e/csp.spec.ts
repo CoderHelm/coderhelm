@@ -81,6 +81,10 @@ async function startServers(): Promise<Servers> {
     if (host === 'coderhelm-public.s3.amazonaws.com' && url.pathname === '/launch/latest.json') {
       return json(200, { version: 'v0.7.0', templateUrl: 'https://coderhelm-public.s3.amazonaws.com/launch/v0.7.0/coderhelm-launch.yaml' }, anyOrigin);
     }
+    if (host === 'coderhelm-public.s3.amazonaws.com' && url.pathname === '/launch/v0.7.0/coderhelm-launch.yaml') {
+      res.writeHead(200, { 'content-type': 'text/yaml', ...anyOrigin, 'access-control-allow-methods': 'GET, HEAD' });
+      return res.end(req.method === 'HEAD' ? undefined : 'AWSTemplateFormatVersion: 2010-09-09\n');
+    }
     if (/^coderhelm-setup-[a-z0-9]{16}\.s3\.[a-z0-9-]+\.amazonaws\.com$/.test(host) && url.pathname === '/status.json') {
       return json(200, { schema: 1, phase: 'done', url: `https://${INSTALL_HOST}`, step: 10, steps: 10 }, anyOrigin);
     }
@@ -181,6 +185,8 @@ test('real headers: the name check says Available, Taken or Reserved from CoderH
   expect(checks.every((h) => h.origin === SITE)).toBe(true);
   // The start screen reads the latest release from the public bucket too.
   expect(servers.hits.map((h) => `${h.host} ${h.path}`)).toContain('coderhelm-public.s3.amazonaws.com /launch/latest.json');
+  // And checks the release's template is there (a HEAD, under the guide's connect-src) before offering the launch.
+  expect(servers.hits.map((h) => `${h.method} ${h.host} ${h.path}`)).toContain('HEAD coderhelm-public.s3.amazonaws.com /launch/v0.7.0/coderhelm-launch.yaml');
   expect(violations).toEqual([]);
   await ctx.close();
 });
