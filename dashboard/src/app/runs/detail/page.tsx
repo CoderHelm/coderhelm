@@ -761,7 +761,17 @@ function RunDetailInner() {
         }
       >
         <div className="min-w-0 space-y-2" data-testid="tooling-failure">
-          <p>This is not a question for the ticket. A command Coderhelm ran failed for want of a dependency or a tool, and installing and trying again didn&apos;t fix it.</p>
+          {tf.error.includes("blocked by the sandbox network allowlist") ? (
+            <p data-testid="tooling-network-blocked">
+              This is not a problem with the change. A command Coderhelm ran couldn&apos;t reach a host the sandbox&apos;s network allowlist doesn&apos;t list. Add the host to the{" "}
+              <Link href="/settings/agents?tab=advanced" className="underline underline-offset-2">
+                sandbox network list
+              </Link>
+              , then retry.
+            </p>
+          ) : (
+            <p>This is not a question for the ticket. A command Coderhelm ran failed for want of a dependency or a tool, and installing and trying again didn&apos;t fix it.</p>
+          )}
           <CodeBlock code={tf.command} lang="bash" title="Command" wrap testId="tooling-command" />
           <CodeBlock code={tf.error} title="Error" wrap testId="tooling-error" />
           {!!tf.tried?.length && (

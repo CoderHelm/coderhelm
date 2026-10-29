@@ -44,6 +44,17 @@ const RUNS: Record<string, unknown> = {
       ],
     },
   },
+  "01NETB": {
+    ...BASE,
+    run_id: "01NETB",
+    status: "failed",
+    error: "Tooling failure: `cd apps/studio && pnpm run typegen` failed: the generator couldn't reach abc123.api.cms.example (blocked by the sandbox network allowlist): SchemaExtractionError: tunneling socket could not be established, statusCode=403. This is the sandbox's network setting, not the change. To allow it, add abc123.api.cms.example to the Network list in Settings, Agent permissions, Advanced, Sandbox.",
+    stop_kind: "tooling",
+    tooling_failure: {
+      command: "cd apps/studio && pnpm run typegen",
+      error: "the generator couldn't reach abc123.api.cms.example (blocked by the sandbox network allowlist): SchemaExtractionError: tunneling socket could not be established, statusCode=403. This is the sandbox's network setting, not the change. To allow it, add abc123.api.cms.example to the Network list in Settings, Agent permissions, Advanced, Sandbox.",
+    },
+  },
   "01COVR": {
     ...BASE,
     run_id: "01COVR",
@@ -132,6 +143,19 @@ for (const [label, width, height] of [
     await expect(outcome).not.toContainText(/needs your answer|more detail/i);
     await noSidewaysScroll(page);
     await shot(page, `stop-rules-tooling-${width}`);
+  });
+
+  test(`a host the sandbox refused is named as the network, with where to allow it (${label})`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await mockApi(page);
+    await page.goto("/runs/detail?id=01NETB");
+    const outcome = page.getByTestId("run-outcome");
+    await expect(page.getByTestId("tooling-network-blocked")).toContainText("This is not a problem with the change.");
+    await expect(page.getByTestId("tooling-error").locator("pre")).toContainText("couldn't reach abc123.api.cms.example (blocked by the sandbox network allowlist)");
+    await expect(page.getByTestId("tooling-command").locator("pre")).toContainText("pnpm run typegen");
+    await expect(page.getByRole("link", { name: "sandbox network list" })).toHaveAttribute("href", /\/settings\/agents\/?\?tab=advanced/);
+    await expect(outcome).not.toContainText(/for want of a dependency|were not regenerated/i);
+    await noSidewaysScroll(page);
   });
 
   test(`a run covered by an open pull request links it (${label})`, async ({ page }) => {
