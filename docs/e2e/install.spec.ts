@@ -369,7 +369,16 @@ test('before launch: what the stack creates in the AWS account, the risks behind
   const launchBox = await page.getByTestId('launch').boundingBox();
   expect(panelBox && launchBox && panelBox.y + panelBox.height <= launchBox.y).toBeTruthy();
   await expect(panel).toContainText('A CloudFormation stack, coderhelm-prod, that runs the installer once.');
-  await expect(panel.getByTestId('disclosure-admin')).toContainText('An installer in CodeBuild with full administrator rights (the AWS managed AdministratorAccess policy).');
+  // What the v0.7.5+ template ships: a boundary, an installer with no deploy rights at rest, a window, a deploy role.
+  await expect(panel.getByTestId('disclosure-boundary')).toContainText('A permissions boundary, coderhelm-prod-boundary-<id>, on every role CoderHelm creates.');
+  await expect(panel.getByTestId('disclosure-boundary')).toContainText('Roles can only be created with it, and it can\'t be removed.');
+  await expect(panel.getByTestId('disclosure-installer')).toContainText('An installer in CodeBuild with no deploy rights of its own.');
+  await expect(panel.getByTestId('disclosure-window')).toContainText('this template\'s exact buildspec (by SHA-256)');
+  await expect(panel.getByTestId('disclosure-window')).toContainText('ends after 100 minutes');
+  await expect(panel.getByTestId('disclosure-deploy-role')).toContainText('only CloudFormation can use');
+  await expect(panel.getByTestId('disclosure-deploy-role')).toContainText('No CDK bootstrap');
+  // Nothing on the install page claims the old admin installer.
+  expect(await page.locator('body').textContent()).not.toContain('AdministratorAccess');
   await expect(panel).toContainText('coderhelm-setup-<id>');
   await expect(panel).toContainText('No access for CoderHelm the company.');
   // The risks are folded until asked for, then name each one.
@@ -378,8 +387,9 @@ test('before launch: what the stack creates in the AWS account, the risks behind
   await panel.getByText('Risks and how to reduce them').click();
   await expect(risks).toBeVisible();
   for (const t of [
-    'The installer has full admin rights.',
-    'Updates deploy new release code with broad rights.',
+    'CoderHelm can act within its boundary.',
+    'A malicious release could change CoderHelm.',
+    'Some pieces stay after you delete the stack.',
     'The progress file is public while the install runs.',
     'The AWS link holds your one-time setup key.',
   ]) await expect(risks).toContainText(t);
@@ -391,7 +401,8 @@ test('before launch: what the stack creates in the AWS account, the risks behind
   await link.click();
   await expect(page).toHaveURL(/\/self-host\/aws-account\/$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('What CoderHelm does in your AWS account');
-  for (const h of ['What gets created', 'What CoderHelm the company can do', 'Risks and how to reduce them', 'Remove everything']) {
+  expect(await page.locator('body').textContent()).not.toContain('AdministratorAccess');
+  for (const h of ['What gets created', 'What CoderHelm the company can do', 'Risks and how to reduce them', 'Remove everything', 'Installed before v0.7.5']) {
     await expect(page.getByRole('heading', { level: 2, name: h })).toBeVisible();
   }
 });
