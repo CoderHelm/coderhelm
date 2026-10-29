@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { convertGuide, guideOrder, sortByOrder } from './import-platform.mjs';
+import { INSTALL_GUIDE_LINK, convertGuide, guideOrder, selfHostLead, sitePages, sortByOrder } from './import-platform.mjs';
 
 const REF = '0123456789abcdef0123456789abcdef01234567';
 
@@ -38,4 +38,10 @@ test('where a guide comes from is front matter, never a comment in the body (Mar
   const body = out.slice(out.indexOf('\n---\n', 4) + 5);
   assert.ok(!/\{\/\*|<!--/.test(body), `no comment in the body:\n${body}`);
   assert.match(body, /^\nKeep a copy\./);
+});
+
+test("the site's own self-host pages follow the install guide in the sidebar", () => {
+  const site = sitePages();
+  assert.ok(site.includes('aws-account'), 'content/self-host-site/aws-account.mdx is listed');
+  assert.deepEqual(selfHostLead(site), ['index', INSTALL_GUIDE_LINK, ...site]);
 });

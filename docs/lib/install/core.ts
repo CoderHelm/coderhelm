@@ -109,6 +109,13 @@ export function monthlyCost(provider: Provider): { low: number; high: number; mo
   return { low, high, model: provider === 'bedrock' ? 'Claude on Bedrock is per token, on this AWS bill' : 'Claude is per token, on each team\u2019s Anthropic bill' };
 }
 
+/**
+ * The full account disclosure: every resource and role the Launch Stack
+ * creates, what each can do, the risks and how to remove it
+ * (content/self-host-site/aws-account.mdx).
+ */
+export const AWS_ACCOUNT_PAGE = '/self-host/aws-account/';
+
 /** What the stack creates in their account, in plain words. */
 export const CREATES: { what: string; why: string }[] = [
   { what: 'A CloudFormation stack', why: 'Runs the installer once, in CodeBuild' },

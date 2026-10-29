@@ -20,6 +20,7 @@ import {
   type SetupStatus,
   type StatusDoc,
   type StepId,
+  AWS_ACCOUNT_PAGE,
   CREATES,
   DNS_PROVIDERS,
   GITHUB_OUTCOMES,
@@ -615,6 +616,54 @@ function Summary({ s, cost }: { s: InstallState; cost: { low: number; high: numb
   );
 }
 
+/** A name or path in the disclosure, kept whole on wide screens and wrapped on phones. */
+function Mono({ children }: { children: React.ReactNode }) {
+  return <code className="rounded bg-fd-secondary px-1 py-0.5 font-mono text-[12.5px] wrap-anywhere">{children}</code>;
+}
+
+const linkCls = 'font-medium text-fd-foreground underline decoration-fd-border underline-offset-2 hover:decoration-fd-foreground';
+
+/**
+ * What the Launch Stack does in the person's AWS account, before they open
+ * AWS: every resource and role in a few lines, then the risks and what to do
+ * about them. The full page is AWS_ACCOUNT_PAGE.
+ *
+ * ADMIN ROLE: the installer's role is the AWS managed AdministratorAccess
+ * policy today (infra/cfn/coderhelm-selfhost-launch.yaml, InstallerRole, in
+ * coderhelm-platform). When the scoped installer role with a permissions
+ * boundary ships there, update the lines marked ADMIN ROLE here and the parts
+ * of content/self-host-site/aws-account.mdx its front matter names.
+ */
+function AccountDisclosure({ s, hybrid }: { s: InstallState; hybrid: boolean }) {
+  const item = 'flex gap-2.5';
+  return (
+    <section className="rounded-2xl border border-fd-border bg-fd-card/50 p-4 text-sm sm:p-5" aria-labelledby="ch-account-title" data-testid="account-disclosure">
+      <h2 id="ch-account-title" className="text-base font-semibold">What this creates in your AWS account</h2>
+      <ul className="mt-3 space-y-2.5 leading-relaxed text-fd-muted-foreground">
+        <li className={item}><Dot /><span>A CloudFormation stack, <Mono>{stackName(s)}</Mono>, that runs the installer once.</span></li>
+        {/* ADMIN ROLE */}
+        <li className={item} data-testid="disclosure-admin"><Dot /><span><span className="font-medium text-fd-foreground">An installer in CodeBuild with full administrator rights</span> (the AWS managed AdministratorAccess policy). It downloads the CoderHelm release, checks its signatures and checksums, and only then deploys it.</span></li>
+        <li className={item}><Dot /><span>CoderHelm itself: Lambda functions, DynamoDB tables, S3 buckets, CloudFront, Cognito, queues, and a role for each service with only what that service uses. Also CDK&apos;s setup stack, CDKToolkit, if this region has none yet.</span></li>
+        <li className={item}><Dot /><span>A small function that starts the installer. Its role can only start that build and write the progress file.</span></li>
+        <li className={item}><Dot /><span>A progress bucket, <Mono>coderhelm-setup-&lt;id&gt;</Mono>, with one file: the install&apos;s progress and, at the end, its address. No emails, keys or account numbers. It is public if your account allows it, the file expires after 30 days, and the bucket stays when you delete the stack.</span></li>
+        <li className={item}><Dot /><span><span className="font-medium text-fd-foreground">No access for CoderHelm the company.</span> No role for another account, and nothing that trusts an account outside yours.{hybrid ? <> Hybrid adds no AWS access either: <a className={linkCls} href="/self-host/hybrid/#trust-model">what CoderHelm sees</a>.</> : null}</span></li>
+      </ul>
+      <Details summary="Risks and how to reduce them">
+        <div data-testid="disclosure-risks" className="space-y-3">
+          {/* ADMIN ROLE */}
+          <p><b className="text-fd-foreground">The installer has full admin rights.</b> Anyone in your account who can start or change its CodeBuild project can act as an admin. Keep CodeBuild and IAM rights to the people who already run this account. Once CoderHelm is running, you can delete the stack: that removes the installer and its role, and CoderHelm keeps running.</p>
+          <p><b className="text-fd-foreground">Updates deploy new release code with broad rights.</b> They run in their own build and deploy through the CDK roles in your account, which have administrator rights by default. Before anything runs, the release is checked: its tag must be on main and signed by a CoderHelm maintainer or attested by CoderHelm&apos;s release workflow, and its files must carry that workflow&apos;s signature and match their checksums. If CoderHelm&apos;s release pipeline were ever broken into, automatic updates would bring that into your account. They are off unless you turn them on in More options, and you can turn them off any time in Settings, System; then an admin starts each update.</p>
+          <p><b className="text-fd-foreground">The progress file is public while the install runs.</b> It holds only the install&apos;s progress and address. If your account blocks public access to S3, that&apos;s fine: the install still runs, and this page asks you for the address from the stack&apos;s Outputs.</p>
+          <p><b className="text-fd-foreground">The AWS link holds your one-time setup key.</b> Don&apos;t share it or paste it anywhere. Until your GitHub App exists, someone with the key could give your install a GitHub App of their own. The link to this page holds no secret.</p>
+        </div>
+      </Details>
+      <p className="mt-4 text-sm">
+        <a className={linkCls} href={AWS_ACCOUNT_PAGE} data-testid="disclosure-page">Everything it creates, what each part can do, and how to remove it</a>
+      </p>
+    </section>
+  );
+}
+
 // ── The guide ────────────────────────────────────────────────────────────
 
 export function InstallWizard() {
@@ -1141,6 +1190,8 @@ export function InstallWizard() {
 
           <Summary s={s} cost={cost} />
 
+          <AccountDisclosure s={s} hybrid={hybrid} />
+
           {release.state === 'missing' ? (
             <div data-testid="release-missing">
               <Notice tone="warn" title={notPublishedText(release.version)} />
@@ -1164,7 +1215,7 @@ export function InstallWizard() {
           <p>Everything it creates is named after the name in your AWS account, {s.stage}: the stack is {stackName(s)}, and every resource name starts with coderhelm-{s.stage}, so you can find them in the AWS console.</p>
           <p>The box you tick lets the stack create IAM roles. The installer needs administrator rights in your account to create CoderHelm&apos;s own, narrower roles.</p>
           <p>{s.domainChoice === 'own' ? `Your domain: when its zone is in Route 53 in this account, the install makes the certificate and the records. Anywhere else, CoderHelm starts on its free cloudfront.net address and this page shows the two records to add; it moves to ${cleanHostname(s.hostname) || 'your domain'} once they work.` : s.domainChoice === 'coderhelm' ? `Your CoderHelm address: once your install answers, this page registers it with CoderHelm and claims ${cleanName(s.coderhelmName) || 'your name'}.${NAME_ZONE}. Your install requests the certificate in your account; CoderHelm adds the DNS records. Nothing for you to do.` : 'No domain or DNS work: CoderHelm gets a free cloudfront.net address. You can add your own domain later, in More options or in CoderHelm.'}</p>
-          <p>Two random values from this page go along: a progress ID, so this page can follow the install, and a one-time setup key, so GitHub (or CoderHelm, for hybrid) can talk to your CoderHelm directly. Both stay in your account and this browser.</p>
+          <p>Two random values from this page go along in the AWS link: a progress ID, so this page can follow the install, and a one-time setup key, so GitHub (or CoderHelm, for hybrid) can talk to your CoderHelm directly. Both stay in your account and this browser; the setup key stops working once your GitHub App exists.</p>
         </Details>
       </section>
     );

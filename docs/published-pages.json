@@ -86,6 +86,7 @@
     "/plugins/versioning/",
     "/plugins/walkthrough/",
     "/self-host/",
+    "/self-host/aws-account/",
     "/self-host/backups/",
     "/self-host/check-your-install/",
     "/self-host/config-reference/",
