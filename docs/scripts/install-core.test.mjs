@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as c from '../lib/install/core.ts';
 
-const S = c.newState({ statusId: 'abcd1234efgh5678', setupToken: 'T'.repeat(40), email: 'Ada@Example.com', region: 'eu-west-1' });
+const S = c.newState({ statusId: 'abcd1234efgh5678', setupToken: 'T'.repeat(40), email: 'Ada@Example.com', region: 'eu-west-1', version: 'v0.7.0' });
 
 test('new state: random, valid IDs; Bedrock and prod by default', () => {
   const a = c.newState();
@@ -48,11 +48,19 @@ test('a later attempt gets a fresh stack name (a failed stack keeps its name)', 
   assert.equal(c.stackName({ stage: 'prod', attempt: 3 }), 'coderhelm-prod-3');
 });
 
-test('the template comes from S3 by version; latest.json picks it, the fallback covers a bad file', () => {
+test('the template comes from S3 by version; latest.json picks it, GitHub covers a bad file, never a hard-coded one', () => {
   assert.equal(c.pickVersion({ version: 'v0.8.1' }), 'v0.8.1');
-  assert.equal(c.pickVersion({ version: 'latest' }), c.FALLBACK_VERSION);
-  assert.equal(c.pickVersion(null), c.FALLBACK_VERSION);
+  assert.equal(c.pickVersion({ version: 'latest' }), null);
+  assert.equal(c.pickVersion(null), null);
+  assert.equal(c.versionFromGithub({ tag_name: 'v0.9.2' }), 'v0.9.2');
+  assert.equal(c.versionFromGithub({ message: 'Not Found' }), null);
+  assert.equal(c.versionFromGithub(null), null);
+  assert.equal(c.GITHUB_LATEST_URL, 'https://api.github.com/repos/CoderHelm/coderhelm-platform/releases/latest');
+  assert.equal(c.newState().version, '');
+  assert.equal(c.notPublishedText('v0.9.2'), "CoderHelm v0.9.2 isn't published yet. Releases publish automatically after each update; try again in a few minutes.");
+  assert.equal(c.notPublishedText(null), "CoderHelm isn't published yet. Releases publish automatically after each update; try again in a few minutes.");
   assert.throws(() => c.templateUrl('main'));
+  assert.throws(() => c.templateUrl(''));
 });
 
 test('progress file and console links', () => {

@@ -58,6 +58,7 @@ async function docsContext(context: BrowserContext, hits: Hit[], tagRequests: st
     if (u.pathname === '/launch/latest.json') {
       return route.fulfill({ json: { version: 'v0.7.0', templateUrl: 'https://coderhelm-public.s3.amazonaws.com/launch/v0.7.0/coderhelm-launch.yaml' }, headers: { 'access-control-allow-origin': '*' } });
     }
+    if (u.pathname === '/launch/v0.7.0/coderhelm-launch.yaml') return route.fulfill({ status: 200, body: '', headers: { 'access-control-allow-origin': '*' } });
     // No progress file yet: the guide keeps its "Open AWS again" link up.
     return route.fulfill({ status: 403, headers: { 'access-control-allow-origin': '*' } });
   });

@@ -7,11 +7,11 @@
 // (its progress file in their S3 bucket, then its /api/setup/status). The
 // contract is docs/self-host/setup-checks.md in coderhelm-platform.
 
-/** Used when launch/latest.json can't be read: the first release with the Launch Stack. */
-export const FALLBACK_VERSION = 'v0.7.0';
 export const PUBLIC_BUCKET = 'coderhelm-public';
 export const LATEST_URL = `https://${PUBLIC_BUCKET}.s3.amazonaws.com/launch/latest.json`;
 export const REPO = 'CoderHelm/coderhelm-platform';
+/** Used when launch/latest.json can't be read: GitHub's newest release (its tag_name). */
+export const GITHUB_LATEST_URL = `https://api.github.com/repos/${REPO}/releases/latest`;
 
 export type Provider = 'bedrock' | 'anthropic';
 export type StepId = 'start' | 'aws' | 'domain' | 'address' | 'github' | 'models' | 'ready';
@@ -228,7 +228,7 @@ export function newState(over: Partial<InstallState> = {}): InstallState {
     email: '',
     provider: 'bedrock',
     org: '',
-    version: FALLBACK_VERSION,
+    version: '',
     url: '',
     launchedAt: null,
     attempt: 1,
@@ -290,11 +290,21 @@ export function templateUrl(version: string): string {
   return `https://${PUBLIC_BUCKET}.s3.amazonaws.com/launch/${version}/coderhelm-launch.yaml`;
 }
 
-/** The newest release from launch/latest.json, or the fallback. */
-export function pickVersion(latest: unknown): string {
+/** The newest release from launch/latest.json, or null when the file isn't usable. */
+export function pickVersion(latest: unknown): string | null {
   const v = (latest as { version?: unknown } | null)?.version;
-  if (typeof v !== 'string' || !TAG_RE.test(v)) return FALLBACK_VERSION;
-  return v;
+  return typeof v === 'string' && TAG_RE.test(v) ? v : null;
+}
+
+/** The newest release from GitHub's releases/latest answer, or null (no release, or not a tag). */
+export function versionFromGithub(release: unknown): string | null {
+  const v = (release as { tag_name?: unknown } | null)?.tag_name;
+  return typeof v === 'string' && TAG_RE.test(v) ? v : null;
+}
+
+/** What the guide says when it has no template to launch (no release yet, or one still publishing). */
+export function notPublishedText(version: string | null): string {
+  return `CoderHelm${version ? ` ${version}` : ''} isn't published yet. Releases publish automatically after each update; try again in a few minutes.`;
 }
 
 /** The stack's name: coderhelm-<stage>, then -2, -3 for later attempts (a failed stack keeps its name). */
