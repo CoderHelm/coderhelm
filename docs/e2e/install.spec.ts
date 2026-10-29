@@ -256,6 +256,25 @@ test('no progress file (private by account policy): paste the URL and carry on',
   await expect(page.getByTestId('screen-github')).toBeVisible();
 });
 
+test('a stuck install can be started over from where it waits', async ({ page }) => {
+  const m = newMock();
+  await seeded(page, m, { launchedAt: Date.now() });
+  await expect(page.getByTestId('no-sign')).toBeVisible();
+  page.once('dialog', (d) => void d.accept());
+  await page.getByTestId('start-over-no-sign').click();
+  await expect(page.getByTestId('screen-start')).toBeVisible();
+  expect(new URL(page.url()).searchParams.get('id')).not.toBe(ID);
+  const kept = await page.evaluate((id) => [localStorage.getItem(`coderhelm-install:${id}`), localStorage.getItem('coderhelm-install:last')], ID);
+  expect(kept[0]).toBeNull();
+  expect(kept[1]).not.toBe(ID);
+});
+
+test('while waiting for AWS, Start over is next to Open AWS again', async ({ page }) => {
+  const m = newMock();
+  await seeded(page, m, { launchedAt: Date.now() });
+  await expect(page.getByTestId('start-over-waiting')).toBeVisible();
+});
+
 test('deployed but not answering: keeps trying, then moves on', async ({ page }) => {
   const m = newMock({ status: { schema: 1, phase: 'done', url: INSTALL }, setup: 503 });
   await seeded(page, m);
