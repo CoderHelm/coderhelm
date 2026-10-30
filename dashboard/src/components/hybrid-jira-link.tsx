@@ -245,7 +245,7 @@ export function HostedJiraLinkRequest({ className = "" }: { className?: string }
             <span className="text-zinc-100">{req.site_url}</span>, and this team stops handling them here. It comments on the site through
             Coderhelm, which keeps the Jira app&apos;s secret. You can unlink it on this page at any time.
           </p>
-          <p className="mt-2 text-sm text-amber-300">Only continue if you started this from that install yourself. If someone sent you this link, choose Cancel.</p>
+          <p className="mt-2 text-sm text-amber-300">Only continue if you started this from that install yourself, and only enter a code shown on an install you run. If someone sent you this link or the code, choose Cancel.</p>
           <label className="mt-3 block max-w-xs text-sm text-zinc-300">
             <span className="block">Confirmation code the install shows</span>
             <input type="text" value={code} onChange={(e) => setCode(e.target.value)} autoComplete="off" className={`${inputClass} mt-1 w-full`} data-testid="hosted-jira-link-code" />
