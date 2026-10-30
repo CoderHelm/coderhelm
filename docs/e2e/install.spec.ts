@@ -38,7 +38,7 @@ interface Mock {
 const LABELS: Record<string, string> = {
   api: 'CoderHelm answers', github_app: 'GitHub App created', github_installed: 'GitHub App installed on your repositories',
   models: 'Claude access', email: 'Email', admin: 'First admin signed up',
-  domain: 'Your domain', google_sign_in: 'Sign in with Google', updates: 'Automatic updates',
+  domain: 'Your domain', updates: 'Automatic updates',
 };
 /** The optional checks a newer install adds after email (domain, Google sign-in, updates). */
 function withOptional(doc: Json, domain: Json = { status: 'skip', code: 'none' }, more: Record<string, Json> = {}) {
@@ -46,7 +46,6 @@ function withOptional(doc: Json, domain: Json = { status: 'skip', code: 'none' }
   const at = checks.findIndex((c) => c.id === 'admin');
   const add = [
     { id: 'domain', label: LABELS.domain, required: false, ...domain },
-    { id: 'google_sign_in', label: LABELS.google_sign_in, status: 'skip', code: 'off', required: false, ...(more.google_sign_in ?? {}) },
     { id: 'updates', label: LABELS.updates, status: 'skip', code: 'auto_off', required: false, ...(more.updates ?? {}) },
   ];
   checks.splice(at, 0, ...add);
@@ -651,7 +650,7 @@ test('ready: the optional setup list, each with its check and one action', async
   await seeded(page, m, { url: INSTALL, region: 'eu-west-1' });
   await expect(page.getByTestId('screen-ready')).toBeVisible();
   const list = page.getByTestId('optional-setup');
-  await expect(list.locator('[data-optional]')).toHaveCount(11);
+  await expect(list.locator('[data-optional]')).toHaveCount(10);
   await expect(list.locator('[data-optional="optional_emails"]')).toContainText('Weekly summary email (off; turn on in Settings)');
   await expect(page.getByTestId('optional-optional_emails-action')).toHaveAttribute('href', `${INSTALL}/settings/emails/`);
   await expect(list.locator('[data-optional="domain"]')).toHaveAttribute('data-state', 'todo');

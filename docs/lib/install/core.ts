@@ -649,6 +649,16 @@ export const CHECK_TEXT: Record<string, Record<string, { title: string; fix?: st
     ok: { title: 'Email is ready' },
     identity_unverified: { title: 'Confirm the sender address', fix: 'AWS emailed a link to the sender address. Click it to let CoderHelm send email.' },
     sandbox: { title: 'Email only reaches confirmed addresses for now', fix: 'New AWS accounts start in the SES sandbox. Request production access when your team joins.' },
+    not_configured: { title: 'No sender address is set', fix: 'Set email.from in your install\u2019s config and deploy, or choose to send through CoderHelm in Settings, Emails.' },
+    identity_missing: { title: 'The sender isn\u2019t set up in Amazon SES', fix: 'Create the SES identity for your sender\u2019s domain and add the three DKIM records it shows.' },
+    identity_unreadable: { title: 'CoderHelm couldn\u2019t read the sender in SES', fix: 'Send a test email from Settings, Setup. If it keeps happening, deploy again to restore the read permission.' },
+    dkim_pending: { title: 'The sender is waiting for its DKIM records', fix: 'Add the three DKIM records SES shows at your DNS provider; SES checks them within an hour.' },
+    account_unreadable: { title: 'CoderHelm couldn\u2019t read your SES account', fix: 'Open the SES account dashboard to see whether it is still in the sandbox.' },
+    relay_ok: { title: 'Email goes through CoderHelm' },
+    relay_not_registered: { title: 'Email is set to go through CoderHelm, but the install isn\u2019t registered', fix: 'Register in Settings, System, Hybrid, or switch Settings, Emails to Amazon SES.' },
+    relay_unreachable: { title: 'CoderHelm\u2019s mail service didn\u2019t answer', fix: 'This usually passes on its own. Press Check again in a minute.' },
+    relay_unverified: { title: 'CoderHelm sends email once your install is verified', fix: 'Finish verifying in Settings, System, Hybrid.' },
+    relay_paused: { title: 'CoderHelm paused email for this install', fix: 'Too many bounces or complaints. Fix the addresses Deliveries lists, then ask CoderHelm support to resume.' },
     unknown: { title: 'Email could not be checked', fix: 'You can check it later in Settings.' },
   },
   domain: {
@@ -687,17 +697,17 @@ export const CHECK_TEXT: Record<string, Record<string, { title: string; fix?: st
     ok: { title: 'CoderHelm\u2019s GitHub App is linked' },
     no_link: { title: 'Install CoderHelm\u2019s GitHub App', fix: 'Press Install on GitHub, pick the repositories, and sign in to GitHub when it asks.' },
   },
+  hybrid_jira: {
+    ok: { title: 'Your Jira site is linked through CoderHelm' },
+    no_link: { title: 'Link your Jira site through CoderHelm', fix: 'In CoderHelm, open Settings, Integrations, Jira and press Link. Sign in to CoderHelm as an admin of the team that connected the site, and confirm.' },
+    syncing: { title: 'Copying the linked site\u2019s Jira settings', fix: 'CoderHelm linked the site. Your install copies its Jira app settings by itself; this page checks again.' },
+  },
   hybrid_access: {
     broker_revoked: { title: 'CoderHelm turned off this install\u2019s access', fix: 'Contact support, or switch to your own GitHub App and domain.' },
   },
   hybrid_relay: {
     signature_mismatch: { title: 'Your install refused CoderHelm\u2019s signature', fix: 'The relay keys differ: register again in CoderHelm, Settings, System, Hybrid.' },
     signature_stale: { title: 'Forwarded events arrived late', fix: 'Usually a slow retry; check your install\u2019s clock if it keeps happening.' },
-  },
-  google_sign_in: {
-    ok: { title: 'Sign in with Google is on' },
-    off: { title: 'Sign in with Google', fix: 'Optional, and it needs your own domain: create a Google OAuth client and add its keys to your install.' },
-    missing_keys: { title: 'Sign in with Google is missing its keys', fix: 'Add google_client_id and google_client_secret to your install’s secret, then deploy again.' },
   },
   updates: {
     ok: { title: 'Automatic updates are on' },
@@ -993,7 +1003,7 @@ export function optionalSetup(s: Pick<InstallState, 'url' | 'region' | 'provider
   const domain = check('domain');
   if (s.domainChoice !== 'coderhelm' && !(s.domainChoice === 'own' && domain?.status === 'pass')) {
     items.push({
-      id: 'domain', title: 'Use your own domain', why: 'An address that’s easy to share, and Google sign-in needs one.',
+      id: 'domain', title: 'Use your own domain', why: 'An address that’s easy to share.',
       state: domain ? (domain.status === 'pass' ? 'done' : 'todo') : 'unknown',
       action: { label: 'Open Settings, System', href: at('/settings/system/#domain') },
       fix: domain && domain.code !== 'none' ? checkText(domain).fix : undefined,
@@ -1005,7 +1015,7 @@ export function optionalSetup(s: Pick<InstallState, 'url' | 'region' | 'provider
     items.push({
       id: 'email', title: 'Email reaches your whole team', why: 'So invites and run results reach everyone on your team, not only confirmed addresses.',
       state: email ? (email.status === 'pass' ? 'done' : 'todo') : 'unknown',
-      action: email?.code === 'identity_unverified'
+      action: email && ['identity_unverified', 'identity_missing', 'dkim_pending'].includes(email.code)
         ? { label: 'Open SES identities', href: `https://${s.region}.console.aws.amazon.com/ses/home?region=${s.region}#/identities` }
         : { label: 'Request production access', href: sesConsoleUrl(s.region) },
       fix: email && email.status !== 'pass' ? checkText(email).fix : undefined,
@@ -1034,13 +1044,6 @@ export function optionalSetup(s: Pick<InstallState, 'url' | 'region' | 'provider
   items.push({
     id: 'jira', title: 'Start work from Jira tickets', why: 'Assign a ticket to CoderHelm instead of a GitHub issue.',
     state: 'unknown', action: { label: 'Open Settings, Integrations', href: at('/settings/integrations/jira/') }, doc: '/self-host/integrations/',
-  });
-  const google = check('google_sign_in');
-  items.push({
-    id: 'google_sign_in', title: 'Sign in with Google', why: 'Your team signs in with the Google account they already have. Needs your own domain.',
-    state: state('google_sign_in'), fix: google && google.status === 'fail' ? checkText(google).fix : undefined,
-    action: { label: 'Open Google Cloud credentials', href: 'https://console.cloud.google.com/apis/credentials' },
-    doc: '/self-host/integrations/',
   });
   const updates = check('updates');
   items.push({

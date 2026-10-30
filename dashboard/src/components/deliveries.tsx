@@ -33,6 +33,7 @@ import { buttonClass, focusRing, linkButton, primaryButton } from "./ui";
 const SOURCE_NAME: Record<string, string> = {
   github: "GitHub",
   relay: "Relay",
+  relay_jira: "Jira relay",
   broker: "Broker",
   jira: "Jira",
   alerts: "Alerts",
@@ -56,6 +57,7 @@ function SourceIcon({ source }: { source: string }) {
     slack: <ChatIcon />,
     teams: <ChatIcon />,
     relay: <RepeatIcon />,
+    relay_jira: <RepeatIcon />,
     broker: <CloudIcon />,
     hybrid: <CloudIcon />,
     webhook: <SendIcon />,

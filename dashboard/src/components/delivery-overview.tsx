@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { endpointHref } from "@/lib/webhooks";
-import { api, type DeliveryAnalytics, type DeliveryEndpointRow, type DeliveryPeriod, type DeliveryPoint } from "@/lib/api";
+import { api, type DeliveryAnalytics, type DeliveryEmail, type DeliveryEndpointRow, type DeliveryPeriod, type DeliveryPoint, type DeliveryRelayRow } from "@/lib/api";
 import { ChartCard, ChartTip, SERIES, Table, axis } from "./charts";
 import { Callout } from "./callout";
 import { FilterSelect } from "./data-source-activity";
@@ -195,6 +195,88 @@ export function DeliveryOverview({ filters, onFilters }: { filters: OverviewFilt
   );
 }
 
+const PROVIDER_NAME: Record<string, string> = { github: "GitHub", jira: "Jira" };
+const RELAY_SOURCE: Record<string, string> = { github: "relay", jira: "relay_jira" };
+
+/** Events Coderhelm's relay forwarded to this install, GitHub and Jira side by side (hybrid installs). */
+function RelayPanel({ rows, span, whole }: { rows: DeliveryRelayRow[]; span: string; whole: { from: string; until: string } }) {
+  const when = (t: string | null, none: string) =>
+    t ? (
+      <span title={formatDate(t, { time: true })}>{timeAgo(t)}</span>
+    ) : (
+      none
+    );
+  return (
+    <Section title="Relay" id="relay" description={`Events Coderhelm forwarded to this install in ${span}, by where they came from.`}>
+      <div data-testid="overview-relay">
+        <Table
+          label="Relay by provider"
+          head={["From", "Forwarded", "Failed", "Success rate", "Slowest 5%", "Last delivered"]}
+          rows={rows.map((r) => [
+            <span key={r.provider} className="block min-w-0">
+              <Link href={listHref({ ...whole, source: RELAY_SOURCE[r.provider] ?? "relay" })} className={textLink} data-testid="relay-provider">
+                {PROVIDER_NAME[r.provider] ?? r.provider}
+              </Link>
+              {r.last_failed_at && <span className="block text-xs text-zinc-400">Last failed {timeAgo(r.last_failed_at)}</span>}
+            </span>,
+            count(r.deliveries),
+            count(r.failed),
+            rateText(r.success_rate),
+            msText(r.p95_ms),
+            when(r.last_delivered_at, "Never"),
+          ])}
+          empty="Nothing forwarded yet."
+        />
+      </div>
+    </Section>
+  );
+}
+
+/** Email by kind, from Amazon SES's own events (self-hosted installs). */
+function EmailPanel({ email }: { email: DeliveryEmail }) {
+  const sender = email.sender === "relay" ? "through Coderhelm" : "through this install's Amazon SES";
+  const t = email.totals;
+  return (
+    <Section
+      title="Email"
+      id="email"
+      description={`Sent ${sender}, ${email.from === email.to ? `on ${email.to}` : `${email.from} to ${email.to}`} (UTC days). Last delivered: ${email.last_delivery_at ? timeAgo(email.last_delivery_at) : "none yet"}.`}
+    >
+      <div data-testid="overview-email">
+        <StatGrid>
+          <StatTile label="Sent" value={count(t.sends)} />
+          <StatTile label="Delivered" value={count(t.deliveries)} />
+          <StatTile label="Bounced" value={count(t.bounces)} />
+          <StatTile label="Complaints" value={count(t.complaints)} />
+        </StatGrid>
+        <div className="mt-4">
+          <Table
+            label="Email by kind"
+            head={["Kind", "Sent", "Delivered", "Bounced", "Complaints", "Rejected"]}
+            rows={email.kinds.map((k) => [
+              <span key={k.kind}>{k.label}</span>,
+              count(k.sends),
+              count(k.deliveries),
+              count(k.bounces),
+              count(k.complaints),
+              count(k.rejections),
+            ])}
+            empty="No email yet."
+          />
+        </div>
+        {email.cognito_sender === "cognito_default" && (
+          <div className="mt-4">
+            <Callout variant="warning" title="Sign-up and password emails are capped" testId="overview-email-cognito">
+              Amazon Cognito sends sign-up codes and password resets from its own address, about {email.cognito_daily_limit ?? 50} a day. Set
+              email.cognitoUsesSes to true in the install&apos;s config once its SES sender is verified, and deploy.
+            </Callout>
+          </div>
+        )}
+      </div>
+    </Section>
+  );
+}
+
 function Body({ data, filters, filtering, onClear }: { data: DeliveryAnalytics; filters: OverviewFilters; filtering: boolean; onClear: () => void }) {
   const router = useRouter();
   const s = data.summary;
@@ -221,6 +303,8 @@ function Body({ data, filters, filtering, onClear }: { data: DeliveryAnalytics; 
           </Callout>
         </div>
       )}
+      {data.relay && data.relay.length > 0 && <RelayPanel rows={data.relay} span={span} whole={whole} />}
+      {data.email && <EmailPanel email={data.email} />}
     </>
   );
 
