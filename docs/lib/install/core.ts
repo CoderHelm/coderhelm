@@ -472,10 +472,22 @@ export interface DomainDoc {
   records: DnsRecord[];
 }
 
+/**
+ * The part (stack) being deployed, with its resources done so far. Newer
+ * installers write it about every 15 seconds while it changes; older ones
+ * don't, and the guide shows the part count alone.
+ */
+export interface PartDoc {
+  name: string;
+  done: number | null;
+  total: number | null;
+}
+
 export interface StatusDoc {
   schema: number;
   phase: Phase;
   domain?: DomainDoc | null;
+  part?: PartDoc | null;
   message?: string;
   step?: number | null;
   steps?: number | null;
@@ -514,7 +526,37 @@ export function parseStatusDoc(v: unknown): StatusDoc | null {
   const records = okDomain && Array.isArray(dom.records)
     ? dom.records.filter((r) => r && typeof r.name === 'string' && typeof r.value === 'string' && HOST_RE.test(r.name.replace(/^_/, 'x')) && /^[a-z0-9._-]+$/i.test(r.value))
     : [];
-  return { ...d, domain: okDomain ? { hostname: dom.hostname, mode: dom.mode === 'route53' ? 'route53' : 'external', state: String(dom.state ?? ''), records } : null };
+  return { ...d, domain: okDomain ? { hostname: dom.hostname, mode: dom.mode === 'route53' ? 'route53' : 'external', state: String(dom.state ?? ''), records } : null, part: parsePart(d.part) };
+}
+
+function parsePart(v: unknown): PartDoc | null | undefined {
+  if (v === undefined) return undefined;
+  const p = v as PartDoc | null;
+  if (!p || typeof p !== 'object' || typeof p.name !== 'string' || !/^[A-Za-z0-9 .-]{1,40}$/.test(p.name)) return null;
+  const count = (n: unknown) => (typeof n === 'number' && Number.isInteger(n) && n >= 0 ? n : null);
+  const total = count(p.total);
+  const done = count(p.done);
+  return total && done !== null && done <= total ? { name: p.name, done, total } : { name: p.name, done: null, total: null };
+}
+
+/** The part's own progress for people, such as "API: 18 of 41", or null. */
+export function partText(doc: StatusDoc | null): string | null {
+  const p = doc?.phase === 'deploying' ? doc.part : null;
+  if (!p) return null;
+  return p.total ? `${p.name}: ${p.done} of ${p.total}` : p.name;
+}
+
+/**
+ * How far the deploy is, 0 to 1. With a part's resource count, the parts
+ * before it plus its share done; from an installer without one, the parts
+ * started (as before).
+ */
+export function deployFraction(doc: StatusDoc | null): number {
+  const steps = Math.max(1, doc?.steps ?? 10);
+  const step = Math.min(doc?.step ?? 0, steps);
+  if (doc?.part === undefined) return step / steps;
+  const share = doc.part?.total ? (doc.part.done ?? 0) / doc.part.total : 0;
+  return Math.min(1, (Math.max(0, step - 1) + share) / steps);
 }
 
 export function findCheck(s: SetupStatus | null, id: string): Check | undefined {

@@ -246,6 +246,71 @@ test('happy path: launch, follow the install, GitHub, models, ready', async ({ p
   assertPrivate(m);
 });
 
+test('a long part shows its resources done, and the guide reads at once when the tab comes back', async ({ page }) => {
+  const m = newMock({ status: { schema: 1, phase: 'deploying', step: 3, steps: 10, part: { name: 'API', done: 18, total: 41 } } });
+  // Slow polling (kept over mock()'s fast one): only coming back to the tab can show the next count in time.
+  await page.addInitScript(() => {
+    Object.defineProperty(window, '__CH_POLL_MS', { get: () => 600_000, set: () => {}, configurable: true });
+  });
+  await seeded(page, m);
+  await expect(page.getByText('Part 3 of 10')).toBeVisible();
+  await expect(page.getByTestId('part-progress')).toHaveText('· API: 18 of 41');
+  m.status = { schema: 1, phase: 'deploying', step: 3, steps: 10, part: { name: 'API', done: 33, total: 41 } };
+  await page.waitForTimeout(500);
+  await expect(page.getByTestId('part-progress')).toHaveText('· API: 18 of 41');
+  const reads = m.requests.filter((u) => u.includes('/status.json')).length;
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await expect(page.getByTestId('part-progress')).toHaveText('· API: 33 of 41', { timeout: 2000 });
+  expect(m.requests.filter((u) => u.includes('/status.json')).length).toBeGreaterThan(reads);
+  // An older installer (no part): the part count alone.
+  m.status = { schema: 1, phase: 'deploying', step: 4, steps: 10 };
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await expect(page.getByText('Part 4 of 10')).toBeVisible();
+  await expect(page.getByTestId('part-progress')).toHaveCount(0);
+});
+
+test('every control shows the hand cursor; a switched-off one shows not-allowed', async ({ page }) => {
+  const cursor = (l: ReturnType<Page['getByTestId']>) => l.evaluate((el) => getComputedStyle(el).cursor);
+  // Before launch: the Launch Stack (AWS) button, off while the release is checked, then on.
+  const m = newMock();
+  await mock(page, m);
+  await page.goto('/self-host/install/');
+  await expect(page.getByTestId('launch')).toBeEnabled();
+  expect(await cursor(page.getByTestId('launch'))).toBe('pointer');
+  await page.getByTestId('launch').evaluate((el) => el.setAttribute('disabled', ''));
+  expect(await cursor(page.getByTestId('launch'))).toBe('not-allowed');
+  for (const el of await page.locator('summary, a[role="button"]').all()) expect(await el.evaluate((e) => getComputedStyle(e).cursor)).toBe('pointer');
+
+  // While it deploys: "I have my install's address" and Start over.
+  const w = newMock({ status: { schema: 1, phase: 'deploying', step: 3, steps: 10 } });
+  const p2 = await page.context().newPage();
+  await seeded(p2, w);
+  await expect(p2.getByText('Part 3 of 10')).toBeVisible();
+  for (const id of ['paste-toggle', 'start-over-waiting']) expect(await cursor(p2.getByTestId(id)), id).toBe('pointer');
+  await p2.close();
+
+  // No progress file: Start over in the notice.
+  const n = newMock();
+  const p4 = await page.context().newPage();
+  await seeded(p4, n, { launchedAt: Date.now() });
+  await expect(p4.getByTestId('no-sign')).toBeVisible();
+  expect(await cursor(p4.getByTestId('start-over-no-sign'))).toBe('pointer');
+  await p4.close();
+
+  // The domain step: Check again and "Use the AWS address for now".
+  const d = newMock({ status: { schema: 1, phase: 'done', url: INSTALL, domain: EXTERNAL } });
+  d.setup = withOptional(setupDoc(), { status: 'wait', code: 'validating' });
+  const p3 = await page.context().newPage();
+  await seeded(p3, d, { domainChoice: 'own', hostname: 'coderhelm.example.com' });
+  await expect(p3.getByTestId('screen-domain')).toBeVisible();
+  for (const id of ['check-again', 'skip-domain']) expect(await cursor(p3.getByTestId(id)), id).toBe('pointer');
+  for (const el of await p3.locator('button:visible').all()) {
+    const want = (await el.isDisabled()) ? 'not-allowed' : 'pointer';
+    expect(await el.evaluate((e) => getComputedStyle(e).cursor), await el.innerText()).toBe(want);
+  }
+  await p3.close();
+});
+
 test('a failed install shows why, with the fix, and launches again under a new name', async ({ page }) => {
   const m = newMock({ status: { schema: 1, phase: 'failed', step: 4, steps: 10, message: 'Something with the same name is already in this account.', fix: 'Launch again with a different install name.', logUrl: 'https://us-east-1.console.aws.amazon.com/cloudwatch/home' } });
   await seeded(page, m);
@@ -880,6 +945,8 @@ test('hybrid failures each say what to do: unreachable install, unreachable Code
   await page.getByTestId('check-again').click();
   await expect(page.getByTestId('hybrid-error')).toContainText('Your install can’t reach CoderHelm.');
   await expect(page.getByTestId('hybrid-error')).toContainText('api.coderhelm.com');
+  // "Check again" and "Use the AWS address for now" show the hand cursor.
+  for (const id of ['check-again', 'skip-address']) expect(await page.getByTestId(id).evaluate((e) => getComputedStyle(e).cursor), id).toBe('pointer');
   await page.getByTestId('skip-address').click();
   await expect(page.getByTestId('screen-github')).toBeVisible();
 });

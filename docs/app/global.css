@@ -45,6 +45,33 @@ html > body[data-scroll-locked] {
   body {
     overflow-wrap: anywhere;
   }
+
+  /* Tailwind's preflight leaves buttons on the arrow cursor. Everything a
+     person can press shows the hand, and a control that is switched off
+     says so. Per component classes (utilities) still win over these. */
+  button,
+  [role='button'],
+  [type='button'],
+  [type='submit'],
+  [type='reset'],
+  summary,
+  select,
+  label[for],
+  input[type='checkbox'],
+  input[type='radio'] {
+    cursor: pointer;
+  }
+  button:disabled,
+  [role='button'][aria-disabled='true'],
+  [type='button']:disabled,
+  [type='submit']:disabled,
+  [type='reset']:disabled,
+  select:disabled,
+  input[type='checkbox']:disabled,
+  input[type='radio']:disabled,
+  fieldset:disabled button {
+    cursor: not-allowed;
+  }
 }
 
 /* Tables (components/table.tsx). One rounded box, a quiet header, a hairline

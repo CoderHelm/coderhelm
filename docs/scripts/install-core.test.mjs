@@ -160,6 +160,23 @@ test('resume: the address bar holds no secret; stored state round-trips; junk is
   assert.equal(c.parseStored(JSON.stringify({ statusId: 'x' })), null);
 });
 
+test('progress inside a part: its resources done, checked before use, and the bar never goes back', () => {
+  const at = (part, step = 3) => c.parseStatusDoc({ schema: 1, phase: 'deploying', step, steps: 10, ...(part === undefined ? {} : { part }) });
+  assert.equal(c.partText(at({ name: 'API', done: 18, total: 41 })), 'API: 18 of 41');
+  assert.equal(c.partText(at({ name: 'API', done: null, total: null })), 'API');
+  assert.equal(c.partText(at(undefined)), null, 'an older installer: the part count alone');
+  assert.equal(c.partText(at({ name: '<img src=x>', done: 1, total: 2 })), null, 'only a plain label');
+  assert.deepEqual(at({ name: 'API', done: 50, total: 41 }).part, { name: 'API', done: null, total: null }, 'a count past the total is dropped');
+  assert.equal(c.partText(c.parseStatusDoc({ schema: 1, phase: 'finishing', part: { name: 'API', done: 41, total: 41 } })), null);
+  // Older installers: the parts started, as before.
+  assert.equal(c.deployFraction(at(undefined)), 0.3);
+  // Newer: the parts before this one plus its share done, rising with each count.
+  const seq = [at({ name: 'API', done: null, total: null }), at({ name: 'API', done: 18, total: 41 }), at({ name: 'API', done: 41, total: 41 }), at({ name: 'Worker', done: null, total: null }, 4)].map(c.deployFraction);
+  assert.equal(seq[0], 0.2);
+  assert.ok(Math.abs(seq[1] - (2 + 18 / 41) / 10) < 1e-9);
+  for (let i = 1; i < seq.length; i++) assert.ok(seq[i] >= seq[i - 1], `never back: ${seq}`);
+});
+
 test('status documents are checked before use', () => {
   assert.equal(c.parseStatusDoc({ schema: 2, phase: 'done' }), null);
   assert.equal(c.parseStatusDoc({ schema: 1, phase: 'weird' }), null);
