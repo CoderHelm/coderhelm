@@ -81,7 +81,7 @@ async function setup(page: Page, cfg: Record<string, unknown>, opts: { jira?: Pa
       return json(route, hybrid(jira));
     }
     if (p === "/api/system/hybrid/jira/link" && method === "POST") {
-      return json(route, { state: "hyj_test", link_url: `${u.origin}/settings/?hosted-link-page=1` });
+      return json(route, { state: "hyj_test", code: "ABCD2345", link_url: `${u.origin}/settings/?hosted-link-page=1` });
     }
     if (p === "/api/system/hybrid/jira/link" && method === "DELETE") {
       Object.assign(jira, { link: null, synced: false });
@@ -90,7 +90,7 @@ async function setup(page: Page, cfg: Record<string, unknown>, opts: { jira?: Pa
     if (p === "/api/hybrid/jira-link" && method === "GET") return json(route, opts.teamLinked ? { linked: true, install_address: "helm.example.org", linked_at: "2026-10-30T00:00:00Z" } : { linked: false });
     if (p === "/api/hybrid/jira-link" && method === "DELETE") return json(route, { linked: false });
     if (p === "/api/hybrid/jira-link/hyj_test" && method === "GET") {
-      return json(route, opts.linkRequest ?? { install_address: "helm.example.org", install_registered_at: "2026-10-01T00:00:00Z", site_url: "https://example.atlassian.net", expected_site: "example.atlassian.net", forge: true, blocked: null, message: null });
+      return json(route, opts.linkRequest ?? { install_address: "helm.example.org", install_registered_at: "2026-10-01T00:00:00Z", site_url: "https://example.atlassian.net", forge: true, blocked: null, message: null });
     }
     if (p === "/api/hybrid/jira-link/hyj_test" && method === "POST") {
       const outcome = body?.choice === "link" ? "linked" : "declined";
@@ -145,8 +145,9 @@ test("an install turns on Link through Coderhelm, starts the link, sees the link
   const start = calls.find((c) => c.method === "POST" && c.path === "/api/system/hybrid/jira/link");
   expect(String(start?.body?.return_url)).toMatch(/\/settings\/integrations\/jira\/$/);
   expect(start?.body?.site_url).toBe("example.atlassian.net");
-  // The browser goes to Coderhelm's page (here, a page on this origin).
-  await page.waitForURL(/hosted-link-page=1/);
+  // The install shows the code to type on Coderhelm, and opens its page.
+  await expect(page.getByTestId("hybrid-jira-code")).toHaveText("ABCD2345");
+  await expect(page.getByTestId("hybrid-jira-open")).toHaveAttribute("href", /hosted-link-page=1/);
 
   // Back from Coderhelm, linked.
   jira.link = { team_id: "TEAM#1", site_url: "https://example.atlassian.net", linked_by: "USER#1", linked_at: "2026-10-30T00:00:00Z" };
@@ -168,8 +169,12 @@ test("the hosted team admin sees which install and site, and only Link links", a
   await expect(box).toContainText("example.atlassian.net");
   await expect(box).toContainText("If someone sent you this link, choose Cancel.");
   expect(calls.some((c) => c.method === "POST" && c.path.startsWith("/api/hybrid/jira-link/"))).toBe(false);
+  // Link waits for the code the install shows.
+  await expect(page.getByTestId("hosted-jira-link-confirm")).toBeDisabled();
+  await page.getByTestId("hosted-jira-link-code").fill("abcd-2345");
   await page.getByTestId("hosted-jira-link-confirm").click();
   await expect.poll(() => calls.find((c) => c.method === "POST" && c.path === "/api/hybrid/jira-link/hyj_test")?.body?.choice).toBe("link");
+  expect(calls.find((c) => c.method === "POST" && c.path === "/api/hybrid/jira-link/hyj_test")?.body?.code).toBe("abcd-2345");
   await page.waitForURL(/\/settings\/\?hybrid_jira=linked/);
 });
 
@@ -186,7 +191,7 @@ test("the hosted team sees where its site is linked and can unlink it there", as
 
 test("a site that can't be linked says why, and offers no Link button", async ({ page }) => {
   await setup(page, {}, {
-    linkRequest: { install_address: "helm.example.org", install_registered_at: "2026-10-01T00:00:00Z", site_url: "", expected_site: "example.atlassian.net", forge: false, blocked: "jira_not_connected", message: "This team doesn't run CoderHelm's Jira app on a Jira site yet. Set the app up from this page first, then start again from the install." },
+    linkRequest: { install_address: "helm.example.org", install_registered_at: "2026-10-01T00:00:00Z", site_url: "", forge: false, blocked: "jira_not_connected", message: "This team doesn't run CoderHelm's Jira app on a Jira site yet. Set the app up from this page first, then start again from the install." },
   });
   await page.goto("/settings/integrations/jira/?hybrid_link=hyj_test");
   await expect(page.getByTestId("hosted-jira-link-blocked")).toContainText("doesn't run CoderHelm's Jira app");

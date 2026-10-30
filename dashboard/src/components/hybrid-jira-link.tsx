@@ -41,6 +41,7 @@ export function HybridJiraLink({ className = "" }: { className?: string }) {
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<string | null>(null);
   const [site, setSite] = useState("");
+  const [started, setStarted] = useState<{ code: string; url: string } | null>(null);
   const s = hybrid.status;
 
   useEffect(() => {
@@ -75,9 +76,10 @@ export function HybridJiraLink({ className = "" }: { className?: string }) {
     setBusy(true);
     try {
       const r = await api.linkHybridJira(site.trim(), `${window.location.origin}/settings/integrations/jira/`);
-      window.location.assign(r.link_url);
+      setStarted({ code: r.code, url: r.link_url });
     } catch (e) {
       toast(e instanceof Error ? e.message : "Couldn't start linking. Try again.", "error");
+    } finally {
       setBusy(false);
     }
   };
@@ -148,6 +150,17 @@ export function HybridJiraLink({ className = "" }: { className?: string }) {
                 </button>
               </div>
               <p className="text-xs text-zinc-400">Coderhelm links only this site, and only for an admin of the team that runs Coderhelm&apos;s Jira app on it.</p>
+              {started && (
+                <div className="min-w-0 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-3" data-testid="hybrid-jira-started">
+                  <p className="text-sm text-zinc-300">
+                    Confirmation code: <code className="text-base font-semibold tracking-widest text-zinc-100" data-testid="hybrid-jira-code">{started.code}</code>
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-400">Type it on Coderhelm&apos;s page when it asks. It works once, for one hour. Don&apos;t send it to anyone you don&apos;t trust with your Jira events.</p>
+                  <a href={started.url} target="_blank" rel="noopener noreferrer" className={`${primaryButton} mt-3 inline-flex`} data-testid="hybrid-jira-open">
+                    Open Coderhelm to confirm
+                  </a>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -173,6 +186,7 @@ export function HostedJiraLinkRequest({ className = "" }: { className?: string }
   const [req, setReq] = useState<JiraLinkRequest | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [code, setCode] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined" || isSelfHosted()) return;
@@ -198,7 +212,7 @@ export function HostedJiraLinkRequest({ className = "" }: { className?: string }
   const answer = async (choice: "link" | "cancel") => {
     setBusy(true);
     try {
-      const r = await api.answerJiraLinkRequest(state, choice);
+      const r = await api.answerJiraLinkRequest(state, choice, code.trim());
       window.location.assign(r.return_url);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't link. Nothing was changed.");
@@ -232,8 +246,12 @@ export function HostedJiraLinkRequest({ className = "" }: { className?: string }
             Coderhelm, which keeps the Jira app&apos;s secret. You can unlink it on this page at any time.
           </p>
           <p className="mt-2 text-sm text-amber-300">Only continue if you started this from that install yourself. If someone sent you this link, choose Cancel.</p>
+          <label className="mt-3 block max-w-xs text-sm text-zinc-300">
+            <span className="block">Confirmation code the install shows</span>
+            <input type="text" value={code} onChange={(e) => setCode(e.target.value)} autoComplete="off" className={`${inputClass} mt-1 w-full`} data-testid="hosted-jira-link-code" />
+          </label>
           <div className="mt-4 flex flex-wrap gap-2">
-            <button type="button" onClick={() => answer("link")} disabled={busy} className={primaryButton} data-testid="hosted-jira-link-confirm">
+            <button type="button" onClick={() => answer("link")} disabled={busy || code.trim().length < 8} className={primaryButton} data-testid="hosted-jira-link-confirm">
               Link
             </button>
             <button type="button" onClick={() => answer("cancel")} disabled={busy} className={secondaryButton} data-testid="hosted-jira-link-cancel">

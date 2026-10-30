@@ -1300,15 +1300,15 @@ export const api = {
   setHybridSettings: (s: HybridSettingsPatch) => request<HybridStatus>("/api/system/hybrid/settings", { method: "PUT", body: JSON.stringify(s) }),
   /** A hybrid install: the Coderhelm page where a hosted team admin confirms linking their Jira site. */
   linkHybridJira: (site_url: string, return_url?: string) =>
-    request<{ state: string; link_url: string }>("/api/system/hybrid/jira/link", { method: "POST", body: JSON.stringify({ site_url, ...(return_url ? { return_url } : {}) }) }),
+    request<{ state: string; code: string; link_url: string }>("/api/system/hybrid/jira/link", { method: "POST", body: JSON.stringify({ site_url, ...(return_url ? { return_url } : {}) }) }),
   unlinkHybridJira: () => request<HybridStatus>("/api/system/hybrid/jira/link", { method: "DELETE" }),
   /** Coderhelm's hosted dashboard: what linking this team's Jira site to an install would do. */
   getJiraLinkRequest: (state: string) => request<JiraLinkRequest>(`/api/hybrid/jira-link/${encodeURIComponent(state)}`),
   /** Coderhelm's hosted dashboard: where this team's Jira site is linked, and unlinking it. */
   getTeamJiraLink: () => request<{ linked: boolean; install_address?: string | null; linked_at?: string | null }>("/api/hybrid/jira-link"),
   unlinkTeamJira: () => request<{ linked: boolean }>("/api/hybrid/jira-link", { method: "DELETE" }),
-  answerJiraLinkRequest: (state: string, choice: "link" | "cancel") =>
-    request<{ outcome: "linked" | "declined"; return_url: string }>(`/api/hybrid/jira-link/${encodeURIComponent(state)}`, { method: "POST", body: JSON.stringify({ choice }) }),
+  answerJiraLinkRequest: (state: string, choice: "link" | "cancel", code = "") =>
+    request<{ outcome: "linked" | "declined"; return_url: string }>(`/api/hybrid/jira-link/${encodeURIComponent(state)}`, { method: "POST", body: JSON.stringify({ choice, code }) }),
 
   // Remote MCP servers
   listMcpServers: () =>
@@ -4415,8 +4415,6 @@ export interface JiraLinkRequest {
   install_address: string | null;
   install_registered_at: string | null;
   site_url: string;
-  /** The site the install asked for. */
-  expected_site: string;
   forge: boolean;
   /** Why it can't be linked, when it can't. */
   blocked: string | null;
