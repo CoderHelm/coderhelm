@@ -38,7 +38,7 @@ interface Mock {
 const LABELS: Record<string, string> = {
   api: 'CoderHelm answers', github_app: 'GitHub App created', github_installed: 'GitHub App installed on your repositories',
   models: 'Claude access', email: 'Email', admin: 'First admin signed up',
-  domain: 'Your domain', google_sign_in: 'Sign in with Google', updates: 'Automatic updates',
+  domain: 'Your domain', updates: 'Automatic updates',
 };
 /** The optional checks a newer install adds after email (domain, Google sign-in, updates). */
 function withOptional(doc: Json, domain: Json = { status: 'skip', code: 'none' }, more: Record<string, Json> = {}) {
@@ -46,7 +46,6 @@ function withOptional(doc: Json, domain: Json = { status: 'skip', code: 'none' }
   const at = checks.findIndex((c) => c.id === 'admin');
   const add = [
     { id: 'domain', label: LABELS.domain, required: false, ...domain },
-    { id: 'google_sign_in', label: LABELS.google_sign_in, status: 'skip', code: 'off', required: false, ...(more.google_sign_in ?? {}) },
     { id: 'updates', label: LABELS.updates, status: 'skip', code: 'auto_off', required: false, ...(more.updates ?? {}) },
   ];
   checks.splice(at, 0, ...add);

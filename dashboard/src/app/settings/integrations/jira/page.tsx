@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/skeleton";
 import { AtlassianIcon, ChevronRightIcon, ExternalLinkIcon } from "@/components/icons";
 import { Page, PageHeader, Section } from "@/components/page";
 import { HybridAppChoice } from "@/components/hybrid-app-choice";
+import { HostedJiraLinked, HostedJiraLinkRequest, HybridJiraLink } from "@/components/hybrid-jira-link";
 import { isSelfHosted } from "@/lib/runtime-config";
 import { useHybrid } from "@/lib/hybrid";
 import { Code, Field, SaveBar, SettingsRow, SettingsSection, Switch, useDirtyForm } from "@/components/settings";
@@ -139,7 +140,10 @@ function JiraPage() {
           </>
         }
       />
+      <HostedJiraLinkRequest className="mt-6" />
+      <HostedJiraLinked className="mt-6" />
       <HybridAppChoice id="jira" name="Jira" className="mt-6" />
+      <HybridJiraLink className="mt-4" />
 
       {load.state === "loading" && (
         <div className="mt-8 grid gap-4 lg:grid-cols-3" aria-busy="true">

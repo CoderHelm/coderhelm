@@ -1298,6 +1298,17 @@ export const api = {
     request<HybridStatus>(`/api/system/hybrid/github/${installationId}`, { method: "PUT", body: JSON.stringify({ repositories }) }),
   unlinkHybridGithub: (installationId: number) => request<HybridStatus>(`/api/system/hybrid/github/${installationId}`, { method: "DELETE" }),
   setHybridSettings: (s: HybridSettingsPatch) => request<HybridStatus>("/api/system/hybrid/settings", { method: "PUT", body: JSON.stringify(s) }),
+  /** A hybrid install: the Coderhelm page where a hosted team admin confirms linking their Jira site. */
+  linkHybridJira: (site_url: string, return_url?: string) =>
+    request<{ state: string; link_url: string }>("/api/system/hybrid/jira/link", { method: "POST", body: JSON.stringify({ site_url, ...(return_url ? { return_url } : {}) }) }),
+  unlinkHybridJira: () => request<HybridStatus>("/api/system/hybrid/jira/link", { method: "DELETE" }),
+  /** Coderhelm's hosted dashboard: what linking this team's Jira site to an install would do. */
+  getJiraLinkRequest: (state: string) => request<JiraLinkRequest>(`/api/hybrid/jira-link/${encodeURIComponent(state)}`),
+  /** Coderhelm's hosted dashboard: where this team's Jira site is linked, and unlinking it. */
+  getTeamJiraLink: () => request<{ linked: boolean; install_address?: string | null; linked_at?: string | null }>("/api/hybrid/jira-link"),
+  unlinkTeamJira: () => request<{ linked: boolean }>("/api/hybrid/jira-link", { method: "DELETE" }),
+  answerJiraLinkRequest: (state: string, choice: "link" | "cancel") =>
+    request<{ outcome: "linked" | "declined"; return_url: string }>(`/api/hybrid/jira-link/${encodeURIComponent(state)}`, { method: "POST", body: JSON.stringify({ choice }) }),
 
   // Remote MCP servers
   listMcpServers: () =>
@@ -4303,8 +4314,47 @@ export interface DeliveryAnalytics {
   endpoints: DeliveryEndpointRow[];
   seen_sources: string[];
   backfill: { complete: boolean };
+  /** Hybrid installs: events Coderhelm's relay forwarded, one row per provider. */
+  relay?: DeliveryRelayRow[];
+  /** Self-hosted installs: email by kind over the period's days. */
+  email?: DeliveryEmail | null;
   kept_days: number;
   records_kept_days: number;
+}
+
+export interface DeliveryRelayRow {
+  provider: "github" | "jira" | (string & {});
+  deliveries: number;
+  ok: number;
+  failed: number;
+  success_rate: number | null;
+  p95_ms: number | null;
+  last_delivered_at: string | null;
+  last_failed_at: string | null;
+}
+
+export interface DeliveryEmailKind {
+  kind: string;
+  label: string;
+  sends: number;
+  deliveries: number;
+  bounces: number;
+  complaints: number;
+  rejections: number;
+}
+
+export interface DeliveryEmail {
+  sender: "relay" | "ses";
+  from: string;
+  to: string;
+  kinds: DeliveryEmailKind[];
+  totals: DeliveryEmailKind;
+  last_send_at: string | null;
+  last_delivery_at: string | null;
+  last_bounce_at: string | null;
+  last_complaint_at: string | null;
+  cognito_sender: "cognito_default" | "ses" | null;
+  cognito_daily_limit: number | null;
 }
 
 // ── Hybrid (self-hosted) ────────────────────────────────────────────────
@@ -4349,7 +4399,28 @@ export interface HybridStatus {
   github: { mode: "own" | "hosted"; links: HybridGithubLink[]; app_slug: string | null };
   integrations: HybridIntegration[];
   sharing: { enabled: boolean; payloads: boolean };
+  /** Jira through Coderhelm: a hosted team's site linked to this install (absent on an older install). */
+  jira?: { enabled: boolean; link: HybridJiraLink | null; synced: boolean };
   checks: HybridCheck[];
+}
+
+export interface HybridJiraLink {
+  team_id: string;
+  site_url: string;
+  linked_at: string;
+}
+
+/** What linking this team's Jira site to a self-hosted install would do (hosted dashboard). */
+export interface JiraLinkRequest {
+  install_address: string | null;
+  install_registered_at: string | null;
+  site_url: string;
+  /** The site the install asked for. */
+  expected_site: string;
+  forge: boolean;
+  /** Why it can't be linked, when it can't. */
+  blocked: string | null;
+  message: string | null;
 }
 
 export interface HybridNameCheck {
@@ -4365,6 +4436,8 @@ export interface HybridSettingsPatch {
   /** The hosted-app integrations among jira, notion, confluence, google_drive (github follows github_mode). */
   integrations?: string[];
   sharing?: { enabled: boolean; payloads: boolean };
+  /** Settings, Integrations, Jira: link a hosted team's Jira site through Coderhelm. */
+  jira_link?: boolean;
 }
 
 

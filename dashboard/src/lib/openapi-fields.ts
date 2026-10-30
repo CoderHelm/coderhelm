@@ -2,7 +2,7 @@
 // docs/api/openapi.json. Do not edit; run `npm run openapi:fields` instead.
 
 /** The platform commit this was generated from. */
-export const OPENAPI_REF = "d4eb86838dabe04a3d9fa0096bf7a17dcb6e54de";
+export const OPENAPI_REF = "a79d841b3c1616e4461c599461c5820e335bcd66";
 
 /** The fields each public API schema has. */
 export interface OpenApiFields {
@@ -16,8 +16,10 @@ export interface OpenApiFields {
   CreatedEndpoint: "endpoint" | "secret";
   CreatedPlan: "plan_id";
   CustomRoleRef: "id" | "name";
-  DeliveryAnalytics: "backfill" | "endpoints" | "events" | "from" | "granularity" | "kept_days" | "period" | "previous" | "previous_from" | "previous_to" | "reasons" | "records_kept_days" | "seen_sources" | "series" | "sources" | "summary" | "to";
+  DeliveryAnalytics: "backfill" | "email" | "endpoints" | "events" | "from" | "granularity" | "kept_days" | "period" | "previous" | "previous_from" | "previous_to" | "reasons" | "records_kept_days" | "relay" | "seen_sources" | "series" | "sources" | "summary" | "to";
   DeliveryAttempt: "at" | "code" | "duration_ms" | "error";
+  EmailKindRow: "bounces" | "complaints" | "deliveries" | "kind" | "label" | "rejections" | "sends";
+  EmailOverview: "cognito_daily_limit" | "cognito_sender" | "from" | "kinds" | "last_bounce_at" | "last_complaint_at" | "last_delivery_at" | "last_send_at" | "sender" | "to" | "totals";
   EndpointRow: "deleted" | "deliveries" | "description" | "disabled_reason" | "enabled" | "failed" | "failing_since" | "id" | "last_failure_at" | "last_failure_message" | "last_failure_reason" | "last_success_at" | "ok" | "p50_ms" | "p95_ms" | "streak" | "success_rate" | "url";
   ErrorBody: "code" | "error" | "scope";
   EventRow: "event" | "failed" | "source";
@@ -46,6 +48,7 @@ export interface OpenApiFields {
   QuarantinedTest: "file" | "framework" | "id" | "project" | "title";
   RatingComment: "at" | "by" | "rating" | "text";
   ReasonRow: "code" | "count" | "fix" | "message" | "previous_count" | "sources";
+  RelayRow: "deliveries" | "failed" | "last_delivered_at" | "last_failed_at" | "ok" | "p95_ms" | "provider" | "success_rate";
   ReplayBody: "only_failed" | "since" | "until";
   ReplayResult: "capped" | "found" | "queued";
   Repo: "enabled" | "name" | "onboard_error" | "onboard_status" | "role" | "ticket_source";

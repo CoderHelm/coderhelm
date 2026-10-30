@@ -132,14 +132,15 @@ test('every code the install documents has a sentence; unknown codes still rende
     github_app: ['ok', 'missing', 'missing_no_setup_key', 'secret_unreadable'],
     github_installed: ['ok', 'needs_app', 'not_installed', 'app_rejected', 'bad_key', 'github_unreachable'],
     models: ['ok', 'use_case_required', 'subscription_pending', 'marketplace_failed', 'access_denied', 'iam_denied', 'not_available', 'no_models', 'anthropic_keys_per_team'],
-    email: ['ok', 'identity_unverified', 'sandbox', 'unknown'],
+    email: ['ok', 'identity_unverified', 'sandbox', 'not_configured', 'identity_missing', 'identity_unreadable', 'dkim_pending', 'account_unreadable', 'relay_ok', 'relay_not_registered', 'relay_unreachable', 'relay_unverified', 'relay_paused'],
+    hybrid_jira: ['ok', 'no_link', 'syncing'],
     admin: ['ok', 'not_signed_up', 'unconfirmed', 'no_admin_configured'],
   };
   for (const [id, codes] of Object.entries(documented)) {
     for (const code of codes) {
       const t = c.checkText({ id, code, status: 'fail' });
       assert.ok(t.title && !t.title.includes(':'), `${id}.${code}`);
-      if (code !== 'ok') assert.ok(t.fix, `${id}.${code} has a fix`);
+      if (code !== 'ok' && code !== 'relay_ok') assert.ok(t.fix, `${id}.${code} has a fix`);
     }
   }
   assert.match(c.checkText({ id: 'new_check', code: 'x', status: 'warn' }).title, /new check/);
@@ -314,7 +315,6 @@ test('domain progress rows follow the code; failures sit on their row', () => {
 test('every domain, sign-in and updates code the install documents has a sentence and a fix', () => {
   const documented = {
     domain: ['ok', 'none', 'validating', 'zone_not_delegated', 'validation_wrong_value', 'caa_blocked', 'certificate_failed', 'attaching', 'attach_failed', 'dns_missing', 'dns_wrong_value', 'cname_at_apex', 'https_failed', 'api_unreachable', 'removing', 'unknown'],
-    google_sign_in: ['ok', 'off', 'missing_keys'],
     updates: ['ok', 'auto_off', 'unknown'],
   };
   for (const [id, codes] of Object.entries(documented)) {
@@ -359,16 +359,17 @@ test('the progress file\'s domain part is checked before it is shown, and rememb
 
 test('optional setup: each item has one action, its check where the install reports one, and backups are done by the install', () => {
   const st = { url: 'https://coderhelm.example.com', region: 'eu-west-1', provider: 'bedrock', domainChoice: 'aws' };
-  const withChecks = { ...setup(), checks: [...setup().checks, { id: 'domain', status: 'skip', code: 'none' }, { id: 'google_sign_in', status: 'skip', code: 'off' }, { id: 'updates', status: 'pass', code: 'ok' }] };
+  const withChecks = { ...setup(), checks: [...setup().checks, { id: 'domain', status: 'skip', code: 'none' }, { id: 'updates', status: 'pass', code: 'ok' }] };
   const items = c.optionalSetup(st, withChecks);
   const by = Object.fromEntries(items.map((i) => [i.id, i]));
-  assert.deepEqual(items.map((i) => i.id), ['domain', 'email', 'optional_emails', 'invite', 'chat', 'jira', 'google_sign_in', 'updates', 'hybrid_apps', 'deliveries', 'backups']);
+  assert.deepEqual(items.map((i) => i.id), ['domain', 'email', 'optional_emails', 'invite', 'chat', 'jira', 'updates', 'hybrid_apps', 'deliveries', 'backups']);
   assert.equal(by.domain.state, 'todo');
   assert.equal(by.domain.action.href, 'https://coderhelm.example.com/settings/system/#domain');
   assert.equal(by.email.state, 'todo');
   assert.equal(by.email.action.href, 'https://eu-west-1.console.aws.amazon.com/ses/home?region=eu-west-1#/account');
   assert.equal(by.updates.state, 'done');
-  assert.equal(by.google_sign_in.state, 'todo');
+  // A self-hosted install has no Google sign-in: the guide never offers it.
+  assert.equal(by.google_sign_in, undefined);
   assert.equal(by.backups.state, 'auto');
   assert.equal(by.invite.state, 'unknown');
   for (const i of items) {
