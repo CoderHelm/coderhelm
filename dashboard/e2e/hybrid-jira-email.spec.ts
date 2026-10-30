@@ -167,7 +167,7 @@ test("the hosted team admin sees which install and site, and only Link links", a
   const box = page.getByTestId("hosted-jira-link");
   await expect(box).toContainText("helm.example.org");
   await expect(box).toContainText("example.atlassian.net");
-  await expect(box).toContainText("If someone sent you this link, choose Cancel.");
+  await expect(box).toContainText("If someone sent you this link or the code, choose Cancel.");
   expect(calls.some((c) => c.method === "POST" && c.path.startsWith("/api/hybrid/jira-link/"))).toBe(false);
   // Link waits for the code the install shows.
   await expect(page.getByTestId("hosted-jira-link-confirm")).toBeDisabled();

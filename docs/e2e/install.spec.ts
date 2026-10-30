@@ -650,7 +650,7 @@ test('ready: the optional setup list, each with its check and one action', async
   await seeded(page, m, { url: INSTALL, region: 'eu-west-1' });
   await expect(page.getByTestId('screen-ready')).toBeVisible();
   const list = page.getByTestId('optional-setup');
-  await expect(list.locator('[data-optional]')).toHaveCount(11);
+  await expect(list.locator('[data-optional]')).toHaveCount(10);
   await expect(list.locator('[data-optional="optional_emails"]')).toContainText('Weekly summary email (off; turn on in Settings)');
   await expect(page.getByTestId('optional-optional_emails-action')).toHaveAttribute('href', `${INSTALL}/settings/emails/`);
   await expect(list.locator('[data-optional="domain"]')).toHaveAttribute('data-state', 'todo');

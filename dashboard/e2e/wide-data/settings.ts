@@ -298,6 +298,7 @@ export const settingsData: Handler = ({ method, path, url }) => {
   if (p === `/api/mcp-servers/${MCP_SERVER.id}/activity`) {
     return { calls: [{ tool: MCP_SERVER.tools[0].name, actor: `planner, run ${SHA}`, ok: false, ms: 1200, detail: TOKEN, at: iso(10) }] };
   }
+  if (p === "/api/hybrid/jira-link") return { linked: true, install_address: `${SHA}${SHA}.cloudfront.net`, linked_at: iso(60) };
   if (p === "/api/integrations/jira/check") {
     return { ready: true, secret_configured: true, configured_repos: { total: 2, enabled: 2 }, enabled_repos: [REPO, REPO_2], jira_events_seen: true, last_jira_event_at: iso(120), jira_event_count: 41, installation_id: 7, team_id: "t_1", forge_secret: `forge-secret-${SHA}${SHA}` };
   }
