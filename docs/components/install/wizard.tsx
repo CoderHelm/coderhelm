@@ -19,6 +19,8 @@ import {
   type InstallState,
   type SetupStatus,
   type StatusDoc,
+  deployFraction,
+  partText,
   type StepId,
   AWS_ACCOUNT_PAGE,
   CREATES,
@@ -146,7 +148,7 @@ function livePercent(doc: StatusDoc | null, answering: boolean): number {
   switch (doc.phase) {
     case 'starting': return 6;
     case 'preparing': return 14;
-    case 'deploying': return Math.round(20 + 68 * ((doc.step ?? 0) / Math.max(1, doc.steps ?? 10)));
+    case 'deploying': return Math.round(20 + 68 * deployFraction(doc));
     case 'finishing': return 92;
     case 'done': return 97;
     default: return 0;
@@ -394,7 +396,7 @@ function StepsRail({ steps, current, done, onPick, checks }: {
               disabled={!can}
               onClick={() => onPick(st.id)}
               aria-current={isCurrent ? 'step' : undefined}
-              className={`relative flex w-full items-start gap-3 rounded-xl px-0 py-2 text-left transition disabled:cursor-default ${can && !isCurrent ? 'hover:opacity-80' : ''}`}
+              className={`relative flex w-full items-start gap-3 rounded-xl px-0 py-2 text-left transition ${can && !isCurrent ? 'hover:opacity-80' : ''}`}
             >
               <span className={`relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition ${
                 isDone ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
@@ -755,9 +757,15 @@ export function InstallWizard() {
     };
     void read();
     const t = setInterval(read, POLL());
+    // Back on this tab: read now, not at the next tick (browsers slow timers in background tabs).
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void read();
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       live = false;
       clearInterval(t);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [s?.launchedAt, s?.url, s?.statusId, s?.region, update]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -790,7 +798,14 @@ export function InstallWizard() {
     if (!s?.url) return;
     void refresh(!!outcome);
     const t = setInterval(() => void refresh(false), POLL());
-    return () => clearInterval(t);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refresh(false);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s?.url, refresh]);
 
@@ -1246,9 +1261,12 @@ export function InstallWizard() {
             <Row key={r.id} tone={r.status} title={r.label}>
               {r.id === 'deploy' && r.status === 'active' && doc?.steps ? (
                 <span>
-                  <span className="mb-1.5 block">Part {doc.step ?? 0} of {doc.steps}</span>
+                  <span className="mb-1.5 block">
+                    Part {doc.step ?? 0} of {doc.steps}
+                    {partText(doc) ? <span className="text-fd-muted-foreground" data-testid="part-progress"> · {partText(doc)}</span> : null}
+                  </span>
                   <span className="block h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-fd-border">
-                    <span className="block h-full rounded-full bg-fd-primary transition-all" style={{ width: `${Math.max(4, Math.round(((doc.step ?? 0) / doc.steps) * 100))}%` }} />
+                    <span className="block h-full rounded-full bg-fd-primary transition-all" style={{ width: `${Math.max(4, Math.round(deployFraction(doc) * 100))}%` }} />
                   </span>
                 </span>
               ) : r.id === 'answering' && r.status !== 'pending' ? (
