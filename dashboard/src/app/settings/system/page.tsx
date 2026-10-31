@@ -6,6 +6,7 @@ import { api, type AutoUpdateSettings, type SystemPreflight, type SystemVersion,
 import { FixBlock } from "@/components/install-checks";
 import { DomainSection } from "@/components/domain-section";
 import { HybridSection } from "@/components/hybrid-section";
+import { UninstallSection } from "@/components/uninstall-section";
 import { ModelsSection, UpdateNeedsAction } from "@/components/models-section";
 import { CodeBlock } from "@/components/code-block";
 
@@ -380,6 +381,10 @@ function System() {
               {busy === "rollback" ? "Starting…" : "Roll back to the previous version"}
             </button>
           </div>
+        </SettingsSection>
+
+        <SettingsSection id="uninstall" title="Uninstall" description="Remove Coderhelm from your AWS account, from a guided page like the install.">
+          <UninstallSection version={data} />
         </SettingsSection>
       </div>
       <SaveBar count={form.dirtyKeys.length} onSave={save} onDiscard={form.discard} idleText="Nothing to save" />

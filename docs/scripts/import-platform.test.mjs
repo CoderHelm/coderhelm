@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { INSTALL_GUIDE_LINK, convertGuide, guideOrder, selfHostLead, sitePages, sortByOrder } from './import-platform.mjs';
+import { INSTALL_GUIDE_LINK, UNINSTALL_GUIDE_LINK, importedName, convertGuide, guideOrder, selfHostLead, sitePages, sortByOrder } from './import-platform.mjs';
 
 const REF = '0123456789abcdef0123456789abcdef01234567';
 
@@ -43,5 +43,8 @@ test('where a guide comes from is front matter, never a comment in the body (Mar
 test("the site's own self-host pages follow the install guide in the sidebar", () => {
   const site = sitePages();
   assert.ok(site.includes('aws-account'), 'content/self-host-site/aws-account.mdx is listed');
-  assert.deepEqual(selfHostLead(site), ['index', INSTALL_GUIDE_LINK, ...site]);
+  assert.deepEqual(selfHostLead(site), ['index', INSTALL_GUIDE_LINK, UNINSTALL_GUIDE_LINK, ...site]);
+  // The platform's uninstall guide sits next to the guided page, which keeps /self-host/uninstall/.
+  assert.equal(importedName('uninstall'), 'uninstall-details');
+  assert.equal(importedName('faq'), 'faq');
 });

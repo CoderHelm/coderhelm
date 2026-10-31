@@ -15,11 +15,13 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.resolve(HERE, '..', 'out');
 const CSP = JSON.parse(fs.readFileSync(path.resolve(HERE, '..', '..', 'infra', 'lib', 'docs-csp.json'), 'utf8'));
 // CloudFront path patterns: `*` matches anything, everything else literally.
-const INSTALL_GUIDE = new RegExp(`^${CSP.installGuidePath.split('*').map((p) => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*')}$`);
+const pattern = (glob) => new RegExp(`^${glob.split('*').map((p) => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*')}$`);
+const INSTALL_GUIDE = pattern(CSP.installGuidePath);
+const UNINSTALL_GUIDE = pattern(CSP.uninstallGuidePath);
 
 /** The policy CloudFront sends for a path, chosen on the path as requested. */
 export function cspFor(url) {
-  return INSTALL_GUIDE.test(url) ? CSP.installGuide : CSP.docs;
+  return INSTALL_GUIDE.test(url) ? CSP.installGuide : UNINSTALL_GUIDE.test(url) ? CSP.uninstallGuide : CSP.docs;
 }
 const PORT = Number(process.env.PORT ?? process.argv[2] ?? 3460);
 const TYPES = {

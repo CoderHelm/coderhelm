@@ -8,6 +8,7 @@ import { SITE, docsRoute, markdownPath } from './shared';
 import { openapi } from './openapi';
 import { operationMarkdown } from './api-markdown';
 import { INSTALL_GUIDE } from './install/page-info';
+import { UNINSTALL_GUIDE } from './uninstall/page-info';
 import { diagramsAsText } from './diagrams/text.mjs';
 
 /**
@@ -142,6 +143,11 @@ export function llmsIndex(): string {
     if (url.replace(/\/$/, '') === INSTALL_GUIDE.url) {
       // The sidebar's link to the browser install guide (an app page, not MDX).
       lines.push(`- [${INSTALL_GUIDE.title}](${SITE.url}${INSTALL_GUIDE.url}.md): ${INSTALL_GUIDE.description}`);
+      return;
+    }
+    if (url.replace(/\/$/, '') === UNINSTALL_GUIDE.url) {
+      // And to the browser uninstall guide (also an app page).
+      lines.push(`- [${UNINSTALL_GUIDE.title}](${SITE.url}${UNINSTALL_GUIDE.url}.md): ${UNINSTALL_GUIDE.description}`);
       return;
     }
     const page = source.getPages().find((p) => p.url === url);

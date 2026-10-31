@@ -86,7 +86,7 @@ import { track } from '@/components/analytics';
 import { GUIDE_TRUST, installStepEvent } from '@/lib/analytics';
 
 // Timings (the end-to-end tests shorten them through window.__CH_*).
-function timing(name: string, fallback: number): number {
+export function timing(name: string, fallback: number): number {
   if (typeof window === 'undefined') return fallback;
   const v = (window as unknown as Record<string, unknown>)[name];
   return typeof v === 'number' ? v : fallback;
@@ -177,7 +177,7 @@ function LiveProgress({ doc, answering, launchedAt, failed }: { doc: StatusDoc |
   );
 }
 
-async function getJson(url: string): Promise<{ ok: boolean; status: number; body: unknown }> {
+export async function getJson(url: string): Promise<{ ok: boolean; status: number; body: unknown }> {
   try {
     const r = await fetch(url, { cache: 'no-store', credentials: 'omit' });
     let body: unknown = null;
@@ -197,7 +197,7 @@ async function getJson(url: string): Promise<{ ok: boolean; status: number; body
  * 403 for a key that isn't there, which CloudFormation would show as a bare
  * "S3 Access Denied", so the guide asks first.
  */
-async function templateExists(url: string): Promise<boolean> {
+export async function templateExists(url: string): Promise<boolean> {
   try {
     const r = await fetch(url, { method: 'HEAD', cache: 'no-store', credentials: 'omit' });
     return r.ok;
@@ -207,7 +207,7 @@ async function templateExists(url: string): Promise<boolean> {
 }
 
 /** The newest release: launch/latest.json, else GitHub's latest release; null when neither names one. */
-async function newestRelease(): Promise<string | null> {
+export async function newestRelease(): Promise<string | null> {
   const latest = await getJson(LATEST_URL);
   const fromFile = latest.ok ? pickVersion(latest.body) : null;
   if (fromFile) return fromFile;
@@ -225,9 +225,9 @@ async function readInstall(url: string, region: string, fresh = false): Promise<
 
 // ── Small pieces ─────────────────────────────────────────────────────────
 
-type Tone = 'pass' | 'fail' | 'warn' | 'active' | 'pending' | 'wait' | 'skip';
+export type Tone = 'pass' | 'fail' | 'warn' | 'active' | 'pending' | 'wait' | 'skip';
 
-function StatusIcon({ tone }: { tone: Tone }) {
+export function StatusIcon({ tone }: { tone: Tone }) {
   const base = 'mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full';
   if (tone === 'pass')
     return (
@@ -256,7 +256,7 @@ function StatusIcon({ tone }: { tone: Tone }) {
   return <span className={`${base} border-2 border-fd-border`} aria-label="Not started" />;
 }
 
-function Row({ tone, title, children }: { tone: Tone; title: React.ReactNode; children?: React.ReactNode }) {
+export function Row({ tone, title, children }: { tone: Tone; title: React.ReactNode; children?: React.ReactNode }) {
   const muted = tone === 'pending' || tone === 'skip';
   return (
     <li className="flex gap-3 py-2.5" data-row-status={tone}>
@@ -272,7 +272,7 @@ function Row({ tone, title, children }: { tone: Tone; title: React.ReactNode; ch
 type Brand = 'aws' | 'github' | 'anthropic' | 'plain';
 
 /** The primary button: one per screen. A provider's own look when it opens that provider. */
-function Primary({ children, href, onClick, disabled, type = 'button', newTab, testId, brand = 'plain' }: {
+export function Primary({ children, href, onClick, disabled, type = 'button', newTab, testId, brand = 'plain' }: {
   children: React.ReactNode; href?: string; onClick?: () => void; disabled?: boolean; type?: 'button' | 'submit'; newTab?: boolean; testId?: string; brand?: Brand;
 }) {
   const look = {
@@ -295,7 +295,7 @@ function Primary({ children, href, onClick, disabled, type = 'button', newTab, t
   );
 }
 
-function Secondary({ children, href, onClick, newTab, testId }: { children: React.ReactNode; href?: string; onClick?: () => void; newTab?: boolean; testId?: string }) {
+export function Secondary({ children, href, onClick, newTab, testId }: { children: React.ReactNode; href?: string; onClick?: () => void; newTab?: boolean; testId?: string }) {
   const cls = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-fd-border bg-fd-background px-4 py-2 text-sm font-medium transition hover:bg-fd-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fd-ring';
   if (href)
     return (
@@ -310,7 +310,7 @@ function Secondary({ children, href, onClick, newTab, testId }: { children: Reac
   );
 }
 
-function Details({ summary, children }: { summary: string; children: React.ReactNode }) {
+export function Details({ summary, children }: { summary: string; children: React.ReactNode }) {
   return (
     <details className="group mt-6 rounded-xl border border-fd-border bg-fd-card/40 px-4 py-3 text-sm">
       <summary className="flex cursor-pointer list-none items-center gap-2 font-medium text-fd-muted-foreground marker:hidden hover:text-fd-foreground">
@@ -322,7 +322,7 @@ function Details({ summary, children }: { summary: string; children: React.React
   );
 }
 
-function CopyBox({ text, testId }: { text: string; testId?: string }) {
+export function CopyBox({ text, testId }: { text: string; testId?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="mt-3 flex items-stretch overflow-hidden rounded-lg border border-fd-border bg-fd-secondary">
@@ -351,7 +351,7 @@ function TodoIcon() {
   );
 }
 
-function Notice({ tone, title, children, testId }: { tone: 'fail' | 'warn' | 'pass' | 'info' | 'todo'; title: string; children?: React.ReactNode; testId?: string }) {
+export function Notice({ tone, title, children, testId }: { tone: 'fail' | 'warn' | 'pass' | 'info' | 'todo'; title: string; children?: React.ReactNode; testId?: string }) {
   const ring = {
     fail: 'border-red-500/30 bg-red-500/5',
     warn: 'border-amber-500/30 bg-amber-500/5',
@@ -457,11 +457,11 @@ function TrustCard({ hybrid }: { hybrid: boolean }) {
   );
 }
 
-function Dot() {
+export function Dot() {
   return <span aria-hidden className="mt-2 size-1 shrink-0 rounded-full bg-fd-muted-foreground/60" />;
 }
 
-function Field({ label, help, error, children, htmlFor }: { label: string; help?: string; error?: string; children: React.ReactNode; htmlFor: string }) {
+export function Field({ label, help, error, children, htmlFor }: { label: string; help?: string; error?: string; children: React.ReactNode; htmlFor: string }) {
   return (
     <div>
       <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium">{label}</label>
@@ -471,9 +471,9 @@ function Field({ label, help, error, children, htmlFor }: { label: string; help?
   );
 }
 
-const inputCls = 'block min-h-12 w-full rounded-xl border border-fd-border bg-fd-background px-3.5 text-base outline-none transition focus:border-fd-primary focus:ring-2 focus:ring-fd-ring/40';
+export const inputCls = 'block min-h-12 w-full rounded-xl border border-fd-border bg-fd-background px-3.5 text-base outline-none transition focus:border-fd-primary focus:ring-2 focus:ring-fd-ring/40';
 
-function Heading({ title, lead }: { title: string; lead?: React.ReactNode }) {
+export function Heading({ title, lead }: { title: string; lead?: React.ReactNode }) {
   return (
     <header className="mb-6">
       <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl" data-testid="step-title">{title}</h1>
@@ -619,11 +619,11 @@ function Summary({ s, cost }: { s: InstallState; cost: { low: number; high: numb
 }
 
 /** A name or path in the disclosure, kept whole on wide screens and wrapped on phones. */
-function Mono({ children }: { children: React.ReactNode }) {
+export function Mono({ children }: { children: React.ReactNode }) {
   return <code className="rounded bg-fd-secondary px-1 py-0.5 font-mono text-[12.5px] wrap-anywhere">{children}</code>;
 }
 
-const linkCls = 'font-medium text-fd-foreground underline decoration-fd-border underline-offset-2 hover:decoration-fd-foreground';
+export const linkCls = 'font-medium text-fd-foreground underline decoration-fd-border underline-offset-2 hover:decoration-fd-foreground';
 
 /**
  * What the Launch Stack does in the person's AWS account, before they open
@@ -1837,9 +1837,12 @@ export function InstallWizard() {
                   : GUIDE_TRUST.private}
               </span>
             </p>
-            {s.launchedAt || s.url ? (
-              <button type="button" onClick={startOver} className="shrink-0 font-medium hover:text-fd-foreground" data-testid="start-over">Start over</button>
-            ) : null}
+            <span className="flex shrink-0 gap-4">
+              {s.launchedAt || s.url ? (
+                <button type="button" onClick={startOver} className="font-medium hover:text-fd-foreground" data-testid="start-over">Start over</button>
+              ) : null}
+              <a href={`/self-host/uninstall/${s.stage ? `?stage=${encodeURIComponent(s.stage)}&region=${encodeURIComponent(s.region)}` : ''}`} className="font-medium hover:text-fd-foreground" data-testid="uninstall-link">Uninstall</a>
+            </span>
           </footer>
         </div>
       </div>
