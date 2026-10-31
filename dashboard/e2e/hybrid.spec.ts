@@ -505,6 +505,6 @@ test("uninstall, hybrid: a plain warning that the forwarded GitHub installations
   await page.goto("/settings/system/");
   await expect(page.getByTestId("uninstall-hybrid")).toContainText("2 GitHub installations");
   await expect(page.getByTestId("uninstall-hybrid")).toContainText("back to Coderhelm hosted");
-  await expect(page.getByTestId("uninstall-link")).toHaveAttribute("href", "https://docs.coderhelm.com/self-host/uninstall/?stage=acme&region=eu-west-1&hybrid=1&github=2");
+  await expect(page.getByTestId("uninstall-link")).toHaveAttribute("href", "https://docs.coderhelm.com/self-host/uninstall/?stage=acme&region=eu-west-1");
   if (process.env.E2E_SHOTS_DIR) await page.getByTestId("uninstall-section").screenshot({ path: path.join(SHOTS_DIR, "system-uninstall.png") });
 });

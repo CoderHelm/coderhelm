@@ -208,7 +208,8 @@ export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function joinsByDomain(s: Partial<Pick<InstallState, 'joinDomain' | 'signupDomain'>>): boolean {
   return s.joinDomain ?? !!s.signupDomain?.trim();
 }
-export const STAGE_RE = /^[a-z][a-z0-9-]{0,19}$/;
+/** An install's name: no hyphen, so coderhelm-<name>-* never also names another install (the stack's Stage rule). */
+export const STAGE_RE = /^[a-z][a-z0-9]{0,19}$/;
 export const STATUS_ID_RE = /^[a-z0-9]{16}$/;
 export const TAG_RE = /^v\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/;
 /** A hostname people type: lowercase labels, a dot, a real top-level domain. */
@@ -269,7 +270,7 @@ export function cleanHostname(raw: string): string {
 export function validate(s: Pick<InstallState, 'email' | 'stage' | 'region'> & Partial<InstallState>): Record<string, string> {
   const p: Record<string, string> = {};
   if (!EMAIL_RE.test(s.email.trim())) p.email = 'Enter the email you will sign in with.';
-  if (!STAGE_RE.test(s.stage)) p.stage = 'Use 1 to 20 lowercase letters, digits or hyphens, starting with a letter.';
+  if (!STAGE_RE.test(s.stage)) p.stage = 'Use 1 to 20 lowercase letters or digits, starting with a letter (no hyphens).';
   if (!REGIONS.some((r) => r.id === s.region)) p.region = 'Pick a region from the list.';
   if (s.domainChoice === 'coderhelm') {
     const np = nameProblem(s.coderhelmName ?? '');
@@ -291,10 +292,17 @@ export function validate(s: Pick<InstallState, 'email' | 'stage' | 'region'> & P
   return p;
 }
 
+/** "Sun 03:00" / "daily 02:00" as the stack's UpdateDay and UpdateHour parameters. */
+export function windowParams(window: string | undefined): { day: string; hour: string } {
+  const m = String(window ?? DEFAULT_WINDOW).trim().toLowerCase().match(/^(mon|tue|wed|thu|fri|sat|sun|daily)[a-z]*\s+(\d{1,2}):00$/);
+  if (!m) return { day: 'sun', hour: '3' };
+  return { day: m[1], hour: String(Number(m[2])) };
+}
+
 /** The release's template in S3 (CloudFormation only opens templates stored in S3). */
 export function templateUrl(version: string): string {
   if (!TAG_RE.test(version)) throw new Error(`not a release tag: ${version}`);
-  return `https://${PUBLIC_BUCKET}.s3.amazonaws.com/launch/${version}/coderhelm-launch.yaml`;
+  return `https://${PUBLIC_BUCKET}.s3.amazonaws.com/launch/${version}/coderhelm.json`;
 }
 
 /** The newest release from launch/latest.json, or null when the file isn't usable. */
@@ -314,9 +322,13 @@ export function notPublishedText(version: string | null): string {
   return `CoderHelm${version ? ` ${version}` : ''} isn't published yet. Releases publish automatically after each update; try again in a few minutes.`;
 }
 
-/** The stack's name: coderhelm-<stage>, then -2, -3 for later attempts (a failed stack keeps its name). */
+/**
+ * The stack's name: always coderhelm-<stage>. A failed first launch rolls
+ * back and deletes everything it made, so after deleting the failed stack
+ * the next attempt takes the same name.
+ */
 export function stackName(s: Pick<InstallState, 'stage' | 'attempt'>): string {
-  return s.attempt > 1 ? `coderhelm-${s.stage}-${s.attempt}` : `coderhelm-${s.stage}`;
+  return `coderhelm-${s.stage}`;
 }
 
 /**
@@ -331,7 +343,6 @@ export function quickCreateUrl(s: InstallState): string {
     ['param_AdminEmail', s.email.trim().toLowerCase()],
     ['param_Stage', s.stage],
     ['param_ModelProvider', s.provider],
-    ['param_Version', s.version],
     ['param_StatusId', s.statusId],
     ['param_SetupToken', s.setupToken],
   ];
@@ -343,7 +354,9 @@ export function quickCreateUrl(s: InstallState): string {
   if (s.requireTwoFactor) params.push(['param_RequireTwoFactor', 'on']);
   if (s.autoUpdate) {
     params.push(['param_AutoUpdate', 'on']);
-    if (s.updateWindow && s.updateWindow !== DEFAULT_WINDOW) params.push(['param_UpdateWindow', s.updateWindow]);
+    const w = windowParams(s.updateWindow);
+    if (w.day !== 'sun') params.push(['param_UpdateDay', w.day]);
+    if (w.hour !== '3') params.push(['param_UpdateHour', w.hour]);
     if (s.updateTimezone && s.updateTimezone !== 'UTC') params.push(['param_UpdateTimezone', s.updateTimezone]);
   }
   const q = params.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');

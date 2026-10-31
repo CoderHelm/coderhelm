@@ -96,7 +96,7 @@ function domainAnswer(code: string) {
   };
 }
 
-async function setup(page: Page, cfg: RuntimeConfig | null, opts: { signedIn?: boolean; provider?: "anthropic" | "bedrock"; blocked?: boolean; domain?: string } = {}) {
+async function setup(page: Page, cfg: RuntimeConfig | null, opts: { native?: unknown; signedIn?: boolean; provider?: "anthropic" | "bedrock"; blocked?: boolean; domain?: string } = {}) {
   const calls: string[] = [];
   const domainState = { code: opts.domain ?? "none" };
   const checksState = { fixed: false, runs: 0 };
@@ -135,6 +135,7 @@ async function setup(page: Page, cfg: RuntimeConfig | null, opts: { signedIn?: b
         latest: { version: "v2.0.0", notes: "## Changes\n\n- A new thing.", published_at: "2026-10-20T00:00:00Z", url: "https://example.org/r", breaking: true },
         update_available: true,
         running: false,
+        ...(opts.native ? { native: opts.native } : {}),
         settings: { auto: false, channel: "stable", day: "sun", hour: 3, timezone: "UTC", majors: "ask" },
         history: [
           { id: "UPDATE#1", version: "v1.2.0", from_version: "v1.1.0", actor: "auto", mode: "update", status: "succeeded", started_at: "2026-10-05T03:00:00Z", reason: "now on v1.2.0" },
@@ -457,4 +458,24 @@ test("System: the domain section at 1440 and 390, no sideways scroll", async ({ 
     expect(width).toBeLessThanOrEqual(w);
     if (shots) await sec.screenshot({ path: `${shots}/dashboard-${w}-domain.png` });
   }
+});
+
+test("System: a one-stack install shows the prepared change set and links to it in AWS", async ({ page }) => {
+  const link = "https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/changesets/changes?stackId=x&changeSetId=y";
+  await setup(page, SELF, {
+    signedIn: true,
+    native: {
+      stack: "coderhelm-prod",
+      auto_apply: false,
+      pending: { version: "v2.0.0", status: "review", counts: { add: 2, modify: 5, remove: 1 }, replacements: [], parts: ["Api", "Worker"], role: false, link, data_changes: [] },
+    },
+  });
+  await page.goto("/settings/system/");
+  const card = page.getByTestId("native-update");
+  await expect(card).toContainText("v2.0.0 is ready for you to review");
+  await expect(page.getByTestId("native-update-summary")).toContainText("8 changes (2 to add, 5 to change, 1 to remove) in Api, Worker");
+  await expect(page.getByTestId("native-update-summary")).toContainText("Nothing is replaced.");
+  await expect(card).toContainText("choose Execute");
+  await expect(page.getByTestId("native-update-link")).toHaveAttribute("href", link);
+  await expect(page.getByRole("button", { name: "Prepare the update to v2.0.0" })).toBeVisible();
 });

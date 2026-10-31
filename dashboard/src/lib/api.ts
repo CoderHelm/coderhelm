@@ -4124,8 +4124,33 @@ export interface SystemVersion {
   history?: UpdateEntry[];
   /** The latest release's model check, once it has run. */
   model_check?: ModelCheck | null;
-  /** Which install this is (its resources are coderhelm-<stage>-*), for the guided uninstall. */
+  /** Which install this is (its resources are coderhelm-<stage>-*), for the uninstall page. */
   install?: { stage: string; region: string } | null;
+  /** A native install (one CloudFormation stack): the stack and the update waiting for review. */
+  native?: NativeUpdate | null;
+}
+
+/** The change set the updater prepared for a release (lambda/updater, change_set_summary). */
+export interface NativeChangeSet {
+  version?: string | null;
+  /** preparing | review | running | succeeded | failed */
+  status?: string | null;
+  name?: string;
+  execution?: string;
+  reason?: string;
+  counts: { add: number; modify: number; remove: number };
+  replacements: string[];
+  parts: string[];
+  /** Whether it runs through the auto-update role. */
+  role: boolean;
+  link: string;
+}
+
+export interface NativeUpdate {
+  stack: string;
+  /** Auto-update on: the updater applies change sets through the stack's deploy role. */
+  auto_apply: boolean;
+  pending: NativeChangeSet | null;
 }
 
 // ── Deliveries ──────────────────────────────────────────────────────────
