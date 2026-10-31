@@ -325,7 +325,7 @@ export function UninstallGuide() {
       <div>
         <Heading
           title={everything ? `Delete CoderHelm ${s.stage} and all its data` : `Remove CoderHelm ${s.stage}`}
-          lead={<>AWS opens with everything filled in. You type the name once more there, tick the IAM box and press <strong>Create stack</strong>. The uninstaller deletes only what is named or tagged for <Mono>coderhelm-{s.stage}</Mono> in {s.region}.</>}
+          lead={<>AWS opens with everything filled in, the name you type here included: the stack checks it again and refuses to start if it differs. Tick the IAM box and press <strong>Create stack</strong>. The uninstaller deletes only what is named or tagged for <Mono>coderhelm-{s.stage}</Mono> in {s.region}.</>}
         />
         {everything ? (
           <Notice tone="fail" title="This deletes your data for good" testId="everything-warning">
