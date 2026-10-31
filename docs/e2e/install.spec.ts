@@ -855,9 +855,9 @@ test('hybrid: pick the setup, the name is checked as you type, and AWS opens wit
   const [u] = await opened(page);
   const q = new URLSearchParams(new URL(u).hash.split('?')[1]);
   expect(q.get('param_Hostname')).toBeNull();
-  // The steps for a CoderHelm address.
-  await expect(page.locator('[aria-label="Install steps"] > li')).toHaveCount(5);
-  await expect(page.getByTestId('trust')).toContainText('GitHub events pass through CoderHelm');
+  // The steps for a CoderHelm address, with CoderHelm's Jira app (on by default).
+  await expect(page.locator('[aria-label="Install steps"] > li')).toHaveCount(6);
+  await expect(page.getByTestId('trust')).toContainText('GitHub and Jira events pass through CoderHelm');
 });
 
 test('hybrid: an empty or bad name stops the launch with the reason', async ({ page }) => {
@@ -1061,6 +1061,176 @@ test('hybrid screenshots at 1440 and 390', async ({ page }) => {
   }
 });
 
+
+// ── Hybrid: CoderHelm's Jira app ─────────────────────────────────────────
+
+const JIRA_STATE = { ...HYBRID_STATE, jiraChoice: 'hosted' };
+const jiraCheck = (status: string, code: string) => ({ id: 'hybrid_jira', label: 'Jira through CoderHelm', status, code, required: false });
+const LINKED_GH = { github_app: { status: 'pass', code: 'hosted_app' } };
+/** The install after sign-up: setup closed, the Jira check still reported (or not, by an older install). */
+const closedWith = (...checks: Json[]) => ({ ...CLOSED, checks: [...checks, ...CLOSED.checks] });
+const cursorOf = (l: ReturnType<Page['getByTestId']>) => l.evaluate((el) => getComputedStyle(el).cursor);
+
+test('hybrid Jira: the toggle sits next to GitHub, on by default, can be turned off, and comes back with GitHub', async ({ page }) => {
+  await mock(page, newMock());
+  await mockHybrid(page, newHybrid());
+  await page.goto('/self-host/install/');
+  await expect(page.getByTestId('hosted-jira')).toHaveCount(0);
+  await page.locator('[data-setup="hybrid"]').click();
+  const options = page.getByTestId('hybrid-options');
+  const jira = page.getByTestId('hosted-jira');
+  await expect(jira).toBeChecked();
+  await expect(options.locator('label')).toHaveText([/Use CoderHelm’s GitHub App/, /Use CoderHelm’s Jira app/, /Share delivery data/]);
+  await expect(options.locator('label').nth(1)).toContainText('your install never holds the app’s secret');
+  await expect(options.locator('label').nth(1)).toContainText('Events come through CoderHelm, checked and re-signed');
+  // The whole row is the control, with the hand cursor.
+  expect(await options.locator('label').nth(1).evaluate((e) => getComputedStyle(e).cursor)).toBe('pointer');
+  const steps = page.locator('[aria-label="Install steps"] > li');
+  await expect(steps).toHaveCount(6);
+  await expect(steps.nth(4)).toContainText('Jira');
+  await options.locator('label').nth(1).click();
+  await expect(jira).not.toBeChecked();
+  await expect(steps).toHaveCount(5);
+  await expect(page.getByTestId('trust')).toContainText('Hybrid: GitHub events pass through CoderHelm');
+  // GitHub off leaves Jira as it is; GitHub on again turns Jira back on.
+  await options.locator('label').nth(0).click();
+  await expect(page.getByTestId('hosted-github')).not.toBeChecked();
+  await expect(jira).not.toBeChecked();
+  await options.locator('label').nth(0).click();
+  await expect(jira).toBeChecked();
+  // Fully private: no Jira app through CoderHelm.
+  await page.locator('[data-setup="private"]').click();
+  await expect(page.getByTestId('hosted-jira')).toHaveCount(0);
+  await page.locator('[data-setup="hybrid"]').click();
+  await expect(page.getByTestId('hosted-jira')).toBeChecked();
+});
+
+test('hybrid Jira: the guide turns on Link through CoderHelm with the setup key, and only when chosen', async ({ page, browser }) => {
+  const m = newMock({ setup: withHybrid(setupDoc(NO_APP), REG_OK) });
+  const h = newHybrid();
+  await mockHybrid(page, h);
+  await seeded(page, m, JIRA_STATE);
+  await expect.poll(() => h.calls.find((c) => c.path === '/settings')?.body).toMatchObject({ setup_token: TOKEN, github_mode: 'hosted', jira_link: true });
+
+  const p2 = await browser.newPage();
+  const m2 = newMock({ setup: withHybrid(setupDoc(NO_APP), REG_OK) });
+  const h2 = newHybrid();
+  await mockHybrid(p2, h2);
+  await seeded(p2, m2, { ...JIRA_STATE, jiraChoice: 'own' });
+  await expect.poll(() => h2.calls.some((c) => c.path === '/settings')).toBe(true);
+  expect(h2.calls.find((c) => c.path === '/settings')!.body.jira_link).toBeUndefined();
+  await p2.close();
+});
+
+test('hybrid Jira: the link step asks for the site, deep-links to Settings, explains the code, and follows hybrid_jira to ok', async ({ page }) => {
+  const m = newMock({ setup: withHybrid(setupDoc(LINKED_GH), REG_OK, nameCheck('pass', 'ok'), jiraCheck('todo', 'no_link')) });
+  await mockHybrid(page, newHybrid());
+  await seeded(page, m, JIRA_STATE);
+  await expect(page.getByTestId('screen-jira')).toBeVisible();
+  await expect(page.getByTestId('step-title')).toHaveText('Link your Jira site');
+  // Before sign-up: sign up first (linking needs an install admin).
+  await expect(page.getByTestId('jira-status')).toContainText('Sign up first');
+  await expect(page.getByTestId('jira-open-signup')).toHaveAttribute('href', `${INSTALL}/?signup=1`);
+  const rows = page.getByTestId('jira-progress').locator('[data-row-status]');
+  await expect(rows).toHaveText([/Link through CoderHelm turned on/, /signed up as the admin/, /Confirmed on app\.coderhelm\.com/, /copied the link’s Jira settings/]);
+  await expect(rows.nth(0)).toHaveAttribute('data-row-status', 'pass');
+  await expect(rows.nth(1)).toHaveAttribute('data-row-status', 'active');
+  // The rail shows the same rows.
+  await expect(page.locator('[aria-label="Install steps"]')).toContainText('Jira');
+
+  // The site: a bad one says why and keeps the button off.
+  const open = page.getByTestId('jira-open-settings');
+  await expect(open).toBeDisabled();
+  expect(await cursorOf(open)).toBe('not-allowed');
+  await page.getByLabel('Your Jira site').fill('not a site');
+  await expect(page.getByTestId('jira-link-form')).toContainText('Enter your Jira site’s address, such as example.atlassian.net.');
+  await expect(open).toBeDisabled();
+  await page.getByLabel('Your Jira site').fill('https://Example.Atlassian.net/jira');
+  await expect(open).toHaveAttribute('href', `${INSTALL}/settings/integrations/jira/?link=coderhelm&site=example.atlassian.net#link`);
+  await expect(open).toHaveAttribute('target', '_blank');
+  for (const id of ['jira-open-settings', 'jira-open-signup', 'check-again', 'skip-jira']) expect(await cursorOf(page.getByTestId(id)), id).toBe('pointer');
+  // The code and who confirms it.
+  const how = page.getByTestId('jira-how');
+  await expect(how).toContainText('example.atlassian.net is filled in');
+  await expect(how).toContainText('8-character confirmation code');
+  await expect(how).toContainText('admin of the team that runs CoderHelm’s Jira app on that site');
+  // The site is remembered.
+  await page.reload();
+  await expect(page.getByLabel('Your Jira site')).toHaveValue('https://Example.Atlassian.net/jira');
+
+  // Signed up (the setup window closes): the Jira check stays and the step follows it.
+  m.setup = closedWith(jiraCheck('todo', 'no_link'));
+  await expect(page.getByTestId('jira-status')).toContainText('Link your Jira site in your CoderHelm');
+  await expect(page.getByTestId('jira-open-signup')).toHaveCount(0);
+  await expect(rows.nth(1)).toHaveAttribute('data-row-status', 'pass');
+  await expect(rows.nth(2)).toHaveAttribute('data-row-status', 'active');
+  m.setup = closedWith(jiraCheck('wait', 'syncing'));
+  await expect(page.getByTestId('jira-status')).toContainText('Copying the linked site’s Jira settings');
+  await expect(rows.nth(2)).toHaveAttribute('data-row-status', 'pass');
+  await expect(rows.nth(3)).toHaveAttribute('data-row-status', 'active');
+  m.setup = closedWith(jiraCheck('pass', 'ok'));
+  await expect(page.getByTestId('screen-ready')).toBeVisible();
+  await expect(page.getByTestId('optional-setup').locator('[data-optional="jira"]')).toHaveAttribute('data-state', 'done');
+  await expect(page.getByTestId('jira-later')).toHaveCount(0);
+});
+
+test('hybrid Jira: Link later in Settings finishes on Ready with the deep link and the way back', async ({ page }) => {
+  const m = newMock({ setup: closedWith(jiraCheck('todo', 'no_link')) });
+  await mockHybrid(page, newHybrid());
+  await seeded(page, m, { ...JIRA_STATE, jiraSite: 'example.atlassian.net' });
+  await expect(page.getByTestId('screen-jira')).toBeVisible();
+  await page.getByTestId('skip-jira').click();
+  await expect(page.getByTestId('screen-ready')).toBeVisible();
+  await expect(page.getByTestId('jira-later')).toContainText('Settings, Integrations, Jira, Link through CoderHelm');
+  const item = page.getByTestId('optional-setup').locator('[data-optional="jira"]');
+  await expect(item).toHaveAttribute('data-state', 'todo');
+  await expect(item).toContainText('Link your Jira site through CoderHelm');
+  await expect(page.getByTestId('optional-jira-action')).toHaveAttribute('href', `${INSTALL}/settings/integrations/jira/?link=coderhelm&site=example.atlassian.net#link`);
+  expect(await cursorOf(page.getByTestId('back-to-jira'))).toBe('pointer');
+  await page.getByTestId('back-to-jira').click();
+  await expect(page.getByTestId('screen-jira')).toBeVisible();
+});
+
+test('hybrid Jira: an install that doesn’t report the link after sign-up goes straight to Ready', async ({ page }) => {
+  const m = newMock({ setup: CLOSED });
+  await mockHybrid(page, newHybrid());
+  await seeded(page, m, JIRA_STATE);
+  await expect(page.getByTestId('screen-ready')).toBeVisible();
+  await expect(page.getByTestId('optional-setup').locator('[data-optional="jira"]')).toContainText('Start work from Jira tickets');
+});
+
+for (const [w, hgt] of [[1440, 900], [375, 812]] as const) {
+  test(`hybrid Jira screenshots: the toggle and the link step at ${w}`, async ({ page }) => {
+    test.skip(!SHOTS, 'set E2E_SHOTS=<dir> to save screenshots');
+    await page.setViewportSize({ width: w, height: hgt });
+    await mock(page, newMock());
+    await mockHybrid(page, newHybrid());
+    await page.goto('/self-host/install/');
+    await page.locator('[data-setup="hybrid"]').click();
+    await page.getByLabel('Your CoderHelm address name').fill('example-co');
+    await expect(page.getByTestId('name-picker-status')).toContainText('is free');
+    await page.getByTestId('hybrid-options').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(150);
+    fs.mkdirSync(SHOTS!, { recursive: true });
+    await page.getByTestId('hybrid-options').screenshot({ path: path.join(SHOTS!, `jira-toggle-${w}.png`) });
+    await shot(page, `jira-start-${w}`);
+    expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+
+  test(`hybrid Jira screenshots: the link step at ${w}`, async ({ page }) => {
+    test.skip(!SHOTS, 'set E2E_SHOTS=<dir> to save screenshots');
+    await page.setViewportSize({ width: w, height: hgt });
+    const m = newMock({ setup: closedWith(jiraCheck('todo', 'no_link')) });
+    await mockHybrid(page, newHybrid());
+    await seeded(page, m, { ...JIRA_STATE, jiraSite: 'example.atlassian.net' });
+    await expect(page.getByTestId('screen-jira')).toBeVisible();
+    await shot(page, `jira-step-${w}`);
+    expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= window.innerWidth)).toBe(true);
+    m.setup = closedWith(jiraCheck('wait', 'syncing'));
+    await expect(page.getByTestId('jira-status')).toContainText('Copying');
+    await shot(page, `jira-step-syncing-${w}`);
+  });
+}
 
 test('email: through CoderHelm only when picked, and then no From address', async ({ page }) => {
   const m = newMock();

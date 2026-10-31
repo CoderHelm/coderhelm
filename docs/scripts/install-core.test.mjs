@@ -464,3 +464,56 @@ test('the Address step follows registration, the claim, the certificate and the 
   assert.equal(c.hybridRows(st([{ id: 'hybrid_registered', status: 'fail', code: 'proof_failed' }]), 'example', false)[0].status, 'fail');
   assert.match(c.hybridRows(st([]), 'example', false)[3].label, /example\.coderhelm\.com/);
 });
+
+test('the Jira step: CoderHelm’s Jira app, before Ready, after sign-up too, skippable', () => {
+  assert.deepEqual(c.stepsFor({ domainChoice: 'coderhelm', jiraChoice: 'hosted' }).map((x) => x.id), ['aws', 'address', 'github', 'models', 'jira', 'ready']);
+  assert.deepEqual(c.stepsFor({ domainChoice: 'aws', jiraChoice: 'own' }).map((x) => x.id), ['aws', 'github', 'models', 'ready']);
+  assert.equal(c.newState().jiraChoice, 'own', 'off unless chosen');
+  const at = { launchedAt: 1, url: 'https://d111.cloudfront.net', jiraChoice: 'hosted' };
+  const withJira = (code, st, extra = {}) => ({ ...setup(extra), checks: [...setup(extra).checks.slice(0, -1), { id: 'hybrid_jira', status: st, code, required: false }, setup(extra).checks.at(-1)] });
+  assert.equal(c.deriveStep(at, withJira('no_link', 'todo')), 'jira');
+  assert.equal(c.deriveStep(at, withJira('syncing', 'wait')), 'jira');
+  assert.equal(c.deriveStep(at, withJira('ok', 'pass')), 'ready');
+  assert.equal(c.deriveStep({ ...at, jiraSkipped: true }, withJira('no_link', 'todo')), 'ready');
+  assert.equal(c.deriveStep({ ...at, jiraChoice: 'own' }, withJira('no_link', 'todo')), 'ready');
+  assert.equal(c.deriveStep(at, setup()), 'ready', 'an install that doesn’t report the link holds nobody up');
+  assert.equal(c.deriveStep(at, withJira('no_link', 'todo', { models: { status: 'fail', code: 'use_case_required' } })), 'models', 'Claude first');
+
+  // After sign-up the install answers setup_open: false; the Jira check stays.
+  const closed = c.parseSetupStatus({ schema: 1, setup_open: false, ready: true, checks: [{ id: 'hybrid_jira', label: 'Jira through CoderHelm', status: 'wait', code: 'syncing', required: false }, { id: 'admin', status: 'pass', code: 'ok' }] }, 'us-east-1');
+  assert.deepEqual(closed.checks.map((x) => x.id), ['api', 'github_app', 'github_installed', 'models', 'hybrid_jira', 'admin']);
+  assert.equal(c.deriveStep(at, closed), 'jira');
+  const closedOld = c.parseSetupStatus({ schema: 1, setup_open: false, ready: true, checks: [{ id: 'admin', status: 'pass', code: 'ok' }] }, 'us-east-1');
+  assert.equal(c.deriveStep(at, closedOld), 'ready');
+  // A CoderHelm address (or own domain) doesn't hold a signed-up install on its step.
+  const named = { ...at, domainChoice: 'coderhelm' };
+  assert.equal(c.deriveStep(named, closed), 'jira');
+  assert.equal(c.deriveStep(named, closedOld), 'ready');
+  assert.equal(c.deriveStep({ ...named, domainChoice: 'own' }, closedOld), 'ready');
+
+  // Rows: on, signed up, confirmed, copied.
+  const st = (s) => c.jiraRows(s).map((r) => r.status).join(',');
+  assert.equal(st(setup()), 'active,pending,pending,pending');
+  assert.equal(st(withJira('no_link', 'todo')), 'pass,active,pending,pending');
+  assert.equal(st(withJira('no_link', 'todo', { admin: { status: 'pass', code: 'ok' } })), 'pass,pass,active,pending');
+  assert.equal(st(withJira('syncing', 'wait', { admin: { status: 'pass', code: 'ok' } })), 'pass,pass,pass,active');
+  assert.equal(st(withJira('ok', 'pass', { admin: { status: 'pass', code: 'ok' } })), 'pass,pass,pass,pass');
+});
+
+test('the Jira site and the deep link to Settings, Integrations, Jira', () => {
+  assert.equal(c.jiraSiteHost(' https://Example.Atlassian.net/jira/software '), 'example.atlassian.net');
+  assert.equal(c.jiraSiteHost('example'), null);
+  assert.equal(c.jiraSiteHost('exa mple.atlassian.net'), null);
+  assert.equal(c.jiraSiteHost('a..b'), null);
+  assert.equal(c.jiraSiteHost('<x>.example'), null);
+  assert.equal(c.jiraLinkUrl('https://acme.coderhelm.com/', 'example.atlassian.net'), 'https://acme.coderhelm.com/settings/integrations/jira/?link=coderhelm&site=example.atlassian.net#link');
+  assert.equal(c.jiraLinkUrl('https://acme.coderhelm.com', 'nope'), 'https://acme.coderhelm.com/settings/integrations/jira/?link=coderhelm#link');
+  // Ready lists it with the deep link while the step is skipped.
+  const s = { ...c.newState({ url: 'https://d1.cloudfront.net', jiraChoice: 'hosted', jiraSite: 'example.atlassian.net' }) };
+  const withJira = { ...setup(), checks: [...setup().checks, { id: 'hybrid_jira', status: 'todo', code: 'no_link', required: false }] };
+  const item = c.optionalSetup(s, withJira).find((o) => o.id === 'jira');
+  assert.equal(item.state, 'todo');
+  assert.match(item.action.href, /\/settings\/integrations\/jira\/\?link=coderhelm&site=example\.atlassian\.net#link$/);
+  const plain = c.optionalSetup({ ...s, jiraChoice: 'own' }, withJira).find((o) => o.id === 'jira');
+  assert.equal(plain.title, 'Start work from Jira tickets');
+});

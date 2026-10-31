@@ -14,7 +14,7 @@ export const REPO = 'CoderHelm/coderhelm-platform';
 export const GITHUB_LATEST_URL = `https://api.github.com/repos/${REPO}/releases/latest`;
 
 export type Provider = 'bedrock' | 'anthropic';
-export type StepId = 'start' | 'aws' | 'domain' | 'address' | 'github' | 'models' | 'ready';
+export type StepId = 'start' | 'aws' | 'domain' | 'address' | 'github' | 'models' | 'jira' | 'ready';
 export const STEPS: { id: StepId; label: string }[] = [
   { id: 'aws', label: 'AWS' },
   { id: 'github', label: 'GitHub' },
@@ -22,11 +22,16 @@ export const STEPS: { id: StepId; label: string }[] = [
   { id: 'ready', label: 'Ready' },
 ];
 
-/** The steps for this install: a Domain step after AWS for their own domain, an Address step for a CoderHelm address. */
-export function stepsFor(s: Pick<InstallState, 'domainChoice'>): { id: StepId; label: string }[] {
-  if (s.domainChoice === 'own') return [STEPS[0], { id: 'domain', label: 'Domain' }, ...STEPS.slice(1)];
-  if (s.domainChoice === 'coderhelm') return [STEPS[0], { id: 'address', label: 'Address' }, ...STEPS.slice(1)];
-  return STEPS;
+/**
+ * The steps for this install: a Domain step after AWS for their own domain,
+ * an Address step for a CoderHelm address, and a Jira step before Ready when
+ * the Jira site links through CoderHelm's Jira app.
+ */
+export function stepsFor(s: Pick<InstallState, 'domainChoice'> & Partial<Pick<InstallState, 'jiraChoice'>>): { id: StepId; label: string }[] {
+  const rest = s.jiraChoice === 'hosted' ? [...STEPS.slice(1, -1), { id: 'jira' as const, label: 'Jira' }, STEPS[STEPS.length - 1]] : STEPS.slice(1);
+  if (s.domainChoice === 'own') return [STEPS[0], { id: 'domain', label: 'Domain' }, ...rest];
+  if (s.domainChoice === 'coderhelm') return [STEPS[0], { id: 'address', label: 'Address' }, ...rest];
+  return [STEPS[0], ...rest];
 }
 
 /** How long each step takes, as people should expect it. */
@@ -37,6 +42,7 @@ export const STEP_TIME: Record<StepId, string> = {
   address: 'about 30 min, by itself',
   github: '1 min',
   models: '1 to 15 min',
+  jira: '2 min',
   ready: '1 min',
 };
 
@@ -56,8 +62,8 @@ export const SETUPS: { id: Setup; title: string; tag?: string; gets: string[]; t
     id: 'hybrid',
     title: 'Hybrid',
     tag: 'Easiest',
-    gets: ['yourname.coderhelm.com, set up for you', 'CoderHelm\u2019s GitHub App: install it and you\u2019re done', 'Your code and data still stay in your AWS account'],
-    tradeoff: 'GitHub events pass through CoderHelm on their way to you (checked, re-signed, never stored past retries).',
+    gets: ['yourname.coderhelm.com, set up for you', 'CoderHelm\u2019s GitHub App: install it and you\u2019re done', 'CoderHelm\u2019s Jira app for your Jira site, linked in a minute', 'Your code and data still stay in your AWS account'],
+    tradeoff: 'GitHub and Jira events pass through CoderHelm on their way to you (checked, re-signed, never stored past retries).',
   },
 ];
 
@@ -91,6 +97,42 @@ export function nameCheckUrl(name: string): string {
 /** What the guide calls on the install itself for hybrid (simple POSTs: the setup key is in the body). */
 export function hybridUrl(installUrl: string, path: '' | '/register' | '/name' | '/github/link' | '/settings'): string {
   return `${installUrl.replace(/\/+$/, '')}/api/setup/hybrid${path}`;
+}
+
+/**
+ * A Jira site address as the install takes it (the same rule as the
+ * install's own check): a bare lowercase hostname with a dot, or null.
+ */
+export function jiraSiteHost(raw: string): string | null {
+  const t = raw.trim().toLowerCase().replace(/^https?:\/\//, '');
+  const host = t.split(/[/?#]/)[0] ?? '';
+  if (!host || host.length > 253 || !host.includes('.')) return null;
+  return host.split('.').every((l) => /^[a-z0-9-]+$/.test(l)) ? host : null;
+}
+
+/**
+ * The install's Settings, Integrations, Jira, opened on Link through
+ * CoderHelm with the site filled in (the dashboard reads `link` and `site`).
+ */
+export function jiraLinkUrl(installUrl: string, site: string): string {
+  const host = jiraSiteHost(site);
+  const q = new URLSearchParams({ link: 'coderhelm' });
+  if (host) q.set('site', host);
+  return `${installUrl.replace(/\/+$/, '')}/settings/integrations/jira/?${q.toString()}#link`;
+}
+
+/** The Jira step's progress, from the install's checks (hybrid_jira and admin). */
+export function jiraRows(setup: SetupStatus | null): DomainRow[] {
+  const admin = findCheck(setup, 'admin');
+  const j = findCheck(setup, 'hybrid_jira');
+  const signedUp = admin?.status === 'pass';
+  const at = !j ? -1 : j.status === 'pass' ? 3 : j.code === 'syncing' ? 2 : 1;
+  return [
+    { id: 'on', label: 'Link through CoderHelm turned on in your install', status: j ? 'pass' : 'active' },
+    { id: 'admin', label: 'You signed up as the admin', status: signedUp ? 'pass' : j ? 'active' : 'pending' },
+    { id: 'confirmed', label: 'Confirmed on app.coderhelm.com with the code', status: at >= 2 ? 'pass' : signedUp ? 'active' : 'pending' },
+    { id: 'synced', label: 'Your install copied the link\u2019s Jira settings', status: at >= 3 ? 'pass' : at === 2 ? 'active' : 'pending' },
+  ];
 }
 
 /** The monthly AWS cost for a small team (the same lines as the CLI's summary). */
@@ -166,6 +208,16 @@ export interface InstallState {
   coderhelmName: string;
   /** Their own GitHub App, or CoderHelm's through the relay. */
   githubChoice: 'own' | 'hosted';
+  /**
+   * Their own Jira app (set up later, or none), or their Jira site linked
+   * through CoderHelm's Jira app (Settings, Integrations, Jira, "Link
+   * through CoderHelm"). Older saved guides have none: their own.
+   */
+  jiraChoice?: 'own' | 'hosted';
+  /** The Jira site to link, as typed (example.atlassian.net). */
+  jiraSite?: string;
+  /** They chose to link the Jira site later, in Settings. */
+  jiraSkipped?: boolean;
   /** Share failed-delivery metadata with CoderHelm support (off by default). */
   sharing: boolean;
   /** Their domain, e.g. coderhelm.example.com (only with domainChoice 'own'). */
@@ -245,6 +297,9 @@ export function newState(over: Partial<InstallState> = {}): InstallState {
     setup: 'private',
     coderhelmName: '',
     githubChoice: 'own',
+    jiraChoice: 'own',
+    jiraSite: '',
+    jiraSkipped: false,
     sharing: false,
     hostname: '',
     domainSkipped: false,
@@ -527,6 +582,8 @@ export interface SetupStatus {
   version?: string | null;
   github_manifest_ready?: boolean;
   checks: Check[];
+  /** Someone has signed up (setup_open: false): the install is ready, whatever the guide last saw. */
+  closed?: boolean;
 }
 
 /** A status file we can use, or null. */
@@ -605,9 +662,13 @@ export function progressRows(doc: StatusDoc | null, answering: boolean, launched
 }
 
 /** Which screen to show, from what is known. The install's own answers win over memory. */
-export function deriveStep(s: Pick<InstallState, 'launchedAt' | 'url'> & Partial<Pick<InstallState, 'domainChoice' | 'domainSkipped' | 'githubChoice'>>, setup: SetupStatus | null): StepId {
+export function deriveStep(s: Pick<InstallState, 'launchedAt' | 'url'> & Partial<Pick<InstallState, 'domainChoice' | 'domainSkipped' | 'githubChoice' | 'jiraChoice' | 'jiraSkipped'>>, setup: SetupStatus | null): StepId {
   if (!s.launchedAt && !s.url) return 'start';
   if (!setup) return 'aws';
+  // Someone has signed up: the install is ready (its domain or CoderHelm
+  // address finishes by itself). Only the Jira link, which needs that admin,
+  // can still be under way.
+  if (setup.closed) return jiraPending(s, setup) ? 'jira' : 'ready';
   // Their own domain first, so the GitHub App gets the domain's URLs. An
   // install too old to report the domain doesn't hold anyone up.
   const domain = findCheck(setup, 'domain');
@@ -624,7 +685,18 @@ export function deriveStep(s: Pick<InstallState, 'launchedAt' | 'url'> & Partial
   const models = findCheck(setup, 'models');
   // A failure, or a warning that is still in the way (the subscription being set up).
   if (models && (models.status === 'fail' || (models.status === 'warn' && models.code !== 'ok'))) return 'models';
-  return 'ready';
+  return jiraPending(s, setup) ? 'jira' : 'ready';
+}
+
+/**
+ * The Jira site through CoderHelm's Jira app, until it's linked. Only when
+ * the install reports the link (one too old to say so goes to Ready, where
+ * Settings, Integrations, Jira is listed).
+ */
+function jiraPending(s: Partial<Pick<InstallState, 'jiraChoice' | 'jiraSkipped'>>, setup: SetupStatus | null): boolean {
+  if (s.jiraChoice !== 'hosted' || s.jiraSkipped) return false;
+  const jira = findCheck(setup, 'hybrid_jira');
+  return !!jira && jira.status !== 'pass';
 }
 
 /** One plain sentence and the fix for each code the install can send. */
@@ -880,9 +952,12 @@ export function parseSetupStatus(v: unknown, region: string): SetupStatus | null
   const d = v as { schema?: number; setup_open?: boolean; version?: string; github_manifest_ready?: boolean; checks?: Check[] } | null;
   if (!d || typeof d !== 'object' || d.schema !== 1 || !Array.isArray(d.checks)) return null;
   if (d.setup_open === false) {
-    // Someone has signed up: the setup window is closed and the install is ready.
-    const checks: Check[] = ['api', 'github_app', 'github_installed', 'models', 'admin'].map((id) => ({ id, status: 'pass', code: 'ok' }));
-    return { schema: 1, ready: true, version: d.version ?? null, github_manifest_ready: false, checks };
+    // Someone has signed up: the setup window is closed and the install is
+    // ready. The Jira link, made after sign-up, still reports its check.
+    const checks: Check[] = ['api', 'github_app', 'github_installed', 'models', 'admin'].map((id): Check => ({ id, status: 'pass', code: 'ok' }));
+    const jira = d.checks.find((c) => c && c.id === 'hybrid_jira' && typeof c.status === 'string' && typeof c.code === 'string');
+    if (jira) checks.splice(checks.length - 1, 0, { id: jira.id, status: jira.status, code: jira.code, label: jira.label, required: false });
+    return { schema: 1, ready: true, version: d.version ?? null, github_manifest_ready: false, checks, closed: true };
   }
   const checks = d.checks
     .filter((c) => c && typeof c.id === 'string' && typeof c.status === 'string')
@@ -1002,7 +1077,7 @@ export interface OptionalItem {
 }
 
 /** Everything else a person can set up, each with its check (when the install reports one) and one action. */
-export function optionalSetup(s: Pick<InstallState, 'url' | 'region' | 'provider' | 'domainChoice'> & Partial<Pick<InstallState, 'emailTransport'>>, setup: SetupStatus | null): OptionalItem[] {
+export function optionalSetup(s: Pick<InstallState, 'url' | 'region' | 'provider' | 'domainChoice'> & Partial<Pick<InstallState, 'emailTransport' | 'jiraChoice' | 'jiraSite'>>, setup: SetupStatus | null): OptionalItem[] {
   const url = s.url.replace(/\/+$/, '');
   const at = (path: string) => (url ? `${url}${path}` : path);
   const check = (id: string) => findCheck(setup, id);
@@ -1054,10 +1129,17 @@ export function optionalSetup(s: Pick<InstallState, 'url' | 'region' | 'provider
     id: 'chat', title: 'Slack or Teams notices', why: 'Pull requests, reviews and alerts in the channel your team already reads.',
     state: 'unknown', action: { label: 'Open Settings, Alerts', href: at('/settings/alerts/') }, doc: '/self-host/integrations/',
   });
-  items.push({
-    id: 'jira', title: 'Start work from Jira tickets', why: 'Assign a ticket to CoderHelm instead of a GitHub issue.',
-    state: 'unknown', action: { label: 'Open Settings, Integrations', href: at('/settings/integrations/jira/') }, doc: '/self-host/integrations/',
-  });
+  const jiraLink = s.jiraChoice === 'hosted' ? check('hybrid_jira') : undefined;
+  items.push(jiraLink
+    ? {
+      id: 'jira', title: 'Link your Jira site through CoderHelm', why: 'Assign a ticket to CoderHelm instead of a GitHub issue; its events come through CoderHelm\u2019s Jira app.',
+      state: jiraLink.status === 'pass' ? 'done' : 'todo', fix: CHECK_TEXT.hybrid_jira[jiraLink.code]?.fix,
+      action: { label: 'Open Settings, Integrations, Jira', href: s.url ? jiraLinkUrl(s.url, s.jiraSite ?? '') : at('/settings/integrations/jira/') }, doc: '/self-host/hybrid/#jira-through-coderhelm',
+    }
+    : {
+      id: 'jira', title: 'Start work from Jira tickets', why: 'Assign a ticket to CoderHelm instead of a GitHub issue.',
+      state: 'unknown', action: { label: 'Open Settings, Integrations', href: at('/settings/integrations/jira/') }, doc: '/self-host/integrations/',
+    });
   const updates = check('updates');
   items.push({
     id: 'updates', title: 'Automatic updates', why: 'New releases install by themselves in your maintenance window, health checked and rolled back if unhealthy.',
