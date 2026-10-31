@@ -517,3 +517,14 @@ test('the Jira site and the deep link to Settings, Integrations, Jira', () => {
   const plain = c.optionalSetup({ ...s, jiraChoice: 'own' }, withJira).find((o) => o.id === 'jira');
   assert.equal(plain.title, 'Start work from Jira tickets');
 });
+
+test('a state saved before the Jira choice keeps CoderHelm\'s Jira app on for hybrid', () => {
+  const base = c.newState();
+  const old = { ...base, setup: 'hybrid', githubChoice: 'hosted' };
+  delete old.jiraChoice;
+  assert.equal(c.parseStored(JSON.stringify(old)).jiraChoice, 'hosted');
+  const priv = { ...base, setup: 'private', githubChoice: 'own' };
+  delete priv.jiraChoice;
+  assert.equal(c.parseStored(JSON.stringify(priv)).jiraChoice, 'own');
+  assert.equal(c.parseStored(JSON.stringify({ ...old, jiraChoice: 'own' })).jiraChoice, 'own');
+});

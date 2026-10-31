@@ -904,7 +904,13 @@ export function parseStored(raw: string | null): InstallState | null {
   try {
     const v = JSON.parse(raw);
     if (!v || typeof v !== 'object' || !STATUS_ID_RE.test(v.statusId)) return null;
-    return { ...newState(), ...v };
+    const s: InstallState = { ...newState(), ...v };
+    // Saved before the Jira choice existed: follow the setup it was saved with,
+    // so a hybrid install keeps CoderHelm's Jira app on like its GitHub App.
+    if (v.jiraChoice !== 'own' && v.jiraChoice !== 'hosted') {
+      s.jiraChoice = s.setup === 'hybrid' || s.githubChoice === 'hosted' ? 'hosted' : 'own';
+    }
+    return s;
   } catch {
     return null;
   }
