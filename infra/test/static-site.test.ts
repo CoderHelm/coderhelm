@@ -14,7 +14,7 @@ import * as cdk from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
 import { AppStack } from "../lib/app-stack";
 import { FrontendStack } from "../lib/frontend-stack";
-import { DOCS_CSP, DocsStack, INSTALL_GUIDE_CSP, INSTALL_GUIDE_PATH, docsRedirects } from "../lib/docs-stack";
+import { DOCS_CSP, DocsStack, INSTALL_GUIDE_CSP, INSTALL_GUIDE_PATH, UNINSTALL_GUIDE_CSP, UNINSTALL_GUIDE_PATH, docsRedirects } from "../lib/docs-stack";
 import { ASSET_CACHE_CONTROL, PAGE_CACHE_CONTROL, SWEEP_CODE, pageRoutes } from "../lib/static-site";
 
 const env = { account: "111111111111", region: "us-east-1" };
@@ -289,7 +289,11 @@ test("docs: only the install guide may call other origins; every page keeps its 
   assert.equal(directive(INSTALL_GUIDE_CSP, "form-action"), "form-action 'self' https://github.com");
   for (const name of ["default-src", "script-src", "style-src", "img-src", "font-src", "frame-ancestors", "base-uri"]) {
     assert.equal(directive(INSTALL_GUIDE_CSP, name), directive(DOCS_CSP, name), name);
+    assert.equal(directive(UNINSTALL_GUIDE_CSP, name), directive(DOCS_CSP, name), name);
   }
+  // The uninstall guide: S3 (the release bucket and the progress file, any region) and GitHub's release API only; no form.
+  assert.equal(directive(UNINSTALL_GUIDE_CSP, "connect-src"), `connect-src 'self' https://*.amazonaws.com https://api.github.com ${GA}`);
+  assert.equal(directive(UNINSTALL_GUIDE_CSP, "form-action"), "form-action 'self'");
 
   const byCsp = (want: string) => Object.entries(policies).filter(([, c]) => csp(c) === want).map(([id]) => id);
   const [docsId] = byCsp(DOCS_CSP);
@@ -305,7 +309,12 @@ test("docs: only the install guide may call other origins; every page keeps its 
   const [, dist] = ofType(r, "AWS::CloudFront::Distribution")[0];
   const cfg = dist.Properties.DistributionConfig;
   assert.deepEqual(cfg.DefaultCacheBehavior.ResponseHeadersPolicyId, { Ref: docsId });
-  assert.equal(cfg.CacheBehaviors.length, 1);
+  assert.equal(cfg.CacheBehaviors.length, 2);
+  assert.equal(cfg.CacheBehaviors[1].PathPattern, UNINSTALL_GUIDE_PATH);
+  assert.equal(UNINSTALL_GUIDE_PATH, "/self-host/uninstall/*", "not /self-host/uninstall-details/");
+  const [uninstallId] = byCsp(UNINSTALL_GUIDE_CSP);
+  assert.deepEqual(cfg.CacheBehaviors[1].ResponseHeadersPolicyId, { Ref: uninstallId });
+  assert.deepEqual(cfg.CacheBehaviors[1].FunctionAssociations, cfg.DefaultCacheBehavior.FunctionAssociations);
   assert.equal(cfg.CacheBehaviors[0].PathPattern, INSTALL_GUIDE_PATH);
   assert.equal(INSTALL_GUIDE_PATH, "/self-host/install*");
   assert.deepEqual(cfg.CacheBehaviors[0].ResponseHeadersPolicyId, { Ref: installId });

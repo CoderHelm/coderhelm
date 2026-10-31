@@ -78,6 +78,19 @@ const plain = (s) =>
 const SELF_HOST_SRC = 'docs/self-host';
 /** The install guide's sidebar entry (a Fumadocs link item). */
 export const INSTALL_GUIDE_LINK = '[Install from your browser](/self-host/install/)';
+/** The uninstall guide's sidebar entry (app/self-host/uninstall). */
+export const UNINSTALL_GUIDE_LINK = '[Uninstall from your browser](/self-host/uninstall/)';
+/**
+ * Platform guides whose name is an app page here: the app page keeps the
+ * address (other guides' links to it land on the guided page), and the
+ * guide is imported next to it under this name.
+ */
+export const APP_PAGE_RENAMES = { uninstall: 'uninstall-details' };
+
+/** The page name a platform guide is imported as. */
+export function importedName(name) {
+  return APP_PAGE_RENAMES[name] ?? name;
+}
 /**
  * Self-hosting pages that belong to this site rather than to the platform:
  * the install guide's own pages, such as what its Launch Stack does in the
@@ -94,7 +107,7 @@ export function sitePages(dir = SITE_PAGES_DIR) {
 
 /** The top of the self-host sidebar: the overview, the install guide, then the site's own pages. */
 export function selfHostLead(site) {
-  return ['index', INSTALL_GUIDE_LINK, ...site];
+  return ['index', INSTALL_GUIDE_LINK, UNINSTALL_GUIDE_LINK, ...site];
 }
 
 /** Copies the site's own pages in; a platform guide of the same name is a mistake, not an override. */
@@ -133,7 +146,7 @@ function importSelfHost(platform) {
         pages.push(entry.name);
       } else if (/\.mdx?$/i.test(entry.name)) {
         const isIndex = /^(readme|index)\.mdx?$/i.test(entry.name);
-        const name = isIndex ? 'index' : entry.name.replace(/\.mdx?$/i, '');
+        const name = isIndex ? 'index' : importedName(entry.name.replace(/\.mdx?$/i, ''));
         const raw = fs.readFileSync(from, 'utf8');
         write(path.posix.join('self-host', rel, `${name}.md`), convertGuide(raw, path.posix.join(SELF_HOST_SRC, relPath), platform.ref));
         if (!isIndex) {

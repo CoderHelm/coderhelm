@@ -4124,6 +4124,8 @@ export interface SystemVersion {
   history?: UpdateEntry[];
   /** The latest release's model check, once it has run. */
   model_check?: ModelCheck | null;
+  /** Which install this is (its resources are coderhelm-<stage>-*), for the guided uninstall. */
+  install?: { stage: string; region: string } | null;
 }
 
 // ── Deliveries ──────────────────────────────────────────────────────────

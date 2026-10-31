@@ -41,6 +41,8 @@ interface DocsStackProps extends cdk.StackProps {
 export const DOCS_CSP = CSP.docs;
 export const INSTALL_GUIDE_PATH = CSP.installGuidePath;
 export const INSTALL_GUIDE_CSP = CSP.installGuide;
+export const UNINSTALL_GUIDE_PATH = CSP.uninstallGuidePath;
+export const UNINSTALL_GUIDE_CSP = CSP.uninstallGuide;
 
 /** The docs' redirect map, checked against the pages of the build. */
 export function docsRedirects(pages: string[], redirects: Record<string, string>): Record<string, string> {
@@ -134,6 +136,7 @@ export class DocsStack extends cdk.Stack {
       });
     const responseHeadersPolicy = securityHeaders("SecurityHeaders", "docs-security-headers", DOCS_CSP);
     const installHeadersPolicy = securityHeaders("InstallGuideHeaders", "docs-install-headers", INSTALL_GUIDE_CSP);
+    const uninstallHeadersPolicy = securityHeaders("UninstallGuideHeaders", "docs-uninstall-headers", UNINSTALL_GUIDE_CSP);
 
     // Page paths open the page's index.html. A path that is no page opens the
     // 404 page right here (no distribution-wide 404 response, which would
@@ -207,7 +210,7 @@ function handler(event) {
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       defaultBehavior: pageBehavior(responseHeadersPolicy),
       // The install guide alone may call other origins (INSTALL_GUIDE_CSP).
-      additionalBehaviors: { [INSTALL_GUIDE_PATH]: pageBehavior(installHeadersPolicy) },
+      additionalBehaviors: { [INSTALL_GUIDE_PATH]: pageBehavior(installHeadersPolicy), [UNINSTALL_GUIDE_PATH]: pageBehavior(uninstallHeadersPolicy) },
       defaultRootObject: "index.html",
       webAclId: props.webAclArn,
       domainNames: [domainName],

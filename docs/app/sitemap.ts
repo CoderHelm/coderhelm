@@ -2,6 +2,7 @@ import type { MetadataRoute } from 'next';
 import { source } from '@/lib/source';
 import { SITE } from '@/lib/shared';
 import { INSTALL_GUIDE } from '@/lib/install/page-info';
+import { UNINSTALL_GUIDE } from '@/lib/uninstall/page-info';
 
 export const dynamic = 'force-static';
 
@@ -14,5 +15,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     })),
     // The browser install guide: an app page, not MDX.
     { url: `${SITE.url}${INSTALL_GUIDE.url}`, changeFrequency: 'weekly' as const, priority: 0.8 },
+    { url: `${SITE.url}${UNINSTALL_GUIDE.url}`, changeFrequency: 'monthly' as const, priority: 0.4 },
   ];
 }
