@@ -7,6 +7,7 @@ import { FixBlock } from "@/components/install-checks";
 import { DomainSection } from "@/components/domain-section";
 import { HybridSection } from "@/components/hybrid-section";
 import { UninstallSection } from "@/components/uninstall-section";
+import { NativeUpdateCard } from "@/components/native-update";
 import { ModelsSection, UpdateNeedsAction } from "@/components/models-section";
 import { CodeBlock } from "@/components/code-block";
 
@@ -234,7 +235,8 @@ function System() {
               )
             }
           />
-          {data.running && (
+          {data.native ? <NativeUpdateCard native={data.native} /> : null}
+          {data.running && !data.native?.pending && (
             <div className="px-4 py-3">
               <Callout variant="neutral" title="An update is running">
                 <p>Coderhelm stays available while it runs. This page shows the result when it finishes.</p>
@@ -249,7 +251,7 @@ function System() {
               </div>
               <div className="mt-3 flex flex-wrap gap-3">
                 <button type="button" className={primaryButton} disabled={!!busy || data.running || blocked} onClick={() => start("update")} aria-describedby={blocked ? "update-blocked" : undefined}>
-                  {busy === "update" ? "Starting…" : `Update now to ${latest.version}`}
+                  {busy === "update" ? "Starting…" : data.native ? `Prepare the update to ${latest.version}` : `Update now to ${latest.version}`}
                 </button>
                 {latest.url && <a href={latest.url} target="_blank" rel="noopener noreferrer" className={linkButton}>Release page</a>}
               </div>
@@ -383,7 +385,7 @@ function System() {
           </div>
         </SettingsSection>
 
-        <SettingsSection id="uninstall" title="Uninstall" description="Remove Coderhelm from your AWS account, from a guided page like the install.">
+        <SettingsSection id="uninstall" title="Uninstall" description="Remove Coderhelm from your AWS account: delete its stack, keeping the data or not.">
           <UninstallSection version={data} />
         </SettingsSection>
       </div>

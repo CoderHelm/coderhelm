@@ -92,10 +92,10 @@ async function mock(page: Page, m: Mock) {
   await page.route('https://coderhelm-public.s3.amazonaws.com/launch/latest.json', (r) =>
     m.latest === 'unreadable'
       ? r.fulfill({ status: 403, body: 'AccessDenied', headers: CORS })
-      : r.fulfill({ json: { version: 'v0.7.0', templateUrl: 'https://coderhelm-public.s3.amazonaws.com/launch/v0.7.0/coderhelm-launch.yaml' }, headers: CORS }),
+      : r.fulfill({ json: { version: 'v0.7.0', templateUrl: 'https://coderhelm-public.s3.amazonaws.com/launch/v0.7.0/coderhelm.json' }, headers: CORS }),
   );
   // The bucket answers 403 for a key that isn't there.
-  await page.route(/^https:\/\/coderhelm-public\.s3\.amazonaws\.com\/launch\/(v[^/]+)\/coderhelm-launch\.yaml$/, (r) => {
+  await page.route(/^https:\/\/coderhelm-public\.s3\.amazonaws\.com\/launch\/(v[^/]+)\/coderhelm\.json$/, (r) => {
     const v = /\/launch\/(v[^/]+)\//.exec(r.request().url())![1];
     return (m.templates ?? ['v0.7.0']).includes(v)
       ? r.fulfill({ status: 200, contentType: 'text/yaml', body: 'AWSTemplateFormatVersion: 2010-09-09\n', headers: CORS })
@@ -190,7 +190,7 @@ test('happy path: launch, follow the install, GitHub, models, ready', async ({ p
   expect(u.hostname).toBe('eu-west-1.console.aws.amazon.com');
   const q = new URLSearchParams(u.hash.split('?')[1]);
   expect(u.hash).toContain('#/stacks/create/review?');
-  expect(q.get('templateURL')).toBe('https://coderhelm-public.s3.amazonaws.com/launch/v0.7.0/coderhelm-launch.yaml');
+  expect(q.get('templateURL')).toBe('https://coderhelm-public.s3.amazonaws.com/launch/v0.7.0/coderhelm.json');
   expect(q.get('param_AdminEmail')).toBe('ada@example.com');
   expect(q.get('param_StatusId')).toMatch(/^[a-z0-9]{16}$/);
   expect(q.get('param_SetupToken')).toMatch(/^[A-Za-z0-9]{40}$/);
@@ -310,18 +310,19 @@ test('every control shows the hand cursor; a switched-off one shows not-allowed'
   await p3.close();
 });
 
-test('a failed install shows why, with the fix, and launches again under a new name', async ({ page }) => {
+test('a failed install shows why, with the fix, and launches again under the same name once the stack is deleted', async ({ page }) => {
   const m = newMock({ status: { schema: 1, phase: 'failed', step: 4, steps: 10, message: 'Something with the same name is already in this account.', fix: 'Launch again with a different install name.', logUrl: 'https://us-east-1.console.aws.amazon.com/cloudwatch/home' } });
   await seeded(page, m);
   await expect(page.getByTestId('step-title')).toHaveText('The install stopped');
   await expect(page.getByTestId('failure')).toContainText('Something with the same name');
   await expect(page.getByTestId('failure')).toContainText('Launch again with a different install name.');
+  await expect(page.getByTestId('delete-failed')).toContainText('Delete the stack coderhelm-prod');
   await expect(page.locator('[data-row-status="fail"]')).toHaveCount(1);
   await expect(page.getByRole('link', { name: 'Open the log' })).toHaveAttribute('href', /cloudwatch/);
   await page.getByTestId('relaunch').click();
   const [link] = await opened(page);
   const q = new URLSearchParams(new URL(link).hash.split('?')[1]);
-  expect(q.get('stackName')).toBe('coderhelm-prod-2');
+  expect(q.get('stackName')).toBe('coderhelm-prod');
   expect(q.get('param_StatusId')).not.toBe(ID);
   expect(q.get('param_SetupToken')).not.toBe(TOKEN);
 });
@@ -432,15 +433,15 @@ test('before launch: what the stack creates in the AWS account, the risks behind
   const panelBox = await panel.boundingBox();
   const launchBox = await page.getByTestId('launch').boundingBox();
   expect(panelBox && launchBox && panelBox.y + panelBox.height <= launchBox.y).toBeTruthy();
-  await expect(panel).toContainText('A CloudFormation stack, coderhelm-prod, that runs the installer once.');
-  // What the v0.7.5+ template ships: a boundary, an installer with no deploy rights at rest, a window, a deploy role.
-  await expect(panel.getByTestId('disclosure-boundary')).toContainText('A permissions boundary, coderhelm-prod-boundary-<id>, on every role CoderHelm creates.');
+  await expect(panel).toContainText('One CloudFormation stack, coderhelm-prod, that holds the whole install as nested stacks.');
+  // What a one-stack release ships: a boundary, a release bucket checked against the template, a helper, no standing deploy role.
+  await expect(panel.getByTestId('disclosure-boundary')).toContainText('A permissions boundary, coderhelm-prod-boundary-stack, on every role CoderHelm creates.');
   await expect(panel.getByTestId('disclosure-boundary')).toContainText('Roles can only be created with it, and it can\'t be removed.');
-  await expect(panel.getByTestId('disclosure-installer')).toContainText('An installer in CodeBuild with no deploy rights of its own.');
-  await expect(panel.getByTestId('disclosure-window')).toContainText('this template\'s exact buildspec (by SHA-256)');
-  await expect(panel.getByTestId('disclosure-window')).toContainText('ends after 100 minutes');
-  await expect(panel.getByTestId('disclosure-deploy-role')).toContainText('only CloudFormation can use');
-  await expect(panel.getByTestId('disclosure-deploy-role')).toContainText('No CDK bootstrap');
+  await expect(panel.getByTestId('disclosure-release')).toContainText('checked against the SHA-256 written in the signed template');
+  await expect(panel.getByTestId('disclosure-helper')).toContainText('its code inside the template');
+  await expect(panel.getByTestId('disclosure-deploy-role')).toContainText('No installer build, no deploy role and no CDK bootstrap.');
+  await expect(panel.getByTestId('disclosure-deploy-role')).toContainText('coderhelm-prod-deploy-stack');
+  await expect(panel).not.toContainText('CodeBuild');
   // Nothing on the install page claims the old admin installer.
   expect(await page.locator('body').textContent()).not.toContain('AdministratorAccess');
   await expect(panel).toContainText('coderhelm-setup-<id>');
@@ -453,11 +454,11 @@ test('before launch: what the stack creates in the AWS account, the risks behind
   for (const t of [
     'CoderHelm can act within its boundary.',
     'A malicious release could change CoderHelm.',
-    'Some pieces stay after you delete the stack.',
+    'Deleting the stack keeps your data unless you say otherwise.',
     'The progress file is public while the install runs.',
     'The AWS link holds your one-time setup key.',
   ]) await expect(risks).toContainText(t);
-  await expect(risks).toContainText('you can turn them off any time in Settings, System');
+  await expect(risks).toContainText('Auto-update is off unless you turn it on in More options.');
   await expect(risks).toContainText('If your account blocks public access to S3, that\'s fine');
   // The full page, with every resource, role, risk and how to remove it.
   const link = panel.getByTestId('disclosure-page');
@@ -466,7 +467,7 @@ test('before launch: what the stack creates in the AWS account, the risks behind
   await expect(page).toHaveURL(/\/self-host\/aws-account\/$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('What CoderHelm does in your AWS account');
   expect(await page.locator('body').textContent()).not.toContain('AdministratorAccess');
-  for (const h of ['What gets created', 'What CoderHelm the company can do', 'Risks and how to reduce them', 'Remove everything', 'Installed before v0.7.5']) {
+  for (const h of ['What gets created', 'What CoderHelm the company can do', 'Risks and how to reduce them', 'Remove everything', 'Installed before one-stack releases']) {
     await expect(page.getByRole('heading', { level: 2, name: h })).toBeVisible();
   }
 });
@@ -509,16 +510,16 @@ test('more options: the name in your AWS account is explained, checked in one se
   await expect(page.getByText('Install name')).toHaveCount(0);
   await name.fill('2nd_install');
   await page.getByTestId('launch').click();
-  await expect(page.getByText('Use 1 to 20 lowercase letters, digits or hyphens, starting with a letter.')).toBeVisible();
+  await expect(page.getByText('Use 1 to 20 lowercase letters or digits, starting with a letter (no hyphens).')).toBeVisible();
   expect(await opened(page)).toEqual([]);
-  await name.fill('helm-two');
+  await name.fill('helmtwo');
   await page.getByText('What happens in AWS').click();
-  await expect(page.getByText('Everything it creates is named after the name in your AWS account, helm-two: the stack is coderhelm-helm-two')).toBeVisible();
+  await expect(page.getByText('Everything it creates is named after the name in your AWS account, helmtwo: the stack is coderhelm-helmtwo')).toBeVisible();
   await page.getByTestId('launch').click();
   const [link] = await opened(page);
-  expect(new URLSearchParams(new URL(link).hash.split('?')[1]).get('param_Stage')).toBe('helm-two');
+  expect(new URLSearchParams(new URL(link).hash.split('?')[1]).get('param_Stage')).toBe('helmtwo');
   await page.getByText('What is happening').click();
-  await expect(page.getByText('Stack name: coderhelm-helm-two (from the name in your AWS account, helm-two)')).toBeVisible();
+  await expect(page.getByText('Stack name: coderhelm-helmtwo (from the name in your AWS account, helmtwo)')).toBeVisible();
 });
 
 test('more options: domain, sender, sign-up and updates go to AWS; a bad hostname opens More options with the sentence', async ({ page }) => {
@@ -558,7 +559,8 @@ test('more options: domain, sender, sign-up and updates go to AWS; a bad hostnam
   expect(q.get('param_SignupDomain')).toBe('example.com');
   expect(q.get('param_RequireTwoFactor')).toBe('on');
   expect(q.get('param_AutoUpdate')).toBe('on');
-  expect(q.get('param_UpdateWindow')).toBe('daily 02:00');
+  expect(q.get('param_UpdateDay')).toBe('daily');
+  expect(q.get('param_UpdateHour')).toBe('2');
   expect(q.get('param_UpdateTimezone')).toBe('Europe/Berlin');
   expect(q.get('param_EmailTransport')).toBeNull();
   // The steps now include the domain.
@@ -1095,8 +1097,8 @@ test('release: latest.json unreadable falls back to GitHub’s latest release, a
   await page.getByTestId('launch').click();
   const [link] = await opened(page);
   const q = new URLSearchParams(new URL(link).hash.split('?')[1]);
-  expect(q.get('templateURL')).toBe('https://coderhelm-public.s3.amazonaws.com/launch/v0.9.2/coderhelm-launch.yaml');
-  expect(q.get('param_Version')).toBe('v0.9.2');
+  expect(q.get('templateURL')).toBe('https://coderhelm-public.s3.amazonaws.com/launch/v0.9.2/coderhelm.json');
+  expect(q.get('param_Version')).toBe(null);
   expect(m.requests).toContain('https://api.github.com/repos/CoderHelm/coderhelm-platform/releases/latest');
   expect(m.requests.some((u) => u.includes('/launch/v0.7.0/'))).toBe(false);
   assertPrivate(m);
@@ -1118,7 +1120,7 @@ test('release: a template that isn’t published shows the message and no launch
   await expect(page.getByTestId('launch')).toBeEnabled();
   await page.getByTestId('launch').click();
   const [link] = await opened(page);
-  expect(new URLSearchParams(new URL(link).hash.split('?')[1]).get('templateURL')).toBe('https://coderhelm-public.s3.amazonaws.com/launch/v0.7.0/coderhelm-launch.yaml');
+  expect(new URLSearchParams(new URL(link).hash.split('?')[1]).get('templateURL')).toBe('https://coderhelm-public.s3.amazonaws.com/launch/v0.7.0/coderhelm.json');
 });
 
 test('release: no release anywhere shows the same message instead of a broken launch link', async ({ page }) => {
@@ -1129,5 +1131,5 @@ test('release: no release anywhere shows the same message instead of a broken la
   await expect(page.getByTestId('launch')).toHaveCount(0);
   await expect(page.getByTestId('release-retry')).toBeVisible();
   // No template is asked for: there is no version to ask about.
-  expect(m.requests.some((u) => /\/launch\/v[^/]+\/coderhelm-launch\.yaml$/.test(u))).toBe(false);
+  expect(m.requests.some((u) => /\/launch\/v[^/]+\/coderhelm\.json$/.test(u))).toBe(false);
 });

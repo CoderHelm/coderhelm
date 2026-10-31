@@ -630,12 +630,12 @@ export const linkCls = 'font-medium text-fd-foreground underline decoration-fd-b
  * AWS: every resource and role in a few lines, then the risks and what to do
  * about them. The full page is AWS_ACCOUNT_PAGE.
  *
- * ACCESS: describes infra/cfn/coderhelm-selfhost-launch.yaml in
- * coderhelm-platform (v0.7.5 and later): a permissions boundary on every
- * role, an installer with no deploy rights at rest, a short deploy window per
- * verified build, and a deploy role only CloudFormation can use. When that
- * template changes, update the lines marked ACCESS here and
- * content/self-host-site/aws-account.mdx.
+ * ACCESS: describes a native release's coderhelm.json in coderhelm-platform
+ * (infra/lib/native/parent.ts): one stack with nested parts, a permissions
+ * boundary on every role, a private bucket with the release's files checked
+ * against the template's sha256s, an install helper, and a CloudFormation
+ * service role only with auto-update on. When that template changes, update
+ * the lines marked ACCESS here and content/self-host-site/aws-account.mdx.
  */
 function AccountDisclosure({ s, hybrid }: { s: InstallState; hybrid: boolean }) {
   const item = 'flex gap-2.5';
@@ -643,23 +643,22 @@ function AccountDisclosure({ s, hybrid }: { s: InstallState; hybrid: boolean }) 
     <section className="rounded-2xl border border-fd-border bg-fd-card/50 p-4 text-sm sm:p-5" aria-labelledby="ch-account-title" data-testid="account-disclosure">
       <h2 id="ch-account-title" className="text-base font-semibold">What this creates in your AWS account</h2>
       <ul className="mt-3 space-y-2.5 leading-relaxed text-fd-muted-foreground">
-        <li className={item}><Dot /><span>A CloudFormation stack, <Mono>{stackName(s)}</Mono>, that runs the installer once.</span></li>
+        <li className={item}><Dot /><span>One CloudFormation stack, <Mono>{stackName(s)}</Mono>, that holds the whole install as nested stacks. Update it to update CoderHelm; delete it to uninstall.</span></li>
         {/* ACCESS */}
-        <li className={item} data-testid="disclosure-boundary"><Dot /><span><span className="font-medium text-fd-foreground">A permissions boundary</span>, <Mono>coderhelm-{s.stage}-boundary-&lt;id&gt;</Mono>, on every role CoderHelm creates. It refuses IAM users and keys, IAM outside <Mono>coderhelm-{s.stage}-*</Mono>, and any change to Organizations, account settings, CloudTrail or GuardDuty. Roles can only be created with it, and it can&apos;t be removed.</span></li>
-        <li className={item} data-testid="disclosure-installer"><Dot /><span><span className="font-medium text-fd-foreground">An installer in CodeBuild with no deploy rights of its own.</span> At rest, its role can only write its log and the progress file, ask for a deploy window, and remove its own window. It downloads the CoderHelm release and checks its signatures and checksums.</span></li>
-        <li className={item} data-testid="disclosure-window"><Dot /><span><span className="font-medium text-fd-foreground">A window function.</span> It checks that the build is this stack&apos;s installer, running this template&apos;s exact buildspec (by SHA-256). Then it gives that one build a policy bound to its session that ends after 100 minutes. The build removes it when it ends.</span></li>
-        <li className={item} data-testid="disclosure-deploy-role"><Dot /><span><span className="font-medium text-fd-foreground">A deploy role</span> that only CloudFormation can use, limited to resources named or tagged for this install, and an assets bucket for deploy files. No CDK bootstrap: no CDKToolkit stack and no admin role for CloudFormation.</span></li>
+        <li className={item} data-testid="disclosure-boundary"><Dot /><span><span className="font-medium text-fd-foreground">A permissions boundary</span>, <Mono>coderhelm-{s.stage}-boundary-stack</Mono>, on every role CoderHelm creates. It refuses IAM users and keys, IAM outside <Mono>coderhelm-{s.stage}-*</Mono>, and any change to Organizations, account settings, CloudTrail or GuardDuty. Roles can only be created with it, and it can&apos;t be removed.</span></li>
+        <li className={item} data-testid="disclosure-release"><Dot /><span><span className="font-medium text-fd-foreground">A private bucket with this release&apos;s files</span>, <Mono>coderhelm-{s.stage}-release-&lt;account&gt;</Mono>. Each part and each piece of code is checked against the SHA-256 written in the signed template before anything uses it.</span></li>
+        <li className={item} data-testid="disclosure-helper"><Dot /><span><span className="font-medium text-fd-foreground">An install helper function</span>, its code inside the template. It copies the release files, stores the one-time setup key, asks for your domain&apos;s certificate, and on delete empties buckets and removes logs. Its role reaches only this install&apos;s names.</span></li>
+        <li className={item} data-testid="disclosure-deploy-role"><Dot /><span><span className="font-medium text-fd-foreground">No installer build, no deploy role and no CDK bootstrap.</span> The stack runs with your own AWS permissions. Only if you turn auto-update on does it add <Mono>coderhelm-{s.stage}-deploy-stack</Mono>, a role that only CloudFormation can use, limited to resources named or tagged for this install.</span></li>
         <li className={item}><Dot /><span>CoderHelm itself: Lambda functions, DynamoDB tables, S3 buckets, CloudFront, Cognito, queues, and a role for each service with only what that service uses.</span></li>
-        <li className={item}><Dot /><span>A small function that starts the installer. Its role can only start that build, write the progress file, and remove a window a failed build left behind.</span></li>
-        <li className={item}><Dot /><span>A progress bucket, <Mono>coderhelm-setup-&lt;id&gt;</Mono>, with one file: the install&apos;s progress and, at the end, its address. No emails, keys or account numbers. It is public if your account allows it, the file expires after 30 days, and the bucket stays when you delete the stack.</span></li>
+        <li className={item}><Dot /><span>A progress bucket, <Mono>coderhelm-setup-&lt;id&gt;</Mono>, with one file: the install&apos;s progress and, at the end, its address. No emails, keys or account numbers. It is public if your account allows it, the file expires after 30 days, and the stack deletes the bucket when you delete the stack.</span></li>
         <li className={item}><Dot /><span><span className="font-medium text-fd-foreground">No access for CoderHelm the company.</span> No role for another account, and nothing that trusts an account outside yours.{hybrid ? <> Hybrid adds no AWS access either: <a className={linkCls} href="/self-host/hybrid/#trust-model">what CoderHelm sees</a>.</> : null}</span></li>
       </ul>
       <Details summary="Risks and how to reduce them">
         <div data-testid="disclosure-risks" className="space-y-3">
           {/* ACCESS */}
-          <p><b className="text-fd-foreground">CoderHelm can act within its boundary.</b> Whoever can change CoderHelm&apos;s functions or start its verified builds can do what the boundary allows. Changing those functions or roles already takes administrator rights in your account. Keep Lambda, CodeBuild and IAM rights to the people who already run this account.</p>
-          <p><b className="text-fd-foreground">A malicious release could change CoderHelm.</b> Updates deploy through the same deploy role. Before anything runs, the release is checked: its tag must be on main and signed by a CoderHelm maintainer or attested by CoderHelm&apos;s release workflow, and its files must carry that workflow&apos;s signature and match their checksums. If CoderHelm&apos;s release pipeline were ever broken into, a malicious release could change any CoderHelm resource and a few unnamed CloudFront and API Gateway settings in this region. It could not create an admin role or touch IAM elsewhere. Automatic updates are off unless you turn them on in More options, and you can turn them off any time in Settings, System; then an admin starts each update.</p>
-          <p><b className="text-fd-foreground">Some pieces stay after you delete the stack.</b> The boundary, the deploy role and the assets bucket stay, so CoderHelm keeps running and updating.</p>
+          <p><b className="text-fd-foreground">CoderHelm can act within its boundary.</b> Whoever can change CoderHelm&apos;s functions can do what the boundary allows. Changing those functions or roles already takes administrator rights in your account. Keep Lambda and IAM rights to the people who already run this account.</p>
+          <p><b className="text-fd-foreground">A malicious release could change CoderHelm.</b> You can check a release yourself before launching: its template&apos;s SHA-256 is in its signed checksums, and the template pins every other file. Updates are stack updates you review as a change set; with auto-update on, CoderHelm applies only published release templates, through a role that reaches only this install. It could not create an admin role or touch IAM elsewhere. Auto-update is off unless you turn it on in More options.</p>
+          <p><b className="text-fd-foreground">Deleting the stack keeps your data unless you say otherwise.</b> <Mono>KeepDataOnDelete</Mono> is true by default: the tables, data bucket, keys, user pool and secret stay. Set it to false before deleting to remove them too.</p>
           <p><b className="text-fd-foreground">The progress file is public while the install runs.</b> It holds only the install&apos;s progress and address. If your account blocks public access to S3, that&apos;s fine: the install still runs, and this page asks you for the address from the stack&apos;s Outputs.</p>
           <p><b className="text-fd-foreground">The AWS link holds your one-time setup key.</b> Don&apos;t share it or paste it anywhere. Until your GitHub App exists, someone with the key could give your install a GitHub App of their own. The link to this page holds no secret.</p>
         </div>
@@ -1231,10 +1230,10 @@ export function InstallWizard() {
           )}
         </form>
         <Details summary="What happens in AWS">
-          <p>A CloudFormation stack starts the installer in CodeBuild, inside your account. It downloads CoderHelm {release.state === 'ready' ? release.version : 'the newest release'}, checks its signature and deploys CoderHelm: Lambda functions, DynamoDB tables, an S3 bucket, CloudFront and Cognito sign-in. Nothing to install on your computer.</p>
+          <p>CloudFormation creates CoderHelm {release.state === 'ready' ? release.version : 'the newest release'} in your account as one stack: it copies the release&apos;s files into a private bucket, checking each against the signed template, then creates Lambda functions, DynamoDB tables, an S3 bucket, CloudFront and Cognito sign-in. Nothing to install on your computer.</p>
           <p>Everything it creates is named after the name in your AWS account, {s.stage}: the stack is {stackName(s)}, and every resource name starts with coderhelm-{s.stage}, so you can find them in the AWS console.</p>
-          <p>The box you tick lets the stack create IAM roles. Every role it creates carries CoderHelm&apos;s permissions boundary, and the installer gets deploy rights only for the length of one verified build.</p>
-          <p>{s.domainChoice === 'own' ? `Your domain: when its zone is in Route 53 in this account, the install makes the certificate and the records. Anywhere else, CoderHelm starts on its free cloudfront.net address and this page shows the two records to add; it moves to ${cleanHostname(s.hostname) || 'your domain'} once they work.` : s.domainChoice === 'coderhelm' ? `Your CoderHelm address: once your install answers, this page registers it with CoderHelm and claims ${cleanName(s.coderhelmName) || 'your name'}.${NAME_ZONE}. Your install requests the certificate in your account; CoderHelm adds the DNS records. Nothing for you to do.` : 'No domain or DNS work: CoderHelm gets a free cloudfront.net address. You can add your own domain later, in More options or in CoderHelm.'}</p>
+          <p>The boxes you tick let the stack create IAM roles and expand its nested templates. Every role it creates carries CoderHelm&apos;s permissions boundary. The stack runs with your own permissions; nothing keeps deploy rights afterwards unless you turn auto-update on.</p>
+          <p>{s.domainChoice === 'own' ? `Your domain: CoderHelm starts on its free cloudfront.net address and requests the certificate for ${cleanHostname(s.hostname) || 'your domain'}. When its zone is in Route 53 in this account, it adds the check record itself; anywhere else this page shows the two records to add. Once the certificate is issued, CoderHelm prepares the stack update that moves it to your domain, for you to apply in AWS.` : s.domainChoice === 'coderhelm' ? `Your CoderHelm address: once your install answers, this page registers it with CoderHelm and claims ${cleanName(s.coderhelmName) || 'your name'}.${NAME_ZONE}. Your install requests the certificate in your account; CoderHelm adds the DNS records. Nothing for you to do.` : 'No domain or DNS work: CoderHelm gets a free cloudfront.net address. You can add your own domain later, in More options or in CoderHelm.'}</p>
           <p>Two random values from this page go along in the AWS link: a progress ID, so this page can follow the install, and a one-time setup key, so GitHub (or CoderHelm, for hybrid) can talk to your CoderHelm directly. Both stay in your account and this browser; the setup key stops working once your GitHub App exists.</p>
         </Details>
       </section>
@@ -1280,6 +1279,7 @@ export function InstallWizard() {
         {failed ? (
           <Notice tone="fail" title={doc?.message || 'The install stopped.'} testId="failure">
             {doc?.fix ? <p>{doc.fix}</p> : null}
+            <p className="mt-2" data-testid="delete-failed">CloudFormation rolled the stack back and removed what it made. Delete the stack <Mono>{stackName(s)}</Mono> in CloudFormation, then launch again under the same name.</p>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               {knowsRelease ? (
                 <Primary onClick={relaunch} testId="relaunch">

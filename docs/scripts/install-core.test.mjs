@@ -21,7 +21,7 @@ test('validation speaks plainly', () => {
   assert.deepEqual(c.validate({ email: 'ada@example.com', stage: 'prod', region: 'us-east-1' }), {});
   const p = c.validate({ email: 'nope', stage: 'Prod!', region: 'mars-1' });
   assert.match(p.email, /email/);
-  assert.equal(p.stage, 'Use 1 to 20 lowercase letters, digits or hyphens, starting with a letter.');
+  assert.equal(p.stage, 'Use 1 to 20 lowercase letters or digits, starting with a letter (no hyphens).');
   assert.ok(c.validate({ email: 'a@example.com', stage: 'a'.repeat(21), region: 'us-east-1' }).stage);
   assert.equal(c.validate({ email: 'a@example.com', stage: 'a'.repeat(20), region: 'us-east-1' }).stage, undefined);
   assert.match(p.region, /region/);
@@ -33,19 +33,19 @@ test('quick-create link: the documented review page, every value filled, one reg
   assert.equal(u.searchParams.get('region'), 'eu-west-1');
   assert.ok(u.hash.startsWith('#/stacks/create/review?'));
   const q = new URLSearchParams(u.hash.split('?')[1]);
-  assert.equal(q.get('templateURL'), 'https://coderhelm-public.s3.amazonaws.com/launch/v0.7.0/coderhelm-launch.yaml');
+  assert.equal(q.get('templateURL'), 'https://coderhelm-public.s3.amazonaws.com/launch/v0.7.0/coderhelm.json');
   assert.equal(q.get('stackName'), 'coderhelm-prod');
   assert.equal(q.get('param_AdminEmail'), 'ada@example.com');
-  assert.equal(q.get('param_Version'), 'v0.7.0');
+  assert.equal(q.get('param_Version'), null, 'the template is the release: no Version parameter');
   assert.equal(q.get('param_StatusId'), 'abcd1234efgh5678');
   assert.equal(q.get('param_SetupToken'), 'T'.repeat(40));
   assert.equal(q.get('param_ModelProvider'), 'bedrock');
   assert.ok(c.quickCreateUrl(S).length < 2000, 'well under URL length limits');
 });
 
-test('a later attempt gets a fresh stack name (a failed stack keeps its name)', () => {
+test('every attempt uses the same stack name (a failed first launch rolls back fully)', () => {
   assert.equal(c.stackName({ stage: 'prod', attempt: 1 }), 'coderhelm-prod');
-  assert.equal(c.stackName({ stage: 'prod', attempt: 3 }), 'coderhelm-prod-3');
+  assert.equal(c.stackName({ stage: 'prod', attempt: 3 }), 'coderhelm-prod', 'a failed launch rolls back fully: the same name again');
 });
 
 test('the template comes from S3 by version; latest.json picks it, GitHub covers a bad file, never a hard-coded one', () => {
@@ -237,7 +237,7 @@ test('the install\'s GET /api/setup/status, in its exact shape, drives the guide
 test('more options: domain, sender, sign-up domain and updates go into the quick-create link only when set', () => {
   const q = (st) => new URLSearchParams(new URL(c.quickCreateUrl(st)).hash.split('?')[1]);
   const plain = q(S);
-  for (const k of ['param_Hostname', 'param_EmailFrom', 'param_SignupDomain', 'param_RequireTwoFactor', 'param_AutoUpdate', 'param_UpdateWindow', 'param_UpdateTimezone']) assert.equal(plain.get(k), null, k);
+  for (const k of ['param_Hostname', 'param_EmailFrom', 'param_SignupDomain', 'param_RequireTwoFactor', 'param_AutoUpdate', 'param_UpdateDay', 'param_UpdateHour', 'param_UpdateTimezone']) assert.equal(plain.get(k), null, k);
   const all = q({ ...S, domainChoice: 'own', hostname: 'https://CoderHelm.Example.com/', emailFrom: 'Bot@Example.com', joinDomain: true, signupDomain: '@example.com', requireTwoFactor: true, autoUpdate: true, updateWindow: 'daily 02:00', updateTimezone: 'Europe/Berlin' });
   assert.equal(all.get('param_RequireTwoFactor'), 'on');
   // Only people I invite (the default): a typed domain is not sent.
@@ -249,7 +249,9 @@ test('more options: domain, sender, sign-up domain and updates go into the quick
   assert.equal(all.get('param_EmailFrom'), 'bot@example.com');
   assert.equal(all.get('param_SignupDomain'), 'example.com');
   assert.equal(all.get('param_AutoUpdate'), 'on');
-  assert.equal(all.get('param_UpdateWindow'), 'daily 02:00');
+  assert.equal(all.get('param_UpdateDay'), 'daily');
+  assert.equal(all.get('param_UpdateHour'), '2');
+  assert.deepEqual(c.windowParams('Sun 03:00'), { day: 'sun', hour: '3' });
   assert.equal(all.get('param_UpdateTimezone'), 'Europe/Berlin');
   // Email: through CoderHelm only when picked, and then no sender address; never by default.
   assert.equal(plain.get('param_EmailTransport'), null);

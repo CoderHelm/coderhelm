@@ -100,6 +100,7 @@
     "/self-host/install/",
     "/self-host/integrations/",
     "/self-host/knowledge-sources/",
+    "/self-host/migrate/",
     "/self-host/model-providers/",
     "/self-host/options/",
     "/self-host/quick-start/",
