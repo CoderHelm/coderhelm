@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useConfirm } from "./confirm-dialog";
 import { formatDate } from "./list";
 import { api, errorStatus, type JiraLinkRequest } from "@/lib/api";
@@ -30,6 +30,19 @@ export const JIRA_LINK_BLOCKED: Record<string, string> = {
 const box = "min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-4";
 
 /**
+ * What the install guide's Jira step put in this page's address:
+ * `?link=coderhelm&site=example.atlassian.net#link`. The site only when it
+ * reads as a hostname (the same rule as the install's own check).
+ */
+export function guideLinkFrom(search: string): { fromGuide: boolean; site: string } {
+  const q = new URLSearchParams(search);
+  const fromGuide = q.get("link") === "coderhelm";
+  const raw = (q.get("site") ?? "").trim().toLowerCase().replace(/^https?:\/\//, "").split(/[/?#]/)[0] ?? "";
+  const ok = raw.length <= 253 && raw.includes(".") && raw.split(".").every((l) => /^[a-z0-9-]+$/.test(l));
+  return { fromGuide, site: fromGuide && ok ? raw : "" };
+}
+
+/**
  * A hybrid install: Settings, Integrations, Jira, "Link through Coderhelm".
  * A hosted team's Jira site, linked here, sends its events to this install
  * through Coderhelm's relay. Shows nothing on the hosted service or on an
@@ -42,18 +55,35 @@ export function HybridJiraLink({ className = "" }: { className?: string }) {
   const [outcome, setOutcome] = useState<string | null>(null);
   const [site, setSite] = useState("");
   const [started, setStarted] = useState<{ code: string; url: string } | null>(null);
+  const [fromGuide, setFromGuide] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const scrolled = useRef(false);
   const s = hybrid.status;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const q = new URLSearchParams(window.location.search);
+    const g = guideLinkFrom(window.location.search);
+    if (g.fromGuide) {
+      // The install guide's Jira step: Link through Coderhelm, with the site filled in.
+      setFromGuide(true);
+      if (g.site) setSite(g.site);
+    }
     const o = q.get("hybrid_jira");
-    if (!o) return;
-    setOutcome(o);
-    q.delete("hybrid_jira");
+    if (o) setOutcome(o);
+    if (!o && !g.fromGuide) return;
+    for (const k of ["hybrid_jira", "link", "site"]) q.delete(k);
     const rest = q.toString();
     window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}${window.location.hash}`);
   }, []);
+
+  // The card only shows once the status loads, so the #link jump happens here.
+  const shown = !!(s && s.available && s.registered);
+  useEffect(() => {
+    if (!fromGuide || !shown || scrolled.current) return;
+    scrolled.current = true;
+    cardRef.current?.scrollIntoView({ block: "start" });
+  }, [fromGuide, shown]);
 
   if (!s || !s.available || !s.registered) return null;
   const jira = s.jira ?? { enabled: false, link: null, synced: false };
@@ -97,7 +127,7 @@ export function HybridJiraLink({ className = "" }: { className?: string }) {
   };
 
   return (
-    <div className={`${box} ${className}`} data-testid="hybrid-jira-link" data-state={jira.link ? "linked" : jira.enabled ? "on" : "off"}>
+    <div id="link" ref={cardRef} className={`${box} scroll-mt-20 ${className}`} data-testid="hybrid-jira-link" data-state={jira.link ? "linked" : jira.enabled ? "on" : "off"}>
       <div className="flex min-w-0 items-start justify-between gap-4">
         <div className="min-w-0">
           <p id="hybrid-jira-label" className="text-sm font-medium text-zinc-100">Link through Coderhelm</p>
@@ -108,6 +138,14 @@ export function HybridJiraLink({ className = "" }: { className?: string }) {
         </div>
         <Switch checked={jira.enabled} onChange={toggle} disabled={busy} labelledBy="hybrid-jira-label" describedBy="hybrid-jira-help" testId="hybrid-jira-switch" />
       </div>
+
+      {fromGuide && !jira.enabled && !jira.link && (
+        <div className="mt-3">
+          <Callout variant="info" title="Turn on Link through Coderhelm to finish the install guide's Jira step" testId="hybrid-jira-from-guide">
+            <p>{site ? <>Then press Link: {site} is filled in.</> : <>Then type your Jira site and press Link.</>}</p>
+          </Callout>
+        </div>
+      )}
 
       {told && (
         <div className="mt-3">

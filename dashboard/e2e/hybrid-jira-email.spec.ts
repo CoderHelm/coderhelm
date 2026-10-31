@@ -161,6 +161,45 @@ test("an install turns on Link through Coderhelm, starts the link, sees the link
   expect(calls.some((c) => c.method === "DELETE" && c.path === "/api/system/hybrid/jira/link")).toBe(true);
 });
 
+test("the install guide's Jira step opens Link through Coderhelm with the site filled in", async ({ page }) => {
+  // The guide turned the link on during setup: the site is typed, Link is ready.
+  const { calls } = await setup(page, SELF, { jira: { enabled: true } });
+  await page.goto("/settings/integrations/jira/?link=coderhelm&site=Example.Atlassian.net#link");
+  const card = page.getByTestId("hybrid-jira-link");
+  await expect(card).toHaveAttribute("data-state", "on");
+  await expect(page.getByTestId("hybrid-jira-site-input")).toHaveValue("example.atlassian.net");
+  await expect(page.getByTestId("hybrid-jira-from-guide")).toHaveCount(0);
+  await expect(card).toBeInViewport();
+  expect(page.url()).not.toContain("site=");
+  expect(page.url()).not.toContain("link=");
+  await expect(page.getByTestId("hybrid-jira-start")).toBeEnabled();
+  await expect(page.getByTestId("hybrid-jira-start")).toHaveCSS("cursor", "pointer");
+  await page.getByTestId("hybrid-jira-start").click();
+  await expect.poll(() => calls.find((c) => c.method === "POST" && c.path === "/api/system/hybrid/jira/link")?.body?.site_url).toBe("example.atlassian.net");
+});
+
+test("from the install guide with Link through Coderhelm off, the page says to turn it on, and never turns it on by itself", async ({ page }) => {
+  const { calls } = await setup(page, SELF);
+  await page.goto("/settings/integrations/jira/?link=coderhelm&site=example.atlassian.net#link");
+  const card = page.getByTestId("hybrid-jira-link");
+  await expect(card).toHaveAttribute("data-state", "off");
+  await expect(page.getByTestId("hybrid-jira-from-guide")).toContainText("Turn on Link through Coderhelm");
+  await expect(page.getByTestId("hybrid-jira-from-guide")).toContainText("example.atlassian.net is filled in");
+  expect(calls.some((c) => c.method === "PUT" && c.path === "/api/system/hybrid/settings")).toBe(false);
+  await expect(page.getByTestId("hybrid-jira-switch")).toHaveCSS("cursor", "pointer");
+  await page.getByTestId("hybrid-jira-switch").click();
+  await expect(card).toHaveAttribute("data-state", "on");
+  await expect(page.getByTestId("hybrid-jira-from-guide")).toHaveCount(0);
+  await expect(page.getByTestId("hybrid-jira-site-input")).toHaveValue("example.atlassian.net");
+});
+
+test("a site in the address that isn't a hostname is not filled in", async ({ page }) => {
+  await setup(page, SELF, { jira: { enabled: true } });
+  await page.goto("/settings/integrations/jira/?link=coderhelm&site=%3Cscript%3E.example");
+  await expect(page.getByTestId("hybrid-jira-link")).toHaveAttribute("data-state", "on");
+  await expect(page.getByTestId("hybrid-jira-site-input")).toHaveValue("");
+});
+
 test("the hosted team admin sees which install and site, and only Link links", async ({ page }) => {
   const { calls } = await setup(page, {});
   await page.goto("/settings/integrations/jira/?hybrid_link=hyj_test");

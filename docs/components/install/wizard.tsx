@@ -60,6 +60,9 @@ import {
   elapsed,
   findCheck,
   githubManifest,
+  jiraLinkUrl,
+  jiraRows,
+  jiraSiteHost,
   newAppUrl,
   joinsByDomain,
   newState,
@@ -447,12 +450,12 @@ function MobileSteps({ steps, current }: { steps: { id: StepId; label: string }[
 }
 
 /** Small trust cues under the steps: open source, where it runs, what leaves the account. */
-function TrustCard({ hybrid }: { hybrid: boolean }) {
+function TrustCard({ hybrid, events = 'GitHub events' }: { hybrid: boolean; events?: string }) {
   return (
     <div className="mt-8 space-y-3 rounded-2xl border border-fd-border bg-fd-card/40 p-4 text-xs leading-5 text-fd-muted-foreground" data-testid="trust">
       <p className="flex gap-2"><Dot />Runs in your AWS account. You own every resource.</p>
       <p className="flex gap-2"><Dot /><span>Source available: <a className="font-medium text-fd-foreground underline decoration-fd-border underline-offset-2 hover:decoration-fd-foreground" href="https://github.com/CoderHelm/coderhelm-platform" target="_blank" rel="noopener noreferrer">read the code</a>.</span></p>
-      <p className="flex gap-2"><Dot />{hybrid ? <span>Hybrid: GitHub events pass through CoderHelm, never your code. <a className="font-medium text-fd-foreground underline decoration-fd-border underline-offset-2 hover:decoration-fd-foreground" href="/self-host/hybrid/#trust-model">Exactly what</a></span> : 'Fully private: nothing about your install reaches CoderHelm.'}</p>
+      <p className="flex gap-2"><Dot />{hybrid ? <span>Hybrid: {events} pass through CoderHelm, never your code. <a className="font-medium text-fd-foreground underline decoration-fd-border underline-offset-2 hover:decoration-fd-foreground" href="/self-host/hybrid/#trust-model">Exactly what</a></span> : 'Fully private: nothing about your install reaches CoderHelm.'}</p>
     </div>
   );
 }
@@ -827,9 +830,9 @@ export function InstallWizard() {
   useEffect(() => {
     if (loaded) track(installStepEvent(view));
   }, [view, loaded]);
-  const steps = stepsFor({ domainChoice: s?.domainChoice ?? 'aws' });
+  const steps = stepsFor({ domainChoice: s?.domainChoice ?? 'aws', jiraChoice: s?.jiraChoice });
   const done = useMemo(() => {
-    const order: StepId[] = ['aws', 'domain', 'address', 'github', 'models', 'ready'];
+    const order: StepId[] = ['aws', 'domain', 'address', 'github', 'models', 'jira', 'ready'];
     const i = order.indexOf(derived);
     return new Set<StepId>(i < 0 ? [] : order.slice(0, i));
   }, [derived]);
@@ -838,7 +841,7 @@ export function InstallWizard() {
   const [hyb, setHyb] = useState<{ error: { title: string; fix: string } | null; claimRefused: boolean; settingsSent: boolean; lastTry: number; busy: boolean }>({ error: null, claimRefused: false, settingsSent: false, lastTry: 0, busy: false });
   const [newName, setNewName] = useState('');
   const [hybridOutcome, setHybridOutcome] = useState<string | null>(null);
-  const hybridWanted = !!s && (s.domainChoice === 'coderhelm' || s.githubChoice === 'hosted' || s.emailTransport === 'coderhelm');
+  const hybridWanted = !!s && (s.domainChoice === 'coderhelm' || s.githubChoice === 'hosted' || s.jiraChoice === 'hosted' || s.emailTransport === 'coderhelm');
   useEffect(() => {
     if (!s || !hybridWanted || !s.url || !setup || !s.setupToken || hyb.busy) return;
     if (Date.now() - hyb.lastTry < timing('__CH_HYBRID_RETRY_MS', 8000)) return;
@@ -850,7 +853,9 @@ export function InstallWizard() {
     else if (reg.status !== 'pass') path = '';
     else if (!hyb.settingsSent) {
       path = '/settings';
-      body = { ...body, github_mode: s.githubChoice, sharing: { enabled: s.sharing, payloads: false } };
+      // CoderHelm's Jira app: Link through CoderHelm turned on now, so the
+      // install reports hybrid_jira and the Jira step can follow the link.
+      body = { ...body, github_mode: s.githubChoice, sharing: { enabled: s.sharing, payloads: false }, ...(s.jiraChoice === 'hosted' ? { jira_link: true } : {}) };
     } else if (s.domainChoice === 'coderhelm' && !nm && !hyb.claimRefused && cleanName(s.coderhelmName)) {
       path = '/name';
       body = { ...body, name: cleanName(s.coderhelmName) };
@@ -947,8 +952,8 @@ export function InstallWizard() {
     const hybrid = s.setup === 'hybrid';
     const pickSetup = (id: Setup) =>
       update(id === 'hybrid'
-        ? { setup: 'hybrid', domainChoice: 'coderhelm', githubChoice: 'hosted' }
-        : { setup: 'private', domainChoice: s.domainChoice === 'coderhelm' ? 'aws' : s.domainChoice, githubChoice: 'own' });
+        ? { setup: 'hybrid', domainChoice: 'coderhelm', githubChoice: 'hosted', jiraChoice: 'hosted' }
+        : { setup: 'private', domainChoice: s.domainChoice === 'coderhelm' ? 'aws' : s.domainChoice, githubChoice: 'own', jiraChoice: 'own' });
     screen = (
       <section data-testid="screen-start">
         <Heading title="Install CoderHelm in your AWS account" lead="About 25 minutes, mostly waiting. You press a few buttons; this page does the rest and checks every step." />
@@ -1022,10 +1027,17 @@ export function InstallWizard() {
               <legend className="mb-1 text-sm font-semibold">What CoderHelm sets up for you</legend>
               <Toggle
                 checked={s.githubChoice === 'hosted'}
-                onChange={(v) => update({ githubChoice: v ? 'hosted' : 'own' })}
+                onChange={(v) => update({ githubChoice: v ? 'hosted' : 'own', ...(v ? { jiraChoice: 'hosted' as const } : {}) })}
                 testId="hosted-github"
                 title="Use CoderHelm’s GitHub App"
                 help="Install one app on your organization instead of creating your own. Events come through CoderHelm, checked and re-signed; your install gets short-lived tokens only for the repositories you pick."
+              />
+              <Toggle
+                checked={s.jiraChoice === 'hosted'}
+                onChange={(v) => update({ jiraChoice: v ? 'hosted' : 'own' })}
+                testId="hosted-jira"
+                title="Use CoderHelm’s Jira app"
+                help="Link your Jira site through CoderHelm’s Jira app instead of setting up your own. Events come through CoderHelm, checked and re-signed; your install never holds the app’s secret and calls Jira through CoderHelm. Needs a team on app.coderhelm.com that runs the Jira app on your site."
               />
               <Toggle
                 checked={s.sharing}
@@ -1649,6 +1661,61 @@ export function InstallWizard() {
         </Details>
       </section>
     );
+  } else if (view === 'jira') {
+    const j = findCheck(setup, 'hybrid_jira');
+    const admin = findCheck(setup, 'admin');
+    const signedUp = admin?.status === 'pass';
+    const site = s.jiraSite ?? '';
+    const siteHost = jiraSiteHost(site);
+    const siteError = site.trim() && !siteHost ? 'Enter your Jira site’s address, such as example.atlassian.net.' : undefined;
+    const rows = jiraRows(setup);
+    const now = !signedUp
+      ? { title: 'Sign up first', fix: `Linking needs an admin of your install. Open CoderHelm and sign up with ${s.email || 'your admin email'}; this page notices.` }
+      : j?.code === 'syncing'
+        ? checkText(j)
+        : { title: 'Link your Jira site in your CoderHelm', fix: 'Type the site below and open your CoderHelm’s Jira settings: Link through CoderHelm is on and the site is filled in. Press Link there.' };
+    screen = (
+      <section data-testid="screen-jira">
+        <Heading title="Link your Jira site" lead="Your Jira site’s events come to your install through CoderHelm’s Jira app, checked and re-signed. Your install never holds the app’s secret. Confirm once on app.coderhelm.com and this page shows the link go live." />
+        <Notice tone={j?.code === 'syncing' ? 'warn' : 'todo'} title={now.title} testId="jira-status">
+          {now.fix ? <p>{now.fix}</p> : null}
+        </Notice>
+        <ul className="mt-5 divide-y divide-fd-border rounded-xl border border-fd-border px-4" data-testid="jira-progress">
+          {rows.map((r) => <Row key={r.id} tone={r.status} title={r.label} />)}
+        </ul>
+        {!signedUp ? (
+          <div className="mt-6">
+            <Primary href={`${s.url}/?signup=1`} newTab testId="jira-open-signup">Open CoderHelm to sign up</Primary>
+          </div>
+        ) : null}
+        <div className="mt-6 space-y-4 rounded-2xl border border-fd-border p-4 sm:p-5" data-testid="jira-link-form">
+          <Field label="Your Jira site" htmlFor="ch-jira-site" help="The address you open Jira at. Only this site is linked." error={siteError}>
+            <input id="ch-jira-site" type="text" inputMode="url" autoComplete="off" spellCheck={false} placeholder="example.atlassian.net" className={inputCls} value={site} onChange={(e) => update({ jiraSite: e.target.value })} data-testid="jira-site" />
+          </Field>
+          {siteHost && s.url ? (
+            <Primary href={jiraLinkUrl(s.url, siteHost)} newTab testId="jira-open-settings">Open Settings, Integrations, Jira</Primary>
+          ) : (
+            <Primary disabled testId="jira-open-settings">Open Settings, Integrations, Jira</Primary>
+          )}
+          <ol className="list-decimal space-y-1.5 pl-5 text-sm text-fd-muted-foreground" data-testid="jira-how">
+            <li>In your CoderHelm, <b className="text-fd-foreground">Link through CoderHelm</b> is on and {siteHost ? <b className="text-fd-foreground">{siteHost}</b> : 'your site'} is filled in. Press <b className="text-fd-foreground">Link</b>.</li>
+            <li>Your install shows an 8-character <b className="text-fd-foreground">confirmation code</b> and <b className="text-fd-foreground">Open CoderHelm to confirm</b>. The code works once, for one hour.</li>
+            <li>On app.coderhelm.com, sign in as an <b className="text-fd-foreground">admin of the team that runs CoderHelm’s Jira app on that site</b>. Check your install’s address, type the code and press Link.</li>
+            <li>You come back to your install linked. This page follows along by itself.</li>
+          </ol>
+        </div>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <Secondary onClick={() => void checkAgain()} testId="check-again">{checking ? 'Checking…' : 'Check again'}</Secondary>
+          <Secondary onClick={() => update({ jiraSkipped: true })} testId="skip-jira">Link later in Settings</Secondary>
+        </div>
+        <p className="mt-3 text-sm text-fd-muted-foreground">This page checks again by itself every few seconds. No team on app.coderhelm.com runs the Jira app on your site? Link later: Settings, Integrations, Jira also sets up a Jira app of your own.</p>
+        <Details summary="What passes through CoderHelm">
+          <p>CoderHelm checks each event of the linked site exactly as it does for its own teams, then forwards it to your install re-signed with your install’s key, without the Jira app’s secret, and never handles it itself. A forward is held only while it’s retried (about 24 hours).</p>
+          <p>Your install comments, creates tickets and publishes release notes through CoderHelm’s Jira proxy, with a token for each action that works only while the link stands. Unlink from either side any time; CoderHelm then handles the site’s events itself again.</p>
+          <p><a className="underline" href="/self-host/hybrid/#jira-through-coderhelm">Jira through CoderHelm</a> lists every check.</p>
+        </Details>
+      </section>
+    );
   } else if (view === 'models') {
     const m = findCheck(setup, 'models');
     const text = m ? checkText(m) : { title: 'Checking model access' };
@@ -1737,6 +1804,14 @@ export function InstallWizard() {
             </div>
           </Notice>
         ) : null}
+        {s.jiraSkipped && s.jiraChoice === 'hosted' && findCheck(setup, 'hybrid_jira')?.status !== 'pass' ? (
+          <Notice tone="info" title="Your Jira site is waiting" testId="jira-later">
+            <p>Link it any time in CoderHelm: Settings, Integrations, Jira, Link through CoderHelm.</p>
+            <div className="mt-3">
+              <Secondary onClick={() => update({ jiraSkipped: false })} testId="back-to-jira">Back to the Jira step</Secondary>
+            </div>
+          </Notice>
+        ) : null}
 
         <h2 className="mt-8 text-lg font-semibold">Optional setup</h2>
         <p className="mt-1 text-sm text-fd-muted-foreground">None of these is needed to start. Each says whether it is done, checked by your install where it can be.</p>
@@ -1802,6 +1877,7 @@ export function InstallWizard() {
         { id: 'installed', label: 'Installed on your repositories', status: tone(findCheck(setup, 'github_installed')) },
       ];
       case 'models': return [{ id: 'models', label: 'Claude answers', status: tone(findCheck(setup, 'models')) }];
+      case 'jira': return jiraRows(setup).map((r) => ({ id: r.id, label: r.label, status: r.status }));
       default: return [{ id: 'admin', label: 'You sign up as the admin', status: tone(findCheck(setup, 'admin')) }];
     }
   })();
@@ -1814,7 +1890,7 @@ export function InstallWizard() {
         <aside className="hidden lg:block">
           <div className="sticky top-8">
             <StepsRail steps={steps} current={current} done={done} onPick={(id) => setManual(id === derived ? null : id)} checks={railChecks} />
-            <TrustCard hybrid={s.setup === 'hybrid' || hybridWanted} />
+            <TrustCard hybrid={s.setup === 'hybrid' || hybridWanted} events={s.jiraChoice === 'hosted' ? (s.githubChoice === 'hosted' ? 'GitHub and Jira events' : 'Jira events') : 'GitHub events'} />
           </div>
         </aside>
         <div className="min-w-0">
