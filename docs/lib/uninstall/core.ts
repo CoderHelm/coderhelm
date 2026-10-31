@@ -81,14 +81,38 @@ export function stacksConsoleUrl(region: string): string {
   return `https://${region}.console.aws.amazon.com/cloudformation/home?region=${region}#/stacks`;
 }
 
-/** The CLI form of Update stack that only changes KeepDataOnDelete (every other value kept). */
+/** Where a release's parent template is; the stack's Version output says which one it runs. */
+export function releaseTemplateUrl(version: string): string {
+  return `https://coderhelm-public.s3.amazonaws.com/launch/${version}/coderhelm.json`;
+}
+
+/**
+ * The CLI form of Update stack that only changes KeepDataOnDelete (every other
+ * value kept), then waits and prints the stack's KeepDataOnDelete output.
+ * It gives the stack its own release's template again, never "use the
+ * previous template": CloudFormation keeps a v0.8.4 or v0.8.5 template
+ * with every parameter already filled in, so that update reports
+ * UPDATE_COMPLETE and changes nothing.
+ */
 export function keepDataCommand(s: Pick<UninstallState, 'stage' | 'region'>, keep: boolean): string {
   const others = ['Stage', 'AdminEmail', 'ModelProvider', 'BedrockInferencePrefix', 'EmailTransport', 'EmailFrom', 'Hostname', 'SignupDomain', 'RequireTwoFactor', 'AutoUpdate', 'UpdateDay', 'UpdateHour', 'UpdateTimezone', 'SetupToken', 'StatusId', 'DomainCertificateArn', 'DomainZoneId'];
+  const at = `--region ${s.region} --stack-name ${stackName(s)}`;
   return [
-    `aws cloudformation update-stack --region ${s.region} --stack-name ${stackName(s)} --use-previous-template`,
-    '--capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND',
-    `--parameters ParameterKey=KeepDataOnDelete,ParameterValue=${keep ? 'true' : 'false'} ${others.map((k) => `ParameterKey=${k},UsePreviousValue=true`).join(' ')}`,
-  ].join(' \\\n  ');
+    `V=$(aws cloudformation describe-stacks ${at} --query "Stacks[0].Outputs[?OutputKey=='Version'].OutputValue" --output text)`,
+    [
+      `aws cloudformation update-stack ${at}`,
+      `--template-url "${releaseTemplateUrl('$V')}"`,
+      '--capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND',
+      `--parameters ParameterKey=KeepDataOnDelete,ParameterValue=${keep ? 'true' : 'false'} ${others.map((k) => `ParameterKey=${k},UsePreviousValue=true`).join(' ')}`,
+    ].join(' \\\n  '),
+    `aws cloudformation wait stack-update-complete ${at}`,
+    keepDataCheckCommand(s),
+  ].join('\n');
+}
+
+/** Prints the stack's KeepDataOnDelete output: it must say what was chosen before the stack is deleted. */
+export function keepDataCheckCommand(s: Pick<UninstallState, 'stage' | 'region'>): string {
+  return `aws cloudformation describe-stacks --region ${s.region} --stack-name ${stackName(s)} --query "Stacks[0].Outputs[?OutputKey=='KeepDataOnDelete'].OutputValue" --output text`;
 }
 
 export function deleteCommand(s: Pick<UninstallState, 'stage' | 'region'>): string {

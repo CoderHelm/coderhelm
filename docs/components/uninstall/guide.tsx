@@ -19,6 +19,7 @@ import {
   deleteCommand,
   fromInstallGuide,
   keepDataCommand,
+  releaseTemplateUrl,
   leftoversCommand,
   newState,
   queryToPartial,
@@ -128,9 +129,10 @@ export function UninstallGuide() {
           {mode === 'everything' ? (
             <Notice tone="warn" title="First set KeepDataOnDelete to false" testId="set-keep-false">
               <ol className="list-decimal space-y-1 pl-5">
-                <li>Open the stack <Mono>{stackName(s)}</Mono> and choose <b>Update</b>.</li>
-                <li>Choose <b>Use existing template</b>, then <b>Next</b>.</li>
-                <li>Set <Mono>KeepDataOnDelete</Mono> to <Mono>false</Mono>, leave everything else, then <b>Next</b>, tick the boxes, and <b>Submit</b>. It takes a minute and changes nothing that runs.</li>
+                <li>Open the stack <Mono>{stackName(s)}</Mono>, then <b>Outputs</b>, and note <b>Version</b> (for example <Mono>v0.8.6</Mono>).</li>
+                <li>Choose <b>Update</b>, then <b>Replace existing template</b>, <b>Amazon S3 URL</b>: <Mono>{releaseTemplateUrl('<Version>')}</Mono> with that version. It is the release you run. Don&apos;t choose <b>Use existing template</b>: on an install from v0.8.4 or v0.8.5 it reports success and keeps the data anyway.</li>
+                <li>Choose <b>Next</b>, set <Mono>KeepDataOnDelete</Mono> to <Mono>false</Mono>, leave everything else, then <b>Next</b>, tick the boxes, and <b>Submit</b>. It takes a minute and changes nothing that runs.</li>
+                <li>When it says <Mono>UPDATE_COMPLETE</Mono>, check <b>Outputs</b> again: <b>KeepDataOnDelete</b> must say <Mono>false</Mono> before you delete the stack.</li>
               </ol>
               <div className="mt-3 flex flex-wrap gap-2"><Primary href={stackConsoleUrl(s)} newTab testId="open-stack-update" brand="aws"><AwsLogo /> Open the stack</Primary></div>
               <Details summary="Or from a terminal"><CopyBox text={keepDataCommand(s, false)} testId="keep-false-command" /></Details>
