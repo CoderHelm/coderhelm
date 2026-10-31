@@ -22,7 +22,7 @@ The guide is an interactive page. It talks only to the AWS console and the unins
 ## Steps
 
 1. **Choose.** The install name and region, then **Remove CoderHelm, keep my data** or **Delete everything**. The guide lists what goes and what stays. Delete everything also deletes the tables and their backups, the data bucket, the user pool, the secret, and schedules the KMS keys for deletion in 7 days (AWS's shortest wait).
-2. **Confirm.** Type the install name. The guide opens the CloudFormation console on a quick-create page for the uninstall stack with everything filled in, the typed name included as `ConfirmStage`; the stack refuses to start unless it equals the install name exactly. Tick the IAM box and press Create stack.
+2. **Confirm.** Type the install name. The guide opens the CloudFormation console on a quick-create page for the uninstall stack with everything filled in, the typed name included as \`ConfirmStage\`; the stack refuses to start unless it equals the install name exactly. Tick the IAM box and press Create stack.
 3. **Remove.** The uninstaller finds the install's pieces, releases a hybrid install's CoderHelm address and hands GitHub and Jira back to CoderHelm hosted, deletes the stacks, the data when chosen, the Launch Stack, then the logs, buckets, roles and the permissions boundary (10 to 40 minutes).
 4. **Check.** The final list: what was removed, what was kept, keys scheduled for deletion and anything left. The uninstall stack then rolls itself back, which removes the uninstaller with your credentials.
 
