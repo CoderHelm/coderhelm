@@ -50,6 +50,12 @@ test('delete everything: set KeepDataOnDelete to false first', async ({ page }) 
   await expect(page.getByTestId('goes')).toContainText('7-day wait');
   await page.getByText('Or from a terminal').click();
   await expect(page.getByTestId('keep-false-command')).toContainText('ParameterKey=KeepDataOnDelete,ParameterValue=false');
+  // The release's own template again, never the current one (it kept every old value on v0.8.4 and v0.8.5).
+  await expect(page.getByTestId('keep-false-command')).toContainText('--template-url "https://coderhelm-public.s3.amazonaws.com/launch/$V/coderhelm.json"');
+  await expect(page.getByTestId('keep-false-command')).not.toContainText('use-previous-template');
+  await expect(page.getByTestId('keep-false-command')).toContainText("OutputKey=='KeepDataOnDelete'");
+  await expect(page.getByTestId('set-keep-false')).toContainText('Replace existing template');
+  await expect(page.getByTestId('set-keep-false')).toContainText('KeepDataOnDelete must say false');
   await shot(page, 'uninstall-everything');
   await page.getByTestId('next-data').click();
   await expect(page.getByTestId('step-delete')).toContainText('deletes its tables itself');

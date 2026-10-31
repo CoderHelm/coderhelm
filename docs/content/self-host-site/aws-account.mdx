@@ -23,7 +23,7 @@ A CloudFormation stack named `coderhelm-<name>` (the name in your AWS account, `
 
 ### The permissions boundary
 
-A managed policy, `coderhelm-<name>-boundary-stack`. It is the most any CoderHelm role can do, whatever its own policy says. Every role the stack creates carries it. Even within the AWS services CoderHelm uses, it refuses:
+A managed policy, `coderhelm-<name>-boundary-stack`. It is the most any CoderHelm role can do, whatever its own policy says. Every role the stack creates carries it; the auto-update role (only with auto-update on) carries an identical copy, `coderhelm-<name>-deploy-boundary-stack`, which is kept with that role when you delete the stack. Even within the AWS services CoderHelm uses, it refuses:
 
 - creating IAM users, access keys, sign in profiles, groups or identity providers;
 - anything in Organizations, account settings, CloudTrail or GuardDuty;
@@ -46,7 +46,7 @@ A Secrets Manager secret, `coderhelm/<name>/secrets`. CloudFormation makes it wi
 
 ### The auto-update role (only with auto-update on)
 
-With **Install new releases by themselves** on, the stack adds `coderhelm-<name>-deploy-stack`, a role only CloudFormation can use, limited to resources named or tagged for this install, with the boundary on it. The updater may hand it only to CloudFormation, and only for a change set on this stack from a published CoderHelm release template. With auto-update off (the default) there is no such role: an admin reviews each update's change set and applies it with their own permissions.
+With **Install new releases by themselves** on, the stack adds `coderhelm-<name>-deploy-stack`, a role only CloudFormation can use, limited to resources named or tagged for this install, with its own copy of the boundary on it. The role and its copy are kept when you delete the stack (CloudFormation keeps using a stack's role, and a role can't delete itself); `leftovers` lists them and `--delete` removes them. The updater may hand it only to CloudFormation, and only for a change set on this stack from a published CoderHelm release template. With auto-update off (the default) there is no such role: an admin reviews each update's change set and applies it with their own permissions.
 
 ### The progress bucket
 

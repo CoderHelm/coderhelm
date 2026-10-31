@@ -26,9 +26,15 @@ test('the stack, its console page, and the commands name exactly this install', 
   assert.match(c.leftoversCommand(S, true), / --delete$/);
 });
 
-test('changing KeepDataOnDelete keeps the template and every other value', () => {
+test('changing KeepDataOnDelete gives the stack its own release template again, keeps every other value, and checks the output', () => {
   const cmd = c.keepDataCommand(S, false);
-  assert.match(cmd, /--use-previous-template/);
+  // --use-previous-template silently kept every old value on v0.8.4 and v0.8.5 (CloudFormation stores that template resolved).
+  assert.doesNotMatch(cmd, /use-previous-template/);
+  assert.match(cmd, /^V=\$\(aws cloudformation describe-stacks --region eu-west-1 --stack-name coderhelm-prod --query "Stacks\[0\]\.Outputs\[\?OutputKey=='Version'\]\.OutputValue" --output text\)/);
+  assert.match(cmd, /--template-url "https:\/\/coderhelm-public\.s3\.amazonaws\.com\/launch\/\$V\/coderhelm\.json"/);
+  assert.match(cmd, /wait stack-update-complete --region eu-west-1 --stack-name coderhelm-prod/);
+  assert.ok(cmd.trim().endsWith(c.keepDataCheckCommand(S)), 'it ends by printing the KeepDataOnDelete output');
+  assert.match(c.keepDataCheckCommand(S), /OutputKey=='KeepDataOnDelete'/);
   assert.match(cmd, /ParameterKey=KeepDataOnDelete,ParameterValue=false/);
   assert.match(cmd, /CAPABILITY_AUTO_EXPAND/);
   for (const k of ['Stage', 'AdminEmail', 'AutoUpdate', 'DomainCertificateArn']) assert.match(cmd, new RegExp(`ParameterKey=${k},UsePreviousValue=true`));
@@ -46,4 +52,16 @@ test('what goes and what stays follows the choice', () => {
 test('validation names what is wrong', () => {
   assert.deepEqual(c.validate({ stage: 'prod', region: 'us-east-1' }), {});
   assert.ok(c.validate({ stage: 'Prod', region: 'x' }).stage);
+});
+
+test('no page tells anyone to change a parameter with the current template', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const root = path.resolve(import.meta.dirname, '..');
+  const files = ['lib/uninstall/core.ts', 'lib/uninstall/page-info.ts', 'components/uninstall/guide.tsx', 'lib/install/core.ts', 'lib/install/page-info.ts', 'components/install/wizard.tsx'];
+  for (const f of files) {
+    const text = fs.readFileSync(path.join(root, f), 'utf8');
+    assert.doesNotMatch(text, /--use-previous-template/, f);
+    for (const m of text.matchAll(/[^.\n]*Use (current|existing) template[^.\n]*/g)) assert.match(m[0], /Don(&apos;|')t/, `${f}: ${m[0].trim()}`);
+  }
 });
