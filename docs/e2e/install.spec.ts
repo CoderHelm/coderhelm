@@ -176,6 +176,8 @@ test('happy path: launch, follow the install, GitHub, models, ready', async ({ p
   const m = newMock();
   await mock(page, m);
   await page.goto('/self-host/install/');
+  // A new guide starts on hybrid; this test follows the fully private guide.
+  await page.locator('[data-setup="private"]').click();
   await expect(page.getByTestId('step-title')).toHaveText('Install CoderHelm in your AWS account');
   await expect(page.getByTestId('privacy')).toContainText('Nothing you type and nothing about your install is sent to CoderHelm or Google.');
 
@@ -502,6 +504,8 @@ test('more options: the name in your AWS account is explained, checked in one se
   const m = newMock();
   await mock(page, m);
   await page.goto('/self-host/install/');
+  // A new guide starts on hybrid; this test follows the fully private guide.
+  await page.locator('[data-setup="private"]').click();
   await page.getByLabel('Your email').fill('ada@example.com');
   await page.getByRole('button', { name: 'More options' }).click();
   const name = page.getByLabel('Name in your AWS account');
@@ -1075,10 +1079,16 @@ test('hybrid Jira: the toggle sits next to GitHub, on by default, can be turned 
   await mock(page, newMock());
   await mockHybrid(page, newHybrid());
   await page.goto('/self-host/install/');
+  // A new guide starts on hybrid, with CoderHelm's GitHub App, Jira app and address.
+  const jira = page.getByTestId('hosted-jira');
+  await expect(jira).toBeChecked();
+  await expect(page.getByTestId('hosted-github')).toBeChecked();
+  await expect(page.locator('[data-setup="hybrid"] input[type="radio"]')).toBeChecked();
+  // Fully private hides both; picking hybrid again brings them back on.
+  await page.locator('[data-setup="private"]').click();
   await expect(page.getByTestId('hosted-jira')).toHaveCount(0);
   await page.locator('[data-setup="hybrid"]').click();
   const options = page.getByTestId('hybrid-options');
-  const jira = page.getByTestId('hosted-jira');
   await expect(jira).toBeChecked();
   await expect(options.locator('label')).toHaveText([/Use CoderHelm’s GitHub App/, /Use CoderHelm’s Jira app/, /Share delivery data/]);
   await expect(options.locator('label').nth(1)).toContainText('your install never holds the app’s secret');
@@ -1236,6 +1246,8 @@ test('email: through CoderHelm only when picked, and then no From address', asyn
   const m = newMock();
   await mock(page, m);
   await page.goto('/self-host/install/');
+  // A new guide starts on hybrid; this test follows the fully private guide.
+  await page.locator('[data-setup="private"]').click();
   await page.getByLabel('Your email').fill('ada@example.com');
   await page.getByRole('button', { name: 'More options' }).click();
   const choice = page.getByTestId('email-choice');
@@ -1261,6 +1273,8 @@ test('release: latest.json unreadable falls back to GitHub’s latest release, a
   const m = newMock({ latest: 'unreadable', githubTag: 'v0.9.2', templates: ['v0.9.2'] });
   await mock(page, m);
   await page.goto('/self-host/install/');
+  // A new guide starts on hybrid; this test follows the fully private guide.
+  await page.locator('[data-setup="private"]').click();
   await page.getByLabel('Your email').fill('ada@example.com');
   await expect(page.getByTestId('launch')).toBeEnabled();
   await expect(page.getByTestId('release-missing')).toHaveCount(0);
@@ -1278,6 +1292,8 @@ test('release: a template that isn’t published shows the message and no launch
   const m = newMock({ templates: [] });
   await mock(page, m);
   await page.goto('/self-host/install/');
+  // A new guide starts on hybrid; this test follows the fully private guide.
+  await page.locator('[data-setup="private"]').click();
   await page.getByLabel('Your email').fill('ada@example.com');
   const missing = page.getByTestId('release-missing');
   await expect(missing).toContainText("CoderHelm v0.7.0 isn't published yet. Releases publish automatically after each update; try again in a few minutes.");
