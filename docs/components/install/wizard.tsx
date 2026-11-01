@@ -1404,7 +1404,7 @@ export function InstallWizard() {
         <Details summary="What CoderHelm does, and what it sees">
           <p>Your install registers with CoderHelm and proves it answers on its own CloudFront address. CoderHelm reserves {host} and shows a “being set up” page there.</p>
           <p>Your install asks AWS for a certificate in your own account. CoderHelm writes its validation record, then, once the certificate is issued and your install has moved, the record that sends {host} to your CloudFront. It can only ever write those records, for this name.</p>
-          <p>Everything CoderHelm sends your install carries CoderHelm’s signature, which your install checks with public keys that come inside its signed release, so nobody else can pass a message off as CoderHelm’s. <a className="underline" href="/self-host/hybrid/#how-an-install-knows-a-message-is-from-coderhelm">How that works</a>.</p>
+          <p>Everything CoderHelm sends your install carries CoderHelm’s signature, which your install checks with public keys that come inside its signed release, so nobody else can pass a message off as CoderHelm’s. <a className="underline" href="/self-host/hybrid/#trust-model">How that works</a>.</p>
           <p>Visitors go straight to your CloudFront: no traffic passes through CoderHelm. <a className="underline" href="/self-host/hybrid/#trust-model">The trust model</a> lists everything.</p>
         </Details>
       </section>
