@@ -212,6 +212,23 @@ test('happy path: launch, follow the install, GitHub, models, ready', async ({ p
   m.status = { schema: 1, phase: 'done', url: INSTALL, step: 10, steps: 10 };
   m.setup = setupDoc(NO_APP);
 
+  // Your data: start fresh by default, nothing to fill in.
+  await expect(page.getByTestId('screen-data')).toBeVisible();
+  await expect(page.getByTestId('data-fresh')).toBeChecked();
+  await expect(page.getByTestId('data-move-panel')).toHaveCount(0);
+  // Moving a team: a link to hosted CoderHelm's request page with only the install's details.
+  await page.getByTestId('data-move').click();
+  await expect(page.getByTestId('data-no-secrets')).toBeVisible();
+  const ask = new URL((await page.getByTestId('data-open-request').getAttribute('href'))!);
+  expect(ask.origin + ask.pathname).toBe('https://app.coderhelm.com/support/move/');
+  expect([...ask.searchParams.keys()].sort()).toEqual(['address', 'region', 'stage']);
+  expect(ask.searchParams.get('address')).toBe(new URL(INSTALL).origin);
+  expect(ask.toString()).not.toContain('ada');
+  await expect(page.getByTestId('data-next').locator('li')).toHaveCount(5);
+  // The guide goes on without waiting for the request.
+  await page.getByTestId('data-fresh').click();
+  await page.getByTestId('data-continue').click();
+
   // GitHub: the manifest goes to GitHub; GitHub's code goes to the install.
   await expect(page.getByTestId('screen-github')).toBeVisible();
   await expect(page.getByTestId('step-title')).toHaveText('Connect GitHub');
@@ -860,7 +877,7 @@ test('hybrid: pick the setup, the name is checked as you type, and AWS opens wit
   const q = new URLSearchParams(new URL(u).hash.split('?')[1]);
   expect(q.get('param_Hostname')).toBeNull();
   // The steps for a CoderHelm address, with CoderHelm's Jira app (on by default).
-  await expect(page.locator('[aria-label="Install steps"] > li')).toHaveCount(6);
+  await expect(page.locator('[aria-label="Install steps"] > li')).toHaveCount(7);
   await expect(page.getByTestId('trust')).toContainText('GitHub and Jira events pass through CoderHelm');
 });
 
@@ -1096,11 +1113,11 @@ test('hybrid Jira: the toggle sits next to GitHub, on by default, can be turned 
   // The whole row is the control, with the hand cursor.
   expect(await options.locator('label').nth(1).evaluate((e) => getComputedStyle(e).cursor)).toBe('pointer');
   const steps = page.locator('[aria-label="Install steps"] > li');
-  await expect(steps).toHaveCount(6);
-  await expect(steps.nth(4)).toContainText('Jira');
+  await expect(steps).toHaveCount(7);
+  await expect(steps.nth(5)).toContainText('Jira');
   await options.locator('label').nth(1).click();
   await expect(jira).not.toBeChecked();
-  await expect(steps).toHaveCount(5);
+  await expect(steps).toHaveCount(6);
   await expect(page.getByTestId('trust')).toContainText('Hybrid: GitHub events pass through CoderHelm');
   // GitHub off leaves Jira as it is; GitHub on again turns Jira back on.
   await options.locator('label').nth(0).click();

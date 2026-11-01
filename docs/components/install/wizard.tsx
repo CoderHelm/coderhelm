@@ -55,6 +55,9 @@ import {
   cleanHostname,
   cliGithubCommand,
   deriveStep,
+  DATA_CHOICES,
+  MOVE_NEXT_STEPS,
+  moveRequestUrl,
   domainRows,
   domainUrl,
   elapsed,
@@ -126,6 +129,9 @@ function load(): { state: InstallState; github?: string; app?: string; hybridGit
     : newState(fromUrl.statusId ? { setupToken: '', setup: 'private', domainChoice: 'aws', githubChoice: 'own', jiraChoice: 'own' } : { setupToken: '' });
   const state = { ...base, ...fromUrl };
   if (fromUrl.statusId && !state.launchedAt && !stored) state.launchedAt = Date.now();
+  // Picked up from the stack's link on another device: Your data was answered
+  // where the install began (a move can still be asked from Support).
+  if (fromUrl.statusId && !stored) state.dataDone = true;
   if (!state.setupToken && !fromUrl.statusId) state.setupToken = newState().setupToken;
   return { state, github, app, hybridGithub };
 }
@@ -289,7 +295,7 @@ export function Primary({ children, href, onClick, disabled, type = 'button', ne
     anthropic: 'bg-[#1f1e1d] text-[#f5f0e8] ring-1 ring-inset ring-white/10 hover:bg-[#2a2826]',
     plain: 'bg-fd-primary text-fd-primary-foreground hover:opacity-90',
   }[brand];
-  const cls = `group/btn inline-flex min-h-12 w-full items-center justify-center gap-2.5 rounded-xl px-6 py-3 text-base font-semibold shadow-sm transition active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fd-ring focus-visible:ring-offset-2 focus-visible:ring-offset-fd-background disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto ${look}`;
+  const cls = `group/btn inline-flex min-h-12 cursor-pointer w-full items-center justify-center gap-2.5 rounded-xl px-6 py-3 text-base font-semibold shadow-sm transition active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fd-ring focus-visible:ring-offset-2 focus-visible:ring-offset-fd-background disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto ${look}`;
   if (href)
     return (
       <a className={cls} href={href} data-testid={testId} onClick={onClick} {...(newTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
@@ -304,7 +310,7 @@ export function Primary({ children, href, onClick, disabled, type = 'button', ne
 }
 
 export function Secondary({ children, href, onClick, newTab, testId }: { children: React.ReactNode; href?: string; onClick?: () => void; newTab?: boolean; testId?: string }) {
-  const cls = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-fd-border bg-fd-background px-4 py-2 text-sm font-medium transition hover:bg-fd-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fd-ring';
+  const cls = 'inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-fd-border bg-fd-background px-4 py-2 text-sm font-medium transition hover:bg-fd-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fd-ring';
   if (href)
     return (
       <a className={cls} href={href} data-testid={testId} {...(newTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
@@ -316,6 +322,15 @@ export function Secondary({ children, href, onClick, newTab, testId }: { childre
       {children}
     </button>
   );
+}
+
+/** The install's host name for a sentence, or a placeholder. */
+function installHost(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return 'its address';
+  }
 }
 
 export function Details({ summary, children }: { summary: string; children: React.ReactNode }) {
@@ -837,7 +852,7 @@ export function InstallWizard() {
   }, [view, loaded]);
   const steps = stepsFor({ domainChoice: s?.domainChoice ?? 'aws', jiraChoice: s?.jiraChoice });
   const done = useMemo(() => {
-    const order: StepId[] = ['aws', 'domain', 'address', 'github', 'models', 'jira', 'ready'];
+    const order: StepId[] = ['aws', 'data', 'domain', 'address', 'github', 'models', 'jira', 'ready'];
     const i = order.indexOf(derived);
     return new Set<StepId>(i < 0 ? [] : order.slice(0, i));
   }, [derived]);
@@ -1363,6 +1378,41 @@ export function InstallWizard() {
           <p>The installer runs in CodeBuild in your account. It writes its progress to a small file in your account (bucket coderhelm-setup-{s.statusId}) that this page reads: the phase, the step and, at the end, your install’s address. Nothing else.</p>
           <p>Stack name: {stackName(s)} (from the name in your AWS account, {s.stage}), in {REGIONS.find((r) => r.id === s.region)?.name ?? s.region}. Release {s.version}.</p>
         </Details>
+      </section>
+    );
+  } else if (view === 'data') {
+    const choice = s.dataChoice ?? 'fresh';
+    screen = (
+      <section data-testid="screen-data">
+        <Heading title="Your data" lead="Start with an empty CoderHelm, or ask CoderHelm to move a team you already run on app.coderhelm.com to this install." />
+        <fieldset className="space-y-2" data-testid="data-choices">
+          <legend className="sr-only">Your data</legend>
+          {DATA_CHOICES.map((c) => (
+            <label key={c.id} className={`flex cursor-pointer gap-3 rounded-xl border p-3 transition ${choice === c.id ? 'border-fd-primary bg-fd-primary/5' : 'border-fd-border hover:bg-fd-accent'}`}>
+              <input type="radio" name="data" className="mt-1 cursor-pointer accent-[var(--color-fd-primary)]" checked={choice === c.id} onChange={() => update({ dataChoice: c.id })} data-testid={`data-${c.id}`} />
+              <span>
+                <span className="block font-medium">{c.title}</span>
+                <span className="block text-sm text-fd-muted-foreground">{c.help}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        {choice === 'move' ? (
+          <div className="mt-6 space-y-4 rounded-2xl border border-fd-border p-4 sm:p-5" data-testid="data-move-panel">
+            <p className="text-sm">
+              Sign in to app.coderhelm.com as an <b>admin or owner of the team to move</b>. The request page fills in this install ({installHost(s.url)}, {s.region}, {s.stage}); you add a good time and any notes. Sending it opens a support ticket and shows its number.
+            </p>
+            <p className="text-sm text-fd-muted-foreground" data-testid="data-no-secrets">Never send AWS keys, tokens or passwords. CoderHelm never needs them to move your team.</p>
+            <Primary href={moveRequestUrl(s)} newTab testId="data-open-request">Ask CoderHelm to move my team</Primary>
+            <ol className="list-decimal space-y-1.5 pl-5 text-sm text-fd-muted-foreground" data-testid="data-next">
+              {MOVE_NEXT_STEPS.map((x) => <li key={x}>{x}</li>)}
+            </ol>
+          </div>
+        ) : null}
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <Primary onClick={() => update({ dataDone: true })} testId="data-continue">Continue</Primary>
+        </div>
+        <p className="mt-3 text-sm text-fd-muted-foreground">{choice === 'move' ? 'The guide goes on while the move is arranged; your request stays open on its ticket.' : 'You can still ask to move a team later, from Support on app.coderhelm.com.'}</p>
       </section>
     );
   } else if (view === 'address') {

@@ -224,6 +224,9 @@ export const api = {
   supportTicket: (id: string) => request<SupportDetail>(`/api/support/tickets/${encodeURIComponent(id)}`),
   openSupportTicket: (body: NewSupportTicket) =>
     request<SupportDetail>("/api/support/tickets", { method: "POST", body: JSON.stringify(body) }),
+  /** A team admin asks Coderhelm to move the team to its self-hosted install (opens a ticket). */
+  requestMove: (body: MoveRequest) =>
+    request<SupportDetail>("/api/support/move", { method: "POST", body: JSON.stringify(body) }),
   replySupportTicket: (id: string, body: string, items: SupportItemRef[] = []) =>
     request<SupportDetail>(`/api/support/tickets/${encodeURIComponent(id)}/reply`, {
       method: "POST",
@@ -2258,6 +2261,16 @@ export interface Banner {
   dismissible: boolean;
   link_text?: string;
   link_url?: string;
+}
+
+/** What the install guide's "Your data" step sends. Never credentials. */
+export interface MoveRequest {
+  region: string;
+  stage: string;
+  /** The install's https address. */
+  address: string;
+  window?: string;
+  notes?: string;
 }
 
 export interface TeamInfo {

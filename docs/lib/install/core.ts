@@ -14,30 +14,34 @@ export const REPO = 'CoderHelm/coderhelm-platform';
 export const GITHUB_LATEST_URL = `https://api.github.com/repos/${REPO}/releases/latest`;
 
 export type Provider = 'bedrock' | 'anthropic';
-export type StepId = 'start' | 'aws' | 'domain' | 'address' | 'github' | 'models' | 'jira' | 'ready';
+export type StepId = 'start' | 'aws' | 'data' | 'domain' | 'address' | 'github' | 'models' | 'jira' | 'ready';
 export const STEPS: { id: StepId; label: string }[] = [
   { id: 'aws', label: 'AWS' },
+  { id: 'data', label: 'Your data' },
   { id: 'github', label: 'GitHub' },
   { id: 'models', label: 'Models' },
   { id: 'ready', label: 'Ready' },
 ];
 
 /**
- * The steps for this install: a Domain step after AWS for their own domain,
- * an Address step for a CoderHelm address, and a Jira step before Ready when
+ * The steps for this install: AWS, then Your data (start fresh or move a
+ * team from hosted CoderHelm), a Domain step for their own domain, an
+ * Address step for a CoderHelm address, and a Jira step before Ready when
  * the Jira site links through CoderHelm's Jira app.
  */
 export function stepsFor(s: Pick<InstallState, 'domainChoice'> & Partial<Pick<InstallState, 'jiraChoice'>>): { id: StepId; label: string }[] {
-  const rest = s.jiraChoice === 'hosted' ? [...STEPS.slice(1, -1), { id: 'jira' as const, label: 'Jira' }, STEPS[STEPS.length - 1]] : STEPS.slice(1);
-  if (s.domainChoice === 'own') return [STEPS[0], { id: 'domain', label: 'Domain' }, ...rest];
-  if (s.domainChoice === 'coderhelm') return [STEPS[0], { id: 'address', label: 'Address' }, ...rest];
-  return [STEPS[0], ...rest];
+  const [aws, data, ...after] = STEPS;
+  const rest = s.jiraChoice === 'hosted' ? [...after.slice(0, -1), { id: 'jira' as const, label: 'Jira' }, after[after.length - 1]] : after;
+  if (s.domainChoice === 'own') return [aws, data, { id: 'domain', label: 'Domain' }, ...rest];
+  if (s.domainChoice === 'coderhelm') return [aws, data, { id: 'address', label: 'Address' }, ...rest];
+  return [aws, data, ...rest];
 }
 
 /** How long each step takes, as people should expect it. */
 export const STEP_TIME: Record<StepId, string> = {
   start: '1 min',
   aws: 'about 20 min, mostly waiting',
+  data: '1 min',
   domain: 'up to 30 min',
   address: 'about 30 min, by itself',
   github: '1 min',
@@ -68,6 +72,47 @@ export const SETUPS: { id: Setup; title: string; tag?: string; gets: string[]; t
 ];
 
 /** The suffix every CoderHelm address has. */
+// ── Your data: start fresh, or move a team from hosted CoderHelm ────────
+
+export type DataChoice = 'fresh' | 'move';
+
+export const DATA_CHOICES: { id: DataChoice; title: string; help: string }[] = [
+  { id: 'fresh', title: 'Start fresh', help: 'A new, empty CoderHelm. Nothing to fill in.' },
+  { id: 'move', title: 'Move my team from CoderHelm (hosted)', help: 'Ask CoderHelm to bring a team you run on app.coderhelm.com to this install. A person sets up the move with you on a support ticket.' },
+];
+
+/** What happens after a move request, in order. */
+export const MOVE_NEXT_STEPS = [
+  'Someone from CoderHelm answers on the support ticket, usually within a working day.',
+  'You agree on a time, and both sides confirm the team and the install.',
+  'Your team\u2019s settings, history and connections are copied to the install and checked, count by count.',
+  'Hosted CoderHelm keeps working the whole time. You switch when you are ready.',
+  'People sign in to the install with the same email and password.',
+];
+
+export const HOSTED_APP = 'https://app.coderhelm.com';
+
+/**
+ * The request page on hosted CoderHelm, where an admin of the team asks for
+ * the move after signing in (the team is the one they are signed in to, never
+ * typed). Only the install's region, name and address go along: no account
+ * id, key, token or email.
+ */
+export function moveRequestUrl(s: Pick<InstallState, 'region' | 'stage' | 'url'>): string {
+  const q = new URLSearchParams();
+  q.set('region', s.region);
+  q.set('stage', s.stage);
+  let address = '';
+  try {
+    const u = new URL(s.url);
+    if (u.protocol === 'https:') address = `https://${u.hostname}`;
+  } catch {
+    address = '';
+  }
+  q.set('address', address);
+  return `${HOSTED_APP}/support/move/?${q.toString()}`;
+}
+
 export const NAME_ZONE = 'coderhelm.com';
 /** CoderHelm's API, which the guide asks whether a name is free. */
 export const HOSTED_API = 'https://api.coderhelm.com';
@@ -218,6 +263,10 @@ export interface InstallState {
   jiraSite?: string;
   /** They chose to link the Jira site later, in Settings. */
   jiraSkipped?: boolean;
+  /** Your data: start fresh, or ask CoderHelm to move a team from hosted. */
+  dataChoice?: DataChoice;
+  /** They finished the Your data step (a move request doesn't hold the guide up). */
+  dataDone?: boolean;
   /** Share failed-delivery metadata with CoderHelm support (off by default). */
   sharing: boolean;
   /** Their domain, e.g. coderhelm.example.com (only with domainChoice 'own'). */
@@ -302,6 +351,8 @@ export function newState(over: Partial<InstallState> = {}): InstallState {
     jiraChoice: 'hosted',
     jiraSite: '',
     jiraSkipped: false,
+    dataChoice: 'fresh',
+    dataDone: false,
     sharing: false,
     hostname: '',
     domainSkipped: false,
@@ -664,13 +715,17 @@ export function progressRows(doc: StatusDoc | null, answering: boolean, launched
 }
 
 /** Which screen to show, from what is known. The install's own answers win over memory. */
-export function deriveStep(s: Pick<InstallState, 'launchedAt' | 'url'> & Partial<Pick<InstallState, 'domainChoice' | 'domainSkipped' | 'githubChoice' | 'jiraChoice' | 'jiraSkipped'>>, setup: SetupStatus | null): StepId {
+export function deriveStep(s: Pick<InstallState, 'launchedAt' | 'url'> & Partial<Pick<InstallState, 'domainChoice' | 'domainSkipped' | 'githubChoice' | 'jiraChoice' | 'jiraSkipped' | 'dataDone'>>, setup: SetupStatus | null): StepId {
   if (!s.launchedAt && !s.url) return 'start';
   if (!setup) return 'aws';
   // Someone has signed up: the install is ready (its domain or CoderHelm
   // address finishes by itself). Only the Jira link, which needs that admin,
   // can still be under way.
   if (setup.closed) return jiraPending(s, setup) ? 'jira' : 'ready';
+  // Your data, once the install answers: start fresh or ask to move a team.
+  // Only an explicit false holds the guide here (a guide saved before the
+  // step has none and goes on).
+  if (s.dataDone === false) return 'data';
   // Their own domain first, so the GitHub App gets the domain's URLs. An
   // install too old to report the domain doesn't hold anyone up.
   const domain = findCheck(setup, 'domain');
@@ -912,6 +967,9 @@ export function parseStored(raw: string | null): InstallState | null {
       ? { setup: 'private' as const, domainChoice: 'aws' as const, githubChoice: 'own' as const, jiraChoice: 'own' as const }
       : {};
     const s: InstallState = { ...newState(), ...before, ...v };
+    // Saved before the Your data step existed: the guide goes on as it was.
+    if (typeof v.dataDone !== 'boolean') s.dataDone = true;
+    if (v.dataChoice !== 'fresh' && v.dataChoice !== 'move') s.dataChoice = 'fresh';
     // Saved before the Jira choice existed: follow the setup it was saved with,
     // so a hybrid install keeps CoderHelm's Jira app on like its GitHub App.
     if (v.jiraChoice !== 'own' && v.jiraChoice !== 'hosted') {
