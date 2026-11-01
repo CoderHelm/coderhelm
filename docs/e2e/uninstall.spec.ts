@@ -1,6 +1,7 @@
 // The uninstall page (/self-host/uninstall/) end to end: the install comes
 // from the address bar, the keep-data choice shows what goes and what stays,
-// "Delete everything" first sends the person to set KeepDataOnDelete, every
+// "Delete everything" first sends the person to the switch in CoderHelm (with
+// KeepDataOnDelete as the fallback for an older install), every
 // link and command names the install's stack, and the last step is the
 // read-only leftover check. Phones too. E2E_SHOTS=<dir> saves screenshots.
 import { expect, test, type Page } from '@playwright/test';
@@ -29,7 +30,7 @@ test('keep my data: delete the stack, then the check', async ({ page }) => {
   await expect(page.getByTestId('next-data')).toBeDisabled();
   await page.getByTestId('mode-keep').click();
   await expect(page.getByTestId('stays')).toContainText('the tables');
-  await expect(page.getByTestId('set-keep-false')).toHaveCount(0);
+  await expect(page.getByTestId('set-delete-switch')).toHaveCount(0);
   await page.getByTestId('next-data').click();
   await expect(page.getByTestId('open-stack')).toHaveAttribute('href', 'https://eu-west-1.console.aws.amazon.com/cloudformation/home?region=eu-west-1#/stacks/stackinfo?stackId=coderhelm-prod');
   await shot(page, 'uninstall-2-delete');
@@ -41,16 +42,19 @@ test('keep my data: delete the stack, then the check', async ({ page }) => {
   expect(page.url()).not.toMatch(/mode|keep|everything/);
 });
 
-test('delete everything: set KeepDataOnDelete to false first', async ({ page }) => {
+test('delete everything: the switch in CoderHelm first, KeepDataOnDelete as the fallback', async ({ page }) => {
   await page.goto('/self-host/uninstall/?stage=prod&region=us-east-1');
   await page.getByTestId('next-choose').click();
   await page.getByTestId('mode-everything').click();
+  await expect(page.getByTestId('set-delete-switch')).toContainText('Settings, System, Uninstall');
+  await expect(page.getByTestId('set-delete-switch')).toContainText('type prod to confirm');
+  await expect(page.getByTestId('step-data')).not.toContainText('v0.8.4');
+  await page.getByText('No such switch in Settings?').click();
   await expect(page.getByTestId('set-keep-false')).toContainText('KeepDataOnDelete');
   await expect(page.getByTestId('stays')).toHaveText('Nothing.');
   await expect(page.getByTestId('goes')).toContainText('7-day wait');
-  await page.getByText('Or from a terminal').click();
   await expect(page.getByTestId('keep-false-command')).toContainText('ParameterKey=KeepDataOnDelete,ParameterValue=false');
-  // The release's own template again, never the current one (it kept every old value on v0.8.4 and v0.8.5).
+  // The release's own template again, never the current one.
   await expect(page.getByTestId('keep-false-command')).toContainText('--template-url "https://coderhelm-public.s3.amazonaws.com/launch/$V/coderhelm.json"');
   await expect(page.getByTestId('keep-false-command')).not.toContainText('use-previous-template');
   await expect(page.getByTestId('keep-false-command')).toContainText("OutputKey=='KeepDataOnDelete'");
