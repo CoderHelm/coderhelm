@@ -118,7 +118,12 @@ function load(): { state: InstallState; github?: string; app?: string; hybridGit
     stored = null;
   }
   // The address bar wins (it may come from the stack's InstallGuide output on another device).
-  const base = stored && (!fromUrl.statusId || stored.statusId === fromUrl.statusId) ? stored : newState({ setupToken: '' });
+  // Opened from the stack's link on another device (no memory here): without
+  // the setup key this browser can't speak for a hybrid install, so it follows
+  // the install as the private guide does.
+  const base = stored && (!fromUrl.statusId || stored.statusId === fromUrl.statusId)
+    ? stored
+    : newState(fromUrl.statusId ? { setupToken: '', setup: 'private', domainChoice: 'aws', githubChoice: 'own', jiraChoice: 'own' } : { setupToken: '' });
   const state = { ...base, ...fromUrl };
   if (fromUrl.statusId && !state.launchedAt && !stored) state.launchedAt = Date.now();
   if (!state.setupToken && !fromUrl.statusId) state.setupToken = newState().setupToken;

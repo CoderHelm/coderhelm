@@ -398,8 +398,12 @@ test('setups: fully private and hybrid, each with what it gives and its trade-of
     assert.ok(x.gets.length >= 3 && x.tradeoff.endsWith('.'));
   }
   const n = c.newState();
-  assert.equal(n.setup, 'private');
-  assert.equal(n.githubChoice, 'own');
+  // Hybrid by default: CoderHelm's GitHub App, Jira app and address.
+  assert.equal(n.setup, 'hybrid');
+  assert.equal(n.githubChoice, 'hosted');
+  assert.equal(n.jiraChoice, 'hosted');
+  assert.equal(n.domainChoice, 'coderhelm');
+  assert.equal(n.emailTransport, '', 'the email sender is still chosen on purpose');
   assert.equal(n.sharing, false, 'sharing is off by default');
 });
 
@@ -468,7 +472,8 @@ test('the Address step follows registration, the claim, the certificate and the 
 test('the Jira step: CoderHelm’s Jira app, before Ready, after sign-up too, skippable', () => {
   assert.deepEqual(c.stepsFor({ domainChoice: 'coderhelm', jiraChoice: 'hosted' }).map((x) => x.id), ['aws', 'address', 'github', 'models', 'jira', 'ready']);
   assert.deepEqual(c.stepsFor({ domainChoice: 'aws', jiraChoice: 'own' }).map((x) => x.id), ['aws', 'github', 'models', 'ready']);
-  assert.equal(c.newState().jiraChoice, 'own', 'off unless chosen');
+  assert.equal(c.newState().jiraChoice, 'hosted', 'on with the hybrid default');
+  assert.equal(c.newState({ setup: 'private', githubChoice: 'own', jiraChoice: 'own' }).jiraChoice, 'own', 'off for a private install');
   const at = { launchedAt: 1, url: 'https://d111.cloudfront.net', jiraChoice: 'hosted' };
   const withJira = (code, st, extra = {}) => ({ ...setup(extra), checks: [...setup(extra).checks.slice(0, -1), { id: 'hybrid_jira', status: st, code, required: false }, setup(extra).checks.at(-1)] });
   assert.equal(c.deriveStep(at, withJira('no_link', 'todo')), 'jira');
@@ -527,4 +532,15 @@ test('a state saved before the Jira choice keeps CoderHelm\'s Jira app on for hy
   delete priv.jiraChoice;
   assert.equal(c.parseStored(JSON.stringify(priv)).jiraChoice, 'own');
   assert.equal(c.parseStored(JSON.stringify({ ...old, jiraChoice: 'own' })).jiraChoice, 'own');
+});
+
+test('a guide saved before the setup choice stays fully private', () => {
+  const old = c.parseStored(JSON.stringify({ statusId: 'abcd1234efgh5678', setupToken: 'x'.repeat(40), region: 'eu-west-1', stage: 'prod' }));
+  assert.equal(old.setup, 'private');
+  assert.equal(old.githubChoice, 'own');
+  assert.equal(old.jiraChoice, 'own');
+  assert.equal(old.domainChoice, 'aws');
+  const hybrid = c.parseStored(JSON.stringify({ statusId: 'abcd1234efgh5678', setup: 'hybrid', githubChoice: 'hosted' }));
+  assert.equal(hybrid.setup, 'hybrid');
+  assert.equal(hybrid.jiraChoice, 'hosted');
 });

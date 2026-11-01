@@ -178,6 +178,10 @@ test('install guide: the trust line is what the code does; no hit carries a quer
   const violations = watchCsp(page);
 
   await page.goto(`${DOCS}/self-host/install/`);
+  // A new guide starts on hybrid; this test follows the fully private guide.
+  // Hybrid's line ends with its "What CoderHelm sees" disclosure.
+  await expect(page.getByTestId('privacy')).toHaveText(`${GUIDE_TRUST.hybrid} What CoderHelm sees`);
+  await page.locator('[data-setup="private"]').click();
   await expect(page.getByTestId('privacy')).toHaveText(GUIDE_TRUST.private);
   await page.keyboard.press('Shift');
   await waitFor(hits, 'page_view');

@@ -293,11 +293,13 @@ export function newState(over: Partial<InstallState> = {}): InstallState {
     launchedAt: null,
     attempt: 1,
     appSlug: '',
-    domainChoice: 'aws',
-    setup: 'private',
+    // Hybrid by default: CoderHelm's GitHub App, Jira app and address, so a
+    // first install needs no app of its own. Private is one click away.
+    domainChoice: 'coderhelm',
+    setup: 'hybrid',
     coderhelmName: '',
-    githubChoice: 'own',
-    jiraChoice: 'own',
+    githubChoice: 'hosted',
+    jiraChoice: 'hosted',
     jiraSite: '',
     jiraSkipped: false,
     sharing: false,
@@ -904,7 +906,12 @@ export function parseStored(raw: string | null): InstallState | null {
   try {
     const v = JSON.parse(raw);
     if (!v || typeof v !== 'object' || !STATUS_ID_RE.test(v.statusId)) return null;
-    const s: InstallState = { ...newState(), ...v };
+    // Saved before the setup choice existed: that guide was fully private
+    // (the old default), so the hybrid default never applies to it.
+    const before = v.setup !== 'private' && v.setup !== 'hybrid'
+      ? { setup: 'private' as const, domainChoice: 'aws' as const, githubChoice: 'own' as const, jiraChoice: 'own' as const }
+      : {};
+    const s: InstallState = { ...newState(), ...before, ...v };
     // Saved before the Jira choice existed: follow the setup it was saved with,
     // so a hybrid install keeps CoderHelm's Jira app on like its GitHub App.
     if (v.jiraChoice !== 'own' && v.jiraChoice !== 'hosted') {
