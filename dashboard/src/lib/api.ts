@@ -3062,6 +3062,12 @@ export interface AnalyticsCounts {
   people: number;
   /** Runs that recorded who (or what) asked for them. */
   runs_with_requester: number;
+  /** Deploys Coderhelm started (a deploy label it added), each counted once. */
+  deploys: number;
+  deploys_preview: number;
+  deploys_staging: number;
+  deploys_prod: number;
+  deploys_other: number;
 }
 
 export interface AnalyticsComparison {
@@ -3072,6 +3078,12 @@ export interface AnalyticsComparison {
   previous_full_period: { start: string; end: string } | null;
   /** False when a period did not record who asked for nearly every run. */
   people_comparable: boolean;
+  /** Since when deploys are known (null: none recorded yet). */
+  deploys_since: string | null;
+  /** False when a compared period started before deploys were known. */
+  deploys_comparable: boolean;
+  /** "running" while earlier deploys are still being copied from GitHub. */
+  deploys_backfill: "done" | "running";
   /** Running totals by day; the previous values are null past the end of a shorter previous period. */
   daily: {
     offset: number;
@@ -3080,9 +3092,11 @@ export interface AnalyticsComparison {
     tickets: number;
     prs_opened: number;
     prs_reviewed: number;
+    deploys: number;
     previous_tickets: number | null;
     previous_prs_opened: number | null;
     previous_prs_reviewed: number | null;
+    previous_deploys: number | null;
   }[];
 }
 

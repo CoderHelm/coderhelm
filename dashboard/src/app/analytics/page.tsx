@@ -496,13 +496,19 @@ const METRICS: Metric[] = [
   { key: "comments", label: "Plain comments", sub: true },
   { key: "repos", label: "Repositories covered" },
   { key: "people", label: "People who asked", note: "people" },
+  { key: "deploys", label: "Deploys started", note: "deploys" },
+  { key: "deploys_preview", label: "To preview", sub: true, note: "deploys" },
+  { key: "deploys_staging", label: "To staging", sub: true, note: "deploys" },
+  { key: "deploys_prod", label: "To production", sub: true, note: "deploys" },
+  { key: "deploys_other", label: "Elsewhere", sub: true, note: "deploys" },
 ];
 
-/** Short toggle labels so the three fit side by side on a phone; the title names the metric in full. */
+/** Short toggle labels so the four fit side by side on a phone; the title names the metric in full. */
 const CHART_METRICS = [
   { value: "prs_reviewed", label: "Reviewed", title: "PRs reviewed" },
   { value: "prs_opened", label: "Opened", title: "PRs opened" },
   { value: "tickets", label: "Tickets", title: "Tickets" },
+  { value: "deploys", label: "Deploys", title: "Deploys started" },
 ] as const;
 type ChartMetric = (typeof CHART_METRICS)[number]["value"];
 
@@ -548,6 +554,17 @@ function Comparison({ c, period, previous, mtd }: { c: AnalyticsComparison; peri
     const recorded = (x: AnalyticsCounts, when: string) => `${count(x.runs_with_requester)} of ${plural(x.runs, "run")} in ${when}`;
     notes.push(`Who asked was recorded on ${recorded(c.previous, prev)} and ${recorded(c.current, cur)}, so people who asked is not compared: a jump from runs that recorded nobody would not be real.`);
   }
+  if (!c.deploys_comparable) {
+    const since = c.deploys_since ? new Date(c.deploys_since).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" }) : "";
+    notes.push(
+      since
+        ? `Deploys are known from ${since}${c.deploys_backfill === "running" ? " (earlier ones are still being read from GitHub)" : ""}, so deploys are not compared: ${prev} started before that, and a jump from days with no record would not be real.`
+        : `No deploys are recorded yet${c.deploys_backfill === "running" ? " (earlier ones are being read from GitHub)" : ""}, so deploys are not compared.`,
+    );
+  }
+  if (c.current.deploys > 0 || c.previous.deploys > 0) {
+    notes.push("Deploys counts the deploy labels Coderhelm added (a label named for a deploy, or the repository's deploy label): once per label and commit. Deploys people started are not counted.");
+  }
 
   // Phones keep the change in view; all of last month shows from the sm breakpoint.
   const cell = "px-1.5 py-2.5 text-right tabular-nums sm:px-4";
@@ -580,7 +597,7 @@ function Comparison({ c, period, previous, mtd }: { c: AnalyticsComparison; peri
                 <td className={`${cell} text-zinc-300`}>{count(c.previous[m.key])}</td>
                 <td className={`${cell} text-zinc-300`}>{count(c.current[m.key])}</td>
                 <td className={cell}>
-                  <Change cur={c.current[m.key]} prev={c.previous[m.key]} comparable={m.note !== "people" || c.people_comparable} />
+                  <Change cur={c.current[m.key]} prev={c.previous[m.key]} comparable={(m.note !== "people" || c.people_comparable) && (m.note !== "deploys" || c.deploys_comparable)} />
                 </td>
                 {full && <td className={`${cell} ${wide} text-zinc-300`}>{count(full[m.key])}</td>}
               </tr>

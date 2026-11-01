@@ -26,10 +26,12 @@ const SUMMARY = {
 const PREV_COUNTS = {
   tickets: 40, runs: 70, prs_opened: 50, prs_merged: 41, prs_open: 3, prs_reviewed: 100, reviews_posted: 400,
   approvals: 80, changes_requested: 40, comments: 280, repos: 6, people: 0, runs_with_requester: 0,
+  deploys: 0, deploys_preview: 0, deploys_staging: 0, deploys_prod: 0, deploys_other: 0,
 };
 const CUR_COUNTS = {
   tickets: 45, runs: 62, prs_opened: 50, prs_merged: 30, prs_open: 12, prs_reviewed: 210, reviews_posted: 660,
   approvals: 300, changes_requested: 250, comments: 110, repos: 8, people: 5, runs_with_requester: 30,
+  deploys: 14, deploys_preview: 2, deploys_staging: 9, deploys_prod: 3, deploys_other: 0,
 };
 const FULL_COUNTS = { ...PREV_COUNTS, tickets: 52, runs: 90, prs_opened: 63, prs_reviewed: 140, reviews_posted: 520 };
 
@@ -40,8 +42,9 @@ function compareDaily(start: Date, prevStart: Date, n: number) {
     const last = i === n - 1;
     return {
       offset: i, day: day(start), previous_day: last ? null : day(prevStart),
-      tickets: 2 * (i + 1), prs_opened: i + 1, prs_reviewed: 3 * (i + 1),
+      tickets: 2 * (i + 1), prs_opened: i + 1, prs_reviewed: 3 * (i + 1), deploys: i + 2,
       previous_tickets: last ? null : i + 1, previous_prs_opened: last ? null : i + 1, previous_prs_reviewed: last ? null : 2 * (i + 1),
+      previous_deploys: last ? null : 0,
     };
   });
 }
@@ -74,6 +77,10 @@ function analytics(period: string, repo: string | null) {
       previous_full: w.full ? FULL_COUNTS : null,
       previous_full_period: w.full ? { start: w.full.start.toISOString(), end: w.full.end.toISOString() } : null,
       people_comparable: false,
+      // Deploys were only recorded from the start of this period.
+      deploys_since: w.start.toISOString(),
+      deploys_comparable: false,
+      deploys_backfill: "running",
       daily: compareDaily(w.start, w.prevStart, Math.max(2, daysN)),
     },
     summary: { ...SUMMARY, prs_merged: Math.round(21 * scale), runs: Math.round(42 * scale) },
@@ -306,6 +313,23 @@ test("this period is compared with the one before, each thing counted once", asy
   await expect(days.locator("tbody tr").first()).toContainText("Day 1");
   // The previous period was a day shorter: its last value is a gap, not a zero.
   await expect(days.locator("tbody tr").last().locator("td").nth(1)).toHaveText("—");
+
+  // Deploys: counted, broken down by where they went, but not compared with a
+  // period that started before they were recorded.
+  await expect(row("Deploys started").locator("td").nth(1)).toHaveText("14");
+  await expect(row("To staging").locator("td").nth(1)).toHaveText("9");
+  await expect(row("To production").locator("td").nth(1)).toHaveText("3");
+  await expect(row("Deploys started").locator("td").nth(2)).toHaveText("Not comparable");
+  await expect(notes).toContainText("Deploys are known from");
+  await expect(notes).toContainText("still being read from GitHub");
+  await expect(notes).toContainText("once per label and commit");
+  const deploys = page.getByRole("group", { name: "Chart metric" }).getByRole("button", { name: "Deploys", exact: true });
+  await expect(deploys).toHaveClass(/cursor-pointer/);
+  // The table stays open from the Tickets check, and follows the metric.
+  await deploys.click();
+  const deployDays = page.getByRole("table", { name: "Deploys started so far by day" });
+  await expect(deployDays.locator("tbody tr").first().locator("td").nth(2)).toHaveText("2");
+  await expect(deployDays.locator("tbody tr").last().locator("td").nth(1)).toHaveText("—");
   await shot(page, "analytics-compare");
 });
 
