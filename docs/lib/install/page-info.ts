@@ -38,6 +38,8 @@ With the Hybrid setup, "What CoderHelm sets up for you" has these toggles, each 
 
 What CoderHelm sees for each: [Hybrid](${SITE.url}/self-host/hybrid/#trust-model).
 
+Everything CoderHelm sends a hybrid install, every relayed event and every answer to the install's own calls, carries CoderHelm's signature. The key stays in AWS KMS, and your install checks the signature with public keys that come inside the release it runs, so the trust comes from the signed release, not from the network: [How an install knows a message is from CoderHelm](${SITE.url}/self-host/hybrid/#trust-model).
+
 Each check comes from your install's own \`GET /api/setup/status\` ([the contract](https://github.com/CoderHelm/coderhelm-platform/blob/main/docs/self-host/setup-checks.md)).
 
 ## What it does in your AWS account
