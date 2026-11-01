@@ -39,7 +39,7 @@ export function Segmented<T extends string>({
             onClick={() => onChange(option.value)}
             // One font weight for every choice: selection changes only the
             // background and colour, so nothing changes width.
-            className={`min-h-8 whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-colors motion-reduce:transition-none disabled:opacity-50 ${
+            className={`min-h-8 cursor-pointer whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-colors motion-reduce:transition-none disabled:cursor-default disabled:opacity-50 ${
               pressed ? "bg-zinc-100 text-zinc-900" : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
             } ${focusRing} focus-visible:outline-offset-[-3px] ${pressed ? "focus-visible:outline-zinc-500" : ""}`}
           >
