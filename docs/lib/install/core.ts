@@ -293,11 +293,13 @@ export function newState(over: Partial<InstallState> = {}): InstallState {
     launchedAt: null,
     attempt: 1,
     appSlug: '',
-    domainChoice: 'aws',
-    setup: 'private',
+    // Hybrid by default: CoderHelm's GitHub App, Jira app and address, so a
+    // first install needs no app of its own. Private is one click away.
+    domainChoice: 'coderhelm',
+    setup: 'hybrid',
     coderhelmName: '',
-    githubChoice: 'own',
-    jiraChoice: 'own',
+    githubChoice: 'hosted',
+    jiraChoice: 'hosted',
     jiraSite: '',
     jiraSkipped: false,
     sharing: false,
