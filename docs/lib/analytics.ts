@@ -142,7 +142,7 @@ export function clickEvent(text: string | null | undefined): DocsEvent | null {
 }
 
 /** The install guide's step names (lib/install/core.ts StepId); anything else is not sent. */
-const STEP_NAMES = new Set(['start', 'aws', 'domain', 'address', 'github', 'models', 'jira', 'ready']);
+const STEP_NAMES = new Set(['start', 'aws', 'data', 'domain', 'address', 'github', 'models', 'jira', 'ready']);
 export function installStepEvent(step: string): DocsEvent | null {
   return STEP_NAMES.has(step) ? { name: 'install_step', step } : null;
 }
