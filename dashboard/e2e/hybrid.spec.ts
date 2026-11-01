@@ -21,6 +21,8 @@ interface State {
   sharing: { enabled: boolean; payloads: boolean };
   /** Whether Coderhelm's own Google Drive app is set up (the hosted side's `offered`). */
   driveOffered?: boolean;
+  /** A native install's uninstall choice (Settings, System, Uninstall); absent on an older release. */
+  uninstall?: { delete_data: boolean; changed_by: string | null; changed_at: string | null };
 }
 
 interface Call {
@@ -92,7 +94,13 @@ async function setup(page: Page, cfg: Record<string, unknown> | null = SELF, ini
     if (p === "/api/banners") return json(route, { banners: [] });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "example-org", status: "active", current: true }] });
     if (p === "/api/system/version") {
-      return json(route, { self_hosted: true, current: { version: "v1.2.0", commit: "abc1234", released_at: "2026-10-01T00:00:00Z", config_fingerprint: null }, latest: null, update_available: false, running: false, settings: { auto: false, channel: "stable", day: "sun", hour: 3, timezone: "UTC", majors: "ask" }, history: [], install: { stage: "acme", region: "eu-west-1" } });
+      return json(route, { self_hosted: true, current: { version: "v1.2.0", commit: "abc1234", released_at: "2026-10-01T00:00:00Z", config_fingerprint: null }, latest: null, update_available: false, running: false, settings: { auto: false, channel: "stable", day: "sun", hour: 3, timezone: "UTC", majors: "ask" }, history: [], install: { stage: "acme", region: "eu-west-1" }, ...(s.uninstall ? { uninstall: s.uninstall } : {}) });
+    }
+    if (p === "/api/system/uninstall-mode" && method === "PUT") {
+      const on = body?.delete_data === true;
+      if (on && body?.confirm !== "acme") return json(route, { error: "type the install's name (acme) to confirm" }, 400);
+      s.uninstall = { delete_data: on, changed_by: "admin@example.org", changed_at: "2026-11-01T00:00:00Z" };
+      return json(route, { ok: true, uninstall: s.uninstall });
     }
     if (p === "/api/system/preflight") return json(route, { checked_at: "2026-10-25T10:00:00Z", ready: true, current: "v1.2.0", latest: null, blockers: [], checks: [] });
     if (p === "/api/system/domain") {
@@ -498,6 +506,35 @@ test("uninstall: a link to the guided uninstall with this install filled in, nev
   expect(await page.getByTestId("uninstall-link").evaluate((e) => getComputedStyle(e).cursor)).toBe("pointer");
   // Opening the guide deletes nothing here.
   expect(calls.some((c) => c.method === "DELETE")).toBe(false);
+});
+
+test("uninstall: keep the data or delete everything, chosen here, deleted only with the stack", async ({ page }) => {
+  const { calls } = await setup(page, SELF, { uninstall: { delete_data: false, changed_by: null, changed_at: null } });
+  await page.goto("/settings/system/");
+  await expect(page.getByTestId("uninstall-data-off")).toContainText("Keep my data");
+  await page.getByTestId("uninstall-data-ask").click();
+  const go = page.getByTestId("uninstall-data-delete");
+  await expect(go).toBeDisabled();
+  await page.getByTestId("uninstall-confirm").fill("acm");
+  await expect(go).toBeDisabled();
+  await page.getByTestId("uninstall-confirm").fill("acme");
+  expect(await go.evaluate((e) => getComputedStyle(e).cursor)).toBe("pointer");
+  await go.click();
+  await expect(page.getByTestId("uninstall-data-on")).toContainText("Nothing is deleted until the stack is");
+  await expect(page.getByTestId("uninstall-data-on")).toContainText("admin@example.org");
+  expect(calls.filter((c) => c.path === "/api/system/uninstall-mode").map((c) => c.body)).toEqual([{ delete_data: true, confirm: "acme" }]);
+  await page.getByTestId("uninstall-data-keep").click();
+  await expect(page.getByTestId("uninstall-data-off")).toBeVisible();
+  expect(calls.filter((c) => c.path === "/api/system/uninstall-mode").at(-1)?.body).toEqual({ delete_data: false, confirm: "" });
+  // Nothing is deleted from here.
+  expect(calls.some((c) => c.method === "DELETE")).toBe(false);
+});
+
+test("uninstall: an install without the switch (an older release) shows no choice", async ({ page }) => {
+  await setup(page);
+  await page.goto("/settings/system/");
+  await expect(page.getByTestId("uninstall-section")).toContainText("KeepDataOnDelete");
+  await expect(page.getByTestId("uninstall-data")).toHaveCount(0);
 });
 
 test("uninstall, hybrid: a plain warning that the forwarded GitHub installations and Jira site go back to Coderhelm hosted", async ({ page }) => {

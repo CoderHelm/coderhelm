@@ -1226,6 +1226,12 @@ export const api = {
   setAutoUpdate: (settings: Partial<AutoUpdateSettings>) =>
     request<{ settings: AutoUpdateSettings }>("/api/system/auto-update", { method: "PUT", body: JSON.stringify(settings) }),
   /**
+   * What happens to the data when the install's stack is deleted: kept (the
+   * default) or deleted with it. Turning it on needs the install's name typed back.
+   */
+  setUninstallMode: (deleteData: boolean, confirm = "") =>
+    request<{ ok: boolean; uninstall: UninstallMode }>("/api/system/uninstall-mode", { method: "PUT", body: JSON.stringify({ delete_data: deleteData, confirm }) }),
+  /**
    * Update to `version` (default: the latest). Refused with the model check
    * when a model the release calls was refused; `skipCheck` passes only a
    * failure on a model the release doesn't call.
@@ -4141,6 +4147,14 @@ export interface SystemVersion {
   install?: { stage: string; region: string } | null;
   /** A native install (one CloudFormation stack): the stack and the update waiting for review. */
   native?: NativeUpdate | null;
+  /** A native install: whether its data is deleted with its stack (Settings, System, Uninstall). */
+  uninstall?: UninstallMode | null;
+}
+
+export interface UninstallMode {
+  delete_data: boolean;
+  changed_by: string | null;
+  changed_at: string | null;
 }
 
 /** The change set the updater prepared for a release (lambda/updater, change_set_summary). */

@@ -1,8 +1,9 @@
 // The uninstall page's decisions (components/uninstall/guide.tsx): a native
 // install is one CloudFormation stack, coderhelm-<name>, so uninstalling is
-// Delete stack. KeepDataOnDelete (a stack parameter, true by default) decides
-// whether the tables, data buckets, keys, user pool and secret stay; it is
-// changed with Update stack before the delete. Afterwards a read-only check
+// Delete stack. The data (tables, data buckets, keys, user pool, secret) is
+// kept unless the admin turns on "delete everything" in Settings, System,
+// Uninstall, or (an older install) sets the stack's KeepDataOnDelete to false
+// with Update stack before the delete. Afterwards a read-only check
 // lists anything still named or tagged for the install.
 
 export const STAGE_RE = /^[a-z][a-z0-9-]{0,19}$/;
@@ -90,9 +91,7 @@ export function releaseTemplateUrl(version: string): string {
  * The CLI form of Update stack that only changes KeepDataOnDelete (every other
  * value kept), then waits and prints the stack's KeepDataOnDelete output.
  * It gives the stack its own release's template again, never "use the
- * previous template": CloudFormation keeps a v0.8.4 or v0.8.5 template
- * with every parameter already filled in, so that update reports
- * UPDATE_COMPLETE and changes nothing.
+ * previous template", so the new value is certain to apply.
  */
 export function keepDataCommand(s: Pick<UninstallState, 'stage' | 'region'>, keep: boolean): string {
   const others = ['Stage', 'AdminEmail', 'ModelProvider', 'BedrockInferencePrefix', 'EmailTransport', 'EmailFrom', 'Hostname', 'SignupDomain', 'RequireTwoFactor', 'AutoUpdate', 'UpdateDay', 'UpdateHour', 'UpdateTimezone', 'SetupToken', 'StatusId', 'DomainCertificateArn', 'DomainZoneId'];

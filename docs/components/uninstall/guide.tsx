@@ -2,7 +2,8 @@
 
 // The uninstall page for self-hosted CoderHelm. A native install is one
 // CloudFormation stack, so this is a short walk through Delete stack: which
-// install, whether its data stays (the stack's KeepDataOnDelete parameter),
+// install, whether its data stays (the switch in Settings, System, Uninstall,
+// or on an older install the stack's KeepDataOnDelete parameter),
 // the delete itself in the AWS console, and the read-only check afterwards.
 // Nothing here calls AWS; it only builds links and commands.
 
@@ -110,13 +111,13 @@ export function UninstallGuide() {
 
       {step === 'data' ? (
         <section data-testid="step-data">
-          <Heading title="Keep the data or not" lead={<>The stack's <Mono>KeepDataOnDelete</Mono> parameter decides. It is <Mono>true</Mono> unless you changed it.</>} />
+          <Heading title="Keep the data or not" lead="The data is kept unless you choose otherwise." />
           <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="What happens to the data">
             {(['keep', 'everything'] as Mode[]).map((m) => (
               <button key={m} type="button" role="radio" aria-checked={mode === m} data-testid={`mode-${m}`} onClick={() => set({ mode: m })}
                 className={`rounded-xl border p-4 text-left transition ${mode === m ? 'border-fd-primary ring-2 ring-fd-primary/30' : 'border-fd-border hover:bg-fd-accent'}`}>
                 <span className="block font-semibold">{m === 'keep' ? 'Remove CoderHelm, keep my data' : 'Delete everything'}</span>
-                <span className="mt-1 block text-sm text-fd-muted-foreground">{m === 'keep' ? 'KeepDataOnDelete = true (the default). Nothing to change.' : `KeepDataOnDelete = false. Nothing can be recovered afterwards; KMS keys after AWS's ${KEY_DAYS}-day wait.`}</span>
+                <span className="mt-1 block text-sm text-fd-muted-foreground">{m === 'keep' ? 'The default. Nothing to change.' : `One switch in CoderHelm. Nothing can be recovered afterwards; KMS keys after AWS's ${KEY_DAYS}-day wait.`}</span>
               </button>
             ))}
           </div>
@@ -127,15 +128,25 @@ export function UninstallGuide() {
             </div>
           ) : null}
           {mode === 'everything' ? (
-            <Notice tone="warn" title="First set KeepDataOnDelete to false" testId="set-keep-false">
+            <Notice tone="warn" title="First turn on Delete everything in CoderHelm" testId="set-delete-switch">
               <ol className="list-decimal space-y-1 pl-5">
-                <li>Open the stack <Mono>{stackName(s)}</Mono>, then <b>Outputs</b>, and note <b>Version</b> (for example <Mono>v0.8.6</Mono>).</li>
-                <li>Choose <b>Update</b>, then <b>Replace existing template</b>, <b>Amazon S3 URL</b>: <Mono>{releaseTemplateUrl('<Version>')}</Mono> with that version. It is the release you run. Don&apos;t choose <b>Use existing template</b>: on an install from v0.8.4 or v0.8.5 it reports success and keeps the data anyway.</li>
-                <li>Choose <b>Next</b>, set <Mono>KeepDataOnDelete</Mono> to <Mono>false</Mono>, leave everything else, then <b>Next</b>, tick the boxes, and <b>Submit</b>. It takes a minute and changes nothing that runs.</li>
-                <li>When it says <Mono>UPDATE_COMPLETE</Mono>, check <b>Outputs</b> again: <b>KeepDataOnDelete</b> must say <Mono>false</Mono> before you delete the stack.</li>
+                <li>In CoderHelm, open <b>Settings</b>, <b>System</b>, <b>Uninstall</b> (install admins).</li>
+                <li>Choose <b>Delete everything on uninstall</b> and type <Mono>{s.stage || '<name>'}</Mono> to confirm. It takes effect at once; nothing is deleted until the stack is.</li>
+                <li>Then delete the stack (next step). It reads the switch and deletes the data with it.</li>
               </ol>
-              <div className="mt-3 flex flex-wrap gap-2"><Primary href={stackConsoleUrl(s)} newTab testId="open-stack-update" brand="aws"><AwsLogo /> Open the stack</Primary></div>
-              <Details summary="Or from a terminal"><CopyBox text={keepDataCommand(s, false)} testId="keep-false-command" /></Details>
+              <Details summary="No such switch in Settings? Set KeepDataOnDelete in AWS instead">
+                <div data-testid="set-keep-false">
+                  <ol className="list-decimal space-y-1 pl-5">
+                    <li>Open the stack <Mono>{stackName(s)}</Mono>, then <b>Outputs</b>, and note <b>Version</b> (for example <Mono>v0.8.10</Mono>).</li>
+                    <li>Choose <b>Update</b>, then <b>Replace existing template</b>, <b>Amazon S3 URL</b>: <Mono>{releaseTemplateUrl('<Version>')}</Mono> with that version. It is the release you run, so nothing else changes.</li>
+                    <li>Choose <b>Next</b>, set <Mono>KeepDataOnDelete</Mono> to <Mono>false</Mono>, leave everything else, then <b>Next</b>, tick the boxes, and <b>Submit</b>. It takes a minute and changes nothing that runs.</li>
+                    <li>When it says <Mono>UPDATE_COMPLETE</Mono>, check <b>Outputs</b> again: <b>KeepDataOnDelete</b> must say <Mono>false</Mono> before you delete the stack.</li>
+                  </ol>
+                  <div className="mt-3 flex flex-wrap gap-2"><Primary href={stackConsoleUrl(s)} newTab testId="open-stack-update" brand="aws"><AwsLogo /> Open the stack</Primary></div>
+                  <p className="mt-3 text-sm font-semibold">Or from a terminal</p>
+                  <CopyBox text={keepDataCommand(s, false)} testId="keep-false-command" />
+                </div>
+              </Details>
             </Notice>
           ) : null}
           <div className="mt-6 flex flex-wrap gap-2">
