@@ -533,3 +533,14 @@ test('a state saved before the Jira choice keeps CoderHelm\'s Jira app on for hy
   assert.equal(c.parseStored(JSON.stringify(priv)).jiraChoice, 'own');
   assert.equal(c.parseStored(JSON.stringify({ ...old, jiraChoice: 'own' })).jiraChoice, 'own');
 });
+
+test('a guide saved before the setup choice stays fully private', () => {
+  const old = c.parseStored(JSON.stringify({ statusId: 'abcd1234efgh5678', setupToken: 'x'.repeat(40), region: 'eu-west-1', stage: 'prod' }));
+  assert.equal(old.setup, 'private');
+  assert.equal(old.githubChoice, 'own');
+  assert.equal(old.jiraChoice, 'own');
+  assert.equal(old.domainChoice, 'aws');
+  const hybrid = c.parseStored(JSON.stringify({ statusId: 'abcd1234efgh5678', setup: 'hybrid', githubChoice: 'hosted' }));
+  assert.equal(hybrid.setup, 'hybrid');
+  assert.equal(hybrid.jiraChoice, 'hosted');
+});
