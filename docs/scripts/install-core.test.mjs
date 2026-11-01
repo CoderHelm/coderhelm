@@ -283,8 +283,8 @@ test('more options are validated in plain words', () => {
 });
 
 test('the domain step: only for their own domain, before GitHub, skippable, and the guide follows the install there', () => {
-  assert.deepEqual(c.stepsFor({ domainChoice: 'aws' }).map((x) => x.id), ['aws', 'github', 'models', 'ready']);
-  assert.deepEqual(c.stepsFor({ domainChoice: 'own' }).map((x) => x.id), ['aws', 'domain', 'github', 'models', 'ready']);
+  assert.deepEqual(c.stepsFor({ domainChoice: 'aws' }).map((x) => x.id), ['aws', 'data', 'github', 'models', 'ready']);
+  assert.deepEqual(c.stepsFor({ domainChoice: 'own' }).map((x) => x.id), ['aws', 'data', 'domain', 'github', 'models', 'ready']);
   const own = { launchedAt: 1, url: 'https://d111.cloudfront.net', domainChoice: 'own', domainSkipped: false };
   const withDomain = (st, code, extra = {}) => ({ ...setup(extra), checks: [...setup(extra).checks, { id: 'domain', status: st, code, required: false }] });
   assert.equal(c.deriveStep(own, withDomain('wait', 'validating', { github_app: { status: 'fail', code: 'missing' } })), 'domain');
@@ -423,7 +423,7 @@ test('CoderHelm address names: the same rules as the server, checked before aski
 });
 
 test('a CoderHelm address adds an Address step that waits for registration and the name', () => {
-  assert.deepEqual(c.stepsFor({ domainChoice: 'coderhelm' }).map((x) => x.id), ['aws', 'address', 'github', 'models', 'ready']);
+  assert.deepEqual(c.stepsFor({ domainChoice: 'coderhelm' }).map((x) => x.id), ['aws', 'data', 'address', 'github', 'models', 'ready']);
   const st = (checks) => ({ schema: 1, ready: false, checks });
   const base = { launchedAt: 1, url: 'https://d111test.cloudfront.net', domainChoice: 'coderhelm' };
   const gh = [{ id: 'github_app', status: 'fail', code: 'missing' }];
@@ -470,8 +470,8 @@ test('the Address step follows registration, the claim, the certificate and the 
 });
 
 test('the Jira step: CoderHelm’s Jira app, before Ready, after sign-up too, skippable', () => {
-  assert.deepEqual(c.stepsFor({ domainChoice: 'coderhelm', jiraChoice: 'hosted' }).map((x) => x.id), ['aws', 'address', 'github', 'models', 'jira', 'ready']);
-  assert.deepEqual(c.stepsFor({ domainChoice: 'aws', jiraChoice: 'own' }).map((x) => x.id), ['aws', 'github', 'models', 'ready']);
+  assert.deepEqual(c.stepsFor({ domainChoice: 'coderhelm', jiraChoice: 'hosted' }).map((x) => x.id), ['aws', 'data', 'address', 'github', 'models', 'jira', 'ready']);
+  assert.deepEqual(c.stepsFor({ domainChoice: 'aws', jiraChoice: 'own' }).map((x) => x.id), ['aws', 'data', 'github', 'models', 'ready']);
   assert.equal(c.newState().jiraChoice, 'hosted', 'on with the hybrid default');
   assert.equal(c.newState({ setup: 'private', githubChoice: 'own', jiraChoice: 'own' }).jiraChoice, 'own', 'off for a private install');
   const at = { launchedAt: 1, url: 'https://d111.cloudfront.net', jiraChoice: 'hosted' };
@@ -543,4 +543,74 @@ test('a guide saved before the setup choice stays fully private', () => {
   const hybrid = c.parseStored(JSON.stringify({ statusId: 'abcd1234efgh5678', setup: 'hybrid', githubChoice: 'hosted' }));
   assert.equal(hybrid.setup, 'hybrid');
   assert.equal(hybrid.jiraChoice, 'hosted');
+});
+
+test('your data: step 2, after AWS, in every setup', () => {
+  for (const domainChoice of ['aws', 'own', 'coderhelm']) {
+    for (const jiraChoice of ['own', 'hosted']) {
+      const ids = c.stepsFor({ domainChoice, jiraChoice }).map((x) => x.id);
+      assert.deepEqual(ids.slice(0, 2), ['aws', 'data'], `${domainChoice} ${jiraChoice}`);
+    }
+  }
+  // Hybrid and private alike.
+  const hybrid = c.newState({ setup: 'hybrid', domainChoice: 'coderhelm', githubChoice: 'hosted', jiraChoice: 'hosted' });
+  const priv = c.newState({ setup: 'private', domainChoice: 'aws', githubChoice: 'own', jiraChoice: 'own' });
+  assert.equal(c.stepsFor(hybrid)[1].id, 'data');
+  assert.equal(c.stepsFor(priv)[1].id, 'data');
+});
+
+test('your data: start fresh by default, nothing to fill in, and the guide goes on', () => {
+  const n = c.newState();
+  assert.equal(n.dataChoice, 'fresh');
+  assert.equal(n.dataDone, false);
+  const running = { ...n, launchedAt: 1, url: 'https://d111.cloudfront.net' };
+  const ok = setup();
+  assert.equal(c.deriveStep({ ...n, launchedAt: 1 }, null), 'aws', 'the install comes first');
+  assert.equal(c.deriveStep(running, ok), 'data');
+  // Continue is the only thing to press; the next step follows.
+  assert.notEqual(c.deriveStep({ ...running, dataDone: true }, ok), 'data');
+  // Someone already signed up: never held at Your data.
+  assert.equal(c.deriveStep(running, { ...ok, closed: true }), 'ready');
+  assert.equal(c.validate(n).dataChoice, undefined);
+});
+
+test('your data: a move request goes to hosted sign-in with only the install details, and never holds the guide', () => {
+  const s = c.newState({ region: 'eu-west-1', stage: 'acme', url: 'https://d111.cloudfront.net/settings/?x=1', email: 'ada@example.com', dataChoice: 'move' });
+  const u = new URL(c.moveRequestUrl(s));
+  // Hosted CoderHelm's own page, where the team admin signs in and the team is the one they are in.
+  assert.equal(u.origin, 'https://app.coderhelm.com');
+  assert.equal(u.pathname, '/support/move/');
+  assert.deepEqual([...u.searchParams.keys()].sort(), ['address', 'region', 'stage']);
+  assert.equal(u.searchParams.get('address'), 'https://d111.cloudfront.net');
+  assert.equal(u.searchParams.get('region'), 'eu-west-1');
+  assert.equal(u.searchParams.get('stage'), 'acme');
+  // No email, token, status id or anything secret in the link.
+  const link = c.moveRequestUrl({ ...s, setupToken: 'T'.repeat(40) });
+  for (const leak of ['ada', '@', 'TTTT', s.statusId, 'token', 'team']) assert.ok(!link.includes(leak), `${leak} in ${link}`);
+  assert.equal(new URL(c.moveRequestUrl({ ...s, url: 'not a url' })).searchParams.get('address'), '');
+  assert.equal(new URL(c.moveRequestUrl({ ...s, url: 'http://d1.cloudfront.net' })).searchParams.get('address'), '');
+  // Asking doesn't hold the guide: Continue moves on, the choice stays.
+  const running = { ...s, launchedAt: 1, url: 'https://d111.cloudfront.net' };
+  assert.equal(c.deriveStep(running, setup()), 'data');
+  assert.notEqual(c.deriveStep({ ...running, dataDone: true }, setup()), 'data');
+  assert.equal(c.MOVE_NEXT_STEPS.length, 5);
+  assert.ok(c.MOVE_NEXT_STEPS.some((x) => /same email and password/.test(x)));
+  assert.ok(c.MOVE_NEXT_STEPS.some((x) => /keeps working/.test(x)));
+});
+
+test('your data: a guide saved before the step goes on where it was', () => {
+  const old = { ...c.newState({ region: 'us-east-1' }), launchedAt: 1, url: 'https://d111.cloudfront.net' };
+  delete old.dataDone;
+  delete old.dataChoice;
+  const back = c.parseStored(JSON.stringify(old));
+  assert.equal(back.dataDone, true);
+  assert.equal(back.dataChoice, 'fresh');
+  assert.notEqual(c.deriveStep(back, setup()), 'data');
+  // One saved with the step keeps its answer.
+  const mid = c.parseStored(JSON.stringify({ ...old, dataDone: false, dataChoice: 'move' }));
+  assert.equal(mid.dataDone, false);
+  assert.equal(mid.dataChoice, 'move');
+  assert.equal(c.deriveStep(mid, setup()), 'data');
+  // Anything else is cleaned.
+  assert.equal(c.parseStored(JSON.stringify({ ...old, dataDone: false, dataChoice: 'everything' })).dataChoice, 'fresh');
 });

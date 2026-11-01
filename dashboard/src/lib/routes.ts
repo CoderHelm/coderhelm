@@ -113,6 +113,7 @@ export const ROUTES: Record<string, RouteInfo> = {
 
   "/support": { label: "Support" },
   "/support/ticket": { label: "Request", parent: "/support", detail: true },
+  "/support/move": { label: "Move your team", parent: "/support" },
 
   "/admin": { label: "Platform admin" },
   "/admin/tickets": { label: "Support queue", parent: "/admin" },
