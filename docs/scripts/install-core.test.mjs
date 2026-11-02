@@ -655,3 +655,27 @@ test('a closed install (someone signed up) drops the address checks, and the add
   assert.equal(c.findCheck(closed, 'hybrid_registered'), undefined);
   assert.equal(c.deriveStep({ launchedAt: 1, url: 'https://x', domainChoice: 'coderhelm', jiraChoice: 'own' }, closed), 'ready');
 });
+
+test('the install address: once its own address is live, the guide follows it, and an AWS address never wins', () => {
+  const aws = 'https://d111test.cloudfront.net';
+  const st = { ...S, url: aws, domainChoice: 'coderhelm', coderhelmName: 'Acme', hostname: '' };
+  assert.equal(c.customAddress(st), 'https://acme.coderhelm.com');
+  assert.equal(c.customAddress({ ...st, domainChoice: 'own', hostname: 'CoderHelm.Example.com' }), 'https://coderhelm.example.com');
+  assert.equal(c.customAddress({ ...st, domainChoice: 'aws' }), null);
+  const open = (checks) => ({ schema: 1, ready: false, checks });
+  // Not live yet: stay on the AWS address.
+  assert.equal(c.followAddress(st, open([{ id: 'hybrid_name', status: 'wait', code: 'cert_pending' }])), null);
+  assert.equal(c.followAddress(st, null), null);
+  // The install says the name is live: follow it once it answers.
+  assert.deepEqual(c.followAddress(st, open([{ id: 'hybrid_name', status: 'pass', code: 'ok' }])), { url: 'https://acme.coderhelm.com', probe: true }, 'followed once the address itself answers');
+  // A closed install no longer says: ask the address itself.
+  const closed = c.parseSetupStatus({ schema: 1, setup_open: false, checks: [] }, 'us-east-1');
+  assert.deepEqual(c.followAddress(st, closed), { url: 'https://acme.coderhelm.com', probe: true });
+  // Already there (a trailing slash too): nothing to do.
+  assert.equal(c.followAddress({ ...st, url: 'https://acme.coderhelm.com/' }, closed), null);
+  // Their own domain the same way.
+  const own = { ...st, domainChoice: 'own', hostname: 'coderhelm.example.com' };
+  assert.deepEqual(c.followAddress(own, open([{ id: 'domain', status: 'pass', code: 'ok' }])), { url: 'https://coderhelm.example.com', probe: false });
+  assert.deepEqual(c.followAddress(own, closed), { url: 'https://coderhelm.example.com', probe: true });
+  assert.equal(c.followAddress({ ...st, domainChoice: 'aws' }, closed), null);
+});

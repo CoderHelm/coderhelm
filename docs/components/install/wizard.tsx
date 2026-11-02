@@ -23,6 +23,7 @@ import {
   partText,
   type StepId,
   finishedStep,
+  followAddress,
   AWS_ACCOUNT_PAGE,
   CREATES,
   DNS_PROVIDERS,
@@ -60,7 +61,6 @@ import {
   MOVE_NEXT_STEPS,
   moveRequestUrl,
   domainRows,
-  domainUrl,
   elapsed,
   findCheck,
   githubManifest,
@@ -838,11 +838,26 @@ export function InstallWizard() {
     return () => clearInterval(t);
   }, []);
 
-  // Once the domain answers, follow the install there (the GitHub App then gets the domain's URLs).
-  const nextUrl = s ? domainUrl(s, setup) : null;
+  // Once its own address is live (their domain or its CoderHelm address),
+  // follow the install there: every link and mention uses it, and the GitHub
+  // App gets its URLs. A closed install no longer reports the check, so the
+  // address itself is asked once.
+  const follow = s ? followAddress(s, setup) : null;
   useEffect(() => {
-    if (nextUrl) update({ url: nextUrl });
-  }, [nextUrl, update]);
+    if (!follow) return;
+    if (!follow.probe) {
+      update({ url: follow.url });
+      return;
+    }
+    let live = true;
+    void readInstall(follow.url, s?.region ?? '').then((v) => {
+      if (live && v) update({ url: follow.url });
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [follow?.url, follow?.probe, update]);
 
   const derived: StepId = s ? deriveStep(s, setup) : 'start';
   const view: StepId = manual ?? derived;
