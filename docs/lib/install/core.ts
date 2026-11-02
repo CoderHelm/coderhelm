@@ -190,10 +190,10 @@ export const COST_LINES: [string, number, number][] = [
   ['Build sandbox (CodeBuild, by the minute)', 3, 25],
   ['Updates and email', 0, 2],
 ];
-export function monthlyCost(provider: Provider): { low: number; high: number; model: string } {
+export function monthlyCost(provider: Provider | ''): { low: number; high: number; model: string } {
   const low = Math.round(COST_LINES.reduce((a, l) => a + l[1], 0));
   const high = Math.round(COST_LINES.reduce((a, l) => a + l[2], 0));
-  return { low, high, model: provider === 'bedrock' ? 'Claude on Bedrock is per token, on this AWS bill' : 'Claude is per token, on each team\u2019s Anthropic bill' };
+  return { low, high, model: provider === 'bedrock' ? 'Claude on Bedrock is per token, on this AWS bill' : provider === 'anthropic' ? 'Claude is per token, on each team\u2019s Anthropic bill' : 'Claude is per token, on the bill of the choice you pick' };
 }
 
 /**
@@ -237,7 +237,8 @@ export interface InstallState {
   region: string;
   stage: string;
   email: string;
-  provider: Provider;
+  /** '' until the person picks one: never a silent default. */
+  provider: Provider | '';
   org: string;
   version: string;
   url: string;
@@ -335,7 +336,7 @@ export function newState(over: Partial<InstallState> = {}): InstallState {
     region: 'us-east-1',
     stage: 'prod',
     email: '',
-    provider: 'bedrock',
+    provider: '',
     org: '',
     version: '',
     url: '',
@@ -380,6 +381,7 @@ export function validate(s: Pick<InstallState, 'email' | 'stage' | 'region'> & P
   if (!EMAIL_RE.test(s.email.trim())) p.email = 'Enter the email you will sign in with.';
   if (!STAGE_RE.test(s.stage)) p.stage = 'Use 1 to 20 lowercase letters or digits, starting with a letter (no hyphens).';
   if (!REGIONS.some((r) => r.id === s.region)) p.region = 'Pick a region from the list.';
+  if (s.provider !== undefined && s.provider !== 'anthropic' && s.provider !== 'bedrock') p.provider = 'Pick how CoderHelm calls Claude: your own Anthropic API key, or Claude on Amazon Bedrock in this account.';
   if (s.domainChoice === 'coderhelm') {
     const np = nameProblem(s.coderhelmName ?? '');
     if (np) p.coderhelmName = np;
@@ -970,6 +972,9 @@ export function parseStored(raw: string | null): InstallState | null {
     // Saved before the Your data step existed: the guide goes on as it was.
     if (typeof v.dataDone !== 'boolean') s.dataDone = true;
     if (v.dataChoice !== 'fresh' && v.dataChoice !== 'move') s.dataChoice = 'fresh';
+    // A saved guide keeps the model choice it was saved with; one saved
+    // before the choice was asked for, and already launched, ran on Bedrock.
+    if (v.provider !== 'anthropic' && v.provider !== 'bedrock') s.provider = v.launchedAt ? 'bedrock' : '';
     // Saved before the Jira choice existed: follow the setup it was saved with,
     // so a hybrid install keeps CoderHelm's Jira app on like its GitHub App.
     if (v.jiraChoice !== 'own' && v.jiraChoice !== 'hosted') {

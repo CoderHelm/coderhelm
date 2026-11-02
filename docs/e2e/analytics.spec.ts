@@ -13,6 +13,12 @@ const DOCS = 'https://docs.coderhelm.com';
 type Hit = { url: string; body: string };
 
 /** Everything sent to Google, as one string per hit (URL plus body, decoded). */
+/** Picks how CoderHelm calls Claude, which the guide asks before Launch (no default). */
+async function pickModels(page: Page, id: 'bedrock' | 'anthropic' = 'bedrock') {
+  const r = page.locator(`[data-provider="${id}"] input`);
+  if ((await r.count()) && !(await r.isChecked())) await r.check();
+}
+
 function text(h: Hit): string {
   let t = `${h.url}\n${h.body}`;
   try {
@@ -190,6 +196,7 @@ test('install guide: the trust line is what the code does; no hit carries a quer
   const email = 'ada.lovelace@example.org';
   await page.getByLabel('Your email').fill(email);
   await page.getByLabel('AWS region').selectOption('eu-west-1');
+  await pickModels(page);
   await page.getByTestId('launch').click();
   await expect(page.getByTestId('screen-aws')).toBeVisible();
   await expect(page).toHaveURL(/\?/);

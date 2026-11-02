@@ -76,6 +76,12 @@ function setupDoc(over: Record<string, Json> = {}, extra: Json = {}) {
 const CLOSED = { schema: 1, service: 'coderhelm', self_hosted: true, setup_open: false, version: 'v0.7.0', ready: true, github_manifest_ready: false, checks: [{ id: 'admin', label: 'First admin signed up', status: 'pass', code: 'ok' }] };
 const NO_APP = { github_app: { status: 'fail', code: 'missing' }, github_installed: { status: 'wait', code: 'needs_app' } };
 
+/** Picks how CoderHelm calls Claude, which the guide asks before Launch (no default). */
+async function pickModels(page: Page, id: 'bedrock' | 'anthropic' = 'bedrock') {
+  const r = page.locator(`[data-provider="${id}"] input`);
+  if ((await r.count()) && !(await r.isChecked())) await r.check();
+}
+
 async function mock(page: Page, m: Mock) {
   await page.addInitScript(() => {
     const w = window as unknown as Record<string, unknown>;
@@ -182,10 +188,12 @@ test('happy path: launch, follow the install, GitHub, models, ready', async ({ p
   await expect(page.getByTestId('privacy')).toContainText('Nothing you type and nothing about your install is sent to CoderHelm or Google.');
 
   // Validation speaks plainly, then the console opens with everything filled in.
+  await pickModels(page);
   await page.getByTestId('launch').click();
   await expect(page.getByText('Enter the email you will sign in with.')).toBeVisible();
   await page.getByLabel('Your email').fill('ada@example.com');
   await page.getByLabel('AWS region').selectOption('eu-west-1');
+  await pickModels(page);
   await page.getByTestId('launch').click();
   const [link] = await opened(page);
   const u = new URL(link);
@@ -293,6 +301,7 @@ test('every control shows the hand cursor; a switched-off one shows not-allowed'
   const m = newMock();
   await mock(page, m);
   await page.goto('/self-host/install/');
+  await pickModels(page);
   await expect(page.getByTestId('launch')).toBeEnabled();
   expect(await cursor(page.getByTestId('launch'))).toBe('pointer');
   await page.getByTestId('launch').evaluate((el) => el.setAttribute('disabled', ''));
@@ -530,12 +539,14 @@ test('more options: the name in your AWS account is explained, checked in one se
   await expect(page.getByText('Names the AWS resources this install creates, so you can find them in the AWS console. Keep it unless this AWS account already has a CoderHelm; each install in one account needs its own name.')).toBeVisible();
   await expect(page.getByText('Install name')).toHaveCount(0);
   await name.fill('2nd_install');
+  await pickModels(page);
   await page.getByTestId('launch').click();
   await expect(page.getByText('Use 1 to 20 lowercase letters or digits, starting with a letter (no hyphens).')).toBeVisible();
   expect(await opened(page)).toEqual([]);
   await name.fill('helmtwo');
   await page.getByText('What happens in AWS').click();
   await expect(page.getByText('Everything it creates is named after the name in your AWS account, helmtwo: the stack is coderhelm-helmtwo')).toBeVisible();
+  await pickModels(page);
   await page.getByTestId('launch').click();
   const [link] = await opened(page);
   expect(new URLSearchParams(new URL(link).hash.split('?')[1]).get('param_Stage')).toBe('helmtwo');
@@ -552,6 +563,7 @@ test('more options: domain, sender, sign-up and updates go to AWS; a bad hostnam
   await page.getByLabel('My own domain').check();
   await page.getByLabel('Your domain').fill('coderhelm');
   await page.getByRole('button', { name: 'Fewer options' }).click();
+  await pickModels(page);
   await page.getByTestId('launch').click();
   // The problem is inside More options: it opens, with the sentence.
   await expect(page.getByText('Enter a hostname such as coderhelm.example.com.')).toBeVisible();
@@ -572,6 +584,7 @@ test('more options: domain, sender, sign-up and updates go to AWS; a bad hostnam
   await page.getByLabel('Day').selectOption('daily');
   await page.getByLabel('Hour').selectOption('02:00');
   await page.getByLabel('Time zone').fill('Europe/Berlin');
+  await pickModels(page);
   await page.getByTestId('launch').click();
   const [link] = await opened(page);
   const q = new URLSearchParams(new URL(link).hash.split('?')[1]);
@@ -708,6 +721,7 @@ test('screenshots of every screen at 1440 and 390', async ({ page }) => {
     await page.getByRole('button', { name: 'More options' }).click();
     await page.getByLabel('Your email').fill('ada@example.com');
     await at('02-start-more-options');
+    await pickModels(page);
     await page.getByTestId('launch').click();
     await expect(page.getByTestId('step-title')).toHaveText('Waiting for AWS');
     await at('03-waiting-for-aws');
@@ -722,6 +736,7 @@ test('screenshots of every screen at 1440 and 390', async ({ page }) => {
     await page.evaluate(() => localStorage.clear());
     await page.goto('/self-host/install/');
     await page.getByLabel('Your email').fill('ada@example.com');
+    await pickModels(page);
     await page.getByTestId('launch').click();
     await expect(page.getByTestId('not-answering')).toBeVisible();
     await at('06-not-answering');
@@ -747,6 +762,7 @@ test('screenshots of every screen at 1440 and 390', async ({ page }) => {
     await page.evaluate(() => localStorage.clear());
     await page.goto('/self-host/install/');
     await page.getByLabel('Your email').fill('ada@example.com');
+    await pickModels(page);
     await page.getByTestId('launch').click();
     await expect(page.getByTestId('no-sign')).toBeVisible();
     await at('12-no-sign-paste');
@@ -761,6 +777,7 @@ test('screenshots of every screen at 1440 and 390', async ({ page }) => {
     await page.getByLabel('Your email').fill('ada@example.com');
     m.status = { schema: 1, phase: 'done', url: INSTALL, domain: EXTERNAL };
     m.setup = withOptional(setupDoc(NO_APP), { status: 'wait', code: 'validating' });
+    await pickModels(page);
     await page.getByTestId('launch').click();
     await expect(page.getByTestId('screen-domain')).toBeVisible();
     await page.getByTestId('dns-provider').selectOption('godaddy');
@@ -777,6 +794,7 @@ test('screenshots of every screen at 1440 and 390', async ({ page }) => {
     await page.getByLabel('My own domain').check();
     await page.getByLabel('Your domain').fill('coderhelm.example.com');
     await page.getByLabel('Your email').fill('ada@example.com');
+    await pickModels(page);
     await page.getByTestId('launch').click();
     await expect(page.getByTestId('step-title')).toHaveText('Setting up your domain');
     await at('17-domain-route53');
@@ -789,6 +807,7 @@ test('screenshots of every screen at 1440 and 390', async ({ page }) => {
     await page.evaluate(() => localStorage.clear());
     await page.goto('/self-host/install/');
     await page.getByLabel('Your email').fill('ada@example.com');
+    await pickModels(page);
     await page.getByTestId('launch').click();
     await expect(page.getByTestId('no-sign')).toBeVisible();
   }
@@ -871,6 +890,7 @@ test('hybrid: pick the setup, the name is checked as you type, and AWS opens wit
   await expect(page.getByTestId('summary')).toContainText('CoderHelm’s app');
   await expect(page.getByTestId('summary').getByTestId('moving-note').getByRole('link', { name: 'Talk to us' })).toHaveAttribute('href', /^mailto:support@coderhelm\.com\?subject=Moving/);
   await page.getByLabel('Your email').fill('ada@example.com');
+  await pickModels(page);
   await page.getByTestId('launch').click();
   await expect(page.getByTestId('step-title')).toHaveText('Waiting for AWS');
   const [u] = await opened(page);
@@ -888,6 +908,7 @@ test('hybrid: an empty or bad name stops the launch with the reason', async ({ p
   await page.goto('/self-host/install/');
   await page.locator('[data-setup="hybrid"]').click();
   await page.getByLabel('Your email').fill('ada@example.com');
+  await pickModels(page);
   await page.getByTestId('launch').click();
   await expect(page.getByTestId('name-picker-status')).toHaveText('Type a name, such as your company’s.');
   expect(await opened(page)).toHaveLength(0);
@@ -1061,6 +1082,7 @@ test('hybrid screenshots at 1440 and 390', async ({ page }) => {
     await at('20-start-name-taken');
     await page.getByLabel('Your CoderHelm address name').fill('example-co');
     m.status = { schema: 1, phase: 'deploying', step: 6, steps: 10 };
+    await pickModels(page);
     await page.getByTestId('launch').click();
     await expect(page.getByText('Part 6 of 10')).toBeVisible();
     await at('21-hybrid-deploying');
@@ -1276,6 +1298,7 @@ test('email: through CoderHelm only when picked, and then no From address', asyn
   await choice.getByLabel('Send email through CoderHelm (easiest)').check();
   await expect(page.getByLabel('Send email from')).toHaveCount(0);
   await expect(choice).toContainText('keeps only delivery records');
+  await pickModels(page);
   await page.getByTestId('launch').click();
   const [link] = await opened(page);
   const q = new URLSearchParams(new URL(link).hash.split('?')[1]);
@@ -1293,8 +1316,10 @@ test('release: latest.json unreadable falls back to GitHub’s latest release, a
   // A new guide starts on hybrid; this test follows the fully private guide.
   await page.locator('[data-setup="private"]').click();
   await page.getByLabel('Your email').fill('ada@example.com');
+  await pickModels(page);
   await expect(page.getByTestId('launch')).toBeEnabled();
   await expect(page.getByTestId('release-missing')).toHaveCount(0);
+  await pickModels(page);
   await page.getByTestId('launch').click();
   const [link] = await opened(page);
   const q = new URLSearchParams(new URL(link).hash.split('?')[1]);
@@ -1320,7 +1345,9 @@ test('release: a template that isn’t published shows the message and no launch
   m.templates = ['v0.7.0'];
   await page.getByTestId('release-retry').click();
   await expect(missing).toHaveCount(0);
+  await pickModels(page);
   await expect(page.getByTestId('launch')).toBeEnabled();
+  await pickModels(page);
   await page.getByTestId('launch').click();
   const [link] = await opened(page);
   expect(new URLSearchParams(new URL(link).hash.split('?')[1]).get('templateURL')).toBe('https://coderhelm-public.s3.amazonaws.com/launch/v0.7.0/coderhelm.json');
@@ -1335,4 +1362,20 @@ test('release: no release anywhere shows the same message instead of a broken la
   await expect(page.getByTestId('release-retry')).toBeVisible();
   // No template is asked for: there is no version to ask about.
   expect(m.requests.some((u) => /\/launch\/v[^/]+\/coderhelm\.json$/.test(u))).toBe(false);
+});
+
+test('models: no default; Launch waits for a choice; Bedrock says what it needs', async ({ page }) => {
+  const m = newMock();
+  await mock(page, m);
+  await page.goto('/self-host/install/');
+  await page.locator('[data-setup="private"]').click();
+  await page.getByLabel('Your email').fill('ada@example.org');
+  await expect(page.locator('[data-provider] input:checked')).toHaveCount(0);
+  await expect(page.getByTestId('launch')).toBeDisabled();
+  await expect(page.getByTestId('launch-needs-provider')).toBeVisible();
+  await page.locator('[data-provider="anthropic"] input').check();
+  await expect(page.getByTestId('bedrock-terms')).toHaveCount(0);
+  await expect(page.getByTestId('launch')).toBeEnabled();
+  await page.locator('[data-provider="bedrock"] input').check();
+  await expect(page.getByTestId('bedrock-terms')).toContainText('AWS Marketplace');
 });

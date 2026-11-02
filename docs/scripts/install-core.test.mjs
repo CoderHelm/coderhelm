@@ -4,16 +4,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as c from '../lib/install/core.ts';
 
-const S = c.newState({ statusId: 'abcd1234efgh5678', setupToken: 'T'.repeat(40), email: 'Ada@Example.com', region: 'eu-west-1', version: 'v0.7.0' });
+const S = c.newState({ statusId: 'abcd1234efgh5678', setupToken: 'T'.repeat(40), email: 'Ada@Example.com', region: 'eu-west-1', version: 'v0.7.0', provider: 'bedrock' });
 
-test('new state: random, valid IDs; Bedrock and prod by default', () => {
+test('new state: random, valid IDs; prod by default; no model choice until one is picked', () => {
   const a = c.newState();
   const b = c.newState();
   assert.match(a.statusId, c.STATUS_ID_RE);
   assert.match(a.setupToken, /^[A-Za-z0-9]{40}$/);
   assert.notEqual(a.statusId, b.statusId);
   assert.notEqual(a.setupToken, b.setupToken);
-  assert.equal(a.provider, 'bedrock');
+  // No silent default: an install never lands on Bedrock without someone picking it.
+  assert.equal(a.provider, '');
   assert.equal(a.stage, 'prod');
 });
 
@@ -613,4 +614,17 @@ test('your data: a guide saved before the step goes on where it was', () => {
   assert.equal(c.deriveStep(mid, setup()), 'data');
   // Anything else is cleaned.
   assert.equal(c.parseStored(JSON.stringify({ ...old, dataDone: false, dataChoice: 'everything' })).dataChoice, 'fresh');
+});
+
+test('model choice: launching needs one picked; saved guides keep theirs', () => {
+  const base = { email: 'ada@example.com', stage: 'prod', region: 'us-east-1' };
+  assert.match(c.validate({ ...base, provider: '' }).provider, /Anthropic API key, or Claude on Amazon Bedrock/);
+  assert.deepEqual(c.validate({ ...base, provider: 'anthropic' }), {});
+  assert.deepEqual(c.validate({ ...base, provider: 'bedrock' }), {});
+  assert.equal(new URLSearchParams(new URL(c.quickCreateUrl({ ...S, provider: 'anthropic' })).hash.split('?')[1]).get('param_ModelProvider'), 'anthropic');
+  const saved = (o) => c.parseStored(JSON.stringify({ statusId: 'abcd1234efgh5678', setupToken: 'x'.repeat(40), region: 'us-east-1', stage: 'prod', setup: 'private', ...o }));
+  assert.equal(saved({ provider: 'anthropic' }).provider, 'anthropic');
+  assert.equal(saved({ provider: 'bedrock' }).provider, 'bedrock');
+  assert.equal(saved({}).provider, '', 'a guide not launched yet asks');
+  assert.equal(saved({ launchedAt: 5 }).provider, 'bedrock', 'a guide launched before the question ran on Bedrock');
 });
