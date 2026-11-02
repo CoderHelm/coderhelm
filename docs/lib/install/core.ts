@@ -1132,6 +1132,58 @@ export function hybridRows(setup: SetupStatus | null, name: string, claimRefused
   ];
 }
 
+/**
+ * A finished step as the guide recorded it: every check done and what the
+ * step gave. Looking back at a step shows this, without asking the install
+ * again (once someone signs up it no longer answers the setup checks).
+ */
+export interface FinishedStep {
+  title: string;
+  outcome: string;
+  href?: string;
+  rows: { id: string; label: string }[];
+}
+
+export function finishedStep(step: StepId, s: InstallState): FinishedStep | null {
+  const labels = (rows: { id: string; label: string }[]) => rows.map(({ id, label }) => ({ id, label }));
+  switch (step) {
+    case 'aws':
+      return { title: 'CoderHelm is installed in your AWS account', outcome: `It runs in your AWS account, in ${s.region}.`, href: s.url || undefined, rows: labels(progressRows(null, true, true)) };
+    case 'data':
+      return { title: 'Your data', outcome: s.dataChoice === 'move' ? 'You asked CoderHelm to move your team from app.coderhelm.com.' : 'You started fresh.', rows: [] };
+    case 'domain': {
+      const host = cleanHostname(s.hostname);
+      return { title: `${host || 'Your domain'} is live`, outcome: `CoderHelm answers on ${host || 'your domain'} over HTTPS.`, href: host ? `https://${host}` : undefined, rows: labels(domainRows('ok', s.domainDoc?.mode ?? 'external')) };
+    }
+    case 'address': {
+      const name = cleanName(s.coderhelmName);
+      const host = `${name || 'yourname'}.${NAME_ZONE}`;
+      return { title: `${host} is live`, outcome: `CoderHelm answers on ${host}.`, href: name ? `https://${host}` : undefined, rows: labels(hybridRows(null, name, false)) };
+    }
+    case 'github':
+      return {
+        title: 'GitHub is connected',
+        outcome: s.githubChoice === 'hosted' ? 'CoderHelm\u2019s GitHub app is installed on your repositories.' : 'Your GitHub App is installed on your repositories.',
+        rows: [
+          { id: 'app', label: s.githubChoice === 'hosted' ? 'CoderHelm\u2019s app' : 'GitHub App created' },
+          { id: 'installed', label: 'Installed on your repositories' },
+        ],
+      };
+    case 'models':
+      return {
+        title: 'Claude answers',
+        outcome: s.provider === 'anthropic' ? 'CoderHelm calls Claude with an Anthropic API key.' : s.provider === 'bedrock' ? 'CoderHelm calls Claude on Amazon Bedrock in your AWS account.' : 'CoderHelm calls Claude.',
+        rows: [{ id: 'models', label: 'Claude answers' }],
+      };
+    case 'jira': {
+      const site = jiraSiteHost(s.jiraSite ?? '');
+      return { title: 'Your Jira site is linked', outcome: site ? `${site} sends its events to your install through CoderHelm.` : 'Your Jira site sends its events to your install through CoderHelm.', rows: labels(jiraRows(null)) };
+    }
+    default:
+      return null;
+  }
+}
+
 /** Once the domain answers, the guide follows the install there (the GitHub App then gets its URLs). */
 export function domainUrl(s: Pick<InstallState, 'domainChoice' | 'hostname' | 'url'>, setup: SetupStatus | null): string | null {
   if (s.domainChoice !== 'own' || !s.hostname) return null;
