@@ -4,7 +4,7 @@ import { can } from "@/lib/capabilities";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { api, ApiError, TWO_FACTOR_REQUIRED, type UsageInfo, type Banner, type TeamInfo } from "@/lib/api";
+import { api, ApiError, TEAM_MOVED, TWO_FACTOR_REQUIRED, movedUrl, type UsageInfo, type Banner, type TeamInfo } from "@/lib/api";
 import { pushToDataLayer } from "@/lib/gtm";
 import { BETA_SIGNUPS_CHANGED } from "@/lib/admin";
 import { formatTokens, limitName, reachedLimit, USAGE_CHANGED, usageBreakdown, usageLimits } from "@/lib/usage";
@@ -169,6 +169,18 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       e instanceof ApiError && e.code === "two_factor_required" ? fetchTwoFactor() : undefined,
     );
   };
+  // The team moved to its own install: hosted refuses its sessions, and
+  // the shell shows where it signs in now (and the person's other teams).
+  const [moved, setMoved] = useState<{ url: string | null } | null>(null);
+  const showMoved = (url: string | null) => {
+    setMoved({ url });
+    api.listTeams().then((r) => setTeams(r.teams)).catch(() => {});
+  };
+  useEffect(() => {
+    const onMoved = (e: Event) => showMoved(movedUrl((e as CustomEvent).detail));
+    window.addEventListener(TEAM_MOVED, onMoved);
+    return () => window.removeEventListener(TEAM_MOVED, onMoved);
+  }, []);
   useEffect(() => {
     const held = () => {
       fetchTwoFactor();
@@ -269,7 +281,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         api.getBanners().then((r) => setBanners(r.banners)).catch(() => {});
         api.listTeams().then((r) => setTeams(r.teams)).catch(() => {});
       })
-      .catch(() => {
+      .catch((e) => {
+        if (e instanceof ApiError && e.code === "team_moved") showMoved(movedUrl(e.url));
         setAuthChecked(true);
       });
   }, []);
@@ -329,6 +342,15 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           <button type="button" className="ch-boot-reload" data-ch-reload>Reload</button>
         </div>
       </div>
+    );
+  }
+
+  if (moved) {
+    return (
+      <>
+        <title>Team moved · Coderhelm</title>
+        <TeamMovedNotice url={moved.url} teams={teams} />
+      </>
     );
   }
 
@@ -834,6 +856,61 @@ function SignInProblemNotice({ problem }: { problem: SignInProblem }) {
  * set up already, sign in again with the code). The server refuses
  * everything else until then.
  */
+function TeamMovedNotice({ url, teams }: { url: string | null; teams: TeamInfo[] }) {
+  const others = teams.filter((t) => t.status !== "deactivated" && !t.current);
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-zinc-950 px-4 py-10">
+      <main className="w-full max-w-md space-y-6" data-testid="team-moved">
+        <div className="flex items-center gap-2.5">
+          <Logo />
+          <span className="text-sm font-semibold text-zinc-100">Coderhelm</span>
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-xl font-semibold text-zinc-50">This team moved to its own Coderhelm</h1>
+          <p className="text-sm text-zinc-300">
+            Its work, settings and history are there now. Sign in there with the same email.
+          </p>
+          {url && <p className="text-sm text-zinc-400 [overflow-wrap:anywhere]">{url}</p>}
+        </div>
+        {url && (
+          <a href={url} rel="noopener noreferrer" className={buttonClass("primary")} data-testid="team-moved-link">
+            Sign in there
+          </a>
+        )}
+        {others.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-sm text-zinc-400">Or switch to another team:</p>
+            {others.map((t) => (
+              <button
+                key={t.team_id}
+                type="button"
+                onClick={async () => {
+                  try {
+                    await api.switchTeam(t.team_id);
+                    window.location.reload();
+                  } catch {
+                    window.alert(`Could not switch to ${t.org}. Try again.`);
+                  }
+                }}
+                className={`block text-sm text-zinc-300 hover:text-white underline rounded ${focusRing}`}
+              >
+                Switch to {t.org}
+              </button>
+            ))}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={signOut}
+          className={`block text-sm text-zinc-400 underline underline-offset-4 hover:text-zinc-100 rounded ${focusRing}`}
+        >
+          Sign out
+        </button>
+      </main>
+    </div>
+  );
+}
+
 function TwoFactorGate({ status, email, onDone }: { status: MyTwoFactor; email: string; onDone: () => void }) {
   const fits = status.fits ?? "cognito";
   const hasIt = !!status.set_up;

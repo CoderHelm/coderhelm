@@ -21,7 +21,7 @@ export function httpErrorMessage(status: number): string {
 
 /** A failed request, with its HTTP status for pages that branch on it. */
 export class ApiError extends Error {
-  constructor(message: string, readonly status: number, readonly code?: string) {
+  constructor(message: string, readonly status: number, readonly code?: string, readonly url?: string) {
     super(message);
     this.name = "ApiError";
   }
@@ -46,17 +46,23 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
     const body = await res.text().catch(() => "");
     let serverMsg = "";
     let serverCode: string | undefined;
+    let serverUrl: string | undefined;
     try {
       const parsed = body ? JSON.parse(body) : {};
       serverMsg = parsed.error || "";
       serverCode = typeof parsed.code === "string" ? parsed.code : undefined;
+      serverUrl = typeof parsed.url === "string" ? parsed.url : undefined;
     } catch {}
     // The team (or a self-hosted organization) requires two-factor sign-in
     // and this session has none: the shell shows the setup screen.
     if (res.status === 403 && serverCode === "two_factor_required" && typeof window !== "undefined") {
       window.dispatchEvent(new Event(TWO_FACTOR_REQUIRED));
     }
-    throw new ApiError(serverMsg || httpErrorMessage(res.status), res.status, serverCode);
+    // The team moved to its own install: the shell sends people there.
+    if (res.status === 403 && serverCode === "team_moved" && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(TEAM_MOVED, { detail: movedUrl(serverUrl) }));
+    }
+    throw new ApiError(serverMsg || httpErrorMessage(res.status), res.status, serverCode, serverUrl);
   }
   const text = await res.text();
   return text ? JSON.parse(text) : (undefined as T);
@@ -64,6 +70,20 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
 
 /** Fired when the server holds this session until it has a second factor. */
 export const TWO_FACTOR_REQUIRED = "coderhelm:two-factor-required";
+
+/** Fired when the team moved to its own install; `detail` is its address. */
+export const TEAM_MOVED = "coderhelm:team-moved";
+
+/** A moved team's install address, only when it is https (else none). */
+export function movedUrl(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  try {
+    const u = new URL(v);
+    return u.protocol === "https:" && u.hostname ? u.toString().replace(/\/$/, "") : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Like `request`, but a non-2xx response with a JSON body is returned instead of
