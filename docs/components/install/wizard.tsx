@@ -22,6 +22,7 @@ import {
   deployFraction,
   partText,
   type StepId,
+  finishedStep,
   AWS_ACCOUNT_PAGE,
   CREATES,
   DNS_PROVIDERS,
@@ -863,7 +864,8 @@ export function InstallWizard() {
   const [hybridOutcome, setHybridOutcome] = useState<string | null>(null);
   const hybridWanted = !!s && (s.domainChoice === 'coderhelm' || s.githubChoice === 'hosted' || s.jiraChoice === 'hosted' || s.emailTransport === 'coderhelm');
   useEffect(() => {
-    if (!s || !hybridWanted || !s.url || !setup || !s.setupToken || hyb.busy) return;
+    // A closed install (someone signed up) answers no setup calls: nothing to send.
+    if (!s || !hybridWanted || !s.url || !setup || setup.closed || !s.setupToken || hyb.busy) return;
     if (Date.now() - hyb.lastTry < timing('__CH_HYBRID_RETRY_MS', 8000)) return;
     const reg = findCheck(setup, 'hybrid_registered');
     const nm = findCheck(setup, 'hybrid_name');
@@ -1926,8 +1928,31 @@ export function InstallWizard() {
     );
   }
 
+  // Looking back at a finished step: what the guide recorded, all done, with no
+  // checks or buttons (the install may no longer answer them).
+  const finished = manual && manual !== derived && done.has(manual) ? finishedStep(manual, s) : null;
+  if (finished) {
+    screen = (
+      <section data-testid={`screen-${manual}-done`}>
+        <Heading title={finished.title} />
+        <Notice tone="pass" title="Done" testId="step-done">
+          <p>
+            {finished.outcome}
+            {finished.href ? <> <a className="font-medium text-fd-primary hover:underline" href={finished.href} target="_blank" rel="noopener noreferrer" data-testid="step-done-link">{finished.href.replace(/^https?:\/\//, '')}</a></> : null}
+          </p>
+        </Notice>
+        {finished.rows.length ? (
+          <ul className="mt-5 divide-y divide-fd-border rounded-xl border border-fd-border px-4" data-testid="step-done-rows">
+            {finished.rows.map((r) => <Row key={r.id} tone="pass" title={r.label} />)}
+          </ul>
+        ) : null}
+      </section>
+    );
+  }
+
   // The checks of the step under way, for the rail.
   const railChecks: RailCheck[] = (() => {
+    if (finished) return finished.rows.map((r) => ({ id: r.id, label: r.label, status: 'pass' as const }));
     // Something still to do (not installed yet) is under way, not a failure.
     const waiting = ['not_installed', 'not_linked', 'needs_app', 'missing', 'not_signed_up', 'use_case_required', 'subscription_pending'];
     const tone = (c?: Check): RowStatusLike => (!c ? 'pending' : c.status === 'pass' || c.status === 'skip' ? 'pass' : c.status === 'fail' && !waiting.includes(c.code) ? 'fail' : 'active');

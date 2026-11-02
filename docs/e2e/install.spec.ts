@@ -1376,3 +1376,33 @@ test('models: your own Anthropic key by default; Bedrock says what it needs', as
   await page.locator('[data-provider="bedrock"] input').check();
   await expect(page.getByTestId('bedrock-terms')).toContainText('AWS Marketplace');
 });
+
+test('looking back at a finished step after sign-up: done, with its outcome, no spinner, no buttons, no calls', async ({ page }) => {
+  // The install is closed (someone signed up) and the Jira link waits for its code.
+  const m = newMock({ setup: closedWith(jiraCheck('todo', 'no_link')) });
+  const h = newHybrid();
+  await mockHybrid(page, h);
+  await seeded(page, m, JIRA_STATE);
+  await expect(page.getByTestId('screen-jira')).toBeVisible();
+  const rail = page.getByRole('list', { name: 'Install steps' });
+  for (const [label, id] of [['Address', 'address'], ['GitHub', 'github'], ['Models', 'models'], ['AWS', 'aws'], ['Your data', 'data']] as const) {
+    await rail.getByRole('button', { name: new RegExp(`^\\d?\\s*${label}`) }).click();
+    const screen = page.getByTestId(`screen-${id}-done`);
+    await expect(screen).toBeVisible();
+    await expect(page.getByTestId('step-done')).toBeVisible();
+    await expect(screen.locator('[data-testid="check-again"], [data-testid="skip-address"], button')).toHaveCount(0);
+    await expect(page.locator('[data-rail-status]:not([data-rail-status="pass"])')).toHaveCount(0);
+    if (id === 'address') {
+      await expect(page.getByTestId('step-title')).toHaveText('example-co.coderhelm.com is live');
+      await expect(page.getByTestId('step-done-link')).toHaveAttribute('href', 'https://example-co.coderhelm.com');
+      await expect(page.getByTestId('step-done-rows').locator('li')).toHaveCount(4);
+      await expect(page.getByTestId('hybrid-error')).toHaveCount(0);
+    }
+    await shot(page, `finished-${id}`);
+  }
+  await page.getByRole('button', { name: 'Back to where you are' }).click();
+  await expect(page.getByTestId('screen-jira')).toBeVisible();
+  // A closed install answers no setup calls: the guide sends none.
+  await page.waitForTimeout(400);
+  expect(h.calls).toEqual([]);
+});

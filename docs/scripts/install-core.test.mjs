@@ -628,3 +628,30 @@ test('model choice: Anthropic key by default; saved guides keep theirs', () => {
   assert.equal(saved({}).provider, 'anthropic', 'a guide not launched yet starts on the Anthropic key');
   assert.equal(saved({ launchedAt: 5 }).provider, 'bedrock', 'a guide launched before the question ran on Bedrock');
 });
+
+test('a finished step shows what it gave, every check done, with no live read', () => {
+  const st = { ...S, url: 'https://d111test.cloudfront.net', domainChoice: 'coderhelm', coderhelmName: 'acme', githubChoice: 'hosted', jiraChoice: 'hosted', jiraSite: 'https://acme.atlassian.net/jira', provider: 'anthropic', dataChoice: 'move' };
+  const addr = c.finishedStep('address', st);
+  assert.equal(addr.title, 'acme.coderhelm.com is live');
+  assert.equal(addr.href, 'https://acme.coderhelm.com');
+  assert.deepEqual(addr.rows.map((r) => r.id), ['registered', 'claimed', 'certificate', 'live']);
+  assert.ok(addr.rows.every((r) => !('status' in r)), 'rows carry no live status: the view marks them done');
+  assert.equal(c.finishedStep('aws', st).href, 'https://d111test.cloudfront.net');
+  assert.match(c.finishedStep('data', st).outcome, /move your team/);
+  assert.match(c.finishedStep('data', { ...st, dataChoice: 'fresh' }).outcome, /started fresh/);
+  assert.equal(c.finishedStep('domain', { ...st, domainChoice: 'own', hostname: 'CoderHelm.Example.com' }).href, 'https://coderhelm.example.com');
+  assert.match(c.finishedStep('github', st).outcome, /CoderHelm’s GitHub app/);
+  assert.match(c.finishedStep('github', { ...st, githubChoice: 'own' }).outcome, /Your GitHub App/);
+  assert.match(c.finishedStep('models', st).outcome, /Anthropic API key/);
+  assert.match(c.finishedStep('models', { ...st, provider: 'bedrock' }).outcome, /Amazon Bedrock/);
+  assert.match(c.finishedStep('jira', st).outcome, /^acme\.atlassian\.net /);
+  assert.equal(c.finishedStep('ready', st), null);
+  assert.equal(c.finishedStep('start', st), null);
+});
+
+test('a closed install (someone signed up) drops the address checks, and the address is past', () => {
+  const closed = c.parseSetupStatus({ schema: 1, setup_open: false, checks: [] }, 'us-east-1');
+  assert.equal(closed.closed, true);
+  assert.equal(c.findCheck(closed, 'hybrid_registered'), undefined);
+  assert.equal(c.deriveStep({ launchedAt: 1, url: 'https://x', domainChoice: 'coderhelm', jiraChoice: 'own' }, closed), 'ready');
+});
