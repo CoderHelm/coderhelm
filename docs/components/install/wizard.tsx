@@ -916,7 +916,7 @@ export function InstallWizard() {
     const problems = Object.keys(validate(s));
     if (problems.length) {
       // A problem inside More options opens it, so the sentence is seen.
-      if (problems.some((k) => k !== 'email' && k !== 'region')) setShowMore(true);
+      if (problems.some((k) => k !== 'email' && k !== 'region' && k !== 'provider')) setShowMore(true);
       return;
     }
     const next = { ...s, version: release.version, email: s.email.trim(), hostname: s.domainChoice === 'own' ? cleanHostname(s.hostname) : '', domainDoc: null, domainSkipped: false, launchedAt: Date.now() };
@@ -1216,28 +1216,39 @@ export function InstallWizard() {
                 <Field label="Name in your AWS account" htmlFor="ch-stage" help="Names the AWS resources this install creates, so you can find them in the AWS console. Keep it unless this AWS account already has a CoderHelm; each install in one account needs its own name." error={errors.stage}>
                   <input id="ch-stage" className={inputCls} value={s.stage} onChange={(e) => update({ stage: e.target.value.toLowerCase() })} autoCapitalize="off" spellCheck={false} />
                 </Field>
-                <fieldset>
-                  <legend className="mb-2 text-sm font-medium">Models</legend>
-                  {(
-                    [
-                      ['bedrock', 'Claude on Amazon Bedrock', 'Recommended. Runs in your AWS account; no API key.', <AwsLogo key="a" size={18} />],
-                      ['anthropic', 'Anthropic API keys', 'Each team adds its own key after signing in.', <AnthropicLogo key="b" size={16} />],
-                    ] as const
-                  ).map(([id, title, help, logo]) => (
-                    <label key={id} className={`mb-2 flex cursor-pointer gap-3 rounded-xl border p-3 transition ${s.provider === id ? 'border-fd-primary bg-fd-primary/5' : 'border-fd-border hover:bg-fd-accent'}`}>
-                      <input type="radio" name="provider" className="mt-1 accent-[var(--color-fd-primary)]" checked={s.provider === id} onChange={() => update({ provider: id })} />
-                      <span>
-                        <span className="flex items-center gap-2 font-medium">{logo}{title}</span>
-                        <span className="block text-sm text-fd-muted-foreground">{help}</span>
-                      </span>
-                    </label>
-                  ))}
-                  <p className="text-sm text-fd-muted-foreground">You can change this later in Settings, System.</p>
-                </fieldset>
               </div>
             ) : null}
           </div>
 
+
+          <fieldset data-testid="provider-choice">
+            <legend className="mb-2 text-sm font-medium">How CoderHelm calls Claude</legend>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {(
+                [
+                  ['anthropic', 'Your own Anthropic API key', 'Each team adds its key in Settings after signing in. Billed by Anthropic.', <AnthropicLogo key="b" size={16} />],
+                  ['bedrock', 'Claude on Amazon Bedrock in this account', 'No API key. Billed on this AWS account.', <AwsLogo key="a" size={18} />],
+                ] as const
+              ).map(([id, title, help, logo]) => (
+                <label key={id} data-provider={id} className={`flex cursor-pointer gap-3 rounded-xl border p-3 transition ${s.provider === id ? 'border-fd-primary bg-fd-primary/5' : 'border-fd-border hover:bg-fd-accent'}`}>
+                  <input type="radio" name="provider" className="mt-1 accent-[var(--color-fd-primary)]" checked={s.provider === id} onChange={() => update({ provider: id })} />
+                  <span>
+                    <span className="flex items-center gap-2 font-medium">{logo}{title}</span>
+                    <span className="block text-sm text-fd-muted-foreground">{help}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {s.provider === 'bedrock' ? (
+              <div className="mt-3" data-testid="bedrock-terms">
+                <Notice tone="warn" title="Someone must accept Anthropic's model terms in AWS Marketplace first">
+                  Bedrock only serves Claude in this account after an AWS user allowed to subscribe in AWS Marketplace accepts Anthropic's terms for the models CoderHelm uses. Until then CoderHelm can't call the models, and Update now stops with that reason.
+                </Notice>
+              </div>
+            ) : null}
+            {touched && errors.provider ? <p className="mt-2 text-sm text-red-500" data-testid="provider-error">{errors.provider}</p> : null}
+            <p className="mt-2 text-sm text-fd-muted-foreground">You can change this later in Settings, System.</p>
+          </fieldset>
 
           <Summary s={s} cost={cost} />
 
@@ -1252,11 +1263,12 @@ export function InstallWizard() {
             </div>
           ) : (
             <div>
-              <Primary type="submit" testId="launch" brand="aws" disabled={release.state !== 'ready'}>
+              <Primary type="submit" testId="launch" brand="aws" disabled={release.state !== 'ready' || !s.provider}>
                 <AwsColorLogo size={30} />
                 {release.state === 'ready' ? 'Open AWS with everything filled in' : 'Checking the newest release…'}
                 <svg viewBox="0 0 16 16" width="14" height="14" className="opacity-60 transition group-hover/btn:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6 3.5l4.5 4.5L6 12.5" /></svg>
               </Primary>
+              {!s.provider ? <p className="mt-3 text-sm text-fd-muted-foreground" data-testid="launch-needs-provider">Pick how CoderHelm calls Claude first.</p> : null}
               <p className="mt-3 text-sm text-fd-muted-foreground">Sign in to AWS if it asks. Then tick the box at the bottom of the page and press <b className="text-fd-foreground">Create stack</b>.</p>
             </div>
           )}
