@@ -1,7 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import path from "node:path";
 
-// A sign-in carried over from another CoderHelm: the team moved to this
+// A sign-in carried over from another Coderhelm: the team moved to this
 // install, and the person's account there has an authenticator app. The
 // password sign-in answers mfa_required with carry_over; the code screen
 // then sends the same email and password with the code. Every API call is

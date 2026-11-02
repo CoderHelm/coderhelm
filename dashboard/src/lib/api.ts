@@ -200,7 +200,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email, code, new_password }),
     }),
-  /** A sign-in carried over from another CoderHelm: the same email and password, with the
+  /** A sign-in carried over from another Coderhelm: the same email and password, with the
    *  authenticator code of the account there. The password is sent, never stored. */
   loginCarryOverCode: (email: string, password: string, code: string) =>
     request<{ status: string; session?: string; team_id?: string }>("/auth/login/code", {

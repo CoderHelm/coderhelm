@@ -899,7 +899,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [mfaSession, setMfaSession] = useState("");
-  // A sign-in carried over from another CoderHelm whose account there has an authenticator app:
+  // A sign-in carried over from another Coderhelm whose account there has an authenticator app:
   // the code goes with the password (kept in memory only) instead of with a session.
   const [carryOver, setCarryOver] = useState(false);
   const [error, setError] = useState("");
@@ -1366,8 +1366,8 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
             <div className="w-full space-y-4">
               <p className="text-sm text-zinc-400 text-center">Enter the code from your authenticator app</p>
               {carryOver && (
-                <p data-testid="carry-over-note" className="text-xs text-zinc-500 text-center">
-                  Your team moved here from another CoderHelm. Use the authenticator app you used there.
+                <p data-testid="carry-over-note" className="text-xs text-zinc-400 text-center">
+                  Your team moved here from another Coderhelm. Use the authenticator app you used there.
                 </p>
               )}
               <div className="space-y-3">
