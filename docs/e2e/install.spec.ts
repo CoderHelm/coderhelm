@@ -1364,16 +1364,13 @@ test('release: no release anywhere shows the same message instead of a broken la
   expect(m.requests.some((u) => /\/launch\/v[^/]+\/coderhelm\.json$/.test(u))).toBe(false);
 });
 
-test('models: no default; Launch waits for a choice; Bedrock says what it needs', async ({ page }) => {
+test('models: your own Anthropic key by default; Bedrock says what it needs', async ({ page }) => {
   const m = newMock();
   await mock(page, m);
   await page.goto('/self-host/install/');
   await page.locator('[data-setup="private"]').click();
   await page.getByLabel('Your email').fill('ada@example.org');
-  await expect(page.locator('[data-provider] input:checked')).toHaveCount(0);
-  await expect(page.getByTestId('launch')).toBeDisabled();
-  await expect(page.getByTestId('launch-needs-provider')).toBeVisible();
-  await page.locator('[data-provider="anthropic"] input').check();
+  await expect(page.locator('[data-provider="anthropic"] input')).toBeChecked();
   await expect(page.getByTestId('bedrock-terms')).toHaveCount(0);
   await expect(page.getByTestId('launch')).toBeEnabled();
   await page.locator('[data-provider="bedrock"] input').check();

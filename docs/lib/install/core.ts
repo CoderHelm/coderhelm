@@ -336,7 +336,9 @@ export function newState(over: Partial<InstallState> = {}): InstallState {
     region: 'us-east-1',
     stage: 'prod',
     email: '',
-    provider: '',
+    // Your own Anthropic key by default: it works with no AWS Marketplace step.
+    // Bedrock is one click away and says what it needs before Launch.
+    provider: 'anthropic',
     org: '',
     version: '',
     url: '',
@@ -974,7 +976,7 @@ export function parseStored(raw: string | null): InstallState | null {
     if (v.dataChoice !== 'fresh' && v.dataChoice !== 'move') s.dataChoice = 'fresh';
     // A saved guide keeps the model choice it was saved with; one saved
     // before the choice was asked for, and already launched, ran on Bedrock.
-    if (v.provider !== 'anthropic' && v.provider !== 'bedrock') s.provider = v.launchedAt ? 'bedrock' : '';
+    if (v.provider !== 'anthropic' && v.provider !== 'bedrock') s.provider = v.launchedAt ? 'bedrock' : 'anthropic';
     // Saved before the Jira choice existed: follow the setup it was saved with,
     // so a hybrid install keeps CoderHelm's Jira app on like its GitHub App.
     if (v.jiraChoice !== 'own' && v.jiraChoice !== 'hosted') {
