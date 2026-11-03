@@ -6,6 +6,7 @@ import { formatTokens, LIMIT_LABELS, limitsTone, usageBreakdown, usageLimits, us
 import { can } from "@/lib/capabilities";
 import { SETTINGS_ITEMS, offered, type SettingsStatusKey } from "@/components/settings-items";
 import { isSelfHosted } from "@/lib/runtime-config";
+import { systemChecks } from "@/lib/install";
 
 export type StatusTone = "neutral" | "success" | "warning" | "error";
 
@@ -79,7 +80,7 @@ const LOADERS: Record<SettingsStatusKey, (me: Me) => Promise<ItemStatus | null>>
   },
   // This install: failing setup checks need someone; warnings are shown, not flagged.
   setup: async () => {
-    const { summary } = await api.getSystemChecks();
+    const { summary } = await systemChecks();
     if (summary.fail > 0) return { text: `${plural(summary.fail, "check")} failing`, tone: "error" };
     if (summary.warn > 0) return { text: `${plural(summary.warn, "warning")}`, tone: "neutral" };
     return { text: "All checks pass", tone: "success" };

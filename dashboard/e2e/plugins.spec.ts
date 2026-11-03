@@ -339,7 +339,7 @@ test("plugins on: the nav shows Plugins, Review and the audit log", async ({ pag
   await expect(tabs.getByRole("link", { name: "Audit log" })).toBeVisible();
   // Connections is a settings page, in Settings' own list.
   await page.goto("/connections");
-  await expect(page.getByRole("navigation", { name: "Settings" }).getByRole("link", { name: "Connections" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Settings" }).getByRole("link", { name: "Connected accounts" })).toBeVisible();
 });
 
 test("install from the catalog waits for a second admin; the asker can't approve, another admin can", async ({ page }) => {

@@ -432,12 +432,11 @@ test("the whole row opens it, from the mouse or the keyboard, and Close folds it
 test("Integrations and Data sources are listed in Settings' own navigation, with no AWS item and no count", async ({ page }) => {
   await mockApi(page);
   await page.goto("/settings/integrations");
-  // The main menu has one Settings entry, marked current on every settings page.
+  // In Settings the menu is Settings' own: the app's destinations give way.
   const main = page.getByRole("navigation", { name: "Main" });
-  await expect(main.getByRole("link", { name: "Settings", exact: true })).toHaveAttribute("aria-current", "page");
-  await expect(main.getByRole("link", { name: "Integrations", exact: true })).toHaveCount(0);
-  const nav = page.getByRole("navigation", { name: "Settings" });
-  const integrations = nav.getByRole("link", { name: "Integrations", exact: true });
+  await expect(page.getByTestId("main-nav")).toHaveCount(0);
+  const nav = main.getByRole("navigation", { name: "Settings" });
+  const integrations = nav.getByRole("link", { name: /^Integrations/ });
   await expect(integrations).toHaveAttribute("href", /\/settings\/integrations\/?$/);
   await expect(integrations).toHaveAttribute("aria-current", "page");
   await expect(nav.getByRole("link", { name: "AWS" })).toHaveCount(0);
@@ -493,7 +492,7 @@ test("the old Plugins address leads to Connections", async ({ page }) => {
   await mockApi(page);
   await page.goto("/settings/plugins");
   await expect(page).toHaveURL(/\/connections\/?$/);
-  await expect(page.getByTestId("topbar")).toContainText("Connections");
+  await expect(page.getByTestId("topbar")).toContainText("Connected accounts");
 });
 
 test("your websites: an admin adds and removes domains, and a bad entry says why", async ({ page }) => {

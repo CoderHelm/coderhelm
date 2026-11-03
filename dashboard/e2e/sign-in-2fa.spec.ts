@@ -234,7 +234,7 @@ for (const width of WIDTHS) {
       await gate.getByRole("button", { name: "Turn on two-factor sign-in" }).click();
       await expect.poll(() => state.verified).toEqual(["654321"]);
       await expect(page.getByTestId("two-factor-gate")).toHaveCount(0);
-      await expect(page.getByRole("heading", { name: "Security", level: 1 })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Password and two step sign in", level: 1 })).toBeVisible();
     });
 
     test("a password account that already has it is asked to sign in again with the code", async ({ page }) => {
@@ -261,7 +261,7 @@ for (const width of WIDTHS) {
       await form.getByLabel("Six digit code").fill("123456");
       await form.getByRole("button", { name: "Sign in", exact: true }).click();
       await expect.poll(() => state.verified).toEqual(["123456"]);
-      await expect(page.getByRole("heading", { name: "Security", level: 1 })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Password and two step sign in", level: 1 })).toBeVisible();
     });
 
     test("too many wrong codes: the pause is said plainly, and a spent sign-in starts over", async ({ page }) => {

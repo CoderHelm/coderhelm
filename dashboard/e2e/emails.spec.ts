@@ -88,7 +88,7 @@ async function selfHostInstall(page: Page, opts: { registered?: boolean; platfor
 test("Settings, Emails: optional emails start off, essential ones are listed, the admin turns one on", async ({ page }) => {
   const { puts } = await selfHostInstall(page);
   await page.goto("/settings/emails");
-  await expect(page.getByRole("heading", { name: "Emails", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Email", exact: true, level: 1 })).toBeVisible();
 
   const weekly = page.getByTestId("optional-weekly_summary").getByRole("switch");
   const welcome = page.getByTestId("optional-welcome").getByRole("switch");

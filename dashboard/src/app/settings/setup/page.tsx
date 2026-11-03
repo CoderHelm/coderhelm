@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type ModelCheck, type SystemChecks } from "@/lib/api";
 import { UpdateNeedsAction } from "@/components/models-section";
-import { EMAIL_OK_KEY, loadSetupChecks, setupProgress, useInstallAdmin, type SetupCheck } from "@/lib/install";
+import { EMAIL_OK_KEY, loadSetupChecks, setupProgress, systemChecks, useInstallAdmin, type SetupCheck } from "@/lib/install";
 import { Page, PageHeader } from "@/components/page";
 import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
@@ -52,10 +52,10 @@ function Setup() {
       .catch(() => setModelCheck(null));
   }, []);
 
-  const runChecks = useCallback(() => {
+  // The first load may reuse the menu's recent result; Check again runs them afresh.
+  const runChecks = useCallback((fresh = true) => {
     setServerState("loading");
-    api
-      .getSystemChecks()
+    systemChecks(fresh)
       .then((r) => {
         setServer(r);
         setServerState("ready");
@@ -63,7 +63,7 @@ function Setup() {
       .catch(() => setServerState("failed"));
   }, []);
   useEffect(() => {
-    runChecks();
+    runChecks(false);
   }, [runChecks]);
   const [email, setEmail] = useState<{ state: "idle" | "sending" | "sent" | "failed"; text?: string }>({ state: "idle" });
 
@@ -116,7 +116,7 @@ function Setup() {
           </p>
         </div>
       )}
-      <InstallChecks data={server} state={serverState} onRecheck={runChecks} />
+      <InstallChecks data={server} state={serverState} onRecheck={() => runChecks()} />
 
       <h2 className="mb-3 mt-10 text-xs font-semibold uppercase tracking-wider text-zinc-400" id="getting-started">Getting started</h2>
       {!checks ? (

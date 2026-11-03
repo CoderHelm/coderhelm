@@ -9,6 +9,7 @@ import type { ItemStatus } from "@/app/settings/use-settings-status";
 import type { SettingsStatusKey } from "./settings-items";
 import { focusRing, inputClass } from "./ui";
 import { Tabs } from "./tabs";
+import { pageWidthClass } from "./page";
 
 /** Paths that show the settings menu. */
 export function inSettings(pathname: string | null | undefined): boolean {
@@ -150,7 +151,7 @@ export function SettingsPageTabs() {
   const tabs = item?.tabs ? SETTINGS_TABS[item.tabs] : undefined;
   if (!item || !tabs) return null;
   return (
-    <div className="mb-6" data-testid="settings-page-tabs">
+    <div className={`${pageWidthClass} mb-6`} data-testid="settings-page-tabs">
       <Tabs label="Instructions pages" items={tabs.map((t) => ({ value: t.href, label: t.label, href: t.href }))} value={item.href} className="" />
     </div>
   );

@@ -782,8 +782,9 @@ test("small screens: the menu opens, navigates and closes with Escape", async ({
   await expect(menuButton).toBeFocused();
   expect(await page.evaluate(() => document.body.style.overflow)).toBe("");
 
+  // On a settings page the drawer is Settings' own menu.
   await menuButton.click();
-  await menu.getByRole("link", { name: "Settings", exact: true }).click();
+  await menu.getByRole("navigation", { name: "Settings" }).getByRole("link", { name: "Overview" }).click();
   await expect(page).toHaveURL(/\/settings\/?$/);
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "Menu" })).toHaveCount(0);

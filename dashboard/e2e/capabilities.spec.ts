@@ -116,6 +116,14 @@ test("viewers are unchanged: member pages stay closed and out of the menu", asyn
     await page.goto("/settings/repos");
     await expect(page.getByText("This page needs a different role")).toBeVisible();
     await expect(page.getByText(/Only a team member can open this page/)).toBeVisible();
+    // Settings' own menu lists none of the member pages.
+    const settings = nav(page).getByRole("navigation", { name: "Settings" });
+    await expect(settings.getByRole("link", { name: /^Notifications/ })).toBeVisible();
+    for (const name of [/^Repositories/, /^Skills/, /^Integrations/, /^Alert routes/, /^Token limit/]) {
+      await expect(settings.getByRole("link", { name })).toHaveCount(0);
+    }
+    // Back in the app, the menu holds no member destinations either.
+    await page.goto("/");
     await expect(nav(page).getByRole("link", { name: "Runs" })).toBeVisible();
     for (const name of ["Repos", "Code review", "Reviewer", "Tests", "Logs", "Skills", "Integrations"]) {
       await expect(nav(page).getByRole("link", { name, exact: true })).toHaveCount(0);

@@ -499,7 +499,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           <main className="flex-1 p-4 md:p-8">
             <SetupBanner />
             {inSettings(pathname) ? (
-              <div data-settings-layout="" className="mx-auto w-full min-w-0 max-w-4xl">
+              <div data-settings-layout="" className="w-full min-w-0">
                 <div className="min-w-0 pb-24 md:pb-32" data-testid="settings-content">
                   <SettingsPageTabs />
                   {children}
