@@ -26,7 +26,8 @@ import { isSelfHosted } from "@/lib/runtime-config";
 import { hybridGithubSetupTarget, hybridOAuthHandoff, maybeHybridOAuthCallback } from "@/lib/hybrid";
 import { Menu } from "./menu";
 import { SectionTabs } from "./section-tabs";
-import { inSettings, SettingsNav } from "./settings-nav";
+import { inSettings, SettingsPageTabs, SettingsSidebarNav } from "./settings-nav";
+import { useSettingsStatus } from "@/app/settings/use-settings-status";
 import { buttonClass } from "./ui";
 import { AlertCircleIcon, InfoIcon, LogFindingsIcon, WarningIcon, XIcon } from "./icons";
 import { apiBase, githubAppUrl, runtimeConfig, siteUrl } from "@/lib/runtime-config";
@@ -498,9 +499,11 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           <main className="flex-1 p-4 md:p-8">
             <SetupBanner />
             {inSettings(pathname) ? (
-              <div data-settings-layout="" className="mx-auto flex w-full min-w-0 max-w-6xl flex-col xl:flex-row xl:gap-10">
-                <SettingsNav visible={(item) => can(user, item.view) && offered(item, isSelfHosted(), user.platform_admin === true)} />
-                <div className="min-w-0 flex-1 pb-24 md:pb-32" data-testid="settings-content">{children}</div>
+              <div data-settings-layout="" className="mx-auto w-full min-w-0 max-w-4xl">
+                <div className="min-w-0 pb-24 md:pb-32" data-testid="settings-content">
+                  <SettingsPageTabs />
+                  {children}
+                </div>
               </div>
             ) : (
               <>
@@ -637,6 +640,9 @@ function Sidebar({
 
   // The destination the page belongs to (an item's page counts for its list).
   const currentSection = sectionFor(pathname)?.key;
+  // In Settings the sidebar is the settings menu (one column of navigation).
+  const settingsMode = inSettings(pathname);
+  const settingsStatus = useSettingsStatus(settingsMode ? user : null);
 
   const currentTeam = teams.find((t) => t.current);
 
@@ -697,6 +703,13 @@ function Sidebar({
 
       <TeamSwitcher teams={teams} currentTeam={currentTeam ?? null} switching={switching} onSwitch={handleSwitch} />
 
+      {settingsMode && user ? (
+        <SettingsSidebarNav
+          visible={(item) => can(user, item.view) && offered(item, isSelfHosted(), user.platform_admin === true)}
+          status={settingsStatus}
+        />
+      ) : (
+      <>
       <ul className="space-y-0.5" data-testid="main-nav">
         {visibleSections(user, pluginsOn).filter((x) => !x.section.superAdminOnly).map(({ section, href }) => (
           <NavItemLink key={section.key} href={href} label={section.label} icon={NAV_ICONS[section.icon]} current={currentSection === section.key} />
@@ -725,6 +738,9 @@ function Sidebar({
             ))}
           </ul>
         </div>
+      )}
+
+      </>
       )}
 
       </ScrollFade>

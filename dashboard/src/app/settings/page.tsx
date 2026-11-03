@@ -27,10 +27,16 @@ export default function SettingsPage() {
   }, []);
 
   const groups = me
-    ? SETTINGS_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => can(me, i.view) && offered(i, isSelfHosted(), me.platform_admin === true)) })).filter((g) => g.items.length > 0)
+    ? SETTINGS_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !i.navUnder && can(me, i.view) && offered(i, isSelfHosted(), me.platform_admin === true)) })).filter((g) => g.items.length > 0)
     : [];
   const roleLabel = me ? (me.custom_role?.name ?? ROLE_LABEL[me.role as Role] ?? me.role) : null;
   const anyReadOnly = groups.some((g) => g.items.some((i) => !can(me, i.edit)));
+  const attention = groups
+    .flatMap((g) => g.items)
+    .flatMap((item) => {
+      const s = item.status ? status[item.status] : undefined;
+      return s && (s.tone === "warning" || s.tone === "error") ? [{ item, s }] : [];
+    });
 
   return (
     <Page>
@@ -39,7 +45,7 @@ export default function SettingsPage() {
           title="Settings"
           lead={
             <>
-              <p>How Coderhelm works for your team, and the settings that are just yours.</p>
+              <p>Everything Coderhelm does for your team, and the settings that are just yours.</p>
               {roleLabel && (
                 <p className="mt-2 text-sm text-zinc-400">
                   Your role: <span className="font-medium text-zinc-200">{roleLabel}</span>.
@@ -68,13 +74,28 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <div className="space-y-10">
+      {attention.length > 0 && (
+        <section aria-labelledby="settings-attention" className="mb-10" data-testid="settings-attention">
+          <SectionHeading id="settings-attention" className="mb-3">
+            Needs attention
+          </SectionHeading>
+          <ul className="divide-y divide-zinc-800 overflow-hidden rounded-lg border border-amber-900/60 bg-amber-950/10">
+            {attention.map(({ item, s }) => (
+              <li key={item.href}>
+                <SettingsRow item={item} readOnly={!can(me, item.edit)} status={s} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <div className="space-y-8">
         {groups.map((group) => (
           <section key={group.id} aria-labelledby={`settings-group-${group.id}`}>
-            <SectionHeading id={`settings-group-${group.id}`} className="mb-3">
+            <SectionHeading id={`settings-group-${group.id}`} className="mb-2">
               {group.label}
             </SectionHeading>
-            <ul className="grid gap-3 lg:grid-cols-2">
+            <ul className="divide-y divide-zinc-800/80 overflow-hidden rounded-lg border border-zinc-800">
               {group.items.map((item) => (
                 <li key={item.href} className="min-w-0">
                   <SettingsRow item={item} readOnly={!can(me, item.edit)} status={item.status ? status[item.status] : undefined} />
@@ -96,13 +117,13 @@ function SettingsRow({ item, readOnly, status }: { item: SettingsItem; readOnly:
   return (
     <Link
       href={item.href}
-      className={`group flex h-full items-start gap-3 rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-4 transition-colors hover:border-zinc-700 hover:bg-zinc-900 motion-reduce:transition-none ${focusRing}`}
+      className={`group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-zinc-900/70 motion-reduce:transition-none ${focusRing}`}
     >
-      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-300" aria-hidden="true">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-zinc-900 text-zinc-400" aria-hidden="true">
         {item.icon}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="flex flex-wrap items-center gap-x-2">
           <span className="text-sm font-medium text-zinc-100">{item.title}</span>
           {readOnly && (
             <span title={`Only ${whoCan(builtInRoleFor(item.edit))}, or a role that includes it, can change this`}>
@@ -110,14 +131,17 @@ function SettingsRow({ item, readOnly, status }: { item: SettingsItem; readOnly:
             </span>
           )}
         </span>
-        <span className="block text-sm text-zinc-400 mt-0.5">{item.description}</span>
+        <span className="block text-sm text-zinc-400">{item.description}</span>
         {status && (
-          <span className="mt-2 flex">
+          <span className="mt-1.5 flex sm:hidden">
             <span title={status.title} className="min-w-0 max-w-full"><StatusPill tone={status.tone}>{status.text}</StatusPill></span>
           </span>
         )}
       </span>
-      <span className="mt-2 shrink-0 text-zinc-500 group-hover:text-zinc-300 transition-colors motion-reduce:transition-none" aria-hidden="true">
+      {status && (
+        <span title={status.title} className="hidden max-w-[45%] shrink-0 sm:flex"><StatusPill tone={status.tone}>{status.text}</StatusPill></span>
+      )}
+      <span className="shrink-0 text-zinc-400 transition-colors group-hover:text-zinc-200 motion-reduce:transition-none" aria-hidden="true">
         <ChevronRightIcon />
       </span>
     </Link>
