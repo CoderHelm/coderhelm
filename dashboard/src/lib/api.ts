@@ -201,7 +201,7 @@ export const api = {
       body: JSON.stringify({ email, ...extra }),
     }),
   loginEmail: (email: string, password: string) =>
-    request<{ status: string; session?: string; team_id?: string }>(
+    request<{ status: string; session?: string; team_id?: string; carry_over?: boolean }>(
       "/auth/login",
       { method: "POST", body: JSON.stringify({ email, password }) },
     ),
@@ -219,6 +219,13 @@ export const api = {
     request<{ status: string; message: string }>("/auth/confirm-reset", {
       method: "POST",
       body: JSON.stringify({ email, code, new_password }),
+    }),
+  /** A sign-in carried over from another Coderhelm: the same email and password, with the
+   *  authenticator code of the account there. The password is sent, never stored. */
+  loginCarryOverCode: (email: string, password: string, code: string) =>
+    request<{ status: string; session?: string; team_id?: string }>("/auth/login/code", {
+      method: "POST",
+      body: JSON.stringify({ email, password, code }),
     }),
   mfaVerify: (session: string, code: string, email: string) =>
     request<{ status: string; team_id?: string }>("/auth/mfa/verify", {

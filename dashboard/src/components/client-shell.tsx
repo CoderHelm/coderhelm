@@ -976,6 +976,9 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [mfaSession, setMfaSession] = useState("");
+  // A sign-in carried over from another Coderhelm whose account there has an authenticator app:
+  // the code goes with the password (kept in memory only) instead of with a session.
+  const [carryOver, setCarryOver] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -1066,7 +1069,11 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
     setError(""); setLoading(true);
     try {
       const result = await api.loginEmail(email, password);
-      if (result.status === "mfa_required" && result.session) {
+      if (result.status === "mfa_required" && result.carry_over) {
+        setCarryOver(true);
+        setView("mfa");
+      } else if (result.status === "mfa_required" && result.session) {
+        setCarryOver(false);
         setMfaSession(result.session);
         setView("mfa");
       } else if (result.status === "second_step") {
@@ -1168,7 +1175,23 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const handleMfa = async () => {
     setError(""); setLoading(true);
     try {
-      await api.mfaVerify(mfaSession, code, email);
+      if (carryOver) {
+        const result = await api.loginCarryOverCode(email, password, code);
+        setPassword("");
+        setCarryOver(false);
+        if (result.status === "mfa_required" && result.session) {
+          setMfaSession(result.session);
+          setCode("");
+          return;
+        }
+        if (result.status === "second_step") {
+          setCode("");
+          setView("second_step");
+          return;
+        }
+      } else {
+        await api.mfaVerify(mfaSession, code, email);
+      }
       const u = await api.me();
       onAuth(u);
     } catch (e: unknown) {
@@ -1419,6 +1442,11 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
           {view === "mfa" && (
             <div className="w-full space-y-4">
               <p className="text-sm text-zinc-400 text-center">Enter the code from your authenticator app</p>
+              {carryOver && (
+                <p data-testid="carry-over-note" className="text-xs text-zinc-400 text-center">
+                  Your team moved here from another Coderhelm. Use the authenticator app you used there.
+                </p>
+              )}
               <div className="space-y-3">
                 <input type="text" inputMode="numeric" autoComplete="one-time-code" aria-label="Six digit code" placeholder="6-digit code" value={code} onChange={(e) => { setCode(e.target.value); setError(""); }}
                   onKeyDown={(e) => e.key === "Enter" && handleMfa()}
@@ -1428,7 +1456,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
                   {loading ? "Verifying..." : "Verify"}
                 </button>
               </div>
-              <button onClick={() => { setView("login"); setError(""); setMessage(""); setCode(""); }} className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">
+              <button onClick={() => { setView("login"); setError(""); setMessage(""); setCode(""); setCarryOver(false); }} className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">
                 Back to sign in
               </button>
             </div>
