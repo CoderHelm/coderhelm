@@ -112,7 +112,7 @@ export function llmsTxt(): string {
       "## Pages",
       [home, ...product].map((p) => `- [${p.title}](${SITE.url}${mdPath(p)}): ${p.description}`).join("\n"),
       "## Get started",
-      `- [Sign in or request access](${SITE.appUrl}): connect GitHub, then Jira if you use it, and add your Anthropic API key.\n- Email: ${SITE.email}`,
+      `- [Sign up or sign in](${SITE.appUrl}): connect GitHub, then Jira if you use it, and add your Anthropic API key.\n- Email: ${SITE.email}`,
       "## Optional",
       legal.map((p) => `- [${p.title}](${SITE.url}${mdPath(p)}): ${p.description}`).join("\n"),
     ].join("\n\n") + "\n"

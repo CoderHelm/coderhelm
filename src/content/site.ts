@@ -27,7 +27,7 @@ export const SITE = {
   entity:
     "CoderHelm is an AI coding agent for GitHub and Jira. Assign it an issue or a ticket and it opens a pull request in your repository, then it stays on the code: it answers review comments, fixes its own failing CI, reviews your team's pull requests and turns production alerts into fixes that a person approves. Teams can also ask it about their code and documents in Chat, and run it hosted or in their own AWS account.",
   llmsDetails: [
-    "Status: the hosted service is in closed beta. Sign in at https://app.coderhelm.com; new accounts are admitted from a waitlist.",
+    "Status: the hosted service is in open beta. Anyone can sign up at https://app.coderhelm.com; a team's admins choose who may join that team.",
     "Self-hosting: runs in your own AWS account, installed from the browser at https://docs.coderhelm.com/self-host/install/ or from a terminal. The first public self-host release is not out yet; releases are published at https://github.com/CoderHelm/coderhelm-platform/releases. License: FSL-1.1-ALv2 (each release becomes Apache 2.0 two years after it ships).",
     "Models: Claude. Hosted teams use their own Anthropic API key; self-hosted installs use Amazon Bedrock in their own account or each team's Anthropic API key. Admins can set monthly token limits: one for new tokens, one for cache reads and one for cache writes.",
     "Chat: answers questions about the team's repositories and knowledge. It reads the code itself (overview, files, code search, code graph) and cites real file paths and lines.",
@@ -64,9 +64,9 @@ export const SITE = {
     "Self-hosting in your own AWS account",
   ],
   sameAs: ["https://github.com/CoderHelm"],
-  ctaNote: "CoderHelm is in closed beta. Sign in to request access; you bring your own Anthropic API key.",
-  updated: "2026-10-27",
-  updatedLabel: "October 27, 2026",
+  ctaNote: "CoderHelm is in open beta. Sign up and bring your own Anthropic API key.",
+  updated: "2026-11-03",
+  updatedLabel: "November 3, 2026",
   year: 2026,
 } as const;
 
@@ -77,7 +77,7 @@ const home: Page = {
   title: "CoderHelm: AI coding agent for GitHub and Jira. Ship code, not tickets.",
   description:
     "Assign a GitHub issue or Jira ticket and get a pull request. Then CoderHelm keeps the code healthy: it fixes its CI, answers review comments, reviews PRs, turns alerts into fixes and answers questions about your code.",
-  eyebrow: "Closed beta",
+  eyebrow: "Open beta",
   h1: "Ship code, not tickets.",
   lede:
     "Assign a GitHub issue or Jira ticket and get a pull request. CoderHelm reads your codebase, plans the change, writes it and reviews its own work, then keeps the code healthy after it ships.",
@@ -352,7 +352,7 @@ const home: Page = {
             { q: "Which languages does it support?", a: "It works on the repository as text and runs your own build and tests, so it is not tied to one language or framework." },
             { q: "Which AI models does it use?", a: "Claude models from Anthropic, through your team's own Anthropic API key. A self-hosted install can use Amazon Bedrock in its own AWS account instead. Admins can choose the models and set monthly token limits." },
             { q: "Can we run it ourselves?", a: "Yes. CoderHelm runs entirely in your own AWS account, installed from your browser with the [install guide](https://docs.coderhelm.com/self-host/install/). It is licensed under FSL-1.1-ALv2: you can run it, change it and self-host it for your own company, and each release becomes Apache 2.0 two years after it ships. See [self-hosting](/self-host/)." },
-            { q: "How much does it cost?", a: "CoderHelm is in closed beta. Each team brings its own Anthropic API key, so model usage is billed to your Anthropic account, and admins can cap it with a monthly token limit." },
+            { q: "How much does it cost?", a: "CoderHelm is in open beta. Each team brings its own Anthropic API key, so model usage is billed to your Anthropic account, and admins can cap it with a monthly token limit." },
             { q: "Can it change data in my database?", a: "No. Lookups are read only, enforced in code at several independent points: the query is checked, the transaction is read only and rolled back, and the database user cannot write." },
           ],
         },
