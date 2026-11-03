@@ -27,7 +27,7 @@ test("the Admin and Support queue pages don't exist on a self-hosted install", a
   for (const path of ["/admin", "/admin/tickets", "/admin/self-host", "/admin/queue"]) {
     await page.goto(path);
     await expect(page.getByRole("heading", { level: 1, name: "Page not found" }), path).toBeVisible();
-    await expect(page.getByRole("tab", { name: /Beta sign-ups|Allowlist/ }), path).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: /Waitlist|Beta sign-ups|Allowlist/ }), path).toHaveCount(0);
   }
 });
 

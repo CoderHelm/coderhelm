@@ -318,9 +318,20 @@ test("sign in screen: every field has a name", async ({ page }) => {
   await page.getByRole("button", { name: "Forgot password?" }).click();
   await expect(page.getByLabel("Email")).toBeVisible();
   await page.getByRole("button", { name: "Back to sign in" }).click();
-  await page.getByRole("button", { name: "Join waitlist" }).click();
-  await expect(page.getByLabel("Email")).toBeVisible();
+  // Open beta: no waitlist, a plain label instead.
+  await expect(page.getByText("Open beta")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Join waitlist" })).toHaveCount(0);
   expect(errors).toEqual([]);
+});
+
+test("open beta: a first sign-in over the hourly limit reads why, and the sign-up form says it starts a new team", async ({ page }) => {
+  await mockApi(page, { me: 401 });
+  await page.goto("/?error=signup_limit");
+  await expect(page.getByText("Too many sign-ups from here just now. Try again in an hour.")).toBeVisible();
+  await page.goto("/");
+  await page.getByRole("button", { name: /Sign up|Create an account|Create account/ }).first().click();
+  await expect(page.getByText("Your account starts its own team.", { exact: false })).toBeVisible();
+  await expect(page.getByText("Closed beta")).toHaveCount(0);
 });
 
 test("removed GitHub app: the sign in link goes to a route that exists", async ({ page }) => {

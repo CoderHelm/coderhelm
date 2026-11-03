@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } f
 import Link from "next/link";
 import { ApiError, api, type AdminOrg, type AdminTeam, type BetaSignup, type BetaSignupStatus, type UsageCheck } from "@/lib/api";
 import {
-  BETA_SIGNUPS_CHANGED,
+  teamsPerDay,
   LINK_WORDS,
   TEAM_SORTS,
   filterOrgs,
@@ -51,11 +51,10 @@ const plural = (n: number, one: string, many = `${one}s`) => `${fmtInt(n)} ${n =
 /** The allowlist gets its own search once it is this long. */
 const ALLOWLIST_SEARCH_AT = 6;
 
-type Tab = "teams" | "beta" | "allowlist";
+type Tab = "teams" | "beta";
 const TABS: { value: Tab; label: string }[] = [
   { value: "teams", label: "Teams" },
-  { value: "beta", label: "Beta sign-ups" },
-  { value: "allowlist", label: "Allowlist" },
+  { value: "beta", label: "Waitlist" },
 ];
 
 const SIGNUP_LOOK: Record<BetaSignupStatus, { label: string; tone: Tone }> = {
@@ -86,9 +85,6 @@ function AdminPage() {
   const [loadError, setLoadError] = useState("");
   const [signups, setSignups] = useState<BetaSignup[] | null>(null);
   const [signupError, setSignupError] = useState("");
-  const [allowlist, setAllowlist] = useState<string[]>([]);
-  const [listError, setListError] = useState("");
-  const [listLoading, setListLoading] = useState(false);
   // Every view's search, filter and sort live in the address.
   const [params, setParams] = useListParams({
     tab: "teams",
@@ -98,7 +94,6 @@ function AdminPage() {
     bq: "",
     bstatus: "all",
     bsort: "new",
-    aq: "",
   });
   const tab: Tab = TABS.some((t) => t.value === params.tab) ? (params.tab as Tab) : "teams";
 
@@ -108,16 +103,6 @@ function AdminPage() {
       .adminBetaSignups()
       .then((r) => setSignups(r.signups))
       .catch((e: unknown) => setSignupError(e instanceof Error ? e.message : "The request failed."));
-  }, []);
-
-  const loadList = useCallback(() => {
-    setListLoading(true);
-    setListError("");
-    api
-      .listAllowlist()
-      .then((r) => setAllowlist(r.emails))
-      .catch((e: unknown) => setListError(e instanceof Error ? e.message : "The request failed."))
-      .finally(() => setListLoading(false));
   }, []);
 
   // The server decides who is a platform admin: anyone else gets a 403.
@@ -130,7 +115,6 @@ function AdminPage() {
         setMonth(r.month);
         setAuthorized(true);
         loadSignups();
-        loadList();
       })
       .catch((e: unknown) => {
         // 401/403: not a platform admin. Anything else is a real failure to show.
@@ -138,9 +122,8 @@ function AdminPage() {
         setLoadError(e instanceof Error ? e.message : "The request failed.");
       })
       .finally(() => setLoading(false));
-  }, [loadSignups, loadList]);
+  }, [loadSignups]);
 
-  const newSignups = signups?.filter((s) => s.status === "new").length ?? 0;
 
   if (loading) {
     return (
@@ -171,23 +154,14 @@ function AdminPage() {
 
   const counts: Record<Tab, ReactNode> = {
     teams: <span className="tabular-nums text-zinc-500">{fmtInt(teamTotal)}</span>,
-    beta:
-      newSignups > 0 ? (
-        <span className="rounded-full bg-amber-500/15 px-1.5 text-xs font-medium tabular-nums text-amber-300">
-          {newSignups}
-          <span className="sr-only"> new</span>
-        </span>
-      ) : signups ? (
-        <span className="tabular-nums text-zinc-500">{fmtInt(signups.length)}</span>
-      ) : null,
-    allowlist: <span className="tabular-nums text-zinc-500">{fmtInt(allowlist.length)}</span>,
+    beta: signups ? <span className="tabular-nums text-zinc-500">{fmtInt(signups.length)}</span> : null,
   };
 
   return (
     <Page>
       <PageHeader
         title="Platform admin"
-        lead="Every organization using Coderhelm, who is waiting to get in, and who may sign up."
+        lead="Every organization using Coderhelm, new teams by day, and the waitlist from before the open beta."
         actions={
           <div className="flex flex-wrap gap-2">
             <Link href="/admin/queue" className={secondaryButton}>
@@ -215,6 +189,7 @@ function AdminPage() {
         }))}
       />
 
+      {tab === "teams" && <NewTeams orgs={orgs} />}
       {tab === "teams" && (
         <TeamsView
           orgs={orgs}
@@ -231,27 +206,9 @@ function AdminPage() {
           signups={signups}
           error={signupError}
           onRetry={loadSignups}
-          onInvited={(email, invitedAt) => {
-            setSignups((prev) =>
-              (prev ?? []).map((s) => (s.email === email && s.status === "new" ? { ...s, status: "invited", invited_at: invitedAt } : s)),
-            );
-            setAllowlist((prev) => (prev.includes(email) ? prev : [...prev, email]));
-            window.dispatchEvent(new Event(BETA_SIGNUPS_CHANGED));
-          }}
           q={params.bq}
           status={params.bstatus}
           sort={params.bsort}
-          setParams={setParams}
-        />
-      )}
-      {tab === "allowlist" && (
-        <AllowlistView
-          allowlist={allowlist}
-          setAllowlist={setAllowlist}
-          error={listError}
-          loading={listLoading}
-          onRetry={loadList}
-          q={params.aq}
           setParams={setParams}
         />
       )}
@@ -557,7 +514,6 @@ function BetaView({
   signups,
   error,
   onRetry,
-  onInvited,
   q,
   status,
   sort,
@@ -566,15 +522,11 @@ function BetaView({
   signups: BetaSignup[] | null;
   error: string;
   onRetry: () => void;
-  onInvited: (email: string, invitedAt: string) => void;
   q: string;
   status: string;
   sort: string;
   setParams: SetParams;
 }) {
-  const { toast } = useToast();
-  const { confirm } = useConfirm();
-  const [inviting, setInviting] = useState<string | null>(null);
   const filter: SignupFilter = status === "new" || status === "invited" || status === "joined" ? status : "all";
   const all = signups ?? [];
   const searched = filterSignups(all, q, "all", sort);
@@ -583,29 +535,11 @@ function BetaView({
   const filtered = !!q || filter !== "all";
   const clear = () => setParams({ bq: "", bstatus: "all" });
 
-  const invite = async (s: BetaSignup) => {
-    const ok = await confirm({
-      title: "Mark as invited?",
-      message: `${s.email} is added to the sign-up allowlist, so they can create an account. No email is sent: let them know yourself.`,
-      confirmLabel: "Mark invited",
-    });
-    if (!ok) return;
-    setInviting(s.email);
-    api
-      .inviteBetaSignup(s.email)
-      .then((r) => {
-        onInvited(s.email, r.invited_at);
-        toast(`Marked ${s.email} invited`);
-      })
-      .catch((e: unknown) => toast(e instanceof Error ? `Could not mark invited: ${e.message}` : "Could not mark invited", "error"))
-      .finally(() => setInviting(null));
-  };
-
   return (
     <section aria-labelledby="beta-heading" className="mt-6">
       <h2 id="beta-heading" className="sr-only">Beta sign-ups</h2>
       <p className="mb-4 text-sm text-zinc-500">
-        People who joined the waitlist from the sign-in page. A sign-up reads as joined once their email is on a team.
+        Who joined the waitlist before the beta opened, kept read only. Anyone can sign up now; a sign-up reads as joined once their email is on a team.
       </p>
       {error ? (
         <ListError title="Couldn't load the beta sign-ups" onRetry={onRetry}>
@@ -614,7 +548,7 @@ function BetaView({
       ) : signups === null ? (
         <ListSkeleton rows={3} label="Loading the beta sign-ups" />
       ) : all.length === 0 ? (
-        <ListEmpty title="No beta sign-ups yet">People who join the waitlist from the sign-in page show up here.</ListEmpty>
+        <ListEmpty title="No one joined the waitlist">The waitlist closed when the beta opened.</ListEmpty>
       ) : (
         <>
           <ListToolbar
@@ -670,17 +604,6 @@ function BetaView({
                     actions={
                       <>
                         <CopyButton text={s.email} label="Copy email" />
-                        {s.status === "new" && (
-                          <button
-                            type="button"
-                            onClick={() => void invite(s)}
-                            disabled={inviting === s.email}
-                            aria-label={`Mark ${s.email} invited`}
-                            className={`${smallSecondaryButton}`}
-                          >
-                            {inviting === s.email ? "Saving..." : "Mark invited"}
-                          </button>
-                        )}
                       </>
                     }
                   />
@@ -694,140 +617,35 @@ function BetaView({
   );
 }
 
-// ── Allowlist ────────────────────────────────────────────────────────
+// ── New teams by day ─────────────────────────────────────────────────
 
-function AllowlistView({
-  allowlist,
-  setAllowlist,
-  error,
-  loading,
-  onRetry,
-  q,
-  setParams,
-}: {
-  allowlist: string[];
-  setAllowlist: (fn: (prev: string[]) => string[]) => void;
-  error: string;
-  loading: boolean;
-  onRetry: () => void;
-  q: string;
-  setParams: SetParams;
-}) {
-  const { toast } = useToast();
-  const { confirm } = useConfirm();
-  const [allowEmail, setAllowEmail] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [removing, setRemoving] = useState<string | null>(null);
-  const aWords = words(q);
-  const shownEmails = allowlist.filter((e) => aWords.every((x) => e.toLowerCase().includes(x)));
-
-  const handleAdd = () => {
-    const value = allowEmail.trim();
-    if (!value) return;
-    setAdding(true);
-    api
-      .addToAllowlist(value)
-      .then((r) => {
-        // The server stores the address in lower case; show what it stored, once.
-        const stored = r?.email || value.toLowerCase();
-        setAllowlist((prev) => (prev.includes(stored) ? prev : [...prev, stored]));
-        setAllowEmail("");
-        toast(`Added ${stored}`);
-      })
-      .catch((e: unknown) => toast(e instanceof Error ? `Could not add: ${e.message}` : "Could not add", "error"))
-      .finally(() => setAdding(false));
-  };
-
-  const handleRemove = async (email: string) => {
-    const ok = await confirm({
-      title: "Remove from the allowlist?",
-      message: `${email} will no longer be able to create an account. Existing accounts keep working.`,
-      confirmLabel: "Remove",
-      destructive: true,
-    });
-    if (!ok) return;
-    setRemoving(email);
-    api
-      .removeFromAllowlist(email)
-      .then(() => {
-        setAllowlist((prev) => prev.filter((x) => x !== email));
-        toast(`Removed ${email}`);
-      })
-      .catch((e: unknown) => toast(e instanceof Error ? `Could not remove: ${e.message}` : "Could not remove", "error"))
-      .finally(() => setRemoving(null));
-  };
-
+/** Teams started each day for the last two weeks: anyone can sign up, so a spike shows here first. */
+function NewTeams({ orgs }: { orgs: AdminOrg[] }) {
+  const days = teamsPerDay(orgs, 14);
+  const max = Math.max(1, ...days.map((d) => d.count));
+  const total = days.reduce((n, d) => n + d.count, 0);
   return (
-    <section aria-labelledby="allowlist-heading" className="mt-6">
-      <h2 id="allowlist-heading" className="sr-only">Signup allowlist</h2>
-      <p className="text-sm text-zinc-500 mb-4">
-        Only these emails can create accounts. Use <code className="text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded text-xs">*@domain.com</code> to allow a whole domain.
-      </p>
-
-      <form
-        className="flex flex-col gap-2 mb-4 sm:flex-row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleAdd();
-        }}
-      >
-        <label htmlFor="allow-email" className="sr-only">Email or domain to allow</label>
-        <input
-          id="allow-email"
-          type="text"
-          autoComplete="off"
-          placeholder="user@example.com or *@company.com"
-          value={allowEmail}
-          onChange={(e) => setAllowEmail(e.target.value)}
-          className={`${inputClass} sm:flex-1`}
-        />
-        <button type="submit" disabled={adding || !allowEmail.trim()} className={primaryButton}>
-          {adding ? "Adding..." : "Add"}
-        </button>
-      </form>
-
-      {allowlist.length >= ALLOWLIST_SEARCH_AT && !error && (
-        <ListToolbar
-          className="mb-3"
-          search={{
-            value: q,
-            onChange: (v) => setParams({ aq: v }, { replace: true }),
-            placeholder: "Find an allowed email or domain",
-            label: "Search allowed emails",
-          }}
-        />
-      )}
-      {error ? (
-        <ListError title="Couldn't load the allowlist" onRetry={onRetry}>
-          {error}
-        </ListError>
-      ) : loading ? (
-        <ListSkeleton rows={2} label="Loading the allowlist" />
-      ) : allowlist.length === 0 ? (
-        <p className="text-sm text-zinc-500">No allowed emails yet, so nobody can sign up.</p>
-      ) : shownEmails.length === 0 ? (
-        <ListEmpty title="No allowed email matches" onClear={() => setParams({ aq: "" })} />
-      ) : (
-        <List label="Allowed emails">
-          {shownEmails.map((email) => (
-            <ListRow
-              key={email}
-              title={email}
-              actions={
-                <button
-                  type="button"
-                  onClick={() => void handleRemove(email)}
-                  disabled={removing === email}
-                  aria-label={`Remove ${email}`}
-                  className={`shrink-0 rounded text-xs text-zinc-400 hover:text-red-400 transition-colors disabled:opacity-50 ${focusRing}`}
-                >
-                  {removing === email ? "Removing..." : "Remove"}
-                </button>
-              }
+    <section aria-labelledby="new-teams-heading" className={`${cardClass} mt-6 p-4`} data-testid="new-teams">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 id="new-teams-heading" className="text-sm font-medium text-zinc-200">
+          New teams, last 14 days
+        </h2>
+        <span className="text-xs tabular-nums text-zinc-400">{fmtInt(total)} in all</span>
+      </div>
+      <ol className="mt-3 flex h-16 items-end gap-1" aria-label="New teams per day">
+        {days.map((d) => (
+          <li key={d.day} className="flex h-full flex-1 flex-col justify-end" title={`${d.day}: ${d.count}`}>
+            <span className="sr-only">
+              {d.day}: {d.count}
+            </span>
+            <span
+              aria-hidden
+              className="block w-full rounded-sm bg-blue-500/70"
+              style={{ height: `${Math.max(d.count ? 8 : 2, (d.count / max) * 100)}%`, opacity: d.count ? 1 : 0.25 }}
             />
-          ))}
-        </List>
-      )}
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }

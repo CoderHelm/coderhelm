@@ -195,11 +195,6 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
-  joinWaitlist: (email: string, extra: { company?: string; reason?: string } = {}) =>
-    request<{ status: string; message: string }>("/auth/waitlist", {
-      method: "POST",
-      body: JSON.stringify({ email, ...extra }),
-    }),
   loginEmail: (email: string, password: string) =>
     request<{ status: string; session?: string; team_id?: string; carry_over?: boolean }>(
       "/auth/login",
@@ -237,14 +232,8 @@ export const api = {
   // Allowlist
   /** Every team with its runs, cost and members. Platform admin only (403 otherwise). */
   adminTeams: () => request<AdminTeamsReply>("/api/admin/teams"),
-  /** Everyone on the beta waitlist and where they stand. Platform admin only. */
+  /** Everyone who joined the waitlist before the beta opened, read only. Platform admin only. */
   adminBetaSignups: () => request<BetaSignupsReply>("/api/admin/beta-signups"),
-  /** Marks a sign-up invited and adds the email to the sign-up allowlist. No email is sent. */
-  inviteBetaSignup: (email: string) =>
-    request<{ status: string; email: string; invited_at: string }>("/api/admin/beta-signups/invite", {
-      method: "POST",
-      body: JSON.stringify({ email }),
-    }),
 
   // Support tickets: the team's own, and the platform admin's queue (403 for anyone else)
   supportTickets: () => request<{ tickets: SupportTicket[] }>("/api/support/tickets"),
@@ -300,17 +289,6 @@ export const api = {
     request<SupportDetail>(`/api/admin/support/tickets/${encodeURIComponent(id)}/status`, {
       method: "POST",
       body: JSON.stringify(change),
-    }),
-  listAllowlist: () => request<{ emails: string[] }>("/api/allowlist"),
-  addToAllowlist: (email: string) =>
-    request<{ status: string; email: string }>("/api/allowlist", {
-      method: "POST",
-      body: JSON.stringify({ email }),
-    }),
-  removeFromAllowlist: (email: string) =>
-    request<{ status: string }>("/api/allowlist", {
-      method: "DELETE",
-      body: JSON.stringify({ email }),
     }),
 
   // Health

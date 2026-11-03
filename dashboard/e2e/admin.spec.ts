@@ -155,14 +155,6 @@ async function mockApi(page: Page, email = ADMIN_EMAIL, usageCheck: Record<strin
       const count = (s: string) => db.signups.filter((x) => x.status === s).length;
       return json(route, { signups: db.signups, counts: { new: count("new"), invited: count("invited"), joined: count("joined"), total: db.signups.length } });
     }
-    if (p === "/api/admin/beta-signups/invite" && method === "POST") {
-      const target = db.signups.find((x) => x.email === body?.email);
-      if (!target) return json(route, { error: "Not found" }, 404);
-      target.status = "invited";
-      target.invited_at = new Date().toISOString();
-      if (!db.allowlist.includes(target.email)) db.allowlist.push(target.email);
-      return json(route, { status: "invited", email: target.email, invited_at: target.invited_at });
-    }
     if (p === "/api/admin/usage-check") return json(route, db.usageCheck);
     if (p === "/api/admin/sign-in-apps") {
       const redirect = "https://app.coderhelm.com/settings/integrations/mcp-callback/";
@@ -237,49 +229,44 @@ test("teams read as one row per organization, active teams first, empty ones beh
   await shot(page, "admin-teams-inactive");
 });
 
-test("beta sign-ups: counts in the menu and the tab, search, copy and mark invited", async ({ page, context }) => {
+test("waitlist: kept read only after the open beta, searchable, with no invite and no menu count", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   const db = await mockApi(page);
   await page.goto("/admin?tab=beta");
 
-  // Two new sign-ups wait: the menu and the tab both say so.
+  // The waitlist no longer grows, so the menu shows no count for it.
   const nav = page.getByRole("link", { name: /^Admin/ });
-  await expect(nav.getByTestId("count-badge")).toHaveText(/^2/);
-  await expect(page.getByRole("link", { name: /Beta sign-ups/ })).toContainText("2");
+  await expect(nav.getByTestId("count-badge")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Waitlist/ })).toContainText("4");
+  await expect(page.getByText("Who joined the waitlist before the beta opened")).toBeVisible();
 
   const rows = page.getByTestId("beta-signup");
   await expect(rows).toHaveCount(4);
   await expect(rows.first()).toContainText("dana@umbrella.test");
-  await expect(rows.first()).toContainText("Umbrella");
-  await expect(rows.first()).toContainText("We review 40 PRs a day");
   await expect(rows.filter({ hasText: "gus@acme.test" })).toContainText("Joined");
-  await expect(rows.filter({ hasText: "eli.park@gmail.com" })).toContainText("No company given");
-  await shot(page, "admin-beta");
+  await shot(page, "admin-waitlist");
 
-  // Filter and search through the shared toolbar.
   await page.getByRole("button", { name: /^New/ }).click();
   await expect(rows).toHaveCount(2);
   await page.getByRole("searchbox", { name: "Search beta sign-ups" }).fill("umbrella");
   await expect(rows).toHaveCount(1);
-
   const dana = rows.filter({ hasText: "dana@umbrella.test" });
   await dana.getByRole("button", { name: "Copy email" }).click();
   await expect(dana.getByText("Copied")).toBeVisible();
 
-  // Mark invited: confirm, the row moves to Invited and the menu count drops.
-  await dana.getByRole("button", { name: "Mark dana@umbrella.test invited" }).click();
-  await expect(page.getByRole("alertdialog")).toContainText("added to the sign-up allowlist");
-  await page.getByRole("alertdialog").getByRole("button", { name: "Mark invited" }).click();
-  await expect(page.getByText("Marked dana@umbrella.test invited")).toBeVisible();
-  expect(db.calls.find((c) => c.path === "/api/admin/beta-signups/invite")?.body).toEqual({ email: "dana@umbrella.test" });
-  await expect(rows).toHaveCount(0);
-  await page.getByRole("button", { name: /^Invited/ }).click();
-  await expect(rows.filter({ hasText: "dana@umbrella.test" })).toContainText("Invited");
-  await expect(nav.getByTestId("count-badge")).toHaveText(/^1/);
+  // Read only: nothing to invite, and nothing is ever sent.
+  await expect(page.getByRole("button", { name: /Mark .* invited/ })).toHaveCount(0);
+  expect(db.calls.some((c) => c.path.includes("/beta-signups/invite"))).toBe(false);
+  await expect(page.getByRole("link", { name: /Allowlist/ })).toHaveCount(0);
+});
 
-  // The allowlist tab shows the address it was given.
-  await page.getByRole("link", { name: /Allowlist/ }).click();
-  await expect(page.getByRole("list", { name: "Allowed emails" })).toContainText("dana@umbrella.test");
+test("new teams by day: the last two weeks of sign-ups on the Teams tab", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/admin");
+  const box = page.getByTestId("new-teams");
+  await expect(box).toBeVisible();
+  await expect(box.getByRole("heading", { name: "New teams, last 14 days" })).toBeVisible();
+  await expect(box.getByRole("list", { name: "New teams per day" }).getByRole("listitem")).toHaveCount(14);
 });
 
 test("anyone but the platform admin is refused and sees no Admin menu item", async ({ page }) => {
