@@ -559,7 +559,8 @@ function Chat() {
 
   return (
     <Page className="flex h-[calc(100dvh-5.25rem)] flex-col md:h-[calc(100dvh-7.25rem)]" testId="chat-page">
-      {navSlot ? <PageHeader title={thread?.title ?? "Chat"} crumb={thread?.title ?? false} titleClassName="sr-only" /> : empty ? <OwnTitle /> : <PageHeader title="Chat" crumb={thread?.title} />}
+      {/* The empty page draws its own heading; an open chat's name is a hidden one (and the top bar's last crumb). */}
+      {navSlot && !empty ? <PageHeader title={thread?.title ?? "Chat"} crumb={thread?.title ?? false} titleClassName="sr-only" /> : navSlot ? <OwnTitle /> : empty ? <OwnTitle /> : <PageHeader title="Chat" crumb={thread?.title} />}
       {navSlot && createPortal(list({ inSheet: true }), navSlot)}
       <div className="flex min-h-0 flex-1 gap-6">
         {!navSlot && railOpen && <aside className="hidden min-h-0 w-64 shrink-0 lg:flex lg:flex-col">{list({})}</aside>}
