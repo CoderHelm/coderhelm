@@ -96,6 +96,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/settings/budget": { label: "Token limit", parent: "/settings" },
   "/settings/setup": { label: "Setup checks", parent: "/settings" },
   "/settings/system": { label: "Version and updates", parent: "/settings" },
+  "/settings/sign-in-apps": { label: "Sign-in apps", parent: "/settings" },
   "/settings/emails": { label: "Email", parent: "/settings" },
   "/settings/deliveries": { label: "Deliveries", parent: "/settings", tab: "Webhook deliveries" },
   "/settings/webhooks": { label: "Outgoing webhooks", parent: "/settings" },

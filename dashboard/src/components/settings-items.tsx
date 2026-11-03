@@ -101,6 +101,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     items: [
       { href: "/settings/setup", title: "Setup checks", description: "What is left to set up, checked live.", icon: <WrenchIcon />, view: "system", edit: "system", selfHostOnly: true, status: "setup" },
       { href: "/settings/system", title: "Version and updates", description: "The running version, updates, history and roll back.", icon: <CpuIcon />, view: "system", edit: "system", selfHostOnly: true, status: "system" },
+      { href: "/settings/sign-in-apps", title: "Sign-in apps", description: "The apps people sign in to connectors with.", icon: <KeyIcon />, view: "system", edit: "system", selfHostOnly: true },
       { href: "/settings/emails", title: "Email", description: "Which emails this install sends, and how.", icon: <BellIcon />, view: "emails", edit: "emails", selfHostOnly: true },
     ],
   },

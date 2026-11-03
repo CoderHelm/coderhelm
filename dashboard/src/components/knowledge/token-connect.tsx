@@ -1,5 +1,7 @@
 "use client";
 
+import { isSelfHosted } from "@/lib/runtime-config";
+
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { Field, SecretInput } from "@/components/field";
@@ -195,7 +197,7 @@ export function NoTokenPath({ kind, installAdmin = false }: { kind: SourceKind; 
       {installAdmin && (
         <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1" data-testid="sign-in-steps">
           <Ext href={steps}>Steps to set up {label} sign-in</Ext>
-          <Link href="/admin/#sign-in-apps" className={linkButton}>
+          <Link href={isSelfHosted() ? "/settings/sign-in-apps" : "/admin/#sign-in-apps"} className={linkButton}>
             Open Sign-in apps
           </Link>
         </p>
