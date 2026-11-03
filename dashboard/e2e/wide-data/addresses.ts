@@ -1,5 +1,5 @@
 import { REPO } from "./long";
-import { ALERT_ID, DRAFT_ID, PLAN_ID, PLUGIN_ID, PLUGIN_RUN_ID, REVIEW_SK, RUN_ID, SUPPORT_TICKET_ID, TEST_ID, TEST_RUN_KEY, TOOL_NAME } from "./ids";
+import { ALERT_ID, DRAFT_ID, PLAN_ID, PLUGIN_ID, PLUGIN_RUN_ID, REVIEW_SK, RUN_ID, SESSION_ID, SUPPORT_TICKET_ID, TEST_ID, TEST_RUN_KEY, TOOL_NAME } from "./ids";
 
 /**
  * The query an item's page (`detail: true` in lib/routes.ts) is opened with,
@@ -12,6 +12,7 @@ export const SAMPLE_QUERY: Record<string, string> = {
   // Not an item's page, but its settings form only shows for one repo.
   "/reviewer/config": `?repo=${encodeURIComponent(REPO)}`,
   "/reviewer/pr": `?repo=${encodeURIComponent(REPO)}&pr=12345`,
+  "/reviewer/session": `?id=${SESSION_ID}`,
   "/tests/run": `?key=${encodeURIComponent(TEST_RUN_KEY)}`,
   "/tests/test": `?id=${encodeURIComponent(TEST_ID)}`,
   "/plans/detail": `?id=${PLAN_ID}`,

@@ -25,6 +25,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/reviewer": { label: "Reviewer" },
   "/reviewer/detail": { label: "Review", parent: "/reviewer", detail: true },
   "/reviewer/pr": { label: "Pull request", parent: "/reviewer", detail: true },
+  "/reviewer/session": { label: "Review session", parent: "/reviewer", detail: true },
   "/reviewer/config": { label: "Settings", parent: "/reviewer", tab: "Reviewer settings" },
 
   "/tests": { label: "Tests" },

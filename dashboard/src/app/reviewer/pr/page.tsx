@@ -15,6 +15,7 @@ import { Problem } from "@/components/problem";
 import { Page, PageHeader, cardClass } from "@/components/page";
 import { statusLook, stopperName } from "../status";
 import { GATE_ACTION_LABEL } from "../gate-control";
+import { isSessionId, sessionHref } from "../session/session";
 
 // One PR's auto-merge: what it waits on, who stopped it, every stop and
 // re-arm, and one button to stop or re-arm it. The PR's status comment links
@@ -154,11 +155,18 @@ function GatePage() {
         status={!stopped && (gateState || gate.status) ? <StatusText look={look} /> : undefined}
         lead={<span className="[overflow-wrap:anywhere]">{gate.repo} #{gate.pr_number}</span>}
         actions={
-          <a href={prUrl} target="_blank" rel="noreferrer" className={`${secondaryButton} gap-1.5`}>
-            Open on GitHub
-            <span aria-hidden="true" className="inline-flex"><ExternalLinkIcon /></span>
-            <span className="sr-only"> (opens in a new tab)</span>
-          </a>
+          <>
+            {gate.session_id && isSessionId(gate.session_id) && (
+              <Link href={sessionHref(gate.session_id)} className={secondaryButton}>
+                View session
+              </Link>
+            )}
+            <a href={prUrl} target="_blank" rel="noreferrer" className={`${secondaryButton} gap-1.5`}>
+              Open on GitHub
+              <span aria-hidden="true" className="inline-flex"><ExternalLinkIcon /></span>
+              <span className="sr-only"> (opens in a new tab)</span>
+            </a>
+          </>
         }
       />
 

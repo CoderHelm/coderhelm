@@ -2,7 +2,7 @@
 // docs/api/openapi.json. Do not edit; run `npm run openapi:fields` instead.
 
 /** The platform commit this was generated from. */
-export const OPENAPI_REF = "9fba0fd6d5b1c2307e776586f5e5c57e40058628";
+export const OPENAPI_REF = "4af300bd05abf7db9f07f0cfe4e7046098aa0bea";
 
 /** The fields each public API schema has. */
 export interface OpenApiFields {
@@ -56,6 +56,7 @@ export interface OpenApiFields {
   ReposList: "repos";
   Review: "action_summary" | "applied_standards" | "body" | "created_at" | "findings" | "head_sha" | "posted_as" | "pr_number" | "pr_title" | "rating_comments" | "repo" | "risk" | "sk" | "thumbs_down" | "thumbs_up" | "trigger" | "verdict";
   ReviewFinding: "blocks" | "body" | "category" | "end_line" | "evidence" | "file" | "line" | "lookups" | "severity" | "suggestion" | "title";
+  ReviewSession: "attempt" | "check_run_id" | "findings" | "finished_at" | "head_sha" | "id" | "in_flight" | "kind" | "pr_number" | "pr_title" | "reason" | "repo" | "review_url" | "started_at" | "status" | "steps" | "trigger" | "verdict";
   ReviewsPage: "next" | "reviews";
   RotateBody: "overlap_hours";
   RotatedSecret: "previous_secret_expires_at" | "secret";
@@ -72,6 +73,7 @@ export interface OpenApiFields {
   RunTrigger: "by" | "kind" | "label" | "ref" | "ref_url";
   RunsPage: "next" | "runs" | "scanned";
   SecretView: "previous_secret_expires_at" | "secret";
+  SessionStep: "at" | "detail" | "text";
   SnsEnvelope: "Message" | "MessageId" | "Signature" | "SignatureVersion" | "SigningCertURL" | "Subject" | "SubscribeURL" | "Timestamp" | "TopicArn" | "Type";
   SourceRow: "deliveries" | "direction" | "failed" | "failed_series" | "ok" | "p50_ms" | "p95_ms" | "previous_deliveries" | "previous_success_rate" | "series" | "source" | "success_rate";
   Totals: "deliveries" | "failed" | "handled" | "ignored" | "p50_ms" | "p95_ms" | "p99_ms" | "retried" | "retried_ok" | "retries" | "success_rate";
