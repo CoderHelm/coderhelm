@@ -352,6 +352,17 @@ export const settingsData: Handler = ({ method, path, url }) => {
     return { days: Number(url.searchParams.get("days") || 7), since: iso(60 * 24 * 7), skills: { reads: 1204, asks: 12, read_problems: 3, ask_problems: 1, applies: 4 }, lookups: { total: 980, ok: 960, refused: 12, failed: 8 } };
   }
   // Settings, Emails and Admin, Self-host: long addresses and host names.
+  if (p === "/api/system/emails/sender") {
+    const name = `${TOKEN} ${TOKEN}`.slice(0, 64);
+    const org = TOKEN.slice(0, 40);
+    const host = `${TOKEN.toLowerCase()} CoderHelm`;
+    return {
+      sender_name: name, organization: org, max: { sender_name: 64, organization: 40 }, suffix: "CoderHelm", transport: "coderhelm",
+      ses: { from_address: EMAIL, display_name: name, from: `"${name}" <${EMAIL}>`, subject_prefix: `${org} CoderHelm: ` },
+      relay: { from_address: EMAIL, display_name: `${org} CoderHelm`, subject_prefix: `${org} CoderHelm: `, organization_used: true },
+      fallback: { ses_display_name: host, ses_subject_prefix: `${host}: `, relay_display_name: host, relay_subject_prefix: `${host}: ` },
+    };
+  }
   if (p === "/api/system/emails") {
     return {
       self_hosted: true,

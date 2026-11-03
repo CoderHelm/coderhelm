@@ -1277,6 +1277,10 @@ export const api = {
   getSystemEmails: () => request<SystemEmails>("/api/system/emails"),
   setSystemEmails: (change: { optional?: Record<string, boolean>; transport?: EmailTransport }) =>
     request<SystemEmails>("/api/system/emails", { method: "PUT", body: JSON.stringify(change) }),
+  /** Who the install's email says it is from (install admins). An empty string clears a value. */
+  getEmailSender: () => request<EmailSender>("/api/system/emails/sender"),
+  setEmailSender: (change: { sender_name?: string; organization?: string }) =>
+    request<EmailSender>("/api/system/emails/sender", { method: "PUT", body: JSON.stringify(change) }),
   // Self-hosted installs on Coderhelm's hosted parts (platform admins, hosted deployment).
   adminSelfHostSummary: () => request<SelfHostSummary>("/api/admin/hybrid/summary"),
   adminSelfHostInstall: (id: string) => request<SelfHostDetail>(`/api/admin/hybrid/${encodeURIComponent(id)}`),
@@ -4576,6 +4580,25 @@ export interface SystemEmails {
       | { error: string; message: string }
       | { paused: { reason: string; at: string } | null; sent_today: number; quota: number; display_name: string; from: string | null };
   };
+  updated_by?: string;
+  updated_at?: string;
+}
+
+/**
+ * Settings, Emails, Sender name: the stored values (empty: not set, the
+ * config's names apply), and how the From line and a subject read on each
+ * route now (`ses`, `relay`) and with nothing stored (`fallback`).
+ */
+export interface EmailSender {
+  sender_name: string;
+  organization: string;
+  max: { sender_name: number; organization: number };
+  /** What every name through Coderhelm's mail service ends with. */
+  suffix: string;
+  transport: EmailTransport;
+  ses: { from_address: string; display_name: string; from: string; subject_prefix: string };
+  relay: { from_address: string | null; display_name: string; subject_prefix: string; organization_used: boolean };
+  fallback: { ses_display_name: string; ses_subject_prefix: string; relay_display_name: string; relay_subject_prefix: string };
   updated_by?: string;
   updated_at?: string;
 }
