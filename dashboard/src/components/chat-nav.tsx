@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { normalizePath } from "@/lib/routes";
 import { focusRing } from "./ui";
@@ -33,6 +34,25 @@ export function ChatSidebarNav() {
       <div id={CHAT_NAV_SLOT} className="mt-2" />
     </div>
   );
+}
+
+/** The keys that open Chat from any page, as this keyboard writes them. */
+export function chatShortcutLabel(mac: boolean): string {
+  return mac ? "⌘J" : "Ctrl+J";
+}
+
+/** ⌘J (Ctrl+J) opens Chat from any page, as in Linear. */
+export function useChatShortcut() {
+  const router = useRouter();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "j" || !(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      router.push("/chat");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [router]);
 }
 
 /** The sidebar slot once the shell has rendered it (null elsewhere). */

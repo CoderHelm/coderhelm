@@ -57,6 +57,7 @@ interface Thread {
   created_at: string;
   updated_at: string;
   messages: number;
+  pinned?: boolean;
 }
 
 interface Backend {
@@ -213,7 +214,15 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       const t = db.threads.find((x) => x.id === one[1]);
       if (method === "PUT") {
         if (!t) return json(route, { error: "No such thread." }, 404);
-        Object.assign(t, body.title !== undefined ? { title: body.title } : {}, body.shared !== undefined ? { shared: body.shared } : {});
+        if (body.pinned === true && !t.pinned && db.threads.filter((x) => x.mine && x.pinned).length >= 5) {
+          return json(route, { error: "You can pin up to 5 chats. Unpin one first." }, 400);
+        }
+        Object.assign(
+          t,
+          body.title !== undefined ? { title: body.title } : {},
+          body.shared !== undefined ? { shared: body.shared } : {},
+          body.pinned !== undefined ? { pinned: body.pinned } : {},
+        );
         return json(route, { thread: t });
       }
       if (method === "DELETE") {
@@ -416,7 +425,9 @@ test.describe("chat: asking", () => {
     await mockApi(page, { streamDelay: 4000 });
     await page.goto("/chat");
     await askIt(page);
-    await expect(page.getByTestId("answer-waiting")).toBeVisible();
+    // From the first moment the steps show what Chat is doing, with the time so far.
+    await expect(page.getByTestId("tool-step")).toContainText("Working out where to look");
+    await expect(page.getByTestId("activity-elapsed")).toBeVisible();
     await page.getByTestId("stop-button").click();
     await expect(page.getByTestId("answer-stopped")).toContainText("You stopped this answer");
     await expect(page.getByTestId("send-button")).toBeVisible();
@@ -514,16 +525,84 @@ test.describe("chat: the chat list", () => {
     expect(db.calls).toContain("DELETE /api/brain/threads/th_old");
   });
 
-  test("the sidebar hides and comes back, and stays as it was left", async ({ page }) => {
+  test("the chats are the app sidebar's menu: a way back, one list, no second column", async ({ page }) => {
     await mockApi(page);
     await page.goto("/chat");
-    await page.getByRole("button", { name: "Hide chats" }).click();
-    await expect(page.getByTestId("thread-rail")).toHaveCount(0);
+    const nav = page.getByTestId("chat-nav");
+    await expect(nav.getByRole("link", { name: /Back to Coderhelm/ })).toBeVisible();
+    await expect(nav.getByTestId("thread-rail")).toBeVisible();
+    // Exactly one chat list, and the app's own menu is replaced while in Chat.
+    await expect(page.getByTestId("thread-rail")).toHaveCount(1);
+    await expect(page.getByTestId("main-nav")).toHaveCount(0);
+    await nav.getByRole("link", { name: /Back to Coderhelm/ }).click();
+    await expect(page.getByTestId("main-nav")).toBeVisible();
+  });
+
+  test("pins a chat to the top, up to five", async ({ page }) => {
+    const db = await mockApi(page, {
+      threads: [
+        thread({ id: "th_a", title: "Older chat to pin", updated_at: iso(60 * 24 * 3) }),
+        thread({ id: "th_b", title: "Newest chat", updated_at: iso(5) }),
+      ],
+    });
+    await page.goto("/chat");
+    const row = page.getByTestId("thread-row").filter({ hasText: "Older chat to pin" });
+    await row.hover();
+    await row.getByTestId("thread-menu").click();
+    await page.getByRole("menuitem", { name: "Pin to top" }).click();
+    await expect.poll(() => db.threads.find((t) => t.id === "th_a")?.pinned).toBe(true);
+    // The pinned chat leads, under Pinned, with its pin shown.
+    const rail = page.getByTestId("thread-rail");
+    await expect(rail.getByText("Pinned", { exact: true })).toBeVisible();
+    await expect(rail.getByTestId("thread-row").first()).toContainText("Older chat to pin");
+    await expect(rail.getByTestId("thread-row").first().getByTestId("thread-pinned")).toBeVisible();
+    // Five pinned: a sixth isn't offered.
+    for (let i = 0; i < 4; i++) db.threads.push(thread({ id: `th_p${i}`, title: `Pinned ${i}`, pinned: true, updated_at: iso(10 + i) }));
     await page.reload();
-    await expect(page.getByTestId("show-chats")).toBeVisible();
-    await expect(page.getByTestId("thread-rail")).toHaveCount(0);
-    await page.getByTestId("show-chats").click();
-    await expect(page.getByTestId("thread-rail")).toBeVisible();
+    const newest = page.getByTestId("thread-row").filter({ hasText: "Newest chat" });
+    await newest.hover();
+    await newest.getByTestId("thread-menu").click();
+    await expect(page.getByRole("menuitem", { name: /5 pinned already/ })).toBeDisabled();
+  });
+
+  test("opened from a run, the run goes with the question as a chip that can be removed", async ({ page }) => {
+    const db = await mockApi(page);
+    await page.goto("/chat?run=01RUNACME&title=Add%20a%20Heading%20component");
+    const chip = page.getByTestId("mention-chip");
+    await expect(chip).toHaveText(/Run: Add a Heading component/);
+    await askIt(page, "Why is this waiting?");
+    await expect.poll(() => db.asks.length).toBe(1);
+    expect(db.asks[0].mentions).toEqual([{ kind: "run", id: "01RUNACME" }]);
+    // Removable before asking.
+    await page.goto("/chat?run=01RUNACME&title=Add%20a%20Heading%20component");
+    await page.getByRole("button", { name: /Stop pointing at Run: Add a Heading component/ }).click();
+    await expect(page.getByTestId("mention-chip")).toHaveCount(0);
+    // A bad id is ignored.
+    await page.goto("/chat?run=bad%20id%3B&title=x");
+    await expect(page.getByTestId("mention-chip")).toHaveCount(0);
+  });
+
+  test("“What needs my answer?” sends the waiting runs with it", async ({ page }) => {
+    const db = await mockApi(page, {
+      starters: [
+        { question: "What needs my answer?", why: "2 runs are waiting on an answer", sources: NONE, mentions: [{ kind: "run", id: "01R1" }, { kind: "run", id: "01R2" }] },
+        ...STARTERS.slice(0, 3),
+      ] as typeof STARTERS,
+    });
+    await page.goto("/chat");
+    await page.getByTestId("starter").filter({ hasText: "What needs my answer?" }).click();
+    await expect.poll(() => db.asks.length).toBe(1);
+    expect(db.asks[0].mentions).toEqual([{ kind: "run", id: "01R1" }, { kind: "run", id: "01R2" }]);
+  });
+
+  test("⌘J opens Chat from any page", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/chat?thread=th_old");
+    await expect(page.getByTestId("answer")).toBeVisible();
+    await page.getByTestId("chat-nav").getByRole("link", { name: /Back to Coderhelm/ }).click();
+    await expect(page.getByTestId("main-nav")).toBeVisible();
+    await page.keyboard.press("ControlOrMeta+KeyJ");
+    await expect(page).toHaveURL(/\/chat\/?$/);
   });
 
   test("⌘/ starts a new chat from an open one, with the box focused", async ({ page }) => {
@@ -606,9 +685,11 @@ test.describe("chat: on a phone", () => {
     await page.goto("/chat");
     await expect(page.getByTestId("starter")).toHaveCount(4);
     await expect(page.getByTestId("thread-rail")).toBeHidden();
+    // One way to the chats on a phone: the app menu, no second chats button.
+    await expect(page.getByTestId("open-chats")).toHaveCount(0);
     await noSideways(page);
-    await page.getByTestId("open-chats").click();
-    const sheet = page.getByTestId("chats-sheet");
+    await page.getByRole("button", { name: "Menu" }).click();
+    const sheet = page.getByRole("dialog", { name: "Menu" });
     await expect(sheet.getByTestId("thread-row")).toHaveCount(2);
     await noSideways(page);
     fs.mkdirSync(SHOTS_DIR, { recursive: true });
@@ -707,7 +788,9 @@ test.describe("chat: how it looks", () => {
         await askIt(page, "How is web put together?");
         const answer = page.getByTestId("answer").last();
         await expect(answer).toContainText("Next.js site");
-        await expect(answer.getByTestId("activity-summary")).toContainText("Read src/server.ts in web");
+        // While working the steps are open: the running one listed, the line says it's working.
+        await expect(answer.getByTestId("tool-step").last()).toContainText("Read src/server.ts in web");
+        await expect(answer.getByTestId("activity-summary")).toHaveText("Working");
         await snap(page, `streaming-${width}`, scheme);
 
         await page.evaluate(

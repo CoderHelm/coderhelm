@@ -27,7 +27,7 @@ import { hybridGithubSetupTarget, hybridOAuthHandoff, maybeHybridOAuthCallback }
 import { Menu } from "./menu";
 import { SectionTabs } from "./section-tabs";
 import { inSettings, SettingsPageTabs, SettingsSidebarNav } from "./settings-nav";
-import { ChatSidebarNav, inChat } from "./chat-nav";
+import { ChatSidebarNav, inChat, useChatShortcut } from "./chat-nav";
 import { useSettingsStatus } from "@/app/settings/use-settings-status";
 import { buttonClass } from "./ui";
 import { AlertCircleIcon, InfoIcon, LogFindingsIcon, WarningIcon, XIcon } from "./icons";
@@ -121,6 +121,8 @@ function palettePages(user: User | null, pluginsOn = false): PalettePage[] {
 }
 
 export function ClientShell({ children }: { children: React.ReactNode }) {
+  // ⌘J opens Chat from anywhere.
+  useChatShortcut();
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const pluginsOn = usePluginsFlag() === "on";
@@ -214,6 +216,19 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
+  // A link to the page you are already on does not change the path, so close on any link click too.
+  // A native listener: links rendered into the menu through a portal (the chat list) don't
+  // bubble through this element in React's tree.
+  useEffect(() => {
+    const el = drawerRef.current;
+    if (!el) return;
+    const onClick = (e: MouseEvent) => {
+      if ((e.target as HTMLElement | null)?.closest("a")) setMenuOpen(false);
+    };
+    el.addEventListener("click", onClick);
+    return () => el.removeEventListener("click", onClick);
+    // Attached when the menu opens: the element exists only once signed in.
+  }, [menuOpen]);
   const menuWasOpen = useRef(false);
 
   // Close on navigation.
@@ -456,8 +471,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           role={menuOpen ? "dialog" : undefined}
           aria-modal={menuOpen ? true : undefined}
           aria-label={menuOpen ? "Menu" : undefined}
-          // A link to the page you are already on does not change the path, so close on any link click too.
-          onClick={(e) => { if ((e.target as HTMLElement).closest("a")) setMenuOpen(false); }}
           className={`${menuOpen ? "fixed inset-y-0 left-0 z-50 flex shadow-2xl" : "hidden"} md:contents`}
         >
           <Sidebar usage={usage} user={user} teams={teams} betaNew={betaNew} pluginsOn={pluginsOn} />
