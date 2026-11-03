@@ -4626,8 +4626,10 @@ export interface HybridNameCheck {
 
 export interface HybridSettingsPatch {
   github_mode?: "own" | "hosted";
-  /** The hosted-app integrations among jira, notion, confluence, google_drive (github follows github_mode). */
+  /** The hosted-app integrations among jira, notion, confluence, google_drive (github follows github_mode). Older installs; newer ones take `apps`. */
   integrations?: string[];
+  /** Other apps, per tool (jira, notion, confluence, google_drive): only the tools named change. A tool nobody chose uses Coderhelm's app. */
+  apps?: Record<string, "coderhelm" | "own">;
   sharing?: { enabled: boolean; payloads: boolean };
   /** Settings, Integrations, Jira: link a hosted team's Jira site through Coderhelm. */
   jira_link?: boolean;

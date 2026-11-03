@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { api, type HybridCheck, type HybridGithubLink, type HybridIntegration, type HybridNameCheck, type HybridStatus } from "@/lib/api";
-import { GITHUB_OUTCOMES, NAME_CODES, TRUST_MODEL_URL, cleanName, hostedIntegrations, useHybrid, type HybridState } from "@/lib/hybrid";
+import { GITHUB_OUTCOMES, NAME_CODES, TRUST_MODEL_URL, appChoice, cleanName, useHybrid, type HybridState } from "@/lib/hybrid";
 import { Callout } from "./callout";
 import { CopyButton } from "./copy-button";
 import { useConfirm } from "./confirm-dialog";
@@ -657,7 +657,7 @@ function IntegrationItem({ i, hybrid, s }: { i: HybridIntegration } & RowProps) 
             value={value}
             disabled={!!busy}
             onChange={(v) =>
-              void act("set", () => hybrid.save({ integrations: hostedIntegrations(s, i.id, v === "coderhelm") }), v === "coderhelm" ? `${i.name} uses Coderhelm's app` : `${i.name} uses your own app`)
+              void act("set", () => hybrid.save(appChoice(i.id, v === "coderhelm")), v === "coderhelm" ? `${i.name} uses Coderhelm's app` : `${i.name} uses your own app`)
             }
             options={[
               { value: "coderhelm", label: "Use Coderhelm's app (easiest)" },
