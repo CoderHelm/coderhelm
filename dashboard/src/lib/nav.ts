@@ -26,7 +26,7 @@ export interface NavSection {
   alsoUnder?: string[];
   superAdminOnly?: boolean;
   /** A count beside the label. */
-  countKey?: "betaSignups" | "supportQueue";
+  countKey?: "supportQueue";
   /** Shown only while this team flag is on. */
   flag?: "plugins";
 }
@@ -111,7 +111,6 @@ export const ADMIN_SECTIONS: NavSection[] = [
       { href: "/admin/self-host", label: "Self-host" },
     ],
     superAdminOnly: true,
-    countKey: "betaSignups",
   },
   { key: "queue", label: "Support queue", icon: "queue", pages: [{ href: "/admin/tickets", label: "Support queue" }], superAdminOnly: true, countKey: "supportQueue" },
 ];

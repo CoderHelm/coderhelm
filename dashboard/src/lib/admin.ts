@@ -3,8 +3,30 @@
 
 import type { AdminOrg, AdminTeam, AdminTeamLink, BetaSignup, BetaSignupStatus } from "./api";
 
-/** Fired after the admin page changes a beta sign-up, so the menu count refreshes. */
-export const BETA_SIGNUPS_CHANGED = "coderhelm:beta-signups-changed";
+/** One day of new teams, oldest first: the open beta's sign-ups at a glance. */
+export interface DayCount {
+  day: string;
+  count: number;
+}
+
+/** New teams per UTC day for the last `days` days (today included), from every team's `created_at`. */
+export function teamsPerDay(orgs: AdminOrg[], days: number, now: Date = new Date()): DayCount[] {
+  const out: DayCount[] = [];
+  const index = new Map<string, number>();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
+    const day = d.toISOString().slice(0, 10);
+    index.set(day, out.length);
+    out.push({ day, count: 0 });
+  }
+  for (const o of orgs) {
+    for (const t of o.teams) {
+      const at = index.get((t.created_at || "").slice(0, 10));
+      if (at !== undefined) out[at].count += 1;
+    }
+  }
+  return out;
+}
 
 export type TeamFilter = "active" | "inactive" | "all";
 

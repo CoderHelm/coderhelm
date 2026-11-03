@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { api, ApiError, TEAM_MOVED, TWO_FACTOR_REQUIRED, movedUrl, type UsageInfo, type Banner, type TeamInfo } from "@/lib/api";
 import { pushToDataLayer } from "@/lib/gtm";
-import { BETA_SIGNUPS_CHANGED } from "@/lib/admin";
 import { formatTokens, limitName, reachedLimit, USAGE_CHANGED, usageBreakdown, usageLimits } from "@/lib/usage";
 import { TokenMeters } from "@/components/token-meters";
 import { usePluginsFlag } from "@/hooks/use-plugins-flag";
@@ -127,8 +126,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const pluginsOn = usePluginsFlag() === "on";
   const [usage, setUsage] = useState<UsageInfo | null>(null);
-  // New beta sign-ups, for the Admin menu item (platform admin only).
-  const [betaNew, setBetaNew] = useState(0);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [teams, setTeams] = useState<TeamInfo[]>([]);
   const [dismissedBanners, setDismissedBanners] = useState<Set<string>>(new Set());
@@ -311,18 +308,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     }
   }, [pathname, user]);
 
-  // The platform admin sees how many beta sign-ups wait, kept current when
-  // the admin page invites someone.
-  const platformAdmin = isPlatformAdmin(user);
-  useEffect(() => {
-    if (!platformAdmin) return;
-    const refresh = () =>
-      api.adminBetaSignups().then((r) => setBetaNew(r.counts.new)).catch(() => {});
-    refresh();
-    window.addEventListener(BETA_SIGNUPS_CHANGED, refresh);
-    return () => window.removeEventListener(BETA_SIGNUPS_CHANGED, refresh);
-  }, [platformAdmin]);
-
   // ...and right after someone changes the limit.
   useEffect(() => {
     const refresh = () => api.getUsage().then(setUsage).catch(() => {});
@@ -473,7 +458,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           aria-label={menuOpen ? "Menu" : undefined}
           className={`${menuOpen ? "fixed inset-y-0 left-0 z-50 flex shadow-2xl" : "hidden"} md:contents`}
         >
-          <Sidebar usage={usage} user={user} teams={teams} betaNew={betaNew} pluginsOn={pluginsOn} />
+          <Sidebar usage={usage} user={user} teams={teams} pluginsOn={pluginsOn} />
           <button
             type="button"
             onClick={() => setMenuOpen(false)}
@@ -630,14 +615,11 @@ function Sidebar({
   usage,
   user,
   teams,
-  betaNew,
   pluginsOn,
 }: {
   usage: UsageInfo | null;
   user: User | null;
   teams: TeamInfo[];
-  /** New beta sign-ups, shown on the Admin item. */
-  betaNew: number;
   /** The team's plugins flag. */
   pluginsOn: boolean;
 }) {
@@ -749,9 +731,7 @@ function Sidebar({
                 icon={NAV_ICONS[section.icon]}
                 current={currentSection === section.key}
                 badge={
-                  section.countKey === "betaSignups" ? (
-                    <CountBadge n={betaNew} label={`new beta ${betaNew === 1 ? "sign-up" : "sign-ups"}`} />
-                  ) : section.countKey === "supportQueue" ? (
+                  section.countKey === "supportQueue" ? (
                     <CountBadge n={support.queue_open ?? 0} label="need a reply" />
                   ) : null
                 }
@@ -992,11 +972,14 @@ function TwoFactorGate({ status, email, onDone }: { status: MyTwoFactor; email: 
 
 // ── Auth Screen (login / signup / verify / forgot password) ────────
 
-type AuthView = "login" | "signup" | "waitlist" | "verify" | "forgot" | "reset" | "mfa" | "second_step";
+type AuthView = "login" | "signup" | "verify" | "forgot" | "reset" | "mfa" | "second_step";
 
 /** What a self-hosted install says to someone it won't let in. */
 const NOT_INVITED =
   "This Coderhelm is private to one organization. Ask one of its admins to invite you; the invite email has the link to set up your account.";
+
+/** Hosted's answer when one address starts too many teams in an hour. */
+const SIGNUP_LIMIT = "Too many sign-ups from here just now. Try again in an hour.";
 
 /** Google or GitHub for someone whose second factor is the code on their password account (only Cognito checks it). */
 const USE_PASSWORD = "two_factor_use_password";
@@ -1006,8 +989,6 @@ const USE_PASSWORD_MESSAGE =
 function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const [view, setView] = useState<AuthView>("login");
   const [email, setEmail] = useState("");
-  const [company, setCompany] = useState("");
-  const [reason, setReason] = useState("");
   const [password, setPassword] = useState("");
   const [agreedTos, setAgreedTos] = useState(false);
   const [code, setCode] = useState("");
@@ -1026,7 +1007,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
 
   // The hosted site's terms; a self-hosted install has none unless it names a site.
   const site = siteUrl();
-  // A self-hosted install: one organization, no waitlist and no closed beta.
+  // A self-hosted install: one organization, joined only by invite.
   const selfHosted = isSelfHosted();
   // A self-hosted install has no terms to agree to (no site): the box is pre-ticked and hidden.
   useEffect(() => {
@@ -1067,9 +1048,8 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
       setView("signup");
       window.history.replaceState({}, "", window.location.pathname);
     }
-    if (params.get("error") === "closed_beta") {
-      setError("Coderhelm is in closed beta. Join the waitlist to get notified.");
-      setView("waitlist");
+    if (params.get("error") === "signup_limit") {
+      setError(SIGNUP_LIMIT);
       window.history.replaceState({}, "", window.location.pathname);
     } else if (params.get("error") === "ask_admin_invite") {
       const org = params.get("org");
@@ -1079,17 +1059,6 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
-
-  const handleWaitlist = async () => {
-    setError(""); setLoading(true);
-    try {
-      const result = await api.joinWaitlist(email, { company: company.trim() || undefined, reason: reason.trim() || undefined });
-      setMessage(result.message || "You're on the list!");
-      setView("login");
-    } catch {
-      setError("We couldn't add you to the waitlist. Check your connection and try again.");
-    } finally { setLoading(false); }
-  };
 
   const handleSignup = async () => {
     setError(""); setLoading(true);
@@ -1101,9 +1070,8 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
       const msg = e instanceof Error ? e.message : "";
       if (e instanceof ApiError && e.code === "not_invited") {
         setError(NOT_INVITED);
-      } else if (msg.includes("403") && !selfHosted) {
-        setError("Coderhelm is in closed beta. Join the waitlist to get notified.");
-        setView("waitlist");
+      } else if (e instanceof ApiError && e.status === 429) {
+        setError(SIGNUP_LIMIT);
       } else if (msg.includes("409")) {
         setError("An account with this email already exists.");
       } else {
@@ -1283,11 +1251,10 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
           {view === "login" && (
             <div className="w-full space-y-4">
               {!selfHosted && (
-              <div className="flex items-center justify-center gap-2 rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                <span className="text-xs font-medium text-amber-400">Closed beta</span>
-                <span className="text-xs text-zinc-400">·</span>
-                <button onClick={() => { setView("waitlist"); setError(""); setMessage(""); }} className="text-xs text-amber-400 hover:text-amber-300 underline underline-offset-2 cursor-pointer">Join waitlist</button>
+              <div className="flex items-center justify-center gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                <span className="text-xs font-medium text-emerald-400">Open beta</span>
+                <span className="text-xs text-zinc-400">· anyone can sign up</span>
               </div>
               )}
               <div className="space-y-3">
@@ -1366,11 +1333,11 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
                   </p>
                 ) : (
                   <>
-                    <div className="inline-flex items-center gap-2 rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 mb-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                      <span className="text-xs font-medium text-amber-400">Closed beta</span>
+                    <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 mb-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      <span className="text-xs font-medium text-emerald-400">Open beta</span>
                     </div>
-                    <p className="text-xs text-zinc-400">Only users with an invite can create an account.</p>
+                    <p className="text-xs text-zinc-400">Your account starts its own team. To join a team that already uses Coderhelm, ask one of its admins to invite you.</p>
                   </>
                 )}
               </div>
@@ -1402,33 +1369,6 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
             </div>
           )}
 
-          {/* ── Waitlist ── */}
-          {view === "waitlist" && (
-            <div className="w-full space-y-4">
-              <div className="text-center">
-                <p className="text-sm text-zinc-300 font-medium">Coderhelm is in closed beta</p>
-                <p className="text-xs text-zinc-400 mt-1">Join the waitlist and we&apos;ll notify you when we open up.</p>
-              </div>
-              <div className="space-y-3">
-                <input type="email" autoComplete="email" aria-label="Email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }}
-                  onKeyDown={(e) => e.key === "Enter" && handleWaitlist()}
-                  className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
-                <input type="text" autoComplete="organization" aria-label="Company (optional)" placeholder="Company (optional)" value={company} maxLength={120}
-                  onChange={(e) => setCompany(e.target.value)}
-                  className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
-                <textarea aria-label="What would you use Coderhelm for? (optional)" placeholder="What would you use Coderhelm for? (optional)" value={reason} maxLength={500} rows={3}
-                  onChange={(e) => setReason(e.target.value)}
-                  className="w-full resize-y rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
-                <button onClick={handleWaitlist} disabled={loading || !email}
-                  className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed">
-                  {loading ? "Joining..." : "Join waitlist"}
-                </button>
-              </div>
-              <button onClick={() => { setView("login"); setError(""); setMessage(""); }} className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">
-                Already have an account? Sign in
-              </button>
-            </div>
-          )}
 
           {/* ── Verify email ── */}
           {view === "verify" && (
