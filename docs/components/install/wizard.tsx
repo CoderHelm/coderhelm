@@ -68,7 +68,6 @@ import {
   jiraRows,
   jiraSiteHost,
   newAppUrl,
-  joinsByDomain,
   newState,
   optionalSetup,
   parseStatusDoc,
@@ -1145,35 +1144,8 @@ export function InstallWizard() {
                   <p className="mt-2 text-sm text-fd-muted-foreground">Optional emails such as the weekly summary start off; turn them on in Settings, Emails.</p>
                 </fieldset>
                 <fieldset data-testid="who-may-join">
-                  <legend className="mb-1 text-sm font-medium">Let people from your company join</legend>
-                  <p className="mb-2 text-sm text-fd-muted-foreground">This install is for one organization only: nobody else can sign up.</p>
-                  {(
-                    [
-                      [false, 'Only people I invite', 'You invite each person by email from Settings.'],
-                      [true, 'Anyone with an email at', 'Your company\'s domain. You can still invite people from elsewhere.'],
-                    ] as const
-                  ).map(([byDomain, title, help]) => (
-                    <label key={title} className={`mb-2 flex cursor-pointer gap-3 rounded-xl border p-3 transition ${joinsByDomain(s) === byDomain ? 'border-fd-primary bg-fd-primary/5' : 'border-fd-border hover:bg-fd-accent'}`}>
-                      <input
-                        type="radio"
-                        name="join"
-                        className="mt-1 accent-[var(--color-fd-primary)]"
-                        checked={joinsByDomain(s) === byDomain}
-                        onChange={() => update({ joinDomain: byDomain, ...(byDomain && !s.signupDomain && s.email.includes('@') ? { signupDomain: s.email.split('@')[1].toLowerCase() } : {}) })}
-                      />
-                      <span>
-                        <span className="block font-medium">{title}</span>
-                        <span className="block text-sm text-fd-muted-foreground">{help}</span>
-                      </span>
-                    </label>
-                  ))}
-                  {joinsByDomain(s) ? (
-                    <div className="mt-1">
-                      <Field label="Company email domain" htmlFor="ch-signup" error={errors.signupDomain}>
-                        <input id="ch-signup" className={inputCls} value={s.signupDomain} placeholder="example.com" onChange={(e) => update({ signupDomain: e.target.value })} autoCapitalize="off" spellCheck={false} />
-                      </Field>
-                    </div>
-                  ) : null}
+                  <legend className="mb-1 text-sm font-medium">Who can sign in</legend>
+                  <p className="mb-2 text-sm text-fd-muted-foreground">This install is for one organization only, and nobody can sign up on their own. You&apos;re its first admin; add everyone else in Settings, Team, and they get an invite email to set up their account.</p>
                   <label className="mt-3 flex cursor-pointer items-start gap-3">
                     <input
                       type="checkbox"
@@ -1187,7 +1159,7 @@ export function InstallWizard() {
                       <span className="block text-sm text-fd-muted-foreground">Everyone, you included, sets up an authenticator app before they can use CoderHelm.</span>
                     </span>
                   </label>
-                  <p className="mt-2 text-sm text-fd-muted-foreground">You can change both later in Settings, Sign-in.</p>
+                  <p className="mt-2 text-sm text-fd-muted-foreground">You can change this later in Settings, Sign-in.</p>
                 </fieldset>
                 <fieldset>
                   <legend className="mb-2 text-sm font-medium">Updates</legend>
