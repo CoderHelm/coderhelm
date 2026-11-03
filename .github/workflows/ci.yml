@@ -28,17 +28,17 @@ jobs:
         run: node dashboard/scripts/ui-lint.mjs
       - run: npm run build
 
-  dashboard:
-    name: Dashboard
+  # One build, its end-to-end tests split across 4 machines, and "Dashboard"
+  # (the required check) passing only when the build and every part did.
+  dashboard-build:
+    name: Dashboard (build)
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: dashboard
-    env:
-      E2E_PORT: "3111"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: lts/*
           cache: npm
@@ -59,18 +59,77 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://localhost:3111
           NEXT_PUBLIC_STREAM_URL: http://localhost:3111
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dashboard-out
+          path: dashboard/out/
+          retention-days: 1
+
+  dashboard-e2e:
+    name: Dashboard (tests ${{ matrix.shard }}/4)
+    needs: dashboard-build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    defaults:
+      run:
+        working-directory: dashboard
+    env:
+      E2E_PORT: "3111"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: npm ci
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dashboard-out
+          path: dashboard/out/
+      - name: Playwright's version
+        id: pw
+        run: echo "version=$(node -p 'require("@playwright/test/package.json").version')" >> "$GITHUB_OUTPUT"
+      # The browsers, kept between runs for this Playwright version; the
+      # system libraries they need are installed every time.
+      - uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        id: browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium-webkit
       - name: Install Playwright's Chromium and WebKit
+        if: steps.browsers.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium webkit
+      - name: Playwright's system libraries
+        if: steps.browsers.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium webkit
       - name: End-to-end tests
-        run: npm run test:e2e
+        run: npx playwright test --shard=${{ matrix.shard }}/4
         env:
           E2E_STATIC: "1"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
-          name: playwright-results
+          name: playwright-results-${{ matrix.shard }}
           path: dashboard/test-results/
           retention-days: 7
+
+  dashboard:
+    name: Dashboard
+    needs: [dashboard-build, dashboard-e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: The build and every part of the end-to-end tests passed
+        env:
+          BUILD: ${{ needs.dashboard-build.result }}
+          E2E: ${{ needs.dashboard-e2e.result }}
+        run: |
+          echo "build: $BUILD, tests: $E2E"
+          [ "$BUILD" = success ] && [ "$E2E" = success ]
 
   docs:
     name: Docs
