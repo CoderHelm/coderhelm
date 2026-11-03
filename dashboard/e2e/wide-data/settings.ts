@@ -209,6 +209,13 @@ export const settingsData: Handler = ({ method, path, url }) => {
   if (p === "/api/repos") return { repos: REPOS };
   // Deliveries: long ids, a long repository and target, an unbroken error.
   if (p === "/api/deliveries") return { deliveries: [WIDE_DELIVERY_ROW, { ...WIDE_DELIVERY_ROW, id: "relay:01JWIDE0000000000000000002", source: "relay", status: "pending", next_retry_at: iso(-5) }], summary: { total: 120, ok: 117, failed: 2, pending: 1, success_rate: 0.975, oldest_pending_at: iso(12), last_failure_at: iso(30) }, sources: ["github", "relay", "slack"], retention_days: 14, sharing: { available: true, enabled: false, payloads: false }, hybrid: true };
+  // The Deliveries overview's numbers (Insights' card reads the summary).
+  if (p === "/api/deliveries/analytics") {
+    return {
+      period: url.searchParams.get("period") || "7d",
+      summary: { deliveries: 1_284_903, handled: 1_190_211, ignored: 61_004, failed: 33_688, success_rate: 0.9738, retried: 41_002, retried_ok: 37_115, retries: 58_430, p50_ms: 180, p95_ms: 1_240_000, p99_ms: 4_800_000 },
+    };
+  }
   if (p === `/api/deliveries/${WIDE_DELIVERY_ROW.id}`) {
     return {
       delivery: { ...WIDE_DELIVERY_ROW, attempts: [{ at: iso(31), code: 502, duration_ms: 10_000, error: TOKEN }, { at: iso(30), duration_ms: 30_000, error: SENTENCE }], headers: { "x-github-event": "pull_request", "x-github-delivery": SHA, "x-hub-signature-256": "[redacted]", "user-agent": LONG_URL }, payload_preview: JSON.stringify({ repository: { full_name: REPO }, html_url: LONG_URL, token: TOKEN }), payload_bytes: 48_213, redeliver: "github" },
