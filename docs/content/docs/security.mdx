@@ -1,0 +1,72 @@
+---
+title: Security
+description: How CoderHelm protects your code, your accounts and your people, on CoderHelm cloud, in hybrid mode and when it runs in your own AWS account.
+---
+
+This page is for anyone deciding whether to trust CoderHelm. It says how each part is protected. For the full detail of a self-hosted install, read the [security model](/self-host/security) and [how updates are kept safe](/self-host/updates-security).
+
+## Install identity and request signing
+
+A self-hosted install that uses any part of CoderHelm (its address, GitHub App, Jira app, email or support) registers once and gets its own secret. CoderHelm derives that secret from a master key it keeps to itself, so it's never stored anywhere as a list of secrets, and one key change revokes every install's secret at once.
+
+- An install proves it owns its address before CoderHelm trusts it.
+- Every request between an install and CoderHelm is signed with that install's secret. The signature covers the time, a request id, the method, the full path with its query, and the body. Change any part and the request is refused.
+- Requests are accepted for 5 minutes, and each request id is accepted once. A copy of a real request, even one captured from a log, is refused.
+- An install can't sign as another install, and a revoked install is cut off from every part of CoderHelm at once.
+- Messages CoderHelm sends to an install are signed with a key held in AWS KMS that only CoderHelm's own services can use. Each message names the install it's for, so it can't be replayed to another one.
+
+## GitHub and Jira forwarding
+
+In hybrid mode, CoderHelm receives your GitHub and Jira events and forwards them to your install.
+
+- CoderHelm checks GitHub's or Jira's own signature on every event before it does anything with it. A forged event never reaches your install.
+- Events go only to the install linked to that GitHub installation or Jira site.
+- When your install needs to call GitHub, CoderHelm gives it a short-lived token limited to the repositories and permissions you linked. It can't get a token for anything else.
+- Jira links your install uses carry a token for that install only, and unlinking ends them.
+
+## Email
+
+Email that installs send "through CoderHelm" comes from `notify.coderhelm.com`.
+
+- Only installs linked through CoderHelm, or approved by CoderHelm, may send. Anyone else is refused.
+- Every email is built from fixed templates on CoderHelm's side. An install fills in values; it never writes the email.
+- Links in an email can only point at the sending install's own addresses.
+- Sending is limited per install, per recipient and overall. Bounces and complaints are suppressed, and if the bounce or complaint rate rises, relay sending pauses on its own without touching sign-in email.
+- People outside your team get support ticket email only after they confirm they want it.
+- `notify.coderhelm.com` publishes SPF, DKIM and a DMARC policy of reject, so mail forged as it is refused. `coderhelm.com` publishes SPF, DKIM and DMARC as well.
+
+## Sign-in
+
+- **Self-hosted installs are invite only.** Nobody signs up on their own. An admin adds each person, and their invite link is the way in. The server refuses anything else, whatever the page shows.
+- **Two step sign in** can be required for everyone. People can move it to a new phone with Replace authenticator app after proving their current code, and an admin can reset someone who lost their phone.
+- **Wrong passwords and codes** are counted, and repeated failures pause sign-in for that person.
+- **Sessions** use a cookie bound to the exact address, so no other site, including other addresses under `coderhelm.com`, can read or set it.
+- **On CoderHelm cloud** anyone can sign up during the open beta, but a new account always starts its own team. Joining an existing team takes an invite from that team.
+
+## Updates
+
+- Every release is signed. The tag is signed by a maintainer or attested by CoderHelm's release workflow, and the files are signed with their checksums.
+- An install checks the signature, the template and its checksum before it changes anything, and refuses a release that doesn't match or is older than the one it runs.
+- Updates are off by default. You choose when to update, and you can check any release yourself. [How updates are kept safe](/self-host/updates-security) shows how.
+
+## What runs in your AWS account
+
+- Every role CoderHelm creates sits under a permissions boundary you can read. It can't create IAM users or keys, change your account settings, CloudTrail or GuardDuty, or touch resources that aren't CoderHelm's.
+- **No DNS changes.** CoderHelm never writes to Route 53. The boundary denies it outright. For a custom domain, it shows you the records to add.
+- **Nothing public.** Nothing CoderHelm creates in your account is readable from the internet. Install progress is reported to CoderHelm directly, so no bucket is ever opened.
+- **Your data stays when you uninstall,** unless you choose otherwise with the keep data setting.
+
+## Data
+
+- **Self-hosted and hybrid:** your code, runs, settings and connected data live in your AWS account. In hybrid mode CoderHelm passes your GitHub and Jira events through, checked and unchanged, and hands out short-lived tokens. It doesn't keep your code. [Hybrid](/self-host/hybrid) lists exactly what goes through CoderHelm's servers.
+- **Delivery records** keep a redacted address, the outcome and a capped preview with secrets masked, for 14 days. Location and IP headers aren't recorded.
+- **Install progress reports** keep the phase and the install's address, with account numbers and email addresses taken out, for 14 days.
+- **Support tickets** from an install send only what the person wrote, their name and email, and any error details they chose to attach. Never code or repository contents.
+
+## Hosted operations
+
+CoderHelm's own AWS account keeps an audit trail of every API call in every region, in storage that can't be changed or deleted for a year, with alerts on changes to logging and to encryption keys. Threat detection and an access analyzer watch the account. Deploys run with only the permissions they need, from CoderHelm's main branch only, and encryption keys can be used only by the services that need them.
+
+## Reporting a vulnerability
+
+Email [support@coderhelm.com](mailto:support@coderhelm.com?subject=Security%20report) with "Security report" in the subject. Tell us what you found and how to reproduce it, and please give us time to fix it before you share it. Don't test against other people's accounts or installs, and don't send real email or load while you look.
