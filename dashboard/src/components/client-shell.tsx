@@ -35,6 +35,7 @@ import { SetupBanner } from "@/components/setup-banner";
 import { CopyButton } from "./copy-button";
 import { openInChromeHref, signInProblem, type SignInProblem } from "@/lib/sign-in-errors";
 import { TwoFactorSetup } from "./two-factor-setup";
+import { useSignInMethods } from "@/hooks/use-sign-in-methods";
 import type { MyTwoFactor } from "@/lib/api";
 
 /** Sign out everywhere the same way: end the session, then the sign-in screen. */
@@ -407,12 +408,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             >
               Copy the link for your GitHub admin
             </button>
-            <a
-              href={`${apiBase()}/auth/github`}
-              className={`text-sm text-zinc-300 hover:text-zinc-100 underline transition-colors rounded ${focusRing}`}
-            >
-              Then sign in with GitHub again
-            </a>
+            <GithubSignInAgain />
           </div>
           {teams.filter((t) => t.status !== "deactivated").length > 0 && (
             <div className="mt-2">
@@ -838,6 +834,20 @@ function SignOutIcon() {
  * do next: Try again, or, inside another app's browser, open the page in a
  * real browser.
  */
+/** After the app is reinstalled: GitHub sign-in again, where this deployment has it. */
+function GithubSignInAgain() {
+  const methods = useSignInMethods();
+  if (!methods.github) return null;
+  return (
+    <a
+      href={`${apiBase()}/auth/github`}
+      className={`text-sm text-zinc-300 hover:text-zinc-100 underline transition-colors rounded ${focusRing}`}
+    >
+      Then sign in with GitHub again
+    </a>
+  );
+}
+
 function SignInProblemNotice({ problem }: { problem: SignInProblem }) {
   const [chromeHref, setChromeHref] = useState<string | null>(null);
   useEffect(() => {
@@ -852,7 +862,7 @@ function SignInProblemNotice({ problem }: { problem: SignInProblem }) {
             Try again
           </a>
         )}
-        {!problem.canRetry && (
+        {problem.code === "in_app_browser" && (
           <>
             <CopyButton text={() => window.location.origin + "/"} label="Copy the link" copiedLabel="Link copied" variant="link" />
             {chromeHref && (
@@ -1009,6 +1019,9 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const site = siteUrl();
   // A self-hosted install: one organization, joined only by invite.
   const selfHosted = isSelfHosted();
+  // Only the ways in that work here (the API says which).
+  const methods = useSignInMethods();
+  const providers = methods.google || methods.github;
   // A self-hosted install has no terms to agree to (no site): the box is pre-ticked and hidden.
   useEffect(() => {
     if (!site) setAgreedTos(true);
@@ -1257,9 +1270,10 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
                 <span className="text-xs text-zinc-400">· anyone can sign up</span>
               </div>
               )}
-              <div className="space-y-3">
+              {providers && (
+              <div className="space-y-3" data-testid="sign-in-providers">
                 {/* A self-hosted install has no Google sign-in. */}
-                {!selfHosted && (
+                {methods.google && (
                 <a
                   href={`${apiBase()}/auth/google`}
                   className="flex w-full items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-200 transition-colors"
@@ -1268,6 +1282,8 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
                   Continue with Google
                 </a>
                 )}
+                {/* GitHub only with an OAuth client of this install's own. */}
+                {methods.github && (
                 <a
                   href={`${apiBase()}/auth/github`}
                   className="flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-2.5 text-sm font-medium text-zinc-100 hover:bg-zinc-700 transition-colors"
@@ -1275,13 +1291,17 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
                   Continue with GitHub
                 </a>
+                )}
               </div>
+              )}
 
+              {providers && (
               <div className="flex items-center gap-3">
                 <div className="flex-1 h-px bg-zinc-800" />
                 <span className="text-xs text-zinc-400">or</span>
                 <div className="flex-1 h-px bg-zinc-800" />
               </div>
+              )}
 
               <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} className="space-y-3">
                 <input type="email" name="email" id="login-email" autoComplete="email" aria-label="Email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); setMessage(""); }}

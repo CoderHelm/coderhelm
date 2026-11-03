@@ -166,8 +166,16 @@ export interface SignInSettings {
   your_session_has_2fa?: boolean;
 }
 
+/** The sign-in methods that work on this deployment (`GET /auth/methods`, public). */
+export interface SignInMethods {
+  password: boolean;
+  google: boolean;
+  github: boolean;
+}
+
 export const api = {
   // Auth
+  signInMethods: () => request<SignInMethods>("/auth/methods"),
   me: () =>
     request<{
       user_id: string;

@@ -43,6 +43,13 @@ export function signInProblem(search: string): SignInProblem | null {
       return { code, provider, sentence: `Sign-in with ${provider ? NAMES[provider] : "the provider"} was cancelled before it finished.`, canRetry: true };
     case "provider":
       return { code, provider, sentence: `${name} didn't confirm your sign-in.`, canRetry: true };
+    case "not_set_up":
+      return {
+        code,
+        provider,
+        sentence: `${provider ? NAMES[provider] : "That"} sign-in isn't set up on this Coderhelm. Sign in with your email and password.`,
+        canRetry: false,
+      };
     case "server":
       return { code, provider, sentence: "Something went wrong on our side while signing you in.", canRetry: true };
     default:

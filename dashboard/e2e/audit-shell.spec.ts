@@ -50,6 +50,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       if (db.me !== 200) return route.fulfill({ status: db.me, body: "" });
       return json(route, { user_id: "u_1", team_id: "t_1", github_login: null, email: db.email, avatar_url: "", role: db.role, status: db.status });
     }
+    if (p === "/auth/methods") return json(route, { password: true, google: true, github: true });
     if (p === "/api/usage") return json(route, { month: "2026-01", tokens_in: 0, tokens_out: 0, total_runs: 0, ...db.usage });
     if (p === "/api/banners") return json(route, { banners: db.banners });
     if (p === "/api/support/badge") return json(route, { waiting: 0, queue_open: null });
