@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { BookIcon, CodeIcon, PaperclipIcon, SendIcon, XIcon } from "@/components/icons";
+import { BookIcon, CodeIcon, PaperclipIcon, SendIcon, XIcon, PlayIcon } from "@/components/icons";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/popover";
 import { SquareIcon } from "@/components/stream-icons";
 import { focusRing } from "@/components/ui";
@@ -45,7 +45,8 @@ export function mentionAt(text: string, caret: number): { start: number; query: 
 /** Options matching what was typed after @: names starting with it first. */
 export function matchMentions(options: MentionOption[], query: string, chosen: Mention[]): MentionOption[] {
   const q = query.toLowerCase();
-  const free = options.filter((o) => !chosen.some((c) => c.kind === o.kind && c.id === o.id));
+  // A run is context from the page Chat was opened on, never offered with @.
+  const free = options.filter((o) => o.kind !== "run" && !chosen.some((c) => c.kind === o.kind && c.id === o.id));
   if (!q) return free.slice(0, 8);
   const starts = free.filter((o) => o.label.toLowerCase().startsWith(q) || o.id.toLowerCase().startsWith(q));
   const has = free.filter((o) => !starts.includes(o) && (o.label.toLowerCase().includes(q) || o.id.toLowerCase().includes(q)));
@@ -53,7 +54,7 @@ export function matchMentions(options: MentionOption[], query: string, chosen: M
 }
 
 function MentionIcon({ kind }: { kind: string }) {
-  return kind === "repo" ? <CodeIcon /> : <BookIcon />;
+  return kind === "repo" ? <CodeIcon /> : kind === "run" ? <PlayIcon /> : <BookIcon />;
 }
 
 export const ChatComposer = forwardRef<

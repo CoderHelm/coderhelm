@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Menu } from "@/components/menu";
-import { BookIcon, ComposeIcon, MoreIcon, SearchIcon, SidebarIcon, UsersIcon } from "@/components/icons";
+import { BookIcon, ComposeIcon, MoreIcon, PinIcon, SearchIcon, SidebarIcon, UsersIcon } from "@/components/icons";
 import { Skeleton } from "@/components/skeleton";
 import { focusRing } from "@/components/ui";
 import { KNOWLEDGE_HREF } from "@/lib/routes";
@@ -28,6 +28,9 @@ export function dayGroup(iso: string, now = Date.now()): string {
 }
 
 export const SHARED_GROUP = "Shared with you";
+export const PINNED_GROUP = "Pinned";
+/** How many chats one person may pin (the server holds the same limit). */
+export const MAX_PINNED = 5;
 
 export function ThreadList({
   threads,
@@ -38,6 +41,7 @@ export function ThreadList({
   onPick,
   onRename,
   onShare,
+  onPin,
   onDelete,
   onCollapse,
   shortcut,
@@ -52,6 +56,8 @@ export function ThreadList({
   onPick?: () => void;
   onRename: (t: BrainThread) => void;
   onShare: (t: BrainThread, shared: boolean) => void;
+  /** Pins a chat to the top, or unpins it. */
+  onPin?: (t: BrainThread, pinned: boolean) => void;
   onDelete: (t: BrainThread) => void;
   /** Hides the sidebar (wide screens). */
   onCollapse?: () => void;
@@ -63,8 +69,13 @@ export function ThreadList({
     const needle = q.trim().toLowerCase();
     const out: { label: string; items: BrainThread[] }[] = [];
     const shared: BrainThread[] = [];
+    const pinned: BrainThread[] = [];
     for (const t of threads ?? []) {
       if (needle && !t.title.toLowerCase().includes(needle)) continue;
+      if (t.mine && t.pinned) {
+        pinned.push(t);
+        continue;
+      }
       if (!t.mine) {
         shared.push(t);
         continue;
@@ -75,6 +86,7 @@ export function ThreadList({
       g.items.push(t);
     }
     if (shared.length) out.push({ label: SHARED_GROUP, items: shared });
+    if (pinned.length) out.unshift({ label: PINNED_GROUP, items: pinned });
     return out;
   }, [threads, q]);
 
@@ -151,6 +163,8 @@ export function ThreadList({
                       onPick={onPick}
                       onRename={onRename}
                       onShare={onShare}
+                      onPin={onPin}
+                      pinsFull={(threads ?? []).filter((x) => x.mine && x.pinned).length >= MAX_PINNED}
                       onDelete={onDelete}
                     />
                   ))}
@@ -186,6 +200,8 @@ function ThreadRow({
   onPick,
   onRename,
   onShare,
+  onPin,
+  pinsFull,
   onDelete,
 }: {
   t: BrainThread;
@@ -194,6 +210,9 @@ function ThreadRow({
   onPick?: () => void;
   onRename: (t: BrainThread) => void;
   onShare: (t: BrainThread, shared: boolean) => void;
+  onPin?: (t: BrainThread, pinned: boolean) => void;
+  /** Five are pinned: pinning another is offered as unavailable. */
+  pinsFull: boolean;
   onDelete: (t: BrainThread) => void;
 }) {
   return (
@@ -209,6 +228,11 @@ function ThreadRow({
           <span className="block truncate">{t.title}</span>
           {!t.mine && <span className="block truncate text-[11px] text-zinc-500">{t.owner_email}</span>}
         </span>
+        {t.mine && t.pinned && (
+          <span className="shrink-0 text-zinc-500 [&_svg]:h-3.5 [&_svg]:w-3.5" title="Pinned" aria-label="Pinned" data-testid="thread-pinned">
+            <PinIcon />
+          </span>
+        )}
         {t.mine && t.shared && (
           <span className="shrink-0 text-zinc-500 [&_svg]:h-3.5 [&_svg]:w-3.5" title="Shared with the team" aria-label="Shared with the team">
             <UsersIcon />
@@ -231,6 +255,13 @@ function ThreadRow({
               </button>
             }
             items={[
+              ...(onPin
+                ? [
+                    t.pinned
+                      ? { label: "Unpin", onSelect: () => onPin(t, false) }
+                      : { label: pinsFull ? `Pin (${MAX_PINNED} pinned already)` : "Pin to top", onSelect: () => onPin(t, true), disabled: pinsFull },
+                  ]
+                : []),
               { label: "Rename", onSelect: () => onRename(t) },
               { label: t.shared ? "Stop sharing" : "Share with team", onSelect: () => onShare(t, !t.shared) },
               { label: "Delete", onSelect: () => onDelete(t), danger: true },

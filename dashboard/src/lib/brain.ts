@@ -170,8 +170,9 @@ export interface Picks {
 
 /** Something the asker pointed a question at with @. */
 export interface Mention {
-  kind: "repo" | "knowledge";
-  /** owner/name, or the knowledge base id. */
+  /** `run`: the run's state goes with the question; it doesn't narrow what Chat reads. */
+  kind: "repo" | "knowledge" | "run";
+  /** owner/name, the knowledge base id, or the run id. */
   id: string;
 }
 
@@ -179,6 +180,8 @@ export interface BrainThread {
   id: string;
   title: string;
   shared: boolean;
+  /** Pinned to the top of the owner's chat list. */
+  pinned?: boolean;
   mine: boolean;
   owner_email: string;
   created_at: string;
@@ -218,6 +221,8 @@ export interface Starter {
   /** Where it comes from: "From the web code". */
   why: string;
   sources?: Picks;
+  /** Runs the question is about, sent with it. */
+  mentions?: Mention[];
 }
 
 export interface BrainRepo {
@@ -238,7 +243,7 @@ export const brainApi = {
   threads: () => request<{ threads: BrainThread[]; can_ask: boolean }>("/api/brain/threads"),
   thread: (id: string) =>
     request<{ thread: BrainThread; messages: BrainMessage[]; can_ask: boolean }>(`/api/brain/threads/${encodeURIComponent(id)}`),
-  updateThread: (id: string, patch: { title?: string; shared?: boolean }) =>
+  updateThread: (id: string, patch: { title?: string; shared?: boolean; pinned?: boolean }) =>
     request<{ thread: BrainThread }>(`/api/brain/threads/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(patch) }),
   deleteThread: (id: string) => request<{ ok: boolean }>(`/api/brain/threads/${encodeURIComponent(id)}`, { method: "DELETE" }),
   sources: () => request<BrainSources>("/api/brain/sources"),

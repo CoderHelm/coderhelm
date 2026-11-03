@@ -975,11 +975,20 @@ function RunDetailInner() {
           </span>
         }
         actions={
-          canAct && closeAsButton ? (
-            <button type="button" onClick={() => setCloseOpen(true)} disabled={busy !== null} className={secondaryButton}>
-              Close run
-            </button>
-          ) : undefined
+          <>
+            <Link
+              href={`/chat?run=${encodeURIComponent(run.run_id)}&title=${encodeURIComponent((run.title || "").slice(0, 120))}`}
+              className={secondaryButton}
+              data-testid="ask-chat-about-run"
+            >
+              Ask Chat
+            </Link>
+            {canAct && closeAsButton ? (
+              <button type="button" onClick={() => setCloseOpen(true)} disabled={busy !== null} className={secondaryButton}>
+                Close run
+              </button>
+            ) : null}
+          </>
         }
         more={more.length ? more : undefined}
       />

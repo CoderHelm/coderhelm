@@ -1,6 +1,8 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useChatNavSlot } from "@/components/chat-nav";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { OwnTitle, Page, PageHeader } from "@/components/page";
@@ -44,8 +46,8 @@ import { ThreadList } from "./thread-list";
 // and in a sheet on narrower screens. A chat is yours until you share it;
 // teammates then read it but only you ask in it.
 
-/** The reading column: about 720px. */
-const COLUMN = "max-w-[40rem]";
+/** The reading column: about 740px, centred in the page. */
+const COLUMN = "max-w-[46rem]";
 
 export default function ChatPage() {
   return (
@@ -83,6 +85,10 @@ function Chat() {
   const { toast } = useToast();
   const { confirm } = useConfirm();
   const threadId = params.get("thread") ?? "";
+  // Opened from a run or pull request: that run goes with the first question,
+  // as a chip the asker can remove.
+  const fromRun = /^[A-Za-z0-9_-]{1,64}$/.test(params.get("run") ?? "") ? params.get("run")! : "";
+  const fromRunTitle = (params.get("title") ?? "").slice(0, 120);
 
   // Asking is the brain_ask capability; managing knowledge is knowledge_manage.
   const { can, ready: capsReady } = useCan();
@@ -92,7 +98,7 @@ function Chat() {
   const [threads, setThreads] = useState<BrainThread[] | null>(null);
   const [sources, setSources] = useState<BrainSources | null>(null);
   const [starters, setStarters] = useState<Starter[] | null>(null);
-  const [mentions, setMentions] = useState<Mention[]>([]);
+  const [mentions, setMentions] = useState<Mention[]>(() => (fromRun && !threadId ? [{ kind: "run", id: fromRun }] : []));
   const [thread, setThread] = useState<BrainThread | null>(null);
   const [messages, setMessages] = useState<BrainMessage[]>([]);
   const [threadCanAsk, setThreadCanAsk] = useState(true);
@@ -106,6 +112,8 @@ function Chat() {
   const [railOpen, setRailOpen] = useState(true);
   const [renaming, setRenaming] = useState<BrainThread | null>(null);
   const [mac, setMac] = useState(true);
+  // The app sidebar's chat menu, where the chat list lives (one column of navigation).
+  const navSlot = useChatNavSlot();
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -329,6 +337,17 @@ function Chat() {
     }
   };
 
+  const pin = async (t: BrainThread, pinned: boolean) => {
+    try {
+      const r = await brainApi.updateThread(t.id, { pinned });
+      if (thread?.id === t.id) setThread(r.thread);
+      loadThreads();
+      toast(pinned ? "Pinned to the top of your chats" : "Unpinned");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "The pin didn't change. Try again.", "error");
+    }
+  };
+
   const remove = async (t: BrainThread) => {
     const ok = await confirm({
       title: "Delete this chat?",
@@ -393,8 +412,9 @@ function Chat() {
       sub: r.role ? `${r.role[0].toUpperCase()}${r.role.slice(1)} code` : "Code",
     }));
     const kbs: MentionOption[] = sources.knowledge.map((b) => ({ kind: "knowledge", id: b.id, label: b.name, sub: "Knowledge" }));
-    return [...repos, ...kbs];
-  }, [sources]);
+    const runs: MentionOption[] = fromRun ? [{ kind: "run", id: fromRun, label: fromRunTitle ? `Run: ${fromRunTitle}` : "This run", sub: "Run" }] : [];
+    return [...repos, ...kbs, ...runs];
+  }, [sources, fromRun, fromRunTitle]);
   const shortcut = mac ? "⌘/" : "Ctrl+/";
 
   const paletteActions = useMemo<PageAction[] | null>(() => {
@@ -425,6 +445,7 @@ function Chat() {
         setRenaming(t);
       }}
       onShare={share}
+      onPin={pin}
       onDelete={(t) => {
         setSheetOpen(false);
         remove(t);
@@ -468,16 +489,18 @@ function Chat() {
   // or a hidden sidebar), the chat's name, and its actions.
   const paneBar = (
     <div className="flex min-h-10 min-w-0 items-center gap-1.5 pb-2">
-      <button
-        type="button"
-        onClick={() => setSheetOpen(true)}
-        aria-label="Chats"
-        data-testid="open-chats"
-        className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800/70 hover:text-zinc-100 lg:hidden ${focusRing}`}
-      >
-        <SidebarIcon />
-      </button>
-      {!railOpen && (
+      {!navSlot && (
+        <button
+          type="button"
+          onClick={() => setSheetOpen(true)}
+          aria-label="Chats"
+          data-testid="open-chats"
+          className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800/70 hover:text-zinc-100 lg:hidden ${focusRing}`}
+        >
+          <SidebarIcon />
+        </button>
+      )}
+      {!navSlot && !railOpen && (
         <button
           type="button"
           onClick={() => toggleRail(true)}
@@ -489,7 +512,7 @@ function Chat() {
           <SidebarIcon />
         </button>
       )}
-      {canAsk && (!railOpen || !empty) && (
+      {canAsk && !navSlot && (!railOpen || !empty) && (
         <button
           type="button"
           onClick={startNew}
@@ -531,13 +554,16 @@ function Chat() {
   );
 
   const noData = !!sources && !!starters && starters.length === 0 && sources.knowledge.length === 0 && sources.repos.length === 0;
-  const mentionName = (m: Mention) => mentionOptions.find((o) => o.kind === m.kind && o.id === m.id)?.label ?? m.id.split("/").pop() ?? m.id;
+  const mentionName = (m: Mention) =>
+    mentionOptions.find((o) => o.kind === m.kind && o.id === m.id)?.label ?? (m.kind === "run" ? "A run" : m.id.split("/").pop() ?? m.id);
 
   return (
     <Page className="flex h-[calc(100dvh-5.25rem)] flex-col md:h-[calc(100dvh-7.25rem)]" testId="chat-page">
-      {empty ? <OwnTitle /> : <PageHeader title="Chat" crumb={thread?.title} />}
+      {/* The empty page draws its own heading; an open chat's name is a hidden one (and the top bar's last crumb). */}
+      {navSlot && !empty ? <PageHeader title={thread?.title ?? "Chat"} crumb={thread?.title ?? false} titleClassName="sr-only" /> : navSlot ? <OwnTitle /> : empty ? <OwnTitle /> : <PageHeader title="Chat" crumb={thread?.title} />}
+      {navSlot && createPortal(list({ inSheet: true }), navSlot)}
       <div className="flex min-h-0 flex-1 gap-6">
-        {railOpen && <aside className="hidden min-h-0 w-64 shrink-0 lg:flex lg:flex-col">{list({})}</aside>}
+        {!navSlot && railOpen && <aside className="hidden min-h-0 w-64 shrink-0 lg:flex lg:flex-col">{list({})}</aside>}
 
         <section aria-label="Conversation" className="relative flex min-h-0 min-w-0 flex-1 flex-col">
           {paneBar}
@@ -578,7 +604,7 @@ function Chat() {
                                 type="button"
                                 data-testid="starter"
                                 disabled={busy}
-                                onClick={() => ask(s.question, [])}
+                                onClick={() => ask(s.question, s.mentions ?? [])}
                                 className={`group flex w-full min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-zinc-900 motion-reduce:transition-none ${focusRing}`}
                               >
                                 <span aria-hidden="true" className="shrink-0 text-zinc-600 transition-colors group-hover:text-zinc-300 motion-reduce:transition-none [&_svg]:h-4 [&_svg]:w-4">
