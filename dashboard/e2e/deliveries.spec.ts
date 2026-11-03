@@ -44,8 +44,19 @@ function detail(id: string) {
         { at: ago(6 * MIN), code: 502, duration_ms: 10_000, error: "Bad gateway from the worker" },
         { at: ago(5 * MIN), duration_ms: 20, error: "Timed out after 10 seconds" },
       ],
-      headers: { "x-github-event": "pull_request", "x-github-delivery": row.external_id || "none", "x-hub-signature-256": "[redacted]", "content-type": "application/json" },
-      payload_preview: JSON.stringify({ action: "opened", repository: { full_name: row.repo || "example-org/web" }, number: 42 }),
+      headers: {
+        "x-github-event": "pull_request",
+        "x-github-delivery": row.external_id || "none",
+        "x-hub-signature-256": "[redacted]",
+        "user-agent": "GitHub-Hookshot/abc123",
+        "content-type": "application/json",
+        "content-length": "18432",
+        "x-coderhelm-delivery": row.id,
+        "via": "2.0 abc.cloudfront.net (CloudFront)",
+        "x-amz-cf-id": "cf-abc",
+        "x-amzn-trace-id": "Root=1-abc",
+      },
+      payload_preview: JSON.stringify({ action: "opened", number: 42, pull_request: { title: "Show the class schedule", html_url: "https://github.com/example-org/web/pull/42" }, sender: { login: "dana" }, repository: { full_name: row.repo || "example-org/web" } }),
       payload_bytes: 18_432,
       redeliver: row.source === "relay" ? "relay" : "github",
     },
@@ -335,3 +346,33 @@ for (const [name, sharing] of [
     await expect(page.getByTestId("sharing-note")).toHaveCount(0);
   });
 }
+
+test("detail reads as a summary first; payload and headers wait behind a click, grouped", async ({ page }) => {
+  for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(vp);
+    await setup(page);
+    await page.goto("/settings/deliveries/?id=gh_01JD000000000000000000001");
+    const drawer = page.getByTestId("delivery-drawer");
+    const summary = drawer.getByTestId("delivery-summary");
+    await expect(summary).toContainText("Pull request opened");
+    await expect(drawer.getByTestId("delivery-about")).toHaveText("Show the class schedule");
+    await expect(drawer.getByTestId("delivery-sender")).toHaveText("by dana");
+    await expect(drawer.getByTestId("delivery-outcome")).toBeVisible();
+    // Collapsed until asked for.
+    await expect(drawer.getByRole("region", { name: "Payload preview" }).or(drawer.getByLabel("Payload preview"))).toBeHidden();
+    await expect(drawer.getByRole("table", { name: "From the sender headers" })).toBeHidden();
+    await drawer.getByTestId("delivery-headers").getByText(/Request headers \(10\)/).click();
+    await expect(drawer.getByRole("table", { name: "From the sender headers" })).toBeVisible();
+    await expect(drawer.getByRole("table", { name: "Coderhelm headers" })).toContainText("x-coderhelm-delivery");
+    await expect(drawer.getByRole("table", { name: "Content headers" })).toContainText("content-length");
+    // Proxy noise sits one more click away.
+    await expect(drawer.getByRole("table", { name: "Network details" })).toBeHidden();
+    await drawer.getByTestId("header-network").getByText("Network details (3)").click();
+    await expect(drawer.getByRole("table", { name: "Network details" })).toContainText("x-amz-cf-id");
+    await drawer.getByTestId("delivery-payload").getByText(/Payload preview, 18.0 KB/).click();
+    await expect(drawer.getByTestId("delivery-payload")).toContainText('"sender"');
+    const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(wide).toBeLessThanOrEqual(1);
+    await page.keyboard.press("Escape");
+  }
+});

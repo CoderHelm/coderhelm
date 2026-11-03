@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { endpointHref } from "@/lib/webhooks";
-import { api, type DeliveryAnalytics, type DeliveryEmail, type DeliveryEndpointRow, type DeliveryPeriod, type DeliveryPoint, type DeliveryRelayRow } from "@/lib/api";
+import { api, type DeliveryAnalytics, type DeliveryEmail, type DeliveryEndpointRow, type DeliveryLatencyBucket, type DeliveryPeriod, type DeliveryPoint, type DeliveryRelayRow } from "@/lib/api";
 import { ChartCard, ChartTip, SERIES, Table, axis } from "./charts";
 import { Callout } from "./callout";
 import { FilterSelect } from "./data-source-activity";
@@ -105,6 +105,39 @@ function endpointState(e: DeliveryEndpointRow): { label: string; tone: Tone } {
 }
 
 const textLink = `rounded text-zinc-100 underline-offset-2 hover:underline ${focusRing}`;
+
+/** A latency bucket in words: "Up to 25 ms", "300 ms to 500 ms", "Over 1 min". */
+export function bucketName(b: DeliveryLatencyBucket): string {
+  if (b.to_ms == null) return `Over ${formatMs(b.from_ms)}`;
+  if (b.from_ms === 0) return `Up to ${formatMs(b.to_ms)}`;
+  return `${formatMs(b.from_ms)} to ${formatMs(b.to_ms)}`;
+}
+
+/**
+ * A row's trend: deliveries per bucket as a thin line, with a mark on each
+ * bucket that had a failure. Decoration only: the row's numbers say the same.
+ */
+export function Sparkline({ values, failed = [], label }: { values: number[]; failed?: number[]; label: string }) {
+  const w = 96;
+  const h = 24;
+  if (values.length < 2 || values.every((v) => v === 0)) {
+    return <span className="text-xs text-zinc-400" data-testid="sparkline-empty">No trend yet</span>;
+  }
+  const max = Math.max(1, ...values);
+  const x = (i: number) => (i / (values.length - 1)) * (w - 4) + 2;
+  const y = (v: number) => h - 3 - (v / max) * (h - 6);
+  const points = values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={label} data-testid="sparkline" className="block">
+      <polyline points={points} fill="none" stroke={SERIES.first} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      {failed.map((f, i) =>
+        f > 0 && i < values.length ? (
+          <circle key={i} cx={x(i)} cy={y(values[i])} r={3} fill={SERIES.second} stroke="#18181b" strokeWidth={2} data-testid="sparkline-failure" />
+        ) : null,
+      )}
+    </svg>
+  );
+}
 
 // ── The overview ────────────────────────────────────────────────────
 
@@ -264,14 +297,21 @@ function EmailPanel({ email }: { email: DeliveryEmail }) {
             empty="No email yet."
           />
         </div>
-        {email.cognito_sender === "cognito_default" && (
-          <div className="mt-4">
-            <Callout variant="warning" title="Sign-up and password emails are capped" testId="overview-email-cognito">
-              Amazon Cognito sends sign-up codes and password resets from its own address, about {email.cognito_daily_limit ?? 50} a day. Set
-              email.cognitoUsesSes to true in the install&apos;s config once its SES sender is verified, and deploy.
-            </Callout>
-          </div>
-        )}
+        {email.cognito_sender === "cognito_default" &&
+          (email.install_form === "native" ? (
+            <div className="mt-4">
+              <Callout variant="info" title="Sign-up and password emails" testId="overview-email-cognito">
+                Amazon Cognito sends sign-up codes and password resets from its own address, about {email.cognito_daily_limit ?? 50} a day: enough for a small team.
+              </Callout>
+            </div>
+          ) : (
+            <div className="mt-4">
+              <Callout variant="warning" title="Sign-up and password emails are capped" testId="overview-email-cognito">
+                Amazon Cognito sends sign-up codes and password resets from its own address, about {email.cognito_daily_limit ?? 50} a day. Set
+                email.cognitoUsesSes to true in the install&apos;s config once its SES sender is verified, and deploy.
+              </Callout>
+            </div>
+          ))}
       </div>
     </Section>
   );
@@ -336,6 +376,14 @@ function Body({ data, filters, filtering, onClear }: { data: DeliveryAnalytics; 
   const rateTone = s.success_rate == null ? "neutral" : s.success_rate >= 0.95 ? "success" : s.success_rate >= 0.8 ? "warning" : "danger";
   const series = data.series.map((pt) => ({ ...pt, label: pt.start, rate: pt.success_rate == null ? null : Math.round(pt.success_rate * 1000) / 10 }));
   const maxReason = Math.max(1, ...data.reasons.map((r) => r.count));
+  const latencySeries = data.series.map((pt) => ({ ...pt, label: pt.start, p50: pt.p50_ms ?? null, p95: pt.p95_ms ?? null }));
+  const timed = latencySeries.some((x) => x.p50 != null || x.p95 != null);
+  const dist = data.latency ?? [];
+  // The distribution's bars: from the first bucket with anything to the last
+  // (the empty tails would only squeeze the rest), every bucket in between.
+  const firstHit = dist.findIndex((b) => b.ok + b.failed > 0);
+  const lastHit = dist.length - 1 - [...dist].reverse().findIndex((b) => b.ok + b.failed > 0);
+  const distShown = firstHit < 0 ? [] : dist.slice(firstHit, lastHit + 1).map((b) => ({ ...b, name: bucketName(b) }));
   const tipLabel = (iso: string) => (hourly ? `${formatDate(iso, { time: true })}` : bucketLabel(iso, false));
   const open = (pt: DeliveryPoint | undefined, extra: { status?: string } = {}) => {
     if (pt && (pt.deliveries > 0 || pt.previous_deliveries > 0)) router.push(bucketHref(pt, extra));
@@ -456,6 +504,75 @@ function Body({ data, filters, filtering, onClear }: { data: DeliveryAnalytics; 
           )}
         </ChartCard>
       </div>
+      <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-2">
+          <ChartCard
+            title="How long deliveries took"
+            table={
+              <Table
+                label="How long deliveries took over time"
+                head={[hourly ? "Hour" : "Day", "Typical (median)", "Slowest 5%"]}
+                rows={data.series.map((pt) => [
+                  <Link key={pt.start} href={bucketHref(pt)} className={textLink}>{tipLabel(pt.start)}</Link>,
+                  msText(pt.p50_ms),
+                  msText(pt.p95_ms),
+                ])}
+                empty="No deliveries."
+              />
+            }
+          >
+            {!timed ? (
+              <div className="flex h-56 items-center justify-center text-center text-sm text-zinc-400" data-testid="latency-empty">No timed deliveries in this period.</div>
+            ) : (
+              <div
+                className="h-56 cursor-pointer"
+                role="img"
+                aria-label={`Line chart of how long deliveries took per ${hourly ? "hour" : "day"}: the typical (median) time and the slowest 5%. Select a point to list its deliveries; Show table has the same numbers.`}
+                data-testid="chart-latency"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={latencySeries} onClick={(e: unknown) => open(clicked(e))}>
+                    <CartesianGrid vertical={false} stroke="#27272a" />
+                    <XAxis dataKey="label" tickFormatter={(v: string) => bucketLabel(v, hourly)} {...axis} minTickGap={24} />
+                    <YAxis width={56} tickFormatter={(v: number) => formatMs(v)} {...axis} />
+                    <Tooltip cursor={{ stroke: "#3f3f46" }} content={<ChartTip labelFormat={tipLabel} format={(v) => formatMs(v)} />} />
+                    <Legend wrapperStyle={{ fontSize: 12, color: "#a1a1aa" }} iconType="circle" iconSize={8} />
+                    <Line type="monotone" dataKey="p50" name="Typical (median)" stroke={SERIES.first} strokeWidth={2} dot={{ r: 2.5, fill: SERIES.first }} activeDot={{ r: 5 }} connectNulls={false} />
+                    <Line type="monotone" dataKey="p95" name="Slowest 5%" stroke={SERIES.second} strokeWidth={2} dot={{ r: 2.5, fill: SERIES.second }} activeDot={{ r: 5 }} connectNulls={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </ChartCard>
+          <ChartCard
+            title="Latency distribution"
+            table={
+              <Table
+                label="Latency distribution"
+                head={["How long", "Went fine", "Failed"]}
+                rows={dist.map((b) => [<span key={b.from_ms}>{bucketName(b)}</span>, count(b.ok), count(b.failed)])}
+                empty="No timed deliveries."
+              />
+            }
+          >
+            {distShown.length === 0 ? (
+              <div className="flex h-56 items-center justify-center text-center text-sm text-zinc-400" data-testid="distribution-empty">No timed deliveries in this period.</div>
+            ) : (
+              <div className="h-56" role="img" aria-label="Bar chart of how many deliveries took each length of time, fine and failed stacked. Show table has the same numbers." data-testid="chart-distribution">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={distShown} barCategoryGap="20%">
+                    <CartesianGrid vertical={false} stroke="#27272a" />
+                    <XAxis dataKey="name" {...axis} interval="preserveStartEnd" minTickGap={16} />
+                    <YAxis allowDecimals={false} width={32} {...axis} />
+                    <Tooltip cursor={{ fill: "#27272a66" }} content={<ChartTip labelFormat={(v) => v} />} />
+                    <Legend wrapperStyle={{ fontSize: 12, color: "#a1a1aa" }} iconType="circle" iconSize={8} />
+                    <Bar dataKey="ok" name="Went fine" stackId="l" fill={SERIES.first} maxBarSize={22} stroke="#18181b" strokeWidth={1} />
+                    <Bar dataKey="failed" name="Failed" stackId="l" fill={SERIES.second} radius={[4, 4, 0, 0]} maxBarSize={22} stroke="#18181b" strokeWidth={1} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </ChartCard>
+        </div>
       {olderThanRecords && (
         <p className="mt-3 text-xs text-zinc-400" data-testid="overview-records-note">
           Counts are kept {data.kept_days} days; each delivery&apos;s own record is kept {data.records_kept_days}, so a day older than that opens an empty list.
@@ -541,16 +658,25 @@ function Body({ data, filters, filtering, onClear }: { data: DeliveryAnalytics; 
         <Section title="By source" id="sources">
           <Table
             label="By source"
-            head={["Source", "Deliveries", "Success rate"]}
+            head={["Source", "Deliveries", "Failed", "Success rate", "Slowest 5%", "Trend"]}
             rows={data.sources.map((r) => [
-              <span key={`${r.source}-${r.direction}`} className="block min-w-0">
+              <span key={`${r.source}-${r.direction}`} className="block min-w-0" data-testid="source-row" data-source={r.source}>
                 <Link href={listHref({ ...whole, source: r.source })} className={textLink} data-testid="source-link">{sourceName(r.source)}</Link>
                 <span className="block text-xs text-zinc-400">
-                  {r.direction === "inbound" ? "Received" : "Sent"} · slowest 5% {msText(r.p95_ms)} · {changeWords(r.deliveries, r.previous_deliveries, "count", vs)}
+                  {r.direction === "inbound" ? "Received" : "Sent"} · {changeWords(r.deliveries, r.previous_deliveries, "count", vs)}
+                  {r.p50_ms != null ? ` · typical ${formatMs(r.p50_ms)}` : ""}
                 </span>
               </span>,
               count(r.deliveries),
+              r.failed ? <Link key="f" href={listHref({ ...whole, source: r.source, status: "failed" })} className={textLink}>{count(r.failed)}</Link> : "0",
               rateText(r.success_rate),
+              msText(r.p95_ms),
+              <Sparkline
+                key="t"
+                values={r.series ?? []}
+                failed={r.failed_series ?? []}
+                label={`${sourceName(r.source)}: deliveries per ${hourly ? "hour" : "day"}${r.failed ? `, ${count(r.failed)} failed` : ""}`}
+              />,
             ])}
             empty={`No deliveries in ${span}.`}
           />

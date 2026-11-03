@@ -35,10 +35,28 @@ function series(period: string) {
       ok,
       failed,
       success_rate: ok / (ok + failed),
+      p50_ms: 150 + ((i * 41) % 120),
       p95_ms: 600 + ((i * 113) % 900),
       previous_deliveries: 110 + ((i * 29) % 70),
     };
   });
+}
+
+/** A source's sparkline: deliveries spread over the buckets, failures on a few. */
+function spark(n: number, total: number, failed: number) {
+  const series = Array.from({ length: n }, (_, i) => Math.floor(total / n) + (i % 3));
+  const failed_series = Array.from({ length: n }, (_, i) => (failed && i % 4 === 1 ? 1 : 0));
+  return { series, failed_series };
+}
+
+/** The latency distribution, as the API sends it: every bucket in order, the last one open. */
+function latencyBuckets() {
+  const bounds = [25, 50, 100, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 5000, 7500, 10000, 15000, 30000, 60000];
+  const ok = [0, 4, 60, 320, 410, 240, 110, 60, 30, 12, 6, 3, 1, 0, 0, 0, 0, 0];
+  const failed = [0, 0, 0, 2, 3, 4, 2, 3, 5, 4, 3, 2, 2, 1, 1, 1, 0, 0];
+  const out = bounds.map((to, i) => ({ from_ms: i === 0 ? 0 : bounds[i - 1], to_ms: to, ok: ok[i], failed: failed[i] }));
+  out.push({ from_ms: 60000, to_ms: null as unknown as number, ok: ok[17], failed: failed[17] });
+  return out;
 }
 
 function full(period: string) {
@@ -53,11 +71,12 @@ function full(period: string) {
     summary: { deliveries: 1284, handled: 1190, ignored: 61, failed: 33, success_rate: 0.9743, retried: 41, retried_ok: 37, retries: 58, p50_ms: 180, p95_ms: 1240, p99_ms: 4800 },
     previous: { deliveries: 1120, handled: 1040, ignored: 52, failed: 28, success_rate: 0.975, retried: 30, retried_ok: 26, retries: 44, p50_ms: 170, p95_ms: 1100, p99_ms: 4100 },
     series: s,
+    latency: latencyBuckets(),
     sources: [
-      { source: "github", direction: "inbound", deliveries: 912, ok: 905, failed: 7, success_rate: 0.9923, p95_ms: 640, previous_deliveries: 870, previous_success_rate: 0.9897 },
-      { source: "webhook", direction: "outbound", deliveries: 214, ok: 202, failed: 12, success_rate: 0.9439, p95_ms: 2900, previous_deliveries: 150, previous_success_rate: 0.98 },
-      { source: "slack", direction: "outbound", deliveries: 101, ok: 99, failed: 2, success_rate: 0.9802, p95_ms: 420, previous_deliveries: 60, previous_success_rate: 1 },
-      { source: "email", direction: "outbound", deliveries: 57, ok: 45, failed: 12, success_rate: 0.7895, p95_ms: 300, previous_deliveries: 40, previous_success_rate: 0.95 },
+      { source: "github", direction: "inbound", deliveries: 912, ok: 905, failed: 7, success_rate: 0.9923, p50_ms: 140, p95_ms: 640, ...spark(s.length, 912, 7), previous_deliveries: 870, previous_success_rate: 0.9897 },
+      { source: "relay_jira", direction: "inbound", deliveries: 214, ok: 202, failed: 12, success_rate: 0.9439, p50_ms: 380, p95_ms: 2900, ...spark(s.length, 214, 12), previous_deliveries: 150, previous_success_rate: 0.98 },
+      { source: "slack", direction: "outbound", deliveries: 101, ok: 99, failed: 2, success_rate: 0.9802, p50_ms: 120, p95_ms: 420, ...spark(s.length, 101, 2), previous_deliveries: 60, previous_success_rate: 1 },
+      { source: "email", direction: "outbound", deliveries: 57, ok: 45, failed: 0, success_rate: 0.7895, p50_ms: 90, p95_ms: 300, ...spark(s.length, 57, 0), previous_deliveries: 40, previous_success_rate: 0.95 },
     ],
     reasons: [
       { code: "webhook_server_error", message: "Your webhook endpoint answered with a server error (5xx).", fix: "Check your endpoint's logs for this event id. CoderHelm retries for about a day.", count: 12, previous_count: 3, sources: ["webhook"] },
@@ -94,7 +113,8 @@ function few(period: string) {
     ...f,
     summary: { deliveries: 6, handled: 5, ignored: 0, failed: 1, success_rate: 0.8333, retried: 1, retried_ok: 0, retries: 2, p50_ms: 210, p95_ms: 900, p99_ms: 980 },
     previous: { deliveries: 0, handled: 0, ignored: 0, failed: 0, success_rate: null, retried: 0, retried_ok: 0, retries: 0, p50_ms: null, p95_ms: null, p99_ms: null },
-    series: s,
+    series: s.map((p) => ({ ...p, p50_ms: null, p95_ms: null })),
+    latency: [],
     sources: [{ source: "slack", direction: "outbound", deliveries: 6, ok: 5, failed: 1, success_rate: 0.8333, p95_ms: 900, previous_deliveries: 0, previous_success_rate: null }],
     reasons: [{ ...f.reasons[3], count: 1, previous_count: 0 }],
     events: [{ event: "run.finished", source: "slack", failed: 1 }],
@@ -108,7 +128,7 @@ interface Backend {
   lists: URLSearchParams[];
 }
 
-async function setup(page: Page, mode: "full" | "empty" | "few" = "full"): Promise<Backend> {
+async function setup(page: Page, mode: "full" | "empty" | "few" = "full", extra: Record<string, unknown> = {}): Promise<Backend> {
   const db: Backend = { asks: [], lists: [] };
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.pathname === "/runtime-config.js", (route) => route.fulfill({ contentType: "text/javascript", body: "window.__CODERHELM_CONFIG__ = {};" }));
@@ -123,7 +143,7 @@ async function setup(page: Page, mode: "full" | "empty" | "few" = "full"): Promi
     if (p === "/api/deliveries/analytics") {
       db.asks.push(u.searchParams);
       const period = u.searchParams.get("period") || "7d";
-      return json(route, mode === "empty" ? empty(period) : mode === "few" ? few(period) : full(period));
+      return json(route, { ...(mode === "empty" ? empty(period) : mode === "few" ? few(period) : full(period)), ...extra });
     }
     if (p === "/api/deliveries") {
       db.lists.push(u.searchParams);
@@ -166,6 +186,18 @@ for (const vp of [
     await expect(page.getByTestId("tile-latency")).toContainText("13% slower than the previous 7 days");
     await expect(page.getByTestId("chart-volume").locator(".recharts-bar-rectangle").first()).toBeVisible();
     await expect(page.getByTestId("chart-rate").locator(".recharts-line-curve")).toBeVisible();
+    // How long deliveries took: the median and the slowest 5%, one line each.
+    await expect(page.getByTestId("chart-latency").locator(".recharts-line-curve")).toHaveCount(2);
+    await expect(page.getByTestId("chart-latency")).toContainText("Typical (median)");
+    await expect(page.getByTestId("chart-latency")).toContainText("Slowest 5%");
+    // The distribution starts at the first bucket with anything and ends at the last.
+    await expect(page.getByTestId("chart-distribution").locator(".recharts-bar-rectangle").first()).toBeVisible();
+    await expect(page.getByTestId("chart-distribution")).toContainText("25 ms to 50 ms");
+    // Every source has a trend, with a mark on the buckets that had a failure.
+    await expect(page.getByTestId("source-row").filter({ visible: true })).toHaveCount(4);
+    await expect(page.getByTestId("sparkline").filter({ visible: true })).toHaveCount(4);
+    await expect(page.getByRole("img", { name: /Jira relay: deliveries per day, 12 failed/ }).filter({ visible: true })).toHaveCount(1);
+    await expect(page.getByRole("img", { name: /Email: deliveries per day$/ }).filter({ visible: true }).locator("[data-testid=sparkline-failure]")).toHaveCount(0);
     await expect(page.getByTestId("reason-row")).toHaveCount(4);
     await expect(page.getByTestId("reason-row").first()).toContainText("server error (5xx)");
     await expect(page.getByTestId("reason-row").first()).toContainText("3 in the previous 7 days");
@@ -275,5 +307,49 @@ for (const vp of [
     expect(wide).toBeLessThanOrEqual(1);
     await page.waitForTimeout(400);
     await shot(page, `delivery-overview-few-${vp.name}`);
+  });
+}
+
+test("the latency charts have tables with the same numbers", async ({ page }) => {
+  await setup(page);
+  await page.goto("/settings/deliveries/?view=overview");
+  await expect(page.getByTestId("chart-latency")).toBeVisible();
+  await page.getByRole("button", { name: "Show table: How long deliveries took" }).click();
+  await expect(page.locator('[aria-label="How long deliveries took over time"]').first()).toContainText("Typical (median)");
+  await page.getByRole("button", { name: "Show table: Latency distribution" }).click();
+  const dist = page.locator('[aria-label="Latency distribution"]').first();
+  await expect(dist).toContainText("Up to 25 ms");
+  await expect(dist).toContainText("25 ms to 50 ms");
+  await expect(dist).toContainText(/Over \S/);
+});
+
+test("no timed deliveries: the latency charts say so instead of drawing nothing", async ({ page }) => {
+  await setup(page, "few");
+  await page.goto("/settings/deliveries/?view=overview");
+  await expect(page.getByTestId("tile-success")).toBeVisible();
+  await expect(page.getByTestId("latency-empty")).toBeVisible();
+  await expect(page.getByTestId("distribution-empty")).toBeVisible();
+});
+
+for (const form of ["native", "config", null] as const) {
+  test(`the sign-up email note fits how the install was made (${form ?? "older install"})`, async ({ page }) => {
+    await setup(page, "full", {
+      email: {
+        sender: "relay", from: "2026-10-27", to: "2026-11-02",
+        kinds: [], totals: { kind: "all", label: "All", sends: 10, deliveries: 10, bounces: 0, complaints: 0, rejections: 0 },
+        last_send_at: null, last_delivery_at: null, last_bounce_at: null, last_complaint_at: null,
+        cognito_sender: "cognito_default", cognito_daily_limit: 50,
+        ...(form === null ? {} : { install_form: form }),
+      },
+    });
+    await page.goto("/settings/deliveries/?view=overview");
+    const note = page.getByTestId("overview-email-cognito");
+    await expect(note).toContainText("about 50 a day");
+    if (form === "native") {
+      await expect(note).toContainText("enough for a small team");
+      await expect(note).not.toContainText("cognitoUsesSes");
+    } else {
+      await expect(note).toContainText("email.cognitoUsesSes");
+    }
   });
 }
