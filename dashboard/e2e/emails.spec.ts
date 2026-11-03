@@ -38,6 +38,37 @@ function emails(state: { weekly: boolean; welcome: boolean; transport: "ses" | "
   };
 }
 
+// The sender name page, worked out the way the gateway does for the names
+// used here (sender_view in email_settings.rs).
+function sender(state: { transport: "ses" | "coderhelm"; sender_name: string; organization: string }) {
+  const label = state.organization || state.sender_name.replace(/ CoderHelm$/, "");
+  return {
+    sender_name: state.sender_name,
+    organization: state.organization,
+    max: { sender_name: 64, organization: 40 },
+    suffix: "CoderHelm",
+    transport: state.transport,
+    ses: {
+      from_address: "helm@example.org",
+      display_name: state.sender_name || (state.organization ? `${state.organization} CoderHelm` : "acme-example CoderHelm"),
+      from: "",
+      subject_prefix: `${label || "acme-example"} CoderHelm: `,
+    },
+    relay: {
+      from_address: state.transport === "coderhelm" ? "notifications@notify.coderhelm.com" : null,
+      display_name: `${label || "acme-example"} CoderHelm`,
+      subject_prefix: `${label || "acme-example"} CoderHelm: `,
+      organization_used: !!label,
+    },
+    fallback: {
+      ses_display_name: "acme-example CoderHelm",
+      ses_subject_prefix: "acme-example CoderHelm: ",
+      relay_display_name: "acme-example CoderHelm",
+      relay_subject_prefix: "acme-example CoderHelm: ",
+    },
+  };
+}
+
 async function shot(page: Page, name: string) {
   fs.mkdirSync(SHOTS_DIR, { recursive: true });
   await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
@@ -55,8 +86,9 @@ async function shot(page: Page, name: string) {
 const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 
 async function selfHostInstall(page: Page, opts: { registered?: boolean; platformAdmin?: boolean } = {}) {
-  const state = { weekly: false, welcome: false, transport: "ses" as "ses" | "coderhelm", registered: opts.registered ?? true };
+  const state = { weekly: false, welcome: false, transport: "ses" as "ses" | "coderhelm", registered: opts.registered ?? true, sender_name: "", organization: "" };
   const puts: Record<string, unknown>[] = [];
+  const senderPuts: Record<string, string>[] = [];
   await page.route((url) => url.pathname === "/runtime-config.js", (route) =>
     route.fulfill({ contentType: "text/javascript", body: `window.__CODERHELM_CONFIG__ = ${JSON.stringify({ selfHosted: true })};` }),
   );
@@ -70,6 +102,18 @@ async function selfHostInstall(page: Page, opts: { registered?: boolean; platfor
     if (p === "/api/usage") return json(route, { month: "2026-10", total_tokens: 0, tokens_in: 0, tokens_out: 0, total_runs: 0, max_tokens: 0 });
     if (p === "/api/banners") return json(route, { banners: [] });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "acme-example", status: "active", current: true }] });
+    if (p === "/api/system/emails/sender") {
+      if (req.method() === "PUT") {
+        const body = JSON.parse(req.postData() || "{}");
+        senderPuts.push(body);
+        if (/support/i.test(body.organization ?? "")) {
+          return json(route, { code: "bad_request", error: "Use up to 40 letters, digits, spaces and - . & ' with no word that reads as CoderHelm's own mail." }, 400);
+        }
+        if (body.sender_name !== undefined) state.sender_name = body.sender_name;
+        if (body.organization !== undefined) state.organization = body.organization;
+      }
+      return json(route, sender(state));
+    }
     if (p === "/api/system/emails") {
       if (req.method() === "PUT") {
         const body = JSON.parse(req.postData() || "{}");
@@ -82,7 +126,7 @@ async function selfHostInstall(page: Page, opts: { registered?: boolean; platfor
     }
     return json(route, { error: `Not mocked: ${p}` }, 404);
   });
-  return { state, puts };
+  return { state, puts, senderPuts };
 }
 
 test("Settings, Emails: optional emails start off, essential ones are listed, the admin turns one on", async ({ page }) => {
@@ -126,6 +170,52 @@ test("Settings, Emails: Coderhelm's mail service needs the install registered fi
   await page.goto("/settings/emails");
   await expect(page.getByTestId("transport-coderhelm").getByRole("radio")).toBeDisabled();
   await expect(page.getByTestId("relay-trust").getByRole("link", { name: "System, Hybrid" })).toBeVisible();
+});
+
+test("Settings, Emails: the sender name, with a preview of the From line and a subject", async ({ page }) => {
+  const { senderPuts } = await selfHostInstall(page);
+  await page.goto("/settings/emails");
+  const from = page.getByTestId("sender-preview-from");
+  const subject = page.getByTestId("sender-preview-subject");
+  const saveBar = page.getByTestId("sender-save-bar");
+  // Nothing set: the install's own address names it, through its own SES.
+  await expect(from).toHaveText("acme-example CoderHelm <helm@example.org>");
+  await expect(page.getByTestId("sender-relay-note")).toHaveCount(0);
+
+  // The preview follows what is typed, before saving.
+  const name = page.getByRole("textbox", { name: "Sender name" });
+  const org = page.getByRole("textbox", { name: "Organization name" });
+  await name.fill("Acme Robots");
+  await expect(from).toHaveText("Acme Robots <helm@example.org>");
+  await expect(subject).toHaveText("Acme Robots CoderHelm: update to v0.9.0 needs your OK");
+  await org.fill("Acme");
+  await expect(subject).toHaveText("Acme CoderHelm: update to v0.9.0 needs your OK");
+  await shot(page, "settings-emails-sender");
+
+  // A name that would break the header is caught before it is sent.
+  await name.fill('Acme "Robots"');
+  await expect(page.getByTestId("sender-name-field").getByRole("alert")).toContainText("quotes");
+  await saveBar.getByRole("button", { name: "Save changes" }).click();
+  await expect(saveBar).toContainText("quotes");
+  expect(senderPuts).toEqual([]);
+
+  await name.fill("Acme Robots");
+  await saveBar.getByRole("button", { name: "Save changes" }).click();
+  await expect(saveBar).toHaveCount(0);
+  expect(senderPuts).toEqual([{ sender_name: "Acme Robots", organization: "Acme" }]);
+  await expect(from).toHaveText("Acme Robots <helm@example.org>");
+
+  // Through Coderhelm the name always ends in the product name, and the page says why.
+  await page.getByTestId("transport-coderhelm").getByRole("radio").check();
+  await expect(page.getByTestId("sender-preview")).toContainText("through Coderhelm");
+  await expect(from).toHaveText("Acme CoderHelm <notifications@notify.coderhelm.com>");
+  await expect(page.getByTestId("sender-relay-note")).toContainText("always ends in");
+  await shot(page, "settings-emails-sender-relay");
+
+  // A name the server refuses keeps the bar up with the reason.
+  await org.fill("Acme Support");
+  await saveBar.getByRole("button", { name: "Save changes" }).click();
+  await expect(saveBar).toContainText("reads as");
 });
 
 test("Settings, Emails is only for install admins", async ({ page }) => {

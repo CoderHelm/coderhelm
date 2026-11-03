@@ -12,12 +12,14 @@ import { Redirect } from "@/components/redirect";
 import { StatusPill } from "@/components/status-pill";
 import { linkButton, secondaryButton } from "@/components/ui";
 import { SettingsRow, SettingsSection, Switch } from "@/components/settings";
+import { SenderName } from "./sender-name";
 
 /**
  * Settings, then Emails (self-hosted installs, install admins): which
  * optional emails the install sends (all off until an admin turns them on),
- * the essential ones and why they are needed, and how email leaves: the
- * install's own Amazon SES, or Coderhelm's mail service. Each person's own
+ * the essential ones and why they are needed, how email leaves (the
+ * install's own Amazon SES, or Coderhelm's mail service) and who it says it
+ * is from. Each person's own
  * unsubscribe (Settings, Notifications) still applies on top.
  */
 export default function EmailsPage() {
@@ -226,6 +228,8 @@ function Emails() {
             </p>
           )}
         </section>
+
+        <SenderName transport={data.transport} />
 
         <SettingsSection
           id="essential"
