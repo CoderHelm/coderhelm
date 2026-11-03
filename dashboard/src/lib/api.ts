@@ -290,17 +290,6 @@ export const api = {
       method: "POST",
       body: JSON.stringify(change),
     }),
-  listAllowlist: () => request<{ emails: string[] }>("/api/allowlist"),
-  addToAllowlist: (email: string) =>
-    request<{ status: string; email: string }>("/api/allowlist", {
-      method: "POST",
-      body: JSON.stringify({ email }),
-    }),
-  removeFromAllowlist: (email: string) =>
-    request<{ status: string }>("/api/allowlist", {
-      method: "DELETE",
-      body: JSON.stringify({ email }),
-    }),
 
   // Health
   getHealth: () => request<HealthCheck>("/api/health"),

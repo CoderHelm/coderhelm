@@ -328,40 +328,6 @@ test("admin page is closed to normal users", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test("admin allowlist adds once in lower case and asks before removing", async ({ page }) => {
-  const errors = watchConsole(page);
-  const db = await mockApi(page, { email: "admin@coderhelm.com", role: "owner" });
-  await page.goto("/admin");
-  await expect(page.getByRole("heading", { name: "Platform admin" })).toBeVisible();
-  // Teams are one row per organization, the busiest first.
-  const orgs = page.getByTestId("admin-org");
-  await expect(orgs).toHaveCount(2);
-  await expect(orgs.first()).toContainText("beta-co");
-  await orgs.first().getByRole("button", { name: "Show teams of beta-co" }).click();
-  await expect(page.getByRole("list", { name: "Teams of beta-co" })).toContainText("$310.50 this month");
-  // The allowlist has its own tab.
-  await page.getByRole("navigation", { name: "Admin views" }).getByRole("link", { name: /Allowlist/ }).click();
-  await expect(page).toHaveURL(/tab=allowlist/);
-  await expect(page.getByText("first@example.com")).toBeVisible();
-  const input = page.getByLabel("Email or domain to allow");
-  // Bug: the raw text was appended, so "First@Example.com" showed as a second entry.
-  await input.fill("First@Example.com");
-  await page.getByRole("button", { name: "Add" }).click();
-  await expect(page.getByRole("list", { name: "Allowed emails" }).getByRole("listitem")).toHaveCount(2);
-  // The box clears when the first add finishes; type the next one after that.
-  await expect(input).toHaveValue("");
-  await input.fill("New@Example.com");
-  await input.press("Enter");
-  await expect(page.getByText("new@example.com", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Remove new@example.com" }).click();
-  await expect(page.getByText("Remove from the allowlist?")).toBeVisible();
-  await page.getByRole("button", { name: "Remove", exact: true }).click();
-  await expect(page.getByText("new@example.com", { exact: true })).toHaveCount(0);
-  expect(db.calls).toContain("DELETE /api/allowlist");
-  await shot(page, "audit-admin");
-  expect(errors).toEqual([]);
-});
-
 test("admin teams: search, status and sort sit above the table and live in the address", async ({ page }) => {
   const errors = watchConsole(page);
   await mockApi(page, { email: "admin@coderhelm.com", role: "owner" });
@@ -379,15 +345,6 @@ test("admin teams: search, status and sort sit above the table and live in the a
   await expect(page.getByRole("group", { name: "Show teams" }).getByRole("button", { name: /^All\s*0$/ })).toBeVisible();
   expect(errors).toEqual([]);
 });
-
-test("admin allowlist load failure is shown, not presented as an empty list", async ({ page }) => {
-  await mockApi(page, { email: "admin@coderhelm.com", role: "owner", fail: new Set(["/api/allowlist"]) });
-  await page.goto("/admin?tab=allowlist");
-  await expect(page.getByText("Couldn't load the allowlist")).toBeVisible();
-  await expect(page.getByText("nobody can sign up")).toHaveCount(0);
-});
-
-// ── Code graph ────────────────────────────────────────────────────────────
 
 test("code graph shows stats, search and the explorer", async ({ page }) => {
   const errors = watchConsole(page);
