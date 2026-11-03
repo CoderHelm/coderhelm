@@ -532,5 +532,9 @@ test("System: a one-stack install shows the prepared change set and links to it 
   await expect(page.getByTestId("native-update-summary")).toContainText("Nothing is replaced.");
   await expect(card).toContainText("choose Execute");
   await expect(page.getByTestId("native-update-link")).toHaveAttribute("href", link);
-  await expect(page.getByRole("button", { name: "Prepare the update to v2.0.0" })).toBeVisible();
+  // The prepared update is the one thing to do: no second "Prepare" button,
+  // and it is never listed as blocking itself.
+  await expect(page.getByRole("button", { name: "Prepare the update to v2.0.0" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Review and apply in AWS" })).toBeVisible();
+  await expect(page.locator("#update-blocked")).toHaveCount(0);
 });
