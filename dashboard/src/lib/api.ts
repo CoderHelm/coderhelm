@@ -857,6 +857,13 @@ export const api = {
     request<{ status: string }>("/api/users/2fa/app/verify", { method: "POST", body: JSON.stringify({ code }) }),
   appTwoFactorDisable: (code: string) =>
     request<{ status: string }>("/api/users/2fa/app", { method: "DELETE", body: JSON.stringify({ code }) }),
+  replaceTwoFactorStart: (code: string, password?: string) =>
+    request<{ secret: string; qr_uri: string; expires_in: number }>("/api/users/2fa/replace/start", {
+      method: "POST",
+      body: JSON.stringify(password ? { code, password } : { code }),
+    }),
+  replaceTwoFactorVerify: (code: string) =>
+    request<{ status: string }>("/api/users/2fa/replace/verify", { method: "POST", body: JSON.stringify({ code }) }),
   verifySecondStep: (code: string) =>
     request<{ status: string; team_id: string }>("/auth/2fa/verify", { method: "POST", body: JSON.stringify({ code }) }),
   signInSettings: () => request<SignInSettings>("/api/sign-in"),

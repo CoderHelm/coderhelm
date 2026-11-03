@@ -14,6 +14,7 @@ import { ExternalLinkIcon } from "@/components/icons";
 import { buttonClass, dangerButton, ghostButton, primaryButton } from "@/components/ui";
 import { Code, Field, SettingsSection } from "@/components/settings";
 import { TwoFactorSetup } from "@/components/two-factor-setup";
+import { ReplaceAuthenticator } from "@/components/replace-authenticator";
 import { isSelfHosted } from "@/lib/runtime-config";
 import type { MyTwoFactor } from "@/lib/api";
 
@@ -55,6 +56,7 @@ export default function SecurityPage() {
   // a person has one second factor, asked for however they sign in.
   const [mine, setMine] = useState<MyTwoFactor | null>(null);
   const [appStep, setAppStep] = useState<"idle" | "setup" | "off">("idle");
+  const [replacing, setReplacing] = useState(false);
   const [offCode, setOffCode] = useState("");
   const loadMine = useCallback(() => {
     api.myTwoFactor().then(setMine, () => setMine(null));
@@ -82,9 +84,24 @@ export default function SecurityPage() {
   const isOAuth = authProvider === "github" || authProvider === "google";
   // It stays on while a team they're on (self-hosted: the organization) requires it.
   const mustKeep = !!(mine?.must_keep ?? mine?.required);
+  // The code is this Coderhelm's own (set up after Google or GitHub, or
+  // moved here by Replace) or on the password account.
+  const appCode = mine?.set_up === "app";
+  const stepOn = mfaEnabled || appCode || mine?.set_up === "cognito";
   const keepWords = isSelfHosted()
     ? "Your organization requires it, so it stays on."
     : "A team you're on requires it, so it stays on.";
+  const keepOrReplace = `${keepWords} You can still move it to a new phone with Replace authenticator app.`;
+  const replaced = () => {
+    setReplacing(false);
+    toast("Authenticator app replaced. Your old app no longer works.");
+    loadMine();
+  };
+  const replaceButton = (
+    <button type="button" onClick={() => setReplacing(true)} className={buttonClass("secondary")} data-testid="replace-app">
+      Replace authenticator app
+    </button>
+  );
   const header = (
     <div className="mb-6">
       <PageHeader title="Password and two step sign in" lead={`Your password and ${TWO_STEP.toLowerCase()}.`} />
@@ -218,6 +235,39 @@ export default function SecurityPage() {
     setMfaPassword("");
   };
 
+  const appOffForm = (
+<form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        try {
+                          await api.appTwoFactorDisable(offCode);
+                          setAppStep("idle");
+                          setOffCode("");
+                          toast("Two-factor sign-in is off");
+                          loadMine();
+                        } catch (err) {
+                          toast(err instanceof Error ? err.message : "That didn't work. Try again.", "error");
+                        }
+                      }}
+                      className="space-y-4"
+                    >
+                      <Field
+                        id="app-off-code"
+                        label="A code from the app, to check it's you"
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        controlClassName="!w-40 text-center text-lg tracking-widest"
+                        value={offCode}
+                        onChange={(e) => setOffCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <button type="submit" disabled={offCode.length < 6} className={dangerButton}>Turn off</button>
+                        <button type="button" onClick={() => setAppStep("idle")} className={ghostButton}>Cancel</button>
+                      </div>
+                    </form>
+  );
+
   if (isOAuth) {
     const provider = PROVIDERS[authProvider] ?? { name: authProvider, settings: "" };
     return (
@@ -281,46 +331,23 @@ export default function SecurityPage() {
                       }}
                     />
                   )}
-                  {mine.set_up === "app" && mustKeep && (
-                    <p className="text-sm text-zinc-400">{keepWords}</p>
+                  {mine.set_up === "app" && replacing && (
+                    <ReplaceAuthenticator needsPassword={false} onDone={replaced} onCancel={() => setReplacing(false)} />
                   )}
-                  {mine.set_up === "app" && !mustKeep && appStep !== "off" && (
-                    <button type="button" onClick={() => setAppStep("off")} className={dangerButton}>
-                      Turn off two-factor sign-in
-                    </button>
+                  {mine.set_up === "app" && !replacing && mustKeep && (
+                    <p className="text-sm text-zinc-400" data-testid="keep-or-replace">{keepOrReplace}</p>
                   )}
-                  {mine.set_up === "app" && appStep === "off" && (
-                    <form
-                      onSubmit={async (e) => {
-                        e.preventDefault();
-                        try {
-                          await api.appTwoFactorDisable(offCode);
-                          setAppStep("idle");
-                          setOffCode("");
-                          toast("Two-factor sign-in is off");
-                          loadMine();
-                        } catch (err) {
-                          toast(err instanceof Error ? err.message : "That didn't work. Try again.", "error");
-                        }
-                      }}
-                      className="space-y-4"
-                    >
-                      <Field
-                        id="app-off-code"
-                        label="A code from the app, to check it's you"
-                        type="text"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        controlClassName="!w-40 text-center text-lg tracking-widest"
-                        value={offCode}
-                        onChange={(e) => setOffCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                      />
-                      <div className="flex flex-wrap gap-2">
-                        <button type="submit" disabled={offCode.length < 6} className={dangerButton}>Turn off</button>
-                        <button type="button" onClick={() => setAppStep("idle")} className={ghostButton}>Cancel</button>
-                      </div>
-                    </form>
+                  {mine.set_up === "app" && !replacing && appStep !== "off" && (
+                    <div className="flex flex-wrap gap-2">
+                      {replaceButton}
+                      {!mustKeep && (
+                        <button type="button" onClick={() => setAppStep("off")} className={dangerButton}>
+                          Turn off two-factor sign-in
+                        </button>
+                      )}
+                    </div>
                   )}
+                  {mine.set_up === "app" && appStep === "off" && appOffForm}
                 </div>
               </SettingsSection>
             </div>
@@ -391,27 +418,37 @@ export default function SecurityPage() {
         >
           <div className="space-y-4 px-4 py-4">
             <p className="flex items-center gap-2 text-sm" data-testid="two-step-status">
-              <StatusDot tone={mfaEnabled ? "success" : "muted"} />
-              <span className={mfaEnabled ? "text-zinc-200" : "text-zinc-400"}>{mfaEnabled ? `${TWO_STEP} is on` : `${TWO_STEP} is off`}</span>
+              <StatusDot tone={stepOn ? "success" : "muted"} />
+              <span className={stepOn ? "text-zinc-200" : "text-zinc-400"}>{stepOn ? `${TWO_STEP} is on` : `${TWO_STEP} is off`}</span>
             </p>
 
-            {mfaStep === "idle" && !mfaEnabled && mine?.set_up === "app" && (
-              <p className="text-sm text-zinc-300" data-testid="code-from-app">
-                You have two-factor sign-in with an authenticator app, set up after Google or GitHub. Signing in with your password asks for that code too.
-              </p>
+            {mfaStep === "idle" && stepOn && replacing && (
+              <ReplaceAuthenticator needsPassword={!appCode} onDone={replaced} onCancel={() => setReplacing(false)} />
             )}
 
-            {mfaStep === "idle" && !mfaEnabled && mine?.set_up !== "app" && (
+            {mfaStep === "idle" && stepOn && !replacing && (
+              <div className="flex flex-wrap gap-2">{replaceButton}</div>
+            )}
+
+            {mfaStep === "idle" && !stepOn && (
               <button type="button" onClick={() => setMfaStep("password")} disabled={mfaLoading} className={primaryButton}>
                 Turn on {TWO_STEP.toLowerCase()}
               </button>
             )}
 
-            {mfaStep === "idle" && mfaEnabled && mustKeep && (
-              <p className="text-sm text-zinc-400">{keepWords}</p>
+            {mfaStep === "idle" && stepOn && !replacing && mustKeep && (
+              <p className="text-sm text-zinc-400" data-testid="keep-or-replace">{keepOrReplace}</p>
             )}
 
-            {mfaStep === "idle" && mfaEnabled && !mustKeep && (
+            {mfaStep === "idle" && appCode && !replacing && !mustKeep && appStep !== "off" && (
+              <button type="button" onClick={() => setAppStep("off")} className={dangerButton}>
+                Turn off {TWO_STEP.toLowerCase()}
+              </button>
+            )}
+
+            {mfaStep === "idle" && appCode && appStep === "off" && appOffForm}
+
+            {mfaStep === "idle" && mfaEnabled && !appCode && !replacing && !mustKeep && (
               <button type="button" onClick={handleMfaDisable} disabled={mfaLoading} className={dangerButton}>
                 {mfaLoading ? "Turning off…" : `Turn off ${TWO_STEP.toLowerCase()}`}
               </button>
