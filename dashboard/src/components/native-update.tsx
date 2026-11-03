@@ -2,6 +2,7 @@
 
 import type { NativeUpdate } from "@/lib/api";
 import { Callout } from "@/components/callout";
+import { primaryButton } from "@/components/ui";
 
 /**
  * A native install updates as a CloudFormation stack update. The updater
@@ -25,12 +26,18 @@ export function NativeUpdateCard({ native }: { native: NativeUpdate }) {
         </p>
         {waiting ? (
           <p className="mt-2">
-            {native.auto_apply ? "Auto-update applies it in the maintenance window." : "Open it in the AWS console, check the changes, and choose Execute. It runs with your own AWS permissions."}
+            {native.auto_apply ? "Auto-update applies it in the maintenance window." : "One step left: open it in the AWS console, check the changes, and choose Execute. It runs with your own AWS permissions."}
           </p>
+        ) : p.status === "preparing" ? (
+          <p className="mt-2">Nothing to do yet. Preparing takes a few minutes; then this says it is ready to apply.</p>
         ) : null}
         {p.reason && p.status !== "review" ? <p className="mt-2 text-zinc-400">{p.reason}</p> : null}
-        <p className="mt-2">
-          <a href={p.link} target="_blank" rel="noopener noreferrer" className="font-medium underline" data-testid="native-update-link">Open the change set in the AWS console</a>
+        <p className="mt-3">
+          {waiting && !native.auto_apply ? (
+            <a href={p.link} target="_blank" rel="noopener noreferrer" className={primaryButton} data-testid="native-update-link">Review and apply in AWS</a>
+          ) : (
+            <a href={p.link} target="_blank" rel="noopener noreferrer" className="font-medium underline" data-testid="native-update-link">Open the change set in the AWS console</a>
+          )}
         </p>
       </Callout>
     </div>

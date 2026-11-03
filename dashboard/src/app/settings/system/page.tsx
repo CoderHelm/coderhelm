@@ -166,7 +166,11 @@ function System() {
   const latest = data.latest;
   const history = data.history ?? [];
   const canRollBack = history.some((h) => h.status === "succeeded" && h.from_version);
-  const blocked = !!pre?.blockers.some((b) => b.severity === "block");
+  // A prepared or applying update is shown once, in its own card, with the
+  // one thing to do; it is never also listed as something blocking itself.
+  const pending = data.native?.pending ?? null;
+  const shownBlockers = (pre?.blockers ?? []).filter((b) => !(pending && b.key === "running"));
+  const blocked = shownBlockers.some((b) => b.severity === "block");
 
   const save = async () => {
     try {
@@ -267,18 +271,20 @@ function System() {
                 <Markdown>{latest.notes || "No notes for this release."}</Markdown>
               </div>
               <div className="mt-3 flex flex-wrap gap-3">
-                <button type="button" className={primaryButton} disabled={!!busy || data.running || blocked} onClick={() => start("update")} aria-describedby={blocked ? "update-blocked" : undefined}>
-                  {busy === "update" ? "Starting…" : data.native ? `Prepare the update to ${latest.version}` : `Update now to ${latest.version}`}
-                </button>
+                {!pending && (
+                  <button type="button" className={primaryButton} disabled={!!busy || data.running || blocked} onClick={() => start("update")} aria-describedby={blocked ? "update-blocked" : undefined}>
+                    {busy === "update" ? "Starting…" : data.native ? `Prepare the update to ${latest.version}` : `Update now to ${latest.version}`}
+                  </button>
+                )}
                 {latest.url && <a href={latest.url} target="_blank" rel="noopener noreferrer" className={linkButton}>Release page</a>}
               </div>
-              {blocked && <p id="update-blocked" className="mt-2 text-sm text-red-300">Fix what blocks the update under Update readiness first.</p>}
+              {!pending && blocked && <p id="update-blocked" className="mt-2 text-sm text-red-300">Fix what blocks the update under Update readiness first.</p>}
             </div>
           )}
         </SettingsSection>
 
         <SettingsSection id="readiness" title="Update readiness" description="What an update checks before it starts, run now: anything that would stop it, and anything to read first.">
-          <Readiness pre={pre} state={preState} onRecheck={loadPreflight} />
+          <Readiness pre={pre && { ...pre, blockers: shownBlockers }} state={preState} onRecheck={loadPreflight} />
         </SettingsSection>
 
         <SettingsSection id="models" title="Models" description="How this install calls Claude: Amazon Bedrock in this AWS account, or each team's Anthropic API key. Change it at any time.">
