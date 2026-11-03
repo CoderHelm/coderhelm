@@ -258,9 +258,11 @@ test("Deliveries shows GitHub and Jira relay rows and email by kind, with Cognit
   await expect(page.getByTestId("overview-email-cognito")).toContainText("about 50 a day");
 });
 
-test("a self-hosted install's sign-in has no Google button; the hosted service keeps it", async ({ page }) => {
+test("a self-hosted install's sign-in has no Google button, and GitHub only when the API lists it", async ({ page }) => {
   await setup(page, SELF, { signedIn: false });
   await page.goto("/");
-  await expect(page.getByRole("link", { name: "Continue with GitHub" })).toBeVisible();
+  await expect(page.getByLabel("Email")).toBeVisible();
+  // This mock has no /auth/methods: a self-hosted install then offers email and password only.
+  await expect(page.getByRole("link", { name: "Continue with GitHub" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Continue with Google" })).toHaveCount(0);
 });
