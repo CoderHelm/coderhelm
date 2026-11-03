@@ -233,6 +233,8 @@ export const REGIONS: { id: string; name: string }[] = [
 /** Everything the guide remembers (localStorage). The setup key never goes in the URL. */
 export interface InstallState {
   statusId: string;
+  /** The key the install reports progress with (to CoderHelm); only this browser reads it back. Never in the URL. */
+  statusKey: string;
   setupToken: string;
   region: string;
   stage: string;
@@ -323,6 +325,7 @@ export function randomId(length: number, alphabet = 'abcdefghijklmnopqrstuvwxyz0
 export function newState(over: Partial<InstallState> = {}): InstallState {
   return {
     statusId: randomId(16),
+    statusKey: randomId(40, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'),
     setupToken: randomId(40, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'),
     region: 'us-east-1',
     stage: 'prod',
@@ -443,6 +446,8 @@ export function quickCreateUrl(s: InstallState): string {
     ['param_SetupToken', s.setupToken],
   ];
   // The optional ones only when set, so the link stays short and older templates still open.
+  // Progress through CoderHelm only with hybrid: the private guide sends CoderHelm nothing.
+  if (s.setup === 'hybrid') params.push(['param_StatusKey', s.statusKey]);
   if (s.domainChoice === 'own' && s.hostname) params.push(['param_Hostname', cleanHostname(s.hostname)]);
   if (s.emailTransport === 'coderhelm') params.push(['param_EmailTransport', 'coderhelm']);
   else if (s.emailFrom?.trim()) params.push(['param_EmailFrom', s.emailFrom.trim().toLowerCase()]);
@@ -458,9 +463,75 @@ export function quickCreateUrl(s: InstallState): string {
   return `https://${s.region}.console.aws.amazon.com/cloudformation/home?region=${s.region}#/stacks/create/review?${q}`;
 }
 
-/** The progress file the installer keeps in the person's own bucket. */
+/**
+ * An older release's progress file, in a public bucket in the person's own
+ * account. Read only when CoderHelm has no report for this id yet (an older
+ * release never sends one); a release that reports to CoderHelm has no public file.
+ */
 export function statusFileUrl(s: Pick<InstallState, 'statusId' | 'region'>): string {
   return `https://coderhelm-setup-${s.statusId}.s3.${s.region}.amazonaws.com/status.json`;
+}
+
+/** Where the install reports progress, on hosted CoderHelm (routes::install_progress). */
+export const PROGRESS_URL = `${HOSTED_API}/api/install-progress`;
+
+export async function sha256Hex(text: string): Promise<string> {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(d), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Registers this guide's progress id with its key's hash, before AWS opens:
+ * the install then reports with the key, and only a browser with the key
+ * reads it back. Nothing in the person's account is public.
+ */
+export async function registerProgress(s: Pick<InstallState, 'statusId' | 'statusKey' | 'setup'>): Promise<boolean> {
+  if (s.setup !== 'hybrid') return false;
+  try {
+    const r = await fetch(PROGRESS_URL, {
+      method: 'POST',
+      credentials: 'omit',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: s.statusId, key_hash: await sha256Hex(s.statusKey) }),
+    });
+    return r.status === 201 || r.status === 409;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The install's latest report from CoderHelm: the document, or null when
+ * there is none yet (an older release never reports: read its file instead).
+ */
+export async function readProgress(s: Pick<InstallState, 'statusId' | 'statusKey'>): Promise<unknown | null> {
+  try {
+    const r = await fetch(`${PROGRESS_URL}/${s.statusId}/read`, {
+      method: 'POST',
+      cache: 'no-store',
+      credentials: 'omit',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ key: s.statusKey }),
+    });
+    if (!r.ok) return null;
+    const body = (await r.json()) as { doc?: unknown };
+    return body?.doc ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The progress document: CoderHelm's copy first (hybrid only), an older
+ * release's public file only when there is none. The private guide never
+ * asks CoderHelm; with a release that has no public file it asks for the
+ * address from the stack's Outputs.
+ */
+export async function progressDoc(s: Pick<InstallState, 'statusId' | 'statusKey' | 'region' | 'setup'>, getJson: (url: string) => Promise<{ ok: boolean; body: unknown }>): Promise<unknown | null> {
+  const hosted = s.setup === 'hybrid' ? await readProgress(s) : null;
+  if (hosted) return hosted;
+  const old = await getJson(statusFileUrl(s));
+  return old.ok ? old.body : null;
 }
 
 export function stacksConsoleUrl(region: string): string {

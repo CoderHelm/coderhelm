@@ -28,6 +28,10 @@ interface Mock {
   githubTag?: string | null;
   /** Release templates in the bucket (default: v0.7.0's). */
   templates?: string[];
+  /** CoderHelm's copy of the progress (hybrid): undefined or null = no report yet, as for an older release. */
+  hosted?: Json | null;
+  /** Bodies the guide sent to CoderHelm's progress routes. */
+  progressCalls?: { path: string; body: Json }[];
 }
 
 /**
@@ -115,6 +119,13 @@ async function mock(page: Page, m: Mock) {
   await page.route(/^https:\/\/coderhelm-setup-[a-z0-9]{16}\.s3\.[a-z0-9-]+\.amazonaws\.com\/status\.json/, (r) =>
     m.status ? r.fulfill({ json: m.status, headers: CORS }) : r.fulfill({ status: 403, body: 'AccessDenied', headers: CORS }),
   );
+  // CoderHelm's progress routes (routes::install_progress in coderhelm-platform).
+  await page.route(/^https:\/\/api\.coderhelm\.com\/api\/install-progress(\/.*)?$/, (r) => {
+    const path = new URL(r.request().url()).pathname;
+    (m.progressCalls ??= []).push({ path, body: JSON.parse(r.request().postData() ?? '{}') });
+    if (path.endsWith('/read')) return r.fulfill({ json: { doc: m.hosted ?? null }, headers: CORS });
+    return r.fulfill({ status: 201, body: '', headers: CORS });
+  });
   await page.route(`${INSTALL}/api/setup/status**`, (r) => {
     if (m.setup === null) return r.abort('connectionrefused');
     if (typeof m.setup === 'number') return r.fulfill({ status: m.setup, body: '', headers: CORS });
@@ -166,6 +177,8 @@ const newMock = (over: Partial<Mock> = {}): Mock => ({ status: null, setup: null
 function assertPrivate(m: Mock) {
   for (const u of m.requests) {
     const h = new URL(u).hostname;
+    // CoderHelm only for the hybrid guide's progress, never anything else.
+    if (h === 'api.coderhelm.com' && new URL(u).pathname.startsWith('/api/install-progress')) continue;
     const ok = h === 'localhost' || h.endsWith('.amazonaws.com') || h === 'github.com' || h === 'api.github.com' || h === new URL(INSTALL).hostname || h === new URL(DOMAIN).hostname;
     expect(ok, `unexpected request to ${u}`).toBe(true);
   }
@@ -472,7 +485,7 @@ test('before launch: what the stack creates in the AWS account, the risks behind
   await expect(panel).not.toContainText('CodeBuild');
   // Nothing on the install page claims the old admin installer.
   expect(await page.locator('body').textContent()).not.toContain('AdministratorAccess');
-  await expect(panel).toContainText('coderhelm-setup-<id>');
+  await expect(panel).toContainText('No progress bucket and nothing public');
   await expect(panel).toContainText('No access for CoderHelm the company.');
   // The risks are folded until asked for, then name each one.
   const risks = panel.getByTestId('disclosure-risks');
@@ -483,11 +496,11 @@ test('before launch: what the stack creates in the AWS account, the risks behind
     'CoderHelm can act within its boundary.',
     'A malicious release could change CoderHelm.',
     'Deleting the stack keeps your data unless you say otherwise.',
-    'The progress file is public while the install runs.',
+    'Nothing in your account is public.',
     'The AWS link holds your one-time setup key.',
   ]) await expect(risks).toContainText(t);
   await expect(risks).toContainText('Auto-update is off unless you turn it on in More options.');
-  await expect(risks).toContainText('If your account blocks public access to S3, that\'s fine');
+  await expect(risks).toContainText('public progress bucket is deleted on the first update');
   // The full page, with every resource, role, risk and how to remove it.
   const link = panel.getByTestId('disclosure-page');
   await expect(link).toHaveAttribute('href', '/self-host/aws-account/');
@@ -1453,4 +1466,37 @@ test('the install says its CoderHelm address is live: the guide follows it befor
   await seeded(page, m, HYBRID_STATE);
   await expect.poll(() => new URL(page.url()).searchParams.get('url')).toBe(ADDRESS);
   await expect.poll(() => asked).toBeGreaterThan(0);
+});
+
+test('progress goes through CoderHelm with a key only this browser has; nothing is read from the account', async ({ page }) => {
+  const KEY = 'K'.repeat(40);
+  const m = newMock({ status: null, hosted: { schema: 1, phase: 'deploying', step: 2, steps: 10, part: { name: 'API', done: 5, total: 41 } } });
+  await seeded(page, m, { setup: 'hybrid', statusKey: KEY, domainChoice: 'aws', githubChoice: 'own', jiraChoice: 'own' });
+  await expect(page.getByTestId('part-progress')).toHaveText('· API: 5 of 41');
+  const read = m.progressCalls!.find((c) => c.path === `/api/install-progress/${ID}/read`)!;
+  expect(read.body).toEqual({ key: KEY });
+  expect(m.requests.some((u) => u.includes('/status.json'))).toBe(false);
+  expect(m.requests.some((u) => u.includes(KEY))).toBe(false);
+  // No report yet (an older release): the old public file is read as before.
+  m.hosted = null;
+  m.status = { schema: 1, phase: 'deploying', step: 3, steps: 10 };
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await expect(page.getByText('Part 3 of 10')).toBeVisible();
+  expect(m.requests.some((u) => u.includes('/status.json'))).toBe(true);
+});
+
+test('the private guide sends CoderHelm nothing: no key in the AWS link, no progress calls', async ({ page }) => {
+  const m = newMock({ status: null });
+  await mock(page, m);
+  await page.goto('/self-host/install/');
+  await page.locator('[data-setup="private"]').click();
+  await page.getByLabel('Your email').fill('ada@example.com');
+  await pickModels(page);
+  await page.getByTestId('launch').click();
+  const [link] = await opened(page);
+  expect(link).not.toContain('param_StatusKey');
+  await page.waitForTimeout(600);
+  expect(m.progressCalls ?? []).toEqual([]);
+  assertPrivate(m);
+  expect(m.requests.some((u) => new URL(u).hostname === 'api.coderhelm.com')).toBe(false);
 });

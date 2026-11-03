@@ -48,9 +48,9 @@ A Secrets Manager secret, `coderhelm/<name>/secrets`. CloudFormation makes it wi
 
 With **Install new releases by themselves** on, the stack adds `coderhelm-<name>-deploy-stack`, a role only CloudFormation can use, limited to resources named or tagged for this install, with its own copy of the boundary on it. The role and its copy are kept when you delete the stack (CloudFormation keeps using a stack's role, and a role can't delete itself); `leftovers` lists them and `--delete` removes them. The updater may hand it only to CloudFormation, and only for a change set on this stack from a published CoderHelm release template. With auto-update off (the default) there is no such role: an admin reviews each update's change set and applies it with their own permissions.
 
-### The progress bucket
+### Progress, and nothing public
 
-`coderhelm-setup-<id>`, with one file, `status.json`: the install's phase, a plain message and, at the end, its address. No emails, keys or account numbers. It is public if your account allows it, the file expires after 30 days, and the bucket is deleted with the stack.
+The stack reports its phase, a plain message and, at the end, its address to CoderHelm, with a key the install guide made in your browser. Only a browser with that key can read it back, and CoderHelm keeps it for 14 days. No emails, keys or account numbers are in it. Nothing in your account is public: releases before this one kept the progress in a public bucket, `coderhelm-setup-<id>`, which the install helper deletes on the stack's first update.
 
 ### CoderHelm itself
 
@@ -78,9 +78,9 @@ What reaches CoderHelm depends only on what you turn on:
 
 ## The setup key and the two links
 
-The install guide makes two random values and puts them in the link that opens AWS:
+The install guide makes three random values and puts them in the link that opens AWS:
 
-- **The progress ID** names the progress bucket. The guide's own link (`/self-host/install/?id=...`) holds only this ID, the region and the install name. It is not a secret: with it, someone can see the install's progress and address, nothing more.
+- **The progress ID and key** let the stack report its progress to CoderHelm and the guide read it back. The key is a hidden stack parameter (NoEcho) and stays in your browser. The guide's own link (`/self-host/install/?id=...`) holds only the ID, the region and the install name: without the key it shows nothing.
 - **The setup key** is one time. It lets the guide hand your new GitHub App's keys straight to your install. It stops working once the app exists. The stack parameter hides it (NoEcho).
 
 The AWS link holds the setup key and your email. Don't share that link or paste it anywhere.
@@ -106,9 +106,9 @@ If CoderHelm's release pipeline were ever broken into, a malicious release you a
 
 The stack parameter `KeepDataOnDelete` is `true` by default: deleting the stack keeps the tables, the data bucket, the KMS keys, the user pool and the secret. A first launch that fails and rolls back still removes everything it made. To delete the data too, set `KeepDataOnDelete` to `false` with **Update stack** first. See [Uninstall](/self-host/uninstall/).
 
-### The progress file is public while the install runs
+### Progress goes through CoderHelm
 
-It holds only the install's progress and address. If your account blocks public access to S3, that's fine: the install still runs, and the guide asks for your address from the stack's **Outputs** tab.
+The stack sends its progress to CoderHelm (api.coderhelm.com). If your install can't reach it, the install still runs, and the guide asks for your address from the stack's **Outputs** tab.
 
 ### A leaked AWS link exposes the setup key
 
