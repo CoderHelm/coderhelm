@@ -1,6 +1,8 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useChatNavSlot } from "@/components/chat-nav";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { OwnTitle, Page, PageHeader } from "@/components/page";
@@ -44,8 +46,8 @@ import { ThreadList } from "./thread-list";
 // and in a sheet on narrower screens. A chat is yours until you share it;
 // teammates then read it but only you ask in it.
 
-/** The reading column: about 720px. */
-const COLUMN = "max-w-[40rem]";
+/** The reading column: about 740px, centred in the page. */
+const COLUMN = "max-w-[46rem]";
 
 export default function ChatPage() {
   return (
@@ -106,6 +108,8 @@ function Chat() {
   const [railOpen, setRailOpen] = useState(true);
   const [renaming, setRenaming] = useState<BrainThread | null>(null);
   const [mac, setMac] = useState(true);
+  // The app sidebar's chat menu, where the chat list lives (one column of navigation).
+  const navSlot = useChatNavSlot();
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -473,11 +477,11 @@ function Chat() {
         onClick={() => setSheetOpen(true)}
         aria-label="Chats"
         data-testid="open-chats"
-        className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800/70 hover:text-zinc-100 lg:hidden ${focusRing}`}
+        className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800/70 hover:text-zinc-100 lg:hidden ${navSlot ? "hidden" : ""} ${focusRing}`}
       >
         <SidebarIcon />
       </button>
-      {!railOpen && (
+      {!navSlot && !railOpen && (
         <button
           type="button"
           onClick={() => toggleRail(true)}
@@ -489,7 +493,7 @@ function Chat() {
           <SidebarIcon />
         </button>
       )}
-      {canAsk && (!railOpen || !empty) && (
+      {canAsk && !navSlot && (!railOpen || !empty) && (
         <button
           type="button"
           onClick={startNew}
@@ -535,9 +539,10 @@ function Chat() {
 
   return (
     <Page className="flex h-[calc(100dvh-5.25rem)] flex-col md:h-[calc(100dvh-7.25rem)]" testId="chat-page">
-      {empty ? <OwnTitle /> : <PageHeader title="Chat" crumb={thread?.title} />}
+      {navSlot ? <PageHeader title={thread?.title ?? "Chat"} crumb={thread?.title ?? false} titleClassName="sr-only" /> : empty ? <OwnTitle /> : <PageHeader title="Chat" crumb={thread?.title} />}
+      {navSlot && createPortal(list({ inSheet: true }), navSlot)}
       <div className="flex min-h-0 flex-1 gap-6">
-        {railOpen && <aside className="hidden min-h-0 w-64 shrink-0 lg:flex lg:flex-col">{list({})}</aside>}
+        {!navSlot && railOpen && <aside className="hidden min-h-0 w-64 shrink-0 lg:flex lg:flex-col">{list({})}</aside>}
 
         <section aria-label="Conversation" className="relative flex min-h-0 min-w-0 flex-1 flex-col">
           {paneBar}

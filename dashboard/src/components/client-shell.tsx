@@ -27,6 +27,7 @@ import { hybridGithubSetupTarget, hybridOAuthHandoff, maybeHybridOAuthCallback }
 import { Menu } from "./menu";
 import { SectionTabs } from "./section-tabs";
 import { inSettings, SettingsPageTabs, SettingsSidebarNav } from "./settings-nav";
+import { ChatSidebarNav, inChat } from "./chat-nav";
 import { useSettingsStatus } from "@/app/settings/use-settings-status";
 import { buttonClass } from "./ui";
 import { AlertCircleIcon, InfoIcon, LogFindingsIcon, WarningIcon, XIcon } from "./icons";
@@ -642,6 +643,8 @@ function Sidebar({
   const currentSection = sectionFor(pathname)?.key;
   // In Settings the sidebar is the settings menu (one column of navigation).
   const settingsMode = inSettings(pathname);
+  // In Chat the sidebar is the chat menu: the way back, then your chats.
+  const chatMode = inChat(pathname);
   const settingsStatus = useSettingsStatus(settingsMode ? user : null);
 
   const currentTeam = teams.find((t) => t.current);
@@ -705,7 +708,9 @@ function Sidebar({
 
       <TeamSwitcher teams={teams} currentTeam={currentTeam ?? null} switching={switching} onSwitch={handleSwitch} />
 
-      {settingsMode && user ? (
+      {chatMode && user ? (
+        <ChatSidebarNav />
+      ) : settingsMode && user ? (
         <SettingsSidebarNav
           visible={(item) => can(user, item.view) && offered(item, isSelfHosted(), user.platform_admin === true)}
           status={settingsStatus}

@@ -289,12 +289,38 @@ export function SourceDialog({ doc, onClose }: { doc: SourceDoc | null; onClose:
   );
 }
 
-/** What Chat did, as one quiet line that opens to the steps. */
+/** Seconds since `start`, ticking while `on`. */
+function useElapsed(on: boolean): number {
+  const [start] = useState(() => Date.now());
+  const [now, setNow] = useState(start);
+  useEffect(() => {
+    if (!on) return;
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [on]);
+  return Math.max(0, Math.floor((now - start) / 1000));
+}
+
+/** The first step, shown the moment a question is sent, before Chat reports its own. */
+const FIRST_STEP: ToolStep = { id: "first", label: "Working out where to look", status: "running" };
+
+/**
+ * What Chat did. While it works the steps are open, as a short live list
+ * with the running one marked and the time so far, so the page is never a
+ * single still line. When the answer is done they fold into one quiet line
+ * ("Read 4 files in web, searched the code") that opens again on a click.
+ */
 export function ActivityLine({ steps, streaming }: { steps: ToolStep[]; streaming: boolean }) {
-  const [open, setOpen] = useState(false);
-  const running = [...steps].reverse().find((s) => s.status === "running");
+  const [open, setOpen] = useState(streaming);
+  useEffect(() => {
+    if (!streaming) setOpen(false);
+  }, [streaming]);
+  const elapsed = useElapsed(streaming);
+  const shown = streaming && steps.length === 0 ? [FIRST_STEP] : steps;
+  const running = [...shown].reverse().find((s) => s.status === "running");
   const summary = activitySummary(steps);
-  const label = streaming ? (running?.label ?? steps[steps.length - 1]?.label ?? "Looking through your team's work") : summary;
+  // While working the list says what; the line just says it's working.
+  const label = streaming ? (open ? "Working" : running?.label ?? shown[shown.length - 1]?.label ?? FIRST_STEP.label) : summary;
   return (
     <div className="mb-3" data-testid="activity">
       <button
@@ -310,16 +336,27 @@ export function ActivityLine({ steps, streaming }: { steps: ToolStep[]; streamin
         <span className={`min-w-0 truncate ${streaming ? "animate-chat-shimmer" : ""}`} data-testid="activity-summary">
           {label}
         </span>
+        {streaming && elapsed > 0 && (
+          <span className="shrink-0 tabular-nums text-zinc-600" data-testid="activity-elapsed">
+            {elapsed}s
+          </span>
+        )}
         <ChevronDownIcon className={`h-3 w-3 shrink-0 transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <ol className="ml-[0.4rem] mt-1.5 flex flex-col gap-1 border-l border-zinc-800 pl-4 text-[0.8rem] text-zinc-500" aria-label="Steps">
-          {steps.map((s) => (
+        <ol className="ml-[0.4rem] mt-1.5 flex flex-col gap-1 border-l border-zinc-800 pl-4 text-[0.8rem] text-zinc-500" aria-label="Steps" aria-live="polite">
+          {shown.map((s) => (
             <li key={s.id} className="flex min-w-0 items-baseline gap-2" data-testid="tool-step">
-              <span aria-hidden="true" className={`relative top-[-1px] h-1.5 w-1.5 shrink-0 rounded-full ${s.status === "error" ? "bg-red-400/80" : s.status === "running" ? "bg-zinc-400" : "bg-zinc-600"}`} />
+              <span
+                aria-hidden="true"
+                className={`relative top-[-1px] h-1.5 w-1.5 shrink-0 rounded-full ${
+                  s.status === "error" ? "bg-red-400/80" : s.status === "running" ? "animate-pulse bg-sky-400 motion-reduce:animate-none" : "bg-zinc-600"
+                }`}
+              />
               <span className="min-w-0 wrap-anywhere">
-                <span className="text-zinc-400">{s.label}</span>
+                <span className={s.status === "running" ? "text-zinc-200" : "text-zinc-400"}>{s.label}</span>
                 {s.summary && s.status !== "running" ? <span className="text-zinc-600"> · {s.summary}</span> : null}
+                {s.status === "error" ? <span className="text-red-300/80"> · didn&apos;t work, Chat carried on</span> : null}
               </span>
             </li>
           ))}
@@ -392,11 +429,8 @@ export function AnswerView({
   const box = useNoShrink(!!streaming);
   let content: ReactNode;
   if (waiting) {
-    content = steps && steps.length ? null : (
-      <p className="text-sm" data-testid="answer-waiting">
-        <span className="animate-chat-shimmer">Looking through your team&apos;s work…</span>
-      </p>
-    );
+    // The live steps (with a first step from the start) say what is happening.
+    content = null;
   } else if (!grounded && !streaming) {
     content = (
       <div className="rounded-xl border border-zinc-800/80 px-4 py-3" data-testid="no-source-answer">
@@ -422,7 +456,7 @@ export function AnswerView({
   }
   return (
     <div className="min-w-0" data-testid="answer" ref={box.ref} style={box.style}>
-      {steps && steps.length > 0 && <ActivityLine steps={steps} streaming={!!streaming} />}
+      {((steps && steps.length > 0) || waiting) && <ActivityLine steps={steps ?? []} streaming={!!streaming} />}
       {content}
       {!streaming && grounded && <SourceList docs={docs} onOpen={setOpen} />}
       {!streaming && text && (
