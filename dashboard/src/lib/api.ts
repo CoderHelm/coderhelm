@@ -4264,12 +4264,13 @@ export interface NativeChangeSet {
   name?: string;
   execution?: string;
   reason?: string;
-  counts: { add: number; modify: number; remove: number };
-  replacements: string[];
-  parts: string[];
+  /** The rest arrive once the change set exists; while preparing, only status and version do. */
+  counts?: { add: number; modify: number; remove: number };
+  replacements?: string[];
+  parts?: string[];
   /** Whether it runs through the auto-update role. */
-  role: boolean;
-  link: string;
+  role?: boolean;
+  link?: string;
 }
 
 export interface NativeUpdate {

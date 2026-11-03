@@ -515,6 +515,20 @@ test("System: the domain section at 1440 and 390, no sideways scroll", async ({ 
   }
 });
 
+test("System: an update still being prepared shows that, before the change set has any details", async ({ page }) => {
+  // While preparing, the install sends only status and version.
+  await setup(page, SELF, {
+    signedIn: true,
+    native: { stack: "coderhelm-prod", auto_apply: false, pending: { status: "preparing", version: "v2.0.0" } },
+  });
+  await page.goto("/settings/system/");
+  const card = page.getByTestId("native-update");
+  await expect(card).toContainText("Preparing v2.0.0");
+  await expect(card).toContainText("Nothing to do yet");
+  await expect(page.getByTestId("native-update-summary")).toHaveCount(0);
+  await expect(page.getByTestId("native-update-link")).toHaveCount(0);
+});
+
 test("System: a one-stack install shows the prepared change set and links to it in AWS", async ({ page }) => {
   const link = "https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/changesets/changes?stackId=x&changeSetId=y";
   await setup(page, SELF, {
