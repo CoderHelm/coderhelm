@@ -6,6 +6,22 @@ import type { StatusLook } from "@/components/list";
 import type { SupportItem, SupportItemKind, SupportMessage, SupportParticipant, SupportPriority, SupportStatus, SupportTicket } from "./api";
 
 /** The status as the team that filed it reads it. */
+/** Where Coderhelm's support can be written to when an install can't reach it. */
+export const SUPPORT_EMAIL = "support@coderhelm.com";
+
+/**
+ * A self-hosted install's ticket on its way to Coderhelm's support, in
+ * words; null on the hosted deployment.
+ */
+export function deliveryWords(t: Pick<SupportTicket, "coderhelm">): string | null {
+  const d = t.coderhelm;
+  if (!d) return null;
+  if (d.state === "sent") return "Sent to Coderhelm support. Its answers come here and by email.";
+  if (d.error)
+    return `Not sent to Coderhelm yet: your install couldn't reach it (${d.error}). It tries again every few minutes. If this keeps happening, email ${SUPPORT_EMAIL}.`;
+  return "Sending to Coderhelm…";
+}
+
 export function customerLook(status: SupportStatus): StatusLook {
   if (status === "waiting") return { label: "Waiting on you", tone: "waiting" };
   if (status === "resolved") return { label: "Resolved", tone: "success" };

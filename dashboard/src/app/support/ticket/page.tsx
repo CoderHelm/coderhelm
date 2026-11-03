@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, errorStatus, type SupportDetail, type SupportItemRef, type SupportMessage, type SupportPersonRef } from "@/lib/api";
-import { customerLook, isOnTicket, MAX_ATTACHMENTS, PRIORITY_LABEL, ticketItems, ticketPeople } from "@/lib/support";
+import { customerLook, deliveryWords, isOnTicket, MAX_ATTACHMENTS, PRIORITY_LABEL, ticketItems, ticketPeople } from "@/lib/support";
 import { SupportAccessControl } from "@/components/support-access";
 import { Page } from "@/components/page";
 import { Callout } from "@/components/callout";
@@ -136,11 +136,22 @@ function TicketPage() {
         ticket={t}
         status={<StatusText look={look} />}
         note={
-          t.status === "waiting"
-            ? "Coderhelm support is waiting for your answer."
-            : t.status === "resolved"
-              ? "Reply to open it again."
-              : "Coderhelm support will answer here and by email."
+          <>
+            {t.status === "waiting"
+              ? "Coderhelm support is waiting for your answer."
+              : t.status === "resolved"
+                ? "Reply to open it again."
+                : "Coderhelm support will answer here and by email."}
+            {deliveryWords(t) && (
+              <span
+                className={`mt-1 block ${t.coderhelm?.state === "sending" && t.coderhelm.error ? "text-amber-300" : ""}`}
+                data-testid="ticket-delivery"
+                data-state={t.coderhelm?.state}
+              >
+                {deliveryWords(t)}
+              </span>
+            )}
+          </>
         }
         people={
           <>
