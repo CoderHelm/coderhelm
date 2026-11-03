@@ -19,6 +19,7 @@ const ALLOWED = {
   "src/lib/runtime-config.ts": "the hosted defaults, used only when no runtime config says otherwise",
   "src/components/google-analytics.tsx": "a hostname check that keeps the hosted dashboard's analytics off every other host; not a link",
   "src/components/client-shell.tsx": "the hosted service's own admin account, checked only when not self-hosted; not a link",
+  "src/lib/support.ts": "CoderHelm support's address, shown on a self-hosted install's ticket only while the install can't reach CoderHelm to send it",
   "src/app/settings/integrations/jira/page.tsx": "CoderHelm's published Jira app: shown on the hosted service, and on a self-hosted install only when hybrid's Jira relay is on (otherwise the page offers the webhook and the install's own copy)",
 };
 

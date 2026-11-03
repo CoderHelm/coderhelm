@@ -3850,6 +3850,16 @@ export interface SupportTicket {
   /** The latest message, one line, and who wrote it. */
   last_snippet?: string;
   last_author_name?: string;
+  /** On a self-hosted install: whether the ticket reached Coderhelm's support. */
+  coderhelm?: SupportDelivery;
+}
+
+/** A self-hosted install's ticket on its way to Coderhelm's support. */
+export interface SupportDelivery {
+  state: "sending" | "sent";
+  /** Why the install couldn't send it yet, in words. */
+  error?: string;
+  sent_at?: string;
 }
 
 export interface SupportParticipant {

@@ -188,6 +188,7 @@ function Tickets() {
                           : ticketItems(t).length > 1
                             ? `${ticketItems(t).length} items attached`
                             : null,
+                        t.coderhelm?.state === "sending" ? "Sending to Coderhelm…" : null,
                         `${t.message_count} message${t.message_count === 1 ? "" : "s"}`,
                         t.participants?.length ? `${t.participants.length + 1} people` : null,
                       ]}
@@ -430,7 +431,7 @@ function NewTicket() {
         >
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <h2 id="attached-heading" className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-              Sent with your ticket
+              {isSelfHosted() ? "Sent to Coderhelm support" : "Sent with your ticket"}
             </h2>
             <span className="text-zinc-400">Never your code, diffs or settings.</span>
           </div>
@@ -443,7 +444,15 @@ function NewTicket() {
                 </button>
               </li>
             )}
-            <li>Your team, your role and your email, so we can answer.</li>
+            {isSelfHosted() ? (
+              <li data-testid="ticket-sent-to-coderhelm">
+                {
+                  "Your message, your name and email (so Coderhelm can answer), this install's version and, for each item attached, its name and status and a run's error and step. It leaves this install for Coderhelm support; answers come back here and by email."
+                }
+              </li>
+            ) : (
+              <li>Your team, your role and your email, so we can answer.</li>
+            )}
           </ul>
           <div className="mt-2 space-y-2">
             {items.length > 0 && (
