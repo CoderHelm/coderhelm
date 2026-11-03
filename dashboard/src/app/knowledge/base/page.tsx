@@ -122,8 +122,15 @@ function BaseView() {
     return () => clearInterval(t);
   }, [busy, load]);
 
+  // Files dropped before the base (and its upload limits) loaded wait here,
+  // then go through once it has: nothing a person drops is lost.
+  const waiting = useRef<{ list: File[]; replace?: string }[]>([]);
   const upload = async (list: File[], replace?: string) => {
-    if (!limits || !list.length) return;
+    if (!list.length) return;
+    if (!limits) {
+      waiting.current.push({ list, replace });
+      return;
+    }
     const bad: string[] = [];
     for (const file of list) {
       const problem = uploadProblem(file, limits);
@@ -146,6 +153,15 @@ function BaseView() {
     setProblems(bad);
   };
 
+
+  useEffect(() => {
+    if (!limits || !waiting.current.length) return;
+    const queued = waiting.current;
+    waiting.current = [];
+    for (const q of queued) void upload(q.list, q.replace);
+    // upload reads the limits that just arrived; it changes every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [limits]);
   const reconnect = async (s: Source) => {
     try {
       rememberReturn({ path: `/knowledge/base/?id=${encodeURIComponent(id)}`, kind: s.kind, kbId: id });

@@ -109,6 +109,8 @@ test.describe("the source picker", () => {
 
     await page.getByTestId("flow-continue").click();
     await page.getByTestId("flow-finish").click();
+    // The click sends it; wait for the request rather than racing it.
+    await expect.poll(() => db.bodies.some((b) => b.call === "POST /api/knowledge")).toBe(true);
     const sent = db.bodies.find((b) => b.call === "POST /api/knowledge")!;
     expect((sent.source as { selection: { id: string; path: string[]; include_children: boolean }[] }).selection).toEqual([
       { id: "page:handbook", title: "Company handbook", kind: "page", path: [], include_children: true },

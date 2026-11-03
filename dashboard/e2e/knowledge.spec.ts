@@ -515,6 +515,8 @@ test.describe("a knowledge base's sources", () => {
     await expect(tree.locator('[data-id="page:eng"]').getByTestId("picker-check")).toBeChecked();
     await tree.locator('[data-id="page:hr"]').getByTestId("picker-check").check();
     await page.getByTestId("save-selection").click();
+    // The click sends it; wait for the request rather than racing it.
+    await expect.poll(() => db.bodies.some((b) => b.call === "PUT /api/knowledge/kb_eng/sources/src_wiki")).toBe(true);
     const put = db.bodies.find((b) => b.call === "PUT /api/knowledge/kb_eng/sources/src_wiki")!;
     expect((put.selection as { id: string }[]).map((s) => s.id)).toEqual(["page:eng", "page:hr"]);
 
