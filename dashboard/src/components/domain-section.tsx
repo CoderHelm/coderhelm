@@ -141,8 +141,13 @@ export function DomainSection() {
         <div className="min-w-0 border-t border-zinc-800 px-4 py-4" data-testid="domain-records">
           <h3 className="text-sm font-medium text-zinc-100">Records to add where your domain&apos;s DNS is hosted</h3>
           <p className="mt-1 text-sm text-zinc-400">
-            Type CNAME for both. If your DNS provider adds the domain to the name for you, type only the part before it. With Cloudflare, set the records to DNS only.
+            Type CNAME for both. If your DNS provider adds the domain to the name for you, type only the part before it. Coderhelm never changes your DNS, so add both yourself.
           </p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-400" data-testid="domain-providers">
+            <li><span className="text-zinc-300">Route 53</span>: Hosted zones, your zone, Create record, record type CNAME. Do it for each record.</li>
+            <li><span className="text-zinc-300">Cloudflare</span>: DNS, Records, Add record. Set Proxy status to DNS only.</li>
+            <li><span className="text-zinc-300">Anywhere else</span>: open the DNS settings where your domain&apos;s name servers are run and add a CNAME for each record.</li>
+          </ul>
           <ul className="mt-3 space-y-3">
             {d.records.map((r) => (
               <li key={`${r.purpose}-${r.name}`} className="min-w-0" data-testid={`domain-record-${r.purpose}`}>
@@ -200,7 +205,7 @@ export function DomainSection() {
         </form>
         {error && <p role="alert" className="mt-2 text-sm text-red-300" data-testid="domain-error">{error}</p>}
         <p id="domain-help" className="mt-2 text-sm text-zinc-400">
-          With a Route 53 zone in this AWS account the records are added for you. Anywhere else, this page shows two records to add. Coderhelm keeps working on its current address until the domain is ready.
+          Coderhelm never changes your DNS: this page shows two records for you to add where your domain&apos;s DNS is hosted, and checks them until they work. Coderhelm keeps working on its current address until the domain is ready.
         </p>
         {(onDomain || d?.state === "failed" || d?.state === "validating") && (
           <div className="mt-4">

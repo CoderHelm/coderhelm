@@ -1098,7 +1098,7 @@ export function InstallWizard() {
                     [
                       ['aws', 'The AWS address', 'Free and ready right away, like d1234abcd.cloudfront.net. You can add a domain later.'],
                       ['coderhelm', 'A CoderHelm address', 'Like yourname.coderhelm.com. CoderHelm sets up the DNS for you; the certificate stays in your AWS account.'],
-                      ['own', 'My own domain', 'Like coderhelm.example.com. Set up for you when its zone is in Route 53 in this AWS account; anywhere else you add two DNS records.'],
+                      ['own', 'My own domain', 'Like coderhelm.example.com. You add two DNS records where its DNS is hosted, Route 53 included: CoderHelm never changes your DNS.'],
                     ] as const
                   ).map(([id, title, help]) => (
                     <label key={id} className={`mb-2 flex cursor-pointer gap-3 rounded-xl border p-3 transition ${s.domainChoice === id ? 'border-fd-primary bg-fd-primary/5' : 'border-fd-border hover:bg-fd-accent'}`}>
@@ -1266,7 +1266,7 @@ export function InstallWizard() {
           <p>CloudFormation creates CoderHelm {release.state === 'ready' ? release.version : 'the newest release'} in your account as one stack: it copies the release&apos;s files into a private bucket, checking each against the signed template, then creates Lambda functions, DynamoDB tables, an S3 bucket, CloudFront and Cognito sign-in. Nothing to install on your computer.</p>
           <p>Everything it creates is named after the name in your AWS account, {s.stage}: the stack is {stackName(s)}, and every resource name starts with coderhelm-{s.stage}, so you can find them in the AWS console.</p>
           <p>The boxes you tick let the stack create IAM roles and expand its nested templates. Every role it creates carries CoderHelm&apos;s permissions boundary. The stack runs with your own permissions; nothing keeps deploy rights afterwards unless you turn auto-update on.</p>
-          <p>{s.domainChoice === 'own' ? `Your domain: CoderHelm starts on its free cloudfront.net address and requests the certificate for ${cleanHostname(s.hostname) || 'your domain'}. When its zone is in Route 53 in this account, it adds the check record itself; anywhere else this page shows the two records to add. Once the certificate is issued, CoderHelm prepares the stack update that moves it to your domain, for you to apply in AWS.` : s.domainChoice === 'coderhelm' ? `Your CoderHelm address: once your install answers, this page registers it with CoderHelm and claims ${cleanName(s.coderhelmName) || 'your name'}.${NAME_ZONE}. Your install requests the certificate in your account; CoderHelm adds the DNS records. Nothing for you to do.` : 'No domain or DNS work: CoderHelm gets a free cloudfront.net address. You can add your own domain later, in More options or in CoderHelm.'}</p>
+          <p>{s.domainChoice === 'own' ? `Your domain: CoderHelm starts on its free cloudfront.net address and requests the certificate for ${cleanHostname(s.hostname) || 'your domain'}. This page shows the two records to add where its DNS is hosted (CoderHelm never changes your DNS, Route 53 included). Once the certificate is issued, CoderHelm prepares the stack update that moves it to your domain, for you to apply in AWS.` : s.domainChoice === 'coderhelm' ? `Your CoderHelm address: once your install answers, this page registers it with CoderHelm and claims ${cleanName(s.coderhelmName) || 'your name'}.${NAME_ZONE}. Your install requests the certificate in your account; CoderHelm adds the DNS records. Nothing for you to do.` : 'No domain or DNS work: CoderHelm gets a free cloudfront.net address. You can add your own domain later, in More options or in CoderHelm.'}</p>
           <p>Two random values from this page go along in the AWS link: a progress ID, so this page can follow the install, and a one-time setup key, so GitHub (or CoderHelm, for hybrid) can talk to your CoderHelm directly. Both stay in your account and this browser; the setup key stops working once your GitHub App exists.</p>
         </Details>
       </section>
@@ -1470,21 +1470,18 @@ export function InstallWizard() {
     const code = d?.code;
     const text = d ? checkText(d) : { title: 'Checking your domain' };
     const dd = s.domainDoc;
-    const mode = dd?.mode ?? 'external';
     const hostname = cleanHostname(s.hostname || dd?.hostname || '');
     const base = hostname ? baseDomain(hostname) : 'your domain';
     const records: DnsRecord[] = dd?.records ?? [];
-    const rows = domainRows(code, mode);
+    const rows = domainRows(code);
     const p = DNS_PROVIDERS.find((x) => x.id === provider);
     const tone = d?.status === 'pass' ? 'pass' : d?.status === 'fail' ? 'fail' : d?.status === 'warn' ? 'warn' : 'todo';
     const show = records;
     screen = (
       <section data-testid="screen-domain">
         <Heading
-          title={mode === 'route53' ? 'Setting up your domain' : 'Point your domain at CoderHelm'}
-          lead={mode === 'route53'
-            ? <>The zone for {base} is in Route 53 in your AWS account, so CoderHelm adds the records itself. This page checks each part.</>
-            : <>Add two records where the DNS for {base} is hosted. This page checks them and moves CoderHelm to <b className="text-fd-foreground">{hostname}</b> once they work.</>}
+          title="Point your domain at CoderHelm"
+          lead={<>Add two records where the DNS for {base} is hosted. CoderHelm never changes your DNS. This page checks them and moves CoderHelm to <b className="text-fd-foreground">{hostname}</b> once they work.</>}
         />
         <Notice tone={tone} title={text.title} testId="domain-status">
           {text.fix ? <p>{text.fix}</p> : null}
@@ -1493,7 +1490,7 @@ export function InstallWizard() {
           {rows.map((r) => <Row key={r.id} tone={r.status} title={r.label} />)}
         </ul>
 
-        {mode === 'external' && show.length ? (
+        {show.length ? (
           <div className="mt-6" data-testid="dns-records">
             <h2 className="text-lg font-semibold">The records to add</h2>
             <p className="mt-1 text-sm text-fd-muted-foreground">Type CNAME for both. If the form shows .{base} after the name box, type only the short name.</p>
@@ -1524,7 +1521,7 @@ export function InstallWizard() {
             </div>
           </div>
         ) : null}
-        {mode === 'external' && !records.length ? (
+        {!records.length ? (
           <Notice tone="info" title="The records to add aren't readable here" testId="domain-no-records">
             <p>Your account keeps the progress file private. Sign up at {host || 'your CoderHelm'} and open Settings, System, Domain: it shows the same records and checks.</p>
           </Notice>
@@ -1951,7 +1948,7 @@ export function InstallWizard() {
       ];
       case 'aws': return progressRows(doc, !!setup, !!s.launchedAt).map((r) => ({ id: r.id, label: r.label, status: r.status }));
       case 'address': return hybridRows(setup, cleanName(s.coderhelmName), hyb.claimRefused).map((r) => ({ id: r.id, label: r.label, status: r.status }));
-      case 'domain': return domainRows(findCheck(setup, 'domain')?.code, s.domainDoc?.mode ?? 'external').map((r) => ({ id: r.id, label: r.label, status: r.status }));
+      case 'domain': return domainRows(findCheck(setup, 'domain')?.code).map((r) => ({ id: r.id, label: r.label, status: r.status }));
       case 'github': return [
         { id: 'app', label: s.githubChoice === 'hosted' ? 'CoderHelm’s app' : 'GitHub App created', status: tone(findCheck(setup, 'github_app')) },
         { id: 'installed', label: 'Installed on your repositories', status: tone(findCheck(setup, 'github_installed')) },

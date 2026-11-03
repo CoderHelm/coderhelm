@@ -476,6 +476,13 @@ test("System: use your own domain, see the records to add, fix a CAA refusal wit
   await expect(page.getByTestId("domain-record-certificate")).toContainText("_a1b2c3.coderhelm.example.com");
   await expect(page.getByTestId("domain-record-certificate")).toContainText("_d4e5f6.xyz.acm-validations.aws");
   await expect(page.getByTestId("domain-record-address")).toContainText("d111test.cloudfront.net");
+  // CoderHelm never changes DNS: no button that would, and plain steps for Route 53 and others.
+  await expect(sec).toContainText("Coderhelm never changes your DNS");
+  await expect(sec).not.toContainText("added for you");
+  await expect(page.getByTestId("domain-providers")).toContainText("Route 53");
+  await expect(page.getByTestId("domain-providers")).toContainText("Anywhere else");
+  await expect(sec.getByRole("button", { name: /Route 53|add these/i })).toHaveCount(0);
+  expect(systemCalls.some((c) => c.path.includes("route53"))).toBe(false);
   // CAA blocks Amazon: the fix, and Try again requests a new certificate.
   domainState.code = "caa_blocked";
   await page.reload();

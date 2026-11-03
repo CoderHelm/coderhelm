@@ -648,13 +648,14 @@ test('another DNS provider: the records to copy, a hint for the provider, each f
   assertPrivate(m);
 });
 
-test('a Route 53 zone in the account: set up by the install, nothing to add', async ({ page }) => {
+test('an older install that says route53: never claims CoderHelm adds records, shows where to find them', async ({ page }) => {
   const m = newMock({ status: { schema: 1, phase: 'done', url: DOMAIN, domain: { hostname: 'coderhelm.example.com', mode: 'route53', state: 'live', records: [] } } });
   m.setup = withOptional(setupDoc(NO_APP), { status: 'wait', code: 'dns_missing' });
   await seeded(page, m, { domainChoice: 'own', hostname: 'coderhelm.example.com' });
-  await expect(page.getByTestId('step-title')).toHaveText('Setting up your domain');
-  await expect(page.getByTestId('dns-records')).toHaveCount(0);
-  await expect(page.getByTestId('domain-progress')).toContainText('Route 53');
+  await expect(page.getByTestId('step-title')).toHaveText('Point your domain at CoderHelm');
+  await expect(page.getByTestId('screen-domain')).toContainText('CoderHelm never changes your DNS');
+  await expect(page.getByTestId('domain-progress')).not.toContainText('Route 53');
+  await expect(page.getByTestId('domain-no-records')).toBeVisible();
   m.setup = withOptional(setupDoc(NO_APP), { status: 'pass', code: 'ok' });
   await expect(page.getByTestId('screen-github')).toBeVisible();
 });
@@ -763,7 +764,7 @@ test('screenshots of every screen at 1440 and 390', async ({ page }) => {
     await page.getByTestId('launch').click();
     await expect(page.getByTestId('no-sign')).toBeVisible();
     await at('12-no-sign-paste');
-    // Your own domain: the options, the records, a failure, Route 53, optional setup.
+    // Your own domain: the options, the records, a failure, an older install, optional setup.
     await page.evaluate(() => localStorage.clear());
     await page.goto('/self-host/install/');
     await page.getByRole('button', { name: 'More options' }).click();
@@ -793,8 +794,8 @@ test('screenshots of every screen at 1440 and 390', async ({ page }) => {
     await page.getByLabel('Your email').fill('ada@example.com');
     await pickModels(page);
     await page.getByTestId('launch').click();
-    await expect(page.getByTestId('step-title')).toHaveText('Setting up your domain');
-    await at('17-domain-route53');
+    await expect(page.getByTestId('step-title')).toHaveText('Point your domain at CoderHelm');
+    await at('17-domain-older-install');
     m.setup = withOptional(setupDoc(), { status: 'pass', code: 'ok' }, { updates: { status: 'pass', code: 'ok' } });
     await expect(page.getByTestId('screen-ready')).toBeVisible();
     await at('18-ready-optional-setup');

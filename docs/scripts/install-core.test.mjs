@@ -301,7 +301,7 @@ test('the domain step: only for their own domain, before GitHub, skippable, and 
 });
 
 test('domain progress rows follow the code; failures sit on their row', () => {
-  const st = (code, mode = 'external') => c.domainRows(code, mode).map((r) => r.status).join(',');
+  const st = (code) => c.domainRows(code).map((r) => r.status).join(',');
   assert.equal(st('validating'), 'active,pending,pending,pending');
   assert.equal(st('validation_wrong_value'), 'fail,pending,pending,pending');
   assert.equal(st('caa_blocked'), 'fail,pending,pending,pending');
@@ -311,7 +311,7 @@ test('domain progress rows follow the code; failures sit on their row', () => {
   assert.equal(st('cname_at_apex'), 'pass,pass,fail,pending');
   assert.equal(st('https_failed'), 'pass,pass,pass,fail');
   assert.equal(st('ok'), 'pass,pass,pass,pass');
-  assert.match(c.domainRows('validating', 'route53')[0].label, /Route 53/);
+  assert.doesNotMatch(c.domainRows('validating').map((r) => r.label).join(' '), /Route 53|zone/, 'CoderHelm never changes DNS: no row says it does');
 });
 
 test('every domain, sign-in and updates code the install documents has a sentence and a fix', () => {
