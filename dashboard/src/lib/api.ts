@@ -4035,7 +4035,9 @@ export interface UpdateEntry {
   from_version?: string;
   actor: string;
   mode?: "update" | "rollback";
-  status: "running" | "succeeded" | "failed" | "rolled_back";
+  /** preparing: the change set is being made; review: it waits for an admin in AWS;
+   * not_started: refused before anything changed (the reason says why). */
+  status: "running" | "preparing" | "review" | "succeeded" | "failed" | "rolled_back" | "not_started";
   reason?: string;
   /** "model check skipped for …" when an admin skipped a model the release doesn't call. */
   note?: string;

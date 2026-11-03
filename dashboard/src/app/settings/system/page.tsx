@@ -41,10 +41,26 @@ const DAYS: [string, string][] = [
 
 const STATUS: Record<UpdateEntry["status"], { label: string; tone: "success" | "danger" | "waiting" | "neutral" }> = {
   running: { label: "Running", tone: "waiting" },
+  preparing: { label: "Preparing", tone: "waiting" },
+  review: { label: "Waiting for review", tone: "waiting" },
   succeeded: { label: "Succeeded", tone: "success" },
   failed: { label: "Failed", tone: "danger" },
   rolled_back: { label: "Rolled back", tone: "danger" },
+  not_started: { label: "Didn't start", tone: "neutral" },
 };
+
+/** A status this page doesn't know yet (a newer updater) shows as itself, neutral. */
+function statusOf(status: string) {
+  return STATUS[status as UpdateEntry["status"]] ?? { label: status.replace(/_/g, " "), tone: "neutral" as const };
+}
+
+/** Who started an update, in words: the admin's email, the install guide, the
+ * auto-update window, or the AWS CLI. Old rows recorded no one ("unknown"). */
+function startedBy(actor: string | undefined): string | null {
+  if (!actor || actor === "unknown") return null;
+  if (actor === "auto") return "auto-update window";
+  return actor;
+}
 
 /** Every time zone the browser knows, with the current value kept even if it isn't listed. */
 function timeZones(current: string): string[] {
@@ -359,8 +375,9 @@ function System() {
                       {h.mode === "rollback" ? "Roll back to " : ""}<span className="font-mono">{h.version}</span>
                       {h.from_version && <span className="text-zinc-400"> from {h.from_version}</span>}
                     </p>
-                    <p className="truncate text-xs text-zinc-400">
-                      <Time iso={h.started_at} /> · {h.actor === "auto" ? "automatic" : h.actor}
+                    <p className="line-clamp-2 break-words text-xs text-zinc-400" data-testid="history-line">
+                      <Time iso={h.started_at} />
+                      {startedBy(h.actor) ? ` · ${startedBy(h.actor)}` : ""}
                       {h.reason ? ` · ${h.reason}` : ""}
                       {h.note ? ` · ${h.note}` : ""}
                     </p>
@@ -373,7 +390,9 @@ function System() {
                       </p>
                     )}
                   </div>
-                  <Chip tone={STATUS[h.status].tone}>{STATUS[h.status].label}</Chip>
+                  <span className="shrink-0 self-start sm:self-center" data-testid="history-status">
+                    <Chip tone={statusOf(h.status).tone}>{statusOf(h.status).label}</Chip>
+                  </span>
                 </li>
               ))}
             </ul>
