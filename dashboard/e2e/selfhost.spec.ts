@@ -226,6 +226,7 @@ test("the first-admin link opens sign-up, with no hosted terms on a self-hosted 
   await setup(page, { apiUrl: "", streamUrl: "", selfHosted: true, siteUrl: null });
   await page.goto("/?signup=1");
   await expect(page.locator("#signup-email")).toBeVisible();
+  await expect(page.getByTestId("signup-one-org")).toContainText("first admin account");
   await expect(page.getByText("I agree to the")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Terms" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: /coderhelm\.com/ })).toHaveCount(0);
@@ -233,6 +234,20 @@ test("the first-admin link opens sign-up, with no hosted terms on a self-hosted 
   await page.locator("#signup-email").fill("owner@example.org");
   await page.locator("#signup-password").fill("Password123");
   await expect(page.getByRole("button", { name: "Create account" })).toBeEnabled();
+});
+
+test("a self-hosted install's sign-in page has no open sign-up", async ({ page }) => {
+  await setup(page, { apiUrl: "", streamUrl: "", selfHosted: true, siteUrl: null });
+  await page.goto("/");
+  await expect(page.locator("#login-email")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Create account" })).toHaveCount(0);
+  await expect(page.getByTestId("login-invite-only")).toBeVisible();
+});
+
+test("the hosted sign-in page still offers Create account", async ({ page }) => {
+  await setup(page, null);
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Create account" })).toBeVisible();
 });
 
 test("the hosted build keeps its terms", async ({ page }) => {

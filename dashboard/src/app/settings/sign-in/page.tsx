@@ -34,7 +34,6 @@ function SignInSettingsPage() {
   const { confirm } = useConfirm();
   const [data, setData] = useState<SignInSettings | null>(null);
   const [failed, setFailed] = useState(false);
-  const [domain, setDomain] = useState("");
   const [domainError, setDomainError] = useState("");
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState<Person | null>(null);
@@ -54,7 +53,7 @@ function SignInSettingsPage() {
         title="Sign-in"
         lead={
           selfHosted
-            ? "This install is for one organization. Choose who may join and whether everyone must use two-factor sign-in."
+            ? "This install is for one organization. Admins add people, and you choose whether everyone must use two-factor sign-in."
             : "Choose whether everyone on this team must use two-factor sign-in, and see who has it set up."
         }
       />
@@ -98,24 +97,12 @@ function SignInSettingsPage() {
     try {
       const r = await api.updateSignInSettings({ domains: next });
       setData({ ...data, domains: r.domains });
-      setDomain("");
       toast(r.domains.length ? "Allowed domains saved" : "Only people you invite can join now");
     } catch (e) {
       setDomainError(e instanceof Error ? e.message : "Couldn't save. Try again.");
     } finally {
       setSaving(false);
     }
-  };
-
-  const addDomain = (e: FormEvent) => {
-    e.preventDefault();
-    const d = domain.trim().replace(/^@/, "").toLowerCase();
-    if (!d) return;
-    if (domains.includes(d)) {
-      setDomain("");
-      return;
-    }
-    saveDomains([...domains, d]);
   };
 
   const removeDomain = async (d: string) => {
@@ -176,7 +163,7 @@ function SignInSettingsPage() {
           <SettingsSection
             id="who-may-join"
             title="Who may join"
-            description="Nobody can sign up on their own. People join with an invite, or with an email at a domain you allow here."
+            description="Nobody can sign up on their own. An admin adds each person in Team, and they get an invite email with the link to set up their account."
           >
             <div className="space-y-4 px-4 py-4">
               <p className="text-sm text-zinc-300">
@@ -187,13 +174,12 @@ function SignInSettingsPage() {
                   Invite people in Team
                 </Link>
               </p>
-              <div>
-                <h3 className="text-sm font-medium text-zinc-200">Allowed email domains</h3>
-                {domains.length === 0 ? (
-                  <p className="mt-1 text-sm text-zinc-400" data-testid="domains-empty">
-                    None: only people you invite can join.
+              {domains.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium text-zinc-200">Email domains from your install&apos;s setup</h3>
+                  <p className="mt-1 text-sm text-zinc-400">
+                    People with an email at these domains can also join. Remove one to make joining invite-only for it.
                   </p>
-                ) : (
                   <ul className="mt-2 flex flex-wrap gap-2" data-testid="domains">
                     {domains.map((d) => (
                       <li key={d} className="flex min-w-0 items-center gap-1 rounded-full border border-zinc-700 bg-zinc-800/60 py-0.5 pl-3 pr-1 text-sm text-zinc-200">
@@ -210,28 +196,9 @@ function SignInSettingsPage() {
                       </li>
                     ))}
                   </ul>
-                )}
-              </div>
-              <form onSubmit={addDomain} className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                <Field
-                  id="add-domain"
-                  className="flex-1"
-                  label="Let anyone with an email at"
-                  help="Your company's domain, such as example.com. They join as members. Public email services can't be allowed."
-                  placeholder="example.com"
-                  autoComplete="off"
-                  spellCheck={false}
-                  value={domain}
-                  error={domainError || undefined}
-                  onChange={(e) => {
-                    setDomain(e.target.value);
-                    setDomainError("");
-                  }}
-                />
-                <button type="submit" disabled={saving || !domain.trim()} className={`${buttonClass("secondary")} ${fullWidthOnPhone} sm:mb-[1.85rem]`}>
-                  Allow
-                </button>
-              </form>
+                  {domainError && <p className="mt-2 text-sm text-red-400" role="alert">{domainError}</p>}
+                </div>
+              )}
             </div>
           </SettingsSection>
         )}

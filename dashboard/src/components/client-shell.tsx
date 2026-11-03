@@ -959,7 +959,7 @@ type AuthView = "login" | "signup" | "waitlist" | "verify" | "forgot" | "reset" 
 
 /** What a self-hosted install says to someone it won't let in. */
 const NOT_INVITED =
-  "This Coderhelm is private to one organization. Ask one of its admins to invite you, or sign in with your work email if your company's domain is allowed.";
+  "This Coderhelm is private to one organization. Ask one of its admins to invite you; the invite email has the link to set up your account.";
 
 /** Google or GitHub for someone whose second factor is the code on their password account (only Cognito checks it). */
 const USE_PASSWORD = "two_factor_use_password";
@@ -983,6 +983,9 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [problem, setProblem] = useState<SignInProblem | null>(null);
+  // How a self-hosted install's account form was opened: an admin's invite email or the
+  // installer's first-admin link. Without either it has no open sign-up.
+  const [joinVia, setJoinVia] = useState<"invite" | "first_admin" | null>(null);
 
   // The hosted site's terms; a self-hosted install has none unless it names a site.
   const site = siteUrl();
@@ -1017,6 +1020,13 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
     }
     // The installer's first-admin link opens the sign-up form.
     if (params.get("signup") === "1") {
+      setJoinVia("first_admin");
+      setView("signup");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    // An admin's invite email opens it too: the only way a new person joins a self-hosted install.
+    if (params.get("invite") === "1") {
+      setJoinVia("invite");
       setView("signup");
       window.history.replaceState({}, "", window.location.pathname);
     }
@@ -1281,19 +1291,41 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
               </form>
 
               <div className="flex items-center justify-between w-full text-xs">
-                <button onClick={() => { setView("signup"); setError(""); setMessage(""); }} className="text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">Create account</button>
+                {selfHosted ? (
+                  <span />
+                ) : (
+                  <button onClick={() => { setView("signup"); setError(""); setMessage(""); }} className="text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">Create account</button>
+                )}
                 <button onClick={() => { setView("forgot"); setError(""); setMessage(""); }} className="text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">Forgot password?</button>
               </div>
+              {selfHosted && (
+                <p className="text-xs text-zinc-400 text-center" data-testid="login-invite-only">
+                  New here? An admin adds you, and your invite email has the link to set up your account.
+                </p>
+              )}
             </div>
           )}
 
           {/* ── Signup ── */}
-          {view === "signup" && (
+          {view === "signup" && selfHosted && !joinVia && (
+            <div className="w-full space-y-4 text-center" data-testid="signup-invite-only">
+              <p className="text-sm text-zinc-400">
+                This Coderhelm is invite-only. Use the link in your invite email, or ask an admin to invite you.
+              </p>
+              <button onClick={() => { setView("login"); setError(""); setMessage(""); }} className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">
+                Sign in
+              </button>
+            </div>
+          )}
+
+          {view === "signup" && (!selfHosted || joinVia) && (
             <div className="w-full space-y-4">
               <div className="text-center">
                 {selfHosted ? (
                   <p className="text-sm text-zinc-400" data-testid="signup-one-org">
-                    This Coderhelm is for one organization. Create an account with the email an admin invited, or your work email if your company&apos;s domain is allowed.
+                    {joinVia === "first_admin"
+                      ? "Create the first admin account with the email your install was set up with."
+                      : "Set up your account with the email your invite was sent to."}
                   </p>
                 ) : (
                   <>
