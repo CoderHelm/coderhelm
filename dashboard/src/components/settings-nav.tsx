@@ -66,6 +66,8 @@ export function SettingsSidebarNav({
 
   return (
     <div data-testid="settings-nav">
+      {/* Pinned while the list scrolls, so the way back and the filter never leave view. */}
+      <div data-settings-sticky="" className="sticky -top-3 z-10 -mx-3 bg-zinc-950 px-3 pb-2 pt-3">
       <Link
         href="/"
         className={`mb-3 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100 ${focusRing}`}
@@ -88,7 +90,8 @@ export function SettingsSidebarNav({
           data-testid="settings-filter"
         />
       </div>
-      <nav aria-label="Settings" className="mt-4 space-y-4">
+      </div>
+      <nav aria-label="Settings" className="mt-2 space-y-4">
         {!q && (
           <ul>
             <MenuLink href="/settings" current={current === "/settings"}>
@@ -148,7 +151,7 @@ export function SettingsPageTabs() {
   if (!item || !tabs) return null;
   return (
     <div className="mb-6" data-testid="settings-page-tabs">
-      <Tabs label="Instructions" items={tabs.map((t) => ({ value: t.href, label: t.label, href: t.href }))} value={item.href} className="" />
+      <Tabs label="Instructions pages" items={tabs.map((t) => ({ value: t.href, label: t.label, href: t.href }))} value={item.href} className="" />
     </div>
   );
 }

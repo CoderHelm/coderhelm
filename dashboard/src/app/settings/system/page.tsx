@@ -23,6 +23,7 @@ import { Markdown } from "@/components/markdown";
 import { Redirect } from "@/components/redirect";
 import { Combobox } from "@/components/combobox";
 import { Time } from "@/components/list";
+import { ResetAllData } from "@/components/reset-data";
 import { Select } from "@/components/select";
 import { TechnicalDetails } from "@/components/problem";
 import { inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
@@ -118,7 +119,7 @@ function System() {
 
   const header = (
     <div className="mb-6">
-      <PageHeader title="System" lead="Which version of Coderhelm runs here, how it is updated, and every update so far." />
+      <PageHeader title="Version and updates" lead="Which version of Coderhelm runs here, how it is updated, and every update so far." />
     </div>
   );
 
@@ -389,6 +390,7 @@ function System() {
           <UninstallSection version={data} />
         </SettingsSection>
       </div>
+      <ResetAllData />
       <SaveBar count={form.dirtyKeys.length} onSave={save} onDiscard={form.discard} idleText="Nothing to save" />
     </Page>
   );

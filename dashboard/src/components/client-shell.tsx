@@ -656,8 +656,10 @@ function Sidebar({
     if (!area || !item) return;
     const a = area.getBoundingClientRect();
     const i = item.getBoundingClientRect();
+    // In Settings the menu's header stays pinned at the top of the area.
+    const top = a.top + (nav?.querySelector<HTMLElement>("[data-settings-sticky]")?.offsetHeight ?? 0);
     if (i.bottom > a.bottom - 24) area.scrollTop += i.bottom - a.bottom + 48;
-    else if (i.top < a.top) area.scrollTop -= a.top - i.top + 8;
+    else if (i.top < top) area.scrollTop -= top - i.top + 8;
   }, [pathname, user]);
 
   // Support counts: tickets waiting on this team, and for platform admins
@@ -716,7 +718,8 @@ function Sidebar({
         ))}
       </ul>
 
-      {visibleSections(user).some((x) => x.section.superAdminOnly) && (
+      {/* Platform pages (all teams, the support queue) are the hosted service's; a self-hosted install has neither. */}
+      {!isSelfHosted() && visibleSections(user).some((x) => x.section.superAdminOnly) && (
         <div className="mt-3">
           <p className="mb-1 px-2 text-xs font-medium text-zinc-400">Platform</p>
           <ul className="space-y-0.5">

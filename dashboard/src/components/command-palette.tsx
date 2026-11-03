@@ -140,11 +140,11 @@ function actionsFor(who: PaletteUser): (Entry & { need?: string })[] {
 }
 
 const SETTINGS: { label: string; href: string; need?: string; keywords: string[] }[] = [
-  { label: "General settings", href: "/settings", keywords: ["team name", "reset", "danger zone"] },
-  { label: "Custom instructions", href: "/settings/instructions", need: "agent_settings", keywords: ["prompt", "rules", "style"] },
+  { label: "Settings overview", href: "/settings", keywords: ["needs attention", "status"] },
+  { label: "Instructions: conventions", href: "/settings/instructions", need: "agent_settings", keywords: ["prompt", "rules", "style"] },
   { label: "Workflow and git conventions", href: "/settings/workflow", need: "agent_settings", keywords: ["branch", "commit", "pr title", "naming"] },
-  { label: "Guardrails", href: "/settings/guardrails", need: "agent_settings", keywords: ["limits", "safety", "files"] },
-  { label: "Team voice", href: "/settings/voice", need: "agent_settings", keywords: ["tone", "writing"] },
+  { label: "Instructions: rules", href: "/settings/guardrails", need: "agent_settings", keywords: ["guardrails", "limits", "safety", "files"] },
+  { label: "Instructions: voice", href: "/settings/voice", need: "agent_settings", keywords: ["team voice", "tone", "writing"] },
   { label: "AI models", href: "/settings/models", need: "model_provider", keywords: ["model", "llm"] },
   { label: "Repositories", href: "/settings/repos", need: ANY_CHANGE, keywords: ["repo", "sync", "role"] },
   { label: "Integrations", href: "/settings/integrations", need: "view_integrations", keywords: ["connect"] },
@@ -154,8 +154,8 @@ const SETTINGS: { label: string; href: string; need?: string; keywords: string[]
   { label: "Reviewer settings", href: "/reviewer/config", need: ANY_CHANGE, keywords: ["review label", "auto-merge", "release notes"] },
   { label: "Alert routes", href: "/settings/alerts", need: "view_alerts", keywords: ["alarm", "sns", "topic"] },
   { label: "Notifications", href: "/settings/notifications", keywords: ["email"] },
-  { label: "Team members", href: "/settings/team", keywords: ["people", "roles", "invite"] },
-  { label: "Security", href: "/settings/security", keywords: ["password", "two-factor", "mfa"] },
+  { label: "Members and roles", href: "/settings/team", keywords: ["team", "people", "roles", "invite"] },
+  { label: "Password and two step sign in", href: "/settings/security", keywords: ["security", "password", "two-factor", "mfa"] },
   { label: "Token limit", href: "/settings/budget", need: ANY_CHANGE, keywords: ["budget", "usage", "cost"] },
 ];
 

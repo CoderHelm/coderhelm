@@ -98,7 +98,7 @@ function Setup() {
     <Page>
       <div className="mb-6">
         <PageHeader
-          title="Setup"
+          title="Setup checks"
           lead={progress ? `${progress.done} of ${progress.total} required steps done. The install checks itself each time this page opens, and anything that needs a fix says how.` : "What is left to set up on this install. It checks itself each time this page opens, and anything that needs a fix says how."}
         />
       </div>
@@ -112,7 +112,7 @@ function Setup() {
             }}
           />
           <p className="mt-2 text-sm text-zinc-400">
-            <Link href="/settings/system#readiness" className={linkButton}>Open Settings, System</Link>
+            <Link href="/settings/system#readiness" className={linkButton}>Open Version and updates</Link>
           </p>
         </div>
       )}

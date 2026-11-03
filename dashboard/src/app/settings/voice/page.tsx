@@ -91,7 +91,7 @@ function VoicePage() {
     <Page>
       <div className="mb-6">
         <PageHeader
-          title="Team voice"
+          title="Voice"
           lead="How Coderhelm writes pull request descriptions, commit messages and code comments. A repository's own voice replaces the one for every repository."
         />
       </div>

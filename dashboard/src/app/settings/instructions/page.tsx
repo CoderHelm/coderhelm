@@ -81,7 +81,7 @@ function InstructionsPage() {
     <Page>
       <div className="mb-6">
         <PageHeader
-          title="Custom instructions"
+          title="Conventions"
           lead="Conventions Coderhelm follows when it writes code. A repository's own instructions are added after the ones for every repository."
         />
       </div>

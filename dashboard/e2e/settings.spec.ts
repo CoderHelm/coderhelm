@@ -13,14 +13,13 @@ type Role = "viewer" | "member" | "billing" | "admin" | "owner";
 // the spec for the hub: an item added to the hub without a row here fails.
 const ITEMS: { title: string; href: string; view: Role; edit: Role; heading: string | RegExp }[] = [
   { title: "Notifications", href: "/settings/notifications", view: "viewer", edit: "viewer", heading: "Notifications" },
-  { title: "Security", href: "/settings/security", view: "viewer", edit: "viewer", heading: "Security" },
-  { title: "Team", href: "/settings/team", view: "viewer", edit: "admin", heading: "Team" },
+  { title: "Password and two step sign in", href: "/settings/security", view: "viewer", edit: "viewer", heading: "Password and two step sign in" },
+  { title: "Members and roles", href: "/settings/team", view: "viewer", edit: "admin", heading: "Members and roles" },
   { title: "API keys", href: "/settings/api-keys", view: "admin", edit: "admin", heading: "API keys" },
   { title: "Repositories", href: "/settings/repos", view: "member", edit: "admin", heading: "Repositories" },
   { title: "Workflow", href: "/settings/workflow", view: "admin", edit: "admin", heading: "Workflow" },
-  { title: "Guardrails", href: "/settings/guardrails", view: "admin", edit: "admin", heading: "Guardrails" },
-  { title: "Team voice", href: "/settings/voice", view: "admin", edit: "admin", heading: "Team voice" },
-  { title: "Custom instructions", href: "/settings/instructions", view: "admin", edit: "admin", heading: "Custom instructions" },
+  // Rules and Voice are tabs of Instructions (see "Instructions keeps its three pages as tabs").
+  { title: "Instructions", href: "/settings/instructions", view: "admin", edit: "admin", heading: "Conventions" },
   { title: "AI models", href: "/settings/models", view: "admin", edit: "admin", heading: "AI models" },
   { title: "Alert routes", href: "/settings/alerts", view: "member", edit: "admin", heading: "Alert routes" },
   { title: "Data sources", href: "/data-sources", view: "admin", edit: "admin", heading: "Data sources" },
@@ -125,14 +124,17 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
   return db;
 }
 
-// A hub row, found by where it leads (titles such as "Team" and "Team voice"
-// overlap, links do not).
-const hubLink = (page: Page, title: string) => {
+// A hub row in its group, found by where it leads. Not the same page in the
+// Settings menu, nor its copy in Needs attention (see attentionLink).
+const hrefOf = (title: string) => {
   const item = ITEMS.find((i) => i.title === title);
   if (!item) throw new Error(`no hub item ${title}`);
-  // The overview's card, not the same page in Settings' own list beside it.
-  return page.locator("main [data-page]").locator(`a[href="${item.href}"], a[href="${item.href}/"]`);
+  return item.href;
 };
+const rowIn = (scope: ReturnType<Page["locator"]>, href: string) => scope.locator(`a[href="${href}"], a[href="${href}/"]`);
+const hubLink = (page: Page, title: string) =>
+  rowIn(page.locator('main [data-page] section[aria-labelledby^="settings-group-"]'), hrefOf(title));
+const attentionLink = (page: Page, title: string) => rowIn(page.getByTestId("settings-attention"), hrefOf(title));
 
 async function shot(page: Page, name: string) {
   fs.mkdirSync(SHOTS_DIR, { recursive: true });
@@ -172,6 +174,10 @@ for (const role of ["owner", "admin", "member"] as Role[]) {
       await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
     }
 
+    // Reset all data is off the overview; on hosted it sits on Members and roles, for owners.
+    await expect(page.getByRole("heading", { name: "Danger zone" })).toHaveCount(0);
+    await page.goto("/settings/team/");
+    await expect(page.getByRole("heading", { level: 1, name: "Members and roles" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Danger zone" })).toHaveCount(role === "owner" ? 1 : 0);
   });
 }
@@ -182,9 +188,17 @@ test("hub shows current values at a glance", async ({ page }) => {
   await expect(hubLink(page, "Token limit")).toContainText("1.2M of 5M used this month");
   await expect(hubLink(page, "Repositories")).toContainText("1 of 2 repositories on");
   await expect(hubLink(page, "Integrations")).toContainText("1 needs credentials · 1 connected");
-  await expect(hubLink(page, "Team")).toContainText("1 person");
+  await expect(hubLink(page, "Members and roles")).toContainText("1 person");
   await expect(hubLink(page, "Alert routes")).toContainText("No routes yet");
-  await expect(hubLink(page, "Security")).toContainText("Two step sign in off");
+  await expect(hubLink(page, "Password and two step sign in")).toContainText("Two step sign in off");
+  // What needs someone comes first, and the menu marks the same pages.
+  const attention = page.getByTestId("settings-attention");
+  await expect(attention.getByRole("link")).toHaveCount(2);
+  await expect(attentionLink(page, "Integrations")).toContainText("1 needs credentials · 1 connected");
+  await expect(attentionLink(page, "Password and two step sign in")).toContainText("Two step sign in off");
+  const menu = page.getByRole("navigation", { name: "Settings" });
+  await expect(menu.getByRole("link", { name: /^Integrations/ })).toContainText("Needs attention");
+  await expect(menu.getByRole("link", { name: /^Repositories/ })).not.toContainText("Needs attention");
   await shot(page, "settings-hub-admin-1280.png");
 
   await page.setViewportSize({ width: 375, height: 812 });
@@ -431,4 +445,42 @@ test("repositories: the list toolbar filters on and off repos and searches by na
   await page.getByRole("searchbox", { name: "Search repos" }).fill("web");
   await expect(list.getByRole("listitem")).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Refresh from GitHub" })).toBeVisible();
+});
+
+test("Instructions keeps its three pages as tabs: Conventions, Rules and Voice", async ({ page }) => {
+  await mockApi(page, { role: "admin" });
+  await page.goto("/settings/instructions/");
+  await expect(page.getByRole("heading", { level: 1, name: "Conventions" })).toBeVisible();
+  const tabs = page.getByRole("navigation", { name: "Instructions pages" });
+  await expect(tabs.getByRole("link")).toHaveText(["Conventions", "Rules", "Voice"]);
+  const menu = page.getByRole("navigation", { name: "Settings" });
+  for (const [tab, href] of [["Rules", "/settings/guardrails"], ["Voice", "/settings/voice"]] as const) {
+    await tabs.getByRole("link", { name: tab }).click();
+    await expect(page).toHaveURL(new RegExp(`${href}/?$`));
+    await expect(page.getByRole("heading", { level: 1, name: tab })).toBeVisible();
+    await expect(tabs.getByRole("link", { name: tab })).toHaveAttribute("aria-current", "page");
+    // One menu entry for all three, marked on each tab.
+    await expect(menu.getByRole("link", { name: "Instructions" })).toHaveAttribute("aria-current", "page");
+    await expect(menu.getByRole("link", { name: tab, exact: true })).toHaveCount(0);
+    const crumb = page.getByRole("navigation", { name: "Breadcrumb" });
+    await expect(crumb.getByRole("link", { name: "Instructions" })).toHaveAttribute("href", /^\/settings\/instructions\/?$/);
+    await expect(crumb.getByText(tab, { exact: true })).toHaveAttribute("aria-current", "page");
+  }
+});
+
+test("the Settings menu filters by name and description, and / jumps to it", async ({ page }) => {
+  await mockApi(page, { role: "admin" });
+  await page.goto("/settings/");
+  await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
+  await page.keyboard.press("/");
+  const filter = page.getByLabel("Find a setting");
+  await expect(filter).toBeFocused();
+  await filter.fill("jira");
+  const menu = page.getByRole("navigation", { name: "Settings" });
+  await expect(menu.getByRole("link")).toHaveCount(1);
+  await expect(menu.getByRole("link", { name: /^Integrations/ })).toBeVisible();
+  await filter.fill("nothing like this");
+  await expect(menu.getByText("No setting matches")).toBeVisible();
+  await filter.fill("");
+  await expect(menu.getByRole("link", { name: "Overview" })).toBeVisible();
 });

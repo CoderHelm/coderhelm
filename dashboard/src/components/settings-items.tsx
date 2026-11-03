@@ -7,7 +7,8 @@ import {
 
 /** Keys for the small "current value" line some items show on the hub. */
 export type SettingsStatusKey =
-  | "usage" | "repos" | "team" | "alerts" | "dataSources" | "integrations" | "models" | "security";
+  | "usage" | "repos" | "team" | "alerts" | "dataSources" | "integrations" | "models" | "security"
+  | "setup" | "deliveries" | "system";
 
 export interface SettingsItem {
   href: string;
@@ -48,7 +49,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     label: "Your account",
     items: [
       { href: "/settings/notifications", title: "Notifications", description: "Which emails Coderhelm sends you.", icon: <BellIcon />, view: "own_account", edit: "own_account" },
-      { href: "/settings/security", title: "Password and two-factor", description: "Your password and your authenticator app.", icon: <LockIcon />, view: "own_account", edit: "own_account", status: "security" },
+      { href: "/settings/security", title: "Password and two step sign in", description: "Your password and your authenticator app.", icon: <LockIcon />, view: "own_account", edit: "own_account", status: "security" },
     ],
   },
   {
@@ -91,15 +92,15 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     label: "Usage and activity",
     items: [
       { href: "/settings/budget", title: "Token limit", description: "Monthly limits. Work pauses when the team reaches one.", icon: <TargetIcon />, view: ANY_CHANGE, edit: "budget", status: "usage" },
-      { href: "/settings/deliveries", title: "Deliveries", description: "Every event in and message out, and the ones that failed.", icon: <RepeatIcon />, view: "integrations", edit: "integrations" },
+      { href: "/settings/deliveries", title: "Deliveries", description: "Every event in and message out, and the ones that failed.", icon: <RepeatIcon />, view: "integrations", edit: "integrations", status: "deliveries" },
     ],
   },
   {
     id: "install",
     label: "This install",
     items: [
-      { href: "/settings/setup", title: "Setup checks", description: "What is left to set up, checked live.", icon: <WrenchIcon />, view: "system", edit: "system", selfHostOnly: true },
-      { href: "/settings/system", title: "Version and updates", description: "The running version, updates, history and roll back.", icon: <CpuIcon />, view: "system", edit: "system", selfHostOnly: true },
+      { href: "/settings/setup", title: "Setup checks", description: "What is left to set up, checked live.", icon: <WrenchIcon />, view: "system", edit: "system", selfHostOnly: true, status: "setup" },
+      { href: "/settings/system", title: "Version and updates", description: "The running version, updates, history and roll back.", icon: <CpuIcon />, view: "system", edit: "system", selfHostOnly: true, status: "system" },
       { href: "/settings/emails", title: "Email", description: "Which emails this install sends, and how.", icon: <BellIcon />, view: "emails", edit: "emails", selfHostOnly: true },
     ],
   },

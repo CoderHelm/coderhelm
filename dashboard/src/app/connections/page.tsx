@@ -117,7 +117,7 @@ function ConnectionsPage() {
   return (
     <Page>
       <PageHeader
-        title="Connections"
+        title="Connected accounts"
         lead={
           <>
             Tools your agents can reach: issue trackers, error trackers, docs and design tools, and any remote MCP server added by its

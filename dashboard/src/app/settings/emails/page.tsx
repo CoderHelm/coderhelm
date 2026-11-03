@@ -87,7 +87,7 @@ function Emails() {
   const header = (
     <div className="mb-6">
       <PageHeader
-        title="Emails"
+        title="Email"
         lead="Optional emails stay off until you turn them on. Essential emails always go out. Each person can still turn their own emails off in Notifications."
       />
     </div>
