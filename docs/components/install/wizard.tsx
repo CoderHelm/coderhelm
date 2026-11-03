@@ -81,7 +81,8 @@ import {
   stackName,
   stacksConsoleUrl,
   stateToQuery,
-  statusFileUrl,
+  progressDoc,
+  registerProgress,
   stepsFor,
   urlFromPaste,
   validate,
@@ -673,7 +674,7 @@ function AccountDisclosure({ s, hybrid }: { s: InstallState; hybrid: boolean }) 
         <li className={item} data-testid="disclosure-helper"><Dot /><span><span className="font-medium text-fd-foreground">An install helper function</span>, its code inside the template. It copies the release files, stores the one-time setup key, asks for your domain&apos;s certificate, and on delete empties buckets and removes logs. Its role reaches only this install&apos;s names.</span></li>
         <li className={item} data-testid="disclosure-deploy-role"><Dot /><span><span className="font-medium text-fd-foreground">No installer build, no deploy role and no CDK bootstrap.</span> The stack runs with your own AWS permissions. Only if you turn auto-update on does it add <Mono>coderhelm-{s.stage}-deploy-stack</Mono>, a role that only CloudFormation can use, limited to resources named or tagged for this install.</span></li>
         <li className={item}><Dot /><span>CoderHelm itself: Lambda functions, DynamoDB tables, S3 buckets, CloudFront, Cognito, queues, and a role for each service with only what that service uses.</span></li>
-        <li className={item}><Dot /><span>A progress bucket, <Mono>coderhelm-setup-&lt;id&gt;</Mono>, with one file: the install&apos;s progress and, at the end, its address. No emails, keys or account numbers. It is public if your account allows it, the file expires after 30 days, and the stack deletes the bucket when you delete the stack.</span></li>
+        <li className={item}><Dot /><span>No progress bucket and nothing public: the install reports its progress and, at the end, its address to CoderHelm with a key only this browser has. No emails, keys or account numbers.</span></li>
         <li className={item}><Dot /><span><span className="font-medium text-fd-foreground">No access for CoderHelm the company.</span> No role for another account, and nothing that trusts an account outside yours.{hybrid ? <> Hybrid adds no AWS access either: <a className={linkCls} href="/self-host/hybrid/#trust-model">what CoderHelm sees</a>.</> : null}</span></li>
       </ul>
       <Details summary="Risks and how to reduce them">
@@ -682,7 +683,7 @@ function AccountDisclosure({ s, hybrid }: { s: InstallState; hybrid: boolean }) 
           <p><b className="text-fd-foreground">CoderHelm can act within its boundary.</b> Whoever can change CoderHelm&apos;s functions can do what the boundary allows. Changing those functions or roles already takes administrator rights in your account. Keep Lambda and IAM rights to the people who already run this account.</p>
           <p><b className="text-fd-foreground">A malicious release could change CoderHelm.</b> You can check a release yourself before launching: its template&apos;s SHA-256 is in its signed checksums, and the template pins every other file. Updates are stack updates you review as a change set; with auto-update on, CoderHelm applies only published release templates, through a role that reaches only this install. It could not create an admin role or touch IAM elsewhere. Auto-update is off unless you turn it on in More options.</p>
           <p><b className="text-fd-foreground">Deleting the stack keeps your data unless you say otherwise.</b> <Mono>KeepDataOnDelete</Mono> is true by default: the tables, data bucket, keys, user pool and secret stay. Set it to false before deleting to remove them too.</p>
-          <p><b className="text-fd-foreground">The progress file is public while the install runs.</b> It holds only the install&apos;s progress and address. If your account blocks public access to S3, that&apos;s fine: the install still runs, and this page asks you for the address from the stack&apos;s Outputs.</p>
+          <p><b className="text-fd-foreground">Nothing in your account is public.</b> The install reports its progress and address to CoderHelm with a key only this browser has, and older releases&apos; public progress bucket is deleted on the first update.</p>
           <p><b className="text-fd-foreground">The AWS link holds your one-time setup key.</b> Don&apos;t share it or paste it anywhere. Until your GitHub App exists, someone with the key could give your install a GitHub App of their own. The link to this page holds no secret.</p>
         </div>
       </Details>
@@ -765,9 +766,9 @@ export function InstallWizard() {
     if (!s?.launchedAt || s.url) return;
     let live = true;
     const read = async () => {
-      const r = await getJson(statusFileUrl(s));
+      const body = await progressDoc(s, getJson);
       if (!live) return;
-      const d = r.ok ? parseStatusDoc(r.body) : null;
+      const d = body ? parseStatusDoc(body) : null;
       if (d) {
         setDoc(d);
         setS((p) => (p ? withDomainDoc(p, d) ?? p : p));
@@ -796,8 +797,8 @@ export function InstallWizard() {
   useEffect(() => {
     if (!s?.url || s.domainDoc || !s.launchedAt) return;
     let live = true;
-    void getJson(statusFileUrl(s)).then((r) => {
-      const d = r.ok ? parseStatusDoc(r.body) : null;
+    void progressDoc(s, getJson).then((body) => {
+      const d = body ? parseStatusDoc(body) : null;
       if (live && d) setS((p) => (p ? withDomainDoc(p, d) ?? p : p));
     });
     return () => {
@@ -939,16 +940,20 @@ export function InstallWizard() {
     setS(next);
     setDoc(null);
     setManual(null);
+    // Registered while AWS opens: the install's first report comes minutes later.
+    void registerProgress(next);
     window.open(quickCreateUrl(next), '_blank', 'noopener');
   };
 
   const relaunch = () => {
     if (!TAG_RE.test(s.version)) return;
-    // A failed stack keeps its name and its progress bucket: new ones for the new try.
-    const next = { ...s, statusId: randomId(16), setupToken: newState().setupToken, attempt: s.attempt + 1, launchedAt: Date.now(), url: '' };
+    // A new progress id, key and setup key for the new try.
+    const fresh = newState();
+    const next = { ...s, statusId: randomId(16), statusKey: fresh.statusKey, setupToken: fresh.setupToken, attempt: s.attempt + 1, launchedAt: Date.now(), url: '' };
     setS(next);
     setDoc(null);
     setSetup(null);
+    void registerProgress(next);
     window.open(quickCreateUrl(next), '_blank', 'noopener');
   };
 
@@ -1267,7 +1272,7 @@ export function InstallWizard() {
           <p>Everything it creates is named after the name in your AWS account, {s.stage}: the stack is {stackName(s)}, and every resource name starts with coderhelm-{s.stage}, so you can find them in the AWS console.</p>
           <p>The boxes you tick let the stack create IAM roles and expand its nested templates. Every role it creates carries CoderHelm&apos;s permissions boundary. The stack runs with your own permissions; nothing keeps deploy rights afterwards unless you turn auto-update on.</p>
           <p>{s.domainChoice === 'own' ? `Your domain: CoderHelm starts on its free cloudfront.net address and requests the certificate for ${cleanHostname(s.hostname) || 'your domain'}. This page shows the two records to add where its DNS is hosted (CoderHelm never changes your DNS, Route 53 included). Once the certificate is issued, CoderHelm prepares the stack update that moves it to your domain, for you to apply in AWS.` : s.domainChoice === 'coderhelm' ? `Your CoderHelm address: once your install answers, this page registers it with CoderHelm and claims ${cleanName(s.coderhelmName) || 'your name'}.${NAME_ZONE}. Your install requests the certificate in your account; CoderHelm adds the DNS records. Nothing for you to do.` : 'No domain or DNS work: CoderHelm gets a free cloudfront.net address. You can add your own domain later, in More options or in CoderHelm.'}</p>
-          <p>Two random values from this page go along in the AWS link: a progress ID, so this page can follow the install, and a one-time setup key, so GitHub (or CoderHelm, for hybrid) can talk to your CoderHelm directly. Both stay in your account and this browser; the setup key stops working once your GitHub App exists.</p>
+          <p>Two random values from this page go along in the AWS link: a progress ID and key, so your install can report its progress to CoderHelm and only this browser can read it, and a one-time setup key, so GitHub (or CoderHelm, for hybrid) can talk to your CoderHelm directly. The keys stay in your account and this browser; the setup key stops working once your GitHub App exists.</p>
         </Details>
       </section>
     );

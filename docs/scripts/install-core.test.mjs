@@ -678,3 +678,25 @@ test('the install address: once its own address is live, the guide follows it, a
   assert.deepEqual(c.followAddress(own, closed), { url: 'https://coderhelm.example.com', probe: true });
   assert.equal(c.followAddress({ ...st, domainChoice: 'aws' }, closed), null);
 });
+
+test('the AWS link carries the progress key only for hybrid; the guide registers only its hash', async () => {
+  const st = { ...c.newState(), email: 'a@example.com', provider: 'bedrock', version: 'v0.9.0' };
+  const q = (s) => new URLSearchParams(c.quickCreateUrl(s).split('#')[1].split('?')[1]);
+  assert.equal(q({ ...st, setup: 'hybrid' }).get('param_StatusKey'), st.statusKey);
+  assert.equal(q({ ...st, setup: 'private' }).get('param_StatusKey'), null);
+  assert.match(st.statusKey, /^[A-Za-z0-9]{40}$/);
+  const sent = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url, init) => { sent.push({ url, body: JSON.parse(init.body) }); return { status: 201 }; };
+  try {
+    assert.equal(await c.registerProgress({ ...st, setup: 'private' }), false);
+    assert.equal(sent.length, 0, 'the private guide sends CoderHelm nothing');
+    assert.equal(await c.registerProgress({ ...st, setup: 'hybrid' }), true);
+  } finally {
+    globalThis.fetch = real;
+  }
+  assert.equal(sent[0].url, 'https://api.coderhelm.com/api/install-progress');
+  assert.deepEqual(Object.keys(sent[0].body).sort(), ['id', 'key_hash']);
+  assert.equal(sent[0].body.key_hash, await c.sha256Hex(st.statusKey));
+  assert.ok(!JSON.stringify(sent[0]).includes(st.statusKey), 'the key itself never leaves for registration');
+});
