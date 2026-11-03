@@ -50,7 +50,7 @@ function SignInSettingsPage() {
   const header = (
     <div className="mb-6">
       <PageHeader
-        title="Sign-in"
+        title="Sign-in rules"
         lead={
           selfHosted
             ? "This install is for one organization. Admins add people, and you choose whether everyone must use two-factor sign-in."
@@ -217,7 +217,7 @@ function SignInSettingsPage() {
                 <p id="require-2fa-help" className="mt-0.5 text-sm text-zinc-400">
                   {required
                     ? `Required${data.require_2fa_since ? ` since ${new Date(data.require_2fa_since).toLocaleDateString()}` : ""}. People without it see a setup screen and nothing else.`
-                    : "Off: each person chooses for themselves in Settings, Security."}
+                    : "Off: each person chooses for themselves in Settings, Password and two step sign in."}
                 </p>
                 <p className="mt-1.5 flex items-center gap-2 text-sm" data-testid="without-2fa">
                   <StatusDot tone={without === 0 ? "success" : required ? "attention" : "muted"} />
@@ -241,7 +241,7 @@ function SignInSettingsPage() {
               <p className="text-sm text-amber-300" data-testid="set-up-yours-first">
                 Set it up for yourself first in{" "}
                 <Link href="/settings/security" className={linkButton}>
-                  Settings, Security
+                  Settings, Password and two step sign in
                 </Link>
                 , then sign out and sign in again with your code. Then you can require it for {everyone}.
               </p>

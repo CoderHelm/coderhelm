@@ -69,10 +69,12 @@ test("1280×800: the whole menu fits without scrolling, and help and the person 
   await expect(nav.getByRole("button", { name: "Sign out" })).toBeInViewport();
   for (const name of LINKS) await expect(menuLink(nav, name), name).toBeInViewport();
 
-  // A settings page marks Settings in the menu and itself in Settings' own list.
+  // A settings page turns the menu into Settings' own, marking itself, with a way back.
   await page.goto("/settings/budget");
-  await expect(nav.getByRole("link", { name: "Settings", exact: true })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("navigation", { name: "Settings" }).getByRole("link", { name: "Token limit", exact: true })).toHaveAttribute("aria-current", "page");
+  const settings = nav.getByRole("navigation", { name: "Settings" });
+  await expect(settings.getByRole("link", { name: /^Token limit/ })).toHaveAttribute("aria-current", "page");
+  await expect(nav.getByRole("link", { name: /Back to Coderhelm/ })).toBeInViewport();
+  await expect(nav.getByRole("button", { name: "Sign out" })).toBeInViewport();
 });
 
 test("390 wide: the menu drawer reaches every link and keeps help and the person in view", async ({ page }) => {
@@ -129,4 +131,18 @@ test("390 wide: more than five tabs become a select; chips that don't fit wrap",
   await page.setViewportSize({ width: 1280, height: 800 });
   await expect(views.getByRole("link", { name: "Trends" })).toHaveAttribute("aria-current", "page");
   await expect(select).toBeHidden();
+});
+
+test("a self-hosted install shows no Platform links: the hosted service's admin and support queue", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await mockApi(page);
+  await page.route((url) => url.pathname === "/runtime-config.js", (route) =>
+    route.fulfill({ contentType: "text/javascript", body: `window.__CODERHELM_CONFIG__ = ${JSON.stringify({ selfHosted: true, version: "v0.0.1" })};` }),
+  );
+  await page.goto("/");
+  const nav = page.getByRole("navigation", { name: "Main" });
+  await expect(menuLink(nav, "Runs")).toBeVisible();
+  await expect(menuLink(nav, "Admin")).toHaveCount(0);
+  await expect(menuLink(nav, "Support queue")).toHaveCount(0);
+  await expect(nav.getByText("Platform", { exact: true })).toHaveCount(0);
 });

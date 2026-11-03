@@ -29,7 +29,7 @@ export function HybridAppChoice({ id, name, className = "" }: { id: string; name
       <div className={box} data-testid="hybrid-app-choice" data-state="unregistered">
         <p className="text-sm text-zinc-300">
           Skip creating your own {name} app: use Coderhelm&apos;s instead, with your code still in your AWS account.{" "}
-          <Link href={HYBRID_HREF} className={linkButton}>Set it up in Settings, System, Hybrid</Link>
+          <Link href={HYBRID_HREF} className={linkButton}>Set it up in Settings, Version and updates, Hybrid</Link>
         </p>
       </div>
     );
@@ -75,7 +75,7 @@ export function HybridAppChoice({ id, name, className = "" }: { id: string; name
       </div>
       <p className="mt-2 text-sm text-zinc-400">
         {note}{" "}
-        <Link href={HYBRID_HREF} className={`${linkButton} text-sm`}>More in Settings, System, Hybrid</Link>
+        <Link href={HYBRID_HREF} className={`${linkButton} text-sm`}>More in Settings, Version and updates, Hybrid</Link>
       </p>
     </div>
   );

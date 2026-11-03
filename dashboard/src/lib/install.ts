@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type SystemVersion } from "@/lib/api";
+import { api, type SystemChecks, type SystemVersion } from "@/lib/api";
 import { isSelfHosted } from "@/lib/runtime-config";
 
 /**
@@ -156,3 +156,18 @@ export function setupProgress(checks: SetupCheck[]): { done: number; total: numb
   const req = checks.filter((c) => !c.optional);
   return { done: req.filter((c) => c.done === true).length, total: req.length };
 }
+
+// The install's live checks are a real run on the server. The Setup page's
+// first load and the Settings menu's status share one result for a minute;
+// "Check again" always runs them afresh.
+let lastChecks: { at: number; result: Promise<SystemChecks> } | null = null;
+export function systemChecks(fresh = false): Promise<SystemChecks> {
+  if (!fresh && lastChecks && Date.now() - lastChecks.at < 60_000) return lastChecks.result;
+  const result = api.getSystemChecks();
+  lastChecks = { at: Date.now(), result };
+  result.catch(() => {
+    if (lastChecks?.result === result) lastChecks = null;
+  });
+  return result;
+}
+

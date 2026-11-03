@@ -89,7 +89,8 @@ const DIALOGS: DialogCase[] = [
   },
   {
     name: "reset-all-data",
-    url: "/settings",
+    // Off the overview: on hosted it sits on Members and roles.
+    url: "/settings/team",
     open: (p) => p.getByRole("button", { name: "Reset all data" }).click(),
     primary: "Delete everything",
   },

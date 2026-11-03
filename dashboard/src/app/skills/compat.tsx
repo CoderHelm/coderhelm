@@ -118,7 +118,7 @@ export function CompatBadge({ item }: { item: Pick<Skill, "compat"> }) {
 /** Where to connect what a step needs, when the check didn't say. GitHub
  * is never offered: every team has it connected already. */
 const CONNECT: Record<Requirement["connect"], { href: string; label: string } | null> = {
-  plugins: { href: "/connections", label: "Connections" },
+  plugins: { href: "/connections", label: "Connected accounts" },
   data_sources: { href: "/data-sources", label: "Data sources" },
   github: null,
   none: null,

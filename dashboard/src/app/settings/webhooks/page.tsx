@@ -141,7 +141,7 @@ function EndpointsPage() {
   return (
     <Page testId="webhooks-page">
       <PageHeader
-        title="Webhooks"
+        title="Outgoing webhooks"
         lead={
           <>
             <p>

@@ -298,7 +298,7 @@ const row = (page: Page, text: string) => members(page).getByRole("listitem").fi
 test("admin sees one row per person, GitHub logins, statuses and the permissions table", async ({ page }) => {
   await mockApi(page);
   await page.goto("/settings/team");
-  await expect(page.getByRole("heading", { name: "Team", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Members and roles", exact: true })).toBeVisible();
   await expect(members(page).getByRole("listitem")).toHaveCount(7);
   await expect(row(page, "Olivia Owner").getByRole("link", { name: /olivia-o on GitHub/ })).toHaveAttribute("href", "https://github.com/olivia-o");
   await expect(row(page, "samrivera").getByText("Signs in with GitHub")).toBeVisible();

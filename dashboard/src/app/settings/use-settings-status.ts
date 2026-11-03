@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { formatTokens, LIMIT_LABELS, limitsTone, usageBreakdown, usageLimits, usageTotal } from "@/lib/usage";
 import { can } from "@/lib/capabilities";
-import { SETTINGS_ITEMS, type SettingsStatusKey } from "@/components/settings-items";
+import { SETTINGS_ITEMS, offered, type SettingsStatusKey } from "@/components/settings-items";
+import { isSelfHosted } from "@/lib/runtime-config";
+import { systemChecks } from "@/lib/install";
 
 export type StatusTone = "neutral" | "success" | "warning" | "error";
 
@@ -76,6 +78,24 @@ const LOADERS: Record<SettingsStatusKey, (me: Me) => Promise<ItemStatus | null>>
     if (m.deployment_provider === "bedrock") return { text: "Amazon Bedrock", tone: "success" };
     return m.api_key_masked ? { text: "Your own API key", tone: "success" } : { text: "Coderhelm's key", tone: "neutral" };
   },
+  // This install: failing setup checks need someone; warnings are shown, not flagged.
+  setup: async () => {
+    const { summary } = await systemChecks();
+    if (summary.fail > 0) return { text: `${plural(summary.fail, "check")} failing`, tone: "error" };
+    if (summary.warn > 0) return { text: `${plural(summary.warn, "warning")}`, tone: "neutral" };
+    return { text: "All checks pass", tone: "success" };
+  },
+  deliveries: async () => {
+    const since = new Date(Date.now() - 24 * 3_600_000).toISOString();
+    const { summary } = await api.listDeliveries({ since, limit: 1 });
+    if (summary.failed > 0) return { text: `${summary.failed} failed in the last 24 hours`, tone: "warning" };
+    return summary.total > 0 ? { text: "No failures in 24 hours", tone: "success" } : null;
+  },
+  system: async () => {
+    const v = await api.getSystemVersion();
+    if (v.update_available && v.latest) return { text: `Update to ${v.latest.version} waiting`, tone: "warning" };
+    return v.current.version ? { text: `Up to date · ${v.current.version}`, tone: "success" } : null;
+  },
   security: async (me) => {
     if (me.auth_provider && me.auth_provider !== "email") {
       return { text: `Signs in with ${me.auth_provider === "github" ? "GitHub" : "Google"}`, tone: "neutral" };
@@ -93,7 +113,7 @@ export function useSettingsStatus(me: Me | null): Partial<Record<SettingsStatusK
     if (!me) return;
     let live = true;
     const keys = new Set(
-      SETTINGS_ITEMS.filter((i) => i.status && can(me, i.view)).map((i) => i.status as SettingsStatusKey),
+      SETTINGS_ITEMS.filter((i) => i.status && can(me, i.view) && offered(i, isSelfHosted(), me.platform_admin === true)).map((i) => i.status as SettingsStatusKey),
     );
     for (const key of keys) {
       LOADERS[key](me)

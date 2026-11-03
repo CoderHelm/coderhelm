@@ -208,7 +208,7 @@ function GuardrailsPage() {
   return (
     <Page>
       <div className="mb-6">
-        <PageHeader title="Guardrails" lead="Rules every Coderhelm run must follow. A repository's own rules add to the ones for every repository." />
+        <PageHeader title="Rules" lead="Rules every Coderhelm run must follow. A repository's own rules add to the ones for every repository." />
       </div>
 
       <div className="max-w-3xl space-y-8">

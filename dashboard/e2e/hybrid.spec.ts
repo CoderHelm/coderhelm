@@ -389,7 +389,7 @@ test("integration pages before registering point to Settings, System, Hybrid", a
   await page.goto("/settings/integrations/github/");
   const choice = page.getByTestId("hybrid-app-choice");
   await expect(choice).toHaveAttribute("data-state", "unregistered");
-  await expect(choice.getByRole("link", { name: /Settings, System, Hybrid/ })).toHaveAttribute("href", /\/settings\/system\/?#hybrid$/);
+  await expect(choice.getByRole("link", { name: /Settings, Version and updates, Hybrid/ })).toHaveAttribute("href", /\/settings\/system\/?#hybrid$/);
 });
 
 test("the hosted service shows no app choice", async ({ page }) => {

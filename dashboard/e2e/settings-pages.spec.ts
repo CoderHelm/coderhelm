@@ -189,7 +189,8 @@ test("voice: a failed load shows no editor, so nothing can be overwritten", asyn
 test("security: a narrow labelled form, and one name for two step sign in", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/settings/security/");
-  await expect(page.getByRole("heading", { name: "Two step sign in" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Password and two step sign in" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Two step sign in", exact: true })).toBeVisible();
   await expect(page.getByText(/2FA|MFA|two-factor|TOTP/i)).toHaveCount(0);
   await shot(page, "settings-security");
 

@@ -3,7 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { mockWideApi } from "./wide-data";
 import { SAMPLE_QUERY } from "./wide-data/addresses";
-import { pickOption } from "./select";
 
 const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots");
 
@@ -60,16 +59,23 @@ test("one banner at a time: the reached limit first, said plainly, with the rest
   await expect(page.getByTestId("token-limit-banner").getByRole("link", { name: "Raise the limit" })).toHaveCount(0);
 });
 
-test("settings pages show Settings' own list, and destinations with several pages show tabs", async ({ page }) => {
+test("settings pages show Settings' own menu in place of the app's, and destinations with several pages show tabs", async ({ page }) => {
   await mockWideApi(page);
   await page.goto("/settings/security");
-  const nav = page.getByRole("navigation", { name: "Settings" });
-  await expect(nav.getByRole("link", { name: "Security" })).toHaveAttribute("aria-current", "page");
-  await expect(nav.getByRole("link", { name: "Integrations" })).toBeVisible();
-  await expect(page.getByTestId("main-nav").getByRole("link", { name: "Settings" })).toHaveAttribute("aria-current", "page");
+  const main = page.getByRole("navigation", { name: "Main" });
+  const nav = main.getByRole("navigation", { name: "Settings" });
+  await expect(nav.getByRole("link", { name: "Password and two step sign in" })).toHaveAttribute("aria-current", "page");
+  await expect(nav.getByRole("link", { name: /^Integrations/ })).toBeVisible();
+  // One column of navigation: the app's menu gives way, with a way back.
+  await expect(page.getByTestId("main-nav")).toHaveCount(0);
+  await expect(main.getByRole("link", { name: /Back to Coderhelm/ })).toHaveAttribute("href", "/");
+  await expect(page.getByTestId("settings-content").getByRole("navigation", { name: "Settings" })).toHaveCount(0);
   // Data sources lives under Settings too.
   await page.goto("/data-sources");
   await expect(page.getByRole("navigation", { name: "Settings" }).getByRole("link", { name: "Data sources" })).toHaveAttribute("aria-current", "page");
+  // Back to Coderhelm brings the app's menu back.
+  await page.getByRole("link", { name: /Back to Coderhelm/ }).click();
+  await expect(page.getByTestId("main-nav")).toBeVisible();
 
   await page.goto("/tests");
   const tabs = page.getByRole("navigation", { name: "Code review pages" });
@@ -79,13 +85,14 @@ test("settings pages show Settings' own list, and destinations with several page
   await page.goto(`/runs/detail${SAMPLE_QUERY["/runs/detail"]}`);
   await expect(page.getByTestId("section-tabs")).toHaveCount(0);
 
-  // On a phone, Settings' list is one select.
+  // On a phone, the menu drawer is the Settings menu.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/settings/security");
-  const select = page.getByTestId("settings-nav-select");
-  await expect(select).toBeVisible();
-  await pickOption(select, "/settings/team");
+  await page.getByRole("button", { name: "Menu" }).click();
+  const drawer = page.getByRole("dialog", { name: "Menu" }).getByRole("navigation", { name: "Settings" });
+  await drawer.getByRole("link", { name: "Members and roles" }).click();
   await expect(page).toHaveURL(/\/settings\/team\/?$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Members and roles" })).toBeVisible();
 });
 
 test("Logs is its own destination: the log analyzer and alerts as its two tabs, both found by the palette", async ({ page }) => {

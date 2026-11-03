@@ -1,5 +1,9 @@
 "use client";
 
+import { ResetAllData } from "@/components/reset-data";
+
+import { isSelfHosted } from "@/lib/runtime-config";
+
 import { useCan } from "@/hooks/use-can";
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -54,7 +58,7 @@ type StatusFilter = "all" | "active" | "github";
 
 export default function TeamPageWithParams() {
   return (
-    <Suspense fallback={<Page><PageHeader title="Team" /><div className="mt-8"><ListSkeleton rows={3} label="Loading members" /></div></Page>}>
+    <Suspense fallback={<Page><PageHeader title="Members and roles" /><div className="mt-8"><ListSkeleton rows={3} label="Loading members" /></div></Page>}>
       <TeamPage />
     </Suspense>
   );
@@ -219,7 +223,7 @@ function TeamPage() {
   return (
     <Page>
       <PageHeader
-        title="Team"
+        title="Members and roles"
         lead={
           <>
             {teamName ? <span className="text-zinc-200">{teamName}</span> : "This workspace"}
@@ -439,6 +443,7 @@ function TeamPage() {
           onConfirm={(person, github) => link(person, github)}
         />
       )}
+      {!isSelfHosted() && <ResetAllData />}
     </Page>
   );
 }
