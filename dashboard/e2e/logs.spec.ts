@@ -164,6 +164,42 @@ async function shot(page: Page, name: string) {
   await page.screenshot({ path: path.join(SHOTS_DIR, `${name}.png`), fullPage: true });
 }
 
+test("a quiet finding says when it resolves on its own, and a resolved one says it did", async ({ page }) => {
+  const day = 24 * HOUR;
+  const quiet = finding({
+    rec_id: "rec_quiet",
+    status: "acknowledged",
+    title: "Prerender cache writes fail with no space left",
+    last_seen: ago(3 * day),
+    quiet_days: 8,
+    resolves_at: new Date(Date.now() + 5 * day).toISOString(),
+  });
+  const resolved = finding({
+    rec_id: "rec_resolved",
+    status: "fixed",
+    title: "Image resize worker ran out of memory",
+    last_seen: ago(5 * day),
+    resolved_at: ago(2 * day),
+    resolved_reason: "Resolved: no new lines for 3 days",
+  });
+  await mockApi(page, { findings: [quiet, resolved] });
+  await page.goto("/logs/");
+
+  const q = page.getByTestId("finding-rec_quiet");
+  await expect(q).toContainText("Quiet for 3 days. Resolves on its own");
+  await expect(q).toContainText("unless seen again");
+  const r = page.getByTestId("finding-rec_resolved");
+  await expect(r).toContainText("Resolved on its own");
+  await expect(r).toContainText("(no new lines for 3 days)");
+  // Open findings first, resolved after.
+  const ids = await page.locator('[data-testid^="finding-rec_"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
+  expect(ids.indexOf("finding-rec_quiet")).toBeLessThan(ids.indexOf("finding-rec_resolved"));
+  // Mark as new stays on the open one.
+  await q.getByRole("button", { name: "Show details of Prerender cache writes fail with no space left" }).click();
+  await expect(page.getByTestId("finding-quiet")).toContainText("Resolves on its own");
+  await expect(page.getByRole("button", { name: "Mark as new" })).toBeVisible();
+});
+
 test("Logs is its own menu item, with Logs and Alerts as its tabs", async ({ page }) => {
   await mockApi(page);
   await page.goto("/logs/");

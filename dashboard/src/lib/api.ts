@@ -2722,6 +2722,13 @@ export interface LogFinding {
   reopened_at?: string | null;
   /** How many times it came back after it was resolved. */
   reopen_count?: number;
+  /** Days without a matching line before it resolves on its own. */
+  quiet_days?: number;
+  /** Open: when it resolves on its own unless seen again. */
+  resolves_at?: string | null;
+  /** When the analyzer resolved it, and why. */
+  resolved_at?: string | null;
+  resolved_reason?: string | null;
 }
 
 /** Which repo a log group's (or alarm's) code lives in, how sure, and why. */

@@ -28,6 +28,7 @@ import { Code } from "@/components/settings/code";
 import { Page, PageHeader } from "@/components/page";
 import { buttonClass, focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Select } from "@/components/select";
+import { formatDate } from "@/components/list/time";
 import {
   Chip,
   DetailBlock,
@@ -80,6 +81,27 @@ function serviceName(group: string): string {
 
 function plural(n: number, one: string, many = `${one}s`): string {
   return `${n.toLocaleString()} ${n === 1 ? one : many}`;
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Whether a finding is quiet, in words: "Quiet for 3 days. Resolves on its own
+ * Nov 5 unless seen again." for an open one with no line for a day or more,
+ * "Resolved on its own Nov 5 (no new lines for 3 days)." once the analyzer
+ * resolved it; null otherwise.
+ */
+function quietWords(f: LogFinding, now = Date.now()): string | null {
+  if (f.status === "fixed" && f.resolved_at && f.fix?.state !== "merged") {
+    const why = f.resolved_reason?.replace(/^Resolved:\s*/, "");
+    return `Resolved on its own ${formatDate(f.resolved_at)}${why ? ` (${why})` : ""}.`;
+  }
+  if ((f.status === "new" || f.status === "acknowledged") && f.resolves_at && f.last_seen) {
+    const quiet = Math.floor((now - Date.parse(f.last_seen)) / DAY_MS);
+    if (!(quiet >= 1)) return null;
+    return `Quiet for ${plural(quiet, "day")}. Resolves on its own ${formatDate(f.resolves_at)} unless seen again.`;
+  }
+  return null;
 }
 
 function errorText(e: unknown, fallback: string): string {
@@ -467,7 +489,7 @@ function FindingRow({
       status={look}
       title={f.title}
       titleText={f.title}
-      quiet={f.status === "ignored"}
+      quiet={f.status === "ignored" || (f.status === "fixed" && !!f.resolved_at)}
       meta={[
         <span key="g" title={f.log_group} className="font-medium text-zinc-300">
           {serviceName(f.log_group)}
@@ -478,11 +500,12 @@ function FindingRow({
         f.reopened_at ? `seen again ${timeAgo(f.reopened_at)} after it was resolved` : null,
         f.repo ? <span key="r">{f.repo}</span> : null,
       ]}
-      summary={fixWords(f) ?? autoNote ?? undefined}
+      summary={fixWords(f) ?? autoNote ?? quietWords(f) ?? undefined}
       summaryTone={f.fix ? (f.fix.state === "merged" ? "success" : f.fix.state === "failed" || f.fix.state === "pr_closed" ? "attention" : "live") : "muted"}
       chips={
         <>
-          <Chip tone={sev.tone}>{sev.label}</Chip>
+          {/* A resolved finding's severity is history: shown, not alarming. */}
+          <Chip tone={f.status === "fixed" || f.status === "ignored" ? "neutral" : sev.tone}>{sev.label}</Chip>
           <StatusText look={look} />
           {f.fix?.auto && <Chip tone="info" title="Started automatically from this finding">Auto</Chip>}
           {link}
@@ -569,6 +592,11 @@ function FindingDetail({
               </li>
             ))}
           </ul>
+        </DetailBlock>
+      )}
+      {quietWords(f) && (
+        <DetailBlock title="Quiet">
+          <p className="text-zinc-300" data-testid="finding-quiet">{quietWords(f)}</p>
         </DetailBlock>
       )}
       {f.suggested_action && (
