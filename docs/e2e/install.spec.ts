@@ -570,15 +570,12 @@ test('more options: domain, sender, sign-up and updates go to AWS; a bad hostnam
   expect(await opened(page)).toEqual([]);
   await page.getByLabel('Your domain').fill('https://CoderHelm.example.com/');
   await page.getByLabel('Send email from').fill('helm@example.com');
-  // One organization: only people the admin invites, unless they pick their domain.
+  // One organization: the first admin adds everyone else in Team. Open joining isn't offered.
   const join = page.getByTestId('who-may-join');
-  await expect(join).toContainText('This install is for one organization only: nobody else can sign up.');
-  await expect(join).toContainText('You can change both later in Settings, Sign-in.');
-  await expect(page.getByLabel('Only people I invite')).toBeChecked();
+  await expect(join).toContainText('nobody can sign up on their own');
+  await expect(join).toContainText('add everyone else in Settings, Team');
+  await expect(page.getByLabel('Anyone with an email at')).toHaveCount(0);
   await expect(page.getByLabel('Company email domain')).toHaveCount(0);
-  await page.getByLabel('Anyone with an email at').check();
-  // It starts from the admin's own domain.
-  await expect(page.getByLabel('Company email domain')).toHaveValue('example.com');
   await page.getByTestId('require-two-factor').check();
   await page.getByTestId('auto-update').check();
   await page.getByLabel('Day').selectOption('daily');
@@ -590,7 +587,7 @@ test('more options: domain, sender, sign-up and updates go to AWS; a bad hostnam
   const q = new URLSearchParams(new URL(link).hash.split('?')[1]);
   expect(q.get('param_Hostname')).toBe('coderhelm.example.com');
   expect(q.get('param_EmailFrom')).toBe('helm@example.com');
-  expect(q.get('param_SignupDomain')).toBe('example.com');
+  expect(q.get('param_SignupDomain')).toBeNull();
   expect(q.get('param_RequireTwoFactor')).toBe('on');
   expect(q.get('param_AutoUpdate')).toBe('on');
   expect(q.get('param_UpdateDay')).toBe('daily');
