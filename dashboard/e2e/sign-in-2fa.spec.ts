@@ -165,15 +165,14 @@ for (const width of WIDTHS) {
       await noSidewaysScroll(page);
       await shot(page, "sign-in-settings", width);
 
-      // A public email service is refused with the server's words.
-      state.refuse = { status: 400, error: "gmail.com is a public email service: allowing it would let anyone join. Invite those people instead." };
-      await page.getByLabel("Let anyone with an email at").fill("gmail.com");
-      await page.getByRole("button", { name: "Allow" }).click();
-      await expect(page.getByRole("alert").filter({ hasText: "public email service" })).toBeVisible();
-      // A company domain is added.
-      await page.getByLabel("Let anyone with an email at").fill("@Corp.Example.org");
-      await page.getByRole("button", { name: "Allow" }).click();
-      await expect.poll(() => state.puts.at(-1)).toEqual({ domains: ["example.org", "corp.example.org"] });
+      // Nobody signs up on their own: no way to open joining to a domain here.
+      await expect(page.getByText("Nobody can sign up on their own.", { exact: false })).toBeVisible();
+      await expect(page.getByLabel("Let anyone with an email at")).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Allow" })).toHaveCount(0);
+      // A domain the install's setup listed can be removed.
+      await page.getByRole("button", { name: "Remove example.org" }).click();
+      await page.getByRole("button", { name: "Remove", exact: true }).last().click();
+      await expect.poll(() => state.puts.at(-1)).toEqual({ domains: [] });
 
       // Require it: a confirmation that says how many will be held.
       await page.getByTestId("require-2fa").click();
@@ -205,7 +204,8 @@ for (const width of WIDTHS) {
         },
       });
       await page.goto("/settings/sign-in");
-      await expect(page.getByTestId("domains-empty")).toContainText("only people you invite");
+      await expect(page.getByTestId("domains")).toHaveCount(0);
+      await expect(page.getByText("Nobody can sign up on their own.", { exact: false })).toBeVisible();
       await expect(page.getByTestId("require-2fa")).toBeDisabled();
       await expect(page.getByTestId("set-up-yours-first")).toBeVisible();
       await noSidewaysScroll(page);
@@ -317,9 +317,25 @@ for (const width of WIDTHS) {
       await page.getByLabel("Password").fill("Secret123!");
       await page.getByRole("button", { name: "Sign in", exact: true }).click();
       await expect(page.getByRole("alert").filter({ hasText: "private to one organization" })).toBeVisible();
-      // The sign-up form says it's one organization.
-      await page.getByRole("button", { name: "Create account" }).click();
-      await expect(page.getByTestId("signup-one-org")).toContainText("This Coderhelm is for one organization.");
+      // No open sign-up: the sign-in page says new people come in through an invite.
+      await expect(page.getByRole("button", { name: "Create account" })).toHaveCount(0);
+      await expect(page.getByTestId("login-invite-only")).toContainText("your invite email has the link");
+    });
+
+    test("an invite email's link opens the account form; nothing else does", async ({ page }) => {
+      await mock(page, { me: null });
+      await page.goto("/?invite=1");
+      await expect(page.getByTestId("signup-one-org")).toContainText("Set up your account with the email your invite was sent to.");
+      await expect(page.locator("#signup-email")).toBeVisible();
+      await expect(page.getByText("Closed beta")).toHaveCount(0);
+      await noSidewaysScroll(page);
+      await shot(page, "invite-signup", width);
+      // Back to sign in: no way to return to an open form.
+      await page.getByRole("button", { name: "Already have an account? Sign in" }).click();
+      await expect(page.getByRole("button", { name: "Create account" })).toHaveCount(0);
+      await expect(page.getByTestId("login-invite-only")).toBeVisible();
+      await noSidewaysScroll(page);
+      await shot(page, "sign-in-invite-only", width);
     });
   });
 }
