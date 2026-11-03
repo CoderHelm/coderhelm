@@ -41,6 +41,10 @@ export interface Member {
   invited_at?: string | null;
   invite_expires_at?: string | null;
   invite_expired?: boolean;
+  /** Self-hosted, admins only: on the team (copied from another Coderhelm) but never signed in here. */
+  needs_setup?: boolean;
+  /** When the last set-up email went to them. */
+  setup_email_sent_at?: string | null;
   is_self: boolean;
 }
 
@@ -167,6 +171,10 @@ export const teamApi = {
   remove: (userId: string) => request<{ status: string }>(`/api/users/${encodeURIComponent(userId)}`, { method: "DELETE" }),
   resend: (userId: string) =>
     request<{ status: string; invited_at?: string; invite_expires_at?: string }>(`/api/users/${encodeURIComponent(userId)}/resend`, {
+      method: "POST",
+    }),
+  setupEmail: (userId: string) =>
+    request<{ status: string; setup_email_sent_at?: string }>(`/api/users/${encodeURIComponent(userId)}/setup-email`, {
       method: "POST",
     }),
   roles: () => request<RolesInfo>("/api/roles"),

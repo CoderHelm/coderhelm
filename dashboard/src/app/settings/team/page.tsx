@@ -204,6 +204,20 @@ function TeamPage() {
     }
   };
 
+  const setupEmail = async (m: Member) => {
+    setBusy(m.user_id);
+    try {
+      const r = await teamApi.setupEmail(m.user_id);
+      const at = r.setup_email_sent_at ?? new Date().toISOString();
+      setMembers((prev) => prev?.map((x) => (x.user_id === m.user_id ? { ...x, setup_email_sent_at: at } : x)) ?? null);
+      toast(`Set-up email sent to ${m.email}`);
+    } catch (e) {
+      toast(errorText(e), "error");
+    } finally {
+      setBusy("");
+    }
+  };
+
   const link = async (person: Member, github: Member) => {
     setBusy(person.user_id);
     try {
@@ -354,6 +368,7 @@ function TeamPage() {
                   onRole={(next) => changeRole(m, next)}
                   onRemove={() => remove(m)}
                   onLink={() => setLinking(m)}
+                  onSetupEmail={canInvites ? () => setupEmail(m) : undefined}
                   roleLabel={roleLabel}
                 />
               ))}
@@ -507,6 +522,7 @@ function MemberRow({
   onRole,
   onRemove,
   onLink,
+  onSetupEmail,
   roleLabel,
 }: {
   m: Member;
@@ -519,6 +535,8 @@ function MemberRow({
   onRole: (role: string) => void;
   onRemove: () => void;
   onLink: () => void;
+  /** Admins on a self-hosted install: email the link to set up their account here. */
+  onSetupEmail?: () => void;
   roleLabel: (key: string) => string;
 }) {
   const githubOnly = isGithubOnly(m);
@@ -530,6 +548,10 @@ function MemberRow({
   const actions: { label: string; onSelect: () => void; danger?: boolean; disabledReason?: string }[] = [];
   if (manageable && linkable) {
     actions.push({ label: githubOnly ? "Link to a member who signs in with email…" : "Link a GitHub sign-in…", onSelect: onLink });
+  }
+  const setup = Boolean(m.needs_setup && onSetupEmail);
+  if (setup && onSetupEmail) {
+    actions.push({ label: m.setup_email_sent_at ? "Send the set-up email again" : "Send set-up email", onSelect: onSetupEmail });
   }
   if (manageable) {
     actions.push({
@@ -562,6 +584,11 @@ function MemberRow({
         m.github_login ? <GithubLink key="gh" login={m.github_login} /> : null,
         githubOnly ? <span key="how">Signs in with GitHub</span> : null,
         <span key="seen">{seen ? `Active ${seen}` : "Not signed in yet"}</span>,
+        setup ? (
+          <span key="setup" data-testid="setup-status">
+            {m.setup_email_sent_at ? `Set-up email sent ${shortDate(m.setup_email_sent_at)}` : "Hasn't set up an account here yet"}
+          </span>
+        ) : null,
       ]}
       chips={
         <>

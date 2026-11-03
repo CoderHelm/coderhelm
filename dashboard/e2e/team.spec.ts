@@ -23,6 +23,8 @@ interface Member {
   invited_at?: string | null;
   invite_expires_at?: string | null;
   invite_expired?: boolean;
+  needs_setup?: boolean;
+  setup_email_sent_at?: string | null;
   is_self: boolean;
 }
 
@@ -231,7 +233,7 @@ async function mockApi(page: Page, selfRole = "admin", init: Partial<Backend> = 
       db.members.push(member({ user_id: `invite_${db.members.length}`, email, role: String(body?.role), status: "invited" }));
       return json(route, { status: "invited", user_id: "invite_x" });
     }
-    const m = p.match(/^\/api\/users\/([^/]+)(?:\/(role|resend|link-github))?$/);
+    const m = p.match(/^\/api\/users\/([^/]+)(?:\/(role|resend|link-github|setup-email))?$/);
     if (m) {
       const id = decodeURIComponent(m[1]);
       const target = db.members.find((x) => x.user_id === id);
@@ -260,6 +262,12 @@ async function mockApi(page: Page, selfRole = "admin", init: Partial<Backend> = 
           updated_at: renewed.updated_at,
         });
         return json(route, { status: "sent", invited_at: renewed.invited_at, invite_expires_at: renewed.invite_expires_at });
+      }
+      if (m[2] === "setup-email") {
+        if (LEVEL[selfRole] < 3) return json(route, { error: "Only admins and owners can do that." }, 403);
+        if (!target.needs_setup) return json(route, { error: "They've already signed in on this install." }, 409);
+        target.setup_email_sent_at = new Date().toISOString();
+        return json(route, { status: "sent", setup_email_sent_at: target.setup_email_sent_at });
       }
       if (m[2] === "link-github") {
         const gh = db.members.find((x) => x.user_id === body?.github_user_id);
@@ -468,6 +476,32 @@ test("remove a member from the actions menu", async ({ page }) => {
   await page.getByRole("button", { name: "Remove", exact: true }).click();
   await expect(row(page, "Mia Member")).toHaveCount(0);
   expect(db.calls.some((c) => c.method === "DELETE" && c.path === "/api/users/u-mem")).toBe(true);
+});
+
+test("self-hosted: a member who never signed in here gets a set-up email from the menu", async ({ page }) => {
+  const db = await mockApi(page);
+  const mia = db.members.find((x) => x.user_id === "u-mem")!;
+  mia.needs_setup = true;
+  await page.goto("/settings/team");
+  await expect(row(page, "Mia Member").getByTestId("setup-status")).toHaveText("Hasn't set up an account here yet");
+  // Only that member: everyone else has signed in here.
+  await expect(members(page).getByTestId("setup-status")).toHaveCount(1);
+  await row(page, "Mia Member").getByRole("button", { name: "More actions for Mia Member" }).click();
+  await page.getByRole("menuitem", { name: "Send set-up email" }).click();
+  await expect(page.getByText("Set-up email sent to mia@example.com")).toBeVisible();
+  await expect(row(page, "Mia Member").getByTestId("setup-status")).toHaveText(/^Set-up email sent /);
+  expect(db.calls.some((c) => c.method === "POST" && c.path === "/api/users/u-mem/setup-email")).toBe(true);
+  // Sent before: the menu says it goes again.
+  await row(page, "Mia Member").getByRole("button", { name: "More actions for Mia Member" }).click();
+  await expect(page.getByRole("menuitem", { name: "Send the set-up email again" })).toBeVisible();
+  await shot(page, "team-setup-email");
+});
+
+test("no set-up email for members who signed in, or for someone who can't invite", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/settings/team");
+  await row(page, "Sam Rivera").getByRole("button", { name: "More actions for Sam Rivera" }).click();
+  await expect(page.getByRole("menuitem", { name: /set-up email/ })).toHaveCount(0);
 });
 
 test("search and filters narrow the list, with a way back", async ({ page }) => {
