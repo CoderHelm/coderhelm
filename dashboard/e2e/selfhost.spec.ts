@@ -96,7 +96,7 @@ function domainAnswer(code: string) {
   };
 }
 
-async function setup(page: Page, cfg: RuntimeConfig | null, opts: { native?: unknown; signedIn?: boolean; provider?: "anthropic" | "bedrock"; blocked?: boolean; domain?: string } = {}) {
+async function setup(page: Page, cfg: RuntimeConfig | null, opts: { native?: unknown; signedIn?: boolean; provider?: "anthropic" | "bedrock"; blocked?: boolean; domain?: string; history?: unknown[] } = {}) {
   const calls: string[] = [];
   const domainState = { code: opts.domain ?? "none" };
   const checksState = { fixed: false, runs: 0 };
@@ -137,7 +137,7 @@ async function setup(page: Page, cfg: RuntimeConfig | null, opts: { native?: unk
         running: false,
         ...(opts.native ? { native: opts.native } : {}),
         settings: { auto: false, channel: "stable", day: "sun", hour: 3, timezone: "UTC", majors: "ask" },
-        history: [
+        history: opts.history ?? [
           { id: "UPDATE#1", version: "v1.2.0", from_version: "v1.1.0", actor: "auto", mode: "update", status: "succeeded", started_at: "2026-10-05T03:00:00Z", reason: "now on v1.2.0" },
           { id: "UPDATE#0", version: "v1.1.5", from_version: "v1.1.0", actor: "owner@example.org", mode: "update", status: "rolled_back", started_at: "2026-10-02T03:00:00Z", reason: "health check failed after deploying v1.1.5; back on v1.1.0" },
         ],
@@ -272,7 +272,7 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
       await expect(page.getByTestId("latest-version")).toContainText("Major: read the notes");
       await expect(page.getByTestId("release-notes")).toContainText("A new thing.");
       await expect(page.getByTestId("update-history")).toContainText("health check failed after deploying v1.1.5");
-      await expect(page.getByTestId("update-history")).toContainText("automatic");
+      await expect(page.getByTestId("update-history")).toContainText("auto-update window");
 
       await page.getByRole("button", { name: "Update now to v2.0.0" }).click();
       await expect.poll(() => systemCalls.map((c) => c.path)).toContain("/api/system/update");
@@ -403,6 +403,39 @@ for (const [name, viewport] of [["1440", { width: 1440, height: 1000 }], ["390",
       await expect(page.getByRole("button", { name: "Update now to v2.0.0" })).toBeEnabled();
       await page.screenshot({ path: `${SHOTS}/system-preflight-ready-${name}.png`, fullPage: true });
     });
+  });
+}
+
+// Update history reads honestly: who started each update, a refusal before
+// anything changed is neutral (no "may be unhealthy"), and the status never
+// truncates, on a desktop and a phone.
+const LONG_WAIT = "use acme.coderhelm.com · v1.1.0's stack template doesn't match its signed checksum, so it was not proposed, which is a long reason that used to push the badge into Fail…";
+const HONEST_HISTORY = [
+  { id: "UPDATE#4", version: "v1.2.0", from_version: "v1.1.0", actor: "AWS CLI", mode: "update", status: "succeeded", started_at: "2026-11-03T02:05:00Z", reason: "" },
+  { id: "UPDATE#3", version: "v1.1.0", from_version: "v1.0.0", actor: "unknown", mode: "update", status: "succeeded", started_at: "2026-11-02T01:00:00Z", reason: "" },
+  { id: "UPDATE#2", version: "v1.0.0", from_version: "v1.0.0", actor: "install guide", mode: "domain", status: "not_started", started_at: "2026-11-01T22:00:00Z", reason: LONG_WAIT },
+  { id: "UPDATE#1", version: "v1.0.0", from_version: "v1.0.0", actor: "admin@acme.example", mode: "domain", status: "review", started_at: "2026-11-01T21:00:00Z", reason: "" },
+];
+for (const [name, viewport] of [["desktop", { width: 1440, height: 900 }], ["phone", { width: 390, height: 844 }]] as const) {
+  test(`System: update history says who started it, keeps refusals neutral and never truncates the status (${name})`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await setup(page, SELF, { signedIn: true, history: HONEST_HISTORY });
+    await page.goto("/settings/system/");
+    const rows = page.getByTestId("update-history").locator("li");
+    await expect(rows).toHaveCount(4);
+    await expect(rows.nth(0)).toContainText("AWS CLI");
+    await expect(rows.nth(1).getByTestId("history-line")).not.toContainText("unknown");
+    await expect(rows.nth(2)).toContainText("install guide");
+    await expect(rows.nth(2).getByTestId("history-status")).toHaveText("Didn't start");
+    await expect(rows.nth(3).getByTestId("history-status")).toHaveText("Waiting for review");
+    await expect(page.getByTestId("history-next-step")).toHaveCount(0);
+    for (let i = 0; i < 4; i++) {
+      const chip = rows.nth(i).getByTestId("history-status").locator("span span");
+      const cut = await chip.evaluate((el) => el.scrollWidth > el.clientWidth);
+      expect(cut, `row ${i} status is cut off`).toBe(false);
+    }
+    const width = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(width).toBeLessThanOrEqual(viewport.width);
   });
 }
 
