@@ -2,6 +2,7 @@ import { REPO } from "./long";
 
 // The ids the sample addresses point at; the fixtures answer for these.
 export const RUN_ID = "01RUNWIDE00000000000000001";
+export const SESSION_ID = "3f2c9a1e-5b7d-4c8e-9a0b-1c2d3e4f5a6b";
 export const REVIEW_SK = `REVIEW#${REPO}#012345#2026-01-03T10:00:00Z`;
 export const TEST_RUN_KEY = "testrun-01WIDE0000000000000001";
 export const TEST_ID = "test-01WIDE0000000000000001";

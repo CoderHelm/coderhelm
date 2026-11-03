@@ -1,4 +1,4 @@
-// The dashboard reads runs and plans through the public API, whose schemas
+// The dashboard reads runs, plans and review sessions through the public API, whose schemas
 // are generated from the gateway's code (src/lib/openapi-fields.ts lists their
 // fields). Each line below fails `npm run typecheck` when the dashboard's type
 // reads a field the gateway's schema does not have, naming the field, so a
@@ -6,7 +6,7 @@
 // Nothing here runs; it is checked by the compiler only.
 
 import type { OpenApiFields } from "./openapi-fields";
-import type { AnswerRunResult, Plan, Run, RunAnswer, RunDetail, RunQuestion, RunTrigger, Task, api } from "./api";
+import type { AnswerRunResult, Plan, ReviewSession, Run, RunAnswer, RunDetail, RunQuestion, RunTrigger, SessionStep, Task, api } from "./api";
 
 type Answer<K extends keyof typeof api> = Awaited<ReturnType<(typeof api)[K]>>;
 
@@ -32,3 +32,7 @@ export type PlansPageContract = None<Undocumented<Answer<"listPlans">, "PlansPag
 export type PlanContract = None<Undocumented<Answer<"getPlan">, "PlanWithTasks">>;
 export type PlanListContract = None<Undocumented<Omit<Plan, "tasks">, "Plan">>;
 export type TaskContract = None<Undocumented<Task, "PlanTask">>;
+
+// A review's session (the page a PR's "Coderhelm review" check links to).
+export type ReviewSessionContract = None<Undocumented<ReviewSession, "ReviewSession">>;
+export type SessionStepContract = None<Undocumented<SessionStep, "SessionStep">>;

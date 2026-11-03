@@ -1136,6 +1136,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ sk, rating, comment }),
     }),
+  /** One review job step by step: where a PR's "Coderhelm review" check links. */
+  getReviewSession: (id: string) =>
+    request<ReviewSession>(`/api/reviewer/session?id=${encodeURIComponent(id)}`),
   /** One PR's auto-merge gate: state, checklist, who stopped it, every stop and re-arm. */
   getGate: (repo: string, pr: number) =>
     request<GateDetail>(`/api/reviewer/gate?${new URLSearchParams({ repo, pr: String(pr) })}`),
@@ -1794,6 +1797,8 @@ export interface GateDetail {
   repo: string;
   pr_number: number;
   pr_title?: string;
+  /** The latest review job's session (`getReviewSession`); empty before any. */
+  session_id?: string;
   auto_merge: boolean;
   status?: string;
   group?: string;
@@ -1809,6 +1814,53 @@ export interface GateDetail {
     /** Newest first. */
     controls?: GateControlEntry[];
   } | null;
+}
+
+/** One step a review went through. */
+export interface SessionStep {
+  /** RFC 3339. */
+  at: string;
+  /** What happened, in one line. */
+  text: string;
+  /** More about it; empty when there is nothing more. */
+  detail: string;
+}
+
+/**
+ * GET /api/reviewer/session: one review job, step by step. Each job has its
+ * own session, so an older check on a PR keeps showing its own review.
+ */
+export interface ReviewSession {
+  id: string;
+  /** owner/name */
+  repo: string;
+  pr_number: number;
+  pr_title: string;
+  head_sha: string;
+  /** label · push · rerequest · reply · … */
+  trigger: string;
+  /** review · question */
+  kind: string;
+  /** reviewing · done · skipped · retrying · failed · stalled */
+  status: string;
+  /** True while the review is still running. */
+  in_flight: boolean;
+  /** Which try this job is, from 0. */
+  attempt: number;
+  started_at: string;
+  /** Empty while it runs. */
+  finished_at: string;
+  /** Why it ended without a review; empty otherwise. */
+  reason: string;
+  /** APPROVE · REQUEST_CHANGES; empty until there is one. */
+  verdict: string;
+  /** How many findings the review kept, once there is a verdict. */
+  findings?: number | null;
+  /** The review posted on GitHub; empty when nothing new was posted. */
+  review_url: string;
+  check_run_id?: number | null;
+  /** Oldest first. */
+  steps: SessionStep[];
 }
 
 export interface GateControlResult {

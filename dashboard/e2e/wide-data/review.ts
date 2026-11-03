@@ -1,5 +1,5 @@
 import type { Handler } from "./index";
-import { ALERT_ID, REVIEW_SK, SUPPORT_TICKET_ID, TEST_ID, TEST_RUN_KEY } from "./ids";
+import { ALERT_ID, REVIEW_SK, SESSION_ID, SUPPORT_TICKET_ID, TEST_ID, TEST_RUN_KEY } from "./ids";
 import {
   ARN, BRANCH, EMAIL, FILE, FILE_2, iso, LOG_GROUP, LONG_URL, MARKDOWN, NOTES, ORG, PR_URL, REPO, REPO_2, SENTENCE, SHA, TICKET, TITLE, TOKEN,
 } from "./long";
@@ -308,7 +308,20 @@ export const reviewData: Handler = ({ method, path, url }) => {
   if (path === "/api/reviewer/gate") {
     return {
       repo: url.searchParams.get("repo") ?? REPO, pr_number: Number(url.searchParams.get("pr") ?? 12345), pr_title: TITLE,
-      auto_merge: true, status: "stopped", group: "waiting", can_control: true, gate: GATE,
+      session_id: SESSION_ID, auto_merge: true, status: "stopped", group: "waiting", can_control: true, gate: GATE,
+    };
+  }
+  if (path === "/api/reviewer/session") {
+    return {
+      id: url.searchParams.get("id") ?? SESSION_ID, repo: REPO, pr_number: 12345, pr_title: TITLE, head_sha: SHA,
+      trigger: "a_trigger_word_the_dashboard_does_not_know_yet_with_a_long_name", kind: "review", status: "done", in_flight: false,
+      attempt: 2, started_at: iso(30), finished_at: iso(20), reason: `${SENTENCE} ${TOKEN}`, verdict: "REQUEST_CHANGES", findings: 12,
+      review_url: `${PR_URL}#pullrequestreview-2201`, check_run_id: 31337000,
+      steps: [
+        { at: iso(30), text: `Started reviewing \`${SHA.slice(0, 7)}\``, detail: "" },
+        { at: iso(28), text: `${TITLE} ${TOKEN}`, detail: [FILE, FILE_2, LONG_URL, TOKEN].join("\n") },
+        { at: iso(20), text: "Posted the review: 12 findings", detail: SENTENCE },
+      ],
     };
   }
   if (path === "/api/reviewer/org-config") return { instructions: NOTES, web_domains: ["staging.web-platform-frontend-monorepo.example.com", LONG_URL] };

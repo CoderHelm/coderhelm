@@ -13,6 +13,12 @@ The reviewer reviews pull requests written by people (and by CoderHelm). It post
 
 Add the label to a pull request to get a review. Once a pull request has the label, every new push is reviewed again. Draft pull requests are skipped until they are marked ready.
 
+## Follow a review while it runs
+
+While a review runs, the pull request shows a **CoderHelm review** check. Its **Details** link opens the review's session in CoderHelm: the steps so far, live while it runs, and the verdict with a link to the posted review once it is done. Each review has its own session, so an older check keeps showing its own review.
+
+When the review is done, the check ends as neutral if the review has findings, and as success when it found nothing. The check needs the **Checks** permission on the GitHub App. Without it, reviews work as before, just with no check on the pull request.
+
 ## Talk to it on a pull request
 
 | Comment | What happens |

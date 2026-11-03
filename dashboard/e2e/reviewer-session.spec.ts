@@ -1,0 +1,285 @@
+import { expect, test, type Page, type Route } from "@playwright/test";
+import {
+  findingsLabel,
+  isSessionId,
+  kindLabel,
+  sessionHref,
+  sessionLook,
+  sessionSeconds,
+  statusNote,
+  stepOffset,
+  triggerLabel,
+} from "../src/app/reviewer/session/session";
+
+// A review's session page: where a PR's "Coderhelm review" check links. Every
+// API call is answered here; nothing reaches a real backend.
+
+const ID = "3f2c9a1e-5b7d-4c8e-9a0b-1c2d3e4f5a6b";
+const now = Date.now();
+const iso = (secsAgo: number) => new Date(now - secsAgo * 1000).toISOString();
+
+// ---- The helpers ------------------------------------------------------------
+
+test.describe("session helpers", () => {
+  test("only a job id (a UUID) is a session id", () => {
+    expect(isSessionId(ID)).toBe(true);
+    expect(isSessionId(ID.toUpperCase())).toBe(true);
+    for (const bad of ["", "abc", `${ID}x`, "../REVIEW#acme/web", "3f2c9a1e_5b7d_4c8e_9a0b_1c2d3e4f5a6b"]) {
+      expect(isSessionId(bad), bad).toBe(false);
+    }
+    expect(sessionHref(ID)).toBe(`/reviewer/session?id=${ID}`);
+  });
+
+  test("every status reads as words with its tone", () => {
+    expect(sessionLook("reviewing")).toEqual({ label: "Reviewing", tone: "live", live: true });
+    expect(sessionLook("reviewing", "question").label).toBe("Answering");
+    expect(sessionLook("done")).toEqual({ label: "Done", tone: "success" });
+    expect(sessionLook("skipped").tone).toBe("muted");
+    expect(sessionLook("retrying").label).toBe("Sent again");
+    expect(sessionLook("failed").tone).toBe("danger");
+    expect(sessionLook("stalled")).toEqual({ label: "Stalled", tone: "danger" });
+    expect(sessionLook("some_new_state")).toEqual({ label: "Some new state", tone: "muted" });
+    expect(statusNote("retrying")).toMatch(/own session/);
+    expect(statusNote("done")).toBeNull();
+  });
+
+  test("trigger, kind and findings read as plain words", () => {
+    expect(triggerLabel("label")).toBe("The review label");
+    expect(triggerLabel("push")).toBe("New commits");
+    expect(triggerLabel("rerequest")).toBe("Asked for again");
+    expect(triggerLabel("reply")).toBe("A reply to the reviewer");
+    expect(triggerLabel("new_kind")).toBe("New kind");
+    expect(triggerLabel("")).toBe("Unknown");
+    expect(kindLabel("question")).toBe("Answer to a comment");
+    expect(kindLabel("review")).toBe("Review");
+    expect(findingsLabel(undefined)).toBeNull();
+    expect(findingsLabel(null)).toBeNull();
+    expect(findingsLabel(0)).toBe("No findings");
+    expect(findingsLabel(1)).toBe("1 finding");
+    expect(findingsLabel(3)).toBe("3 findings");
+  });
+
+  test("duration runs to now while in flight and to the finish after", () => {
+    const start = "2026-10-22T14:18:00+00:00";
+    const end = "2026-10-22T14:20:05+00:00";
+    expect(sessionSeconds({ started_at: start, finished_at: end, in_flight: false })).toBe(125);
+    const t = new Date(start).getTime() + 42_000;
+    expect(sessionSeconds({ started_at: start, finished_at: "", in_flight: true }, t)).toBe(42);
+    expect(sessionSeconds({ started_at: start, finished_at: "", in_flight: false })).toBeNull();
+    expect(sessionSeconds({ started_at: "", finished_at: end, in_flight: false })).toBeNull();
+    expect(stepOffset(start, "2026-10-22T14:18:12+00:00")).toBe(12);
+    expect(stepOffset(start, "not a time")).toBeNull();
+  });
+});
+
+// ---- The page ---------------------------------------------------------------
+
+type Session = Record<string, unknown>;
+
+function session(over: Session = {}): Session {
+  return {
+    id: ID,
+    repo: "acme/web",
+    pr_number: 318,
+    pr_title: "Rate-limit the login form",
+    head_sha: "9fceb02d0ae598e95dc970b74767f19372d61af8",
+    trigger: "push",
+    kind: "review",
+    status: "reviewing",
+    in_flight: true,
+    attempt: 0,
+    started_at: iso(90),
+    finished_at: "",
+    reason: "",
+    verdict: "",
+    findings: null,
+    review_url: "",
+    check_run_id: 31337000,
+    steps: [
+      { at: iso(90), text: "Started reviewing `9fceb02`", detail: "" },
+      { at: iso(80), text: "Read the change: 2 files changed", detail: "src/auth/login.ts\nsrc/auth/limits.ts" },
+    ],
+    ...over,
+  };
+}
+
+interface Backend {
+  calls: string[];
+  /** Answers to /api/reviewer/session, in turn; the last one repeats. */
+  sessions: (Session | number)[];
+  role: string;
+  gate?: Record<string, unknown>;
+}
+
+async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
+  const db: Backend = { calls: [], sessions: [session()], role: "member", ...init };
+  let served = 0;
+  const json = (route: Route, body: unknown, status = 200) =>
+    route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+  await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
+  await page.route((url) => url.hostname === "localhost" && /^\/(api|auth)\//.test(url.pathname), async (route) => {
+    const req = route.request();
+    const url = new URL(req.url());
+    const p = url.pathname;
+    db.calls.push(`${req.method()} ${p}${url.search}`);
+    if (p === "/api/me") return json(route, { user_id: "u_1", team_id: "t_1", github_login: "a-maintainer", email: "someone@example.com", avatar_url: "", role: db.role });
+    if (p === "/api/usage") return json(route, { month: "2026-01", total_tokens: 0, tokens_in: 0, tokens_out: 0, total_runs: 0, max_tokens: 0 });
+    if (p === "/api/banners") return json(route, { banners: [] });
+    if (p === "/api/support/badge") return json(route, { waiting: 0, queue_open: null });
+    if (p === "/api/integrations") return json(route, { can_edit: false, items: [], migrated: 0 });
+    if (p === "/api/skills/used") return json(route, { skills: [], agents: [], sources: [], standards: [] });
+    if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "acme", status: "active", current: true }] });
+    if (p === "/api/repos") return json(route, { repos: [{ name: "acme/web", enabled: true, ticket_source: "github" }] });
+    if (p === "/api/aws-connections") return json(route, { connections: [] });
+    if (p === "/api/reviewer/session") {
+      const answer = db.sessions[Math.min(served, db.sessions.length - 1)];
+      served += 1;
+      if (typeof answer === "number") return json(route, { error: "nope" }, answer);
+      return json(route, answer);
+    }
+    if (p === "/api/reviewer/gate" && db.gate) return json(route, db.gate);
+    return json(route, { error: `Not mocked: ${req.method()} ${p}` }, 404);
+  });
+  return db;
+}
+
+function watchConsole(page: Page, allowFailedLoads = false) {
+  const errors: string[] = [];
+  page.on("console", (msg) => {
+    if (msg.type() !== "error") return;
+    const text = msg.text();
+    if (text.includes("net::ERR_ABORTED") || text.includes("net::ERR_FAILED")) return;
+    if (allowFailedLoads && text.startsWith("Failed to load resource")) return;
+    errors.push(text);
+  });
+  page.on("pageerror", (err) => errors.push(err.message));
+  return errors;
+}
+
+const sessionCalls = (db: Backend) => db.calls.filter((c) => c.startsWith("GET /api/reviewer/session"));
+
+test("a running review shows its steps live, then its verdict and the posted review", async ({ page }) => {
+  const errors = watchConsole(page);
+  const done = session({
+    status: "done",
+    in_flight: false,
+    finished_at: iso(5),
+    verdict: "REQUEST_CHANGES",
+    findings: 2,
+    review_url: "https://github.com/acme/web/pull/318#pullrequestreview-2201",
+    steps: [
+      ...(session().steps as unknown[]),
+      { at: iso(5), text: "Posted the review: 2 findings", detail: "" },
+    ],
+  });
+  const db = await mockApi(page, { sessions: [session(), done] });
+  await page.goto(`/reviewer/session?id=${ID}`);
+  await expect(page.getByRole("heading", { level: 1, name: "Rate-limit the login form" })).toBeVisible();
+  await expect(page.getByTestId("session-status")).toHaveText("Reviewing");
+  await expect(page.getByRole("link", { name: /Open on GitHub/ })).toHaveAttribute("href", "https://github.com/acme/web/pull/318");
+  await expect(page.getByTestId("session-facts")).toContainText("New commits");
+  await expect(page.getByTestId("session-facts")).toContainText("Still running");
+  await expect(page.getByRole("link", { name: /9fceb02/ })).toHaveAttribute("href", "https://github.com/acme/web/commit/9fceb02d0ae598e95dc970b74767f19372d61af8");
+  const steps = page.getByTestId("session-steps").getByRole("listitem");
+  await expect(steps).toHaveCount(2);
+  await expect(steps.nth(1)).toContainText("Read the change: 2 files changed");
+  // A step's detail opens on demand.
+  await expect(page.getByText("src/auth/limits.ts")).toBeHidden();
+  await steps.nth(1).getByText("More").click();
+  await expect(page.getByText(/src\/auth\/limits\.ts/)).toBeVisible();
+  await expect(page.getByTestId("session-outcome")).toHaveCount(0);
+
+  // The page refreshes on its own while the review runs, and stops when it ends.
+  await expect(page.getByTestId("session-status")).toHaveText("Done", { timeout: 10_000 });
+  await expect(steps).toHaveCount(3);
+  const outcome = page.getByTestId("session-outcome");
+  await expect(outcome).toContainText("Changes requested");
+  await expect(page.getByTestId("session-findings")).toHaveText("2 findings");
+  await expect(outcome.getByRole("link", { name: /See the review on GitHub/ })).toHaveAttribute(
+    "href",
+    "https://github.com/acme/web/pull/318#pullrequestreview-2201",
+  );
+  await expect(page.getByTestId("session-duration")).toHaveText("1m 25s");
+  const calls = sessionCalls(db).length;
+  await page.waitForTimeout(5_000);
+  expect(sessionCalls(db).length).toBe(calls);
+
+  // Phone width: nothing scrolls sideways.
+  await page.setViewportSize({ width: 390, height: 800 });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+  expect(errors).toEqual([]);
+});
+
+test("a hidden tab stops refreshing until it is visible again", async ({ page }) => {
+  const db = await mockApi(page);
+  await page.goto(`/reviewer/session?id=${ID}`);
+  await expect(page.getByTestId("session-status")).toHaveText("Reviewing");
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  const calls = sessionCalls(db).length;
+  await page.waitForTimeout(9_000);
+  expect(sessionCalls(db).length).toBe(calls);
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await expect.poll(() => sessionCalls(db).length).toBeGreaterThan(calls);
+});
+
+test("a skipped or retried review says why", async ({ page }) => {
+  await mockApi(page, {
+    sessions: [session({ status: "skipped", in_flight: false, finished_at: iso(60), reason: "Only lockfile changes." })],
+  });
+  await page.goto(`/reviewer/session?id=${ID}`);
+  await expect(page.getByTestId("session-status")).toHaveText("Skipped");
+  await expect(page.getByTestId("session-notice")).toContainText("Only lockfile changes.");
+  await expect(page.getByTestId("session-outcome")).toHaveCount(0);
+
+  await mockApi(page, { sessions: [session({ status: "retrying", in_flight: false, finished_at: iso(60), attempt: 1 })] });
+  await page.goto(`/reviewer/session?id=${ID}`);
+  await expect(page.getByTestId("session-status")).toHaveText("Sent again");
+  await expect(page.getByTestId("session-notice")).toContainText("The new try has its own session.");
+  await expect(page.getByTestId("session-facts")).toContainText("Review, try 2");
+});
+
+test("a missing, malformed or forbidden session shows nothing to read", async ({ page }) => {
+  const errors = watchConsole(page, true);
+  const db = await mockApi(page, { sessions: [404] });
+  await page.goto(`/reviewer/session?id=${ID}`);
+  await expect(page.getByText("Review not found")).toBeVisible();
+  // A malformed id never reaches the API.
+  const before = sessionCalls(db).length;
+  await page.goto("/reviewer/session?id=../REVIEW%23acme");
+  await expect(page.getByText("Review not found")).toBeVisible();
+  expect(sessionCalls(db).length).toBe(before);
+
+  await mockApi(page, { sessions: [403] });
+  await page.goto(`/reviewer/session?id=${ID}`);
+  await expect(page.getByText("You can't open this review")).toBeVisible();
+
+  await mockApi(page, { sessions: [500, session()] });
+  await page.goto(`/reviewer/session?id=${ID}`);
+  await expect(page.getByText("Could not load the review")).toBeVisible();
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByTestId("session-status")).toHaveText("Reviewing");
+  expect(errors).toEqual([]);
+});
+
+test("the PR page links to its latest review session", async ({ page }) => {
+  const gate = { repo: "acme/web", pr_number: 318, pr_title: "Rate-limit the login form", auto_merge: false, status: "reviewing", group: "active", can_control: true, gate: null };
+  await mockApi(page, { gate: { ...gate, session_id: ID } });
+  await page.goto("/reviewer/pr?repo=acme/web&pr=318");
+  const link = page.getByRole("link", { name: "View session" });
+  await expect(link).toHaveAttribute("href", new RegExp(`/reviewer/session/?\\?id=${ID}`));
+  await link.click();
+  await expect(page.getByTestId("session-status")).toHaveText("Reviewing");
+
+  // No session yet: no link.
+  await mockApi(page, { gate: { ...gate, session_id: "" } });
+  await page.goto("/reviewer/pr?repo=acme/web&pr=318");
+  await expect(page.getByRole("heading", { level: 1, name: "Rate-limit the login form" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "View session" })).toHaveCount(0);
+});
