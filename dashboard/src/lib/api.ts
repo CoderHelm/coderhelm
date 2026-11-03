@@ -1267,6 +1267,13 @@ export const api = {
   setSystemModels: (to: ModelsChoice) =>
     requestWithBody<SystemModels, { results: ModelAccess[] }>("/api/system/models", { method: "PUT", body: JSON.stringify(to) }),
   rollbackInstall: () => request<UpdateEntry>("/api/system/rollback", { method: "POST", body: "{}" }),
+  /**
+   * Apply the prepared update waiting for an admin (a one-stack install).
+   * `confirm` is the token of the data and permission changes the admin
+   * confirmed; the updater applies only when it names exactly those.
+   */
+  applyUpdate: (id: string, confirm = "") =>
+    request<UpdateEntry>("/api/system/update/apply", { method: "POST", body: JSON.stringify({ id, ...(confirm ? { confirm } : {}) }) }),
   // Setup checks and update readiness (install admins), each with its fix.
   getSystemChecks: () => request<SystemChecks>("/api/system/checks"),
   getSystemPreflight: () => request<SystemPreflight>("/api/system/preflight"),
@@ -4268,14 +4275,29 @@ export interface NativeChangeSet {
   counts?: { add: number; modify: number; remove: number };
   replacements?: string[];
   parts?: string[];
-  /** Whether it runs through the auto-update role. */
+  /** Whether it runs through the install's deploy role. */
   role?: boolean;
   link?: string;
+  /** The update's history id (what Apply names). */
+  id?: string;
+  /** Waiting for an admin (status review): why, in words. */
+  hold?: string;
+  /** Tables, buckets, keys, user pools or secrets it would replace or remove. */
+  data_changes?: string[];
+  /** Changes to who may do what. */
+  permission_changes?: string[];
+  /** Changes to the deploy role or a boundary: only an AWS admin can apply those. */
+  admin_changes?: string[];
+  /** Whether Coderhelm can apply it here (otherwise: in the AWS console). */
+  can_apply?: boolean;
+  /** The token of exactly the data and permission changes to confirm ("" when none). */
+  confirm?: string;
 }
 
 export interface NativeUpdate {
   stack: string;
-  /** Auto-update on: the updater applies change sets through the stack's deploy role. */
+  /** The install has the deploy role, so an admin's Update applies (older updaters: auto_apply). */
+  can_apply?: boolean;
   auto_apply: boolean;
   pending: NativeChangeSet | null;
 }

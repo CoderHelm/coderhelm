@@ -147,6 +147,10 @@ async function setup(page: Page, cfg: RuntimeConfig | null, opts: { native?: unk
       systemCalls.push({ path: p, body: JSON.parse(req.postData() || "{}") });
       return json(route, { settings: { auto: true, channel: "stable", day: "sat", hour: 22, timezone: "UTC", majors: "ask" } });
     }
+    if (p === "/api/system/update/apply") {
+      systemCalls.push({ path: p, body: JSON.parse(req.postData() || "{}") });
+      return json(route, { version: "v2.0.0", actor: "owner@example.org", status: "running" });
+    }
     if (p === "/api/system/update" || p === "/api/system/rollback") {
       systemCalls.push({ path: p, body: JSON.parse(req.postData() || "{}") });
       return json(route, { version: p.endsWith("update") ? "v2.0.0" : "v1.1.0", actor: "owner@example.org", status: "running" });
@@ -529,26 +533,96 @@ test("System: an update still being prepared shows that, before the change set h
   await expect(page.getByTestId("native-update-link")).toHaveCount(0);
 });
 
-test("System: a one-stack install shows the prepared change set and links to it in AWS", async ({ page }) => {
-  const link = "https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/changesets/changes?stackId=x&changeSetId=y";
-  await setup(page, SELF, {
+const CS_LINK = "https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/changesets/changes?stackId=x&changeSetId=y";
+const PREPARED = { version: "v2.0.0", status: "review", counts: { add: 2, modify: 5, remove: 1 }, replacements: [], parts: ["Api", "Worker"], role: true, link: CS_LINK, id: "UPDATE#2026-11-03T10:00:00Z#abcd1234" };
+
+test("System: a one-stack install's Update applies it, and shows it running", async ({ page }) => {
+  const { systemCalls } = await setup(page, SELF, { signedIn: true, native: { stack: "coderhelm-prod", can_apply: true, auto_apply: true, pending: null } });
+  await page.goto("/settings/system/");
+  await expect(page.getByRole("button", { name: "Prepare the update to v2.0.0" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Update to v2.0.0" }).click();
+  await expect.poll(() => systemCalls.map((c) => c.path)).toContain("/api/system/update");
+  expect(systemCalls.find((c) => c.path === "/api/system/update")!.body).toEqual({ version: "v2.0.0" });
+});
+
+test("System: a running one-stack update says so, with nothing to do and no console step", async ({ page }) => {
+  await setup(page, SELF, { signedIn: true, native: { stack: "coderhelm-prod", can_apply: true, auto_apply: true, pending: { ...PREPARED, status: "running" } } });
+  await page.goto("/settings/system/");
+  const card = page.getByTestId("native-update");
+  await expect(card).toContainText("Updating to v2.0.0");
+  await expect(page.getByTestId("native-update-summary")).toContainText("8 changes (2 to add, 5 to change, 1 to remove) in Api, Worker");
+  await expect(card).not.toContainText("Execute");
+  await expect(page.getByTestId("native-update-apply")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Update to v2.0.0" })).toHaveCount(0);
+});
+
+test("System: data and permission changes are listed in a dialog and apply only once confirmed", async ({ page }) => {
+  const confirm = "c".repeat(64);
+  const { systemCalls } = await setup(page, SELF, {
     signedIn: true,
     native: {
-      stack: "coderhelm-prod",
-      auto_apply: false,
-      pending: { version: "v2.0.0", status: "review", counts: { add: 2, modify: 5, remove: 1 }, replacements: [], parts: ["Api", "Worker"], role: false, link, data_changes: [] },
+      stack: "coderhelm-prod", can_apply: true, auto_apply: true,
+      pending: { ...PREPARED, can_apply: true, confirm, hold: "waiting for you to confirm: it would replace or remove Api.Table",
+        data_changes: ["Database.Table (AWS::DynamoDB::GlobalTable: Modify, replacement True)"],
+        permission_changes: ["Api.NewRole (AWS::IAM::Role Add: an IAM change)"], admin_changes: [] },
     },
   });
   await page.goto("/settings/system/");
   const card = page.getByTestId("native-update");
-  await expect(card).toContainText("v2.0.0 is ready for you to review");
-  await expect(page.getByTestId("native-update-summary")).toContainText("8 changes (2 to add, 5 to change, 1 to remove) in Api, Worker");
-  await expect(page.getByTestId("native-update-summary")).toContainText("Nothing is replaced.");
-  await expect(card).toContainText("choose Execute");
-  await expect(page.getByTestId("native-update-link")).toHaveAttribute("href", link);
-  // The prepared update is the one thing to do: no second "Prepare" button,
-  // and it is never listed as blocking itself.
-  await expect(page.getByRole("button", { name: "Prepare the update to v2.0.0" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Review and apply in AWS" })).toBeVisible();
+  await expect(card).toContainText("v2.0.0 needs your OK");
+  await expect(page.getByTestId("native-update-hold")).toContainText("replace or remove data and change permissions");
+  await expect(card).not.toContainText("choose Execute");
+  await page.getByRole("button", { name: "Review and apply" }).click();
+  const dialog = page.getByTestId("native-update-confirm");
+  await expect(dialog).toBeVisible();
+  await expect(page.getByTestId("native-update-data-changes")).toContainText("Database.Table (AWS::DynamoDB::GlobalTable");
+  await expect(page.getByTestId("native-update-permission-changes")).toContainText("Api.NewRole (AWS::IAM::Role Add");
+  // Cancel sends nothing.
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(systemCalls.filter((c) => c.path === "/api/system/update/apply")).toEqual([]);
+  await page.getByRole("button", { name: "Review and apply" }).click();
+  await page.getByRole("button", { name: "Confirm and apply" }).click();
+  await expect.poll(() => systemCalls.find((c) => c.path === "/api/system/update/apply")?.body).toEqual({ id: PREPARED.id, confirm });
+});
+
+test("System: a prepared update with nothing to confirm applies with one press", async ({ page }) => {
+  const { systemCalls } = await setup(page, SELF, {
+    signedIn: true,
+    native: { stack: "coderhelm-prod", can_apply: true, auto_apply: true,
+      pending: { ...PREPARED, can_apply: true, confirm: "", hold: "auto-update was turned off before it ran: press Apply to apply it", data_changes: [], permission_changes: [], admin_changes: [] } },
+  });
+  await page.goto("/settings/system/");
+  await expect(page.getByTestId("native-update")).toContainText("v2.0.0 is ready to apply");
+  await expect(page.getByTestId("native-update-hold")).toContainText("Auto-update was turned off before it ran");
+  await page.getByRole("button", { name: "Apply v2.0.0" }).click();
+  await expect.poll(() => systemCalls.find((c) => c.path === "/api/system/update/apply")?.body).toEqual({ id: PREPARED.id });
+  await expect(page.getByTestId("native-update-confirm")).toHaveCount(0);
+});
+
+test("System: a change to the deploy role or a boundary is the one update that goes to the AWS console", async ({ page }) => {
+  await setup(page, SELF, {
+    signedIn: true,
+    native: { stack: "coderhelm-prod", can_apply: true, auto_apply: true,
+      pending: { ...PREPARED, can_apply: false, confirm: "", hold: "it changes the deploy role", data_changes: [], permission_changes: [], admin_changes: ["DeployBoundary (Modify)"] } },
+  });
+  await page.goto("/settings/system/");
+  const card = page.getByTestId("native-update");
+  await expect(card).toContainText("v2.0.0 needs an AWS admin");
+  await expect(card).toContainText("chooses Execute");
+  await expect(page.getByTestId("native-update-apply")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Open it in the AWS console" })).toHaveAttribute("href", CS_LINK);
+  // The prepared update is the one thing to do: no second Update button, and it never blocks itself.
+  await expect(page.getByRole("button", { name: "Update to v2.0.0" })).toHaveCount(0);
   await expect(page.locator("#update-blocked")).toHaveCount(0);
+});
+
+test("System: an older stack without the deploy role says its one console step adds it", async ({ page }) => {
+  await setup(page, SELF, {
+    signedIn: true,
+    native: { stack: "coderhelm-prod", auto_apply: false, pending: { ...PREPARED, role: false, data_changes: [] } },
+  });
+  await page.goto("/settings/system/");
+  await expect(page.getByTestId("native-update-hold")).toContainText("doesn't have the deploy role yet");
+  await expect(page.getByRole("link", { name: "Open it in the AWS console" })).toHaveAttribute("href", CS_LINK);
 });

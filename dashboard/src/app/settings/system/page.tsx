@@ -132,6 +132,16 @@ function System() {
   useEffect(() => {
     load();
   }, [load]);
+  // While an update prepares or runs, follow it: the card and the history
+  // move along without a reload (the updater checks the stack every 5 minutes).
+  const following = !!data && (!!data.running || ["preparing", "running"].includes(data.native?.pending?.status ?? ""));
+  useEffect(() => {
+    if (!following) return;
+    const t = window.setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, 30_000);
+    return () => window.clearInterval(t);
+  }, [following, load]);
 
   const header = (
     <div className="mb-6">
@@ -194,7 +204,7 @@ function System() {
           loadPreflight();
           return;
         }
-        toast(`Updating to ${r.version}. This takes 10 to 20 minutes.`);
+        toast(data.native ? `Preparing ${r.version}, then it applies. This takes 10 to 20 minutes.` : `Updating to ${r.version}. This takes 10 to 20 minutes.`);
       } else {
         const e = await api.rollbackInstall();
         toast(`Rolling back to ${e.version}.`);
@@ -256,7 +266,7 @@ function System() {
               )
             }
           />
-          {data.native ? <NativeUpdateCard native={data.native} /> : null}
+          {data.native ? <NativeUpdateCard native={data.native} onChanged={load} /> : null}
           {data.running && !data.native?.pending && (
             <div className="px-4 py-3">
               <Callout variant="neutral" title="An update is running">
@@ -273,7 +283,7 @@ function System() {
               <div className="mt-3 flex flex-wrap gap-3">
                 {!pending && (
                   <button type="button" className={primaryButton} disabled={!!busy || data.running || blocked} onClick={() => start("update")} aria-describedby={blocked ? "update-blocked" : undefined}>
-                    {busy === "update" ? "Starting…" : data.native ? `Prepare the update to ${latest.version}` : `Update now to ${latest.version}`}
+                    {busy === "update" ? "Starting…" : data.native ? `Update to ${latest.version}` : `Update now to ${latest.version}`}
                   </button>
                 )}
                 {latest.url && <a href={latest.url} target="_blank" rel="noopener noreferrer" className={linkButton}>Release page</a>}
