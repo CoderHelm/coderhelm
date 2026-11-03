@@ -15,6 +15,7 @@ import { endpointHref } from "@/lib/webhooks";
 import { Callout } from "./callout";
 import { CodeBlock } from "./code-block";
 import { CopyButton } from "./copy-button";
+import { Disclosure } from "./disclosure";
 import { Drawer } from "./drawer";
 import { EmptyState } from "./empty-state";
 import { FilterSelect } from "./data-source-activity";
@@ -647,28 +648,98 @@ function Block({ title, children, testId }: { title: string; children: ReactNode
   );
 }
 
+/** "pull_request.edited" in words: "Pull request edited". Unknown shapes come back as they are. */
+export function eventWords(event: string): string {
+  if (!event) return "Delivery";
+  const [kind, action] = event.split(".", 2);
+  const words = (t: string) => t.replace(/_/g, " ");
+  const head = words(kind);
+  const s = action ? `${head} ${words(action)}` : head;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Who sent it and what it was about, from a kept JSON preview (GitHub and Jira shapes). */
+export function payloadFacts(preview: string): { sender?: string; title?: string; url?: string } {
+  try {
+    const v = JSON.parse(preview) as Record<string, unknown>;
+    const o = (x: unknown) => (x && typeof x === "object" ? (x as Record<string, unknown>) : {});
+    const str = (x: unknown) => (typeof x === "string" && x ? x : undefined);
+    const item = o(v.pull_request ?? v.issue ?? o(v.issue));
+    const user = o(v.sender ?? o(v.user));
+    return {
+      sender: str(user.login) ?? str(o(v.user).displayName) ?? str(o(v.user).name),
+      title: str(item.title) ?? str(o(o(v.issue).fields).summary),
+      url: str(item.html_url),
+    };
+  } catch {
+    return {};
+  }
+}
+
+/** The groups request headers are shown in; anything else is network detail. */
+const HEADER_GROUPS: { title: string; test: (k: string) => boolean }[] = [
+  { title: "Coderhelm", test: (k) => k.startsWith("x-coderhelm-") },
+  { title: "From the sender", test: (k) => k.startsWith("x-github-") || k.startsWith("x-hub-") || k.startsWith("x-atlassian-") || k.startsWith("x-amz-sns-") || k === "user-agent" },
+  { title: "Content", test: (k) => k.startsWith("content-") || k.startsWith("accept") },
+];
+
+export function groupHeaders(headers: Record<string, string>): { title: string; rows: [string, string][] }[] {
+  const left = Object.entries(headers).sort(([a], [b]) => a.localeCompare(b));
+  const out = HEADER_GROUPS.map((g) => ({ title: g.title, rows: left.filter(([k]) => g.test(k)) }));
+  const used = new Set(out.flatMap((g) => g.rows.map(([k]) => k)));
+  out.push({ title: "Network details", rows: left.filter(([k]) => !used.has(k)) });
+  return out.filter((g) => g.rows.length > 0);
+}
+
+function HeaderTable({ rows, label }: { rows: [string, string][]; label: string }) {
+  return (
+    <div className="min-w-0 overflow-x-auto rounded-lg border border-zinc-800">
+      <table className="w-full text-sm" aria-label={label}>
+        <tbody className="divide-y divide-zinc-800">
+          {rows.map(([k, v]) => (
+            <tr key={k} className="align-top">
+              <th scope="row" className="w-px whitespace-nowrap px-3 py-2 text-left font-normal text-zinc-400">{k}</th>
+              <td className="px-3 py-2 text-zinc-200">
+                {v === "[redacted]" ? <Chip tone="muted">Hidden</Chip> : <span className="wrap-anywhere">{v}</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function DeliveryDetail({ detail, refusal }: { detail: DeliveryDetailReply; refusal: string }) {
   const d = detail.delivery;
   const reason = detail.reason;
   const attempts = Array.isArray(d.attempts) ? d.attempts : [];
-  const headers = Object.entries(d.headers ?? {});
   const preview = d.payload_preview ?? "";
   const kept = preview && !/^\[\d+ bytes, not JSON/.test(preview);
+  const about = kept ? payloadFacts(preview) : {};
+  const groups = groupHeaders(d.headers ?? {});
+  const headerCount = Object.keys(d.headers ?? {}).length;
+  const prUrl = d.repo && d.pr ? `https://github.com/${d.repo}/pull/${d.pr}` : about.url;
+  const verb = d.direction === "inbound" ? "Received" : "Sent";
+  const outcome =
+    d.status === "pending"
+      ? `Not through yet${d.next_retry_at ? `: Coderhelm tries again at ${clock(d.next_retry_at)}` : ""}.`
+      : d.status === "failed"
+        ? "Failed for good."
+        : d.status === "ignored"
+          ? "Received, and not an event Coderhelm acts on."
+          : "Went through.";
+
   const facts: [string, ReactNode][] = [
-    ["Delivery id", <Code key="id">{d.id}</Code>],
+    [
+      "Delivery id",
+      <span key="id" className="flex min-w-0 items-center gap-2">
+        <Code>{d.id}</Code>
+        <CopyButton text={d.id} label="Copy delivery id" />
+      </span>,
+    ],
     ...(d.external_id ? ([[d.source === "github" ? "GitHub delivery id" : d.source === "webhook" ? "Event id" : "Their id", <Code key="ext">{d.external_id}</Code>]] as [string, ReactNode][]) : []),
-    ...(d.repo
-      ? ([[
-          "Repository",
-          d.pr ? (
-            <a key="repo" href={`https://github.com/${d.repo}/pull/${d.pr}`} target="_blank" rel="noopener noreferrer" className={linkButton}>
-              <span className="wrap-anywhere">{d.repo} #{d.pr}</span>
-            </a>
-          ) : (
-            <span key="repo" className="wrap-anywhere">{d.repo}</span>
-          ),
-        ]] as [string, ReactNode][])
-      : []),
+    ["Source", `${sourceName(d.source)} · ${directionWord(d.direction).toLowerCase()}`],
     ...(d.target ? ([["Target", <span key="t" className="wrap-anywhere">{d.target}</span>]] as [string, ReactNode][]) : []),
     ...(d.source === "webhook" && d.endpoint_id
       ? ([[
@@ -678,16 +749,35 @@ function DeliveryDetail({ detail, refusal }: { detail: DeliveryDetailReply; refu
           </Link>,
         ]] as [string, ReactNode][])
       : []),
-    ...(d.outcome ? ([["Outcome", <span key="o" className="wrap-anywhere">{d.outcome}</span>]] as [string, ReactNode][]) : []),
+    ...(d.payload_bytes ? ([["Size", bytes(d.payload_bytes)]] as [string, ReactNode][]) : []),
     ...(d.duration_ms ? ([["Took", formatMs(d.duration_ms)]] as [string, ReactNode][]) : []),
-    ["Received", formatDate(d.created_at, { time: true })],
+    [verb, formatDate(d.created_at, { time: true })],
   ];
 
   return (
-    <div className="space-y-7" data-testid="delivery-detail" data-status={d.status}>
-      {d.status === "pending" && d.next_retry_at && (
-        <p className="text-sm text-amber-300" data-testid="delivery-next-retry">Coderhelm tries again at {clock(d.next_retry_at)}.</p>
-      )}
+    <div className="space-y-6" data-testid="delivery-detail" data-status={d.status}>
+      <section className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4" data-testid="delivery-summary">
+        <p className="text-base font-semibold text-zinc-100">{eventWords(d.event)}</p>
+        {about.title && <p className="mt-1 text-sm text-zinc-200 wrap-anywhere" data-testid="delivery-about">{about.title}</p>}
+        <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-400">
+          {d.repo &&
+            (prUrl ? (
+              <a href={prUrl} target="_blank" rel="noopener noreferrer" className={linkButton}>
+                <span className="wrap-anywhere">{d.repo}{d.pr ? ` #${d.pr}` : ""}</span>
+              </a>
+            ) : (
+              <span className="wrap-anywhere text-zinc-300">{d.repo}</span>
+            ))}
+          {about.sender && <span data-testid="delivery-sender">by {about.sender}</span>}
+        </p>
+        <p className={`mt-3 text-sm ${d.status === "failed" ? "text-red-300" : d.status === "pending" ? "text-amber-300" : "text-zinc-200"}`} data-testid="delivery-outcome">
+          {outcome}
+          {d.outcome ? <span className="block text-xs text-zinc-400 wrap-anywhere">{d.outcome}</span> : null}
+        </p>
+        {d.status === "pending" && d.next_retry_at && (
+          <p className="sr-only" data-testid="delivery-next-retry">Coderhelm tries again at {clock(d.next_retry_at)}.</p>
+        )}
+      </section>
 
       {reason && (
         <div data-testid="delivery-reason">
@@ -712,7 +802,35 @@ function DeliveryDetail({ detail, refusal }: { detail: DeliveryDetailReply; refu
         </Callout>
       )}
 
-      <Block title="Details">
+      <Block title="Timeline" testId="delivery-attempts">
+        <ol className="relative min-w-0 space-y-3 border-l border-zinc-800 pl-5">
+          <li className="relative min-w-0">
+            <span aria-hidden="true" className={`absolute -left-[1.6rem] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-zinc-900 ${TONES.neutral.dot}`} />
+            <div className="text-sm text-zinc-200">{verb} <span className="text-zinc-400">{formatDate(d.created_at, { time: true })}</span></div>
+          </li>
+          {attempts.map((a, i) => (
+            <li key={`${a.at}-${i}`} className="relative min-w-0" data-testid="delivery-attempt">
+              <span aria-hidden="true" className={`absolute -left-[1.6rem] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-zinc-900 ${TONES[a.error ? "danger" : httpTone(a.code)].dot}`} />
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                <span className="text-zinc-200">{attempts.length > 1 ? `Attempt ${i + 1}` : d.direction === "inbound" ? "Handled" : "Sent"}</span>
+                {a.code ? <Chip tone={httpTone(a.code)}>{`HTTP ${a.code}`}</Chip> : <Chip tone="danger">No answer</Chip>}
+                {a.duration_ms ? <span className="text-xs tabular-nums text-zinc-400">in {formatMs(a.duration_ms)}</span> : null}
+                <span className="text-xs text-zinc-400">{clock(a.at)}</span>
+              </div>
+              {a.error && <p className="mt-1 text-sm text-red-300"><span className="wrap-anywhere">{a.error}</span></p>}
+            </li>
+          ))}
+          {d.status === "pending" && d.next_retry_at && (
+            <li className="relative min-w-0">
+              <span aria-hidden="true" className={`absolute -left-[1.6rem] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-zinc-900 ${TONES.queued.dot}`} />
+              <div className="text-sm text-amber-300">Next try at {clock(d.next_retry_at)}</div>
+            </li>
+          )}
+        </ol>
+        {attempts.length === 0 && <p className="mt-2 text-sm text-zinc-400">No attempts recorded.</p>}
+      </Block>
+
+      <Block title="Key facts">
         <dl className="grid min-w-0 grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-[9rem_1fr]">
           {facts.map(([k, v]) => (
             <div key={k} className="contents">
@@ -723,57 +841,45 @@ function DeliveryDetail({ detail, refusal }: { detail: DeliveryDetailReply; refu
         </dl>
       </Block>
 
-      <Block title={attempts.length === 1 ? "1 attempt" : `${attempts.length} attempts`} testId="delivery-attempts">
-        {attempts.length === 0 ? (
-          <p className="text-sm text-zinc-400">No attempts recorded.</p>
-        ) : (
-          <ol className="relative min-w-0 space-y-3 border-l border-zinc-800 pl-5">
-            {attempts.map((a, i) => (
-              <li key={`${a.at}-${i}`} className="relative min-w-0" data-testid="delivery-attempt">
-                <span aria-hidden="true" className={`absolute -left-[1.6rem] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-zinc-900 ${TONES[a.error ? "danger" : httpTone(a.code)].dot}`} />
-                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                  <span className="text-zinc-200">{formatDate(a.at, { time: true })}</span>
-                  {a.code ? <Chip tone={httpTone(a.code)}>{`HTTP ${a.code}`}</Chip> : <Chip tone="danger">No answer</Chip>}
-                  {a.duration_ms ? <span className="text-xs tabular-nums text-zinc-400">{formatMs(a.duration_ms)}</span> : null}
-                </div>
-                {a.error && <p className="mt-1 text-sm text-red-300"><span className="wrap-anywhere">{a.error}</span></p>}
-              </li>
-            ))}
-          </ol>
-        )}
-      </Block>
-
-      <Block title="Headers" testId="delivery-headers">
-        {headers.length === 0 ? (
-          <p className="text-sm text-zinc-400">No headers kept.</p>
-        ) : (
-          <div className="min-w-0 overflow-x-auto rounded-lg border border-zinc-800">
-            <table className="w-full text-sm" aria-label="Headers">
-              <tbody className="divide-y divide-zinc-800">
-                {headers.map(([k, v]) => (
-                  <tr key={k} className="align-top">
-                    <th scope="row" className="w-px whitespace-nowrap px-3 py-2 text-left font-normal text-zinc-400">{k}</th>
-                    <td className="px-3 py-2 text-zinc-200">
-                      {v === "[redacted]" ? <Chip tone="muted">Hidden</Chip> : <span className="wrap-anywhere">{v}</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <p className="mt-2 text-xs text-zinc-400">Signatures and tokens are never kept: they show as Hidden.</p>
-      </Block>
-
-      <Block title="Payload" testId="delivery-payload">
-        {kept ? (
-          <CodeBlock code={prettyPayload(preview)} lang={payloadLang(preview)} title={d.payload_bytes ? `Preview of ${bytes(d.payload_bytes)}` : "Preview"} label="Payload preview" maxHeightClass="max-h-96" />
-        ) : (
-          <p className="text-sm text-zinc-400">
-            {preview ? `Not kept: ${bytes(d.payload_bytes) || "the body"} wasn't JSON.` : "No payload kept for this delivery."}
-          </p>
-        )}
-      </Block>
+      <section className="min-w-0 space-y-3">
+        <div data-testid="delivery-payload">
+          <Disclosure summary={kept ? `Payload preview${d.payload_bytes ? `, ${bytes(d.payload_bytes)}` : ""}` : "Payload"} defaultOpen={false}>
+            {kept ? (
+              <CodeBlock code={prettyPayload(preview)} lang={payloadLang(preview)} title={d.payload_bytes ? `Preview of ${bytes(d.payload_bytes)}` : "Preview"} label="Payload preview" maxHeightClass="max-h-96" />
+            ) : (
+              <p className="text-sm text-zinc-400">
+                {preview ? `Not kept: ${bytes(d.payload_bytes) || "the body"} wasn't JSON.` : "No payload kept for this delivery."}
+              </p>
+            )}
+          </Disclosure>
+        </div>
+        <div data-testid="delivery-headers">
+          <Disclosure summary={`Request headers (${headerCount})`}>
+            {headerCount === 0 ? (
+              <p className="text-sm text-zinc-400">No headers kept.</p>
+            ) : (
+              <div className="space-y-3">
+                {groups
+                  .filter((g) => g.title !== "Network details")
+                  .map((g) => (
+                    <div key={g.title} className="min-w-0" data-testid="header-group" data-group={g.title}>
+                      <p className="mb-1 text-xs font-medium text-zinc-300">{g.title}</p>
+                      <HeaderTable rows={g.rows} label={`${g.title} headers`} />
+                    </div>
+                  ))}
+                {groups.some((g) => g.title === "Network details") && (
+                  <div data-testid="header-network">
+                    <Disclosure summary={`Network details (${groups.find((g) => g.title === "Network details")!.rows.length})`}>
+                      <HeaderTable rows={groups.find((g) => g.title === "Network details")!.rows} label="Network details" />
+                    </Disclosure>
+                  </div>
+                )}
+                <p className="text-xs text-zinc-400">Signatures and tokens are never kept: they show as Hidden. Where the sender is (location and IP addresses) isn&apos;t kept either.</p>
+              </div>
+            )}
+          </Disclosure>
+        </div>
+      </section>
     </div>
   );
 }

@@ -4342,6 +4342,8 @@ export interface DeliveryPoint {
   ok: number;
   failed: number;
   success_rate: number | null;
+  /** Median latency (older installs: absent). */
+  p50_ms?: number | null;
   p95_ms: number | null;
   previous_deliveries: number;
 }
@@ -4353,9 +4355,22 @@ export interface DeliverySourceRow {
   ok: number;
   failed: number;
   success_rate: number | null;
+  p50_ms?: number | null;
   p95_ms: number | null;
+  /** Deliveries per hour or day of the period, oldest first (the overview's buckets). */
+  series?: number[];
+  /** Failures per bucket, as `series`. */
+  failed_series?: number[];
   previous_deliveries: number;
   previous_success_rate: number | null;
+}
+
+/** One bucket of the latency distribution: slower than `from_ms`, up to `to_ms` (null: the open last bucket). */
+export interface DeliveryLatencyBucket {
+  from_ms: number;
+  to_ms: number | null;
+  ok: number;
+  failed: number;
 }
 
 export interface DeliveryReasonRow {
@@ -4405,6 +4420,8 @@ export interface DeliveryAnalytics {
   summary: DeliveryTotals;
   previous: DeliveryTotals;
   series: DeliveryPoint[];
+  /** How long the period's deliveries took, every bucket in order (older installs: absent). */
+  latency?: DeliveryLatencyBucket[];
   sources: DeliverySourceRow[];
   reasons: DeliveryReasonRow[];
   events: DeliveryEventRow[];
@@ -4452,6 +4469,8 @@ export interface DeliveryEmail {
   last_complaint_at: string | null;
   cognito_sender: "cognito_default" | "ses" | null;
   cognito_daily_limit: number | null;
+  /** How the install was made: one stack from the launch page, or a config file. Null on older installs. */
+  install_form?: "native" | "config" | null;
 }
 
 // ── Hybrid (self-hosted) ────────────────────────────────────────────────

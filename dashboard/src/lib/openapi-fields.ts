@@ -2,7 +2,7 @@
 // docs/api/openapi.json. Do not edit; run `npm run openapi:fields` instead.
 
 /** The platform commit this was generated from. */
-export const OPENAPI_REF = "93a156b25e248b7e7630f51a64afc9a5bec7372f";
+export const OPENAPI_REF = "9fba0fd6d5b1c2307e776586f5e5c57e40058628";
 
 /** The fields each public API schema has. */
 export interface OpenApiFields {
@@ -16,10 +16,10 @@ export interface OpenApiFields {
   CreatedEndpoint: "endpoint" | "secret";
   CreatedPlan: "plan_id";
   CustomRoleRef: "id" | "name";
-  DeliveryAnalytics: "backfill" | "email" | "endpoints" | "events" | "from" | "granularity" | "kept_days" | "period" | "previous" | "previous_from" | "previous_to" | "reasons" | "records_kept_days" | "relay" | "seen_sources" | "series" | "sources" | "summary" | "to";
+  DeliveryAnalytics: "backfill" | "email" | "endpoints" | "events" | "from" | "granularity" | "kept_days" | "latency" | "period" | "previous" | "previous_from" | "previous_to" | "reasons" | "records_kept_days" | "relay" | "seen_sources" | "series" | "sources" | "summary" | "to";
   DeliveryAttempt: "at" | "code" | "duration_ms" | "error";
   EmailKindRow: "bounces" | "complaints" | "deliveries" | "kind" | "label" | "rejections" | "sends";
-  EmailOverview: "cognito_daily_limit" | "cognito_sender" | "from" | "kinds" | "last_bounce_at" | "last_complaint_at" | "last_delivery_at" | "last_send_at" | "sender" | "to" | "totals";
+  EmailOverview: "cognito_daily_limit" | "cognito_sender" | "from" | "install_form" | "kinds" | "last_bounce_at" | "last_complaint_at" | "last_delivery_at" | "last_send_at" | "sender" | "to" | "totals";
   EndpointRow: "deleted" | "deliveries" | "description" | "disabled_reason" | "enabled" | "failed" | "failing_since" | "id" | "last_failure_at" | "last_failure_message" | "last_failure_reason" | "last_success_at" | "ok" | "p50_ms" | "p95_ms" | "streak" | "success_rate" | "url";
   ErrorBody: "code" | "error" | "scope";
   EventRow: "event" | "failed" | "source";
@@ -32,6 +32,7 @@ export interface OpenApiFields {
   JiraUser: "displayName";
   JiraWebhookBody: "coderhelm" | "comment" | "issue" | "webhookEvent";
   KnowledgeWebhookBody: "_id" | "_rev" | "_type" | "type" | "workspace_id";
+  LatencyBucket: "failed" | "from_ms" | "ok" | "to_ms";
   Me: "api_key" | "auth_provider" | "avatar_url" | "capabilities" | "custom_role" | "email" | "flags" | "github_login" | "mfa_enabled" | "platform_admin" | "role" | "status" | "team_id" | "user_id";
   MeApiKey: "created_by" | "expires_at" | "id" | "name" | "rate_limit_per_minute";
   MeFlags: "plugins";
@@ -42,7 +43,7 @@ export interface OpenApiFields {
   PlanTask: "acceptance_criteria" | "approved_at" | "approved_by" | "created_at" | "depends_on" | "description" | "destination" | "issue_number" | "issue_url" | "jira_project" | "jira_ticket_key" | "jira_ticket_url" | "order" | "plan_id" | "pr_url" | "rejected_at" | "rejected_by" | "repo" | "run_id" | "status" | "task_id" | "title";
   PlanWithTasks: "chat_id" | "created_at" | "description" | "destination" | "executed_at" | "executed_by" | "mcp_servers" | "plan_id" | "repo" | "status" | "task_count" | "tasks" | "title" | "tokens_in" | "tokens_out" | "updated_at";
   PlansPage: "next" | "next_cursor" | "plans";
-  Point: "deliveries" | "end" | "failed" | "ok" | "p95_ms" | "previous_deliveries" | "start" | "success_rate";
+  Point: "deliveries" | "end" | "failed" | "ok" | "p50_ms" | "p95_ms" | "previous_deliveries" | "start" | "success_rate";
   PushedCommit: "message" | "sha";
   Quarantine: "playwright_grep_invert" | "tests";
   QuarantinedTest: "file" | "framework" | "id" | "project" | "title";
@@ -72,7 +73,7 @@ export interface OpenApiFields {
   RunsPage: "next" | "runs" | "scanned";
   SecretView: "previous_secret_expires_at" | "secret";
   SnsEnvelope: "Message" | "MessageId" | "Signature" | "SignatureVersion" | "SigningCertURL" | "Subject" | "SubscribeURL" | "Timestamp" | "TopicArn" | "Type";
-  SourceRow: "deliveries" | "direction" | "failed" | "ok" | "p95_ms" | "previous_deliveries" | "previous_success_rate" | "source" | "success_rate";
+  SourceRow: "deliveries" | "direction" | "failed" | "failed_series" | "ok" | "p50_ms" | "p95_ms" | "previous_deliveries" | "previous_success_rate" | "series" | "source" | "success_rate";
   Totals: "deliveries" | "failed" | "handled" | "ignored" | "p50_ms" | "p95_ms" | "p99_ms" | "retried" | "retried_ok" | "retries" | "success_rate";
   TriggerKind: never;
   UpdateEndpointBody: "description" | "enabled" | "events" | "url";

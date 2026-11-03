@@ -133,7 +133,7 @@ function analytics(period: string, repo: string | null) {
   };
 }
 
-interface Backend { calls: string[]; fail: boolean; empty: boolean; oldServer: boolean; estimated: number; recovered: number }
+interface Backend { calls: string[]; fail: boolean; empty: boolean; oldServer: boolean; estimated: number; recovered: number; deliveries?: "ok" | "refused" }
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = { calls: [], fail: false, empty: false, oldServer: false, estimated: 0, recovered: 0, ...init };
@@ -163,6 +163,13 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
         return json(route, { ...body, summary: zero, previous: zero, reviews: { ...body.reviews, posted: 0 }, lookups: { ...body.lookups, total: 0 } });
       }
       return json(route, body);
+    }
+    if (p === "/api/deliveries/analytics" && db.deliveries) {
+      if (db.deliveries === "refused") return json(route, { error: "Admins only" }, 403);
+      return json(route, {
+        period: "24h",
+        summary: { deliveries: 412, handled: 380, ignored: 26, failed: 6, success_rate: 0.9854, retried: 4, retried_ok: 3, retries: 5, p50_ms: 160, p95_ms: 1300, p99_ms: 3900 },
+      });
     }
     return json(route, { error: `Not mocked: ${p}` }, 404);
   });
@@ -437,4 +444,25 @@ test("the usage note shows only the count above zero, and nothing when both are 
   await expect(page.getByTestId("tile-merged")).toContainText("21");
   expect(db.calls).toContain("/api/stats");
   await expect(page.getByTestId("usage-note")).toHaveCount(0);
+});
+
+test("Insights shows the last 24 hours of deliveries to an admin, linking to Deliveries", async ({ page }) => {
+  const db = await mockApi(page, { deliveries: "ok" });
+  await page.goto("/analytics");
+  const card = page.getByTestId("insights-deliveries");
+  await expect(card).toBeVisible();
+  await expect(page.getByTestId("deliveries-rate")).toContainText("98.5%");
+  await expect(page.getByTestId("deliveries-rate")).toContainText("406 of 412 went fine");
+  await expect(page.getByTestId("deliveries-failed")).toContainText("6");
+  await expect(page.getByTestId("deliveries-p95")).toContainText("1.3s");
+  await expect(page.getByTestId("deliveries-p95")).toContainText("Typical 160 ms");
+  await expect(page.getByTestId("deliveries-card-link")).toHaveAttribute("href", /\/settings\/deliveries\/?$/);
+  expect(db.calls.some((c) => c.startsWith("/api/deliveries/analytics?period=24h"))).toBe(true);
+});
+
+test("Insights hides the Deliveries card from anyone who can't open Deliveries", async ({ page }) => {
+  await mockApi(page, { deliveries: "refused" });
+  await page.goto("/analytics");
+  await expect(page.getByTestId("tile-merged")).toBeVisible();
+  await expect(page.getByTestId("insights-deliveries")).toHaveCount(0);
 });

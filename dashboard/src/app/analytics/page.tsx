@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { api, type Analytics, type Stats, type AnalyticsCiOutcomes, type AnalyticsComparison, type AnalyticsCounts, type AnalyticsPeriod } from "@/lib/api";
+import { api, type Analytics, type DeliveryAnalytics, type Stats, type AnalyticsCiOutcomes, type AnalyticsComparison, type AnalyticsCounts, type AnalyticsPeriod } from "@/lib/api";
 import { CardSkeleton, ChartSkeleton } from "@/components/skeleton";
 import { StatGrid, StatTile } from "@/components/stat-tile";
 import { Problem } from "@/components/problem";
@@ -13,7 +13,7 @@ import { Segmented } from "@/components/segmented";
 import { Callout } from "@/components/callout";
 import { inputClass } from "@/components/ui";
 import { Page, PageHeader, Section } from "@/components/page";
-import { RepoFilter, formatDuration } from "@/components/list";
+import { RepoFilter, formatDuration, formatMs } from "@/components/list";
 import { ChartCard, ChartTip, SERIES, Table, axis, delta, shortDay } from "@/components/charts";
 
 const PERIODS: { value: `${AnalyticsPeriod}`; label: string }[] = [
@@ -196,6 +196,8 @@ function AnalyticsPage() {
         <Segmented label="Period" options={PERIODS} value={`${period}` as `${AnalyticsPeriod}`} onChange={(v) => setPeriod(v === "mtd" ? "mtd" : (Number(v) as AnalyticsPeriod))} />
         <RepoFilter value={repo} onChange={setRepo} repos={repoNames} />
       </div>
+
+      {tab === "overview" && <DeliveriesCard />}
 
       {error ? (
         <div className="mt-6">
@@ -714,6 +716,50 @@ function TimeSaved({ merged, span }: { merged: number; span: string }) {
             <span className="block text-xs text-zinc-400">{count(merged)} merged PRs × {perPr} minutes ÷ 60. An estimate from your number, not a measurement.</span>
           </p>
         )}
+      </div>
+    </Section>
+  );
+}
+
+/**
+ * The last 24 hours of deliveries (GitHub, the relay, Jira, alerts, email),
+ * for admins: the Deliveries overview's numbers, linking there. Anyone who
+ * can't open Settings, Deliveries sees nothing, and a failed read hides it.
+ */
+function DeliveriesCard() {
+  const [d, setD] = useState<DeliveryAnalytics | null>(null);
+  useEffect(() => {
+    let live = true;
+    api
+      .getDeliveryAnalytics({ period: "24h" })
+      .then((r) => live && setD(r))
+      .catch(() => live && setD(null));
+    return () => {
+      live = false;
+    };
+  }, []);
+  // Anyone who can't open Deliveries gets a refusal: show nothing then.
+  if (!d?.summary) return null;
+  const s = d.summary;
+  const rate = s.success_rate == null ? "None yet" : `${(s.success_rate * 100).toFixed(s.success_rate >= 0.9995 ? 0 : 1)}%`;
+  const tone = s.success_rate == null ? "neutral" : s.success_rate >= 0.95 ? "success" : s.success_rate >= 0.8 ? "warning" : "danger";
+  return (
+    <Section
+      title="Deliveries"
+      id="deliveries"
+      description="Events in and messages out in the last 24 hours: GitHub, the relay, Jira, alerts and email."
+      actions={
+        <Link href="/settings/deliveries/" className="rounded text-sm text-zinc-300 underline-offset-2 hover:text-zinc-100 hover:underline" data-testid="deliveries-card-link">
+          Open Deliveries
+        </Link>
+      }
+    >
+      <div data-testid="insights-deliveries">
+        <StatGrid>
+          <StatTile testId="deliveries-rate" label="Success rate" value={rate} tone={tone} note={s.deliveries ? `${count(s.handled + s.ignored)} of ${count(s.deliveries)} went fine` : "No deliveries yet"} href="/settings/deliveries/" />
+          <StatTile testId="deliveries-failed" label="Failures" value={count(s.failed)} tone={s.failed > 0 ? "danger" : "neutral"} href="/settings/deliveries/?status=failed" />
+          <StatTile testId="deliveries-p95" label="Slowest 5% took" value={s.p95_ms == null ? "Not timed" : formatMs(s.p95_ms)} note={s.p50_ms != null ? `Typical ${formatMs(s.p50_ms)}` : undefined} />
+        </StatGrid>
       </div>
     </Section>
   );
