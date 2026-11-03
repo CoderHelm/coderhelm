@@ -572,10 +572,12 @@ export interface DnsRecord {
   value: string;
 }
 
-/** The domain part of the progress file: how it is set up and the records to add. */
+/**
+ * The domain part of the progress file: the records to add. CoderHelm never
+ * changes DNS, so an older install's `mode` is ignored.
+ */
 export interface DomainDoc {
   hostname: string;
-  mode: 'route53' | 'external';
   state: string;
   records: DnsRecord[];
 }
@@ -636,7 +638,7 @@ export function parseStatusDoc(v: unknown): StatusDoc | null {
   const records = okDomain && Array.isArray(dom.records)
     ? dom.records.filter((r) => r && typeof r.name === 'string' && typeof r.value === 'string' && HOST_RE.test(r.name.replace(/^_/, 'x')) && /^[a-z0-9._-]+$/i.test(r.value))
     : [];
-  return { ...d, domain: okDomain ? { hostname: dom.hostname, mode: dom.mode === 'route53' ? 'route53' : 'external', state: String(dom.state ?? ''), records } : null, part: parsePart(d.part) };
+  return { ...d, domain: okDomain ? { hostname: dom.hostname, state: String(dom.state ?? ''), records } : null, part: parsePart(d.part) };
 }
 
 function parsePart(v: unknown): PartDoc | null | undefined {
@@ -794,7 +796,7 @@ export const CHECK_TEXT: Record<string, Record<string, { title: string; fix?: st
     ok: { title: 'CoderHelm answers on your domain' },
     none: { title: 'CoderHelm uses its AWS address', fix: 'Add your own domain any time in CoderHelm: Settings, System, Domain.' },
     validating: { title: 'Waiting for the certificate record', fix: 'Add the records below where your domain’s DNS is hosted. New records can take up to an hour to show up; this page checks by itself.' },
-    zone_not_delegated: { title: 'Your domain doesn’t use its Route 53 zone yet', fix: 'At the company you bought the domain from, set the name servers to the four in your Route 53 zone (Route 53, Hosted zones, your zone, the NS record). It can take up to a day.' },
+    zone_not_delegated: { title: 'Your domain’s name servers don’t match its DNS zone yet', fix: 'At the company you bought the domain from, set the name servers to the ones your DNS host gives you. It can take up to a day.' },
     validation_wrong_value: { title: 'The certificate record has a different value', fix: 'Edit the record and paste the value below exactly, then save.' },
     caa_blocked: { title: 'Your domain doesn’t allow Amazon certificates', fix: 'Add a CAA record with the value 0 issue "amazon.com" next to your existing ones, then press Try again in CoderHelm: Settings, System, Domain.' },
     certificate_failed: { title: 'AWS could not issue the certificate', fix: 'Check the records below, then press Try again in CoderHelm: Settings, System, Domain.' },
@@ -1060,7 +1062,7 @@ export const DNS_PROVIDERS: { id: string; name: string; where: string; url?: str
   { id: 'namecheap', name: 'Namecheap', where: 'Domain List, Manage, Advanced DNS, Add New Record. The Host is the short name.', url: 'https://ap.www.namecheap.com/domains/list/' },
   { id: 'squarespace', name: 'Squarespace (formerly Google Domains)', where: 'Domains, your domain, DNS, Custom records.', url: 'https://account.squarespace.com/domains' },
   { id: 'porkbun', name: 'Porkbun', where: 'Domain Management, your domain, DNS. The Host is the short name.', url: 'https://porkbun.com/account/domainsSpeedy' },
-  { id: 'route53', name: 'Route 53 in another AWS account', where: 'Hosted zones, your zone, Create record. Record type CNAME.', url: 'https://console.aws.amazon.com/route53/v2/hostedzones' },
+  { id: 'route53', name: 'Amazon Route 53', where: 'Route 53, Hosted zones, your zone, Create record. Record type CNAME; add both records yourself (CoderHelm never changes your DNS).', url: 'https://console.aws.amazon.com/route53/v2/hostedzones' },
   { id: 'azure', name: 'Azure DNS', where: 'DNS zones, your zone, Record set. Type CNAME.', url: 'https://portal.azure.com/#browse/Microsoft.Network%2FdnsZones' },
   { id: 'other', name: 'Somewhere else', where: 'Open the DNS or zone settings where you bought the domain (or wherever its name servers are run) and add a CNAME record for each line.' },
 ];
@@ -1068,7 +1070,7 @@ export const DNS_PROVIDERS: { id: string; name: string; where: string; url?: str
 export type DomainRow = { id: string; label: string; status: RowStatus };
 
 /** The domain step's progress, from the install's domain code. */
-export function domainRows(code: string | undefined, mode: 'route53' | 'external'): DomainRow[] {
+export function domainRows(code: string | undefined): DomainRow[] {
   const at = (() => {
     switch (code) {
       case 'validating': case 'zone_not_delegated': case 'validation_wrong_value': case 'caa_blocked': case 'certificate_failed': return 0;
@@ -1082,9 +1084,9 @@ export function domainRows(code: string | undefined, mode: 'route53' | 'external
   const failed = ['zone_not_delegated', 'validation_wrong_value', 'caa_blocked', 'certificate_failed', 'attach_failed', 'dns_wrong_value', 'cname_at_apex', 'https_failed', 'api_unreachable'].includes(code ?? '');
   const row = (i: number): RowStatus => (at > i ? 'pass' : at === i ? (failed ? 'fail' : 'active') : 'pending');
   const rows: DomainRow[] = [
-    { id: 'certificate', label: mode === 'route53' ? 'Certificate checked through your Route 53 zone' : 'Certificate record found, certificate issued', status: row(0) },
+    { id: 'certificate', label: 'Certificate record found, certificate issued', status: row(0) },
     { id: 'move', label: 'CoderHelm moved to your domain', status: row(1) },
-    { id: 'address', label: mode === 'route53' ? 'Address records made in your zone' : 'Address record found', status: row(2) },
+    { id: 'address', label: 'Address record found', status: row(2) },
     { id: 'https', label: 'CoderHelm answers on your domain over HTTPS', status: row(3) },
   ];
   return rows;
@@ -1136,7 +1138,7 @@ export function finishedStep(step: StepId, s: InstallState): FinishedStep | null
       return { title: 'Your data', outcome: s.dataChoice === 'move' ? 'You asked CoderHelm to move your team from app.coderhelm.com.' : 'You started fresh.', rows: [] };
     case 'domain': {
       const host = cleanHostname(s.hostname);
-      return { title: `${host || 'Your domain'} is live`, outcome: `CoderHelm answers on ${host || 'your domain'} over HTTPS.`, href: host ? `https://${host}` : undefined, rows: labels(domainRows('ok', s.domainDoc?.mode ?? 'external')) };
+      return { title: `${host || 'Your domain'} is live`, outcome: `CoderHelm answers on ${host || 'your domain'} over HTTPS.`, href: host ? `https://${host}` : undefined, rows: labels(domainRows('ok')) };
     }
     case 'address': {
       const name = cleanName(s.coderhelmName);

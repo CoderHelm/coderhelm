@@ -4101,10 +4101,8 @@ export interface DomainRecord {
 export interface DomainView {
   hostname: string | null;
   state: "none" | "validating" | "attaching" | "live" | "failed" | "removing";
-  mode: "route53" | "external" | "config" | null;
+  mode: "external" | "config" | null;
   reason?: string;
-  zone?: string | null;
-  name_servers?: string[];
   current?: string | null;
   target?: string | null;
   certificate?: { status?: string; failure_reason?: string | null } | null;
