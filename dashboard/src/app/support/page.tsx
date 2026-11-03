@@ -446,8 +446,9 @@ function NewTicket() {
             )}
             {isSelfHosted() ? (
               <li data-testid="ticket-sent-to-coderhelm">
-                Your message, your name and email (so Coderhelm can answer), this install's version and, for each item attached, its name and
-                status and a run's error and step. It leaves this install for Coderhelm support; answers come back here and by email.
+                {
+                  "Your message, your name and email (so Coderhelm can answer), this install's version and, for each item attached, its name and status and a run's error and step. It leaves this install for Coderhelm support; answers come back here and by email."
+                }
               </li>
             ) : (
               <li>Your team, your role and your email, so we can answer.</li>
