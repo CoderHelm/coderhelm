@@ -149,6 +149,11 @@ async function setup(page: Page, cfg: Record<string, unknown> | null = SELF, ini
     if (p === "/api/system/hybrid/settings" && method === "PUT") {
       if (body?.github_mode) s.mode = body.github_mode as State["mode"];
       if (Array.isArray(body?.integrations)) s.hosted = new Set(body!.integrations as string[]);
+      // Other apps, per tool: only the tools named change.
+      for (const [id, v] of Object.entries((body?.apps as Record<string, string> | undefined) ?? {})) {
+        if (v === "coderhelm") s.hosted.add(id);
+        else s.hosted.delete(id);
+      }
       if (body?.sharing) s.sharing = body.sharing as State["sharing"];
       return json(route, status(s));
     }
@@ -285,16 +290,31 @@ for (const [outcome, words, tone] of [
   });
 }
 
-test("other apps: each choice sends the hosted list; direct and unavailable say so", async ({ page }) => {
+test("other apps: a new install shows Coderhelm's app selected for every tool", async ({ page }) => {
+  // What the install answers when nobody chose: Coderhelm's app for each tool.
+  const { puts } = await setup(page, SELF, { registered: true, verified: true, hosted: new Set(["jira", "notion", "confluence", "google_drive"]) });
+  await page.goto("/settings/system/");
+  for (const id of ["jira", "notion", "confluence", "google_drive"]) {
+    const row = page.getByTestId(`hybrid-integration-${id}`);
+    await expect(row.getByRole("button", { name: "Use Coderhelm's app (easiest)" })).toHaveAttribute("aria-pressed", "true");
+    await expect(row.getByRole("button", { name: "Use my own app (fully private)" })).toHaveAttribute("aria-pressed", "false");
+    await expect(row).toContainText("Through Coderhelm");
+  }
+  // Showing the defaults saves nothing.
+  expect(puts()).toEqual([]);
+});
+
+test("other apps: each choice sends only that tool; direct and unavailable say so", async ({ page }) => {
   const { puts } = await setup(page, SELF, { registered: true, verified: true });
   await page.goto("/settings/system/");
   const jira = page.getByTestId("hybrid-integration-jira");
   await expect(jira).toContainText("Ticket events and the sign-in.");
   await jira.getByRole("button", { name: "Use Coderhelm's app (easiest)" }).click();
-  await expect.poll(() => (puts().at(-1)?.integrations as string[] | undefined)?.slice().sort()).toEqual(["jira", "notion"]);
+  await expect.poll(() => puts().at(-1)).toEqual({ apps: { jira: "coderhelm" } });
   await expect(jira.getByRole("button", { name: "Use Coderhelm's app (easiest)" })).toHaveAttribute("aria-pressed", "true");
   await page.getByTestId("hybrid-integration-notion").getByRole("button", { name: "Use my own app (fully private)" }).click();
-  await expect.poll(() => puts().at(-1)?.integrations).toEqual(["jira"]);
+  await expect.poll(() => puts().at(-1)).toEqual({ apps: { notion: "own" } });
+  await expect(page.getByTestId("hybrid-integration-notion").getByRole("button", { name: "Use my own app (fully private)" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("hybrid-integration-confluence")).toHaveAttribute("data-mode", "hosted");
   await expect(page.getByTestId("hybrid-integration-slack_notifications")).toContainText("Works from your install, no app needed");
   await expect(page.getByTestId("hybrid-integration-mcp_apps")).toContainText("Works from your install, no app needed");
@@ -381,7 +401,7 @@ test("integration pages: the app choice saves the same settings, and links to Sy
   await page.goto("/settings/integrations/jira/");
   const jira = page.getByTestId("hybrid-app-choice");
   await jira.getByRole("button", { name: "Use Coderhelm's app (easiest)" }).click();
-  await expect.poll(() => (puts().at(-1)?.integrations as string[] | undefined)?.slice().sort()).toEqual(["jira", "notion"]);
+  await expect.poll(() => puts().at(-1)).toEqual({ apps: { jira: "coderhelm" } });
 });
 
 test("integration pages before registering point to Settings, System, Hybrid", async ({ page }) => {

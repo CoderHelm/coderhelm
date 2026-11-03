@@ -217,10 +217,7 @@ export function canUseCoderhelm(i: HybridIntegration | undefined): boolean {
   return i?.mode === "hosted" && i.offered !== false;
 }
 
-/** The hosted-app integrations after switching `id` on or off (GitHub follows its own mode). */
-export function hostedIntegrations(status: HybridStatus, id: string, useCoderhelm: boolean): string[] {
-  const now = new Set(status.integrations.filter((i) => i.id !== "github" && canUseCoderhelm(i) && i.uses_coderhelm).map((i) => i.id));
-  if (useCoderhelm) now.add(id);
-  else now.delete(id);
-  return [...now];
+/** The settings change for one Other apps tool (GitHub follows its own mode). Only that tool changes. */
+export function appChoice(id: string, useCoderhelm: boolean): HybridSettingsPatch {
+  return { apps: { [id]: useCoderhelm ? "coderhelm" : "own" } };
 }

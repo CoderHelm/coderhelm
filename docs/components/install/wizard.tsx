@@ -31,6 +31,11 @@ import {
   HYBRID_GITHUB_OUTCOMES,
   NAME_ZONE,
   SETUPS,
+  ALL_HOSTED_APPS,
+  ALL_OWN_APPS,
+  OTHER_APPS,
+  appsBody,
+  wantsHybrid,
   STEP_TIME,
   type Setup,
   cleanName,
@@ -877,7 +882,7 @@ export function InstallWizard() {
   const [hyb, setHyb] = useState<{ error: { title: string; fix: string } | null; claimRefused: boolean; settingsSent: boolean; lastTry: number; busy: boolean }>({ error: null, claimRefused: false, settingsSent: false, lastTry: 0, busy: false });
   const [newName, setNewName] = useState('');
   const [hybridOutcome, setHybridOutcome] = useState<string | null>(null);
-  const hybridWanted = !!s && (s.domainChoice === 'coderhelm' || s.githubChoice === 'hosted' || s.jiraChoice === 'hosted' || s.emailTransport === 'coderhelm');
+  const hybridWanted = !!s && wantsHybrid(s);
   useEffect(() => {
     // A closed install (someone signed up) answers no setup calls: nothing to send.
     if (!s || !hybridWanted || !s.url || !setup || setup.closed || !s.setupToken || hyb.busy) return;
@@ -892,7 +897,8 @@ export function InstallWizard() {
       path = '/settings';
       // CoderHelm's Jira app: Link through CoderHelm turned on now, so the
       // install reports hybrid_jira and the Jira step can follow the link.
-      body = { ...body, github_mode: s.githubChoice, sharing: { enabled: s.sharing, payloads: false }, ...(s.jiraChoice === 'hosted' ? { jira_link: true } : {}) };
+      // Other apps: each tool's choice, applied as the install registers.
+      body = { ...body, github_mode: s.githubChoice, sharing: { enabled: s.sharing, payloads: false }, apps: appsBody(s), ...(s.jiraChoice === 'hosted' ? { jira_link: true } : {}) };
     } else if (s.domainChoice === 'coderhelm' && !nm && !hyb.claimRefused && cleanName(s.coderhelmName)) {
       path = '/name';
       body = { ...body, name: cleanName(s.coderhelmName) };
@@ -993,8 +999,8 @@ export function InstallWizard() {
     const hybrid = s.setup === 'hybrid';
     const pickSetup = (id: Setup) =>
       update(id === 'hybrid'
-        ? { setup: 'hybrid', domainChoice: 'coderhelm', githubChoice: 'hosted', jiraChoice: 'hosted' }
-        : { setup: 'private', domainChoice: s.domainChoice === 'coderhelm' ? 'aws' : s.domainChoice, githubChoice: 'own', jiraChoice: 'own' });
+        ? { setup: 'hybrid', domainChoice: 'coderhelm', githubChoice: 'hosted', jiraChoice: 'hosted', appChoices: { ...ALL_HOSTED_APPS } }
+        : { setup: 'private', domainChoice: s.domainChoice === 'coderhelm' ? 'aws' : s.domainChoice, githubChoice: 'own', jiraChoice: 'own', appChoices: { ...ALL_OWN_APPS } });
     screen = (
       <section data-testid="screen-start">
         <Heading title="Install CoderHelm in your AWS account" lead="About 25 minutes, mostly waiting. You press a few buttons; this page does the rest and checks every step." />
@@ -1080,6 +1086,16 @@ export function InstallWizard() {
                 title="Use CoderHelm’s Jira app"
                 help="Link your Jira site through CoderHelm’s Jira app instead of setting up your own. Events come through CoderHelm, checked and re-signed; your install never holds the app’s secret and calls Jira through CoderHelm. Needs a team on app.coderhelm.com that runs the Jira app on your site."
               />
+              {OTHER_APPS.map((a) => (
+                <Toggle
+                  key={a.id}
+                  checked={(s.appChoices ?? ALL_HOSTED_APPS)[a.id] !== 'own'}
+                  onChange={(v) => update({ appChoices: { ...ALL_HOSTED_APPS, ...s.appChoices, [a.id]: v ? 'hosted' : 'own' } })}
+                  testId={`hosted-${a.id}`}
+                  title={a.title}
+                  help={`${a.help} Nothing passes through CoderHelm until someone connects it.`}
+                />
+              ))}
               <Toggle
                 checked={s.sharing}
                 onChange={(v) => update({ sharing: v })}

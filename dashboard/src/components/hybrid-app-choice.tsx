@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { HYBRID_HREF, canUseCoderhelm, hostedIntegrations, useHybrid } from "@/lib/hybrid";
+import { HYBRID_HREF, appChoice, canUseCoderhelm, useHybrid } from "@/lib/hybrid";
 import { Segmented } from "./segmented";
 import { useToast } from "./toast";
 import { linkButton } from "./ui";
@@ -44,7 +44,7 @@ export function HybridAppChoice({ id, name, className = "" }: { id: string; name
     if (next === value || busy) return;
     setBusy(true);
     try {
-      await hybrid.save(id === "github" ? { github_mode: next === "coderhelm" ? "hosted" : "own" } : { integrations: hostedIntegrations(s, id, next === "coderhelm") });
+      await hybrid.save(id === "github" ? { github_mode: next === "coderhelm" ? "hosted" : "own" } : appChoice(id, next === "coderhelm"));
       toast(next === "coderhelm" ? `${name} now uses Coderhelm's app` : `${name} now uses your own app`);
     } catch (e) {
       toast(e instanceof Error ? e.message : "Could not save", "error");
