@@ -1406,3 +1406,53 @@ test('looking back at a finished step after sign-up: done, with its outcome, no 
   await page.waitForTimeout(400);
   expect(h.calls).toEqual([]);
 });
+
+const ADDRESS = 'https://example-co.coderhelm.com';
+
+test('once the CoderHelm address is live, every link and mention uses it, and the AWS address in the link never wins', async ({ page }) => {
+  // Someone signed up (setup closed) and the guide was opened from a link that names the AWS address.
+  const m = newMock({ setup: CLOSED });
+  await mockHybrid(page, newHybrid());
+  let asked = 0;
+  await page.route(`${ADDRESS}/api/setup/status**`, (r) => {
+    asked += 1;
+    return r.fulfill({ json: CLOSED, headers: CORS });
+  });
+  await seeded(page, m, HYBRID_STATE);
+  await expect(page.getByTestId('step-title')).toHaveText('Your CoderHelm is ready');
+  await expect(page.getByTestId('open-coderhelm')).toHaveAttribute('href', `${ADDRESS}/?signup=1`);
+  await expect(page.getByRole('link', { name: 'example-co.coderhelm.com' }).first()).toHaveAttribute('href', ADDRESS);
+  expect(asked).toBeGreaterThan(0);
+  // No mention or link of the AWS address is left on the page, and the address bar carries the live one.
+  await expect.poll(() => page.evaluate(() => document.body.innerHTML.includes('d111test.cloudfront.net'))).toBe(false);
+  await expect.poll(() => new URL(page.url()).searchParams.get('url')).toBe(ADDRESS);
+  // Its optional setup links go there too.
+  const hrefs = await page.locator('[data-testid^="optional-"][href^="https://"]').evaluateAll((els) => els.map((e) => e.getAttribute('href')));
+  for (const h of hrefs) expect(h!.startsWith(ADDRESS) || !h!.includes('cloudfront.net'), h!).toBe(true);
+  // A reload from the old link (the AWS address in it) comes back to the live address.
+  await page.goto(`/self-host/install/?id=${ID}&region=us-east-1&stage=prod&url=${encodeURIComponent(INSTALL)}`);
+  await expect(page.getByTestId('open-coderhelm')).toHaveAttribute('href', `${ADDRESS}/?signup=1`);
+});
+
+test('a CoderHelm address that does not answer yet: the guide stays on the AWS address, saying only what is true', async ({ page }) => {
+  const m = newMock({ setup: CLOSED });
+  await mockHybrid(page, newHybrid());
+  await page.route(`${ADDRESS}/api/setup/status**`, (r) => r.abort('connectionrefused'));
+  await seeded(page, m, HYBRID_STATE);
+  await expect(page.getByTestId('step-title')).toHaveText('Your CoderHelm is ready');
+  await expect(page.getByTestId('open-coderhelm')).toHaveAttribute('href', `${INSTALL}/?signup=1`);
+});
+
+test('the install says its CoderHelm address is live: the guide follows it before sign-up too', async ({ page }) => {
+  const live = withHybrid(setupDoc(LINKED_GH), REG_OK, nameCheck('pass', 'ok'));
+  const m = newMock({ setup: live });
+  await mockHybrid(page, newHybrid());
+  let asked = 0;
+  await page.route(`${ADDRESS}/api/setup/status**`, (r) => {
+    asked += 1;
+    return r.fulfill({ json: live, headers: CORS });
+  });
+  await seeded(page, m, HYBRID_STATE);
+  await expect.poll(() => new URL(page.url()).searchParams.get('url')).toBe(ADDRESS);
+  await expect.poll(() => asked).toBeGreaterThan(0);
+});

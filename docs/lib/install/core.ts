@@ -1184,6 +1184,37 @@ export function finishedStep(step: StepId, s: InstallState): FinishedStep | null
   }
 }
 
+/** The install's own address: their domain or its CoderHelm address (null on the AWS address). */
+export function customAddress(s: Pick<InstallState, 'domainChoice' | 'hostname' | 'coderhelmName'>): string | null {
+  if (s.domainChoice === 'own') {
+    const h = cleanHostname(s.hostname);
+    return h ? `https://${h}` : null;
+  }
+  if (s.domainChoice === 'coderhelm') {
+    const n = cleanName(s.coderhelmName);
+    return n ? `https://${n}.${NAME_ZONE}` : null;
+  }
+  return null;
+}
+
+/**
+ * Where the guide follows the install once its own address is live, so every
+ * link and mention uses it (and an AWS address in the link never wins).
+ * Their domain: once the install's domain check passes (it includes HTTPS).
+ * A CoderHelm address: once the install says the name is live and the
+ * address itself answers (`probe`). Once someone has signed up the install
+ * no longer reports either check, so the address itself is asked. Null:
+ * stay where it is.
+ */
+export function followAddress(s: Pick<InstallState, 'domainChoice' | 'hostname' | 'coderhelmName' | 'url'>, setup: SetupStatus | null): { url: string; probe: boolean } | null {
+  const want = customAddress(s);
+  if (!want || !setup || s.url.replace(/\/+$/, '') === want) return null;
+  const check = findCheck(setup, s.domainChoice === 'own' ? 'domain' : 'hybrid_name');
+  if (check?.status === 'pass') return { url: want, probe: s.domainChoice !== 'own' };
+  if (setup.closed) return { url: want, probe: true };
+  return null;
+}
+
 /** Once the domain answers, the guide follows the install there (the GitHub App then gets its URLs). */
 export function domainUrl(s: Pick<InstallState, 'domainChoice' | 'hostname' | 'url'>, setup: SetupStatus | null): string | null {
   if (s.domainChoice !== 'own' || !s.hostname) return null;
