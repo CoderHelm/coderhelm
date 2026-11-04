@@ -190,7 +190,10 @@ async function mockApi(page: Page, role = "admin", init: Partial<Backend> = {}):
       const a = db.approvals.find((x) => x.id === p.split("/").pop());
       return a ? json(route, { approval: a, can: { approve: true, always: true } }) : json(route, { error: "Not found" }, 404);
     }
-    if (p === "/api/agents/activity") return json(route, { events: [{ id: "e1", at: new Date().toISOString(), actor: "agent:coder", actor_kind: "agent", action: "tool.queued_for_approval", tool: "linear__create_issue", result: "waiting", detail: "Changes ask by default.", policy: { decision: "ask" } }] });
+    if (p === "/api/agents/activity") return json(route, { events: [
+      { id: "e1", at: new Date().toISOString(), actor: "agent:coder", actor_kind: "agent", action: "tool.queued_for_approval", tool: "linear__create_issue", result: "waiting", detail: "Changes ask by default.", policy: { decision: "ask" } },
+      { id: "e2", at: new Date().toISOString(), actor: "agent:planner", actor_kind: "agent", action: "tool.refused", tool: "tool_find_order", result: "refused", detail: "tool_find_order changed since it was approved, so it doesn't run. Approve the new version in Settings, Tools.", policy: { decision: "deny", rule: "unknown_tool", tool_label: "Find order" } },
+    ] });
     if (p === "/api/agents/sign-in/decline" && m === "POST") return json(route, { declined: true });
 
     // The run page.
@@ -344,6 +347,17 @@ test("the page splits into Approvals, Agents and Advanced, and a switch can be u
   await expect(bar).toContainText("1 unsaved change");
   await bar.getByRole("button", { name: "Save changes" }).click();
   await expect.poll(() => db.calls.find((c) => c.path === "/api/agents/policy" && c.method === "PUT")?.body?.ask_timeout_secs).toBe(1800);
+});
+
+test("recent decisions name a team tool for people, with the name agents call it", async ({ page }) => {
+  await mockApi(page, "admin");
+  await page.goto("/settings/agents");
+  const log = page.getByTestId("agent-log");
+  const row = log.getByRole("listitem").filter({ hasText: "Find order" });
+  await expect(row).toContainText("Find order tool_find_order: tool_find_order changed since it was approved");
+  await expect(row.getByTestId("agent-log-tool-id")).toHaveText("tool_find_order");
+  // A tool with no name of its own shows as before.
+  await expect(log.getByRole("listitem").filter({ hasText: "linear__create_issue: Changes ask by default." })).toBeVisible();
 });
 
 test("pause all agents shows the banner, and resume lifts it", async ({ page }) => {

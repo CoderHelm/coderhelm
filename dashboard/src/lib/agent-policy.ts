@@ -177,7 +177,8 @@ export interface AgentEvent {
   risk?: string;
   result: string;
   detail?: string;
-  policy?: { agent?: string; repo?: string; decision?: string; rule?: string; thread_id?: string };
+  /** `tool_label`: the name people know the tool by ("Find order" for `tool_find_order`), when its definition gives one. */
+  policy?: { agent?: string; repo?: string; decision?: string; rule?: string; thread_id?: string; tool_label?: string };
 }
 
 export const AGENT_LABELS: Record<AgentKey, string> = {

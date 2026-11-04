@@ -779,6 +779,17 @@ export function SandboxSettings({ view, edit, repos, onChange }: { view: PolicyV
 
 // ── Recent decisions ────────────────────────────────────────────────
 
+/** A decision's tool: the name people know it by, with the name agents call it next to it. */
+function EventTool({ tool, label }: { tool: string; label?: string }) {
+  if (!label) return <>{tool}: </>;
+  return (
+    <>
+      <span className="font-medium">{label}</span>{" "}
+      <code className="text-xs text-zinc-400" data-testid="agent-log-tool-id">{tool}</code>:{" "}
+    </>
+  );
+}
+
 export function RecentDecisions({ reload }: { reload: number }) {
   const [events, setEvents] = useState<AgentEvent[] | null>(null);
   useEffect(() => {
@@ -799,7 +810,7 @@ export function RecentDecisions({ reload }: { reload: number }) {
                 {e.policy?.decision && <StatusPill tone={DECISION_TONE[e.policy.decision as Decision] ?? "neutral"}>{e.policy.decision}</StatusPill>}
               </div>
               <p className="mt-1 text-sm text-zinc-200">
-                {e.tool ? `${e.tool}: ` : ""}
+                {e.tool && <EventTool tool={e.tool} label={e.policy?.tool_label} />}
                 {e.detail || e.action}
               </p>
             </li>
