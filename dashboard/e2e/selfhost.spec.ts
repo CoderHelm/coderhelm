@@ -96,7 +96,7 @@ function domainAnswer(code: string) {
   };
 }
 
-async function setup(page: Page, cfg: RuntimeConfig | null, opts: { native?: unknown; signedIn?: boolean; provider?: "anthropic" | "bedrock"; blocked?: boolean; domain?: string; history?: unknown[]; version?: Record<string, unknown>; blockers?: unknown[]; onlyBlockers?: unknown[] } = {}) {
+async function setup(page: Page, cfg: RuntimeConfig | null, opts: { native?: unknown; signedIn?: boolean; provider?: "anthropic" | "bedrock"; blocked?: boolean; domain?: string; history?: unknown[]; version?: Record<string, unknown>; checked?: Record<string, unknown>; blockers?: unknown[]; onlyBlockers?: unknown[] } = {}) {
   const calls: string[] = [];
   const domainState = { code: opts.domain ?? "none" };
   const checksState = { fixed: false, runs: 0 };
@@ -128,7 +128,8 @@ async function setup(page: Page, cfg: RuntimeConfig | null, opts: { native?: unk
         deployment_provider: opts.provider ?? "anthropic",
       });
     }
-    if (p === "/api/system/version") {
+    if (p === "/api/system/version" || p === "/api/system/releases/check") {
+      if (p !== "/api/system/version") systemCalls.push({ path: p, body: JSON.parse(req.postData() || "{}") });
       return json(route, {
         self_hosted: true,
         current: { version: "v1.2.0", commit: "abc1234def", released_at: "2026-10-01T00:00:00Z", config_fingerprint: "0123456789ab" },
@@ -142,6 +143,7 @@ async function setup(page: Page, cfg: RuntimeConfig | null, opts: { native?: unk
           { id: "UPDATE#0", version: "v1.1.5", from_version: "v1.1.0", actor: "owner@example.org", mode: "update", status: "rolled_back", started_at: "2026-10-02T03:00:00Z", reason: "health check failed after deploying v1.1.5; back on v1.1.0" },
         ],
         ...(opts.version ?? {}),
+        ...(p === "/api/system/version" ? {} : (opts.checked ?? {})),
       });
     }
     if (p === "/api/system/auto-update") {
@@ -297,7 +299,8 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
 
       await page.getByRole("button", { name: "Update now to v2.0.0" }).click();
       await expect.poll(() => systemCalls.map((c) => c.path)).toContain("/api/system/update");
-      expect(systemCalls.find((c) => c.path === "/api/system/update")!.body).toEqual({ version: "v2.0.0" });
+      // No version: the updater reads GitHub first and installs the newest release at that moment.
+      expect(systemCalls.find((c) => c.path === "/api/system/update")!.body).toEqual({});
 
       await page.getByRole("switch", { name: "Install updates automatically" }).click();
       await pickOption(page.getByRole("combobox", { name: "Day" }), "sat");
@@ -551,7 +554,7 @@ test("System: a one-stack install's Update applies it, and shows it running", as
   await expect(page.getByRole("button", { name: "Prepare the update to v2.0.0" })).toHaveCount(0);
   await page.getByRole("button", { name: "Update to v2.0.0" }).click();
   await expect.poll(() => systemCalls.map((c) => c.path)).toContain("/api/system/update");
-  expect(systemCalls.find((c) => c.path === "/api/system/update")!.body).toEqual({ version: "v2.0.0" });
+  expect(systemCalls.find((c) => c.path === "/api/system/update")!.body).toEqual({});
 });
 
 test("System: a running one-stack update says so, with nothing to do and no console step", async ({ page }) => {
@@ -754,6 +757,55 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
       await expect(status.getByRole("progressbar")).toBeVisible();
       await expect(page.getByTestId("update-readiness")).not.toContainText("already running");
       await page.screenshot({ path: `${SHOTS}/system-version-updating-${name}.png`, fullPage: true });
+    });
+
+    test("Check for updates reads GitHub now and shows the newer release, Checked just now", async ({ page }) => {
+      const hourAgo = Math.floor(Date.now() / 1000) - 31 * 60;
+      const { systemCalls } = await setup(page, SELF, {
+        signedIn: true,
+        onlyBlockers: [],
+        version: { latest: null, update_available: false, releases: { fetched_at: hourAgo, stale: false, reason: null, error: null, behind: null } },
+        checked: {
+          latest: { version: "v1.3.0", notes: "## Changes\n\n- Fixes.", published_at: "2026-11-04T17:22:00Z", url: "https://example.org/r", breaking: false },
+          update_available: true,
+          releases: { fetched_at: Math.floor(Date.now() / 1000), stale: false, reason: null, error: null, behind: null },
+        },
+      });
+      await page.goto("/settings/system/");
+      const status = page.getByTestId("update-status");
+      await expect(status).toHaveAttribute("data-state", "current");
+      const check = page.getByTestId("release-check");
+      await expect(check).toContainText("Checked 31 min ago");
+      await check.getByRole("button", { name: "Check for updates" }).click();
+      await expect(check).toContainText("Checked just now");
+      expect(systemCalls.filter((c) => c.path === "/api/system/releases/check")).toHaveLength(1);
+      await expect(status).toHaveAttribute("data-state", "available");
+      await expect(status.getByRole("button", { name: "Update now to v1.3.0" })).toBeEnabled();
+      const width = await page.evaluate(() => document.documentElement.scrollWidth);
+      expect(width).toBeLessThanOrEqual(viewport.width);
+      await page.screenshot({ path: `${SHOTS}/system-version-checked-${name}.png`, fullPage: true });
+    });
+
+    test("a newer release GitHub doesn't list yet: no older Update button, and a failed check says so", async ({ page }) => {
+      await setup(page, SELF, {
+        signedIn: true,
+        onlyBlockers: [],
+        version: {
+          latest: null,
+          update_available: false,
+          releases: {
+            fetched_at: Math.floor(Date.now() / 1000) - 600, stale: false, reason: null, error: "GitHub is down",
+            behind: { version: "v1.3.0", reason: "v1.3.0 is out, but GitHub's release list doesn't show it yet; it shows here once it does" },
+          },
+        },
+      });
+      await page.goto("/settings/system/");
+      const status = page.getByTestId("update-status");
+      await expect(status).toHaveAttribute("data-state", "behind");
+      await expect(status).toContainText("v1.3.0 is out");
+      await expect(page.locator("#version").getByRole("button", { name: /^Update/ })).toHaveCount(0);
+      await expect(page.getByTestId("release-check")).toContainText("Checked 10 min ago");
+      await expect(page.getByTestId("release-check-error")).toContainText("couldn't reach GitHub");
     });
 
     test("up to date: green, with the version", async ({ page }) => {

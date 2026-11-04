@@ -199,7 +199,10 @@ function System() {
     setBusy(kind);
     try {
       if (kind === "update") {
-        const r = await api.updateNow(latest?.version, skipCheck);
+        // No version: the updater reads GitHub first and installs the newest
+        // release at this moment. Skipping a model check names the release
+        // whose check the admin read.
+        const r = await api.updateNow(skipCheck ? data.model_check?.version : undefined, skipCheck);
         if (!r.ok) {
           // A model the release calls was refused: show which, with its fix.
           if (r.model_check) setData({ ...data, model_check: r.model_check });
@@ -237,6 +240,7 @@ function System() {
         <SettingsSection id="version" title="Version">
           <div className="min-w-0 space-y-3 px-4 py-4">
             <UpdateStatus data={data} failure={failure} blocked={blocked} busy={busy} onUpdate={() => start("update")} onChanged={load} />
+            {!data.running && !pending && <ReleaseCheck data={data} onChecked={setData} />}
             <SettingsMore summary="Technical details">
               <VersionDetails version={data} autoUpdates={!!data.settings?.auto} failure={failure} />
             </SettingsMore>
@@ -564,6 +568,17 @@ function UpdateStatus({
     );
   }
 
+  const behind = data.releases?.behind;
+  if (behind && current) {
+    return (
+      <div data-testid="update-status" data-state="behind">
+        <Callout variant="info" title={<>{behind.version} is out</>}>
+          <p>You&apos;re on {current}. GitHub&apos;s release list doesn&apos;t show {behind.version} yet, so nothing older is offered meanwhile. It shows here, with Update, once it does: Check for updates in a minute.</p>
+        </Callout>
+      </div>
+    );
+  }
+
   if (!current) {
     return (
       <div data-testid="update-status" data-state="development">
@@ -579,6 +594,46 @@ function UpdateStatus({
       <Callout variant="success" title={<>You&apos;re up to date ({current})</>}>
         {data.current.released_at ? <p>Released <Time iso={data.current.released_at} mode="date" />.</p> : null}
       </Callout>
+    </div>
+  );
+}
+
+/**
+ * When this install last read GitHub's release list, and Check for updates
+ * to read it now (the updater reads at most once per 30 seconds).
+ */
+function ReleaseCheck({ data, onChecked }: { data: SystemVersion; onChecked: (v: SystemVersion) => void }) {
+  const { toast } = useToast();
+  const [checking, setChecking] = useState(false);
+  // "just now" ages into "2 min ago" while the page stays open.
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const t = window.setInterval(() => tick((n) => n + 1), 30_000);
+    return () => window.clearInterval(t);
+  }, []);
+  const r = data.releases;
+  const at = r?.fetched_at ? new Date(r.fetched_at * 1000).toISOString() : null;
+  const check = async () => {
+    setChecking(true);
+    try {
+      onChecked(await api.checkReleases());
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Could not check for updates", "error");
+    } finally {
+      setChecking(false);
+    }
+  };
+  return (
+    <div data-testid="release-check" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-400">
+      <span data-testid="release-checked" aria-live="polite">
+        {checking ? "Checking for updates…" : at ? <>Checked <Time iso={at} /></> : "Not checked yet"}
+      </span>
+      <button type="button" className={buttonClass("secondary", "sm")} onClick={check} disabled={checking}>
+        Check for updates
+      </button>
+      {r?.error && !checking && (
+        <p className="w-full text-amber-300" data-testid="release-check-error">The last check couldn&apos;t reach GitHub, so this is the list from then.</p>
+      )}
     </div>
   );
 }

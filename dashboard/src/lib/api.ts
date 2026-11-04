@@ -1246,6 +1246,8 @@ export const api = {
   getIntegrations: () => request<IntegrationsResponse>("/api/integrations"),
   /** Self-hosted installs (install admins): this build, the latest release, settings, history. */
   getSystemVersion: () => request<SystemVersion>("/api/system/version"),
+  /** Check for updates: the updater reads GitHub's release list now (at most once per 30 seconds), and answers with the same status. */
+  checkReleases: () => request<SystemVersion>("/api/system/releases/check", { method: "POST", body: "{}" }),
   setAutoUpdate: (settings: Partial<AutoUpdateSettings>) =>
     request<{ settings: AutoUpdateSettings }>("/api/system/auto-update", { method: "PUT", body: JSON.stringify(settings) }),
   /**
@@ -1255,7 +1257,8 @@ export const api = {
   setUninstallMode: (deleteData: boolean, confirm = "") =>
     request<{ ok: boolean; uninstall: UninstallMode }>("/api/system/uninstall-mode", { method: "PUT", body: JSON.stringify({ delete_data: deleteData, confirm }) }),
   /**
-   * Update to `version` (default: the latest). Refused with the model check
+   * Update to `version` (default: the newest release, read from GitHub at
+   * that moment, never the copy the page showed). Refused with the model check
    * when a model the release calls was refused; `skipCheck` passes only a
    * failure on a model the release doesn't call.
    */
@@ -4252,6 +4255,8 @@ export interface SystemVersion {
   current: { version: string | null; commit: string | null; released_at: string | null; config_fingerprint: string | null };
   latest: null | { version: string; notes: string; published_at?: string; url?: string; prerelease?: boolean; breaking: boolean };
   update_available: boolean;
+  /** The release list: when GitHub last answered (unix seconds), and a newer release it doesn't show yet. */
+  releases?: ReleaseFreshness;
   settings?: AutoUpdateSettings;
   running?: boolean;
   history?: UpdateEntry[];
@@ -4263,6 +4268,16 @@ export interface SystemVersion {
   native?: NativeUpdate | null;
   /** A native install: whether its data is deleted with its stack (Settings, System, Uninstall). */
   uninstall?: UninstallMode | null;
+}
+
+export interface ReleaseFreshness {
+  fetched_at: number | null;
+  stale: boolean;
+  reason: string | null;
+  /** The last try to read the list failed (GitHub didn't answer); the list is from fetched_at. */
+  error?: string | null;
+  /** A release launch/latest.json names that GitHub's list doesn't show yet: nothing older is offered meanwhile. */
+  behind?: { version: string; reason: string } | null;
 }
 
 export interface UninstallMode {
