@@ -4574,7 +4574,7 @@ export interface HybridGithubLink {
 export interface HybridIntegration {
   id: HybridIntegrationId;
   name: string;
-  mode: "hosted" | "direct" | "unavailable";
+  mode: "hosted" | "direct" | "included" | "unavailable";
   through_coderhelm: string;
   stays_with_you: string;
   reason?: string;

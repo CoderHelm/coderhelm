@@ -56,7 +56,7 @@ function status(s: State) {
       { id: "slack_notifications", name: "Slack and Teams notifications", mode: "direct", through_coderhelm: "", stays_with_you: "", uses_coderhelm: false },
       { id: "mcp_apps", name: "Figma, Linear, Sentry, Sanity and other sign-in apps", mode: "direct", through_coderhelm: "", stays_with_you: "", uses_coderhelm: false },
       { id: "slack_commands", name: "Slack and Teams commands", mode: "unavailable", through_coderhelm: "", stays_with_you: "", reason: "CoderHelm has no shared Slack or Teams app: each team connects its own app's signing secret in Plugins settings, so there is nothing to relay. That keeps working the same way on a hybrid install.", uses_coderhelm: false },
-      { id: "github_sign_in", name: "Sign in with GitHub", mode: "unavailable", through_coderhelm: "", stays_with_you: "", reason: "Signing people in to your install with GitHub needs your own GitHub App: a hosted app's sign-in would hand CoderHelm your people's identities. Use email sign-in, or Google with your own domain.", uses_coderhelm: false },
+      { id: "github_sign_in", name: "Sign in with GitHub", mode: "included", through_coderhelm: "Without a GitHub OAuth client of your own, GitHub's sign-in page is CoderHelm's GitHub App: CoderHelm passes GitHub's one-time code to your install, exchanges it when your install asks (with a secret only your install holds), and revokes the token at GitHub seconds later. It stores neither and doesn't ask GitHub who signed in.", stays_with_you: "Who signs in: your install asks GitHub itself whose account it is, then applies its own rules (team members and invites, two-factor). CoderHelm can't start a session on your install or choose who signs in.", reason: "", uses_coderhelm: false },
     ],
     sharing: s.sharing,
     checks,
@@ -319,7 +319,15 @@ test("other apps: each choice sends only that tool; direct and unavailable say s
   await expect(page.getByTestId("hybrid-integration-slack_notifications")).toContainText("Works from your install, no app needed");
   await expect(page.getByTestId("hybrid-integration-mcp_apps")).toContainText("Works from your install, no app needed");
   await expect(page.getByTestId("hybrid-integration-slack_commands")).toContainText("Not available");
-  await expect(page.getByTestId("hybrid-integration-github_sign_in")).toContainText("needs your own GitHub App");
+  // Sign in with GitHub works through Coderhelm's app: on, nothing to choose,
+  // and the card says the install decides who signs in.
+  const signIn = page.getByTestId("hybrid-integration-github_sign_in");
+  await expect(signIn).toHaveAttribute("data-mode", "included");
+  await expect(signIn).toContainText("On through Coderhelm's app");
+  await expect(signIn).toContainText("your install asks GitHub itself whose account it is");
+  await expect(signIn).not.toContainText("Google");
+  await expect(signIn).not.toContainText("Not available");
+  await expect(signIn.getByRole("button")).toHaveCount(0);
   // GitHub has its own row above, so it isn't listed again.
   await expect(page.getByTestId("hybrid-integration-github")).toHaveCount(0);
 });
