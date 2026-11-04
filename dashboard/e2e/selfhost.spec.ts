@@ -96,7 +96,7 @@ function domainAnswer(code: string) {
   };
 }
 
-async function setup(page: Page, cfg: RuntimeConfig | null, opts: { native?: unknown; signedIn?: boolean; provider?: "anthropic" | "bedrock"; blocked?: boolean; domain?: string; history?: unknown[] } = {}) {
+async function setup(page: Page, cfg: RuntimeConfig | null, opts: { native?: unknown; signedIn?: boolean; provider?: "anthropic" | "bedrock"; blocked?: boolean; domain?: string; history?: unknown[]; version?: Record<string, unknown>; blockers?: unknown[]; onlyBlockers?: unknown[] } = {}) {
   const calls: string[] = [];
   const domainState = { code: opts.domain ?? "none" };
   const checksState = { fixed: false, runs: 0 };
@@ -141,6 +141,7 @@ async function setup(page: Page, cfg: RuntimeConfig | null, opts: { native?: unk
           { id: "UPDATE#1", version: "v1.2.0", from_version: "v1.1.0", actor: "auto", mode: "update", status: "succeeded", started_at: "2026-10-05T03:00:00Z", reason: "now on v1.2.0" },
           { id: "UPDATE#0", version: "v1.1.5", from_version: "v1.1.0", actor: "owner@example.org", mode: "update", status: "rolled_back", started_at: "2026-10-02T03:00:00Z", reason: "health check failed after deploying v1.1.5; back on v1.1.0" },
         ],
+        ...(opts.version ?? {}),
       });
     }
     if (p === "/api/system/auto-update") {
@@ -166,12 +167,12 @@ async function setup(page: Page, cfg: RuntimeConfig | null, opts: { native?: unk
         ready: !opts.blocked,
         current: "v1.2.0",
         latest: "v2.0.0",
-        blockers: opts.blocked
+        blockers: opts.onlyBlockers ?? (opts.blocked
           ? [
               { key: "email_identity", severity: "block", detail: "example.org isn't verified yet (DKIM pending). The update's health check would fail, so it wouldn't start.", fix: (installChecks(false).checks.find((x) => x.key === "email_identity") as { fix: unknown }).fix },
               { key: "migration", severity: "warn", detail: "v2.0.0 is a major release whose notes ask you to do something before or after updating.", fix: { text: "Read the release notes below and do what they say, then update.", href: "/settings/system#version", url: "https://github.com/CoderHelm/coderhelm-platform/releases" } },
             ]
-          : [{ key: "migration", severity: "warn", detail: "v2.0.0 is a major release whose notes ask you to do something before or after updating.", fix: { text: "Read the release notes below and do what they say, then update.", href: "/settings/system#version" } }],
+          : [{ key: "migration", severity: "warn", detail: "v2.0.0 is a major release whose notes ask you to do something before or after updating.", fix: { text: "Read the release notes below and do what they say, then update.", href: "/settings/system#version" } }, ...(opts.blockers ?? [])]),
         checks: c.checks,
       });
     }
@@ -285,10 +286,11 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
     test("System: version, a major update with notes, Update now, auto-update settings, history, roll back", async ({ page }) => {
       const { systemCalls } = await setup(page, SELF, { signedIn: true });
       await page.goto("/settings/system/");
-      await expect(page.getByTestId("current-version")).toContainText("v1.2.0");
-      await expect(page.getByTestId("current-version")).toContainText("Commit abc1234");
-      await expect(page.getByTestId("latest-version")).toContainText("v2.0.0");
-      await expect(page.getByTestId("latest-version")).toContainText("Major: read the notes");
+      const status = page.getByTestId("update-status");
+      await expect(status).toHaveAttribute("data-state", "available");
+      await expect(status).toContainText("You're on v1.2.0 · v2.0.0 is available");
+      await expect(status).toContainText("Major: read the notes");
+      await expect(page.getByTestId("version-facts")).toContainText("abc1234def");
       await expect(page.getByTestId("release-notes")).toContainText("A new thing.");
       await expect(page.getByTestId("update-history")).toContainText("health check failed after deploying v1.1.5");
       await expect(page.getByTestId("update-history")).toContainText("auto-update window");
@@ -418,7 +420,12 @@ for (const [name, viewport] of [["1440", { width: 1440, height: 1000 }], ["390",
       await page.goto("/settings/system/");
       const r = page.getByTestId("update-readiness");
       await expect(r.locator('[data-severity="block"]')).toHaveCount(0);
-      await expect(r.getByTestId("doctor-summary")).toContainText("0 failing");
+      // A warning (the major release's notes) opens it, as something to read, not a stop.
+      await expect(r).toHaveAttribute("data-state", "attention");
+      await expect(r).toContainText("Read before updating");
+      await expect(r).not.toContainText("What stops an update");
+      await expect(r.getByTestId("doctor-summary").first()).toContainText("checks fine");
+      await expect(r.getByTestId("doctor-summary").first()).not.toContainText("failing");
       await expect(page.getByRole("button", { name: "Update now to v2.0.0" })).toBeEnabled();
       await page.screenshot({ path: `${SHOTS}/system-preflight-ready-${name}.png`, fullPage: true });
     });
@@ -527,7 +534,9 @@ test("System: an update still being prepared shows that, before the change set h
   });
   await page.goto("/settings/system/");
   const card = page.getByTestId("native-update");
-  await expect(card).toContainText("Preparing v2.0.0");
+  await expect(card).toContainText("Preparing the update to v2.0.0");
+  await expect(page.getByTestId("update-status")).toHaveAttribute("data-state", "updating");
+  await expect(page.getByTestId("native-update-progress")).toContainText("Step 1 of 2");
   await expect(card).toContainText("Nothing to do yet");
   await expect(page.getByTestId("native-update-summary")).toHaveCount(0);
   await expect(page.getByTestId("native-update-link")).toHaveCount(0);
@@ -626,3 +635,140 @@ test("System: an older stack without the deploy role says its one console step a
   await expect(page.getByTestId("native-update-hold")).toContainText("doesn't have the deploy role yet");
   await expect(page.getByRole("link", { name: "Open it in the AWS console" })).toHaveAttribute("href", CS_LINK);
 });
+
+// The Version section's one status at the top: up to date, an update to
+// install, an update on its way, or the last one that didn't work. Release
+// notes show only what changed; readiness is one line while nothing blocks.
+const NOTES = [
+  "Self-host release v2.0.0, cut automatically after the deploy of main at 0123456789abcdef.",
+  "",
+  "Install: `npx -y github:acme/platform#v2.0.0 init`, then deploy. Update: `npx -y github:acme/platform#v2.0.0 update --to v2.0.0`. Check an install: `npx -y github:acme/platform doctor`. Verify it yourself: docs/self-host/updates-security.md.",
+  "",
+  "## What changed",
+  "",
+  ...Array.from({ length: 8 }, (_, i) => `- Change number ${i + 1} (#${100 + i})`),
+  "",
+  "**Full list of changes:** https://example.org/compare/v1.2.0...v2.0.0",
+].join("\n");
+const RAW = "Stack arn:aws:cloudformation:us-east-1:111122223333:stack/coderhelm-prod/abc is in UPDATE_ROLLBACK_COMPLETE: Resource handler returned message: AWS::Lambda::Function failed";
+
+for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["phone", { width: 375, height: 740 }]] as const) {
+  test.describe(`Version status on a ${name}`, () => {
+    test.use({ viewport });
+
+    test("an update is available: version, release notes without the boilerplate, collapsed, and Technical details", async ({ page }) => {
+      await setup(page, SELF, {
+        signedIn: true,
+        native: { stack: "coderhelm-prod", auto_apply: false, pending: null },
+        version: {
+          current: { version: "v1.2.0", commit: "0123456789abcdef0123456789abcdef01234567", released_at: "2026-10-01T00:00:00Z", config_fingerprint: "0a3bb7ad772e" },
+          latest: { version: "v2.0.0", notes: NOTES, published_at: "2026-10-20T00:00:00Z", url: "https://example.org/r", breaking: false },
+          install: { stage: "prod", region: "us-east-1" },
+        },
+      });
+      await page.goto("/settings/system/");
+      const status = page.getByTestId("update-status");
+      await expect(status).toHaveAttribute("data-state", "available");
+      await expect(status).toContainText("You're on v1.2.0 · v2.0.0 is available");
+      await expect(status.getByRole("button", { name: "Update to v2.0.0" })).toBeEnabled();
+
+      const notes = page.getByTestId("release-notes");
+      await expect(notes).toContainText("What changed in v2.0.0");
+      await expect(notes).toContainText("Change number 5");
+      await expect(notes).not.toContainText("Change number 6");
+      for (const gone of ["cut automatically", "npx", "doctor", "Full list of changes"]) await expect(notes).not.toContainText(gone);
+      await notes.getByTestId("release-notes-more").click();
+      await expect(notes).toContainText("Change number 8");
+      await expect(notes.getByRole("link", { name: "Release page" })).toHaveAttribute("href", "https://example.org/r");
+
+      // No "How it works" anywhere in the section; one Technical details with every fact.
+      const version = page.locator("#version");
+      await expect(version.getByText("How it works")).toHaveCount(0);
+      await version.getByText("Technical details").click();
+      const facts = page.getByTestId("version-facts");
+      await expect(facts).toContainText("v1.2.0");
+      await expect(facts.getByRole("link", { name: "0123456789ab" })).toHaveAttribute("href", "https://github.com/coderhelm/coderhelm-platform/commit/0123456789abcdef0123456789abcdef01234567");
+      await expect(facts).toContainText("0a3bb7ad772e");
+      await expect(facts).toContainText("coderhelm-prod");
+      await expect(facts).toContainText("us-east-1");
+      await expect(page.getByTestId("version-details")).toContainText("Automatic updates are off");
+
+      await expect(page.getByTestId("update-readiness")).toHaveAttribute("data-state", "attention");
+      const width = await page.evaluate(() => document.documentElement.scrollWidth);
+      expect(width).toBeLessThanOrEqual(viewport.width);
+      await page.screenshot({ path: `${SHOTS}/system-version-available-${name}.png`, fullPage: true });
+    });
+
+    test("the last update didn't work: red, plain, still on the old version, Try again; never also a blocker", async ({ page }) => {
+      const { systemCalls } = await setup(page, SELF, {
+        signedIn: true,
+        history: [
+          { id: "UPDATE#2", version: "v2.0.0", from_version: "v1.2.0", actor: "owner@example.org", mode: "update", status: "rolled_back", started_at: "2026-10-21T03:00:00Z", reason: RAW },
+          { id: "UPDATE#1", version: "v1.2.0", from_version: "v1.1.0", actor: "auto", mode: "update", status: "succeeded", started_at: "2026-10-05T03:00:00Z" },
+        ],
+        blockers: [{ key: "failed_before", severity: "warn", detail: `The last try to update to v2.0.0 didn't succeed: ${RAW}.`, fix: { text: "Fix what the history says, then try again.", href: "/settings/system#history" } }],
+      });
+      await page.goto("/settings/system/");
+      const status = page.getByTestId("update-status");
+      await expect(status).toHaveAttribute("data-state", "failed");
+      await expect(status).toContainText("The update to v2.0.0 didn't work");
+      await expect(status).toContainText("Nothing changed: you're still on v1.2.0");
+      await expect(page.getByTestId("update-failed-reason")).not.toContainText("arn:aws");
+      // The raw AWS text only under Technical details.
+      await expect(status).not.toContainText("UPDATE_ROLLBACK_COMPLETE");
+      await expect(page.locator("#version").getByText("Technical details", { exact: true })).toHaveCount(1);
+      await page.locator("#version").getByText("Technical details", { exact: true }).click();
+      await expect(page.getByTestId("update-failed-raw")).toContainText("UPDATE_ROLLBACK_COMPLETE");
+      await expect(page.getByTestId("update-readiness")).not.toContainText("didn't succeed");
+      await expect(page.getByTestId("update-readiness")).not.toContainText("Fix what the history says");
+      await status.getByTestId("update-retry").click();
+      await expect.poll(() => systemCalls.map((c) => c.path)).toContain("/api/system/update");
+      const width = await page.evaluate(() => document.documentElement.scrollWidth);
+      expect(width).toBeLessThanOrEqual(viewport.width);
+      await page.screenshot({ path: `${SHOTS}/system-version-failed-${name}.png`, fullPage: true });
+    });
+
+    test("a plain reason is shown as the reason", async ({ page }) => {
+      await setup(page, SELF, {
+        signedIn: true,
+        history: [{ id: "UPDATE#2", version: "v2.0.0", from_version: "v1.2.0", actor: "auto", mode: "update", status: "rolled_back", started_at: "2026-10-21T03:00:00Z", reason: "the health check failed after deploying v2.0.0" }],
+      });
+      await page.goto("/settings/system/");
+      await expect(page.getByTestId("update-failed-reason")).toHaveText("The health check failed after deploying v2.0.0.");
+    });
+
+    test("updating: the version it goes to, when it started, and a working bar", async ({ page }) => {
+      await setup(page, SELF, {
+        signedIn: true,
+        version: { running: true },
+        history: [
+          { id: "UPDATE#2", version: "v2.0.0", from_version: "v1.2.0", actor: "owner@example.org", mode: "update", status: "running", started_at: new Date(Date.now() - 120_000).toISOString() },
+          { id: "UPDATE#1", version: "v1.2.0", from_version: "v1.1.0", actor: "auto", mode: "update", status: "succeeded", started_at: "2026-10-05T03:00:00Z" },
+        ],
+      });
+      await page.goto("/settings/system/");
+      const status = page.getByTestId("update-status");
+      await expect(status).toHaveAttribute("data-state", "updating");
+      await expect(status).toContainText("Updating to v2.0.0");
+      await expect(status).toContainText("Started");
+      await expect(status.getByRole("progressbar")).toBeVisible();
+      await expect(page.getByTestId("update-readiness")).not.toContainText("already running");
+      await page.screenshot({ path: `${SHOTS}/system-version-updating-${name}.png`, fullPage: true });
+    });
+
+    test("up to date: green, with the version", async ({ page }) => {
+      await setup(page, SELF, { signedIn: true, version: { latest: null, update_available: false }, onlyBlockers: [] });
+      await page.goto("/settings/system/");
+      // Nothing blocks or warns: readiness is one line.
+      const r = page.getByTestId("update-readiness");
+      await expect(r).toHaveAttribute("data-state", "ready");
+      await expect(r).toContainText("Ready to update");
+      await expect(r.getByRole("listitem")).toHaveCount(0);
+      const status = page.getByTestId("update-status");
+      await expect(status).toHaveAttribute("data-state", "current");
+      await expect(status).toContainText("You're up to date (v1.2.0)");
+      await expect(page.getByTestId("release-notes")).toHaveCount(0);
+      await page.screenshot({ path: `${SHOTS}/system-version-current-${name}.png`, fullPage: true });
+    });
+  });
+}

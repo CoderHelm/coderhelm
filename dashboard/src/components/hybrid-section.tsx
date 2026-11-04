@@ -536,6 +536,58 @@ function GithubRow({ hybrid, s }: RowProps) {
   );
 }
 
+/** Repository names as small chips; a long list folds after the first few. */
+function RepoNames({ names, account }: { names: string[]; account: string }) {
+  const FIRST = 12;
+  const chip = (r: string) => (
+    <li key={r} className="inline-flex min-w-0 max-w-full items-center rounded-full border border-zinc-800 bg-zinc-900/60 px-2.5 py-0.5 text-sm text-zinc-300">
+      <span className="min-w-0 wrap-anywhere">{r}</span>
+    </li>
+  );
+  return (
+    <div className="mt-2 min-w-0" data-testid="hybrid-repos-all">
+      <ul className="flex min-w-0 flex-wrap gap-2" aria-label={`Repositories this install works on in ${account}`}>
+        {names.slice(0, FIRST).map(chip)}
+      </ul>
+      {names.length > FIRST && (
+        <details className="group mt-2">
+          <summary className={`inline-flex cursor-pointer list-none items-center gap-1 rounded text-xs text-zinc-400 hover:text-zinc-200 [&::-webkit-details-marker]:hidden ${focusRing}`}>
+            {`Show ${names.length - FIRST} more`}
+          </summary>
+          <ul className="mt-2 flex min-w-0 flex-wrap gap-2">{names.slice(FIRST).map(chip)}</ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+/**
+ * What a link lets this install work on, in words (services/common/src/hybrid/broker.rs):
+ * events are forwarded for the whole GitHub installation; tokens reach the
+ * chosen repositories, or with none chosen, every repository the person who
+ * linked it could push to (its ceiling). A link made before the ceiling was
+ * recorded gets no token until it is linked again.
+ */
+export function repoScope(account: string, chosen: string[], ceiling: string[] | null): { chip: string; text: string } {
+  const n = (k: number) => `${k} ${k === 1 ? "repository" : "repositories"}`;
+  if (chosen.length > 0) {
+    return {
+      chip: ceiling ? `${chosen.length} of ${ceiling.length}` : n(chosen.length),
+      text: `This install reads and changes code only in ${chosen.length === 1 ? "this repository" : `these ${n(chosen.length)}`}:`,
+    };
+  }
+  if (!ceiling) {
+    return {
+      chip: "Link again",
+      text: `This link is older than Coderhelm's record of which repositories you can push to, so this install gets no GitHub token for ${account}. Unlink it, then install on GitHub again to link it anew.`,
+    };
+  }
+  return {
+    chip: `All ${n(ceiling.length)}`,
+    text: `This install reads and changes code in all ${n(ceiling.length)} you could push to in ${account} when you linked it:`,
+  };
+}
+
 function GithubLinkCard({ link, hybrid }: { link: HybridGithubLink; hybrid: HybridState }) {
   const { busy, act } = useAct();
   const { confirm } = useConfirm();
@@ -544,6 +596,8 @@ function GithubLinkCard({ link, hybrid }: { link: HybridGithubLink; hybrid: Hybr
   const addId = useId();
   useEffect(() => setRepos(link.repositories), [link.repositories]);
   const dirty = repos.join("\n") !== link.repositories.join("\n");
+  const ceiling = link.ceiling ?? null;
+  const scope = repoScope(link.account, repos, ceiling);
 
   const add = () => {
     const r = adding.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\/+$/, "");
@@ -570,15 +624,20 @@ function GithubLinkCard({ link, hybrid }: { link: HybridGithubLink; hybrid: Hybr
         <p className="flex min-w-0 items-center gap-2 text-sm font-medium text-zinc-100">
           <span aria-hidden="true" className="shrink-0 text-zinc-400"><GitHubIcon /></span>
           <span className="min-w-0 wrap-anywhere">{link.account}</span>
-          <Chip tone="neutral">{`${link.repositories.length} ${link.repositories.length === 1 ? "repository" : "repositories"}`}</Chip>
+          <Chip tone="neutral">{scope.chip}</Chip>
         </p>
         <button type="button" className={buttonClass("ghost", "sm")} disabled={!!busy} onClick={() => void unlink()}>
           {busy === "unlink" ? "Unlinking…" : "Unlink"}
         </button>
       </div>
-      <p className="mt-2 text-sm text-zinc-400">Only these repositories send events to this install.</p>
+      <p className="mt-2 text-sm text-zinc-400" data-testid="hybrid-repos-events">
+        Every GitHub event from {link.account} reaches this install, from every repository the app is installed on.
+      </p>
+      <p className="mt-2 text-sm text-zinc-300" data-testid="hybrid-repos-scope">{scope.text}</p>
       {repos.length === 0 ? (
-        <p className="mt-2 text-sm text-zinc-300">None yet: add the ones this install should work on.</p>
+        ceiling && ceiling.length > 0 && (
+          <RepoNames names={ceiling} account={link.account} />
+        )
       ) : (
         <ul className="mt-2 flex min-w-0 flex-wrap gap-2" aria-label={`Repositories for ${link.account}`}>
           {repos.map((r) => (
@@ -596,8 +655,13 @@ function GithubLinkCard({ link, hybrid }: { link: HybridGithubLink; hybrid: Hybr
           ))}
         </ul>
       )}
+      <p className="mt-3 text-xs text-zinc-400">
+        {repos.length === 0
+          ? "To limit it to some of them, add those here and save."
+          : "Remove them all and save to go back to every repository."}
+      </p>
       <form
-        className="mt-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center"
+        className="mt-2 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center"
         onSubmit={(e) => {
           e.preventDefault();
           add();

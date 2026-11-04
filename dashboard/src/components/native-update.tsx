@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { api, type NativeUpdate } from "@/lib/api";
 import { Callout } from "@/components/callout";
+import { Time } from "@/components/list";
 import { Code } from "@/components/settings/code";
 import { Modal, modalActions } from "@/components/modal";
 import { useToast } from "@/components/toast";
@@ -16,7 +17,19 @@ import { primaryButton, secondaryButton } from "@/components/ui";
  * to confirm here (then Apply), or a change to the deploy role or a
  * boundary that only an AWS admin can execute in the console.
  */
-export function NativeUpdateCard({ native, onChanged }: { native: NativeUpdate; onChanged?: () => void }) {
+export function NativeUpdateCard({
+  native,
+  onChanged,
+  startedAt,
+  from,
+}: {
+  native: NativeUpdate;
+  onChanged?: () => void;
+  /** When this update started (its history row), for "Started 3 minutes ago". */
+  startedAt?: string | null;
+  /** The version the install is on while it updates. */
+  from?: string | null;
+}) {
   const { toast } = useToast();
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -53,12 +66,25 @@ export function NativeUpdateCard({ native, onChanged }: { native: NativeUpdate; 
         : `${version} is ready to apply`
       : `${version} needs an AWS admin`
     : p.status === "preparing"
-      ? `Preparing ${version}`
-      : `Updating to ${version}`;
+      ? `Preparing the update to ${version}…`
+      : `Updating to ${version}…`;
+  const working = !waiting;
 
   return (
-    <div className="px-4 py-3" data-testid="native-update">
-      <Callout variant={waiting ? "warning" : "neutral"} title={title}>
+    <div data-testid="native-update">
+      <Callout variant={waiting ? "warning" : "info"} title={title}>
+        {working && (
+          <>
+            <p data-testid="native-update-progress">
+              {startedAt ? <>Started <Time iso={startedAt} />. </> : null}
+              {p.status === "preparing" ? "Step 1 of 2: preparing the change to your stack. Step 2 applies it." : "Step 2 of 2: applying the change to your stack."}
+              {from ? <> Coderhelm stays available on {from} until it finishes.</> : null}
+            </p>
+            <div className="mt-2 h-1.5 w-full max-w-sm overflow-hidden rounded-full bg-zinc-800" role="progressbar" aria-label={title} aria-busy="true">
+              <div className={`h-full rounded-full bg-blue-400/70 animate-pulse motion-reduce:animate-none ${p.status === "preparing" ? "w-1/3" : "w-2/3"}`} />
+            </div>
+          </>
+        )}
         {p.counts ? (
           <p data-testid="native-update-summary">
             A stack update to <Code>{native.stack}</Code>: {total} change{total === 1 ? "" : "s"} ({n.add} to add, {n.modify} to change, {n.remove} to remove)
@@ -81,7 +107,7 @@ export function NativeUpdateCard({ native, onChanged }: { native: NativeUpdate; 
         ) : p.status === "preparing" ? (
           <p className="mt-2">Nothing to do yet. Preparing takes a few minutes, then it applies.</p>
         ) : (
-          <p className="mt-2">Coderhelm stays available while it runs. This page shows the result when it finishes.</p>
+          <p className="mt-2">This takes 10 to 20 minutes. This page shows the result when it finishes.</p>
         )}
         {p.reason && !waiting ? <p className="mt-2 text-zinc-400">{p.reason}</p> : null}
         <p className="mt-3 flex flex-wrap items-center gap-3">

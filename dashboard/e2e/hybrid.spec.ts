@@ -16,7 +16,7 @@ interface State {
   verified: boolean;
   name: { name: string; hostname: string; code: string } | null;
   mode: "own" | "hosted";
-  links: { installation_id: number; account: string; repositories: string[] }[];
+  links: { installation_id: number; account: string; repositories: string[]; ceiling?: string[] | null }[];
   hosted: Set<string>;
   sharing: { enabled: boolean; payloads: boolean };
   /** Whether Coderhelm's own Google Drive app is set up (the hosted side's `offered`). */
@@ -269,6 +269,47 @@ test("GitHub links: repositories are edited and saved, and a link is removed", a
   expect(calls.some((c) => c.method === "DELETE" && c.path === "/api/system/hybrid/github/77")).toBe(true);
 });
 
+test("GitHub links: with no repositories chosen, every repository it can push to is shown, counted, and the events line is true", async ({ page }) => {
+  const ceiling = ["web", "api", "terraform-infra"];
+  const { calls } = await setup(page, SELF, { registered: true, verified: true, mode: "hosted", links: [{ installation_id: 77, account: "acme-eng", repositories: [], ceiling }] });
+  await page.goto("/settings/system/");
+  const card = page.getByTestId("hybrid-github-link");
+  await expect(card).toContainText("All 3 repositories");
+  await expect(card).not.toContainText("0 repositories");
+  await expect(card).not.toContainText("None yet");
+  await expect(card).not.toContainText("Only these repositories send events");
+  await expect(page.getByTestId("hybrid-repos-events")).toContainText("Every GitHub event from acme-eng reaches this install");
+  await expect(page.getByTestId("hybrid-repos-scope")).toContainText("all 3 repositories you could push to in acme-eng");
+  for (const r of ceiling) await expect(page.getByTestId("hybrid-repos-all")).toContainText(r);
+  // Narrowing it still works, and shows "1 of 3".
+  await card.getByRole("textbox", { name: "Add a repository" }).fill("web");
+  await card.getByRole("button", { name: "Add" }).click();
+  await expect(card).toContainText("1 of 3");
+  await card.getByTestId("hybrid-repos-save").click();
+  await expect.poll(() => calls.find((c) => c.method === "PUT" && c.path === "/api/system/hybrid/github/77")?.body).toEqual({ repositories: ["acme-eng/web"] });
+  await expect(page.getByTestId("hybrid-repos-scope")).toContainText("only in this repository");
+});
+
+test("GitHub links: a long list folds after the first twelve", async ({ page }) => {
+  const ceiling = Array.from({ length: 20 }, (_, i) => `repo-${i + 1}`);
+  await setup(page, SELF, { registered: true, verified: true, mode: "hosted", links: [{ installation_id: 77, account: "acme-eng", repositories: [], ceiling }] });
+  await page.goto("/settings/system/");
+  const all = page.getByTestId("hybrid-repos-all");
+  await expect(page.getByTestId("hybrid-github-link")).toContainText("All 20 repositories");
+  await expect(all.getByText("repo-20")).toBeHidden();
+  await all.getByText("Show 8 more").click();
+  await expect(all.getByText("repo-20")).toBeVisible();
+});
+
+test("GitHub links: a link from before the push list was recorded says to link it again", async ({ page }) => {
+  await setup(page, SELF, { registered: true, verified: true, mode: "hosted", links: [{ installation_id: 77, account: "acme-eng", repositories: [] }] });
+  await page.goto("/settings/system/");
+  const card = page.getByTestId("hybrid-github-link");
+  await expect(card).toContainText("Link again");
+  await expect(page.getByTestId("hybrid-repos-scope")).toContainText("gets no GitHub token for acme-eng");
+  await expect(card).not.toContainText("None yet");
+});
+
 for (const [outcome, words, tone] of [
   ["linked", "GitHub is linked.", "success"],
   ["linked_elsewhere", "already linked to another install", "error"],
@@ -474,7 +515,7 @@ for (const [label, viewport] of [["1440", { width: 1440, height: 1000 }], ["390"
 
 test("on a phone the Hybrid section fits", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await setup(page, SELF, { registered: true, verified: true, mode: "hosted", links: [{ installation_id: 77, account: "example-org", repositories: ["example-org/web", "example-org/api"] }], name: { name: "example-org", hostname: "example-org.coderhelm.com", code: "ok" } });
+  await setup(page, SELF, { registered: true, verified: true, mode: "hosted", links: [{ installation_id: 77, account: "example-org", repositories: ["example-org/web", "example-org/api"], ceiling: ["web", "api", "docs"] }], name: { name: "example-org", hostname: "example-org.coderhelm.com", code: "ok" } });
   await page.goto("/settings/system/#hybrid");
   await expect(page.getByTestId("hybrid-section")).toBeVisible();
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= window.innerWidth)).toBe(true);
@@ -487,7 +528,7 @@ for (const [label, viewport] of [["1440", { width: 1440, height: 1000 }], ["390"
     test(`hybrid screenshots ${label}`, async ({ page }) => {
       await setup(page, SELF, {
         registered: true, verified: true, mode: "hosted",
-        links: [{ installation_id: 77, account: "example-org", repositories: ["example-org/web", "example-org/api"] }],
+        links: [{ installation_id: 77, account: "example-org", repositories: ["example-org/web", "example-org/api"], ceiling: ["web", "api", "docs"] }],
         name: { name: "example-org", hostname: "example-org.coderhelm.com", code: "ok" },
       });
       await page.goto("/settings/system/");
