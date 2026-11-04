@@ -201,8 +201,8 @@ for (const width of [1440, 390]) {
       await expect(banner).toContainText("Coderhelm only checks");
       // No override for a model the release calls.
       await expect(banner.getByRole("button", { name: "Skip this check" })).toHaveCount(0);
-      await expect(page.getByRole("button", { name: "Update now to v1.3.0" })).toBeDisabled();
-      await expect(page.getByTestId("update-readiness")).toContainText("Update to v1.3.0 needs your action");
+      await expect(page.getByRole("button", { name: /^Update to/ })).toHaveCount(0);
+      await expect(page.getByTestId("update-status")).toHaveAttribute("data-state", "needs-action");
       await noSidewaysScroll(page, width);
       await shot(page, "update-blocked-system", width);
 
@@ -214,7 +214,7 @@ for (const width of [1440, 390]) {
 
       // Accepted in the console: Check again clears it.
       state.blocked = false;
-      await onSetup.getByRole("button", { name: "Check again" }).click();
+      await onSetup.getByRole("button", { name: "Re-run the model check" }).click();
       await expect(page.getByTestId("update-needs-action")).toHaveCount(0);
       expect(calls.some((c) => c.path === "/api/system/update-check")).toBe(true);
     });
@@ -227,6 +227,6 @@ test("while the release's signature is checked, the update waits and says so", a
   await expect(page.getByTestId("update-checking")).toContainText("Checking v1.3.0 before it can be applied");
   await expect(page.getByTestId("update-needs-action")).toHaveCount(0);
   state.pending = false;
-  await page.getByTestId("update-checking").getByRole("button", { name: "Check again" }).click();
+  await page.getByTestId("update-checking").getByRole("button", { name: "Re-run the model check" }).click();
   await expect(page.getByTestId("update-checking")).toHaveCount(0);
 });
