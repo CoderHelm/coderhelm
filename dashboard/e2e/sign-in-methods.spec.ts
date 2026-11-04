@@ -7,9 +7,10 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 // install checks the account itself. An install with neither shows no GitHub
 // button. Every API call is answered here.
 
-type Methods = { password: boolean; google: boolean; github: boolean };
+type Methods = { password: boolean; google: boolean; github: boolean; senders?: { setup: string | null; reset_codes: string | null } };
+type ForgotReply = { status: string; message: string; email?: string };
 
-async function mockApi(page: Page, opts: { selfHosted: boolean; methods: Methods | "missing"; status?: string }) {
+async function mockApi(page: Page, opts: { selfHosted: boolean; methods: Methods | "missing"; status?: string; forgot?: ForgotReply }) {
   const calls: string[] = [];
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -31,6 +32,7 @@ async function mockApi(page: Page, opts: { selfHosted: boolean; methods: Methods
         ? json(route, { user_id: "u_1", team_id: "t_1", github_login: "a-dev", email: "dev@acme.example", avatar_url: "", role: "owner", status: opts.status })
         : json(route, { error: "unauthorized" }, 401);
     }
+    if (p === "/auth/forgot-password" && opts.forgot) return json(route, opts.forgot);
     if (p === "/api/usage") return json(route, { month: "2026-01", tokens_in: 0, tokens_out: 0, total_runs: 0, total_tokens: 0, max_tokens: 0 });
     if (p === "/api/banners") return json(route, { banners: [] });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "acme", status: "deactivated", current: true }] });
@@ -123,4 +125,70 @@ test("removed GitHub app: 'sign in with GitHub again' only where GitHub sign-in 
   await mockApi(page, { selfHosted: true, methods: { password: true, google: false, github: true }, status: "deactivated" });
   await page.goto("/");
   await expect(page.getByRole("link", { name: "Then sign in with GitHub again" })).toHaveAttribute("href", /^\/auth\/github$/);
+});
+
+// Forgot password on a self-hosted install says what happened for that email, and where the
+// email comes from, so someone whose mail filter holds it back can ask IT to allow it.
+const SENDERS = { setup: "coderhelm@acme.example", reset_codes: "no-reply@verificationemail.com" };
+
+async function askForReset(page: Page, email: string) {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Forgot password?" }).click();
+  await page.getByLabel("Email").fill(email);
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+}
+
+test("forgot password, account here: the code is on its way from Amazon Cognito's address", async ({ page }) => {
+  const { calls } = await mockApi(page, {
+    selfHosted: true,
+    methods: { password: true, google: false, github: false, senders: SENDERS },
+    forgot: { status: "code_sent", message: "We sent a reset code to jo@acme.example.", email: "jo@acme.example" },
+  });
+  await askForReset(page, "jo@acme.example");
+  await expect(page.getByRole("status").filter({ hasText: "sent" })).toHaveText("We sent a reset code to jo@acme.example.");
+  await expect(page.getByTestId("sender-note")).toContainText(
+    "The reset code comes from no-reply@verificationemail.com (Amazon Cognito, which signs people in here).",
+  );
+  await expect(page.getByTestId("sender-note")).toContainText("ask IT to allow that address");
+  await expect(page.getByLabel("Reset code")).toBeVisible();
+  expect(calls).toContain("/auth/forgot-password");
+});
+
+test("forgot password, on the team with no account here: a set-up link instead, from the install's sender", async ({ page }) => {
+  await mockApi(page, {
+    selfHosted: true,
+    methods: { password: true, google: false, github: false, senders: SENDERS },
+    forgot: { status: "setup_sent", message: "You don't have an account here yet. We sent you a set-up link instead." },
+  });
+  await askForReset(page, "al@acme.example");
+  await expect(page.getByRole("status").filter({ hasText: "sent" })).toHaveText("You don't have an account here yet. We sent you a set-up link instead.");
+  await expect(page.getByTestId("sender-note")).toContainText("The set-up link comes from coderhelm@acme.example.");
+  await expect(page.getByTestId("sender-note")).not.toContainText("verificationemail.com");
+  // No code to type: the link in the email sets up the account.
+  await expect(page.getByLabel("Reset code")).toHaveCount(0);
+});
+
+test("forgot password, not on this install: says so, sends nothing, no sender line", async ({ page }) => {
+  await mockApi(page, {
+    selfHosted: true,
+    methods: { password: true, google: false, github: false, senders: SENDERS },
+    forgot: { status: "no_account", message: "There's no account for who@else.example on this CoderHelm. Ask an admin to add you." },
+  });
+  await askForReset(page, "who@else.example");
+  await expect(page.getByRole("alert").filter({ hasText: "no account" })).toHaveText(
+    "There's no account for who@else.example on this CoderHelm. Ask an admin to add you.",
+  );
+  await expect(page.getByTestId("sender-note")).toHaveCount(0);
+  await expect(page.getByLabel("Reset code")).toHaveCount(0);
+});
+
+test("forgot password with an SES sender for Cognito: that address, not Cognito's", async ({ page }) => {
+  await mockApi(page, {
+    selfHosted: true,
+    methods: { password: true, google: false, github: false, senders: { setup: "coderhelm@acme.example", reset_codes: "noreply@acme.example" } },
+    forgot: { status: "code_sent", message: "We sent a reset code to jo@acme.example." },
+  });
+  await askForReset(page, "jo@acme.example");
+  await expect(page.getByTestId("sender-note")).toContainText("The reset code comes from noreply@acme.example.");
+  await expect(page.getByTestId("sender-note")).not.toContainText("Amazon Cognito");
 });

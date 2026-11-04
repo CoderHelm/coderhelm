@@ -19,6 +19,8 @@ const USERS = [
   { user_id: "u_owner", email: EMAIL, name: "Olivia Owner-With-A-Very-Long-Double-Barrelled-Surname", github_login: "olivia-owner-with-a-long-github-login", github_id: null, avatar_url: null, role: "owner", status: "active", sign_in: "email", invited_by: null, last_active_at: iso(60), updated_at: iso(600), is_self: false },
   { user_id: "u_self", email: `dana.${EMAIL}`, name: "Dana Developer", github_login: "dana-developer-with-a-long-login", github_id: null, avatar_url: null, role: "owner", status: "active", sign_in: "github", invited_by: null, last_active_at: iso(5), updated_at: iso(600), is_self: true },
   { user_id: "u_inv", email: `invited.person.${EMAIL}`, name: null, github_login: null, github_id: null, avatar_url: null, role: "member", status: "invited", sign_in: "email", invited_by: EMAIL, last_active_at: null, updated_at: iso(60 * 24), is_self: false },
+  // Copied from another Coderhelm and never signed in here: the status, the old activity, the GitHub line and the row button.
+  { user_id: "u_moved", email: `moved.person.${EMAIL}`, name: "Moved Person-With-A-Very-Long-Double-Barrelled-Surname", github_login: "moved-person-with-a-long-github-login", github_id: "4242", avatar_url: null, role: "member", status: "active", sign_in: "email_and_github", invited_by: null, last_active_at: iso(60 * 24 * 5), updated_at: iso(600), needs_setup: true, setup_email_sent_at: iso(60 * 24), is_self: false },
   { user_id: "u_view", email: `viewer.${EMAIL}`, name: "Jo Viewer", github_login: null, github_id: null, avatar_url: null, role: "viewer", status: "active", sign_in: "email", invited_by: null, last_active_at: iso(60 * 24 * 9), updated_at: iso(60 * 24 * 9), is_self: false },
 ];
 
@@ -236,6 +238,7 @@ export const settingsData: Handler = ({ method, path, url }) => {
       headers: { "webhook-id": "evt_01JBEVNT8M1N4P7Q0R3S6T9V2WWIDEWIDEWIDE", "webhook-signature": "[redacted]", "user-agent": LONG_URL },
     }] };
   }
+  if (p === "/auth/methods") return { password: true, google: false, github: true, senders: { setup: `coderhelm.${EMAIL}`, reset_codes: "no-reply@verificationemail.com" } };
   if (p === "/api/users") return { users: USERS };
   // Your own two-factor sign-in (both deployments): kept on by a team's rule.
   if (p === "/api/users/2fa") {

@@ -4,7 +4,7 @@ import { can } from "@/lib/capabilities";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { api, ApiError, TEAM_MOVED, TWO_FACTOR_REQUIRED, movedUrl, type UsageInfo, type Banner, type TeamInfo } from "@/lib/api";
+import { api, ApiError, TEAM_MOVED, TWO_FACTOR_REQUIRED, movedUrl, type ForgotStatus, type SignInSenders, type UsageInfo, type Banner, type TeamInfo } from "@/lib/api";
 import { pushToDataLayer } from "@/lib/gtm";
 import { formatTokens, limitName, reachedLimit, USAGE_CHANGED, usageBreakdown, usageLimits } from "@/lib/usage";
 import { TokenMeters } from "@/components/token-meters";
@@ -996,6 +996,30 @@ const USE_PASSWORD = "two_factor_use_password";
 const USE_PASSWORD_MESSAGE =
   "Your two-factor code is on your password account. Sign in with your email and password, then enter the code from your authenticator app.";
 
+/** Amazon Cognito's own sender, when the install's user pool sends its emails itself. */
+const COGNITO_DEFAULT_SENDER = "no-reply@verificationemail.com";
+
+/**
+ * Where the email that forgot-password just sent comes from, so a person whose mail filter
+ * holds it back can ask IT to allow that address. Shown only when the install said who sends.
+ */
+function SenderNote({ status, senders }: { status: ForgotStatus | null; senders?: SignInSenders }) {
+  if (!status || !senders) return null;
+  let line = "";
+  if (status === "code_sent" && senders.reset_codes) {
+    const who = senders.reset_codes === COGNITO_DEFAULT_SENDER ? " (Amazon Cognito, which signs people in here)" : "";
+    line = `The reset code comes from ${senders.reset_codes}${who}.`;
+  } else if ((status === "setup_sent" || status === "setup_recent") && senders.setup) {
+    line = `The set-up link comes from ${senders.setup}.`;
+  }
+  if (!line) return null;
+  return (
+    <p data-testid="sender-note" className="w-full text-xs text-zinc-400">
+      {line} Not in your inbox after a few minutes? Check spam or quarantine, or ask IT to allow that address.
+    </p>
+  );
+}
+
 function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const [view, setView] = useState<AuthView>("login");
   const [email, setEmail] = useState("");
@@ -1010,6 +1034,8 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  // What forgot-password last did (a self-hosted install says which case it was).
+  const [forgotStatus, setForgotStatus] = useState<ForgotStatus | null>(null);
   const [problem, setProblem] = useState<SignInProblem | null>(null);
   // How a self-hosted install's account form was opened: an admin's invite email or the
   // installer's first-admin link. Without either it has no open sign-up.
@@ -1156,13 +1182,21 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   };
 
   const handleForgot = async () => {
-    setError(""); setLoading(true);
+    setError(""); setMessage(""); setForgotStatus(null); setLoading(true);
     try {
-      await api.forgotPassword(email);
-      setView("reset");
-      setMessage("If an account exists, a reset code was sent to your email.");
-    } catch {
-      setError("We couldn't send a reset code. Check your connection and try again.");
+      const r = await api.forgotPassword(email);
+      setForgotStatus(r.status);
+      if (r.status === "code_sent" || r.status === "sent") {
+        setView("reset");
+        setMessage(r.status === "sent" ? "If an account exists, a reset code was sent to your email." : r.message);
+      } else if (r.status === "no_account") {
+        setError(r.message);
+      } else {
+        // A set-up link (sent now or within the hour), or an invite to use: no code to enter.
+        setMessage(r.message);
+      }
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "We couldn't send a reset code. Check your connection and try again.");
     } finally { setLoading(false); }
   };
 
@@ -1259,6 +1293,8 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
               {message}
             </div>
           )}
+
+          {(view === "forgot" || view === "reset") && <SenderNote status={forgotStatus} senders={methods.senders} />}
 
           {/* ── Login ── */}
           {view === "login" && (
@@ -1412,14 +1448,18 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
           {/* ── Forgot password ── */}
           {view === "forgot" && (
             <div className="w-full space-y-4">
-              <p className="text-sm text-zinc-400 text-center">Enter your email to receive a reset code</p>
+              <p className="text-sm text-zinc-400 text-center">
+                {selfHosted
+                  ? "Enter your email. We'll send a reset code, or a set-up link if you don't have an account here yet."
+                  : "Enter your email to receive a reset code"}
+              </p>
               <div className="space-y-3">
                 <input type="email" autoComplete="email" aria-label="Email" placeholder="Email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }}
                   onKeyDown={(e) => e.key === "Enter" && handleForgot()}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
                 <button onClick={handleForgot} disabled={loading || !email}
                   className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed">
-                  {loading ? "Sending..." : "Send reset code"}
+                  {loading ? "Sending..." : selfHosted ? "Send" : "Send reset code"}
                 </button>
               </div>
               <button onClick={() => { setView("login"); setError(""); setMessage(""); }} className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">

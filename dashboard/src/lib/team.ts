@@ -41,7 +41,7 @@ export interface Member {
   invited_at?: string | null;
   invite_expires_at?: string | null;
   invite_expired?: boolean;
-  /** Self-hosted, admins only: on the team (copied from another Coderhelm) but never signed in here. */
+  /** Self-hosted: on the team (copied from another Coderhelm) but never signed in here. */
   needs_setup?: boolean;
   /** When the last set-up email went to them. */
   setup_email_sent_at?: string | null;
@@ -175,6 +175,11 @@ export const teamApi = {
     }),
   setupEmail: (userId: string) =>
     request<{ status: string; setup_email_sent_at?: string }>(`/api/users/${encodeURIComponent(userId)}/setup-email`, {
+      method: "POST",
+    }),
+  /** Self-hosted, admins: the set-up email to everyone who hasn't set up an account here (skips anyone sent one in the last hour). */
+  setupEmailsAll: () =>
+    request<{ sent: number; skipped_recent: number; failed: number; sent_at: Record<string, string> }>("/api/users/setup-emails", {
       method: "POST",
     }),
   roles: () => request<RolesInfo>("/api/roles"),
@@ -320,4 +325,18 @@ export function relativeTime(iso: string | null, now: Date = new Date()): string
 
 export function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@.]+$/.test(email.trim()) && email.trim().length <= 254;
+}
+
+/** "1 person" / "3 people". */
+export function people(n: number): string {
+  return `${n} ${n === 1 ? "person" : "people"}`;
+}
+
+/** What the bulk set-up email did, in one sentence. */
+export function bulkSetupSummary(r: { sent: number; skipped_recent: number; failed: number }): string {
+  const parts: string[] = [];
+  parts.push(r.sent === 0 ? "No set-up emails sent." : `Set-up email sent to ${people(r.sent)}.`);
+  if (r.skipped_recent > 0) parts.push(`${people(r.skipped_recent)} got one in the last hour and ${r.skipped_recent === 1 ? "was" : "were"} skipped.`);
+  if (r.failed > 0) parts.push(`${r.failed} couldn't be sent: see Deliveries.`);
+  return parts.join(" ");
 }

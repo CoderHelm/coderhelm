@@ -171,7 +171,24 @@ export interface SignInMethods {
   password: boolean;
   google: boolean;
   github: boolean;
+  /**
+   * Self-hosted: where the sign-in page's emails come from, so a person can ask IT to allow
+   * them. `setup` is the install's own sender (the set-up email), `reset_codes` Amazon
+   * Cognito's (reset codes). Null when it couldn't be read.
+   */
+  senders?: SignInSenders;
 }
+
+export interface SignInSenders {
+  setup: string | null;
+  reset_codes: string | null;
+}
+
+/**
+ * What forgot-password did for an email. A self-hosted install says which case it was;
+ * the hosted service answers `sent` for every email.
+ */
+export type ForgotStatus = "code_sent" | "setup_sent" | "setup_recent" | "invited" | "no_account" | "sent";
 
 export const api = {
   // Auth
@@ -214,7 +231,7 @@ export const api = {
       body: JSON.stringify({ email, code }),
     }),
   forgotPassword: (email: string) =>
-    request<{ status: string; message: string }>("/auth/forgot-password", {
+    request<{ status: ForgotStatus; message: string; email?: string }>("/auth/forgot-password", {
       method: "POST",
       body: JSON.stringify({ email }),
     }),
