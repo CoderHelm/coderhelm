@@ -185,10 +185,10 @@ export interface SignInSenders {
 }
 
 /**
- * What forgot-password did for an email. A self-hosted install says which case it was;
- * the hosted service answers `sent` for every email.
+ * Forgot-password's answer: `sent`, the same for every email, so it never says whether one has
+ * an account or is on the team.
  */
-export type ForgotStatus = "code_sent" | "setup_sent" | "setup_recent" | "invited" | "no_account" | "sent";
+export type ForgotStatus = "sent";
 
 export const api = {
   // Auth
@@ -231,7 +231,7 @@ export const api = {
       body: JSON.stringify({ email, code }),
     }),
   forgotPassword: (email: string) =>
-    request<{ status: ForgotStatus; message: string; email?: string }>("/auth/forgot-password", {
+    request<{ status: ForgotStatus; message: string }>("/auth/forgot-password", {
       method: "POST",
       body: JSON.stringify({ email }),
     }),

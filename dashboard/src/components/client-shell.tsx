@@ -4,7 +4,7 @@ import { can } from "@/lib/capabilities";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { api, ApiError, TEAM_MOVED, TWO_FACTOR_REQUIRED, movedUrl, type ForgotStatus, type SignInSenders, type UsageInfo, type Banner, type TeamInfo } from "@/lib/api";
+import { api, ApiError, TEAM_MOVED, TWO_FACTOR_REQUIRED, movedUrl, type SignInSenders, type UsageInfo, type Banner, type TeamInfo } from "@/lib/api";
 import { pushToDataLayer } from "@/lib/gtm";
 import { formatTokens, limitName, reachedLimit, USAGE_CHANGED, usageBreakdown, usageLimits } from "@/lib/usage";
 import { TokenMeters } from "@/components/token-meters";
@@ -1000,23 +1000,35 @@ const USE_PASSWORD_MESSAGE =
 const COGNITO_DEFAULT_SENDER = "no-reply@verificationemail.com";
 
 /**
- * Where the email that forgot-password just sent comes from, so a person whose mail filter
- * holds it back can ask IT to allow that address. Shown only when the install said who sends.
+ * What the sign-in page says after Forgot password, the same for every email: it never says
+ * whether the email has an account here, is on the team, is invited, or is unknown.
  */
-function SenderNote({ status, senders }: { status: ForgotStatus | null; senders?: SignInSenders }) {
-  if (!status || !senders) return null;
-  let line = "";
-  if (status === "code_sent" && senders.reset_codes) {
+function forgotSentMessage(email: string, selfHosted: boolean): string {
+  return selfHosted
+    ? `If ${email} can sign in here, we've sent a reset code or a set-up link.`
+    : `If ${email} can sign in here, we've sent a reset code.`;
+}
+
+/**
+ * Who sends both emails Forgot password can send, so a person whose mail filter holds one back
+ * can ask IT to allow it. The same lines whatever the email; shown when the install said who sends.
+ */
+function SenderNote({ senders }: { senders?: SignInSenders }) {
+  if (!senders) return null;
+  const lines: string[] = [];
+  if (senders.reset_codes) {
     const who = senders.reset_codes === COGNITO_DEFAULT_SENDER ? " (Amazon Cognito, which signs people in here)" : "";
-    line = `The reset code comes from ${senders.reset_codes}${who}.`;
-  } else if ((status === "setup_sent" || status === "setup_recent") && senders.setup) {
-    line = `The set-up link comes from ${senders.setup}.`;
+    lines.push(`Reset codes come from ${senders.reset_codes}${who}.`);
   }
-  if (!line) return null;
+  if (senders.setup) lines.push(`Set-up links come from ${senders.setup}.`);
+  if (lines.length === 0) return null;
   return (
-    <p data-testid="sender-note" className="w-full text-xs text-zinc-400">
-      {line} Not in your inbox after a few minutes? Check spam or quarantine, or ask IT to allow that address.
-    </p>
+    <div data-testid="sender-note" className="w-full space-y-1 text-xs text-zinc-400">
+      {lines.map((l) => <p key={l}>{l}</p>)}
+      <p>
+        Not in your inbox after a few minutes? Check spam or quarantine, or ask IT to allow {lines.length > 1 ? "those addresses" : "that address"}.
+      </p>
+    </div>
   );
 }
 
@@ -1034,8 +1046,8 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  // What forgot-password last did (a self-hosted install says which case it was).
-  const [forgotStatus, setForgotStatus] = useState<ForgotStatus | null>(null);
+  // Forgot password was asked for (its answer is the same for every email).
+  const [forgotSent, setForgotSent] = useState(false);
   const [problem, setProblem] = useState<SignInProblem | null>(null);
   // How a self-hosted install's account form was opened: an admin's invite email or the
   // installer's first-admin link. Without either it has no open sign-up.
@@ -1104,7 +1116,13 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
     try {
       await api.signup(email, password);
       setView("verify");
-      setMessage("Check your email for a verification code.");
+      // A self-hosted install answers the same for every email (invited, already with an
+      // account, or not let in), so the page can't say which either.
+      setMessage(
+        selfHosted
+          ? `If ${email} can join here, we've sent a verification code. No code after a few minutes? If you already have an account, sign in or use Forgot password; otherwise ask an admin to invite you.`
+          : "Check your email for a verification code.",
+      );
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";
       if (e instanceof ApiError && e.code === "not_invited") {
@@ -1182,19 +1200,13 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   };
 
   const handleForgot = async () => {
-    setError(""); setMessage(""); setForgotStatus(null); setLoading(true);
+    setError(""); setMessage(""); setForgotSent(false); setLoading(true);
     try {
-      const r = await api.forgotPassword(email);
-      setForgotStatus(r.status);
-      if (r.status === "code_sent" || r.status === "sent") {
-        setView("reset");
-        setMessage(r.status === "sent" ? "If an account exists, a reset code was sent to your email." : r.message);
-      } else if (r.status === "no_account") {
-        setError(r.message);
-      } else {
-        // A set-up link (sent now or within the hour), or an invite to use: no code to enter.
-        setMessage(r.message);
-      }
+      // One answer for every email: the page always moves on to the code.
+      await api.forgotPassword(email);
+      setForgotSent(true);
+      setView("reset");
+      setMessage(forgotSentMessage(email, selfHosted));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "We couldn't send a reset code. Check your connection and try again.");
     } finally { setLoading(false); }
@@ -1283,7 +1295,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
           {problem && view === "login" && <SignInProblemNotice problem={problem} />}
 
           {error && (
-            <div role="alert" className="mt-2 w-full rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2.5 text-sm text-red-400">
+            <div role="alert" data-testid="auth-error" className="mt-2 w-full rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2.5 text-sm text-red-400">
               {error}
             </div>
           )}
@@ -1294,7 +1306,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
             </div>
           )}
 
-          {(view === "forgot" || view === "reset") && <SenderNote status={forgotStatus} senders={methods.senders} />}
+          {view === "reset" && forgotSent && <SenderNote senders={methods.senders} />}
 
           {/* ── Login ── */}
           {view === "login" && (
@@ -1472,6 +1484,11 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
           {view === "reset" && (
             <div className="w-full space-y-4">
               <p className="text-sm text-zinc-400 text-center">Enter the code and your new password</p>
+              {selfHosted && (
+                <p className="text-xs text-zinc-400 text-center" data-testid="setup-link-instead">
+                  Got a set-up link instead of a code? There&apos;s no code to enter: open the link in that email to set up your account.
+                </p>
+              )}
               <div className="space-y-3">
                 <input type="text" inputMode="numeric" autoComplete="one-time-code" aria-label="Reset code" placeholder="Reset code" value={code} onChange={(e) => { setCode(e.target.value); setError(""); }}
                   className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600 text-center tracking-widest" />
