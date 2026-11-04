@@ -33,6 +33,7 @@ async function mockApi(page: Page, opts: { selfHosted: boolean; methods: Methods
         : json(route, { error: "unauthorized" }, 401);
     }
     if (p === "/auth/forgot-password" && opts.forgot) return json(route, opts.forgot);
+    if (p === "/auth/signup") return json(route, { status: "verification_required", message: "If that email can join here, we've sent a verification code." });
     if (p === "/api/usage") return json(route, { month: "2026-01", tokens_in: 0, tokens_out: 0, total_runs: 0, total_tokens: 0, max_tokens: 0 });
     if (p === "/api/banners") return json(route, { banners: [] });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "acme", status: "deactivated", current: true }] });
@@ -127,8 +128,9 @@ test("removed GitHub app: 'sign in with GitHub again' only where GitHub sign-in 
   await expect(page.getByRole("link", { name: "Then sign in with GitHub again" })).toHaveAttribute("href", /^\/auth\/github$/);
 });
 
-// Forgot password on a self-hosted install says what happened for that email, and where the
-// email comes from, so someone whose mail filter holds it back can ask IT to allow it.
+// Forgot password gives one answer for every email, so the page can't be used to learn who has
+// an account here or is on the team. It names both senders, so someone whose mail filter holds
+// one back can ask IT to allow it.
 const SENDERS = { setup: "coderhelm@acme.example", reset_codes: "no-reply@verificationemail.com" };
 
 async function askForReset(page: Page, email: string) {
@@ -138,57 +140,77 @@ async function askForReset(page: Page, email: string) {
   await page.getByRole("button", { name: "Send", exact: true }).click();
 }
 
-test("forgot password, account here: the code is on its way from Amazon Cognito's address", async ({ page }) => {
-  const { calls } = await mockApi(page, {
-    selfHosted: true,
-    methods: { password: true, google: false, github: false, senders: SENDERS },
-    forgot: { status: "code_sent", message: "We sent a reset code to jo@acme.example.", email: "jo@acme.example" },
-  });
-  await askForReset(page, "jo@acme.example");
-  await expect(page.getByRole("status").filter({ hasText: "sent" })).toHaveText("We sent a reset code to jo@acme.example.");
-  await expect(page.getByTestId("sender-note")).toContainText(
-    "The reset code comes from no-reply@verificationemail.com (Amazon Cognito, which signs people in here).",
-  );
-  await expect(page.getByTestId("sender-note")).toContainText("ask IT to allow that address");
+/** The page's error box (not Next's route announcer, which is an alert too). */
+const errorBox = (page: Page) => page.getByTestId("auth-error");
+
+/** What the page shows after asking: the message, the sender lines, and what comes next. */
+async function shown(page: Page) {
   await expect(page.getByLabel("Reset code")).toBeVisible();
-  expect(calls).toContain("/auth/forgot-password");
-});
+  return {
+    message: await page.getByRole("status").innerText(),
+    senders: await page.getByTestId("sender-note").locator("p").allInnerTexts(),
+    setupNote: await page.getByTestId("setup-link-instead").innerText(),
+    errors: await errorBox(page).count(),
+  };
+}
 
-test("forgot password, on the team with no account here: a set-up link instead, from the install's sender", async ({ page }) => {
-  await mockApi(page, {
-    selfHosted: true,
-    methods: { password: true, google: false, github: false, senders: SENDERS },
-    forgot: { status: "setup_sent", message: "You don't have an account here yet. We sent you a set-up link instead." },
-  });
-  await askForReset(page, "al@acme.example");
-  await expect(page.getByRole("status").filter({ hasText: "sent" })).toHaveText("You don't have an account here yet. We sent you a set-up link instead.");
-  await expect(page.getByTestId("sender-note")).toContainText("The set-up link comes from coderhelm@acme.example.");
-  await expect(page.getByTestId("sender-note")).not.toContainText("verificationemail.com");
-  // No code to type: the link in the email sets up the account.
-  await expect(page.getByLabel("Reset code")).toHaveCount(0);
-});
+// Whatever a server answers (the one `sent`, or a per-case status an older gateway gave), the
+// page reads the same: has an account, on the team without one, invited, not on this install.
+const REPLIES: ForgotReply[] = [
+  { status: "sent", message: "If that email can sign in here, we've sent a reset code or a set-up link." },
+  { status: "code_sent", message: "We sent a reset code to jo@acme.example.", email: "jo@acme.example" },
+  { status: "setup_sent", message: "You don't have an account here yet. We sent you a set-up link instead." },
+  { status: "invited", message: "jo@acme.example has an invite here but no account yet." },
+  { status: "no_account", message: "There's no account for jo@acme.example on this CoderHelm. Ask an admin to add you." },
+];
 
-test("forgot password, not on this install: says so, sends nothing, no sender line", async ({ page }) => {
-  await mockApi(page, {
-    selfHosted: true,
-    methods: { password: true, google: false, github: false, senders: SENDERS },
-    forgot: { status: "no_account", message: "There's no account for who@else.example on this CoderHelm. Ask an admin to add you." },
+test("forgot password: the same message, senders and next step for every case", async ({ page }) => {
+  const seen = [];
+  for (const forgot of REPLIES) {
+    const { calls } = await mockApi(page, {
+      selfHosted: true,
+      methods: { password: true, google: false, github: false, senders: SENDERS },
+      forgot,
+    });
+    await askForReset(page, "jo@acme.example");
+    seen.push(await shown(page));
+    expect(calls).toContain("/auth/forgot-password");
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  }
+  expect(seen[0]).toEqual({
+    message: "If jo@acme.example can sign in here, we've sent a reset code or a set-up link.",
+    senders: [
+      "Reset codes come from no-reply@verificationemail.com (Amazon Cognito, which signs people in here).",
+      "Set-up links come from coderhelm@acme.example.",
+      "Not in your inbox after a few minutes? Check spam or quarantine, or ask IT to allow those addresses.",
+    ],
+    setupNote: "Got a set-up link instead of a code? There's no code to enter: open the link in that email to set up your account.",
+    errors: 0,
   });
-  await askForReset(page, "who@else.example");
-  await expect(page.getByRole("alert").filter({ hasText: "no account" })).toHaveText(
-    "There's no account for who@else.example on this CoderHelm. Ask an admin to add you.",
-  );
-  await expect(page.getByTestId("sender-note")).toHaveCount(0);
-  await expect(page.getByLabel("Reset code")).toHaveCount(0);
+  for (const s of seen) expect(s).toEqual(seen[0]);
 });
 
 test("forgot password with an SES sender for Cognito: that address, not Cognito's", async ({ page }) => {
   await mockApi(page, {
     selfHosted: true,
     methods: { password: true, google: false, github: false, senders: { setup: "coderhelm@acme.example", reset_codes: "noreply@acme.example" } },
-    forgot: { status: "code_sent", message: "We sent a reset code to jo@acme.example." },
+    forgot: REPLIES[0],
   });
   await askForReset(page, "jo@acme.example");
-  await expect(page.getByTestId("sender-note")).toContainText("The reset code comes from noreply@acme.example.");
+  await expect(page.getByTestId("sender-note")).toContainText("Reset codes come from noreply@acme.example.");
   await expect(page.getByTestId("sender-note")).not.toContainText("Amazon Cognito");
+});
+
+test("self-hosted sign-up from an invite link: one answer, whoever the email is", async ({ page }) => {
+  const { calls } = await mockApi(page, { selfHosted: true, methods: { password: true, google: false, github: false, senders: SENDERS } });
+  await page.goto("/?invite=1");
+  await page.getByLabel("Email").fill("jo@acme.example");
+  await page.getByLabel("Password, at least 8 characters").fill("Acme2026x");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByRole("status")).toHaveText(
+    "If jo@acme.example can join here, we've sent a verification code. No code after a few minutes? If you already have an account, sign in or use Forgot password; otherwise ask an admin to invite you.",
+  );
+  await expect(page.getByLabel("Verification code")).toBeVisible();
+  await expect(errorBox(page)).toHaveCount(0);
+  expect(calls).toContain("/auth/signup");
 });
