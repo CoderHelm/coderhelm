@@ -200,7 +200,9 @@ test("teams read as one row per organization, active teams first, empty ones beh
   await expect(orgRows(page)).toHaveCount(2);
   await expect(orgRows(page).first()).toContainText("acme-labs");
   const acme = orgRow(page, "acme-labs");
-  await expect(acme).toContainText("37 reviews");
+  // Each count says which it is: in all, and this month (reviews count pull requests).
+  await expect(acme).toContainText("412 runs in all, 103 this month");
+  await expect(acme).toContainText("37 PRs reviewed in all, 0 this month");
   await expect(acme).toContainText("6 more teams with no activity");
   await expect(page.getByRole("button", { name: /No activity/ })).toContainText("8");
 

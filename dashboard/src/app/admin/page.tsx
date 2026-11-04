@@ -47,6 +47,9 @@ const fmtInt = (n: number) => n.toLocaleString();
 const fmtUsd = (n: number) => `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtDate = (iso: string) => formatDate(iso);
 const plural = (n: number, one: string, many = `${one}s`) => `${fmtInt(n)} ${n === 1 ? one : many}`;
+/** "412 runs in all, 103 this month": which number is which, said every time. */
+const activity = (total: number, month: number, one: string, many: string) =>
+  `${plural(total, one, many)} in all, ${fmtInt(month)} this month`;
 
 /** The allowlist gets its own search once it is this long. */
 const ALLOWLIST_SEARCH_AT = 6;
@@ -420,8 +423,8 @@ function OrgRow({ org, hidden, filter }: { org: AdminOrg; hidden: number; filter
       meta={[
         plural(org.members, "member"),
         plural(org.repos, "repo"),
-        plural(org.runs_total, "run"),
-        plural(org.reviews_total, "review"),
+        activity(org.runs_total, org.runs_month, "run", "runs"),
+        activity(org.reviews_total, org.reviews_month, "PR reviewed", "PRs reviewed"),
         org.created_at && `Created ${fmtDate(org.created_at)}`,
       ]}
       summary={hidden > 0 ? `${plural(hidden, "more team")} ${hiddenWords}` : undefined}
@@ -457,9 +460,9 @@ function TeamLine({ team: t }: { team: AdminTeam }) {
         <span aria-hidden="true">·</span>
         <span>{plural(t.repos, "repo")}</span>
         <span aria-hidden="true">·</span>
-        <span>{plural(t.runs_total, "run")} ({fmtInt(t.runs_month)} this month)</span>
+        <span>{activity(t.runs_total, t.runs_month, "run", "runs")}</span>
         <span aria-hidden="true">·</span>
-        <span>{plural(t.reviews_total, "review")}</span>
+        <span>{activity(t.reviews_total, t.reviews_month, "PR reviewed", "PRs reviewed")}</span>
         {t.cost_month_usd > 0 && (
           <>
             <span aria-hidden="true">·</span>
