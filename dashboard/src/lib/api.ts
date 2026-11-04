@@ -4568,7 +4568,14 @@ export type HybridIntegrationId = "github" | "jira" | "notion" | "confluence" | 
 export interface HybridGithubLink {
   installation_id: number;
   account: string;
+  /** The repositories chosen for this install. Empty: all of `ceiling`. */
   repositories: string[];
+  /**
+   * The repositories the person who linked it could push to, read when it
+   * was linked: no token reaches past them. Absent on a link made before
+   * Coderhelm recorded them (no token until it is linked again).
+   */
+  ceiling?: string[] | null;
 }
 
 export interface HybridIntegration {
