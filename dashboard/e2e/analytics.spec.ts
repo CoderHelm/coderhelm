@@ -18,7 +18,8 @@ function days(n: number) {
 
 const SUMMARY = {
   runs: 42, prs_opened: 30, prs_merged: 21, prs_closed: 3, prs_open: 6, merge_rate: 0.7, failed_runs: 4, failure_rate: 0.095,
-  cost_usd: 96.4, cost_per_run: 2.3, cost_per_merged_pr: 4.59, tokens_in: 12_000_000, tokens_out: 900_000,
+  cost_usd: 96.4, run_cost_usd: 41.2, cost_basis: "metered", cost_by_feature: [{ feature: "review", cost_usd: 50 }, { feature: "run", cost_usd: 41.2 }, { feature: "feedback", cost_usd: 5.2 }],
+  cost_per_run: 2.3, cost_per_merged_pr: 4.59, tokens_in: 12_000_000, tokens_out: 900_000,
   median_run_minutes: 11.5, median_hours_to_merge: 5.2, time_to_merge_known: 12, merged_untouched: 9, merged_with_edits: 3, edits_known: 12, reviews: 55,
 };
 
@@ -205,6 +206,8 @@ test("the scorecard answers whether it is worth it, against the previous period"
   await expect(page.getByTestId("tile-untouched")).toContainText("75%");
   await expect(page.getByTestId("tile-ci")).toContainText("6 of 8 runs went green");
   await expect(page.getByTestId("tile-findings")).toContainText("24 fixed in code, 8 settled by a person");
+  // The tokens per day are the meter's (every model call), and say so.
+  await expect(page.getByText("Tokens per day, every model call")).toBeVisible();
   const views = page.getByRole("navigation", { name: "Analytics views" });
   await views.getByRole("link", { name: "Reliability" }).click();
   await expect(page.getByRole("table", { name: "Failures by reason" })).toContainText("Timed out after #s");

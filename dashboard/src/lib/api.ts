@@ -3222,8 +3222,21 @@ export interface AnalyticsSummary {
   failure_rate: number | null;
   /** Runs a person closed on purpose: not failures. Older backends leave it out. */
   closed_runs?: number;
+  /**
+   * What the team spent on model calls in the period. With `cost_basis`
+   * "metered": every call the usage meter counted (runs, including work on
+   * runs started earlier, reviews, follow-ups, chat). With "runs" (one
+   * repository picked, or an older server): what the run records add up to.
+   */
   cost_usd: number;
+  /** What the run records add up to (runs only, on the day each started). */
+  run_cost_usd?: number;
+  cost_basis?: "metered" | "runs";
+  /** The metered cost by what the calls were for, largest first. */
+  cost_by_feature?: { feature: string; cost_usd: number }[];
+  /** From the run records. */
   cost_per_run: number | null;
+  /** From the run records. */
   cost_per_merged_pr: number | null;
   /** Tokens in plus out. */
   tokens?: number;
@@ -3250,7 +3263,8 @@ export interface Analytics {
   previous_period: { start: string; end: string };
   summary: AnalyticsSummary;
   previous: AnalyticsSummary;
-  daily: { day: string; runs: number; prs_opened: number; merged: number; failed: number; cost_usd: number; tokens?: number; reviews: number }[];
+  /** `cost_usd` and `tokens` are metered when the summary's `cost_basis` is "metered"; `run_*` are the run records'. */
+  daily: { day: string; runs: number; prs_opened: number; merged: number; failed: number; cost_usd: number; tokens?: number; run_cost_usd?: number; run_tokens?: number; reviews: number }[];
   sources: { source: string; runs: number; prs: number; merged: number; merge_rate: number | null }[];
   repos: { repo: string; runs: number; prs: number; merged: number; failed: number; cost_usd: number; tokens?: number; merge_rate: number | null; reviews: number }[];
   /** One row per person (however Jira, GitHub or the dashboard named them), Coderhelm's own work, and runs that recorded nobody. */
