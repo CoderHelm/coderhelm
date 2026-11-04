@@ -77,8 +77,8 @@ export function NativeUpdateCard({
           <>
             <p data-testid="native-update-progress">
               {startedAt ? <>Started <Time iso={startedAt} />. </> : null}
-              {p.status === "preparing" ? "Step 1 of 2: preparing the change to your stack. Step 2 applies it." : "Step 2 of 2: applying the change to your stack."}
-              {from ? <> Coderhelm stays available on {from} until it finishes.</> : null}
+              {p.status === "preparing" ? "Step 1 of 2: preparing the change; step 2 applies it." : "Step 2 of 2: applying the change. This takes 10 to 20 minutes."}
+              {from ? <> Coderhelm keeps running {from} until it finishes, and this page updates by itself.</> : null}
             </p>
             <div className="mt-2 h-1.5 w-full max-w-sm overflow-hidden rounded-full bg-zinc-800" role="progressbar" aria-label={title} aria-busy="true">
               <div className={`h-full rounded-full bg-blue-400/70 animate-pulse motion-reduce:animate-none ${p.status === "preparing" ? "w-1/3" : "w-2/3"}`} />
@@ -87,7 +87,7 @@ export function NativeUpdateCard({
         )}
         {p.counts ? (
           <p data-testid="native-update-summary">
-            A stack update to <Code>{native.stack}</Code>: {total} change{total === 1 ? "" : "s"} ({n.add} to add, {n.modify} to change, {n.remove} to remove)
+            It changes {total} resource{total === 1 ? "" : "s"} ({n.add} to add, {n.modify} to change, {n.remove} to remove)
             {p.parts?.length ? <> in {p.parts.join(", ")}</> : null}.
             {p.replacements?.length ? <> Replaced: {p.replacements.join(", ")}.</> : <> Nothing is replaced.</>}
           </p>
@@ -105,10 +105,8 @@ export function NativeUpdateCard({
               : "This install's stack doesn't have the deploy role yet, so this one update is executed in the AWS console by someone with administrator rights in the account. It adds the role; every update after it applies from here."}
           </p>
         ) : p.status === "preparing" ? (
-          <p className="mt-2">Nothing to do yet. Preparing takes a few minutes, then it applies.</p>
-        ) : (
-          <p className="mt-2">This takes 10 to 20 minutes. This page shows the result when it finishes.</p>
-        )}
+          <p className="mt-2">Nothing to do yet. If it would change data or permissions, it asks you here first.</p>
+        ) : null}
         {p.reason && !waiting ? <p className="mt-2 text-zinc-400">{p.reason}</p> : null}
         <p className="mt-3 flex flex-wrap items-center gap-3">
           {canApply ? (
@@ -119,7 +117,7 @@ export function NativeUpdateCard({
             <a href={p.link} target="_blank" rel="noopener noreferrer" className={primaryButton} data-testid="native-update-link">Open it in the AWS console</a>
           ) : null}
           {p.link && (canApply || !waiting) ? (
-            <a href={p.link} target="_blank" rel="noopener noreferrer" className="font-medium underline" data-testid="native-update-link">See the change set in AWS</a>
+            <a href={p.link} target="_blank" rel="noopener noreferrer" className="font-medium underline" data-testid="native-update-link">See the change in the AWS console</a>
           ) : null}
         </p>
       </Callout>

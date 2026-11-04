@@ -290,14 +290,15 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
       await page.goto("/settings/system/");
       const status = page.getByTestId("update-status");
       await expect(status).toHaveAttribute("data-state", "available");
-      await expect(status).toContainText("You're on v1.2.0 · v2.0.0 is available");
-      await expect(status).toContainText("Major: read the notes");
+      await expect(status).toContainText("v2.0.0 is available");
+      await expect(status).toContainText("You're on v1.2.0.");
+      await expect(status).toContainText("Major release");
       await expect(page.getByTestId("version-facts")).toContainText("abc1234def");
       await expect(page.getByTestId("release-notes")).toContainText("A new thing.");
       await expect(page.getByTestId("update-history")).toContainText("health check failed after deploying v1.1.5");
       await expect(page.getByTestId("update-history")).toContainText("auto-update window");
 
-      await page.getByRole("button", { name: "Update now to v2.0.0" }).click();
+      await page.getByRole("button", { name: "Update to v2.0.0" }).click();
       await expect.poll(() => systemCalls.map((c) => c.path)).toContain("/api/system/update");
       // No version: the updater reads GitHub first and installs the newest release at that moment.
       expect(systemCalls.find((c) => c.path === "/api/system/update")!.body).toEqual({});
@@ -370,7 +371,7 @@ for (const [name, viewport] of [["1440", { width: 1440, height: 1000 }], ["390",
   test.describe(`install checks at ${name}px`, () => {
     test.use({ viewport });
 
-    test("Setup: failing checks say what, why and how to fix; Check again after the fix shows them passing", async ({ page }) => {
+    test("Setup: failing checks say what, why and how to fix; Re-run checks after the fix shows them passing", async ({ page }) => {
       const { checksState } = await setup(page, SELF, { signedIn: true, provider: "bedrock" });
       await page.goto("/settings/setup/");
       const checks = page.getByTestId("install-checks");
@@ -393,7 +394,7 @@ for (const [name, viewport] of [["1440", { width: 1440, height: 1000 }], ["390",
 
       // The person fixes both, then checks again: no reload.
       checksState.fixed = true;
-      await checks.getByRole("button", { name: "Check again" }).click();
+      await checks.getByRole("button", { name: "Re-run checks" }).click();
       await expect(checks.getByTestId("install-checks-summary")).toContainText("0 need a fix");
       await expect(checks).toContainText("Nothing needs a fix");
       await expect(perms).toHaveAttribute("data-status", "pass");
@@ -402,34 +403,31 @@ for (const [name, viewport] of [["1440", { width: 1440, height: 1000 }], ["390",
       await page.screenshot({ path: `${SHOTS}/setup-passing-${name}.png`, fullPage: true });
     });
 
-    test("System: update readiness lists what blocks an update, with its fix, and holds Update now", async ({ page }) => {
+    test("System: a failing check holds the update, and Install health lists it with its fix", async ({ page }) => {
       await setup(page, SELF, { signedIn: true, blocked: true });
       await page.goto("/settings/system/");
-      const r = page.getByTestId("update-readiness");
-      await expect(r.locator('[data-severity="block"]')).toContainText("Blocks the update");
-      await expect(r.locator('[data-severity="block"]')).toContainText("isn't verified yet");
-      await expect(r.locator('[data-severity="block"]').getByTestId("fix-command")).toContainText("dkim.amazonses.com");
-      await expect(r.locator('[data-severity="warn"]')).toContainText("Read first");
-      await expect(page.getByRole("button", { name: "Update now to v2.0.0" })).toBeDisabled();
-      await expect(page.locator("#update-blocked")).toContainText("Fix what blocks the update");
+      const status = page.getByTestId("update-status");
+      await expect(status).toHaveAttribute("data-state", "blocked");
+      await expect(page.getByTestId("update-blocked")).toContainText("Fix the install check marked Stops updates below");
+      await expect(page.getByRole("button", { name: /^Update to/ })).toHaveCount(0);
+      const h = page.getByTestId("install-health");
+      await expect(h).toHaveAttribute("data-state", "failing");
+      await expect(page.getByTestId("health-summary")).toHaveText("2 checks fail");
+      await expect(h.locator("#check-email_identity")).toContainText("Stops updates");
+      await expect(h.locator("#check-email_identity").getByTestId("fix-command")).toContainText("dkim.amazonses.com");
       await expect(page.getByTestId("history-next-step")).toContainText("Back on v1.1.0; your data is untouched");
       const width = await page.evaluate(() => document.documentElement.scrollWidth);
       expect(width).toBeLessThanOrEqual(viewport.width);
       await page.screenshot({ path: `${SHOTS}/system-preflight-blocked-${name}.png`, fullPage: true });
     });
 
-    test("System: ready to update when nothing blocks", async ({ page }) => {
+    test("System: a major release's notes are said in the status, not as a health problem", async ({ page }) => {
       await setup(page, SELF, { signedIn: true });
       await page.goto("/settings/system/");
-      const r = page.getByTestId("update-readiness");
-      await expect(r.locator('[data-severity="block"]')).toHaveCount(0);
-      // A warning (the major release's notes) opens it, as something to read, not a stop.
-      await expect(r).toHaveAttribute("data-state", "attention");
-      await expect(r).toContainText("Read before updating");
-      await expect(r).not.toContainText("What stops an update");
-      await expect(r.getByTestId("doctor-summary").first()).toContainText("checks fine");
-      await expect(r.getByTestId("doctor-summary").first()).not.toContainText("failing");
-      await expect(page.getByRole("button", { name: "Update now to v2.0.0" })).toBeEnabled();
+      await expect(page.getByTestId("update-major")).toContainText("read them below first");
+      const h = page.getByTestId("install-health");
+      await expect(h).not.toContainText("major release");
+      await expect(page.getByRole("button", { name: "Update to v2.0.0" })).toBeEnabled();
       await page.screenshot({ path: `${SHOTS}/system-preflight-ready-${name}.png`, fullPage: true });
     });
   });
@@ -538,7 +536,7 @@ test("System: an update still being prepared shows that, before the change set h
   await page.goto("/settings/system/");
   const card = page.getByTestId("native-update");
   await expect(card).toContainText("Preparing the update to v2.0.0");
-  await expect(page.getByTestId("update-status")).toHaveAttribute("data-state", "updating");
+  await expect(page.getByTestId("update-status")).toHaveAttribute("data-state", "preparing");
   await expect(page.getByTestId("native-update-progress")).toContainText("Step 1 of 2");
   await expect(card).toContainText("Nothing to do yet");
   await expect(page.getByTestId("native-update-summary")).toHaveCount(0);
@@ -562,7 +560,7 @@ test("System: a running one-stack update says so, with nothing to do and no cons
   await page.goto("/settings/system/");
   const card = page.getByTestId("native-update");
   await expect(card).toContainText("Updating to v2.0.0");
-  await expect(page.getByTestId("native-update-summary")).toContainText("8 changes (2 to add, 5 to change, 1 to remove) in Api, Worker");
+  await expect(page.getByTestId("native-update-summary")).toContainText("It changes 8 resources (2 to add, 5 to change, 1 to remove) in Api, Worker");
   await expect(card).not.toContainText("Execute");
   await expect(page.getByTestId("native-update-apply")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Update to v2.0.0" })).toHaveCount(0);
@@ -672,7 +670,7 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
       await page.goto("/settings/system/");
       const status = page.getByTestId("update-status");
       await expect(status).toHaveAttribute("data-state", "available");
-      await expect(status).toContainText("You're on v1.2.0 · v2.0.0 is available");
+      await expect(status).toContainText("v2.0.0 is available");
       await expect(status.getByRole("button", { name: "Update to v2.0.0" })).toBeEnabled();
 
       const notes = page.getByTestId("release-notes");
@@ -696,7 +694,6 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
       await expect(facts).toContainText("us-east-1");
       await expect(page.getByTestId("version-details")).toContainText("Automatic updates are off");
 
-      await expect(page.getByTestId("update-readiness")).toHaveAttribute("data-state", "attention");
       const width = await page.evaluate(() => document.documentElement.scrollWidth);
       expect(width).toBeLessThanOrEqual(viewport.width);
       await page.screenshot({ path: `${SHOTS}/system-version-available-${name}.png`, fullPage: true });
@@ -714,7 +711,7 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
       await page.goto("/settings/system/");
       const status = page.getByTestId("update-status");
       await expect(status).toHaveAttribute("data-state", "failed");
-      await expect(status).toContainText("The update to v2.0.0 didn't work");
+      await expect(status).toContainText("The update to v2.0.0 didn't finish");
       await expect(status).toContainText("Nothing changed: you're still on v1.2.0");
       await expect(page.getByTestId("update-failed-reason")).not.toContainText("arn:aws");
       // The raw AWS text only under Technical details.
@@ -722,8 +719,7 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
       await expect(page.locator("#version").getByText("Technical details", { exact: true })).toHaveCount(1);
       await page.locator("#version").getByText("Technical details", { exact: true }).click();
       await expect(page.getByTestId("update-failed-raw")).toContainText("UPDATE_ROLLBACK_COMPLETE");
-      await expect(page.getByTestId("update-readiness")).not.toContainText("didn't succeed");
-      await expect(page.getByTestId("update-readiness")).not.toContainText("Fix what the history says");
+      await expect(page.getByTestId("install-health")).not.toContainText("didn't succeed");
       await status.getByTestId("update-retry").click();
       await expect.poll(() => systemCalls.map((c) => c.path)).toContain("/api/system/update");
       const width = await page.evaluate(() => document.documentElement.scrollWidth);
@@ -755,7 +751,7 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
       await expect(status).toContainText("Updating to v2.0.0");
       await expect(status).toContainText("Started");
       await expect(status.getByRole("progressbar")).toBeVisible();
-      await expect(page.getByTestId("update-readiness")).not.toContainText("already running");
+      await expect(page.getByTestId("install-health")).not.toContainText("already running");
       await page.screenshot({ path: `${SHOTS}/system-version-updating-${name}.png`, fullPage: true });
     });
 
@@ -780,7 +776,7 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
       await expect(check).toContainText("Checked just now");
       expect(systemCalls.filter((c) => c.path === "/api/system/releases/check")).toHaveLength(1);
       await expect(status).toHaveAttribute("data-state", "available");
-      await expect(status.getByRole("button", { name: "Update now to v1.3.0" })).toBeEnabled();
+      await expect(status.getByRole("button", { name: "Update to v1.3.0" })).toBeEnabled();
       const width = await page.evaluate(() => document.documentElement.scrollWidth);
       expect(width).toBeLessThanOrEqual(viewport.width);
       await page.screenshot({ path: `${SHOTS}/system-version-checked-${name}.png`, fullPage: true });
@@ -802,23 +798,22 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
       await page.goto("/settings/system/");
       const status = page.getByTestId("update-status");
       await expect(status).toHaveAttribute("data-state", "behind");
-      await expect(status).toContainText("v1.3.0 is out");
+      await expect(status).toContainText("v1.3.0 is out, but can't install yet");
       await expect(page.locator("#version").getByRole("button", { name: /^Update/ })).toHaveCount(0);
-      await expect(page.getByTestId("release-check")).toContainText("Checked 10 min ago");
-      await expect(page.getByTestId("release-check-error")).toContainText("couldn't reach GitHub");
+      await expect(page.getByTestId("release-check")).toContainText("GitHub didn't answer the last check. It last answered 10 min ago.");
     });
 
     test("up to date: green, with the version", async ({ page }) => {
       await setup(page, SELF, { signedIn: true, version: { latest: null, update_available: false }, onlyBlockers: [] });
       await page.goto("/settings/system/");
-      // Nothing blocks or warns: readiness is one line.
-      const r = page.getByTestId("update-readiness");
-      await expect(r).toHaveAttribute("data-state", "ready");
-      await expect(r).toContainText("Ready to update");
-      await expect(r.getByRole("listitem")).toHaveCount(0);
+      // Health is its own section; nothing near the status reads like an update state.
+      const h = page.getByTestId("install-health");
+      await expect(h).toHaveAttribute("data-state", "warning");
+      await expect(page.locator("main")).not.toContainText("Ready to update");
       const status = page.getByTestId("update-status");
       await expect(status).toHaveAttribute("data-state", "current");
-      await expect(status).toContainText("You're up to date (v1.2.0)");
+      await expect(status).toContainText("You're up to date");
+      await expect(status).toContainText("Coderhelm v1.2.0");
       await expect(page.getByTestId("release-notes")).toHaveCount(0);
       await page.screenshot({ path: `${SHOTS}/system-version-current-${name}.png`, fullPage: true });
     });

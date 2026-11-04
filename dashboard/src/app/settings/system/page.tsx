@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { api, type AutoUpdateSettings, type SystemPreflight, type SystemVersion, type UpdateBlocker, type UpdateEntry } from "@/lib/api";
-import { FixBlock } from "@/components/install-checks";
+import { CheckRow } from "@/components/install-checks";
 import { DomainSection } from "@/components/domain-section";
 import { HybridSection } from "@/components/hybrid-section";
 import { UninstallSection } from "@/components/uninstall-section";
@@ -78,7 +78,7 @@ function timeZones(current: string): string[] {
 
 const DEFAULTS: AutoUpdateSettings = { auto: false, channel: "stable", day: "sun", hour: 3, timezone: "UTC", majors: "ask" };
 
-/** Settings, then System: the install's version, update readiness, updates and their history (self-hosted, install admins). */
+/** Settings, then System: the install's version, its health, updates and their history (self-hosted, install admins). */
 export default function SystemPage() {
   const { ready, allowed } = useInstallAdmin();
   if (!ready) return null;
@@ -145,7 +145,7 @@ function System() {
 
   const header = (
     <div className="mb-6">
-      <PageHeader title="Version and updates" lead="Which version of Coderhelm runs here, how it is updated, and every update so far." />
+      <PageHeader title="Version and updates" lead="Which version of Coderhelm runs here, new releases, the health of the install, and every update so far." />
     </div>
   );
 
@@ -179,11 +179,16 @@ function System() {
   // A prepared or applying update is shown once, in its own card, with the
   // one thing to do; it is never also listed as something blocking itself.
   const pending = data.native?.pending ?? null;
-  // The update itself (running, or the last try that failed) is the status
-  // at the top, never also a blocker of itself.
-  const shownBlockers = (pre?.blockers ?? []).filter((b) => b.key !== "running" && b.key !== "failed_before");
   const failure = failedTry(data, pre);
-  const blocked = shownBlockers.some((b) => b.severity === "block");
+  // What stops an update now: install checks that fail (listed under Install
+  // health), or an updater that didn't answer. The update itself (running,
+  // or its last try) and the model check have their own status, and a major
+  // release's notes are said in the status, so none of those repeat here.
+  const blockers = (pre?.blockers ?? []).filter((b) => b.severity === "block");
+  const checkKeys = new Set((pre?.checks ?? []).map((c) => c.key));
+  const blocking = new Set(blockers.filter((b) => checkKeys.has(b.key)).map((b) => b.key));
+  const hold: UpdateHold = { checks: blocking.size, updater: blockers.find((b) => b.key === "updater") ?? null };
+  const modelBlock = !!latest && data.model_check?.version === latest.version && !data.model_check.ok;
 
   const save = async () => {
     try {
@@ -227,28 +232,37 @@ function System() {
     <Page>
       {header}
       <div className="space-y-8">
-        {latest && data.model_check?.version === latest.version && (
-          <UpdateNeedsAction
-            check={data.model_check}
-            onChecked={(c) => {
-              setData({ ...data, model_check: c });
-              loadPreflight();
-            }}
-            onSkip={() => start("update", true)}
-          />
-        )}
         <SettingsSection id="version" title="Version">
           <div className="min-w-0 space-y-3 px-4 py-4">
-            <UpdateStatus data={data} failure={failure} blocked={blocked} busy={busy} onUpdate={() => start("update")} onChanged={load} />
-            {!data.running && !pending && <ReleaseCheck data={data} onChecked={setData} />}
+            <UpdateStatus
+              data={data}
+              failure={failure}
+              hold={hold}
+              modelBlock={modelBlock}
+              busy={busy}
+              onUpdate={() => start("update")}
+              onChanged={load}
+              onModelChecked={(c) => {
+                setData({ ...data, model_check: c });
+                loadPreflight();
+              }}
+              onSkipModel={() => start("update", true)}
+            />
+            {failure && modelBlock && (
+              <div id="readiness" className="scroll-mt-6">
+                <UpdateNeedsAction check={data.model_check} onChecked={(c) => { setData({ ...data, model_check: c }); loadPreflight(); }} onSkip={() => start("update", true)} />
+              </div>
+            )}
+            {!data.running && !pending && data.current.version && <ReleaseCheck data={data} onChecked={setData} />}
             <SettingsMore summary="Technical details">
               <VersionDetails version={data} autoUpdates={!!data.settings?.auto} failure={failure} />
             </SettingsMore>
           </div>
           {latest && !pending && <ReleaseNotes version={latest.version} notes={latest.notes} url={latest.url} />}
-          <div id="readiness" className="scroll-mt-6">
-            <Readiness pre={pre && { ...pre, blockers: shownBlockers }} state={preState} onRecheck={loadPreflight} />
-          </div>
+        </SettingsSection>
+
+        <SettingsSection id="health" title="Install health" description="The checks Coderhelm runs on itself: its address, GitHub, email, Claude and its queues. An update starts only while none fails.">
+          <InstallHealth pre={pre} state={preState} blocking={blocking} onRecheck={loadPreflight} />
         </SettingsSection>
 
         <SettingsSection id="models" title="Models" description="How this install calls Claude: Amazon Bedrock in this AWS account, or each team's Anthropic API key. Change it at any time.">
@@ -355,9 +369,9 @@ function System() {
                     {(h.status === "failed" || h.status === "rolled_back") && (
                       <p className="mt-1 text-xs text-zinc-300" data-testid="history-next-step">
                         {h.status === "rolled_back"
-                          ? `Back on ${h.from_version ?? "the previous version"}; your data is untouched. Fix what Setup lists, then update to ${h.version} again. Automatic updates skip it until then.`
-                          : "The install may be unhealthy. Check Setup for what fails and how to fix it, or roll back below."}{" "}
-                        <Link href="/settings/setup" className={linkButton}>Open Setup</Link>
+                          ? `Back on ${h.from_version ?? "the previous version"}; your data is untouched. Fix what Install health lists, then update to ${h.version} again. Automatic updates skip it until then.`
+                          : "Coderhelm may not be fully working. Fix what Install health lists, or roll back below."}{" "}
+                        <a href="#health" className={linkButton}>See install health</a>
                       </p>
                     )}
                   </div>
@@ -450,35 +464,84 @@ function Working({ label }: { label: string }) {
   );
 }
 
+/** "Sundays at 03:00 UTC": when automatic updates may start, or null when they're off. */
+function windowText(s: AutoUpdateSettings | undefined): string | null {
+  if (!s?.auto) return null;
+  const day = s.day === "daily" ? "every day" : `${DAYS.find(([k]) => k === s.day)?.[1] ?? s.day}s`;
+  return `${day} at ${String(s.hour).padStart(2, "0")}:00 ${s.timezone.replace(/_/g, " ")}`;
+}
+
+/** Why an update can't start now, from the preflight: failing install checks, or an updater that didn't answer. */
+interface UpdateHold {
+  /** Install checks that fail and stop an update (shown under Install health). */
+  checks: number;
+  /** The updater in the AWS account didn't answer. */
+  updater: UpdateBlocker | null;
+}
+
+function plural(n: number, one: string, many = `${one}s`) {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+/** The one status card: a test id and state, a headline, one line of detail, and the one thing to do. */
+function StatusCard({ state, variant, title, children, actions }: { state: string; variant: "neutral" | "info" | "success" | "warning" | "error"; title: ReactNode; children?: ReactNode; actions?: ReactNode }) {
+  return (
+    <div data-testid="update-status" data-state={state}>
+      <Callout variant={variant} title={title} actions={actions}>
+        {children}
+      </Callout>
+    </div>
+  );
+}
+
+/** The newest update succeeded in the last day and is what runs: "Updated to v0.8.32". */
+function recentSuccess(data: SystemVersion): UpdateEntry | null {
+  const newest = (data.history ?? [])[0];
+  if (!newest || newest.mode === "rollback" || newest.status !== "succeeded" || newest.version !== data.current.version) return null;
+  const at = newest.finished_at ?? newest.started_at;
+  if (!at || Date.now() - new Date(at).getTime() > 24 * 3600_000) return null;
+  return newest;
+}
+
 /**
- * The one status at the top of Version: up to date, an update to install,
- * an update on its way, or the last one that didn't work, each with the one
- * thing to do.
+ * The one status at the top of Version, about updates only (the install's
+ * own health is its own section): up to date, a release to install, one on
+ * its way, or the last one that didn't work, each with the one thing to do.
  */
 function UpdateStatus({
   data,
   failure,
-  blocked,
+  hold,
+  modelBlock,
   busy,
   onUpdate,
   onChanged,
+  onModelChecked,
+  onSkipModel,
 }: {
   data: SystemVersion;
   failure: FailedTry | null;
-  blocked: boolean;
+  hold: UpdateHold;
+  /** The release's model check holds it (or is still running). */
+  modelBlock: boolean;
   busy: "" | "update" | "rollback";
   onUpdate: () => void;
   onChanged: () => void;
+  onModelChecked: (c: SystemVersion["model_check"]) => void;
+  onSkipModel: () => void;
 }) {
   const current = data.current.version;
   const latest = data.latest;
   const pending = data.native?.pending ?? null;
   const on = current ?? "a development build";
+  const auto = windowText(data.settings);
+  const preview = data.settings?.channel === "preview";
+  const healthLink = <a href="#health" className={linkButton}>See install health</a>;
 
   if (pending) {
     const t = runningTry(data);
     return (
-      <div data-testid="update-status" data-state={pending.status === "review" ? "review" : "updating"}>
+      <div data-testid="update-status" data-state={pending.status === "review" ? "review" : pending.status === "preparing" ? "preparing" : "updating"}>
         <NativeUpdateCard native={data.native!} onChanged={onChanged} startedAt={t?.started_at} from={current} />
       </div>
     );
@@ -488,119 +551,180 @@ function UpdateStatus({
     const t = runningTry(data);
     const to = t?.version ?? latest?.version ?? "the new version";
     return (
-      <div data-testid="update-status" data-state="updating">
-        <Callout variant="info" title={<>Updating to {to}…</>}>
-          <p>
-            {t?.started_at ? <>Started <Time iso={t.started_at} />. </> : null}
-            This takes 10 to 20 minutes. Coderhelm stays available on {on} while it runs, and this page follows it.
-          </p>
-          <Working label={`Updating to ${to}`} />
-        </Callout>
-      </div>
+      <StatusCard state="updating" variant="info" title={<>Updating to {to}…</>}>
+        <p>
+          {t?.started_at ? <>Started <Time iso={t.started_at} />. </> : null}
+          This takes 10 to 20 minutes. Coderhelm keeps running {on} until it finishes, and this page updates by itself.
+        </p>
+        <Working label={`Updating to ${to}`} />
+      </StatusCard>
     );
   }
 
   if (failure) {
-    const rolledBack = failure.status !== "failed";
     const plain = failure.reason && !isRawReason(failure.reason) ? sentence(failure.reason) : null;
     const retry = latest?.version === failure.version;
+    const held = modelBlock || hold.checks > 0 || !!hold.updater;
+    const title =
+      failure.status === "not_started"
+        ? <>The update to {failure.version} couldn&apos;t start</>
+        : failure.status === "rolled_back"
+          ? <>The update to {failure.version} didn&apos;t finish</>
+          : <>The update to {failure.version} stopped partway</>;
     return (
-      <div data-testid="update-status" data-state="failed">
-        <Callout
-          variant="error"
-          title={<>The update to {failure.version} didn&apos;t work</>}
-          actions={
-            <>
-              {retry && (
-                <button type="button" className={primaryButton} disabled={!!busy || blocked} onClick={onUpdate} data-testid="update-retry">
-                  {busy === "update" ? "Starting…" : "Try again"}
-                </button>
-              )}
-              <Link href="/settings/setup" className={secondaryButton}>Open Setup</Link>
-              {latest?.url && retry && <a href={latest.url} target="_blank" rel="noopener noreferrer" className={linkButton}>Release page</a>}
-            </>
-          }
-        >
-          <p data-testid="update-failed-state">
-            {rolledBack
-              ? <>Nothing changed: you&apos;re still on {on}, and your data is untouched.</>
-              : <>It stopped partway, so this install may not be healthy. It reports {on}.</>}
-            {failure.startedAt ? <> Tried <Time iso={failure.startedAt} />.</> : null}
-          </p>
-          {plain && <p data-testid="update-failed-reason">{plain}</p>}
-          {!plain && <p data-testid="update-failed-reason">It stopped on an error from AWS. AWS&apos;s own message is under Technical details below.</p>}
-          <p className="text-zinc-300">
-            {rolledBack
-              ? "Fix what Setup lists as failing, then try again."
-              : "Check Setup for what fails and how to fix it, or roll back under Update history."}
-            {failure.status !== "not_started" ? ` Automatic updates skip ${failure.version} until it works.` : ""}
-            {blocked ? " Something below blocks a new try; fix it first." : ""}
-          </p>
-        </Callout>
+      <StatusCard
+        state="failed"
+        variant="error"
+        title={title}
+        actions={
+          <>
+            {retry && (
+              <button type="button" className={primaryButton} disabled={!!busy || held} onClick={onUpdate} data-testid="update-retry">
+                {busy === "update" ? "Starting…" : "Try again"}
+              </button>
+            )}
+            {healthLink}
+            {failure.status === "failed" && <a href="#history" className={linkButton}>Roll back</a>}
+          </>
+        }
+      >
+        <p data-testid="update-failed-state">
+          {failure.status === "failed"
+            ? <>Coderhelm may not be fully working: it reports {on}.</>
+            : <>Nothing changed: you&apos;re still on {on}, and your data is untouched.</>}
+          {failure.startedAt ? <> Tried <Time iso={failure.startedAt} />.</> : null}
+        </p>
+        <p data-testid="update-failed-reason">
+          {plain ?? "AWS stopped it with an error; its own message is under Technical details."}
+        </p>
+        <p className="text-zinc-400">
+          {held
+            ? "Fix what Install health lists, then try again."
+            : failure.status === "failed"
+              ? "Fix what Install health lists and try again, or roll back under Update history."
+              : "If Install health below lists a check that fails, fix it first."}
+          {failure.status !== "not_started" ? ` Automatic updates skip ${failure.version} until it works.` : ""}
+        </p>
+      </StatusCard>
+    );
+  }
+
+  if (latest && modelBlock && data.model_check) {
+    return (
+      <div data-testid="update-status" data-state={data.model_check.pending ? "checking-release" : "needs-action"} id="readiness" className="scroll-mt-6">
+        <UpdateNeedsAction check={data.model_check} onChecked={onModelChecked} onSkip={onSkipModel} />
       </div>
     );
   }
 
-  if (latest) {
+  if (latest && hold.updater) {
     return (
-      <div data-testid="update-status" data-state="available" className="flex min-w-0 flex-col gap-3 rounded-lg border border-blue-500/25 bg-blue-500/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-base font-semibold text-zinc-50">
-            You&apos;re on {on} · {latest.version} is available
-          </p>
-          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-400">
-            {latest.published_at && <span>Released <Time iso={latest.published_at} mode="date" /></span>}
-            {latest.breaking && <Chip tone="danger">Major: read the notes</Chip>}
+      <StatusCard state="updater-down" variant="warning" title={<>{latest.version} is available, but can&apos;t install from here</>}>
+        <p>You&apos;re on {on}. The updater in your AWS account didn&apos;t answer, so update from your machine instead:</p>
+        <div className="mt-2"><CodeBlock code={hold.updater.fix.command ?? `${DOCTOR.replace(/ doctor$/, "")} update`} lang="bash" label="Update command" /></div>
+      </StatusCard>
+    );
+  }
+
+  if (latest && hold.checks > 0) {
+    return (
+      <StatusCard
+        state="blocked"
+        variant="warning"
+        title={<>{latest.version} is available, but can&apos;t install yet</>}
+        actions={<a href="#health" className={primaryButton} data-testid="update-see-fix">See what to fix</a>}
+      >
+        <p data-testid="update-blocked">
+          You&apos;re on {on}. Fix the {hold.checks === 1 ? "install check" : `${hold.checks} install checks`} marked Stops updates below, then update.
+        </p>
+      </StatusCard>
+    );
+  }
+
+  if (latest) {
+    const majorWaits = latest.breaking && data.settings?.majors !== "auto";
+    return (
+      <StatusCard
+        state="available"
+        variant="info"
+        title={
+          <span className="inline-flex flex-wrap items-center gap-2">
+            {latest.version} is available
+            {latest.breaking && <Chip tone="waiting">Major release</Chip>}
             {latest.prerelease && <Chip tone="neutral">Preview</Chip>}
+          </span>
+        }
+        actions={
+          <button type="button" className={primaryButton} disabled={!!busy} onClick={onUpdate} data-testid="update-now">
+            {busy === "update" ? "Starting…" : `Update to ${latest.version}`}
+          </button>
+        }
+      >
+        <p data-testid="update-detail">
+          You&apos;re on {on}.{latest.published_at ? <> {latest.version} came out <Time iso={latest.published_at} mode="date" />.</> : null}
+          {auto && !majorWaits ? <> It installs by itself {auto}, or update now.</> : null}
+        </p>
+        {latest.breaking && (
+          <p data-testid="update-major">
+            Its notes ask you to do something before or after updating: read them below first.{auto ? " Major releases wait for you, even with automatic updates on." : ""}
           </p>
-          {blocked && <p id="update-blocked" className="mt-1 text-sm text-red-300">Fix what blocks the update below first.</p>}
-        </div>
-        <button
-          type="button"
-          className={`${primaryButton} shrink-0 self-start sm:self-center`}
-          disabled={!!busy || blocked}
-          onClick={onUpdate}
-          aria-describedby={blocked ? "update-blocked" : undefined}
-        >
-          {busy === "update" ? "Starting…" : data.native ? `Update to ${latest.version}` : `Update now to ${latest.version}`}
-        </button>
-      </div>
+        )}
+        {latest.prerelease && <p>A preview release, before it is fully tested. You get these because the channel is Preview.</p>}
+      </StatusCard>
     );
   }
 
   const behind = data.releases?.behind;
   if (behind && current) {
     return (
-      <div data-testid="update-status" data-state="behind">
-        <Callout variant="info" title={<>{behind.version} is out</>}>
-          <p>You&apos;re on {current}. GitHub&apos;s release list doesn&apos;t show {behind.version} yet, so nothing older is offered meanwhile. It shows here, with Update, once it does: Check for updates in a minute.</p>
-        </Callout>
-      </div>
+      <StatusCard state="behind" variant="info" title={<>{behind.version} is out, but can&apos;t install yet</>}>
+        <p>You&apos;re on {current}. GitHub&apos;s release list doesn&apos;t show {behind.version} yet, which usually takes a few minutes. Check for updates again shortly.</p>
+      </StatusCard>
     );
   }
 
   if (!current) {
     return (
-      <div data-testid="update-status" data-state="development">
-        <Callout variant="neutral" title="This install runs a development build">
-          <p>It was deployed from a source checkout, not a published release, so there is no version to compare with new releases.</p>
-        </Callout>
-      </div>
+      <StatusCard state="development" variant="neutral" title="Development build">
+        <p>This install was deployed from source, not a published release, so there is no version to compare with new releases.</p>
+      </StatusCard>
     );
   }
 
+  if (data.releases?.error) {
+    return (
+      <StatusCard state="unreachable" variant="warning" title="Couldn't check for updates">
+        <p>GitHub didn&apos;t answer, so it isn&apos;t known whether a newer release is out. You&apos;re on {current}.</p>
+      </StatusCard>
+    );
+  }
+
+  if (data.releases && !data.releases.fetched_at) {
+    return (
+      <StatusCard state="not-checked" variant="neutral" title="Not checked for updates yet">
+        <p>You&apos;re on {current}. Check for updates to see whether a newer release is out.</p>
+      </StatusCard>
+    );
+  }
+
+  const done = recentSuccess(data);
+  const channel = preview ? " on the Preview channel" : "";
   return (
-    <div data-testid="update-status" data-state="current">
-      <Callout variant="success" title={<>You&apos;re up to date ({current})</>}>
-        {data.current.released_at ? <p>Released <Time iso={data.current.released_at} mode="date" />.</p> : null}
-      </Callout>
-    </div>
+    <StatusCard state="current" variant="success" title={done ? <>Updated to {current}</> : "You're up to date"}>
+      <p data-testid="update-detail">
+        {done
+          ? <>Finished <Time iso={done.finished_at ?? done.started_at} />. You&apos;re up to date{channel}.</>
+          : <>Coderhelm {current}{channel}{data.current.released_at ? <>, released <Time iso={data.current.released_at} mode="date" /></> : null}.</>}
+        {auto ? <> New releases install by themselves {auto}.</> : null}
+      </p>
+    </StatusCard>
   );
 }
 
 /**
- * When this install last read GitHub's release list, and Check for updates
- * to read it now (the updater reads at most once per 30 seconds).
+ * Under the status: when this install last heard from GitHub's release list,
+ * and Check for updates to read it now (the updater reads at most once per
+ * 30 seconds).
  */
 function ReleaseCheck({ data, onChecked }: { data: SystemVersion; onChecked: (v: SystemVersion) => void }) {
   const { toast } = useToast();
@@ -623,17 +747,19 @@ function ReleaseCheck({ data, onChecked }: { data: SystemVersion; onChecked: (v:
       setChecking(false);
     }
   };
+  const primary = !!r && (!r.fetched_at || !!r.error || !!r.behind) && !data.latest;
   return (
-    <div data-testid="release-check" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-400">
-      <span data-testid="release-checked" aria-live="polite">
-        {checking ? "Checking for updates…" : at ? <>Checked <Time iso={at} /></> : "Not checked yet"}
-      </span>
-      <button type="button" className={buttonClass("secondary", "sm")} onClick={check} disabled={checking}>
-        Check for updates
+    <div data-testid="release-check" className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-zinc-400">
+      <button type="button" className={buttonClass(primary ? "primary" : "secondary", "sm")} onClick={check} disabled={checking}>
+        {checking ? "Checking for updates…" : "Check for updates"}
       </button>
-      {r?.error && !checking && (
-        <p className="w-full text-amber-300" data-testid="release-check-error">The last check couldn&apos;t reach GitHub, so this is the list from then.</p>
-      )}
+      <span data-testid="release-checked" aria-live="polite">
+        {checking
+          ? null
+          : r?.error
+            ? at ? <>GitHub didn&apos;t answer the last check. It last answered <Time iso={at} />.</> : "GitHub didn't answer the last check."
+            : at ? <>Checked <Time iso={at} /></> : r ? "Not checked yet" : null}
+      </span>
     </div>
   );
 }
@@ -746,68 +872,70 @@ function ReleaseNotes({ version, notes, url }: { version: string; notes: string;
   );
 }
 
-/** The preflight: one line when nothing stops an update; each blocker with its fix, up front, when something does. */
-function Readiness({ pre, state, onRecheck }: { pre: SystemPreflight | null; state: "loading" | "ready" | "failed"; onRecheck: () => void }) {
-  const failing = pre?.checks.filter((c) => c.status === "fail").length ?? 0;
-  const warning = pre?.checks.filter((c) => c.status === "warn").length ?? 0;
-  const fine = (pre?.checks.length ?? 0) - failing - warning;
-  const blockers: UpdateBlocker[] = pre?.blockers ?? [];
-  const recheck = (
-    <button type="button" className={buttonClass("ghost", "sm")} onClick={onRecheck} disabled={state === "loading"}>
-      {state === "loading" ? "Checking…" : "Check again"}
+/**
+ * Install health: the checks Coderhelm runs on itself (its address, GitHub,
+ * email, Claude, its queues), apart from updates. All passing is one line;
+ * a check that fails or warns is listed with its fix. An update only starts
+ * while no check fails, and the Version status says so.
+ */
+function InstallHealth({ pre, state, blocking, onRecheck }: { pre: SystemPreflight | null; state: "loading" | "ready" | "failed"; blocking: Set<string>; onRecheck: () => void }) {
+  const checks = pre?.checks ?? [];
+  const failing = checks.filter((c) => c.status === "fail");
+  const warning = checks.filter((c) => c.status === "warn");
+  const passing = checks.filter((c) => c.status === "pass").length;
+  const optional = checks.filter((c) => c.status === "skip").length;
+  const health = !pre ? state : failing.length ? "failing" : warning.length ? "warning" : "healthy";
+  const rerun = (
+    <button type="button" className={buttonClass("secondary", "sm")} onClick={onRecheck} disabled={state === "loading"}>
+      {state === "loading" ? "Running checks…" : "Re-run checks"}
     </button>
   );
-  const counts = pre && (
-    <span data-testid="doctor-summary">
-      {`${fine} check${fine === 1 ? "" : "s"} fine`}
-      {warning ? `, ${warning} warning${warning === 1 ? "" : "s"}` : ""}
-      {failing ? `, ${failing} failing` : ""}
-    </span>
-  );
+  const dot = failing.length ? "bg-red-400" : warning.length ? "bg-amber-400" : "bg-emerald-400";
+  const headline = failing.length
+    ? `${plural(failing.length, "check")} ${failing.length === 1 ? "fails" : "fail"}`
+    : warning.length
+      ? `Nothing fails, ${plural(warning.length, "check")} ${warning.length === 1 ? "needs" : "need"} a look`
+      : `All ${plural(passing, "check")} pass`;
   return (
-    <div className="min-w-0 px-4 py-3" data-testid="update-readiness" data-state={blockers.length ? "attention" : pre ? "ready" : state}>
-      {state === "loading" && !pre && <Skeleton className="h-6 w-full" />}
+    <div className="min-w-0" data-testid="install-health" data-state={health}>
+      {state === "loading" && !pre && <div className="px-4 py-4"><Skeleton className="h-6 w-full" /></div>}
       {state === "failed" && !pre && (
-        <Callout variant="error" title="Couldn't check update readiness">
-          <p>Run the same checks from your machine:</p>
-          <div className="mt-2"><CodeBlock code={DOCTOR} lang="bash" label="Doctor command" /></div>
-        </Callout>
-      )}
-      {pre && blockers.length === 0 && (
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-400">
-          <span className="inline-flex items-center gap-1.5 text-zinc-300">
-            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-emerald-400" />
-            Ready to update
-          </span>
-          <span aria-hidden="true">·</span>
-          {counts}
-          <Link href="/settings/setup" className={linkButton}>See every check</Link>
-          {recheck}
+        <div className="px-4 py-4">
+          <Callout variant="warning" title="Couldn't run the checks" actions={rerun}>
+            <p>Run the same checks from your machine:</p>
+            <div className="mt-2"><CodeBlock code={DOCTOR} lang="bash" label="Doctor command" /></div>
+          </Callout>
         </div>
       )}
-      {pre && blockers.length > 0 && (
-        <div className="min-w-0">
-          <h3 className="text-sm font-medium text-zinc-100">
-            {blockers.some((b) => b.severity === "block") ? "What stops an update" : "Read before updating"}
-          </h3>
-          <ul className="mt-2 space-y-3" aria-label="What would stop or pause an update">
-            {blockers.map((b) => (
-              <li key={b.key} data-severity={b.severity} className={`min-w-0 rounded-lg border p-3 ${b.severity === "block" ? "border-red-500/30 bg-red-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
-                <p className="flex flex-wrap items-center gap-2 text-sm text-zinc-100">
-                  <Chip tone={b.severity === "block" ? "danger" : "waiting"}>{b.severity === "block" ? "Blocks the update" : "Read first"}</Chip>
-                </p>
-                <p className="mt-1 break-words text-sm text-zinc-200">{b.detail}</p>
-                <FixBlock fix={b.fix} />
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 flex flex-wrap items-center gap-3 text-sm text-zinc-400">
-            Install checks: {counts}.
+      {pre && (
+        <div className="flex min-w-0 flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-sm font-medium text-zinc-100" data-testid="health-summary">
+              <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
+              {headline}
+            </p>
+            <p className="mt-0.5 text-sm text-zinc-400">
+              {failing.some((c) => blocking.has(c.key)) ? `Updates won't start until ${failing.length === 1 ? "it passes" : "they pass"}. ` : ""}
+              {optional ? `${plural(optional, "optional check")} not set up. ` : ""}
+              Checked <Time iso={pre.checked_at} />.
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-3">
+            {rerun}
             <Link href="/settings/setup" className={linkButton}>See every check</Link>
-            {recheck}
-          </p>
+          </div>
         </div>
+      )}
+      {pre && failing.length + warning.length > 0 && (
+        <ul className="divide-y divide-zinc-800 border-t border-zinc-800" aria-label="Checks that need a fix or a look">
+          {[...failing, ...warning].map((c) => (
+            <CheckRow key={c.key} check={c}>
+              {blocking.has(c.key) && <p className="mt-2"><Chip tone="danger">Stops updates</Chip></p>}
+            </CheckRow>
+          ))}
+        </ul>
       )}
     </div>
   );
 }
+

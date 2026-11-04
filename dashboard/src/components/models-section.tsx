@@ -263,7 +263,7 @@ export function UpdateNeedsAction({ check, onChecked, onSkip }: { check: ModelCh
         variant="neutral"
         testId="update-checking"
         title={`Checking ${mc.version} before it can be applied`}
-        actions={<button type="button" className={secondaryButton} onClick={() => api.checkUpdateModels().then((r) => { setMc(r.model_check); onChecked?.(r.model_check); }).catch(() => {})}>Check again</button>}
+        actions={<button type="button" className={secondaryButton} onClick={() => api.checkUpdateModels().then((r) => { setMc(r.model_check); onChecked?.(r.model_check); }).catch(() => {})}>Re-run the model check</button>}
       >
         <p>Coderhelm checks the release&apos;s signature, then tries each model it calls. This takes a few minutes.</p>
       </Callout>
@@ -289,7 +289,7 @@ export function UpdateNeedsAction({ check, onChecked, onSkip }: { check: ModelCh
       title={`Update to ${mc.version} needs your action`}
       actions={
         <>
-          <button type="button" className={secondaryButton} onClick={again} disabled={busy}>{busy ? "Checking..." : "Check again"}</button>
+          <button type="button" className={secondaryButton} onClick={again} disabled={busy}>{busy ? "Checking…" : "Re-run the model check"}</button>
           {mc.skippable && onSkip && <button type="button" className={secondaryButton} onClick={onSkip}>Skip this check</button>}
         </>
       }

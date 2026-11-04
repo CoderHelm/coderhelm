@@ -52,7 +52,7 @@ function Setup() {
       .catch(() => setModelCheck(null));
   }, []);
 
-  // The first load may reuse the menu's recent result; Check again runs them afresh.
+  // The first load may reuse the menu's recent result; Re-run checks runs them afresh.
   const runChecks = useCallback((fresh = true) => {
     setServerState("loading");
     systemChecks(fresh)
@@ -112,7 +112,7 @@ function Setup() {
             }}
           />
           <p className="mt-2 text-sm text-zinc-400">
-            <Link href="/settings/system#readiness" className={linkButton}>Open Version and updates</Link>
+            <Link href="/settings/system#version" className={linkButton}>Open Version and updates</Link>
           </p>
         </div>
       )}
@@ -194,7 +194,7 @@ function InstallChecks({ data, state, onRecheck }: { data: SystemChecks | null; 
           </p>
         </div>
         <button type="button" className={secondaryButton} onClick={onRecheck} disabled={state === "loading"}>
-          {state === "loading" ? "Checking..." : "Check again"}
+          {state === "loading" ? "Running checks…" : "Re-run checks"}
         </button>
       </div>
       {state === "failed" && (
@@ -211,7 +211,7 @@ function InstallChecks({ data, state, onRecheck }: { data: SystemChecks | null; 
             </Callout>
           ) : (
             <Callout variant="error" title={`${s.fail} check${s.fail === 1 ? " needs" : "s need"} a fix`}>
-              <p>Each one below says what is wrong, why it matters and how to fix it. Then press Check again.</p>
+              <p>Each one below says what is wrong, why it matters and how to fix it. Then press Re-run checks.</p>
             </Callout>
           )}
         </div>
