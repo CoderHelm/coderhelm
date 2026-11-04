@@ -3787,8 +3787,10 @@ export interface AdminTeam {
   members: number;
   invites: number;
   repos: number;
+  /** Runs started (agent and plugin runs), in all and this month. */
   runs_total: number;
   runs_month: number;
+  /** Pull requests the reviewer posted a review on, each counted once (in all, and once this month). */
   reviews_total: number;
   reviews_month: number;
   cost_month_usd: number;
@@ -3818,6 +3820,7 @@ export interface AdminOrg {
   personal_count: number;
   members: number;
   repos: number;
+  /** Sums of the teams' counts (see AdminTeam). */
   runs_total: number;
   runs_month: number;
   reviews_total: number;
