@@ -1,10 +1,11 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 // The sign-in screen shows only the ways in that work on this deployment, as
-// the API's GET /auth/methods says. A self-hosted install on Coderhelm's
-// GitHub App (hybrid) has no GitHub OAuth client of its own, so it offers no
-// GitHub button: before this, the button sent people to GitHub with an empty
-// client_id and GitHub answered 404. Every API call is answered here.
+// the API's GET /auth/methods says. A self-hosted install offers GitHub with
+// an OAuth client of its own, or on Coderhelm's GitHub App (hybrid) once it is
+// registered: the same /auth/github then goes through Coderhelm's app and the
+// install checks the account itself. An install with neither shows no GitHub
+// button. Every API call is answered here.
 
 type Methods = { password: boolean; google: boolean; github: boolean };
 
@@ -41,7 +42,7 @@ async function mockApi(page: Page, opts: { selfHosted: boolean; methods: Methods
 const github = (page: Page) => page.getByRole("link", { name: "Continue with GitHub" });
 const google = (page: Page) => page.getByRole("link", { name: "Continue with Google" });
 
-test("hybrid install with no GitHub client: email and password only, no GitHub button and no 'or'", async ({ page }) => {
+test("self-hosted install with no way to GitHub: email and password only, no GitHub button and no 'or'", async ({ page }) => {
   const { calls } = await mockApi(page, { selfHosted: true, methods: { password: true, google: false, github: false } });
   await page.goto("/");
   await expect(page.getByLabel("Email")).toBeVisible();
@@ -60,6 +61,19 @@ test("self-hosted install with its own GitHub client: the GitHub button goes to 
   await expect(github(page)).toHaveAttribute("href", /^\/auth\/github$/);
   await expect(google(page)).toHaveCount(0);
   await expect(page.getByText("or", { exact: true })).toBeVisible();
+});
+
+test("hybrid install registered with Coderhelm: GitHub is offered and starts at the install's own /auth/github", async ({ page }) => {
+  const { calls } = await mockApi(page, { selfHosted: true, methods: { password: true, google: false, github: true } });
+  await page.goto("/");
+  await expect.poll(() => calls.includes("/auth/methods")).toBe(true);
+  await expect(github(page)).toBeVisible();
+  // The install's API starts the trip (it then goes through Coderhelm's app),
+  // never a Coderhelm address in the page itself.
+  await expect(github(page)).toHaveAttribute("href", "/auth/github");
+  await expect(github(page)).not.toHaveAttribute("href", /coderhelm\.com/);
+  await expect(google(page)).toHaveCount(0);
+  await expect(page.getByLabel("Email")).toBeVisible();
 });
 
 test("self-hosted install whose API has no method list yet: no GitHub button", async ({ page }) => {

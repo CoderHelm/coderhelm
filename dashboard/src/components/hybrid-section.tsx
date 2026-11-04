@@ -730,15 +730,17 @@ function IntegrationItem({ i, hybrid, s }: { i: HybridIntegration } & RowProps) 
           />
         ) : i.mode === "direct" ? (
           <Chip tone="success">Works from your install, no app needed</Chip>
+        ) : i.mode === "included" ? (
+          <Chip tone="success">On through Coderhelm&apos;s app</Chip>
         ) : (
           <Chip tone="muted">Not available</Chip>
         )}
       </div>
       {notOffered && <p className="mt-1 text-sm text-zinc-400">Use your own {i.name} app for now.</p>}
-      {i.mode === "hosted" && !notOffered && (i.through_coderhelm || i.stays_with_you) && (
+      {(i.mode === "hosted" || i.mode === "included") && !notOffered && (i.through_coderhelm || i.stays_with_you) && (
         <dl className="mt-2 grid min-w-0 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
           {i.through_coderhelm && (
-            <div className={`min-w-0 ${value === "coderhelm" ? "" : "opacity-60"}`}>
+            <div className={`min-w-0 ${value === "coderhelm" || i.mode === "included" ? "" : "opacity-60"}`}>
               <dt className="text-zinc-300">Through Coderhelm</dt>
               <dd className="text-zinc-400">{i.through_coderhelm}</dd>
             </div>
