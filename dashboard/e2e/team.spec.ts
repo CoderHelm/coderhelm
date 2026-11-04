@@ -111,6 +111,8 @@ interface Backend {
   changes: { at: string; actor: string; action: string; role_id: string; role_name: string; detail: string }[];
   /** You hold this custom role (your record's role); requests run as `selfRole`. */
   selfCustom?: string;
+  /** GitHub sign-in works here (`GET /auth/methods`). */
+  githubSignIn?: boolean;
 }
 
 // The gateway's rules for custom roles, as the mock answers them.
@@ -140,6 +142,22 @@ async function mockApi(page: Page, selfRole = "admin", init: Partial<Backend> = 
     const body = req.postData() ? (JSON.parse(req.postData() as string) as Record<string, unknown>) : null;
     db.calls.push({ method, path: p, body, search: url.search });
     const self = db.members.find((m) => m.is_self);
+    if (p === "/auth/methods") return json(route, { password: true, google: false, github: db.githubSignIn ?? false });
+    if (p === "/api/users/setup-emails" && method === "POST") {
+      if (LEVEL[selfRole] < 3) return json(route, { error: "Only admins and owners can do that." }, 403);
+      const hour = Date.now() - 3600_000;
+      const sent_at: Record<string, string> = {};
+      let skipped = 0;
+      for (const m of db.members.filter((x) => x.needs_setup)) {
+        if (m.setup_email_sent_at && new Date(m.setup_email_sent_at).getTime() > hour) {
+          skipped += 1;
+          continue;
+        }
+        m.setup_email_sent_at = new Date().toISOString();
+        sent_at[m.user_id] = m.setup_email_sent_at;
+      }
+      return json(route, { sent: Object.keys(sent_at).length, skipped_recent: skipped, failed: 0, sent_at });
+    }
     if (p === "/api/me") return json(route, { user_id: self?.user_id ?? "u-admin", team_id: "t_1", github_login: null, email: self?.email ?? "", avatar_url: "", role: selfRole });
     if (p === "/api/usage") return json(route, { month: "2026-01", total_tokens: 0, tokens_in: 0, tokens_out: 0, total_runs: 0, max_tokens: 0 });
     if (p === "/api/banners") return json(route, { banners: [] });
@@ -483,18 +501,77 @@ test("self-hosted: a member who never signed in here gets a set-up email from th
   const mia = db.members.find((x) => x.user_id === "u-mem")!;
   mia.needs_setup = true;
   await page.goto("/settings/team");
-  await expect(row(page, "Mia Member").getByTestId("setup-status")).toHaveText("Hasn't set up an account here yet");
+  await expect(row(page, "Mia Member").getByTestId("setup-status")).toHaveText("Hasn't signed in here yet");
   // Only that member: everyone else has signed in here.
   await expect(members(page).getByTestId("setup-status")).toHaveCount(1);
+  await expect(row(page, "Mia Member").getByRole("button", { name: "Send set-up email" })).toBeVisible();
   await row(page, "Mia Member").getByRole("button", { name: "More actions for Mia Member" }).click();
   await page.getByRole("menuitem", { name: "Send set-up email" }).click();
   await expect(page.getByText("Set-up email sent to mia@example.com")).toBeVisible();
-  await expect(row(page, "Mia Member").getByTestId("setup-status")).toHaveText(/^Set-up email sent /);
+  await expect(row(page, "Mia Member").getByTestId("setup-sent")).toHaveText(/^Set-up email sent /);
+  await expect(row(page, "Mia Member").getByRole("button", { name: "Send the set-up email again" })).toBeVisible();
   expect(db.calls.some((c) => c.method === "POST" && c.path === "/api/users/u-mem/setup-email")).toBe(true);
   // Sent before: the menu says it goes again.
   await row(page, "Mia Member").getByRole("button", { name: "More actions for Mia Member" }).click();
   await expect(page.getByRole("menuitem", { name: "Send the set-up email again" })).toBeVisible();
   await shot(page, "team-setup-email");
+});
+
+test("self-hosted: someone copied over shows they haven't signed in here, not their old activity", async ({ page }) => {
+  const db = await mockApi(page, "admin", { githubSignIn: true });
+  db.members.push(
+    member({ user_id: "u-al", email: "al.chan@acme.example", name: "Al Chan", github_login: "achan", github_id: "777", sign_in: "email_and_github", last_active_at: ago(5 * DAY), needs_setup: true }),
+  );
+  await page.goto("/settings/team");
+  const al = row(page, "Al Chan");
+  await expect(al.getByTestId("setup-status")).toHaveText("Hasn't signed in here yet");
+  await expect(al).not.toContainText("Active 5 days ago");
+  await expect(al.getByTestId("previous-activity")).toHaveText("Last active on the previous Coderhelm, 5 days ago");
+  await expect(al.getByTestId("github-sign-in")).toHaveText("Can sign in with GitHub (achan)");
+  await expect(al.getByRole("button", { name: "Send set-up email" })).toBeVisible();
+  // People who signed in here keep their plain activity time.
+  await expect(row(page, "Sam Rivera")).toContainText("Active 5 days ago");
+  await expect(page.getByText("· 1 haven't signed in here yet")).toBeVisible();
+});
+
+test("self-hosted: without GitHub sign-in, no GitHub line for someone copied over", async ({ page }) => {
+  const db = await mockApi(page, "admin", { githubSignIn: false });
+  db.members.push(member({ user_id: "u-al", email: "al.chan@acme.example", name: "Al Chan", github_login: "achan", github_id: "777", needs_setup: true }));
+  await page.goto("/settings/team");
+  await expect(row(page, "Al Chan").getByTestId("setup-status")).toBeVisible();
+  await expect(row(page, "Al Chan").getByTestId("github-sign-in")).toHaveCount(0);
+});
+
+test("self-hosted: the banner counts who hasn't set up an account and sends to all, skipping the last hour", async ({ page }) => {
+  const db = await mockApi(page);
+  const mia = db.members.find((x) => x.user_id === "u-mem")!;
+  const jo = db.members.find((x) => x.user_id === "u-jo")!;
+  const sam = db.members.find((x) => x.user_id === "u-sam")!;
+  mia.needs_setup = true;
+  sam.needs_setup = true;
+  jo.needs_setup = true;
+  jo.setup_email_sent_at = ago(20 * 60_000);
+  await page.goto("/settings/team");
+  const banner = page.getByTestId("setup-banner");
+  await expect(banner).toContainText("3 people haven't set up an account here yet");
+  await expect(page.getByText("· 3 haven't signed in here yet")).toBeVisible();
+  await banner.getByRole("button", { name: "Send set-up emails to all" }).click();
+  await expect(page.getByText("Set-up email sent to 2 people. 1 person got one in the last hour and was skipped.")).toBeVisible();
+  expect(db.calls.filter((c) => c.method === "POST" && c.path === "/api/users/setup-emails")).toHaveLength(1);
+  await expect(row(page, "Mia Member").getByTestId("setup-sent")).toHaveText(/^Set-up email sent /);
+  await expect(row(page, "Sam Rivera").getByTestId("setup-sent")).toHaveText(/^Set-up email sent /);
+  await shot(page, "team-setup-banner");
+});
+
+test("the set-up banner has no send button for someone who can't invite", async ({ page }) => {
+  const db = await mockApi(page, "member");
+  db.members.find((x) => x.user_id === "u-sam")!.needs_setup = true;
+  await page.goto("/settings/team");
+  const banner = page.getByTestId("setup-banner");
+  await expect(banner).toContainText("1 person hasn't set up an account here yet");
+  await expect(banner).toContainText("Ask an admin to send them the set-up email.");
+  await expect(banner.getByRole("button", { name: "Send set-up emails to all" })).toHaveCount(0);
+  await expect(row(page, "Sam Rivera").getByRole("button", { name: "Send set-up email" })).toHaveCount(0);
 });
 
 test("no set-up email for members who signed in, or for someone who can't invite", async ({ page }) => {

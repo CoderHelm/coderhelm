@@ -28,7 +28,12 @@ export function useSignInMethods(): SignInMethods {
       .signInMethods()
       .then((m) => {
         if (!live) return;
-        setMethods({ password: m.password !== false, google: m.google === true, github: m.github === true });
+        setMethods({
+          password: m.password !== false,
+          google: m.google === true,
+          github: m.github === true,
+          ...(m.senders ? { senders: m.senders } : {}),
+        });
       })
       .catch(() => {});
     return () => {

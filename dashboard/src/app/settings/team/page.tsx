@@ -18,7 +18,9 @@ import {
   isGithubOnly,
   isLinkTarget,
   isValidEmail,
+  bulkSetupSummary,
   linkSuggestions,
+  people,
   matchScore,
   relativeTime,
   roleLadder,
@@ -42,6 +44,7 @@ import { Select as SharedSelect } from "@/components/select";
 import { SectionHeading } from "@/components/page";
 import { Menu } from "@/components/menu";
 import { RolesMatrix } from "@/components/roles-matrix";
+import { useSignInMethods } from "@/hooks/use-sign-in-methods";
 import { CustomRoles } from "@/components/custom-roles";
 
 const ROLE_STYLE: Record<string, string> = {
@@ -127,6 +130,10 @@ function TeamPage() {
   const active = useMemo(() => (members ?? []).filter((m) => m.status === "active"), [members]);
   const invites = useMemo(() => (members ?? []).filter((m) => m.status === "invited"), [members]);
   const owners = active.filter((m) => m.role === "owner").length;
+  // Copied from another Coderhelm and never signed in here (self-hosted).
+  const notSetUp = useMemo(() => active.filter((m) => m.needs_setup), [active]);
+  const githubSignIn = useSignInMethods().github;
+  const [bulkBusy, setBulkBusy] = useState(false);
   const suggestions = useMemo(() => (canManagePeople ? linkSuggestions(active) : []), [active, canManagePeople]);
 
   const shown = useMemo(() => {
@@ -218,6 +225,20 @@ function TeamPage() {
     }
   };
 
+  const setupEmailsAll = async () => {
+    setBulkBusy(true);
+    try {
+      const r = await teamApi.setupEmailsAll();
+      const sentAt = r.sent_at ?? {};
+      setMembers((prev) => prev?.map((x) => (sentAt[x.user_id] ? { ...x, setup_email_sent_at: sentAt[x.user_id] } : x)) ?? null);
+      toast(bulkSetupSummary(r), r.failed > 0 ? "error" : undefined);
+    } catch (e) {
+      toast(errorText(e), "error");
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   const link = async (person: Member, github: Member) => {
     setBusy(person.user_id);
     try {
@@ -241,7 +262,8 @@ function TeamPage() {
         lead={
           <>
             {teamName ? <span className="text-zinc-200">{teamName}</span> : "This workspace"}
-            {members ? ` · ${active.length} ${active.length === 1 ? "person" : "people"}` : ""}
+            {members ? ` · ${people(active.length)}` : ""}
+            {members && notSetUp.length > 0 ? ` · ${notSetUp.length} haven't signed in here yet` : ""}
             {". "}
             Who has access, what their role lets them do, and pending invites.
           </>
@@ -276,6 +298,30 @@ function TeamPage() {
             await load();
           }}
         />
+      )}
+
+      {notSetUp.length > 0 && (
+        <div className="mt-6">
+          <Callout
+            live={false}
+            variant="warning"
+            testId="setup-banner"
+            title={`${notSetUp.length === 1 ? "1 person hasn't" : `${notSetUp.length} people haven't`} set up an account here yet`}
+            actions={
+              canInvites ? (
+                <button type="button" className={primaryButton} disabled={bulkBusy} onClick={setupEmailsAll}>
+                  {bulkBusy ? "Sending…" : "Send set-up emails to all"}
+                </button>
+              ) : undefined
+            }
+          >
+            <p>
+              They&apos;re on the team, copied from the previous Coderhelm, but can&apos;t sign in here until they set a password from the
+              set-up email{githubSignIn ? " or sign in with their linked GitHub account" : ""}.
+              {canInvites ? " Anyone sent one in the last hour is skipped." : " Ask an admin to send them the set-up email."}
+            </p>
+          </Callout>
+        </div>
       )}
 
       {suggestions.length > 0 && (
@@ -369,6 +415,7 @@ function TeamPage() {
                   onRemove={() => remove(m)}
                   onLink={() => setLinking(m)}
                   onSetupEmail={canInvites ? () => setupEmail(m) : undefined}
+                  githubSignIn={githubSignIn}
                   roleLabel={roleLabel}
                 />
               ))}
@@ -523,6 +570,7 @@ function MemberRow({
   onRemove,
   onLink,
   onSetupEmail,
+  githubSignIn,
   roleLabel,
 }: {
   m: Member;
@@ -537,6 +585,8 @@ function MemberRow({
   onLink: () => void;
   /** Admins on a self-hosted install: email the link to set up their account here. */
   onSetupEmail?: () => void;
+  /** GitHub sign-in works on this deployment (`GET /auth/methods`). */
+  githubSignIn?: boolean;
   roleLabel: (key: string) => string;
 }) {
   const githubOnly = isGithubOnly(m);
@@ -549,9 +599,12 @@ function MemberRow({
   if (manageable && linkable) {
     actions.push({ label: githubOnly ? "Link to a member who signs in with email…" : "Link a GitHub sign-in…", onSelect: onLink });
   }
-  const setup = Boolean(m.needs_setup && onSetupEmail);
+  // On the team but never signed in here: its activity time is from the previous Coderhelm.
+  const notHere = Boolean(m.needs_setup);
+  const setup = Boolean(notHere && onSetupEmail);
+  const setupLabel = m.setup_email_sent_at ? "Send the set-up email again" : "Send set-up email";
   if (setup && onSetupEmail) {
-    actions.push({ label: m.setup_email_sent_at ? "Send the set-up email again" : "Send set-up email", onSelect: onSetupEmail });
+    actions.push({ label: setupLabel, onSelect: onSetupEmail });
   }
   if (manageable) {
     actions.push({
@@ -583,11 +636,21 @@ function MemberRow({
         m.email && m.email !== name ? <span key="email">{m.email}</span> : null,
         m.github_login ? <GithubLink key="gh" login={m.github_login} /> : null,
         githubOnly ? <span key="how">Signs in with GitHub</span> : null,
-        <span key="seen">{seen ? `Active ${seen}` : "Not signed in yet"}</span>,
-        setup ? (
-          <span key="setup" data-testid="setup-status">
-            {m.setup_email_sent_at ? `Set-up email sent ${shortDate(m.setup_email_sent_at)}` : "Hasn't set up an account here yet"}
+        notHere ? (
+          <span key="setup" data-testid="setup-status" className="font-medium text-amber-300">
+            Hasn&apos;t signed in here yet
           </span>
+        ) : (
+          <span key="seen">{seen ? `Active ${seen}` : "Not signed in yet"}</span>
+        ),
+        notHere && m.setup_email_sent_at ? (
+          <span key="sent" data-testid="setup-sent">{`Set-up email sent ${shortDate(m.setup_email_sent_at)}`}</span>
+        ) : null,
+        notHere && m.github_login && githubSignIn ? (
+          <span key="gh-sign-in" data-testid="github-sign-in">{`Can sign in with GitHub (${m.github_login})`}</span>
+        ) : null,
+        notHere && seen ? (
+          <span key="before" data-testid="previous-activity">{`Last active on the previous Coderhelm, ${seen}`}</span>
         ) : null,
       ]}
       chips={
@@ -610,9 +673,16 @@ function MemberRow({
       }
       actions={
         actions.length > 0 ? (
-          // On a phone the menu sits at the row's top right instead of on a line of its own.
-          <span className="max-sm:absolute max-sm:right-2 max-sm:top-2">
-            <ActionsMenu label={`More actions for ${name}`} actions={actions} disabled={busy} />
+          <span className="flex items-center gap-2">
+            {setup && onSetupEmail && (
+              <button type="button" className={buttonClass("secondary", "sm")} disabled={busy} onClick={onSetupEmail}>
+                {setupLabel}
+              </button>
+            )}
+            {/* On a phone the menu sits at the row's top right instead of on a line of its own. */}
+            <span className="max-sm:absolute max-sm:right-2 max-sm:top-2">
+              <ActionsMenu label={`More actions for ${name}`} actions={actions} disabled={busy} />
+            </span>
           </span>
         ) : (
           <span className="hidden w-9 sm:block" />
