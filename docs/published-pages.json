@@ -16,6 +16,7 @@
     "/api/reference/plans/get-plan/",
     "/api/reference/plans/list-plans/",
     "/api/reference/repositories/list-repos/",
+    "/api/reference/reviews/get-review-session/",
     "/api/reference/reviews/get-review/",
     "/api/reference/reviews/list-reviews/",
     "/api/reference/runs/answer-run/",

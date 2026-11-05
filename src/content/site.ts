@@ -28,7 +28,7 @@ export const SITE = {
     "CoderHelm is an AI coding agent for GitHub and Jira. Assign it an issue or a ticket and it opens a pull request in your repository, then it stays on the code: it answers review comments, fixes its own failing CI, reviews your team's pull requests and turns production alerts into fixes that a person approves. Teams can also ask it about their code and documents in Chat, and run it hosted or in their own AWS account.",
   llmsDetails: [
     "Status: the hosted service is in open beta. Anyone can sign up at https://app.coderhelm.com; a team's admins choose who may join that team.",
-    "Self-hosting: runs in your own AWS account, installed from the browser at https://docs.coderhelm.com/self-host/install/ or from a terminal. The first public self-host release is not out yet; releases are published at https://github.com/CoderHelm/coderhelm-platform/releases. License: FSL-1.1-ALv2 (each release becomes Apache 2.0 two years after it ships).",
+    "Self-hosting: runs in your own AWS account, installed from the browser at https://docs.coderhelm.com/self-host/install/ or from a terminal. The first public self-host release is not out yet; releases are published at https://github.com/CoderHelm/coderhelm-platform/releases. Updates apply from the app in one click or automatically in a maintenance window, on the Stable channel or the nightly Beta channel; admins are emailed only when they need to act or something went wrong, plus an optional weekly digest. License: FSL-1.1-ALv2 (each release becomes Apache 2.0 two years after it ships).",
     "Models: Claude. Hosted teams use their own Anthropic API key; self-hosted installs use Amazon Bedrock in their own account or each team's Anthropic API key. Admins can set monthly token limits: one for new tokens, one for cache reads and one for cache writes.",
     "Chat: answers questions about the team's repositories and knowledge. It reads the code itself (overview, files, code search, code graph) and cites real file paths and lines.",
     "Knowledge sources: Notion, Confluence, Google Drive, Sanity, GitHub, websites and uploaded files, kept in sync.",
@@ -65,8 +65,8 @@ export const SITE = {
   ],
   sameAs: ["https://github.com/CoderHelm"],
   ctaNote: "CoderHelm is in open beta. Sign up and bring your own Anthropic API key.",
-  updated: "2026-11-03",
-  updatedLabel: "November 3, 2026",
+  updated: "2026-11-05",
+  updatedLabel: "November 5, 2026",
   year: 2026,
 } as const;
 
@@ -309,7 +309,8 @@ const home: Page = {
             "Your GitHub App in one click, and a check that Claude answers on Amazon Bedrock",
             "Your own domain, set up in Route 53 for you or with DNS records to copy, checked live",
             "The same install checks in the guide, the `doctor` command and the dashboard's Setup page",
-            "Automatic updates in a maintenance window, health checked and rolled back if unhealthy",
+            "Updates applied from the app in one click, or automatically in your maintenance window, from the Stable or nightly Beta channel",
+            "Quiet email: only when you need to act or something went wrong, plus an optional weekly what's new",
             "Every install and update checks the release's signature before anything runs",
             "Fully private, or hybrid: use CoderHelm's GitHub App and event relay, and see every event in and out on the Deliveries page",
             "One organization per install: nobody signs up on their own, and admins can require two factor sign in",
@@ -986,7 +987,7 @@ const selfHost: Page = {
         {
           type: "cards",
           items: [
-            { title: "Automatic updates", text: "Turn them on and new releases install in your maintenance window, health checked and rolled back if unhealthy. Off, admins get an email about each release." },
+            { title: "Updates from the app", text: "Apply a new release in one click from Settings, or let it install in your maintenance window. Choose Stable, or Beta for nightly builds. Admins get an email only when they need to act or something went wrong, plus an optional weekly what's new." },
             { title: "Your models", text: "Amazon Bedrock in your account, with no API key anywhere, or each team's own Anthropic API key." },
             { title: "Serverless on AWS", text: "Lambda, API Gateway, SQS, DynamoDB, S3, CloudFront, Cognito and SES. No servers to patch, and no Rust or Docker needed to install." },
             { title: "Prefer a terminal?", text: "The installer asks a few questions, deploys the release and creates your GitHub App: `npx -y github:CoderHelm/coderhelm-platform init`, then `deploy`." },

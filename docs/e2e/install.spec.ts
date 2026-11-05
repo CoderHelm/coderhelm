@@ -480,7 +480,7 @@ test('before launch: what the stack creates in the AWS account, the risks behind
   await expect(panel.getByTestId('disclosure-boundary')).toContainText('Roles can only be created with it, and it can\'t be removed.');
   await expect(panel.getByTestId('disclosure-release')).toContainText('checked against the SHA-256 written in the signed template');
   await expect(panel.getByTestId('disclosure-helper')).toContainText('its code inside the template');
-  await expect(panel.getByTestId('disclosure-deploy-role')).toContainText('No installer build, no deploy role and no CDK bootstrap.');
+  await expect(panel.getByTestId('disclosure-deploy-role')).toContainText('One deploy role, and no installer build or CDK bootstrap.');
   await expect(panel.getByTestId('disclosure-deploy-role')).toContainText('coderhelm-prod-deploy-stack');
   await expect(panel).not.toContainText('CodeBuild');
   // Nothing on the install page claims the old admin installer.
@@ -499,7 +499,7 @@ test('before launch: what the stack creates in the AWS account, the risks behind
     'Nothing in your account is public.',
     'The AWS link holds your one-time setup key.',
   ]) await expect(risks).toContainText(t);
-  await expect(risks).toContainText('Auto-update is off unless you turn it on in More options.');
+  await expect(risks).toContainText('Automatic updates are off unless you turn them on in More options.');
   await expect(risks).toContainText('public progress bucket is deleted on the first update');
   // The full page, with every resource, role, risk and how to remove it.
   const link = panel.getByTestId('disclosure-page');

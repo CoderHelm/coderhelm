@@ -179,7 +179,7 @@ export function UninstallGuide() {
           <CopyBox text={leftoversCommand(s)} testId="leftovers-command" />
           <ul className="mt-5 list-disc space-y-1.5 pl-5 text-sm">
             <li>{mode === 'keep' ? 'Your data is listed: that is expected.' : `KMS keys show as scheduled for deletion until AWS's ${KEY_DAYS}-day wait ends.`}</li>
-            <li>It also finds pieces an earlier failed install left (two user pools of the same name are both listed), and the auto-update role if auto-update was ever on.</li>
+            <li>It also finds pieces an earlier failed install left (two user pools of the same name are both listed), and the deploy role once an update ran through it (a role can't delete itself).</li>
             <li>To remove what it lists, add <Mono>--delete</Mono>; it asks you to type the install name and prints every result.</li>
           </ul>
           <Details summary="Remove what is left"><CopyBox text={leftoversCommand(s, true)} testId="leftovers-delete-command" /></Details>
