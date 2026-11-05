@@ -6,14 +6,14 @@ description: Everything the install guide's Launch Stack creates in your AWS acc
 # The install guide shows a short version (components/install/wizard.tsx, AccountDisclosure).
 # ACCESS: one stack with nested parts, a permissions boundary on every role, a
 # private release bucket checked against the template's sha256s, an install
-# helper, a CloudFormation service role only with auto-update on, no installer
+# helper, a CloudFormation service role (the deploy role) on every install, no installer
 # build and no CDK bootstrap; and docs/self-host/security.md. Keep them in step.
 # (Notes live here because a comment in the body would print in the Markdown twin.)
 ---
 
 The [install guide](/self-host/install/) opens AWS on a CloudFormation stack. This page lists everything that stack creates in your account, what each part is allowed to do, and what that means for you. Read it before you press **Create stack**.
 
-In short: CoderHelm is one CloudFormation stack in your account. You update it with a stack update and remove it by deleting the stack. Every role it creates carries a permissions boundary that keeps it to CoderHelm's own resources. Nothing keeps deploy rights after the stack is created unless you turn auto-update on. CoderHelm the company gets no access to your account.
+In short: CoderHelm is one CloudFormation stack in your account. You update it with a stack update and remove it by deleting the stack. Every role it creates carries a permissions boundary that keeps it to CoderHelm's own resources. Updates are applied through one deploy role that only CloudFormation can use, limited to this install's resources. CoderHelm the company gets no access to your account.
 
 ## What gets created
 
@@ -23,13 +23,13 @@ A CloudFormation stack named `coderhelm-<name>` (the name in your AWS account, `
 
 ### The permissions boundary
 
-A managed policy, `coderhelm-<name>-boundary-stack`. It is the most any CoderHelm role can do, whatever its own policy says. Every role the stack creates carries it; the auto-update role (only with auto-update on) carries an identical copy, `coderhelm-<name>-deploy-boundary-stack`, which is kept with that role when you delete the stack. Even within the AWS services CoderHelm uses, it refuses:
+A managed policy, `coderhelm-<name>-boundary-stack`. It is the most any CoderHelm role can do, whatever its own policy says. Every role the stack creates carries it; the deploy role carries an identical copy, `coderhelm-<name>-deploy-boundary-stack`, which is kept with that role when you delete the stack. Even within the AWS services CoderHelm uses, it refuses:
 
 - creating IAM users, access keys, sign in profiles, groups or identity providers;
 - anything in Organizations, account settings, CloudTrail or GuardDuty;
 - any IAM action on a role or policy whose name doesn't start with `coderhelm-<name>-`;
 - creating or changing a role without this boundary on it, and removing the boundary from any role;
-- changing or deleting the boundary itself, or changing the auto-update role;
+- changing or deleting the boundary itself, or changing the deploy role;
 - assuming any other role in this account, except CoderHelm's two read roles (`CoderHelmLogReader` and `CoderhelmReadOnly`), and those only by the gateway's and worker's roles.
 
 ### The release bucket
@@ -44,9 +44,9 @@ A Lambda function, `coderhelm-<name>-install-helper`, whose code is inside the t
 
 A Secrets Manager secret, `coderhelm/<name>/secrets`. CloudFormation makes it with a random session signing key and empty GitHub App fields. Its template never changes, so updates never regenerate it.
 
-### The auto-update role (only with auto-update on)
+### The deploy role
 
-With **Install new releases by themselves** on, the stack adds `coderhelm-<name>-deploy-stack`, a role only CloudFormation can use, limited to resources named or tagged for this install, with its own copy of the boundary on it. The role and its copy are kept when you delete the stack (CloudFormation keeps using a stack's role, and a role can't delete itself); `leftovers` lists them and `--delete` removes them. The updater may hand it only to CloudFormation, and only for a change set on this stack from a published CoderHelm release template. With auto-update off (the default) there is no such role: an admin reviews each update's change set and applies it with their own permissions.
+The stack adds `coderhelm-<name>-deploy-stack`, a role only CloudFormation can use, limited to resources named or tagged for this install, with its own copy of the boundary on it. The role and its copy are kept when you delete the stack (CloudFormation keeps using a stack's role, and a role can't delete itself); `leftovers` lists them and `--delete` removes them. The updater may hand it only to CloudFormation, and only for a change set on this stack from a published CoderHelm release template. It applies an update when an install admin presses **Update** in Settings, then System, or in the maintenance window when automatic updates are on (they are off by default). A change that would replace or remove data or change permissions waits for an admin to confirm it there, and a change to this role or a boundary is never applied by CoderHelm: someone with administrator rights executes it in the CloudFormation console. On releases up to v0.8.26, the role existed only with automatic updates on.
 
 ### Progress, and nothing public
 
@@ -58,7 +58,7 @@ The stack reports its phase, a plain message and, at the end, its address to Cod
 - DynamoDB tables, an S3 data bucket, SQS queues and KMS keys: your runs, settings and files, encrypted.
 - CloudFront and a Cognito user pool: the web address and sign in.
 - CodeBuild projects: a build sandbox for your repositories' own build scripts, and a read only release check that verifies a new release's signature. Neither can deploy anything.
-- An updater function that looks for new releases every hour, emails your admins, and prepares each update as a change set.
+- An updater function that looks for new releases every hour, prepares and applies each update as a change set, and emails your admins only when one needs them or something went wrong (plus an optional weekly digest of what's new).
 - An IAM role for each service, with only the tables, queues, keys and actions that service uses. [Security model](/self-host/security/) lists them.
 
 Every one of those roles carries the boundary.
@@ -100,7 +100,7 @@ Every update is a stack update to a release's template, shown first as a change 
 
 If CoderHelm's release pipeline were ever broken into, a malicious release you applied could change any CoderHelm resource, within the boundary. It could not create an admin role or an IAM user, touch IAM outside `coderhelm-<name>-*`, or switch off CloudTrail or GuardDuty.
 
-- Auto-update is off unless you turn it on in the install guide's **More options**. With it off, an admin reviews and applies each change set.
+- Automatic updates are off unless you turn them on in the install guide's **More options**. With them off, a release is applied only when an install admin presses **Update**, and anything that changes data or permissions waits for an admin to confirm it.
 
 ### Deleting the stack keeps your data unless you say otherwise
 
@@ -117,7 +117,7 @@ Until your GitHub App exists, someone with the setup key could give your install
 ## Remove everything
 
 1. **Delete the stack** `coderhelm-<name>` in CloudFormation. With `KeepDataOnDelete` left at `true`, your data stays. Set it to `false` first to remove that too (KMS keys after AWS's 7 day wait). The [uninstall page](/self-host/uninstall/) walks you through it.
-2. **Check nothing is left:** `npx -y github:CoderHelm/coderhelm-platform leftovers --stage <name> --region <region>` lists, read only, anything still named or tagged for the install. With auto-update ever on, the auto-update role is listed: a role can't delete itself, so it stays.
+2. **Check nothing is left:** `npx -y github:CoderHelm/coderhelm-platform leftovers --stage <name> --region <region>` lists, read only, anything still named or tagged for the install. Once an update ran, the deploy role is listed: a role can't delete itself, so it stays.
 3. **Uninstall and delete your GitHub App** on GitHub.
 
 ## Installed before one-stack releases
