@@ -78,6 +78,18 @@ function timeZones(current: string): string[] {
 
 const DEFAULTS: AutoUpdateSettings = { auto: false, channel: "stable", day: "sun", hour: 3, timezone: "UTC", majors: "ask" };
 
+/** The update channels (docs/self-host/updates.md, Channels). */
+const CHANNELS: { value: AutoUpdateSettings["channel"]; label: string; help: string }[] = [
+  { value: "stable", label: "Stable", help: "Releases that ran as a beta for a day with no reported problem." },
+  { value: "beta", label: "Beta (nightly)", help: "A new build of the latest changes each night, a day before Stable gets them." },
+];
+
+/** The saved settings, with the beta channel's old name ("preview") read as beta. */
+function withChannel(s: Partial<AutoUpdateSettings> | undefined): AutoUpdateSettings {
+  const out = { ...DEFAULTS, ...(s ?? {}) };
+  return (out.channel as string) === "preview" ? { ...out, channel: "beta" } : out;
+}
+
 /** Settings, then System: the install's version, its health, updates and their history (self-hosted, install admins). */
 export default function SystemPage() {
   const { ready, allowed } = useInstallAdmin();
@@ -122,7 +134,7 @@ function System() {
       const v = await api.getSystemVersion();
       setData(v);
       setError(false);
-      form.reset({ ...DEFAULTS, ...(v.settings ?? {}) });
+      form.reset(withChannel(v.settings));
     } catch {
       setError(true);
     }
@@ -317,18 +329,34 @@ function System() {
             )}
           />
           <SettingsRow
-            label="Channel"
-            help="Preview: get new versions earlier, before they are fully tested."
+            label="Update channel"
+            layout="stacked"
+            help="Which releases this install offers and installs. Moving to Stable never goes back to an older version: this install waits for the next stable release."
             control={(ids) => (
-              <Select
-                id={ids.inputId}
-                value={v.channel}
-                onChange={(c) => set("channel", c)}
-                options={[
-                  { value: "stable", label: "Stable" },
-                  { value: "preview", label: "Preview" },
-                ]}
-              />
+              <div
+                role="radiogroup"
+                aria-labelledby={ids.labelId}
+                aria-describedby={ids.helpId}
+                data-testid="update-channel"
+                className="divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/40"
+              >
+                {CHANNELS.map((c) => (
+                  <label key={c.value} className="flex min-w-0 cursor-pointer gap-3 px-4 py-3" data-testid={`channel-${c.value}`}>
+                    <input
+                      type="radio"
+                      name="update-channel"
+                      value={c.value}
+                      checked={v.channel === c.value}
+                      onChange={() => set("channel", c.value)}
+                      className="mt-1 h-4 w-4 shrink-0 accent-sky-500"
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-zinc-100">{c.label}</span>
+                      <span className="mt-0.5 block max-w-prose text-sm text-zinc-400">{c.help}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
             )}
           />
           <SettingsRow
@@ -535,7 +563,7 @@ function UpdateStatus({
   const pending = data.native?.pending ?? null;
   const on = current ?? "a development build";
   const auto = windowText(data.settings);
-  const preview = data.settings?.channel === "preview";
+  const beta = withChannel(data.settings).channel === "beta";
   const healthLink = <a href="#health" className={linkButton}>See install health</a>;
 
   if (pending) {
@@ -651,7 +679,7 @@ function UpdateStatus({
           <span className="inline-flex flex-wrap items-center gap-2">
             {latest.version} is available
             {latest.breaking && <Chip tone="waiting">Major release</Chip>}
-            {latest.prerelease && <Chip tone="neutral">Preview</Chip>}
+            {latest.prerelease && <Chip tone="neutral">Beta</Chip>}
           </span>
         }
         actions={
@@ -669,7 +697,7 @@ function UpdateStatus({
             Its notes ask you to do something before or after updating: read them below first.{auto ? " Major releases wait for you, even with automatic updates on." : ""}
           </p>
         )}
-        {latest.prerelease && <p>A preview release, before it is fully tested. You get these because the channel is Preview.</p>}
+        {latest.prerelease && <p>A nightly beta: it reaches Stable after a day with no reported problem. You get these because the channel is Beta (nightly).</p>}
       </StatusCard>
     );
   }
@@ -708,7 +736,7 @@ function UpdateStatus({
   }
 
   const done = recentSuccess(data);
-  const channel = preview ? " on the Preview channel" : "";
+  const channel = beta ? " on the Beta (nightly) channel" : "";
   return (
     <StatusCard state="current" variant="success" title={done ? <>Updated to {current}</> : "You're up to date"}>
       <p data-testid="update-detail">

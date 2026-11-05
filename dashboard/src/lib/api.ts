@@ -4131,7 +4131,8 @@ export interface Learning {
 
 export interface AutoUpdateSettings {
   auto: boolean;
-  channel: "stable" | "preview";
+  /** stable: releases only. beta: the nightly builds too (an updater from before calls it "preview"). */
+  channel: "stable" | "beta";
   /** mon…sun, or daily */
   day: string;
   hour: number;
