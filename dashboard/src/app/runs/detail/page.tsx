@@ -32,8 +32,7 @@ import { Code } from "@/components/settings/code";
 import { CodeBlock } from "@/components/code-block";
 import { ChevronRightIcon, ExternalLinkIcon } from "@/components/icons";
 import { RunTriggerLine } from "@/components/run-trigger";
-
-const PASSES = ["triage", "plan", "implement", "test", "security", "pr", "review"];
+import { activePass, PASSES, runSteps } from "@/lib/run-steps";
 
 /** Words people read for each step name the worker records. */
 const PASS_LABEL: Record<string, string> = {
@@ -80,25 +79,14 @@ function actionError(e: unknown, what: string): string {
   return `Couldn't ${what}. Try again in a moment.`;
 }
 
-function PassProgress({ currentPass, status, passHistory }: { currentPass?: string; status: string; passHistory?: { pass: string }[] }) {
-  // Use the highest pass ever reached so CI fix cycles don't regress the bar
-  let maxIdx = PASSES.indexOf(currentPass ?? "");
-  passHistory?.forEach((entry) => {
-    const idx = PASSES.indexOf(entry.pass);
-    if (idx > maxIdx) maxIdx = idx;
-  });
-  // A run whose fix is outside the code finished its plan and stopped there on purpose.
-  const doneIdx = ["completed", "merged", "success"].includes(status)
-    ? PASSES.length
-    : status === "needs_outside_change"
-      ? Math.max(maxIdx, PASSES.indexOf("plan")) + 1
-      : maxIdx;
+function PassProgress({ currentPass, status, passHistory, hasPr }: { currentPass?: string; status: string; passHistory?: { pass: string }[]; hasPr: boolean }) {
+  const { doneIdx, activeIdx } = runSteps({ currentPass, status, passHistory, hasPr });
   const awaiting = status === "awaiting_ci";
   return (
     <ol aria-label="Steps" className="flex flex-wrap items-center gap-y-2">
       {PASSES.map((pass, i) => {
         const done = i < doneIdx;
-        const active = i === doneIdx && (status === "running" || awaiting);
+        const active = i === activeIdx;
         const failed = status === "failed" && i === doneIdx;
         return (
           <li key={pass} className="flex items-center" aria-current={active ? "step" : undefined}>
@@ -639,7 +627,9 @@ function RunDetailInner() {
   const live = runIsLive(run.status) || run.status === "queued" || run.status === "pending";
   // Asks and stop notes are current while the run works or waits on an answer.
   const asksAreCurrent = live || run.status === "needs_input";
-  const currentStep = PASS_LABEL[run.current_pass ?? ""] ?? null;
+  const hasPr = !!run.pr_number || !!run.pr_url || runPrs.length > 0 || (run.pr_urls?.length ?? 0) > 0;
+  // One answer for the steps and the sentence: they can't disagree.
+  const currentStep = PASS_LABEL[activePass(runSteps({ currentPass: run.current_pass, status: run.status, passHistory: run.pass_history, hasPr }), run.current_pass)] ?? null;
   const tab: RunTab = (RUN_TABS as readonly string[]).includes(searchParams.get("tab") ?? "") ? (searchParams.get("tab") as RunTab) : "overview";
   const tabHref = (t: RunTab) => `/runs/detail?id=${encodeURIComponent(runId)}${t === "overview" ? "" : `&tab=${t}`}`;
   const sourceWord = run.ticket_source === "jira" ? "Jira ticket" : run.ticket_source === "alert" ? "Alert" : "Issue";
@@ -995,7 +985,7 @@ function RunDetailInner() {
 
       <div className="mt-6 space-y-4">
         {outcome}
-        <PassProgress currentPass={run.current_pass} status={run.status} passHistory={run.pass_history} />
+        <PassProgress currentPass={run.current_pass} status={run.status} passHistory={run.pass_history} hasPr={hasPr} />
       </div>
 
       <Tabs

@@ -89,7 +89,7 @@ For a small change (one or two files, or one test helper), the description is fo
 
 ## When the test fails every time
 
-Before planning, CoderHelm runs the failing test 20 times in a row with retries off on your base branch. It runs it again on the pull request's branch before the pull request opens. If the test fails every run (for example 0/20 on both branches), it is not flaky. The run becomes a bug investigation, and the run's status and the pull request say so:
+Before planning, CoderHelm runs the failing test 20 times in a row with retries off on your base branch. It runs it again on the pull request's branch, once the draft pull request is open and before it can be marked ready. If the test fails every run (for example 0/20 on both branches), it is not flaky. The run becomes a bug investigation, and the run's status and the pull request say so:
 
 * Waits, retries and longer timeouts are refused, even when the report shows a timeout. They can't fix a test that never passes.
 * The fix goes in the app, with a unit test that reproduces the bug. CoderHelm runs that unit test in the sandbox on the code before the fix, where it must fail, and on the fix, where it must pass.

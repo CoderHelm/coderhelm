@@ -3285,6 +3285,8 @@ export interface Analytics {
     /** Why Coderhelm left a red PR to a person, most common first. */
     gave_up_reasons?: { reason: string; count: number }[];
   };
+  /** Runs the run guard ended for making no progress. Missing from older backends. */
+  loops_stopped?: { total: number; reasons: { reason: string; count: number }[] };
   reviews: {
     posted: number; approve: number; request_changes: number; comment: number; questions: number; prs_reviewed: number;
     findings: number; findings_fixed: number; findings_settled_by_person: number; acted_on_rate: number | null;
