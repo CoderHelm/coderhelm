@@ -28,7 +28,7 @@ export const SITE = {
     "CoderHelm is an AI coding agent for GitHub and Jira. Assign it an issue or a ticket and it opens a pull request in your repository, then it stays on the code: it answers review comments, fixes its own failing CI, reviews your team's pull requests and turns production alerts into fixes that a person approves. Teams can also ask it about their code and documents in Chat, and run it hosted or in their own AWS account.",
   llmsDetails: [
     "Status: the hosted service is in open beta. Anyone can sign up at https://app.coderhelm.com; a team's admins choose who may join that team.",
-    "Self-hosting: runs in your own AWS account, installed from the browser at https://docs.coderhelm.com/self-host/install/ or from a terminal. The first public self-host release is not out yet; releases are published at https://github.com/CoderHelm/coderhelm-platform/releases. Updates apply from the app in one click or automatically in a maintenance window, on the Stable channel or the nightly Beta channel; admins are emailed only when they need to act or something went wrong, plus an optional weekly digest. License: FSL-1.1-ALv2 (each release becomes Apache 2.0 two years after it ships).",
+    "Self-hosting: runs in your own AWS account, installed from the browser at https://docs.coderhelm.com/self-host/install/ or from a terminal. Releases are published at https://github.com/CoderHelm/coderhelm-platform/releases. Updates apply from the app in one click or automatically in a maintenance window, on the Stable channel or the nightly Beta channel; admins are emailed only when they need to act or something went wrong, plus an optional weekly digest. License: FSL-1.1-ALv2 (each release becomes Apache 2.0 two years after it ships).",
     "Models: Claude. Hosted teams use their own Anthropic API key; self-hosted installs use Amazon Bedrock in their own account or each team's Anthropic API key. Admins can set monthly token limits: one for new tokens, one for cache reads and one for cache writes.",
     "Chat: answers questions about the team's repositories and knowledge. It reads the code itself (overview, files, code search, code graph) and cites real file paths and lines.",
     "Knowledge sources: Notion, Confluence, Google Drive, Sanity, GitHub, websites and uploaded files, kept in sync.",
@@ -326,10 +326,6 @@ const home: Page = {
         {
           type: "p",
           text: "The guide talks to AWS, GitHub and your own install, and counts anonymous page views with Google Analytics. Nothing you type and nothing about your install is sent to CoderHelm or Google.",
-        },
-        {
-          type: "note",
-          text: "The first public self-host release is not out yet. Until it is, you can read through the guide, but an install cannot finish.",
         },
         {
           type: "p",
@@ -950,8 +946,8 @@ const selfHost: Page = {
           text: "The guide talks to AWS, GitHub and your own install, and counts anonymous page views with Google Analytics. Nothing you type and nothing about your install is sent to CoderHelm or Google.",
         },
         {
-          type: "note",
-          text: "The first public self-host release is not out yet. Until it is, you can read through the guide, but an install cannot finish. Releases are published on [GitHub](https://github.com/CoderHelm/coderhelm-platform/releases).",
+          type: "p",
+          text: "Releases are published on [GitHub](https://github.com/CoderHelm/coderhelm-platform/releases).",
         },
       ],
     },
