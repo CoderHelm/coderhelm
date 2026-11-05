@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { api, type AutoUpdateSettings, type SystemPreflight, type SystemVersion, type UpdateBlocker, type UpdateEntry } from "@/lib/api";
+import { api, type AutoUpdateSettings, type ModelCheck, type SystemPreflight, type SystemVersion, type UpdateEntry } from "@/lib/api";
+import { deriveUpdateState, followEvery, STATE_ID, type FailedTry, type UpdateState } from "@/lib/update-state";
 import { CheckRow } from "@/components/install-checks";
 import { DomainSection } from "@/components/domain-section";
 import { HybridSection } from "@/components/hybrid-section";
 import { UninstallSection } from "@/components/uninstall-section";
-import { NativeUpdateCard } from "@/components/native-update";
+import { NativeUpdateCard, UpdateSteps } from "@/components/native-update";
 import { ModelsSection, UpdateNeedsAction } from "@/components/models-section";
 import { CodeBlock } from "@/components/code-block";
 import { Code } from "@/components/settings/code";
@@ -48,6 +49,7 @@ const STATUS: Record<UpdateEntry["status"], { label: string; tone: "success" | "
   failed: { label: "Failed", tone: "danger" },
   rolled_back: { label: "Rolled back", tone: "danger" },
   not_started: { label: "Didn't start", tone: "neutral" },
+  superseded: { label: "Replaced", tone: "neutral" },
 };
 
 /** A status this page doesn't know yet (a newer updater) shows as itself, neutral. */
@@ -144,16 +146,20 @@ function System() {
   useEffect(() => {
     load();
   }, [load]);
-  // While an update prepares or runs, follow it: the card and the history
-  // move along without a reload (the updater checks the stack every 5 minutes).
-  const following = !!data && (!!data.running || ["preparing", "running"].includes(data.native?.pending?.status ?? ""));
+  // The one update state, derived in one place (lib/update-state.ts).
+  const state: UpdateState | null = data ? deriveUpdateState(data, pre) : null;
+  // While something is happening (the release check, preparing, waiting for
+  // an OK that can also be given in the AWS console, applying), follow it:
+  // the version route reads CloudFormation each time, so the card moves from
+  // preparing to waiting for the OK to applying to done without a reload.
+  const every = state ? followEvery(state) : null;
   useEffect(() => {
-    if (!following) return;
+    if (!every) return;
     const t = window.setInterval(() => {
       if (document.visibilityState === "visible") load();
-    }, 30_000);
+    }, every);
     return () => window.clearInterval(t);
-  }, [following, load]);
+  }, [every, load]);
 
   const header = (
     <div className="mb-6">
@@ -171,7 +177,7 @@ function System() {
       </Page>
     );
   }
-  if (!data) {
+  if (!data || !state) {
     return (
       <Page>
         {header}
@@ -188,19 +194,15 @@ function System() {
   const latest = data.latest;
   const history = data.history ?? [];
   const canRollBack = history.some((h) => h.status === "succeeded" && h.from_version);
-  // A prepared or applying update is shown once, in its own card, with the
-  // one thing to do; it is never also listed as something blocking itself.
-  const pending = data.native?.pending ?? null;
-  const failure = failedTry(data, pre);
-  // What stops an update now: install checks that fail (listed under Install
-  // health), or an updater that didn't answer. The update itself (running,
-  // or its last try) and the model check have their own status, and a major
-  // release's notes are said in the status, so none of those repeat here.
+  // Install checks that fail and stop an update: marked under Install health
+  // (the status says "can't install yet" and points there). Nothing else on
+  // the page repeats the update state.
   const blockers = (pre?.blockers ?? []).filter((b) => b.severity === "block");
   const checkKeys = new Set((pre?.checks ?? []).map((c) => c.key));
   const blocking = new Set(blockers.filter((b) => checkKeys.has(b.key)).map((b) => b.key));
-  const hold: UpdateHold = { checks: blocking.size, updater: blockers.find((b) => b.key === "updater") ?? null };
-  const modelBlock = !!latest && data.model_check?.version === latest.version && !data.model_check.ok;
+  const busyUpdating = ["applying", "preparing", "review"].includes(state.kind);
+  const failure = state.kind === "failed" ? state.failure : null;
+  const offered = !!latest && ["available", "blocked", "updater-down", "needs-action", "checking", "check-stalled", "failed"].includes(state.kind);
 
   const save = async () => {
     try {
@@ -247,30 +249,24 @@ function System() {
         <SettingsSection id="version" title="Version">
           <div className="min-w-0 space-y-3 px-4 py-4">
             <UpdateStatus
+              state={state}
               data={data}
-              failure={failure}
-              hold={hold}
-              modelBlock={modelBlock}
               busy={busy}
               onUpdate={() => start("update")}
               onChanged={load}
               onModelChecked={(c) => {
                 setData({ ...data, model_check: c });
                 loadPreflight();
+                load();
               }}
               onSkipModel={() => start("update", true)}
             />
-            {failure && modelBlock && (
-              <div id="readiness" className="scroll-mt-6">
-                <UpdateNeedsAction check={data.model_check} onChecked={(c) => { setData({ ...data, model_check: c }); loadPreflight(); }} onSkip={() => start("update", true)} />
-              </div>
-            )}
-            {!data.running && !pending && data.current.version && <ReleaseCheck data={data} onChecked={setData} />}
+            {!busyUpdating && data.current.version && <ReleaseCheck data={data} onChecked={setData} />}
             <SettingsMore summary="Technical details">
               <VersionDetails version={data} autoUpdates={!!data.settings?.auto} failure={failure} />
             </SettingsMore>
           </div>
-          {latest && !pending && <ReleaseNotes version={latest.version} notes={latest.notes} url={latest.url} />}
+          {latest && offered && <ReleaseNotes version={latest.version} notes={latest.notes} url={latest.url} />}
         </SettingsSection>
 
         <SettingsSection id="health" title="Install health" description="The checks Coderhelm runs on itself: its address, GitHub, email, Claude and its queues. An update starts only while none fails.">
@@ -411,7 +407,7 @@ function System() {
             </ul>
           )}
           <div className="px-4 py-4">
-            <button type="button" className={secondaryButton} disabled={!canRollBack || !!busy || data.running} onClick={() => start("rollback")}>
+            <button type="button" className={secondaryButton} disabled={!canRollBack || !!busy || busyUpdating} onClick={() => start("rollback")}>
               {busy === "rollback" ? "Starting…" : "Roll back to the previous version"}
             </button>
           </div>
@@ -430,42 +426,6 @@ function System() {
 /** Where release commits live: the commit a release was built from links here. */
 const RELEASE_REPO_URL = "https://github.com/coderhelm/coderhelm-platform";
 
-/** The last try at an update that didn't land, while this install is still not on it. */
-interface FailedTry {
-  version: string;
-  status: "failed" | "rolled_back" | "not_started";
-  /** The updater's reason: shown as is only when it reads as a sentence. */
-  reason: string | null;
-  from: string | null;
-  startedAt: string | null;
-}
-
-/**
- * The newest update in the history, when it didn't succeed and this install
- * isn't on that version (a later success, or a roll back an admin chose,
- * ends it). Older updaters only say so in the readiness blocker.
- */
-function failedTry(data: SystemVersion, pre: SystemPreflight | null): FailedTry | null {
-  if (data.running || data.native?.pending) return null;
-  const last = (data.history ?? []).find((h) => h.mode !== "rollback");
-  const newest = (data.history ?? [])[0];
-  if (last && newest === last && ["failed", "rolled_back", "not_started"].includes(last.status) && last.version !== data.current.version) {
-    return {
-      version: last.version,
-      status: last.status as FailedTry["status"],
-      reason: last.reason ?? null,
-      from: last.from_version ?? data.current.version,
-      startedAt: last.started_at ?? null,
-    };
-  }
-  const b = pre?.blockers.find((x) => x.key === "failed_before");
-  if (b && data.latest) {
-    const m = b.detail.match(/didn't succeed: (.*?)\.?$/);
-    return { version: data.latest.version, status: "rolled_back", reason: m?.[1] ?? null, from: data.current.version, startedAt: null };
-  }
-  return null;
-}
-
 /** Raw AWS text (an ARN, a resource type, a handler error) belongs under Technical details. */
 function isRawReason(r: string): boolean {
   return /arn:aws|[A-Z][A-Za-z0-9]+::[A-Z][A-Za-z0-9]+|Resource handler returned|\bstatus code\b|Exception\b|\bRequestId\b/i.test(r) || r.length > 240;
@@ -474,13 +434,6 @@ function isRawReason(r: string): boolean {
 function sentence(r: string): string {
   const t = r.trim().replace(/\.$/, "");
   return `${t.charAt(0).toUpperCase()}${t.slice(1)}.`;
-}
-
-/** The update in progress: its version and when it started, from the history. */
-function runningTry(data: SystemVersion): UpdateEntry | null {
-  const h = data.history ?? [];
-  const id = data.native?.pending?.id;
-  return (id ? h.find((e) => e.id === id) : undefined) ?? h.find((e) => e.status === "running" || e.status === "preparing") ?? null;
 }
 
 /** An indeterminate bar: an update has no reliable percentage. */
@@ -499,14 +452,6 @@ function windowText(s: AutoUpdateSettings | undefined): string | null {
   return `${day} at ${String(s.hour).padStart(2, "0")}:00 ${s.timezone.replace(/_/g, " ")}`;
 }
 
-/** Why an update can't start now, from the preflight: failing install checks, or an updater that didn't answer. */
-interface UpdateHold {
-  /** Install checks that fail and stop an update (shown under Install health). */
-  checks: number;
-  /** The updater in the AWS account didn't answer. */
-  updater: UpdateBlocker | null;
-}
-
 function plural(n: number, one: string, many = `${one}s`) {
   return `${n} ${n === 1 ? one : many}`;
 }
@@ -522,230 +467,275 @@ function StatusCard({ state, variant, title, children, actions }: { state: strin
   );
 }
 
-/** The newest update succeeded in the last day and is what runs: "Updated to v0.8.32". */
-function recentSuccess(data: SystemVersion): UpdateEntry | null {
-  const newest = (data.history ?? [])[0];
-  if (!newest || newest.mode === "rollback" || newest.status !== "succeeded" || newest.version !== data.current.version) return null;
-  const at = newest.finished_at ?? newest.started_at;
-  if (!at || Date.now() - new Date(at).getTime() > 24 * 3600_000) return null;
-  return newest;
-}
-
 /**
  * The one status at the top of Version, about updates only (the install's
- * own health is its own section): up to date, a release to install, one on
- * its way, or the last one that didn't work, each with the one thing to do.
+ * own health is its own section). It renders exactly the state
+ * deriveUpdateState chose, nothing else: one headline, one line of detail,
+ * one thing to do.
  */
 function UpdateStatus({
+  state,
   data,
-  failure,
-  hold,
-  modelBlock,
   busy,
   onUpdate,
   onChanged,
   onModelChecked,
   onSkipModel,
 }: {
+  state: UpdateState;
   data: SystemVersion;
-  failure: FailedTry | null;
-  hold: UpdateHold;
-  /** The release's model check holds it (or is still running). */
-  modelBlock: boolean;
   busy: "" | "update" | "rollback";
   onUpdate: () => void;
   onChanged: () => void;
-  onModelChecked: (c: SystemVersion["model_check"]) => void;
+  onModelChecked: (c: ModelCheck | null) => void;
   onSkipModel: () => void;
 }) {
   const current = data.current.version;
   const latest = data.latest;
-  const pending = data.native?.pending ?? null;
   const on = current ?? "a development build";
   const auto = windowText(data.settings);
   const beta = withChannel(data.settings).channel === "beta";
   const healthLink = <a href="#health" className={linkButton}>See install health</a>;
+  const id = STATE_ID[state.kind];
 
-  if (pending) {
-    const t = runningTry(data);
-    return (
-      <div data-testid="update-status" data-state={pending.status === "review" ? "review" : pending.status === "preparing" ? "preparing" : "updating"}>
-        <NativeUpdateCard native={data.native!} onChanged={onChanged} startedAt={t?.started_at} from={current} />
-      </div>
-    );
-  }
+  switch (state.kind) {
+    case "applying":
+      if (state.pending && data.native) {
+        return (
+          <div data-testid="update-status" data-state={id}>
+            <NativeUpdateCard native={{ ...data.native, pending: state.pending }} phase="applying" onChanged={onChanged} startedAt={state.startedAt} startedBy={state.startedBy} appliedBy={state.appliedBy} from={current} />
+          </div>
+        );
+      }
+      return (
+        <StatusCard state={id} variant="info" title={<>Updating to {state.version}…</>}>
+          <p>
+            {state.startedAt ? <>Started <Time iso={state.startedAt} />{state.startedBy ? <> by {state.startedBy}</> : null}. </> : null}
+            This takes 10 to 20 minutes. Coderhelm keeps running {on} until it finishes, and this page updates by itself.
+          </p>
+          <Working label={`Updating to ${state.version}`} />
+        </StatusCard>
+      );
 
-  if (data.running) {
-    const t = runningTry(data);
-    const to = t?.version ?? latest?.version ?? "the new version";
-    return (
-      <StatusCard state="updating" variant="info" title={<>Updating to {to}…</>}>
-        <p>
-          {t?.started_at ? <>Started <Time iso={t.started_at} />. </> : null}
-          This takes 10 to 20 minutes. Coderhelm keeps running {on} until it finishes, and this page updates by itself.
-        </p>
-        <Working label={`Updating to ${to}`} />
-      </StatusCard>
-    );
-  }
+    case "preparing":
+    case "review":
+      return (
+        <div data-testid="update-status" data-state={id}>
+          <NativeUpdateCard
+            native={{ ...(data.native ?? { stack: "", auto_apply: false }), pending: state.pending }}
+            phase={state.kind}
+            onChanged={onChanged}
+            startedAt={state.kind === "preparing" ? state.startedAt : undefined}
+            startedBy={state.kind === "preparing" ? state.startedBy : undefined}
+            from={current}
+          />
+        </div>
+      );
 
-  if (failure) {
-    const plain = failure.reason && !isRawReason(failure.reason) ? sentence(failure.reason) : null;
-    const retry = latest?.version === failure.version;
-    const held = modelBlock || hold.checks > 0 || !!hold.updater;
-    const title =
-      failure.status === "not_started"
-        ? <>The update to {failure.version} couldn&apos;t start</>
-        : failure.status === "rolled_back"
-          ? <>The update to {failure.version} didn&apos;t finish</>
-          : <>The update to {failure.version} stopped partway</>;
-    return (
-      <StatusCard
-        state="failed"
-        variant="error"
-        title={title}
-        actions={
-          <>
-            {retry && (
-              <button type="button" className={primaryButton} disabled={!!busy || held} onClick={onUpdate} data-testid="update-retry">
-                {busy === "update" ? "Starting…" : "Try again"}
-              </button>
-            )}
-            {healthLink}
-            {failure.status === "failed" && <a href="#history" className={linkButton}>Roll back</a>}
-          </>
-        }
-      >
-        <p data-testid="update-failed-state">
-          {failure.status === "failed"
-            ? <>Coderhelm may not be fully working: it reports {on}.</>
-            : <>Nothing changed: you&apos;re still on {on}, and your data is untouched.</>}
-          {failure.startedAt ? <> Tried <Time iso={failure.startedAt} />.</> : null}
-        </p>
-        <p data-testid="update-failed-reason">
-          {plain ?? "AWS stopped it with an error; its own message is under Technical details."}
-        </p>
-        <p className="text-zinc-400">
-          {held
-            ? "Fix what Install health lists, then try again."
-            : failure.status === "failed"
+    case "checking":
+      return (
+        <StatusCard state={id} variant="info" title={<>Checking {state.version} before it can be applied</>}>
+          <p data-testid="update-checking">
+            {state.startedAt ? <>Started <Time iso={state.startedAt} />. </> : null}
+            Coderhelm checks the release&apos;s signature and checksums, then tries each model it calls. This usually takes about 5 minutes; this page moves on by itself, and then you can update.
+          </p>
+          <UpdateSteps at="check" />
+          <Working label={`Checking ${state.version}`} />
+        </StatusCard>
+      );
+
+    case "check-stalled":
+      return (
+        <div id="readiness" className="scroll-mt-6">
+          <StatusCard
+            state={id}
+            variant="warning"
+            title={<>Checking {state.version} didn&apos;t finish</>}
+            actions={<CheckAgain onChecked={onModelChecked} />}
+          >
+            <p data-testid="update-check-stalled">{state.note}</p>
+            <p className="text-zinc-400">Nothing was changed: you&apos;re on {on}. The update waits until the release is checked.</p>
+          </StatusCard>
+        </div>
+      );
+
+    case "needs-action":
+      return (
+        <div data-testid="update-status" data-state={id} id="readiness" className="scroll-mt-6">
+          <UpdateNeedsAction check={state.check} onChecked={onModelChecked} onSkip={onSkipModel} />
+        </div>
+      );
+
+    case "failed": {
+      const failure = state.failure;
+      const plain = failure.reason && !isRawReason(failure.reason) ? sentence(failure.reason) : null;
+      const retry = latest?.version === failure.version;
+      const title =
+        failure.status === "not_started"
+          ? <>The update to {failure.version} couldn&apos;t start</>
+          : failure.status === "rolled_back"
+            ? <>The update to {failure.version} didn&apos;t finish</>
+            : <>The update to {failure.version} stopped partway</>;
+      return (
+        <StatusCard
+          state={id}
+          variant="error"
+          title={title}
+          actions={
+            <>
+              {retry && (
+                <button type="button" className={primaryButton} disabled={!!busy} onClick={onUpdate} data-testid="update-retry">
+                  {busy === "update" ? "Starting…" : "Try again"}
+                </button>
+              )}
+              {healthLink}
+              {failure.status === "failed" && <a href="#history" className={linkButton}>Roll back</a>}
+            </>
+          }
+        >
+          <p data-testid="update-failed-state">
+            {failure.status === "failed"
+              ? <>Coderhelm may not be fully working: it reports {on}.</>
+              : <>Nothing changed: you&apos;re still on {on}, and your data is untouched.</>}
+            {failure.startedAt ? <> Tried <Time iso={failure.startedAt} />.</> : null}
+          </p>
+          <p data-testid="update-failed-reason">
+            {plain ?? "AWS stopped it with an error; its own message is under Technical details."}
+          </p>
+          <p className="text-zinc-400">
+            {failure.status === "failed"
               ? "Fix what Install health lists and try again, or roll back under Update history."
               : "If Install health below lists a check that fails, fix it first."}
-          {failure.status !== "not_started" ? ` Automatic updates skip ${failure.version} until it works.` : ""}
-        </p>
-      </StatusCard>
-    );
-  }
-
-  if (latest && modelBlock && data.model_check) {
-    return (
-      <div data-testid="update-status" data-state={data.model_check.pending ? "checking-release" : "needs-action"} id="readiness" className="scroll-mt-6">
-        <UpdateNeedsAction check={data.model_check} onChecked={onModelChecked} onSkip={onSkipModel} />
-      </div>
-    );
-  }
-
-  if (latest && hold.updater) {
-    return (
-      <StatusCard state="updater-down" variant="warning" title={<>{latest.version} is available, but can&apos;t install from here</>}>
-        <p>You&apos;re on {on}. The updater in your AWS account didn&apos;t answer, so update from your machine instead:</p>
-        <div className="mt-2"><CodeBlock code={hold.updater.fix.command ?? `${DOCTOR.replace(/ doctor$/, "")} update`} lang="bash" label="Update command" /></div>
-      </StatusCard>
-    );
-  }
-
-  if (latest && hold.checks > 0) {
-    return (
-      <StatusCard
-        state="blocked"
-        variant="warning"
-        title={<>{latest.version} is available, but can&apos;t install yet</>}
-        actions={<a href="#health" className={primaryButton} data-testid="update-see-fix">See what to fix</a>}
-      >
-        <p data-testid="update-blocked">
-          You&apos;re on {on}. Fix the {hold.checks === 1 ? "install check" : `${hold.checks} install checks`} marked Stops updates below, then update.
-        </p>
-      </StatusCard>
-    );
-  }
-
-  if (latest) {
-    const majorWaits = latest.breaking && data.settings?.majors !== "auto";
-    return (
-      <StatusCard
-        state="available"
-        variant="info"
-        title={
-          <span className="inline-flex flex-wrap items-center gap-2">
-            {latest.version} is available
-            {latest.breaking && <Chip tone="waiting">Major release</Chip>}
-            {latest.prerelease && <Chip tone="neutral">Beta</Chip>}
-          </span>
-        }
-        actions={
-          <button type="button" className={primaryButton} disabled={!!busy} onClick={onUpdate} data-testid="update-now">
-            {busy === "update" ? "Starting…" : `Update to ${latest.version}`}
-          </button>
-        }
-      >
-        <p data-testid="update-detail">
-          You&apos;re on {on}.{latest.published_at ? <> {latest.version} came out <Time iso={latest.published_at} mode="date" />.</> : null}
-          {auto && !majorWaits ? <> It installs by itself {auto}, or update now.</> : null}
-        </p>
-        {latest.breaking && (
-          <p data-testid="update-major">
-            Its notes ask you to do something before or after updating: read them below first.{auto ? " Major releases wait for you, even with automatic updates on." : ""}
+            {failure.status !== "not_started" ? ` Automatic updates skip ${failure.version} until it works.` : ""}
           </p>
-        )}
-        {latest.prerelease && <p>A nightly beta: it reaches Stable after a day with no reported problem. You get these because the channel is Beta (nightly).</p>}
-      </StatusCard>
-    );
-  }
+        </StatusCard>
+      );
+    }
 
-  const behind = data.releases?.behind;
-  if (behind && current) {
-    return (
-      <StatusCard state="behind" variant="info" title={<>{behind.version} is out, but can&apos;t install yet</>}>
-        <p>You&apos;re on {current}. GitHub&apos;s release list doesn&apos;t show {behind.version} yet, which usually takes a few minutes. Check for updates again shortly.</p>
-      </StatusCard>
-    );
-  }
+    case "updater-down":
+      return (
+        <StatusCard state={id} variant="warning" title={<>{state.version} is available, but can&apos;t install from here</>}>
+          <p>You&apos;re on {on}. The updater in your AWS account didn&apos;t answer, so update from your machine instead:</p>
+          <div className="mt-2"><CodeBlock code={state.blocker.fix.command ?? `${DOCTOR.replace(/ doctor$/, "")} update`} lang="bash" label="Update command" /></div>
+        </StatusCard>
+      );
 
-  if (!current) {
-    return (
-      <StatusCard state="development" variant="neutral" title="Development build">
-        <p>This install was deployed from source, not a published release, so there is no version to compare with new releases.</p>
-      </StatusCard>
-    );
-  }
+    case "blocked":
+      return (
+        <StatusCard
+          state={id}
+          variant="warning"
+          title={<>{state.version} is available, but can&apos;t install yet</>}
+          actions={<a href="#health" className={primaryButton} data-testid="update-see-fix">See what to fix</a>}
+        >
+          <p data-testid="update-blocked">
+            You&apos;re on {on}. Fix the {state.checks === 1 ? "install check" : `${state.checks} install checks`} marked Stops updates below, then update.
+          </p>
+        </StatusCard>
+      );
 
-  if (data.releases?.error) {
-    return (
-      <StatusCard state="unreachable" variant="warning" title="Couldn't check for updates">
-        <p>GitHub didn&apos;t answer, so it isn&apos;t known whether a newer release is out. You&apos;re on {current}.</p>
-      </StatusCard>
-    );
-  }
+    case "available": {
+      const l = latest!;
+      const majorWaits = l.breaking && data.settings?.majors !== "auto";
+      return (
+        <StatusCard
+          state={id}
+          variant="info"
+          title={
+            <span className="inline-flex flex-wrap items-center gap-2">
+              {l.version} is available
+              {l.breaking && <Chip tone="waiting">Major release</Chip>}
+              {l.prerelease && <Chip tone="neutral">Beta</Chip>}
+            </span>
+          }
+          actions={
+            <button type="button" className={primaryButton} disabled={!!busy} onClick={onUpdate} data-testid="update-now">
+              {busy === "update" ? "Starting…" : `Update to ${l.version}`}
+            </button>
+          }
+        >
+          <p data-testid="update-detail">
+            You&apos;re on {on}.{l.published_at ? <> {l.version} came out <Time iso={l.published_at} mode="date" />.</> : null}
+            {auto && !majorWaits ? <> It installs by itself {auto}, or update now.</> : null}
+          </p>
+          {l.breaking && (
+            <p data-testid="update-major">
+              Its notes ask you to do something before or after updating: read them below first.{auto ? " Major releases wait for you, even with automatic updates on." : ""}
+            </p>
+          )}
+          {l.prerelease && <p>A nightly beta: it reaches Stable after a day with no reported problem. You get these because the channel is Beta (nightly).</p>}
+        </StatusCard>
+      );
+    }
 
-  if (data.releases && !data.releases.fetched_at) {
-    return (
-      <StatusCard state="not-checked" variant="neutral" title="Not checked for updates yet">
-        <p>You&apos;re on {current}. Check for updates to see whether a newer release is out.</p>
-      </StatusCard>
-    );
-  }
+    case "behind":
+      return (
+        <StatusCard state={id} variant="info" title={<>{state.version} is out, but can&apos;t install yet</>}>
+          <p>You&apos;re on {current}. GitHub&apos;s release list doesn&apos;t show {state.version} yet, which usually takes a few minutes. Check for updates again shortly.</p>
+        </StatusCard>
+      );
 
-  const done = recentSuccess(data);
-  const channel = beta ? " on the Beta (nightly) channel" : "";
+    case "development":
+      return (
+        <StatusCard state={id} variant="neutral" title="Development build">
+          <p>This install was deployed from source, not a published release, so there is no version to compare with new releases.</p>
+        </StatusCard>
+      );
+
+    case "unreachable":
+      return (
+        <StatusCard state={id} variant="warning" title="Couldn't check for updates">
+          <p>GitHub didn&apos;t answer, so it isn&apos;t known whether a newer release is out. You&apos;re on {current}.</p>
+        </StatusCard>
+      );
+
+    case "not-checked":
+      return (
+        <StatusCard state={id} variant="neutral" title="Not checked for updates yet">
+          <p>You&apos;re on {current}. Check for updates to see whether a newer release is out.</p>
+        </StatusCard>
+      );
+
+    case "current": {
+      const done = state.done;
+      const channel = beta ? " on the Beta (nightly) channel" : "";
+      return (
+        <StatusCard state={id} variant="success" title={done ? <>Updated to {current}</> : "You're up to date"}>
+          <p data-testid="update-detail">
+            {done
+              ? <>Finished <Time iso={done.finished_at ?? done.started_at} />. You&apos;re up to date{channel}.</>
+              : <>Coderhelm {current}{channel}{data.current.released_at ? <>, released <Time iso={data.current.released_at} mode="date" /></> : null}.</>}
+            {auto ? <> New releases install by themselves {auto}.</> : null}
+          </p>
+        </StatusCard>
+      );
+    }
+  }
+}
+
+/** Starts the release check over (a check that stalled), then the page reads the state again. */
+function CheckAgain({ onChecked }: { onChecked: (c: ModelCheck | null) => void }) {
+  const { toast } = useToast();
+  const [busy, setBusy] = useState(false);
   return (
-    <StatusCard state="current" variant="success" title={done ? <>Updated to {current}</> : "You're up to date"}>
-      <p data-testid="update-detail">
-        {done
-          ? <>Finished <Time iso={done.finished_at ?? done.started_at} />. You&apos;re up to date{channel}.</>
-          : <>Coderhelm {current}{channel}{data.current.released_at ? <>, released <Time iso={data.current.released_at} mode="date" /></> : null}.</>}
-        {auto ? <> New releases install by themselves {auto}.</> : null}
-      </p>
-    </StatusCard>
+    <button
+      type="button"
+      className={primaryButton}
+      disabled={busy}
+      data-testid="update-check-again"
+      onClick={async () => {
+        setBusy(true);
+        try {
+          onChecked((await api.checkUpdateModels()).model_check);
+        } catch (e) {
+          toast(e instanceof Error ? e.message : "Could not start the check", "error");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? "Starting…" : "Check again"}
+    </button>
   );
 }
 

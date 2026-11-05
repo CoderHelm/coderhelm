@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, type HybridStatus, type SystemVersion, type UninstallMode } from "@/lib/api";
 import { Callout } from "@/components/callout";
+import { ExternalLinkIcon } from "@/components/icons";
 import { dangerButton, inputClass, secondaryButton, smallDangerButton } from "@/components/ui";
 
 /** The uninstall page on the docs site (docs.coderhelm.com/self-host/uninstall/). */
@@ -21,7 +22,8 @@ export function uninstallLink(install: SystemVersion["install"], hybrid: HybridS
 /**
  * Keep the data, or delete everything when the stack is deleted. Nothing is
  * deleted here: the stack's own delete reads the choice. Turning on needs
- * the install's name typed back.
+ * the install's name typed back. One row of the Uninstall card, not a box
+ * inside it.
  */
 function DataChoice({ stage, initial }: { stage: string; initial: UninstallMode }) {
   const [mode, setMode] = useState<UninstallMode>(initial);
@@ -44,15 +46,15 @@ function DataChoice({ stage, initial }: { stage: string; initial: UninstallMode 
     }
   };
   return (
-    <div className="space-y-3 rounded-lg border border-border p-4" data-testid="uninstall-data">
-      <p className="text-sm font-medium">When Coderhelm is uninstalled</p>
+    <div className="space-y-3 px-4 py-4" data-testid="uninstall-data">
+      <h3 className="text-sm font-medium text-zinc-100">When Coderhelm is uninstalled</h3>
       {mode.delete_data ? (
         <Callout variant="warning" title="Delete everything" testId="uninstall-data-on">
           Deleting the stack also deletes the tables, data bucket, sign-in users and secret, and schedules the KMS keys for deletion (AWS&apos;s 7-day minimum).
           {mode.changed_by ? ` Turned on by ${mode.changed_by}.` : ""} Nothing is deleted until the stack is.
         </Callout>
       ) : (
-        <p className="text-sm text-text-secondary" data-testid="uninstall-data-off">
+        <p className="text-sm text-zinc-400" data-testid="uninstall-data-off">
           Keep my data: deleting the stack removes Coderhelm, and the tables, data bucket, keys, sign-in users and secret stay.
         </p>
       )}
@@ -62,7 +64,7 @@ function DataChoice({ stage, initial }: { stage: string; initial: UninstallMode 
         </button>
       ) : asking ? (
         <div className="space-y-2">
-          <label className="block text-sm" htmlFor="uninstall-confirm">
+          <label className="block text-sm text-zinc-300" htmlFor="uninstall-confirm">
             Type <code className="font-mono">{stage}</code> to delete everything when the stack is deleted
           </label>
           <input id="uninstall-confirm" className={inputClass} value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" data-testid="uninstall-confirm" />
@@ -95,16 +97,19 @@ export function UninstallSection({ version }: { version: SystemVersion | null })
   const jira = !!(hybrid?.registered && hybrid.jira?.link);
   const install = version?.install ?? null;
   const choice = version?.uninstall ?? null;
+  // One card, rows split by the section's own dividers: what uninstalling
+  // is, the data choice, a hybrid note, and the guide. Nothing here deletes
+  // anything: the guide walks through deleting the stack in AWS.
   return (
-    <div className="space-y-4" data-testid="uninstall-section">
-      <p className="text-sm text-text-secondary">
+    <div className="divide-y divide-zinc-800" data-testid="uninstall-section">
+      <div className="space-y-3 px-4 py-4">
+      <p className="text-sm text-zinc-400">
         Remove Coderhelm from this AWS account{install ? <> (<code className="font-mono">coderhelm-{install.stage}</code> in {install.region})</> : null}. It is one CloudFormation stack: deleting it removes Coderhelm.{" "}
         {choice
           ? "Choose below whether its data goes with it."
           : <>Its <code className="font-mono">KeepDataOnDelete</code> setting decides whether the tables, data bucket, keys, sign-in users and secret stay (they do unless you change it; KMS keys go after AWS&apos;s 7-day minimum).</>}{" "}
-        The page walks you through it and ends with a check that nothing is left.
+        The uninstall guide walks you through it and ends with a check that nothing is left.
       </p>
-      {choice && install ? <DataChoice stage={install.stage} initial={choice} /> : null}
       {hybrid?.registered ? (
         <Callout variant="warning" title={links || jira ? "Coderhelm forwards GitHub or Jira events here" : "This install is hybrid"} testId="uninstall-hybrid">
           {links || jira
@@ -112,9 +117,16 @@ export function UninstallSection({ version }: { version: SystemVersion | null })
             : "Uninstalling releases this install's coderhelm.com address and its links first."}
         </Callout>
       ) : null}
-      <a className={dangerButton} href={uninstallLink(install, hybrid)} target="_blank" rel="noopener noreferrer" data-testid="uninstall-link">
-        Uninstall Coderhelm
-      </a>
+      </div>
+      {choice && install ? <DataChoice stage={install.stage} initial={choice} /> : null}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-4">
+        <a className={`${dangerButton} inline-flex items-center gap-2`} href={uninstallLink(install, hybrid)} target="_blank" rel="noopener noreferrer" data-testid="uninstall-link">
+          Open the uninstall guide
+          <span aria-hidden="true" className="scale-90"><ExternalLinkIcon /></span>
+          <span className="sr-only">(opens in a new tab)</span>
+        </a>
+        <p className="text-sm text-zinc-400" data-testid="uninstall-link-note">Opens the guide in a new tab. Nothing is deleted from here.</p>
+      </div>
     </div>
   );
 }

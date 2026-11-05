@@ -270,6 +270,20 @@ export function UpdateNeedsAction({ check, onChecked, onSkip }: { check: ModelCh
     );
   }
   const failing = mc.results.filter((r) => r.status === "fail");
+  if (mc.stalled || failing.length === 0) {
+    // The release check stopped reporting, or couldn't verify the release:
+    // it holds the update, with its reason, never "Checking" forever.
+    return (
+      <Callout
+        variant="warning"
+        testId="update-check-stalled"
+        title={`Checking ${mc.version} didn't finish`}
+        actions={<button type="button" className={secondaryButton} onClick={() => api.checkUpdateModels().then((r) => { setMc(r.model_check); onChecked?.(r.model_check); }).catch(() => {})}>Check again</button>}
+      >
+        <p>{mc.note ?? "The release check didn't report back."}</p>
+      </Callout>
+    );
+  }
   const again = async () => {
     setBusy(true);
     try {

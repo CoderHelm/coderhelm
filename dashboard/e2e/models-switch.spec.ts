@@ -59,7 +59,8 @@ async function setup(page: Page, opts: Opts = {}) {
   const calls: { method: string; path: string; body: Record<string, unknown> }[] = [];
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   const modelCheck = () => ({
-    version: "v1.3.0", checked_at: "2026-10-26T08:00:00Z", ok: !state.blocked && !state.pending, pending: state.pending, provider: "bedrock", region: "us-east-1",
+    // A check still running started just now (an old pending one reads as stalled).
+    version: "v1.3.0", checked_at: state.pending ? new Date().toISOString() : "2026-10-26T08:00:00Z", ok: !state.blocked && !state.pending, pending: state.pending, provider: "bedrock", region: "us-east-1",
     results: state.blocked ? [pass("claude-opus-5-5"), terms("claude-sonnet-5-5")] : MODELS.map((m) => pass(m)),
   });
   await page.route((url) => url.pathname === "/runtime-config.js", (route) =>
@@ -224,9 +225,11 @@ for (const width of [1440, 390]) {
 test("while the release's signature is checked, the update waits and says so", async ({ page }) => {
   const { state } = await setup(page, { pending: true });
   await page.goto("/settings/system/");
-  await expect(page.getByTestId("update-checking")).toContainText("Checking v1.3.0 before it can be applied");
+  await expect(page.getByTestId("update-status")).toContainText("Checking v1.3.0 before it can be applied");
+  await expect(page.getByTestId("update-checking")).toContainText("Started just now");
   await expect(page.getByTestId("update-needs-action")).toHaveCount(0);
+  await expect(page.getByTestId("update-status")).toHaveAttribute("data-state", "checking-release");
+  // Nothing to press: the page follows the check and moves on once it passes.
   state.pending = false;
-  await page.getByTestId("update-checking").getByRole("button", { name: "Re-run the model check" }).click();
-  await expect(page.getByTestId("update-checking")).toHaveCount(0);
+  await expect(page.getByTestId("update-checking")).toHaveCount(0, { timeout: 20_000 });
 });

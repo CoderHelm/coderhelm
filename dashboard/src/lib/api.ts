@@ -4146,9 +4146,14 @@ export interface UpdateEntry {
   from_version?: string;
   actor: string;
   mode?: "update" | "rollback";
-  /** preparing: the change set is being made; review: it waits for an admin in AWS;
-   * not_started: refused before anything changed (the reason says why). */
-  status: "running" | "preparing" | "review" | "succeeded" | "failed" | "rolled_back" | "not_started";
+  /** preparing: the change set is being made; review: it waits for an admin;
+   * not_started: refused before anything changed (the reason says why);
+   * superseded: prepared, never run, replaced by a newer update (nothing changed). */
+  status: "running" | "preparing" | "review" | "succeeded" | "failed" | "rolled_back" | "not_started" | "superseded";
+  /** superseded: the update that replaced it. */
+  superseded_by?: string;
+  /** Who applied it: an admin here, or "someone in the AWS console". */
+  applied_by?: string;
   reason?: string;
   /** "model check skipped for …" when an admin skipped a model the release doesn't call. */
   note?: string;
@@ -4256,6 +4261,12 @@ export interface ModelCheck {
   skippable?: boolean;
   /** The release's signature is being checked before its model list is read. */
   pending?: boolean;
+  /** The release check stopped reporting, or couldn't verify the release: it holds the update, and `note` says why. */
+  stalled?: boolean;
+  /** When the release check started (pending). */
+  started_at?: string;
+  /** While pending: the step, when it started, and CodeBuild's status of the release check build. */
+  progress?: { step: "signature"; started_at: string | null; build: string | null };
   note?: string;
 }
 
@@ -4338,6 +4349,12 @@ export interface NativeChangeSet {
   link?: string;
   /** The update's history id (what Apply names). */
   id?: string;
+  /** Who started it ("auto" for the maintenance window) and when. */
+  actor?: string | null;
+  started_at?: string | null;
+  /** Who applied it (an admin here, or "someone in the AWS console") and when. */
+  applied_by?: string | null;
+  executed_at?: string | null;
   /** Waiting for an admin (status review): why, in words. */
   hold?: string;
   /** Tables, buckets, keys, user pools or secrets it would replace or remove. */

@@ -272,7 +272,7 @@ test.describe("Version and updates: every state", () => {
     await page.goto("/settings/system/");
     await expect(status(page)).toHaveAttribute("data-state", "preparing");
     await expect(status(page)).toContainText("Preparing the update to v0.9.0");
-    await expect(status(page)).toContainText("Step 1 of 2");
+    await expect(status(page).getByTestId("update-steps").locator('[aria-current="step"]')).toHaveAttribute("data-step", "prepare");
     await expect(page.getByTestId("release-check")).toHaveCount(0);
     await shoot(page, "11-preparing");
   });
@@ -281,7 +281,7 @@ test.describe("Version and updates: every state", () => {
     await setup(page, { version: { latest: LATEST, update_available: true, running: true, native: { stack: "coderhelm-acme", can_apply: true, auto_apply: true, pending: { ...PREPARED, status: "running" } }, history: [{ id: "UPDATE#2", version: "v0.9.0", from_version: "v0.8.32", actor: "admin@acme.example", mode: "update", status: "running", started_at: ago(6) }, ...OK_HISTORY] } });
     await page.goto("/settings/system/");
     await expect(status(page)).toHaveAttribute("data-state", "updating");
-    await expect(status(page)).toContainText("Updating to v0.9.0");
+    await expect(status(page)).toContainText("Applying v0.9.0");
     await expect(status(page)).toContainText("Started 6 min ago");
     await expect(status(page)).toContainText("It changes 7 resources");
     await expect(status(page)).not.toContainText("coderhelm-acme");
@@ -389,5 +389,215 @@ test.describe("Version and updates: every state", () => {
     await expect(status(page)).toContainText("v0.9.0 is available, but can't install from here");
     await expect(status(page)).toContainText("coderhelm-platform update");
     await shoot(page, "20-updater-down");
+  });
+});
+
+// ── One truthful state, from the payloads seen on a live install ──────────
+//
+// The Version card shows exactly one state, from lib/update-state.ts. These
+// feed the page the contradictory payloads observed live and the states the
+// updater moves through, and check there is one status, saying one thing.
+
+const OLD = "v0.8.37";
+const NEW = "v0.8.39";
+const PERMS = { can_apply: true, confirm: "c".repeat(64), data_changes: [], permission_changes: ["Api.NewRole (AWS::IAM::Role Add: an IAM change)"], admin_changes: [] };
+const LIVE_LATEST = { ...LATEST, version: NEW };
+const STALE_PENDING_CHECK = { version: NEW, checked_at: ago(120), started_at: ago(120), ok: false, pending: true, results: [], note: "checking the release's signature before reading the models it calls" };
+const PENDING_BLOCKER = { key: "model_check_pending", severity: "block", detail: `Checking ${NEW}'s signature before reading the models it calls.`, fix: { text: "Wait a few minutes, then check again." } };
+const row = (id: string, version: string, status: string, min: number, extra: Record<string, unknown> = {}) => ({ id, version, from_version: "v0.8.32", actor: "owner@example.org", mode: "update", status, started_at: ago(min), ...extra });
+
+/** Nothing but the one status talks about the update. */
+async function oneState(page: Page) {
+  await expect(page.getByTestId("update-status")).toHaveCount(1);
+  await expect(page.getByTestId("native-update")).toHaveCount(await page.getByTestId("update-status").getByTestId("native-update").count());
+  await expect(page.locator("main")).not.toContainText("Ready to update");
+  await expect(page.locator("main")).not.toContainText("What stops an update");
+  await expect(page.locator("main")).not.toContainText("Blocks the update");
+}
+
+test.describe("Version and updates: one truthful state", () => {
+  test("observed: an older update waiting, a newer one prepared, and a stale Checking: one state, the newer update", async ({ page }) => {
+    await setup(page, {
+      version: {
+        latest: LIVE_LATEST, update_available: true,
+        native: { stack: "coderhelm-example", can_apply: true, auto_apply: true, pending: { version: OLD, status: "review", id: "UPDATE#a", counts: { add: 1, modify: 3, remove: 0 }, ...PERMS } },
+        history: [row("UPDATE#b", NEW, "review", 10), row("UPDATE#a", OLD, "review", 60), ...OK_HISTORY],
+        model_check: STALE_PENDING_CHECK,
+      },
+      blockers: [PENDING_BLOCKER],
+    });
+    await page.goto("/settings/system/");
+    await oneState(page);
+    await expect(status(page)).toHaveAttribute("data-state", "preparing");
+    await expect(status(page)).toContainText(`Preparing the update to ${NEW}`);
+    await expect(page.locator("main")).not.toContainText(`${OLD} needs your OK`);
+    await expect(page.locator("main")).not.toContainText(`Checking ${NEW}`);
+    await expect(page.getByRole("button", { name: "Review and apply" })).toHaveCount(0);
+    await shoot(page, "21-observed-contradiction");
+  });
+
+  test("the same install once the updater reconciled it: v0.8.39 needs your OK, the permission list in the dialog", async ({ page }) => {
+    await setup(page, {
+      version: {
+        latest: LIVE_LATEST, update_available: true,
+        native: { stack: "coderhelm-example", can_apply: true, auto_apply: true, pending: { ...PREPARED, version: NEW, id: "UPDATE#b", execution: "AVAILABLE", ...PERMS } },
+        history: [row("UPDATE#b", NEW, "review", 10), row("UPDATE#a", OLD, "superseded", 60, { reason: `replaced by the update to ${NEW} before it was applied; nothing was changed` }), ...OK_HISTORY],
+        model_check: { ...STALE_PENDING_CHECK, pending: false, ok: true, checked_at: ago(10) },
+      },
+    });
+    await page.goto("/settings/system/");
+    await oneState(page);
+    await expect(status(page)).toHaveAttribute("data-state", "review");
+    await expect(status(page)).toContainText(`${NEW} needs your OK`);
+    await expect(status(page).getByTestId("update-steps").locator('[aria-current="step"]')).toContainText("waits for your OK");
+    await expect(page.locator("main")).not.toContainText(OLD + " needs");
+    // History keeps the older one as replaced, never as a second update waiting.
+    await expect(page.getByTestId("update-history").locator("li").nth(1).getByTestId("history-status")).toHaveText("Replaced");
+    // Install health is its own section and never reads as an update state.
+    await expect(page.getByTestId("health-summary")).toHaveText("All 9 checks pass");
+    await shoot(page, "22-needs-your-ok");
+    await status(page).getByRole("button", { name: "Review and apply" }).click();
+    await expect(page.getByTestId("native-update-permission-changes")).toContainText("Api.NewRole");
+  });
+
+  test("observed: executed in the AWS console while the entry said review: Applying, never Review and apply", async ({ page }) => {
+    await setup(page, {
+      version: {
+        latest: LIVE_LATEST, update_available: true, running: true,
+        native: { stack: "coderhelm-example", can_apply: true, auto_apply: true, pending: { ...PREPARED, version: NEW, id: "UPDATE#b", status: "review", execution: "EXECUTE_IN_PROGRESS", ...PERMS } },
+        history: [row("UPDATE#b", NEW, "review", 10), ...OK_HISTORY],
+      },
+    });
+    await page.goto("/settings/system/");
+    await oneState(page);
+    await expect(status(page)).toHaveAttribute("data-state", "updating");
+    await expect(status(page)).toContainText(`Applying ${NEW}`);
+    await expect(page.getByRole("button", { name: "Review and apply" })).toHaveCount(0);
+    await expect(page.getByTestId("native-update-apply")).toHaveCount(0);
+  });
+
+  test("applied in the AWS console, as the updater reports it: who applied it", async ({ page }) => {
+    await setup(page, {
+      version: {
+        latest: LIVE_LATEST, update_available: true, running: true,
+        native: { stack: "coderhelm-example", can_apply: true, auto_apply: true, pending: { ...PREPARED, version: NEW, id: "UPDATE#b", status: "running", applied_by: "someone in the AWS console", executed_at: ago(4) } },
+        history: [row("UPDATE#b", NEW, "running", 10), ...OK_HISTORY],
+      },
+    });
+    await page.goto("/settings/system/");
+    await expect(status(page)).toHaveAttribute("data-state", "updating");
+    await expect(page.getByTestId("native-update-progress")).toContainText("It was applied in the AWS console.");
+    await shoot(page, "23-applied-in-console");
+  });
+
+  test("checking: the step, when it started, nothing to press, and it moves on by itself", async ({ page }) => {
+    const m = {
+      version: { latest: LIVE_LATEST, update_available: true, model_check: { ...STALE_PENDING_CHECK, checked_at: ago(2), started_at: ago(2), progress: { step: "signature", started_at: ago(2), build: "IN_PROGRESS" } } } as Record<string, unknown>,
+      blockers: [PENDING_BLOCKER] as unknown[],
+    };
+    await page.clock.install({ time: new Date(NOW) });
+    await setup(page, m);
+    await page.goto("/settings/system/");
+    await oneState(page);
+    await expect(status(page)).toHaveAttribute("data-state", "checking-release");
+    await expect(status(page)).toContainText(`Checking ${NEW} before it can be applied`);
+    await expect(page.getByTestId("update-checking")).toContainText("Started 2 min ago");
+    await expect(status(page).getByTestId("update-steps").locator('[aria-current="step"]')).toHaveAttribute("data-step", "check");
+    await expect(status(page).getByRole("button")).toHaveCount(0);
+    await shoot(page, "24-checking");
+    // The check passes: the next poll shows the update, no reload.
+    m.version.model_check = { version: NEW, checked_at: ago(0), ok: true, results: [] };
+    m.blockers = [];
+    await page.clock.fastForward(11_000);
+    await expect(status(page)).toHaveAttribute("data-state", "available");
+    await expect(status(page).getByRole("button", { name: `Update to ${NEW}` })).toBeVisible();
+  });
+
+  test("a check that stopped reporting: stalled with its reason and Check again, never Checking forever", async ({ page }) => {
+    const { calls } = await setup(page, {
+      version: { latest: LIVE_LATEST, update_available: true, model_check: { version: NEW, checked_at: ago(40), ok: false, pending: false, stalled: true, results: [], note: `Checking ${NEW} didn't finish: the release check build ended FAILED without reporting back. Check again to start it over.` } },
+      blockers: [{ key: "model_check_stalled", severity: "block", detail: "stalled", fix: { text: "Check again to start the release check over." } }],
+    });
+    await page.goto("/settings/system/");
+    await oneState(page);
+    await expect(status(page)).toHaveAttribute("data-state", "check-stalled");
+    await expect(status(page)).toContainText(`Checking ${NEW} didn't finish`);
+    await expect(page.getByTestId("update-check-stalled")).toContainText("ended FAILED without reporting back");
+    await shoot(page, "25-check-stalled");
+    await status(page).getByRole("button", { name: "Check again" }).click();
+    await expect.poll(() => calls).toContain("/api/system/update-check");
+  });
+
+  test("an older updater's pending check past its time bound reads as stalled", async ({ page }) => {
+    await setup(page, { version: { latest: LIVE_LATEST, update_available: true, model_check: STALE_PENDING_CHECK }, blockers: [PENDING_BLOCKER] });
+    await page.goto("/settings/system/");
+    await oneState(page);
+    await expect(status(page)).toHaveAttribute("data-state", "check-stalled");
+    await expect(status(page)).toContainText("didn't finish within 30 minutes");
+  });
+
+  test("preparing, then waiting for the OK, then applying, then updated: without a reload", async ({ page }) => {
+    const m = {
+      version: {
+        latest: LIVE_LATEST, update_available: true,
+        native: { stack: "coderhelm-example", can_apply: true, auto_apply: true, pending: { version: NEW, status: "preparing", id: "UPDATE#b", actor: "owner@example.org", started_at: ago(1) } },
+        history: [row("UPDATE#b", NEW, "preparing", 1), ...OK_HISTORY],
+      } as Record<string, unknown>,
+    };
+    await page.clock.install({ time: new Date(NOW) });
+    await setup(page, m);
+    await page.goto("/settings/system/");
+    await expect(status(page)).toHaveAttribute("data-state", "preparing");
+    await expect(page.getByTestId("native-update-progress")).toContainText("by owner@example.org");
+    // The change set is ready and changes IAM: it waits for the OK.
+    m.version.native = { stack: "coderhelm-example", can_apply: true, auto_apply: true, pending: { ...PREPARED, version: NEW, id: "UPDATE#b", execution: "AVAILABLE", ...PERMS } };
+    m.version.history = [row("UPDATE#b", NEW, "review", 2), ...OK_HISTORY];
+    await page.clock.fastForward(11_000);
+    await expect(status(page)).toHaveAttribute("data-state", "review");
+    // Executed (here or in the console): applying.
+    m.version.running = true;
+    m.version.native = { stack: "coderhelm-example", can_apply: true, auto_apply: true, pending: { ...PREPARED, version: NEW, id: "UPDATE#b", status: "running", execution: "EXECUTE_IN_PROGRESS", executed_at: ago(0) } };
+    await page.clock.fastForward(31_000);
+    await expect(status(page)).toHaveAttribute("data-state", "updating");
+    // Done: the install runs v0.8.39.
+    m.version.running = false;
+    m.version.native = { stack: "coderhelm-example", can_apply: true, auto_apply: true, pending: null };
+    m.version.latest = null;
+    m.version.update_available = false;
+    m.version.current = { version: NEW, commit: null, released_at: null, config_fingerprint: null };
+    m.version.history = [row("UPDATE#b", NEW, "succeeded", 20, { finished_at: ago(0) }), ...OK_HISTORY];
+    await page.clock.fastForward(16_000);
+    await expect(status(page)).toHaveAttribute("data-state", "current");
+    await expect(status(page)).toContainText(`Updated to ${NEW}`);
+  });
+});
+
+test.describe("Uninstall: one clean card", () => {
+  test("dark mode: no box inside the box, the theme's border colour, and a guide link that says what it does", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "dark" });
+    await setup(page, { version: { uninstall: { delete_data: false, changed_by: null, changed_at: null } } });
+    await page.goto("/settings/system/#uninstall");
+    const card = page.locator("#uninstall > div").first();
+    const choice = page.getByTestId("uninstall-data");
+    await expect(choice).toBeVisible();
+    const cardBorder = await card.evaluate((e) => getComputedStyle(e).borderTopColor);
+    const box = await choice.evaluate((e) => {
+      const c = getComputedStyle(e);
+      return { left: c.borderLeftWidth, right: c.borderRightWidth, radius: c.borderTopLeftRadius, top: c.borderTopColor };
+    });
+    // A row of the card, split by the card's own divider: no nested border, no bright outline.
+    expect(box.left).toBe("0px");
+    expect(box.right).toBe("0px");
+    expect(box.radius).toBe("0px");
+    expect(box.top).toBe(cardBorder);
+    expect(box.top).not.toBe("rgb(255, 255, 255)");
+    const link = page.getByTestId("uninstall-link");
+    await expect(link).toHaveText(/Open the uninstall guide/);
+    await expect(link).toHaveAttribute("target", "_blank");
+    await expect(page.getByTestId("uninstall-link-note")).toHaveText("Opens the guide in a new tab. Nothing is deleted from here.");
+    // Turning on "delete everything" still needs the install's name typed back.
+    await page.getByTestId("uninstall-data-ask").click();
+    await expect(page.getByTestId("uninstall-data-delete")).toBeDisabled();
+    if (SHOTS) await page.locator("#uninstall").screenshot({ path: path.join(SHOTS, "26-uninstall-dark.png") });
   });
 });
