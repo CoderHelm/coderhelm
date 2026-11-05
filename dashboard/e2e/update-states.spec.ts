@@ -186,12 +186,33 @@ test.describe("Version and updates: every state", () => {
     await shoot(page, "05-major-release");
   });
 
-  test("preview channel: a chip and why", async ({ page }) => {
-    await setup(page, { version: { latest: { ...LATEST, version: "v0.9.0-rc.1", prerelease: true }, update_available: true, settings: { ...SETTINGS, channel: "preview" } } });
+  test("beta channel: a chip and why", async ({ page }) => {
+    await setup(page, { version: { latest: { ...LATEST, version: "v0.9.0-beta.20261105", prerelease: true }, update_available: true, settings: { ...SETTINGS, channel: "beta" } } });
     await page.goto("/settings/system/");
-    await expect(status(page)).toContainText("Preview");
-    await expect(status(page)).toContainText("You get these because the channel is Preview.");
-    await shoot(page, "06-preview");
+    await expect(status(page)).toContainText("Beta");
+    await expect(status(page)).toContainText("You get these because the channel is Beta (nightly).");
+    await expect(page.getByTestId("channel-beta").getByRole("radio")).toBeChecked();
+    await shoot(page, "06-beta");
+  });
+
+  test("an updater from before calls the beta channel preview: it shows as Beta (nightly)", async ({ page }) => {
+    await setup(page, { version: { settings: { ...SETTINGS, channel: "preview" } } });
+    await page.goto("/settings/system/");
+    await expect(status(page)).toContainText("on the Beta (nightly) channel");
+    await expect(page.getByTestId("channel-beta").getByRole("radio")).toBeChecked();
+  });
+
+  test("the channel choice: Stable and Beta (nightly), each with a line on what it means", async ({ page }) => {
+    await setup(page, { version: {} });
+    await page.goto("/settings/system/");
+    const group = page.getByRole("radiogroup", { name: "Update channel" });
+    await expect(group.getByRole("radio")).toHaveCount(2);
+    await expect(page.getByTestId("channel-stable")).toContainText("Releases that ran as a beta for a day with no reported problem.");
+    await expect(page.getByTestId("channel-beta")).toContainText("Beta (nightly)");
+    await expect(page.getByTestId("channel-beta")).toContainText("A new build of the latest changes each night, a day before Stable gets them.");
+    await expect(page.getByTestId("channel-stable").getByRole("radio")).toBeChecked();
+    await page.getByTestId("channel-beta").click();
+    await expect(page.getByTestId("channel-beta").getByRole("radio")).toBeChecked();
   });
 
   test("blocked by a failing check: the status says so and points to Install health", async ({ page }) => {
