@@ -276,7 +276,7 @@ function Body({ data, loading, stats, tab }: { data: Analytics; loading: boolean
           </div>
         </ChartCard>
         <ChartCard
-          title="Tokens per day"
+          title={s.cost_basis === "metered" ? "Tokens per day, every model call" : "Tokens per day, runs only"}
           table={<Table label="Tokens per day" head={["Day", "Tokens", "Runs"]} rows={data.daily.map((r) => [shortDay(r.day), tokens(r.tokens ?? 0), r.runs])} empty="No days." />}
         >
           {data.daily.every((r) => !r.tokens) ? (
