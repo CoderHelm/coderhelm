@@ -86,6 +86,13 @@ const CHANNELS: { value: AutoUpdateSettings["channel"]; label: string; help: str
   { value: "beta", label: "Beta (nightly)", help: "A new build of the latest changes each night, a day before Stable gets them." },
 ];
 
+/** How often the "What's new" email may go (docs/self-host/updates.md). */
+const DIGESTS: { value: NonNullable<AutoUpdateSettings["digest"]>; label: string }[] = [
+  { value: "weekly", label: "Weekly" },
+  { value: "biweekly", label: "Every two weeks" },
+  { value: "off", label: "Off" },
+];
+
 /** The saved settings, with the beta channel's old name ("preview") read as beta. */
 function withChannel(s: Partial<AutoUpdateSettings> | undefined): AutoUpdateSettings {
   const out = { ...DEFAULTS, ...(s ?? {}) };
@@ -370,6 +377,22 @@ function System() {
               />
             )}
           />
+          {/* An updater from before this email doesn't return `digest`: nothing to save, so no control. */}
+          {data.settings?.digest !== undefined && (
+            <SettingsRow
+              label="What's new email"
+              help="A short email listing new releases on your channel. Sent only when something new came out. Emails about updates that need you are always sent."
+              control={(ids) => (
+                <Select
+                  id={ids.inputId}
+                  data-testid="update-digest"
+                  value={v.digest ?? "weekly"}
+                  onChange={(d) => set("digest", d)}
+                  options={DIGESTS}
+                />
+              )}
+            />
+          )}
         </SettingsSection>
 
         <SettingsSection id="history" title="Update history">
