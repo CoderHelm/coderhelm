@@ -537,7 +537,7 @@ test("System: an update still being prepared shows that, before the change set h
   const card = page.getByTestId("native-update");
   await expect(card).toContainText("Preparing the update to v2.0.0");
   await expect(page.getByTestId("update-status")).toHaveAttribute("data-state", "preparing");
-  await expect(page.getByTestId("native-update-progress")).toContainText("Step 1 of 2");
+  await expect(page.getByTestId("update-steps").locator('[aria-current="step"]')).toHaveAttribute("data-step", "prepare");
   await expect(card).toContainText("Nothing to do yet");
   await expect(page.getByTestId("native-update-summary")).toHaveCount(0);
   await expect(page.getByTestId("native-update-link")).toHaveCount(0);
@@ -559,7 +559,7 @@ test("System: a running one-stack update says so, with nothing to do and no cons
   await setup(page, SELF, { signedIn: true, native: { stack: "coderhelm-prod", can_apply: true, auto_apply: true, pending: { ...PREPARED, status: "running" } } });
   await page.goto("/settings/system/");
   const card = page.getByTestId("native-update");
-  await expect(card).toContainText("Updating to v2.0.0");
+  await expect(card).toContainText("Applying v2.0.0");
   await expect(page.getByTestId("native-update-summary")).toContainText("It changes 8 resources (2 to add, 5 to change, 1 to remove) in Api, Worker");
   await expect(card).not.toContainText("Execute");
   await expect(page.getByTestId("native-update-apply")).toHaveCount(0);
