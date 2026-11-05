@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { expectSelectValue, pickOption, selectLabels } from "./select";
 
 // Settings, then System, Version and Install health: every state the page
 // can be in, each with one headline, one line of detail and one thing to do.
@@ -57,7 +58,8 @@ interface Mock {
 
 async function setup(page: Page, m: Mock) {
   const calls: string[] = [];
-  const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+  const saved: Record<string, unknown>[] = [];
+  const json =(route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.pathname === "/runtime-config.js", (route) =>
     route.fulfill({ contentType: "text/javascript", body: `window.__CODERHELM_CONFIG__ = ${JSON.stringify({ apiUrl: "", streamUrl: "", selfHosted: true, version: "v0.8.32" })};` }),
   );
@@ -91,9 +93,14 @@ async function setup(page: Page, m: Mock) {
       return json(route, { checked_at: ago(0.2), ready: true, current: "v0.8.32", latest: null, blockers: m.blockers ?? [], checks: m.checks ?? CHECKS });
     }
     if (p === "/api/system/update") return json(route, { version: "v0.9.0", actor: "admin@acme.example", status: "running" });
+    if (p === "/api/system/auto-update" && route.request().method() === "PUT") {
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      saved.push(body);
+      return json(route, { settings: body });
+    }
     return json(route, {});
   });
-  return { calls };
+  return { calls, saved };
 }
 
 async function shoot(page: Page, name: string) {
@@ -213,6 +220,55 @@ test.describe("Version and updates: every state", () => {
     await expect(page.getByTestId("channel-stable").getByRole("radio")).toBeChecked();
     await page.getByTestId("channel-beta").click();
     await expect(page.getByTestId("channel-beta").getByRole("radio")).toBeChecked();
+  });
+
+  test("the What's new email: weekly by default, saved with the rest of the settings", async ({ page }) => {
+    const { saved } = await setup(page, { version: { settings: { ...SETTINGS, digest: "weekly" } } });
+    await page.goto("/settings/system/");
+    const digest = page.getByRole("combobox", { name: "What's new email" });
+    await expect(digest).toBeVisible();
+    await expectSelectValue(digest, "weekly");
+    await expect(digest).toContainText("Weekly");
+    expect(await selectLabels(digest)).toEqual(["Weekly", "Every two weeks", "Off"]);
+    await expect(page.locator("#auto")).toContainText(
+      "A short email listing new releases on your channel. Sent only when something new came out. Emails about updates that need you are always sent.",
+    );
+
+    await pickOption(digest, "biweekly");
+    await page.getByRole("button", { name: "Save changes" }).click();
+    await expect.poll(() => saved.length).toBe(1);
+    expect(saved[0]).toEqual({ ...SETTINGS, digest: "biweekly" });
+    await expectSelectValue(digest, "biweekly");
+
+    await pickOption(digest, "Off");
+    await page.getByRole("button", { name: "Save changes" }).click();
+    await expect.poll(() => saved.length).toBe(2);
+    expect(saved[1]).toEqual({ ...SETTINGS, digest: "off" });
+  });
+
+  test("an updater from before the What's new email: no control, and saving sends no digest", async ({ page }) => {
+    const { saved } = await setup(page, { version: { settings: SETTINGS } });
+    await page.goto("/settings/system/");
+    await expect(page.getByRole("radiogroup", { name: "Update channel" })).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "Major releases" })).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "What's new email" })).toHaveCount(0);
+    await expect(page.locator("main")).not.toContainText("What's new email");
+    await page.getByTestId("channel-beta").click();
+    await page.getByRole("button", { name: "Save changes" }).click();
+    await expect.poll(() => saved.length).toBe(1);
+    expect(saved[0]).toEqual({ ...SETTINGS, channel: "beta" });
+  });
+
+  test("the What's new email fits a phone: no sideways scroll", async ({ page }) => {
+    await setup(page, { version: { settings: { ...SETTINGS, digest: "off" } } });
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto("/settings/system/");
+    const digest = page.getByRole("combobox", { name: "What's new email" });
+    await digest.scrollIntoViewIfNeeded();
+    await expectSelectValue(digest, "off");
+    const box = await digest.boundingBox();
+    expect(box!.x + box!.width).toBeLessThanOrEqual(375);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
   });
 
   test("blocked by a failing check: the status says so and points to Install health", async ({ page }) => {

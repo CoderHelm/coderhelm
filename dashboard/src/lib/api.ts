@@ -4138,6 +4138,8 @@ export interface AutoUpdateSettings {
   hour: number;
   timezone: string;
   majors: "ask" | "auto";
+  /** How often the "What's new" email may go. Absent from an updater from before it existed. */
+  digest?: "weekly" | "biweekly" | "off";
 }
 
 export interface UpdateEntry {
