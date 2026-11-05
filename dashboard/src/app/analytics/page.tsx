@@ -329,6 +329,7 @@ function Body({ data, loading, stats, tab }: { data: Analytics; loading: boolean
           </p>
         )}
         {data.ci.outcomes && <CiOutcomes ci={data.ci} outcomes={data.ci.outcomes} />}
+        {!!data.loops_stopped?.total && <LoopsStopped stopped={data.loops_stopped} />}
       </Section>
 
       <Section title="Reviews" id="reviews" description="Pull request reviews Coderhelm posted, and what became of the findings it raised before.">
@@ -667,6 +668,17 @@ function CiOutcomes({ ci, outcomes }: { ci: Analytics["ci"]; outcomes: Analytics
     <div className="mt-4">
       <h3 className="mb-2 text-sm font-medium text-zinc-200">CI outcomes</h3>
       <Table label="CI outcomes" head={["How red CI ended", "Runs"]} rows={rows} empty="No red CI." />
+    </div>
+  );
+}
+
+/** Runs Coderhelm stopped for making no progress, handing them to a person. */
+function LoopsStopped({ stopped }: { stopped: NonNullable<Analytics["loops_stopped"]> }) {
+  const rows: ReactNode[][] = stopped.reasons.map((r) => [r.reason, r.count]);
+  return (
+    <div className="mt-4">
+      <h3 className="mb-2 text-sm font-medium text-zinc-200">Runs stopped for no progress</h3>
+      <Table label="Runs stopped for no progress" head={["Why", "Runs"]} rows={rows} empty="None." />
     </div>
   );
 }
