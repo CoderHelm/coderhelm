@@ -41,6 +41,9 @@ jobs:
       - name: Build dashboard
         working-directory: dashboard
         run: npm ci && npm run build
+        env:
+          # The absolute address link previews point at (lib/link-preview.ts).
+          NEXT_PUBLIC_DASHBOARD_URL: https://app.${{ vars.APP_DOMAIN }}
 
       # docs.coderhelm.com (infra/lib/docs-stack.ts deploys docs/out).
       - name: Build docs
