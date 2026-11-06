@@ -69,6 +69,61 @@ const RUNS: Record<string, unknown> = {
       reason: "It selects the card by its name, which is the ticket's fix.",
     },
   },
+  // Coderhelm's own pull request covered the ticket and lacked part of it:
+  // the run carried its work there; the ticket's earlier pull request is
+  // superseded.
+  "01CONT": {
+    ...BASE,
+    run_id: "01CONT",
+    status: "covered_by_pr",
+    covered_by: {
+      repo: "your-team/web",
+      number: 52,
+      url: "https://github.com/your-team/web/pull/52",
+      title: "Merge and deploy the cards change",
+      author: "coderhelm[bot]",
+      reason: "It implements the scope.",
+      own: true,
+      outcome: "continued",
+      carried: { branch: "coderhelm/abc-13", head: "9f2c1e0", commits: 3, files: ["src/register.ts", "src/helpers/a.ts"], rebuilt: false },
+      open_items: ["Register the two extra helper files"],
+      superseded: { repo: "your-team/web", number: 41, url: "https://github.com/your-team/web/pull/41", title: "Cards list fix", closed: false },
+      note: "Continued in #52, Coderhelm's own open pull request that already covered this ticket.",
+    },
+  },
+  "01DONE": {
+    ...BASE,
+    run_id: "01DONE",
+    status: "covered_by_pr",
+    covered_by: {
+      repo: "your-team/web",
+      number: 52,
+      url: "https://github.com/your-team/web/pull/52",
+      title: "Merge and deploy the cards change",
+      author: "coderhelm[bot]",
+      reason: "It implements the scope.",
+      own: true,
+      outcome: "complete",
+      superseded: { repo: "your-team/web", number: 41, url: "https://github.com/your-team/web/pull/41", closed: true, closed_by: "Sam" },
+      note: "#52 already has everything this ticket asks for.",
+    },
+  },
+  "01PERS": {
+    ...BASE,
+    run_id: "01PERS",
+    status: "covered_by_pr",
+    covered_by: {
+      repo: "your-team/web",
+      number: 60,
+      url: "https://github.com/your-team/web/pull/60",
+      title: "Cards fix",
+      author: "dev-b",
+      reason: "It fixes the spec.",
+      own: false,
+      outcome: "person",
+      note: "dev-b's pull request #60 covers this ticket.",
+    },
+  },
   "01ASKD": {
     ...BASE,
     run_id: "01ASKD",
@@ -106,6 +161,7 @@ async function mockApi(page: Page, role = "member") {
       const rest = m[2] ?? "";
       if (rest === "") return json(route, RUNS[m[1]]);
       if (rest === "/retry" && req.method() === "POST") return json(route, { status: "queued" });
+      if (rest === "/close-superseded" && req.method() === "POST") return json(route, { closed: true, message: "Closed #41." });
       if (rest === "/openspec") return json(route, {});
       if (rest === "/traces") return json(route, { traces: [] });
       if (rest === "/agent-log") return json(route, { passes: [], live_events: [] });
@@ -186,4 +242,41 @@ test("a covered run can be retried when the ticket needs its own change", async 
   await page.goto("/runs/detail?id=01COVR");
   await page.getByTestId("run-outcome").getByRole("button", { name: /Retry/ }).click();
   await expect.poll(() => calls).toContain("POST /api/runs/01COVR/retry");
+});
+
+test("a covered run that continued in Coderhelm's own pull request shows what was carried and offers to close the earlier one", async ({ page }) => {
+  const calls = await mockApi(page);
+  await page.goto("/runs/detail?id=01CONT");
+  const outcome = page.getByTestId("run-outcome");
+  await expect(outcome).toContainText("Continued in #52");
+  await expect(page.getByTestId("covered-carried")).toContainText("3 commits onto coderhelm/abc-13");
+  await expect(page.getByTestId("covered-open-items")).toContainText("Register the two extra helper files");
+  await expect(page.getByTestId("covered-superseded")).toContainText("#41 is superseded by #52");
+  await expect(page.getByTestId("covered-by-link")).toHaveAttribute("href", "https://github.com/your-team/web/pull/52");
+  // Retry isn't the way on: the work is in #52.
+  await expect(outcome.getByRole("button", { name: /Retry/ })).toHaveCount(0);
+  // Closing #41 happens only on a click, after a confirm.
+  expect(calls).not.toContain("POST /api/runs/01CONT/close-superseded");
+  await page.getByTestId("close-superseded").click();
+  await page.getByTestId("confirm-dialog").getByRole("button", { name: "Close #41" }).click();
+  await expect.poll(() => calls).toContain("POST /api/runs/01CONT/close-superseded");
+});
+
+test("a covering pull request that has everything says so, with the earlier one closed", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/runs/detail?id=01DONE");
+  await expect(page.getByTestId("run-outcome")).toContainText("#52 already has everything this ticket asks for");
+  await expect(page.getByTestId("covered-superseded")).toContainText("#41 is closed by Sam");
+  await expect(page.getByTestId("close-superseded")).toHaveCount(0);
+});
+
+test("a person's covering pull request is linked, never offered to continue in or close", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/runs/detail?id=01PERS");
+  const outcome = page.getByTestId("run-outcome");
+  await expect(outcome).toContainText("Covered by dev-b's pull request #60");
+  await expect(page.getByTestId("covered-by")).toContainText("dev-b's pull request #60 covers this ticket.");
+  await expect(page.getByTestId("close-superseded")).toHaveCount(0);
+  await expect(outcome.getByRole("button", { name: /Continue/ })).toHaveCount(0);
+  await expect(outcome.getByRole("button", { name: /Retry/ })).toBeVisible();
 });

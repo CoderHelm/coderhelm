@@ -425,6 +425,16 @@ export const api = {
   closeRuns: (ids: string[], body: CloseRunRequest) =>
     request<BulkCloseAnswer>("/api/runs/close", { method: "POST", body: JSON.stringify({ run_ids: ids, ...body }) }),
   /** Undo a close: the run shows as before (or waiting on a person); nothing restarts. */
+  /**
+   * Close the ticket's earlier pull request a covered run superseded. Only
+   * Coderhelm's own pull request is closed (the gateway reads it from GitHub
+   * first); anything else comes back `ok: false` with the reason.
+   */
+  closeSupersededPr: (id: string) =>
+    requestWithBody<{ closed?: boolean; message?: string }, { message?: string }>(
+      `/api/runs/${encodeURIComponent(id)}/close-superseded`,
+      { method: "POST" },
+    ),
   reopenRun: (id: string) =>
     requestWithBody<{ status: string; message?: string }, { status?: string; message?: string }>(
       `/api/runs/${encodeURIComponent(id)}/reopen`,
@@ -2111,6 +2121,37 @@ export interface RunCoveredBy {
   title?: string;
   author?: string;
   reason?: string;
+  /** It is Coderhelm's own pull request: only then does a run continue in it or offer to close the earlier one. */
+  own?: boolean;
+  /** `continued`, `complete`, `person`, `busy` or `not_carried`; empty on older runs. */
+  outcome?: string;
+  /** What the run put on its branch, when it continued in it. */
+  carried?: RunCoveredCarried | null;
+  /** What is still open for this ticket in it. */
+  open_items?: string[];
+  /** The ticket's earlier pull request Coderhelm opened, now redundant. */
+  superseded?: RunSupersededPr | null;
+  /** What the run page says, in one paragraph. */
+  note?: string;
+}
+
+/** What a covered run carried over to Coderhelm's own covering pull request. */
+export interface RunCoveredCarried {
+  branch: string;
+  head?: string;
+  commits?: number;
+  files?: string[];
+  rebuilt?: boolean;
+}
+
+/** The ticket's earlier pull request, superseded by the covering one. */
+export interface RunSupersededPr {
+  repo: string;
+  number: number;
+  url?: string;
+  title?: string;
+  closed?: boolean;
+  closed_by?: string;
 }
 
 /** An answer given in Coderhelm to a run's question. */
