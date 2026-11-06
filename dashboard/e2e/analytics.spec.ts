@@ -171,6 +171,8 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       }
       return json(route, body);
     }
+    if (p === "/api/analytics/decisions") return json(route, DECISIONS);
+    if (p === "/api/analytics/decisions/export") return json(route, { cases: [{ case: "stop_judge" }] });
     if (p === "/api/deliveries/analytics" && db.deliveries) {
       if (db.deliveries === "refused") return json(route, { error: "Admins only" }, 403);
       return json(route, {
@@ -182,6 +184,24 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
   });
   return db;
 }
+
+// Invented decisions: two of five questions were answered with the default;
+// one of two blocks was dismissed.
+const DECISIONS = {
+  days: 30,
+  summary: {
+    unnecessary_stops: {
+      total: 7, with_outcome: 5, wrong: 2, rate: 0.4, by_category: [["product_choice", 2]],
+      examples: [{ sk: "DECISION#RUN#01RUNASKED000000000000000A#2026-11-02T10:00:00.000Z", kind: "ask", step: "plan", category: "product_choice", detail: "Monthly or yearly totals?", outcome: "answered_default", created_at: "2026-11-02T10:00:00.000Z", run_id: "01RUNASKED000000000000000A" }],
+    },
+    nuisance_blocks: {
+      total: 3, with_outcome: 2, wrong: 1, rate: 0.5, by_category: [["correctness", 1]],
+      examples: [{ sk: "DECISION#PR#your-team/web#000101#2026-11-03T09:00:00.000Z", kind: "block", step: "review", category: "correctness", detail: "Retry loop never ends", outcome: "dismissed_review", created_at: "2026-11-03T09:00:00.000Z", repo: "your-team/web", pr_number: 101 }],
+    },
+    decisions: 25,
+    proceeded: 15,
+  },
+};
 
 async function shot(page: Page, name: string) {
   fs.mkdirSync(SHOTS_DIR, { recursive: true });
@@ -228,6 +248,26 @@ test("the scorecard answers whether it is worth it, against the previous period"
   await expect(page.getByRole("link", { name: "#101" })).toHaveAttribute("href", "https://github.com/your-team/web/pull/101");
   expect(db.calls).toContain("/api/analytics?days=30");
   await shot(page, "analytics");
+});
+
+test("stops and blocks show the unnecessary and the nuisance ones, with examples to export as replay cases", async ({ page }) => {
+  const db = await mockApi(page);
+  await page.goto("/analytics?tab=reliability");
+  await expect(page.getByTestId("tile-unnecessary-stops")).toContainText("40%");
+  await expect(page.getByTestId("tile-unnecessary-stops")).toContainText("2 of 5 with an outcome (7 stops in all)");
+  await expect(page.getByTestId("tile-nuisance-blocks")).toContainText("50%");
+  await expect(page.getByTestId("tile-proceeded")).toContainText("15");
+  const table = page.getByRole("table", { name: "Recent unnecessary stops and nuisance blocks" });
+  await expect(table.locator("tbody tr td:first-child")).toHaveText(["Retry loop never ends", "Monthly or yearly totals?"]);
+  await expect(table).toContainText("Review dismissed");
+  await expect(table).toContainText("Answered with the default");
+  await expect(table.getByRole("link", { name: "Open run" })).toHaveAttribute("href", /\/runs\/detail\/?\?id=01RUNASKED000000000000000A$/);
+  const download = page.waitForEvent("download");
+  await page.getByTestId("export-decisions").click();
+  expect((await download).suggestedFilename()).toBe("replay-cases-30d.json");
+  expect(db.calls).toContain("/api/analytics/decisions?days=30");
+  await page.getByTestId("tile-nuisance-blocks").scrollIntoViewIfNeeded();
+  await shot(page, "analytics-decisions");
 });
 
 test("where it struggles places every red CI run in one outcome, base-branch failures apart", async ({ page }) => {

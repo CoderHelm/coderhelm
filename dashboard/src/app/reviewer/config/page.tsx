@@ -603,12 +603,13 @@ function ReviewerConfigPage() {
                 />
                 <SettingsRow
                   label="Require tests"
-                  help="Blocks pull requests whose new or changed behavior comes without tests."
+                  help="Flags new or changed behavior that comes without tests, as a Suggestion on the approval."
                   more={
                     <p>
                       New features need new tests; changed or fixed behavior needs its tests added or updated. Coderhelm writes those tests itself
-                      when it plans and codes a change (following your AGENTS.md / CLAUDE.md test conventions), and the reviewer blocks any pull
-                      request, Coderhelm&apos;s or a person&apos;s, whose tests are missing or stale. Refactors, docs, config and dependency bumps are exempt.
+                      when it plans and codes a change (following your AGENTS.md / CLAUDE.md test conventions), and the reviewer always flags a
+                      missing or stale test as a Suggestion. Changes are requested only for a correctness, security or data-loss problem, so a
+                      missing test alone never holds the merge. Refactors, docs, config and dependency bumps are exempt.
                     </p>
                   }
                   {...marks("require_tests")}

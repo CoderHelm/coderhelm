@@ -5,6 +5,20 @@ description: Turn on CoderHelm's reviewer for your team's pull requests, and con
 
 The reviewer reviews pull requests written by people (and by CoderHelm). It posts a real GitHub review, either **Approve** or **Request changes**, with comments on the lines that matter, and a risk level of low, medium or high. Changes that touch migrations, authentication, secrets or payments are always rated high.
 
+## When it requests changes
+
+It requests changes only for a named correctness, security or data-loss problem, with the file and line and the evidence that shows it (the code path, a test or CI result, a data query, or the documentation of the tool involved). Before it posts, a final check looks at the whole pull request and its threads; when nothing named holds up, it approves instead and says what it assumed.
+
+Every other finding is a labeled note on the approval:
+
+| Label | What it is |
+| --- | --- |
+| **Nit** | A style, naming or layout preference |
+| **Suggestion** | An optional improvement, hardening, a refactor, a missing test, or a written team rule the change doesn't follow with no defect shown |
+| **FYI** | A question, a fact worth confirming, or a concern nothing in the change could show |
+
+A request for changes lasts only while what it names does: once those threads are fixed or answered, the next review approves.
+
 ## Turn it on
 
 1. Open **Reviewer**, then **Reviewer settings**, and pick a repository.
@@ -33,7 +47,7 @@ When the review is done, the check ends as neutral if the review has findings, a
 | Section | What you can set |
 | --- | --- |
 | Reviews | On or off, trigger label, what to focus on |
-| Tests | Check the change by running tests; require tests |
+| Tests | Check the change by running tests (a failing run requests changes); require tests (a missing test is a Suggestion, and CoderHelm writes tests for its own changes) |
 | CI labels | Labels it may add, labels that must go together, guidance |
 | Auto-merge | Merge when it approves, merge method, deploy labels, also require a person's approval |
 | Tags and health check | Tag after merge, tag style and prefix, batch window, health check after merge |
