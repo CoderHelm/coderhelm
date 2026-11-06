@@ -1,13 +1,30 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ClientShell } from "@/components/client-shell";
+import { RouteHead } from "@/components/route-head";
+import { THEME_COLOR } from "@/lib/link-preview";
 import { GoogleAnalytics } from "@/components/google-analytics";
 import { BOOT_RECOVERY_SCRIPT, BOOT_STYLE } from "@/lib/boot-recovery";
 
 export const metadata: Metadata = {
-  // No title here: the shell names each tab after its page (client-shell.tsx).
-  description: "Manage your Coderhelm settings and monitor runs",
-  icons: { icon: "/favicon.svg" },
+  // No title or description here: the shell names each tab after its page
+  // (client-shell.tsx), and RouteHead writes each page's description and link
+  // preview from lib/routes.ts.
+  applicationName: "Coderhelm",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: THEME_COLOR,
+  colorScheme: "dark",
 };
 
 export default function RootLayout({
@@ -27,6 +44,7 @@ export default function RootLayout({
         <script src="/runtime-config.js" />
       </head>
       <body className="bg-zinc-950 text-zinc-100 min-h-screen antialiased">
+        <RouteHead />
         <GoogleAnalytics />
         <ClientShell>{children}</ClientShell>
       </body>

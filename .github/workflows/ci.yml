@@ -199,9 +199,10 @@ jobs:
           grep -q 'src="/runtime-config.js"' out/index.html
       - name: Install Playwright's Chromium
         run: npx playwright install --with-deps chromium
-      # Includes: a self-hosted install never loads Google's tag.
+      # Includes: a self-hosted install never loads Google's tag, and its link
+      # previews name no hosted address (e2e/link-preview.spec.ts).
       - name: Self-host checks
-        run: npx playwright test e2e/selfhost.spec.ts e2e/google-analytics.spec.ts e2e/selfhost-links.spec.ts --project=chromium
+        run: npx playwright test e2e/selfhost.spec.ts e2e/google-analytics.spec.ts e2e/selfhost-links.spec.ts e2e/link-preview.spec.ts --project=chromium
         env:
           E2E_STATIC: "1"
 
