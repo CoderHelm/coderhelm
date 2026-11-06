@@ -485,7 +485,7 @@ const TONE = { up: "text-emerald-400", down: "text-rose-400", flat: "text-zinc-4
 
 /** How far the count of earlier deploys got: "12 of 40 repositories" once the first pass reports. */
 function countingProgress(p: AnalyticsComparison["deploys_backfill_progress"]) {
-  return p && p.total > 0 ? `${count(p.read)} of ${plural(p.total, "repository")}` : null;
+  return p && p.total > 0 ? `${count(p.read)} of ${plural(p.total, "repository", "repositories")}` : null;
 }
 
 function Change({ cur, prev, comparable = true, counting = false, progress = null }: { cur: number; prev: number; comparable?: boolean; counting?: boolean; progress?: string | null }) {
@@ -590,12 +590,12 @@ function Comparison({ c, period, previous, mtd }: { c: AnalyticsComparison; peri
   }
   if (c.deploys_no_access?.length) {
     notes.push(
-      `Coderhelm can't read workflow runs in ${plural(c.deploys_no_access.length, "repository")} (${c.deploys_no_access.join(", ")}), so deploys there are not counted. Grant the app Actions: read on them.`,
+      `Coderhelm can't read workflow runs in ${plural(c.deploys_no_access.length, "repository", "repositories")} (${c.deploys_no_access.join(", ")}), so deploys there are not counted. Grant the app Actions: read on them.`,
     );
   }
   if (c.deploys_not_read?.length) {
     notes.push(
-      `Coderhelm could not read earlier deploys in ${plural(c.deploys_not_read.length, "repository")} (${c.deploys_not_read.map((r) => (r.reason ? `${r.repo}: ${r.reason}` : r.repo)).join("; ")}), so deploys there before webhooks recorded them are not counted.`,
+      `Coderhelm could not read earlier deploys in ${plural(c.deploys_not_read.length, "repository", "repositories")} (${c.deploys_not_read.map((r) => (r.reason ? `${r.repo}: ${r.reason}` : r.repo)).join("; ")}), so deploys there before webhooks recorded them are not counted.`,
     );
   }
 
