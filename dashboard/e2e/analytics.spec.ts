@@ -140,7 +140,7 @@ function analytics(period: string, repo: string | null, deployState: DeployState
   };
 }
 
-interface Backend { calls: string[]; fail: boolean; empty: boolean; oldServer: boolean; estimated: number; recovered: number; deliveries?: "ok" | "refused"; deployState?: DeployState; noAccess?: string[] }
+interface Backend { calls: string[]; fail: boolean; empty: boolean; oldServer: boolean; estimated: number; recovered: number; deliveries?: "ok" | "refused"; deployState?: DeployState; noAccess?: string[]; notRead?: { repo: string; reason: string }[]; progress?: { read: number; total: number } | null }
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = { calls: [], fail: false, empty: false, oldServer: false, estimated: 0, recovered: 0, ...init };
@@ -163,7 +163,8 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/analytics") {
       if (db.fail) return json(route, { error: "boom" }, 500);
       const period = url.searchParams.get("period") === "mtd" ? "mtd" : url.searchParams.get("days") || "30";
-      const { comparison, ...older } = analytics(period, url.searchParams.get("repo"), db.deployState, db.noAccess);
+      const { comparison: base, ...older } = analytics(period, url.searchParams.get("repo"), db.deployState, db.noAccess);
+      const comparison = { ...base, deploys_not_read: db.notRead ?? [], deploys_backfill_progress: db.progress ?? null };
       const body = db.oldServer ? older : { ...older, comparison };
       if (db.empty) {
         const zero = Object.fromEntries(Object.keys(SUMMARY).map((k) => [k, typeof (SUMMARY as Record<string, unknown>)[k] === "number" ? 0 : null]));
@@ -398,12 +399,32 @@ test("deploys still being read from GitHub say so instead of a fake 0", async ({
   const table = page.getByRole("table", { name: "Compared with the period before" });
   const row = (name: string) => table.locator("tbody tr").filter({ has: page.getByRole("rowheader").filter({ hasText: name }) });
   await expect(row("Deploys Coderhelm started").locator("td").nth(0)).toHaveText("Counting…");
-  await expect(row("Deploys Coderhelm started").locator("td").nth(1)).toHaveText("14");
+  await expect(row("Deploys Coderhelm started").locator("td").nth(1)).toHaveText("14 so far");
   await expect(row("Deploys Coderhelm started").locator("td").nth(2)).toHaveText("Counting earlier deploys…");
   await expect(row("To production").locator("td").nth(0)).toHaveText("Counting…");
   await expect(page.getByTestId("compare-notes")).toContainText("still being read from GitHub's run history");
   // The rest of the table compares as usual.
   await expect(row("Tickets worked on").locator("td").nth(2)).toHaveText("↑ +13%");
+});
+
+test("deploys being read say how many repositories are done, and keep this period's number", async ({ page }) => {
+  await mockApi(page, { deployState: "counting", progress: { read: 12, total: 40 } });
+  await page.goto("/analytics?tab=trends");
+  const table = page.getByRole("table", { name: "Compared with the period before" });
+  const row = (name: string) => table.locator("tbody tr").filter({ has: page.getByRole("rowheader").filter({ hasText: name }) });
+  await expect(row("Deploys Coderhelm started").locator("td").nth(2)).toHaveText("Counting earlier deploys: 12 of 40 repositories");
+  await expect(row("Deploys Coderhelm started").locator("td").nth(1)).toHaveText("14 so far");
+  await expect(page.getByTestId("compare-notes")).toContainText("(12 of 40 repositories read so far)");
+});
+
+test("repositories whose earlier deploys could not be read are named with why, not counted forever", async ({ page }) => {
+  await mockApi(page, { notRead: [{ repo: "your-team/monorepo", reason: "GitHub answered 502 Bad Gateway" }] });
+  await page.goto("/analytics?tab=trends");
+  const notes = page.getByTestId("compare-notes");
+  await expect(notes).toContainText("could not read earlier deploys in 1 repository (your-team/monorepo: GitHub answered 502 Bad Gateway)");
+  const table = page.getByRole("table", { name: "Compared with the period before" });
+  const row = (name: string) => table.locator("tbody tr").filter({ has: page.getByRole("rowheader").filter({ hasText: name }) });
+  await expect(row("Deploys Coderhelm started").locator("td").nth(2)).toHaveText("↑ +14");
 });
 
 test("deploys from before GitHub's history was read are not compared", async ({ page }) => {

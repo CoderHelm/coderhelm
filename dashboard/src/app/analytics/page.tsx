@@ -483,8 +483,13 @@ function change(cur: number, prev: number): { text: string; tone: "up" | "down" 
 
 const TONE = { up: "text-emerald-400", down: "text-rose-400", flat: "text-zinc-400" };
 
-function Change({ cur, prev, comparable = true, counting = false }: { cur: number; prev: number; comparable?: boolean; counting?: boolean }) {
-  if (counting) return <span className="text-zinc-500">Counting earlier deploys…</span>;
+/** How far the count of earlier deploys got: "12 of 40 repositories" once the first pass reports. */
+function countingProgress(p: AnalyticsComparison["deploys_backfill_progress"]) {
+  return p && p.total > 0 ? `${count(p.read)} of ${plural(p.total, "repository", "repositories")}` : null;
+}
+
+function Change({ cur, prev, comparable = true, counting = false, progress = null }: { cur: number; prev: number; comparable?: boolean; counting?: boolean; progress?: string | null }) {
+  if (counting) return <span className="text-zinc-500">{progress ? `Counting earlier deploys: ${progress}` : "Counting earlier deploys…"}</span>;
   if (!comparable) return <span className="text-zinc-500">Not comparable</span>;
   const c = change(cur, prev);
   return <span className={`font-medium ${TONE[c.tone]}`}>{c.text}</span>;
@@ -574,15 +579,23 @@ function Comparison({ c, period, previous, mtd }: { c: AnalyticsComparison; peri
   notes.push(
     "Deploys Coderhelm started counts GitHub Actions deploy runs its app triggered (a deploy label it added, a push to its PR, a merge it made, a tag or release it created), by the environment the run deployed to. Runs a person starts or re-runs are not counted.",
   );
+  const progress = countingProgress(c.deploys_backfill_progress);
   if (deployState === "counting") {
-    notes.push(`Earlier deploys are still being read from GitHub's run history, so ${prev} is not counted yet.`);
+    notes.push(
+      `Earlier deploys are still being read from GitHub's run history${progress ? ` (${progress} read so far)` : ""}, so ${prev} is not counted yet and ${cur} shows only what has been read so far. Both fill in as the rest is read.`,
+    );
   } else if (deployState === "before_records") {
     const since = c.deploys_since ? new Date(c.deploys_since).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" }) : "";
     notes.push(`Deploys are known from ${since}, so deploys are not compared: ${prev} started before that.`);
   }
   if (c.deploys_no_access?.length) {
     notes.push(
-      `Coderhelm can't read workflow runs in ${plural(c.deploys_no_access.length, "repository")} (${c.deploys_no_access.join(", ")}), so deploys there are not counted. Grant the app Actions: read on them.`,
+      `Coderhelm can't read workflow runs in ${plural(c.deploys_no_access.length, "repository", "repositories")} (${c.deploys_no_access.join(", ")}), so deploys there are not counted. Grant the app Actions: read on them.`,
+    );
+  }
+  if (c.deploys_not_read?.length) {
+    notes.push(
+      `Coderhelm could not read earlier deploys in ${plural(c.deploys_not_read.length, "repository", "repositories")} (${c.deploys_not_read.map((r) => (r.reason ? `${r.repo}: ${r.reason}` : r.repo)).join("; ")}), so deploys there before webhooks recorded them are not counted.`,
     );
   }
 
@@ -617,10 +630,13 @@ function Comparison({ c, period, previous, mtd }: { c: AnalyticsComparison; peri
                 <td className={`${cell} text-zinc-300`}>
                   {m.note === "deploys" && deployState === "counting" ? <span className="text-zinc-500">Counting…</span> : withFailed(c.previous, m)}
                 </td>
-                <td className={`${cell} text-zinc-300`}>{withFailed(c.current, m)}</td>
+                <td className={`${cell} text-zinc-300`}>
+                  {withFailed(c.current, m)}
+                  {m.note === "deploys" && deployState === "counting" && <span className="text-zinc-500"> so far</span>}
+                </td>
                 <td className={cell}>
                   {m.note === "deploys" && deployState === "counting" ? (
-                    m.sub ? <span className="text-zinc-500">Counting…</span> : <Change cur={0} prev={0} counting />
+                    m.sub ? <span className="text-zinc-500">Counting…</span> : <Change cur={0} prev={0} counting progress={progress} />
                   ) : (
                     <Change cur={c.current[m.key]} prev={c.previous[m.key]} comparable={(m.note !== "people" || c.people_comparable) && (m.note !== "deploys" || deployState === "known")} />
                   )}
