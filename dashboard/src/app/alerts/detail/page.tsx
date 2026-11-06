@@ -129,6 +129,15 @@ function AlertDetail() {
 
       <div className={`mt-6 text-sm ${cardClass}`}>
         <p className="text-zinc-200">{outcomeDetail(a.outcome)}</p>
+        {a.episode && a.episode !== a.id && (
+          <p className="mt-2 text-zinc-400" data-testid="alert-episode-note">
+            Part of one firing that started with{" "}
+            <Link href={`/alerts/detail?id=${encodeURIComponent(a.episode)}`} className={linkButton}>
+              the first alarm
+            </Link>
+            {a.episode_fires ? `; this was firing number ${a.episode_fires}.` : "."}
+          </p>
+        )}
         <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm">
           <dt className="text-zinc-400">Repo</dt>
           <dd className="wrap-anywhere text-zinc-200">{a.repo || "—"}</dd>

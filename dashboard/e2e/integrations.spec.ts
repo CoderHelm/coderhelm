@@ -459,6 +459,88 @@ test.describe("Alert routes", () => {
     expect(saved.post_recoveries).toBe(true);
   });
 
+  test("a route saved before the repeat setting posts every time, and saving keeps it that way", async ({ page }) => {
+    const db = await mockApi(page);
+    await page.goto("/settings/alerts");
+    const card = page.getByTestId("route-prod-alarms");
+    await expect(card.getByText("Repeats: every time it fires")).toBeVisible();
+    await card.getByRole("button", { name: "Edit rules" }).click();
+    const repeats = page.getByRole("region", { name: "When an alarm keeps firing" });
+    await expect(repeats.getByRole("radio", { name: /Every time it fires/ })).toBeChecked();
+    await page.getByRole("button", { name: "Save route" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Alert routes" })).toBeVisible();
+    const saved = callsTo(db, "PUT", /\/api\/alert-routes$/).at(-1)!.body as { repeat: string; alarm_repeat: Record<string, string> };
+    expect(saved.repeat).toBe("every_time");
+    expect(saved.alarm_repeat).toEqual({});
+  });
+
+  test("the repeat setting saves per route, an alarm can have its own, and pausing keeps both", async ({ page }) => {
+    const db = await mockApi(page);
+    await page.goto("/settings/alerts");
+    await page.getByTestId("route-prod-alarms").getByRole("button", { name: "Edit rules" }).click();
+    const repeats = page.getByRole("region", { name: "When an alarm keeps firing" });
+    await repeats.getByRole("radio", { name: /Once, then a daily reminder/ }).check();
+    await expect(repeats).toContainText("one message a day while it is still firing");
+
+    // One alarm on the topic keeps posting every time.
+    await pickOption(repeats.getByRole("combobox", { name: "Alarm to give its own setting" }), "prod-db-cpu");
+    await repeats.getByRole("button", { name: "Give it its own setting" }).click();
+    const own = repeats.getByRole("list", { name: "Alarms with their own setting" });
+    await expect(own.getByRole("listitem")).toHaveCount(1);
+    await expect(own.getByRole("combobox", { name: "Repeat setting for prod-db-cpu" })).toContainText("Every time it fires");
+    await pickOption(own.getByRole("combobox", { name: "Repeat setting for prod-db-cpu" }), "until_clear");
+    await shot(page, "alerts-editor-repeat");
+
+    await page.getByRole("button", { name: "Save route" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Alert routes" })).toBeVisible();
+    const saved = callsTo(db, "PUT", /\/api\/alert-routes$/).at(-1)!.body as { repeat: string; alarm_repeat: Record<string, string> };
+    expect(saved.repeat).toBe("daily");
+    expect(saved.alarm_repeat).toEqual({ "prod-db-cpu": "until_clear" });
+
+    const card = page.getByTestId("route-prod-alarms");
+    await expect(card.getByText("Repeats: once, then a daily reminder")).toBeVisible();
+    await expect(card.getByText("1 alarm with their own repeat setting")).toBeVisible();
+
+    // Pausing the route sends the setting back unchanged.
+    await card.getByRole("switch").click();
+    await expect.poll(() => callsTo(db, "PUT", /\/api\/alert-routes$/).length).toBe(2);
+    const paused = callsTo(db, "PUT", /\/api\/alert-routes$/).at(-1)!.body as { enabled: boolean; repeat: string; alarm_repeat: Record<string, string> };
+    expect(paused).toMatchObject({ enabled: false, repeat: "daily", alarm_repeat: { "prod-db-cpu": "until_clear" } });
+  });
+
+  test("a firing alarm's repeats show as one row with a count", async ({ page }) => {
+    const OPEN = "01JC0000000000000000000001";
+    const fire = (n: number, min: number, outcome: string, suppressed = false) => ({
+      id: `01JC00000000000000000000${String(n).padStart(2, "0")}`, received_at: ago(min * MIN), topic_arn: TOPIC, repo: "", kind: "cloudwatch_alarm",
+      title: "ALARM: example-queue-depth", outcome, ticket_id: "ALERT-QUEUE", episode: OPEN, episode_fires: n, suppressed,
+    });
+    await mockApi(page, {
+      alerts: [
+        fire(5, 2, "suppressed", true),
+        { id: "01JC0000000000000000000004", received_at: ago(5 * MIN), topic_arn: TOPIC, repo: "", kind: "cloudwatch_alarm", title: "OK: example-queue-depth", outcome: "clearing", ticket_id: "ALERT-QUEUE", episode: OPEN },
+        fire(3, 8, "reminded"),
+        fire(2, 12, "suppressed", true),
+        fire(1, 15, "notified"),
+        ALERTS[3],
+      ],
+    });
+    await page.goto("/settings/alerts");
+    const timeline = page.getByRole("list", { name: "Recent alerts" });
+    // The four firings fold into one row; the OK and the other alert stay rows.
+    await expect(timeline.locator(":scope > li")).toHaveCount(3);
+    const episode = page.getByTestId("alert-episode");
+    await expect(episode).toHaveCount(1);
+    await expect(episode).toContainText("Fired 5 times: 1 posted, 1 reminder, 2 held back");
+    await expect(episode.getByRole("link", { name: "ALARM: example-queue-depth" })).toHaveAttribute("href", new RegExp(`id=${OPEN}$`));
+    await episode.getByText(/Fired 5 times/).click();
+    const firings = episode.getByRole("list", { name: "Firings of ALARM: example-queue-depth" });
+    await expect(firings.getByRole("listitem")).toHaveCount(4);
+    await expect(firings).toContainText("Still firing, held back");
+    await expect(firings).toContainText("Daily reminder");
+    await expect(timeline.getByRole("listitem").filter({ hasText: "OK: example-queue-depth" })).toContainText("OK, waiting to clear");
+    await shot(page, "alerts-episode");
+  });
+
   test("adding a route refuses a topic in an account that isn't connected", async ({ page }) => {
     await mockApi(page);
     await page.goto("/settings/alerts");
