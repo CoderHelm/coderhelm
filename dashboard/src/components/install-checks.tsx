@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { CheckFix, CheckStatus, InstallCheck } from "@/lib/api";
 import { Chip, type Tone } from "@/components/list";
 import { CodeBlock } from "@/components/code-block";
@@ -17,6 +18,9 @@ export const STATUS: Record<CheckStatus, { label: string; tone: Tone; icon: Reac
 
 /** The fix: plain words, a command to copy, a link out, a page in Coderhelm. */
 export function FixBlock({ fix, testId }: { fix: CheckFix; testId?: string }) {
+  const here = usePathname();
+  // Never a link to the page it is on: the fix is already in front of you.
+  const href = fix.href && samePage(fix.href, here) ? undefined : fix.href;
   return (
     <div className="mt-2 min-w-0 space-y-2" data-testid={testId}>
       {fix.text && (
@@ -26,9 +30,9 @@ export function FixBlock({ fix, testId }: { fix: CheckFix; testId?: string }) {
         </p>
       )}
       {fix.command && <CodeBlock code={fix.command} lang="bash" label="Command to copy" testId="fix-command" />}
-      {(fix.url || fix.href) && (
+      {(fix.url || href) && (
         <div className="flex flex-wrap gap-x-4 gap-y-1">
-          {fix.href && <Link href={fix.href} className={linkButton}>Open in Coderhelm</Link>}
+          {href && <Link href={href} className={linkButton}>Open in Coderhelm</Link>}
           {fix.url && (
             <a href={fix.url} target="_blank" rel="noopener noreferrer" className={linkButton}>
               <span className="wrap-anywhere">{linkLabel(fix.url)}</span>
@@ -38,6 +42,13 @@ export function FixBlock({ fix, testId }: { fix: CheckFix; testId?: string }) {
       )}
     </div>
   );
+}
+
+/** Whether a Coderhelm link points at the page `here` (its hash and a trailing slash aside). */
+export function samePage(href: string, here: string | null): boolean {
+  if (!here) return false;
+  const path = (p: string) => p.split(/[?#]/)[0].replace(/\/+$/, "") || "/";
+  return path(href) === path(here);
 }
 
 /** "Open github.com", "Open the AWS console": where the link goes, in words. */

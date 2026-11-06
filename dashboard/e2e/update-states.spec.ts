@@ -139,7 +139,7 @@ test.describe("Version and updates: every state", () => {
     await expect(page.getByRole("heading", { name: "Install health" })).toBeVisible();
     await expect(health(page)).toHaveAttribute("data-state", "healthy");
     await expect(page.getByTestId("health-summary")).toHaveText("All 9 checks pass");
-    await expect(health(page)).toContainText("1 optional check not set up");
+    await expect(page.getByTestId("health-optional")).toHaveText("Optional: Slack. Not connected (optional).");
     await expect(page.getByTestId("release-notes")).toHaveCount(0);
     await shoot(page, "01-up-to-date");
     const before = calls.filter((c) => c === "/api/system/preflight").length;
@@ -352,12 +352,12 @@ test.describe("Version and updates: every state", () => {
     await expect(status(page).getByRole("progressbar")).toBeVisible();
   });
 
-  test("needs your OK: data and permission changes", async ({ page }) => {
+  test("data and permission changes: what it replaces, in words, and one clearly worded button", async ({ page }) => {
     await setup(page, { version: { latest: LATEST, update_available: true, native: { stack: "coderhelm-acme", can_apply: true, auto_apply: true, pending: { ...PREPARED, can_apply: true, confirm: "c".repeat(64), data_changes: ["Database.Table (AWS::DynamoDB::GlobalTable: Modify, replacement True)"], permission_changes: ["Api.NewRole (AWS::IAM::Role Add)"], admin_changes: [] } } } });
     await page.goto("/settings/system/");
     await expect(status(page)).toHaveAttribute("data-state", "review");
-    await expect(status(page)).toContainText("v0.9.0 needs your OK");
-    await expect(status(page).getByRole("button", { name: "Review and apply" })).toBeVisible();
+    await expect(status(page)).toContainText("v0.9.0 would replace or remove data");
+    await expect(status(page).getByRole("button", { name: "Replace the data and apply" })).toBeVisible();
     await shoot(page, "13-needs-your-ok");
   });
 
@@ -486,13 +486,13 @@ test.describe("Version and updates: one truthful state", () => {
     await oneState(page);
     await expect(status(page)).toHaveAttribute("data-state", "preparing");
     await expect(status(page)).toContainText(`Preparing the update to ${NEW}`);
-    await expect(page.locator("main")).not.toContainText(`${OLD} needs your OK`);
+    await expect(page.locator("main")).not.toContainText(`${OLD} is ready`);
     await expect(page.locator("main")).not.toContainText(`Checking ${NEW}`);
-    await expect(page.getByRole("button", { name: "Review and apply" })).toHaveCount(0);
+    await expect(page.getByTestId("native-update-apply")).toHaveCount(0);
     await shoot(page, "21-observed-contradiction");
   });
 
-  test("the same install once the updater reconciled it: v0.8.39 needs your OK, the permission list in the dialog", async ({ page }) => {
+  test("the same install once the updater reconciled it: v0.8.39 is ready, one Apply update, the raw list under Technical details", async ({ page }) => {
     await setup(page, {
       version: {
         latest: LIVE_LATEST, update_available: true,
@@ -504,15 +504,16 @@ test.describe("Version and updates: one truthful state", () => {
     await page.goto("/settings/system/");
     await oneState(page);
     await expect(status(page)).toHaveAttribute("data-state", "review");
-    await expect(status(page)).toContainText(`${NEW} needs your OK`);
+    await expect(status(page)).toContainText(`${NEW} is ready to apply`);
     await expect(status(page).getByTestId("update-steps").locator('[aria-current="step"]')).toContainText("waits for your OK");
-    await expect(page.locator("main")).not.toContainText(OLD + " needs");
+    await expect(page.locator("main")).not.toContainText(OLD + " is ready");
     // History keeps the older one as replaced, never as a second update waiting.
     await expect(page.getByTestId("update-history").locator("li").nth(1).getByTestId("history-status")).toHaveText("Replaced");
     // Install health is its own section and never reads as an update state.
     await expect(page.getByTestId("health-summary")).toHaveText("All 9 checks pass");
     await shoot(page, "22-needs-your-ok");
-    await status(page).getByRole("button", { name: "Review and apply" }).click();
+    await expect(status(page).getByRole("button", { name: "Apply update" })).toBeVisible();
+    await status(page).getByText("Technical details").click();
     await expect(page.getByTestId("native-update-permission-changes")).toContainText("Api.NewRole");
   });
 
@@ -528,7 +529,7 @@ test.describe("Version and updates: one truthful state", () => {
     await oneState(page);
     await expect(status(page)).toHaveAttribute("data-state", "updating");
     await expect(status(page)).toContainText(`Applying ${NEW}`);
-    await expect(page.getByRole("button", { name: "Review and apply" })).toHaveCount(0);
+    await expect(page.getByTestId("native-update-apply")).toHaveCount(0);
     await expect(page.getByTestId("native-update-apply")).toHaveCount(0);
   });
 

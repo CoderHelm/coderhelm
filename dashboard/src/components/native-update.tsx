@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { api, type NativeUpdate } from "@/lib/api";
+import { useRef, useState, type ReactNode } from "react";
+import { api, errorStatus, type NativeUpdate } from "@/lib/api";
+import { failureText } from "@/lib/update-state";
 import { Callout } from "@/components/callout";
 import { Time } from "@/components/list";
 import { Code } from "@/components/settings/code";
-import { Modal, modalActions } from "@/components/modal";
 import { useToast } from "@/components/toast";
-import { primaryButton, secondaryButton } from "@/components/ui";
+import { dangerButton, primaryButton } from "@/components/ui";
 
 /** Where an update is: the release checked, the change prepared, the change applied. */
 export type UpdateStep = "check" | "prepare" | "apply";
@@ -66,6 +66,7 @@ export function NativeUpdateCard({
   startedBy,
   appliedBy,
   from,
+  next,
 }: {
   native: NativeUpdate;
   phase: "preparing" | "review" | "applying";
@@ -78,10 +79,13 @@ export function NativeUpdateCard({
   appliedBy?: string | null;
   /** The version the install is on while it updates. */
   from?: string | null;
+  /** A quiet line about a newer release, next after this one. */
+  next?: ReactNode;
 }) {
   const { toast } = useToast();
-  const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
+  // One apply per click, whatever the clicks.
+  const acting = useRef(false);
   const p = native.pending;
   if (!p) return null;
   const n = p.counts ?? { add: 0, modify: 0, remove: 0 };
@@ -94,24 +98,30 @@ export function NativeUpdateCard({
   const version = p.version ?? "the update";
 
   const apply = async () => {
-    if (!p.id) return;
+    if (!p.id || acting.current) return;
+    acting.current = true;
     setBusy(true);
     try {
-      await api.applyUpdate(p.id, toConfirm ? p.confirm : "");
-      setAsking(false);
-      toast(`Updating to ${version}. This takes 10 to 20 minutes.`);
-      onChanged?.();
+      // The token names exactly the changes shown on this card: if they
+      // changed since, the updater refuses and the card shows the new ones.
+      await api.applyUpdate(p.id, toConfirm ? p.confirm ?? "" : "");
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Could not apply the update", "error");
+      const status = errorStatus(e);
+      if (status !== 400 && status !== 409) {
+        toast(failureText(`apply ${version}`, e instanceof Error ? e.message : null, status), "error");
+      }
     } finally {
+      acting.current = false;
       setBusy(false);
+      // The card follows what happened: applying, or where the update is now.
+      onChanged?.();
     }
   };
 
   const title = waiting
     ? canApply
-      ? toConfirm
-        ? `${version} needs your OK`
+      ? data.length
+        ? `${version} would replace or remove data`
         : `${version} is ready to apply`
       : `${version} needs an AWS admin`
     : phase === "preparing"
@@ -119,10 +129,16 @@ export function NativeUpdateCard({
       : `Applying ${version}…`;
   const working = !waiting;
   const outside = !!appliedBy && /aws console/i.test(appliedBy);
+  const roles = permissionRoles(perms);
+  const rolesLine = perms.length ? (
+    <p className="mt-2" data-testid="native-update-permissions">
+      It changes what {roles === 1 ? "1 of Coderhelm's own roles" : `${roles} of Coderhelm's own roles`} may do, all inside this install&apos;s permission limit.
+    </p>
+  ) : null;
 
   return (
     <div data-testid="native-update">
-      <Callout variant={waiting ? "warning" : "info"} title={title}>
+      <Callout variant={waiting && data.length ? "warning" : "info"} title={title}>
         {working && (
           <>
             <p data-testid="native-update-progress">
@@ -139,19 +155,22 @@ export function NativeUpdateCard({
             </div>
           </>
         )}
-        {p.counts ? (
-          <p data-testid="native-update-summary">
-            It changes {total} resource{total === 1 ? "" : "s"} ({n.add} to add, {n.modify} to change, {n.remove} to remove)
-            {p.parts?.length ? <> in {p.parts.join(", ")}</> : null}.
-            {p.replacements?.length ? <> Replaced: {p.replacements.join(", ")}.</> : <> Nothing is replaced.</>}
-          </p>
-        ) : null}
-        {waiting && canApply && toConfirm ? (
-          <p className="mt-2" data-testid="native-update-hold">
-            It would {data.length ? "replace or remove data" : ""}{data.length && perms.length ? " and " : ""}{perms.length ? "change permissions" : ""}, so it waits for you. Check what it changes, then apply it.
-          </p>
+        {waiting && canApply && data.length ? (
+          <div className="mt-2" data-testid="native-update-hold">
+            <p>Applying it replaces or removes this data, which can&apos;t be undone:</p>
+            <ul className="mt-1 list-disc space-y-1 pl-5" data-testid="native-update-data-changes">
+              {data.map((c) => <li key={c}>{plainResource(c)}</li>)}
+            </ul>
+            <p className="mt-2">Nothing changes until you apply it. If what it changes is different by then, it asks you again.</p>
+          </div>
         ) : waiting && canApply ? (
-          <p className="mt-2" data-testid="native-update-hold">{p.hold ? `${p.hold.charAt(0).toUpperCase()}${p.hold.slice(1)}.` : "It is prepared and waits for you."}</p>
+          <p className="mt-2" data-testid="native-update-hold">
+            {perms.length
+              ? "It's prepared. One press applies it."
+              : p.hold
+                ? `${p.hold.charAt(0).toUpperCase()}${p.hold.slice(1)}.`
+                : "It's prepared. One press applies it."}
+          </p>
         ) : waiting ? (
           <p className="mt-2" data-testid="native-update-hold">
             {p.admin_changes?.length
@@ -159,58 +178,79 @@ export function NativeUpdateCard({
               : "This install's stack doesn't have the deploy role yet, so this one update is executed in the AWS console by someone with administrator rights in the account. It adds the role; every update after it applies from here."}
           </p>
         ) : phase === "preparing" ? (
-          <p className="mt-2">Nothing to do yet. If it would change data or permissions, it asks you here first.</p>
+          <p className="mt-2">Nothing to do yet. It applies by itself once prepared; it only stops to ask if it would replace or remove data.</p>
         ) : null}
+        {rolesLine}
         {waiting ? <UpdateSteps at="apply" waiting={canApply ? "waits for your OK" : "waits for an AWS admin"} /> : null}
         {p.reason && !waiting ? <p className="mt-2 text-zinc-400">{p.reason}</p> : null}
+        {next}
         <p className="mt-3 flex flex-wrap items-center gap-3">
           {canApply ? (
-            <button type="button" className={primaryButton} disabled={busy} onClick={() => (toConfirm ? setAsking(true) : apply())} data-testid="native-update-apply">
-              {busy ? "Applying…" : toConfirm ? "Review and apply" : `Apply ${version}`}
+            <button type="button" className={data.length ? dangerButton : primaryButton} disabled={busy} onClick={apply} data-testid="native-update-apply">
+              {busy ? "Applying…" : data.length ? "Replace the data and apply" : "Apply update"}
             </button>
           ) : waiting && p.link ? (
             <a href={p.link} target="_blank" rel="noopener noreferrer" className={primaryButton} data-testid="native-update-link">Open it in the AWS console</a>
           ) : null}
-          {p.link && (canApply || !waiting) ? (
-            <a href={p.link} target="_blank" rel="noopener noreferrer" className="font-medium underline" data-testid="native-update-link">See the change in the AWS console</a>
-          ) : null}
         </p>
+        {p.counts || p.link || data.length || perms.length ? (
+          <details className="mt-3 text-sm" data-testid="native-update-details">
+            <summary className="cursor-pointer text-zinc-400">Technical details</summary>
+            <div className="mt-2 space-y-2 text-zinc-300">
+              {p.counts ? (
+                <p data-testid="native-update-summary">
+                  It changes {total} resource{total === 1 ? "" : "s"} ({n.add} to add, {n.modify} to change, {n.remove} to remove)
+                  {p.parts?.length ? <> in {p.parts.join(", ")}</> : null}.
+                  {p.replacements?.length ? <> Replaced: {p.replacements.join(", ")}.</> : <> Nothing is replaced.</>}
+                </p>
+              ) : null}
+              {data.length ? (
+                <ul className="list-disc space-y-1 pl-5" aria-label="Data changes as CloudFormation lists them">
+                  {data.map((c) => <li key={c}><Code className="text-xs">{c}</Code></li>)}
+                </ul>
+              ) : null}
+              {perms.length ? (
+                <ul className="list-disc space-y-1 pl-5" data-testid="native-update-permission-changes" aria-label="Permission changes as CloudFormation lists them">
+                  {perms.map((c) => <li key={c}><Code className="text-xs">{c}</Code></li>)}
+                </ul>
+              ) : null}
+              {perms.length ? <p className="text-xs text-zinc-400">Every Coderhelm role stays inside the install&apos;s permissions boundary whatever its policy says, and the deploy role can&apos;t change itself or the boundary.</p> : null}
+              {p.link ? (
+                <a href={p.link} target="_blank" rel="noopener noreferrer" className="font-medium underline" data-testid="native-update-console">See the change in the AWS console</a>
+              ) : null}
+            </div>
+          </details>
+        ) : null}
       </Callout>
-      <Modal
-        open={asking}
-        onOpenChange={(v) => !busy && setAsking(v)}
-        role="alertdialog"
-        title={`Apply ${version}?`}
-        description="This update makes changes Coderhelm never applies without your OK. It applies only these; if they change before you confirm, it asks again."
-        testId="native-update-confirm"
-        initialFocus="[data-confirm-cancel]"
-        footer={
-          <div className={modalActions}>
-            <button type="button" data-confirm-cancel className={secondaryButton} disabled={busy} onClick={() => setAsking(false)}>Cancel</button>
-            <button type="button" className={primaryButton} disabled={busy} onClick={apply} data-testid="native-update-confirm-apply">
-              {busy ? "Applying…" : "Confirm and apply"}
-            </button>
-          </div>
-        }
-      >
-        {data.length ? (
-          <div className="mb-4">
-            <h3 className="text-sm font-medium text-zinc-100">Data it would replace or remove</h3>
-            <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-zinc-300" data-testid="native-update-data-changes">
-              {data.map((c) => <li key={c}><Code className="text-xs">{c}</Code></li>)}
-            </ul>
-          </div>
-        ) : null}
-        {perms.length ? (
-          <div>
-            <h3 className="text-sm font-medium text-zinc-100">Permissions it changes</h3>
-            <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-zinc-300" data-testid="native-update-permission-changes">
-              {perms.map((c) => <li key={c}><Code className="text-xs">{c}</Code></li>)}
-            </ul>
-            <p className="mt-1 text-xs text-zinc-400">Every Coderhelm role stays inside the install&apos;s permissions boundary whatever its policy says.</p>
-          </div>
-        ) : null}
-      </Modal>
     </div>
   );
+}
+
+/**
+ * How many of Coderhelm's own roles a list of permission changes touches:
+ * "LogAnalyzer.LogAnalyzerServiceRoleDefaultPolicy341691CC (AWS::IAM::Policy
+ * Modify: ...)" and "LogAnalyzer.LogAnalyzerServiceRole1A2B3C4D (AWS::IAM::Role
+ * Modify)" are one role.
+ */
+export function permissionRoles(changes: string[]): number {
+  const roles = new Set(
+    changes.map((c) =>
+      c
+        .split(" ")[0]
+        .replace(/[0-9A-F]{8}$/, "")
+        .replace(/(DefaultPolicy|Policy)$/, "")
+        .replace(/[0-9A-F]{8}$/, ""),
+    ),
+  );
+  return Math.max(1, roles.size);
+}
+
+/** "Api.Table (AWS::DynamoDB::GlobalTable: Modify, replacement True)" in words: "Table in Api (replaced)". */
+export function plainResource(c: string): string {
+  const m = /^([^.\s]+)\.(\S+)\s*\(([^)]*)\)/.exec(c);
+  if (!m) return c;
+  const [, part, id, what] = m;
+  const kind = /DynamoDB/.test(what) ? "table" : /S3::Bucket/.test(what) ? "bucket" : /Cognito/.test(what) ? "sign-in user pool" : /KMS/.test(what) ? "key" : /SecretsManager/.test(what) ? "secret" : "resource";
+  const how = /Remove|Delete/i.test(what) ? "removed" : "replaced";
+  return `The ${id} ${kind} in ${part} (${how})`;
 }

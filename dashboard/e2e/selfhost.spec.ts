@@ -298,11 +298,6 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
       await expect(page.getByTestId("update-history")).toContainText("health check failed after deploying v1.1.5");
       await expect(page.getByTestId("update-history")).toContainText("auto-update window");
 
-      await page.getByRole("button", { name: "Update to v2.0.0" }).click();
-      await expect.poll(() => systemCalls.map((c) => c.path)).toContain("/api/system/update");
-      // No version: the updater reads GitHub first and installs the newest release at that moment.
-      expect(systemCalls.find((c) => c.path === "/api/system/update")!.body).toEqual({});
-
       await page.getByRole("switch", { name: "Install updates automatically" }).click();
       await pickOption(page.getByRole("combobox", { name: "Day" }), "sat");
       await pickOption(page.getByRole("combobox", { name: "Hour" }), "22");
@@ -311,6 +306,14 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
 
       await page.getByRole("button", { name: "Roll back to the previous version" }).click();
       await expect.poll(() => systemCalls.map((c) => c.path)).toContain("/api/system/rollback");
+
+      await page.getByRole("button", { name: "Update to v2.0.0" }).click();
+      await expect.poll(() => systemCalls.map((c) => c.path)).toContain("/api/system/update");
+      // No version: the updater reads GitHub first and installs the newest release at that moment.
+      expect(systemCalls.find((c) => c.path === "/api/system/update")!.body).toEqual({});
+      // Pressed: the card shows it starting at once, and the button isn't offered again.
+      await expect(status).toHaveAttribute("data-state", "starting");
+      await expect(page.getByRole("button", { name: /^Update to/ })).toHaveCount(0);
 
       const width = await page.evaluate(() => document.documentElement.scrollWidth);
       expect(width).toBeLessThanOrEqual(viewport.width);
@@ -552,7 +555,7 @@ test("System: a one-stack install's Update applies it, and shows it running", as
   await expect(page.getByRole("button", { name: "Prepare the update to v2.0.0" })).toHaveCount(0);
   await page.getByRole("button", { name: "Update to v2.0.0" }).click();
   await expect.poll(() => systemCalls.map((c) => c.path)).toContain("/api/system/update");
-  expect(systemCalls.find((c) => c.path === "/api/system/update")!.body).toEqual({});
+  expect(systemCalls.find((c) => c.path === "/api/system/update")!.body).toEqual({ accept_permissions: true });
 });
 
 test("System: a running one-stack update says so, with nothing to do and no console step", async ({ page }) => {
@@ -566,7 +569,7 @@ test("System: a running one-stack update says so, with nothing to do and no cons
   await expect(page.getByRole("button", { name: "Update to v2.0.0" })).toHaveCount(0);
 });
 
-test("System: data and permission changes are listed in a dialog and apply only once confirmed", async ({ page }) => {
+test("System: data and permission changes: said plainly on the card, one clearly worded press applies exactly them", async ({ page }) => {
   const confirm = "c".repeat(64);
   const { systemCalls } = await setup(page, SELF, {
     signedIn: true,
@@ -579,20 +582,15 @@ test("System: data and permission changes are listed in a dialog and apply only 
   });
   await page.goto("/settings/system/");
   const card = page.getByTestId("native-update");
-  await expect(card).toContainText("v2.0.0 needs your OK");
-  await expect(page.getByTestId("native-update-hold")).toContainText("replace or remove data and change permissions");
+  await expect(card).toContainText("v2.0.0 would replace or remove data");
+  await expect(page.getByTestId("native-update-data-changes")).toHaveText("The Table table in Database (replaced)");
+  await expect(page.getByTestId("native-update-permissions")).toHaveText("It changes what 1 of Coderhelm's own roles may do, all inside this install's permission limit.");
   await expect(card).not.toContainText("choose Execute");
-  await page.getByRole("button", { name: "Review and apply" }).click();
-  const dialog = page.getByTestId("native-update-confirm");
-  await expect(dialog).toBeVisible();
-  await expect(page.getByTestId("native-update-data-changes")).toContainText("Database.Table (AWS::DynamoDB::GlobalTable");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // The raw CloudFormation list is behind Technical details.
+  await card.getByText("Technical details").click();
   await expect(page.getByTestId("native-update-permission-changes")).toContainText("Api.NewRole (AWS::IAM::Role Add");
-  // Cancel sends nothing.
-  await dialog.getByRole("button", { name: "Cancel" }).click();
-  await expect(dialog).toHaveCount(0);
-  expect(systemCalls.filter((c) => c.path === "/api/system/update/apply")).toEqual([]);
-  await page.getByRole("button", { name: "Review and apply" }).click();
-  await page.getByRole("button", { name: "Confirm and apply" }).click();
+  await page.getByRole("button", { name: "Replace the data and apply" }).click();
   await expect.poll(() => systemCalls.find((c) => c.path === "/api/system/update/apply")?.body).toEqual({ id: PREPARED.id, confirm });
 });
 
@@ -605,9 +603,9 @@ test("System: a prepared update with nothing to confirm applies with one press",
   await page.goto("/settings/system/");
   await expect(page.getByTestId("native-update")).toContainText("v2.0.0 is ready to apply");
   await expect(page.getByTestId("native-update-hold")).toContainText("Auto-update was turned off before it ran");
-  await page.getByRole("button", { name: "Apply v2.0.0" }).click();
+  await page.getByRole("button", { name: "Apply update" }).click();
   await expect.poll(() => systemCalls.find((c) => c.path === "/api/system/update/apply")?.body).toEqual({ id: PREPARED.id });
-  await expect(page.getByTestId("native-update-confirm")).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
 test("System: a change to the deploy role or a boundary is the one update that goes to the AWS console", async ({ page }) => {

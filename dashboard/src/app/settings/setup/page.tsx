@@ -12,6 +12,7 @@ import { Chip } from "@/components/list";
 import { linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
 import { CheckRow } from "@/components/install-checks";
+import { healthChecks } from "@/lib/update-state";
 import { CodeBlock } from "@/components/code-block";
 import { Redirect } from "@/components/redirect";
 
@@ -174,7 +175,7 @@ function Setup() {
 /** The server-side checks, grouped, failing first within the summary. */
 function InstallChecks({ data, state, onRecheck }: { data: SystemChecks | null; state: "loading" | "ready" | "failed"; onRecheck: () => void }) {
   const groups: [string, SystemChecks["checks"]][] = [];
-  for (const c of data?.checks ?? []) {
+  for (const c of healthChecks(data?.checks ?? [])) {
     const g = groups.find(([name]) => name === c.group);
     if (g) g[1].push(c);
     else groups.push([c.group, [c]]);

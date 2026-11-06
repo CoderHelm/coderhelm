@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { deriveUpdateState, followEvery, type UpdateState } from "../src/lib/update-state";
+import { deriveUpdateState, failureText, followEvery, nextAfter, withPress, type UpdateState } from "../src/lib/update-state";
 import type { SystemPreflight, SystemVersion } from "../src/lib/api";
 
 // The one function that maps the version route (and the preflight) to the
@@ -88,5 +88,60 @@ test.describe("deriveUpdateState: one coherent state", () => {
     expect(followEvery(derive({ native: { ...BASE.native!, pending: { version: "v0.8.39", status: "preparing", id: "UPDATE#b" } } }))).toBe(10_000);
     expect(followEvery(derive({ native: { ...BASE.native!, pending: { version: "v0.8.39", status: "review", id: "UPDATE#b", ...PERMS } } }))).toBe(30_000);
     expect(followEvery(derive({}))).toBeNull();
+  });
+});
+
+test.describe("an Update press: one state, never a second button", () => {
+  const waiting = { version: "v0.8.39", actor: "owner@example.org", requested_at: ago(2), status: "waiting" as const, waiting_for: "the release check" };
+  const pending = { ...STALE_CHECK, checked_at: ago(2), started_at: ago(2) };
+
+  test("a press waiting for the check is Checking, with who pressed", () => {
+    const s = derive({ model_check: pending, update_request: waiting });
+    expect(s.kind).toBe("checking");
+    if (s.kind === "checking") expect(s.request?.actor).toBe("owner@example.org");
+  });
+
+  test("a newer release listed while the pressed one is checked: still Checking the pressed one, the newer one next", () => {
+    const data = { ...BASE, latest: { version: "v0.8.40", notes: "", breaking: false }, model_check: pending, update_request: waiting };
+    const s = deriveUpdateState(data, null, NOW);
+    expect(s.kind === "checking" && s.version).toBe("v0.8.39");
+    expect(nextAfter(s, data)).toBe("v0.8.40");
+  });
+
+  test("the check passed but the updater hasn't started it yet: still Checking, not an Update button", () => {
+    expect(derive({ model_check: { version: "v0.8.39", checked_at: ago(0), ok: true, results: [] }, update_request: waiting }).kind).toBe("checking");
+  });
+
+  test("a press that ended: the offer, with the reason", () => {
+    const s = derive({ update_request: { ...waiting, status: "ended", reason: "a model was refused", ended_at: ago(1) } });
+    expect(s.kind).toBe("available");
+    if (s.kind === "available") expect(s.ended?.reason).toBe("a model was refused");
+  });
+
+  test("just pressed and the version route still reads as before: Starting, until it moves or the hold runs out", () => {
+    const before = derive({});
+    expect(before.kind).toBe("available");
+    const press = { version: "v0.8.39", at: NOW };
+    expect(withPress(before, press, NOW).kind).toBe("starting");
+    expect(followEvery(withPress(before, press, NOW))).toBe(3_000);
+    expect(withPress(before, press, NOW + 120_000).kind).toBe("available");
+    const preparing = derive({ native: { ...BASE.native!, pending: { version: "v0.8.39", status: "preparing", id: "UPDATE#b" } } });
+    expect(withPress(preparing, press, NOW).kind).toBe("preparing");
+  });
+
+  test("no newer release mentioned for the version in progress itself, or when nothing runs", () => {
+    const data = { ...BASE, native: { ...BASE.native!, pending: { version: "v0.8.39", status: "preparing", id: "UPDATE#b" } } };
+    expect(nextAfter(deriveUpdateState(data, null, NOW), data)).toBeNull();
+    expect(nextAfter(derive({}), BASE)).toBeNull();
+  });
+
+  test("an old release list is not up to date", () => {
+    expect(derive({ latest: null, update_available: false, releases: { fetched_at: Math.floor(NOW / 1000) - 4 * 86400, stale: true, reason: null, error: null, behind: null } }).kind).toBe("stale");
+  });
+
+  test("error toasts say what went wrong and what to do", () => {
+    expect(failureText("start the update", "", 502)).toBe("Couldn't start the update: the server didn't answer (error 502). Nothing changed; try again in a minute.");
+    expect(failureText("start the update", "Forbidden", 403)).toContain("only install admins");
+    expect(failureText("start the roll back", "an update is already running.", 400)).toBe("Couldn't start the roll back: an update is already running.");
   });
 });
