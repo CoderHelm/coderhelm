@@ -469,7 +469,8 @@ const FLAT_PCT = 3;
 
 /** How the current number moved from the previous one: ↑ +12%, ↓ −11%, ↑ ×2.1, Flat, or New. */
 function change(cur: number, prev: number): { text: string; tone: "up" | "down" | "flat" } {
-  if (prev === 0) return cur === 0 ? { text: "Flat", tone: "flat" } : { text: "New", tone: "up" };
+  // From a real 0 the change is the count itself.
+  if (prev === 0) return cur === 0 ? { text: "Flat", tone: "flat" } : { text: `↑ +${count(cur)}`, tone: "up" };
   const pctChange = ((cur - prev) / prev) * 100;
   if (Math.abs(pctChange) < FLAT_PCT) return { text: "Flat", tone: "flat" };
   if (cur / prev >= 2) return { text: `↑ ×${(cur / prev).toFixed(1)}`, tone: "up" };
@@ -479,13 +480,14 @@ function change(cur: number, prev: number): { text: string; tone: "up" | "down" 
 
 const TONE = { up: "text-emerald-400", down: "text-rose-400", flat: "text-zinc-400" };
 
-function Change({ cur, prev, comparable = true }: { cur: number; prev: number; comparable?: boolean }) {
+function Change({ cur, prev, comparable = true, counting = false }: { cur: number; prev: number; comparable?: boolean; counting?: boolean }) {
+  if (counting) return <span className="text-zinc-500">Counting earlier deploys…</span>;
   if (!comparable) return <span className="text-zinc-500">Not comparable</span>;
   const c = change(cur, prev);
   return <span className={`font-medium ${TONE[c.tone]}`}>{c.text}</span>;
 }
 
-type Metric = { key: keyof AnalyticsCounts; label: string; sub?: boolean; note?: string };
+type Metric = { key: keyof AnalyticsCounts; label: string; sub?: boolean; note?: string; failed?: keyof AnalyticsCounts };
 
 const METRICS: Metric[] = [
   { key: "tickets", label: "Tickets worked on" },
@@ -499,11 +501,13 @@ const METRICS: Metric[] = [
   { key: "comments", label: "Plain comments", sub: true },
   { key: "repos", label: "Repositories covered" },
   { key: "people", label: "People who asked", note: "people" },
-  { key: "deploys", label: "Deploys started", note: "deploys" },
-  { key: "deploys_preview", label: "To preview", sub: true, note: "deploys" },
-  { key: "deploys_staging", label: "To staging", sub: true, note: "deploys" },
-  { key: "deploys_prod", label: "To production", sub: true, note: "deploys" },
-  { key: "deploys_other", label: "Elsewhere", sub: true, note: "deploys" },
+  { key: "deploys", label: "Deploys Coderhelm started", note: "deploys" },
+  { key: "deploys_preview", label: "To preview", sub: true, note: "deploys", failed: "deploys_preview_failed" },
+  { key: "deploys_staging", label: "To staging", sub: true, note: "deploys", failed: "deploys_staging_failed" },
+  { key: "deploys_prod", label: "To production", sub: true, note: "deploys", failed: "deploys_prod_failed" },
+  { key: "deploys_other", label: "To other environments", sub: true, note: "deploys", failed: "deploys_other_failed" },
+  { key: "deploys_succeeded", label: "Succeeded", sub: true, note: "deploys" },
+  { key: "deploys_failed", label: "Failed", sub: true, note: "deploys" },
 ];
 
 /** Short toggle labels so the four fit side by side on a phone; the title names the metric in full. */
@@ -511,7 +515,7 @@ const CHART_METRICS = [
   { value: "prs_reviewed", label: "Reviewed", title: "PRs reviewed" },
   { value: "prs_opened", label: "Opened", title: "PRs opened" },
   { value: "tickets", label: "Tickets", title: "Tickets" },
-  { value: "deploys", label: "Deploys", title: "Deploys started" },
+  { value: "deploys", label: "Deploys", title: "Deploys Coderhelm started" },
 ] as const;
 type ChartMetric = (typeof CHART_METRICS)[number]["value"];
 
@@ -531,6 +535,12 @@ function CompareTip({ active, payload, rows }: { active?: boolean; payload?: { n
       ))}
     </div>
   );
+}
+
+/** A count, with how many of its deploys failed when any did. */
+function withFailed(x: AnalyticsCounts, m: Metric) {
+  const failed = m.failed ? (x[m.failed] ?? 0) : 0;
+  return failed > 0 ? `${count(x[m.key] ?? 0)} (${count(failed)} failed)` : count(x[m.key] ?? 0);
 }
 
 /** This period against the one before it: each thing counted once, from the records. */
@@ -557,16 +567,20 @@ function Comparison({ c, period, previous, mtd }: { c: AnalyticsComparison; peri
     const recorded = (x: AnalyticsCounts, when: string) => `${count(x.runs_with_requester)} of ${plural(x.runs, "run")} in ${when}`;
     notes.push(`Who asked was recorded on ${recorded(c.previous, prev)} and ${recorded(c.current, cur)}, so people who asked is not compared: a jump from runs that recorded nobody would not be real.`);
   }
-  if (!c.deploys_comparable) {
+  const deployState = c.deploys_previous_state ?? (c.deploys_comparable ? "known" : "counting");
+  notes.push(
+    "Deploys Coderhelm started counts GitHub Actions deploy runs its app triggered (a deploy label it added, a push to its PR, a merge it made, a tag or release it created), by the environment the run deployed to. Runs a person starts or re-runs are not counted.",
+  );
+  if (deployState === "counting") {
+    notes.push(`Earlier deploys are still being read from GitHub's run history, so ${prev} is not counted yet.`);
+  } else if (deployState === "before_records") {
     const since = c.deploys_since ? new Date(c.deploys_since).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" }) : "";
-    notes.push(
-      since
-        ? `Deploys are known from ${since}${c.deploys_backfill === "running" ? " (earlier ones are still being read from GitHub)" : ""}, so deploys are not compared: ${prev} started before that, and a jump from days with no record would not be real.`
-        : `No deploys are recorded yet${c.deploys_backfill === "running" ? " (earlier ones are being read from GitHub)" : ""}, so deploys are not compared.`,
-    );
+    notes.push(`Deploys are known from ${since}, so deploys are not compared: ${prev} started before that.`);
   }
-  if (c.current.deploys > 0 || c.previous.deploys > 0) {
-    notes.push("Deploys counts the deploy labels Coderhelm added (a label named for a deploy, or the repository's deploy label): once per label and commit. Deploys people started are not counted.");
+  if (c.deploys_no_access?.length) {
+    notes.push(
+      `Coderhelm can't read workflow runs in ${plural(c.deploys_no_access.length, "repository")} (${c.deploys_no_access.join(", ")}), so deploys there are not counted. Grant the app Actions: read on them.`,
+    );
   }
 
   // Phones keep the change in view; all of last month shows from the sm breakpoint.
@@ -597,12 +611,18 @@ function Comparison({ c, period, previous, mtd }: { c: AnalyticsComparison; peri
                   {m.sub ? "·\u00a0" : ""}
                   {m.label}
                 </th>
-                <td className={`${cell} text-zinc-300`}>{count(c.previous[m.key])}</td>
-                <td className={`${cell} text-zinc-300`}>{count(c.current[m.key])}</td>
-                <td className={cell}>
-                  <Change cur={c.current[m.key]} prev={c.previous[m.key]} comparable={(m.note !== "people" || c.people_comparable) && (m.note !== "deploys" || c.deploys_comparable)} />
+                <td className={`${cell} text-zinc-300`}>
+                  {m.note === "deploys" && deployState === "counting" ? <span className="text-zinc-500">Counting…</span> : withFailed(c.previous, m)}
                 </td>
-                {full && <td className={`${cell} ${wide} text-zinc-300`}>{count(full[m.key])}</td>}
+                <td className={`${cell} text-zinc-300`}>{withFailed(c.current, m)}</td>
+                <td className={cell}>
+                  {m.note === "deploys" && deployState === "counting" ? (
+                    m.sub ? <span className="text-zinc-500">Counting…</span> : <Change cur={0} prev={0} counting />
+                  ) : (
+                    <Change cur={c.current[m.key]} prev={c.previous[m.key]} comparable={(m.note !== "people" || c.people_comparable) && (m.note !== "deploys" || deployState === "known")} />
+                  )}
+                </td>
+                {full && <td className={`${cell} ${wide} text-zinc-300`}>{m.note === "deploys" && deployState === "counting" ? "…" : withFailed(full, m)}</td>}
               </tr>
             ))}
           </tbody>

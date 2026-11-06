@@ -74,6 +74,7 @@ const DEFAULTS: ReviewerConfig = {
   release_notes_guide: "",
   release_notes_instructions: "",
   deploy_label: "",
+  deploy_workflows: "",
   health_log_groups: [],
   reminders_enabled: false,
   reminder_cooldown_hours: 4,
@@ -118,7 +119,7 @@ const SECTION_KEYS: Record<SectionId, Key[]> = {
   reviews: ["enabled", "label", "instructions"],
   tests: ["verify_tests", "require_tests"],
   labels: ["auto_labels", "auto_label_allow", "auto_label_requires", "auto_label_guide"],
-  merge: ["auto_merge", "merge_method", "require_human_approval", "deploy_label"],
+  merge: ["auto_merge", "merge_method", "require_human_approval", "deploy_label", "deploy_workflows"],
   "after-merge": ["auto_tag", "tag_mode", "tag_prefix", "tag_batch_minutes", "health_check", "health_log_groups"],
   "release-notes": [
     "release_notes", "release_notes_branch", "release_notes_confluence_parent_id", "release_notes_confluence_container",
@@ -725,6 +726,20 @@ function ReviewerConfigPage() {
                   control={({ labelId, helpId, inputId }) => (
                     <Switch id={inputId} checked={cfg.require_human_approval} onChange={(v) => set("require_human_approval", v)} labelledBy={labelId} describedBy={helpId} />
                   )}
+                />
+                <Field
+                  label="Deploy workflows (optional)"
+                  {...marks("deploy_workflows")}
+                  help={
+                    <>
+                      Analytics counts a deploy when a workflow job declares an environment, or the workflow&apos;s name says deploy. Name any
+                      other workflow that deploys, with where it goes, for example <Code>apply.yml=production</Code>. Comma separate several.
+                    </>
+                  }
+                  mono
+                  value={cfg.deploy_workflows ?? ""}
+                  onChange={(e) => set("deploy_workflows", e.target.value)}
+                  placeholder="apply.yml=production"
                 />
               </SettingsSection>
               )}
