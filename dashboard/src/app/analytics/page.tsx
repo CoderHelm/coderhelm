@@ -15,6 +15,7 @@ import { inputClass } from "@/components/ui";
 import { Page, PageHeader, Section } from "@/components/page";
 import { RepoFilter, formatDuration, formatMs } from "@/components/list";
 import { ChartCard, ChartTip, SERIES, Table, axis, delta, shortDay } from "@/components/charts";
+import { DecisionsSection } from "./decisions";
 
 const PERIODS: { value: `${AnalyticsPeriod}`; label: string }[] = [
   { value: "7", label: "7 days" },
@@ -331,6 +332,8 @@ function Body({ data, loading, stats, tab }: { data: Analytics; loading: boolean
         {data.ci.outcomes && <CiOutcomes ci={data.ci} outcomes={data.ci.outcomes} />}
         {!!data.loops_stopped?.total && <LoopsStopped stopped={data.loops_stopped} />}
       </Section>
+
+      <DecisionsSection days={d} />
 
       <Section title="Reviews" id="reviews" description="Pull request reviews Coderhelm posted, and what became of the findings it raised before.">
         <StatGrid>

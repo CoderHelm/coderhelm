@@ -484,6 +484,10 @@ export const api = {
   getStats: () => request<{ month: Stats; all_time: Stats }>("/api/stats"),
   getStatsHistory: () =>
     request<{ months: MonthStats[] }>("/api/stats/history"),
+  /** The stop judge's decisions: unnecessary stops and nuisance blocks over 7, 30 or 90 days. */
+  getDecisions: (days: 7 | 30 | 90) => request<DecisionsAnalytics>(`/api/analytics/decisions?days=${days}`),
+  /** Every confirmed-wrong decision as a replay case (names as written: scrub before committing one). */
+  exportDecisions: (days: 7 | 30 | 90) => request<{ cases: unknown[] }>(`/api/analytics/decisions/export?days=${days}`),
   /** The analytics page: one period (7, 30 or 90 days, or this month so far) and the one before it. */
   getAnalytics: (period: AnalyticsPeriod, repo?: string) =>
     request<Analytics>(
@@ -4907,4 +4911,43 @@ export interface SelfHostDetail {
   install: SelfHostRow;
   trend: SelfHostTrendDay[];
   audit: { action: string; at: string; detail: string }[];
+}
+
+/** One decision people's act showed was wrong (`common::decision_log::Example`). */
+export interface DecisionExample {
+  sk: string;
+  kind: string;
+  step: string;
+  category: string;
+  detail: string;
+  outcome: string;
+  created_at: string;
+  run_id?: string;
+  repo?: string;
+  pr_number?: number;
+}
+
+/** A rate of wrong stops or blocks (`common::decision_log::Rate`). */
+export interface DecisionRate {
+  /** Stops (or blocks) the judge let happen. */
+  total: number;
+  /** Of those, the ones a person's act settled either way. */
+  with_outcome: number;
+  /** Of those, confirmed wrong. */
+  wrong: number;
+  /** wrong / with_outcome. */
+  rate: number;
+  by_category: [string, number][];
+  examples: DecisionExample[];
+}
+
+/** GET /api/analytics/decisions. */
+export interface DecisionsAnalytics {
+  days: number;
+  summary: {
+    unnecessary_stops: DecisionRate;
+    nuisance_blocks: DecisionRate;
+    decisions: number;
+    proceeded: number;
+  };
 }
