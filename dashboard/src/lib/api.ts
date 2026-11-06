@@ -1998,6 +1998,18 @@ export interface CodegenVar {
 }
 
 /** A run stopped before its pull request: a generator needed public values the repo doesn't set. */
+/** What a run waiting on a person (`needs_input`) waits for: one named action. */
+export interface RunWaitingOn {
+  /** What to do, in plain words ("Review pull request #12"). */
+  action: string;
+  /** Why, or what is still open. May be empty. */
+  detail: string;
+  /** Where to do it (the pull request, the ticket), when known. */
+  url?: string | null;
+  /** When the wait started. */
+  since?: string | null;
+}
+
 export interface CodegenEnvMissing {
   repo: string;
   command: string;
@@ -2082,6 +2094,8 @@ export interface RunDetail extends Run {
   closed_from?: string | null;
   /** What the run asked when it stopped to wait on a person (`needs_input`). */
   questions?: RunQuestion[];
+  /** While `needs_input`: what it waits for from a person, by name. */
+  waiting_on?: RunWaitingOn | null;
   /** The comment with those questions on the ticket or issue. */
   questions_url?: string | null;
   /** Answers people gave to them in Coderhelm. */
