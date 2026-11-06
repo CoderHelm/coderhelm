@@ -1717,6 +1717,8 @@ export interface ReviewerConfig {
   release_notes_guide: string;
   release_notes_instructions: string;
   deploy_label: string;
+  /** Workflows that deploy though their names don't say where: `file.yml=production`, comma separated. */
+  deploy_workflows?: string;
   health_log_groups: string[];
   reminders_enabled: boolean;
   /** Where reminders and release notes failures post. Read only: shown as a hint. */
@@ -3191,12 +3193,20 @@ export interface AnalyticsCounts {
   people: number;
   /** Runs that recorded who (or what) asked for them. */
   runs_with_requester: number;
-  /** Deploys Coderhelm started (a deploy label it added), each counted once. */
+  /** Deploys Coderhelm started: deploy workflow runs its app triggered (a
+   * deploy label it added, a push to its PR, a merge it made, a tag or
+   * release it created), one per run and environment. A person's are not. */
   deploys: number;
   deploys_preview: number;
   deploys_staging: number;
   deploys_prod: number;
   deploys_other: number;
+  deploys_succeeded: number;
+  deploys_failed: number;
+  deploys_preview_failed: number;
+  deploys_staging_failed: number;
+  deploys_prod_failed: number;
+  deploys_other_failed: number;
 }
 
 export interface AnalyticsComparison {
@@ -3207,12 +3217,16 @@ export interface AnalyticsComparison {
   previous_full_period: { start: string; end: string } | null;
   /** False when a period did not record who asked for nearly every run. */
   people_comparable: boolean;
-  /** Since when deploys are known (null: none recorded yet). */
+  /** Since when deploys are known: how far back GitHub's run history was read (null: still reading). */
   deploys_since: string | null;
-  /** False when a compared period started before deploys were known. */
+  /** True when every earlier period's deploys are known, so a 0 there is a real 0. */
   deploys_comparable: boolean;
-  /** "running" while earlier deploys are still being copied from GitHub. */
+  /** "counting" while earlier deploys are still being read, "before_records" when a period starts before they were read. */
+  deploys_previous_state: "known" | "counting" | "before_records";
+  /** "running" while earlier deploys are still being read from GitHub. */
   deploys_backfill: "done" | "running";
+  /** Repositories whose workflow runs Coderhelm can't read. */
+  deploys_no_access: string[];
   /** Running totals by day; the previous values are null past the end of a shorter previous period. */
   daily: {
     offset: number;

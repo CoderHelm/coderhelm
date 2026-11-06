@@ -151,7 +151,7 @@ const CONFIG = {
   verify_tests: false, require_tests: false, auto_labels: false, auto_label_allow: "", auto_label_requires: "", auto_label_guide: "",
   release_notes: false, release_notes_branch: "", release_notes_confluence_space: "", release_notes_confluence_parent_id: "",
   release_notes_confluence_container: "Changelog", release_notes_email_webhook_url: "", release_notes_email_webhook_secret_set: false,
-  release_notes_guide: "", release_notes_instructions: "", graph_enabled: false, deploy_label: "", health_log_groups: [],
+  release_notes_guide: "", release_notes_instructions: "", graph_enabled: false, deploy_label: "", deploy_workflows: "", health_log_groups: [],
   reminders_enabled: false, reminder_cooldown_hours: 4,
   webhooks: { teams: { set: false, hint: "" }, slack: { set: false, hint: "" } },
 };

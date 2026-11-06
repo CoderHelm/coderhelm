@@ -28,11 +28,13 @@ const PREV_COUNTS = {
   tickets: 40, runs: 70, prs_opened: 50, prs_merged: 41, prs_open: 3, prs_reviewed: 100, reviews_posted: 400,
   approvals: 80, changes_requested: 40, comments: 280, repos: 6, people: 0, runs_with_requester: 0,
   deploys: 0, deploys_preview: 0, deploys_staging: 0, deploys_prod: 0, deploys_other: 0,
+  deploys_succeeded: 0, deploys_failed: 0, deploys_preview_failed: 0, deploys_staging_failed: 0, deploys_prod_failed: 0, deploys_other_failed: 0,
 };
 const CUR_COUNTS = {
   tickets: 45, runs: 62, prs_opened: 50, prs_merged: 30, prs_open: 12, prs_reviewed: 210, reviews_posted: 660,
   approvals: 300, changes_requested: 250, comments: 110, repos: 8, people: 5, runs_with_requester: 30,
   deploys: 14, deploys_preview: 2, deploys_staging: 9, deploys_prod: 3, deploys_other: 0,
+  deploys_succeeded: 13, deploys_failed: 1, deploys_preview_failed: 0, deploys_staging_failed: 0, deploys_prod_failed: 1, deploys_other_failed: 0,
 };
 const FULL_COUNTS = { ...PREV_COUNTS, tickets: 52, runs: 90, prs_opened: 63, prs_reviewed: 140, reviews_posted: 520 };
 
@@ -63,7 +65,10 @@ function windows(period: string) {
   return { days: n, start, end: now, prevStart: new Date(start.getTime() - n * 86_400_000), prevEnd: start, full: null };
 }
 
-function analytics(period: string, repo: string | null) {
+/** How far earlier deploys were read: known (a real 0 before), still counting, or read only from the start of this period. */
+type DeployState = "known" | "counting" | "before_records";
+
+function analytics(period: string, repo: string | null, deployState: DeployState = "known", noAccess: string[] = []) {
   const scale = repo ? 0.5 : 1;
   const w = windows(period);
   const daysN = w.days;
@@ -78,11 +83,12 @@ function analytics(period: string, repo: string | null) {
       previous_full: w.full ? FULL_COUNTS : null,
       previous_full_period: w.full ? { start: w.full.start.toISOString(), end: w.full.end.toISOString() } : null,
       people_comparable: false,
-      // Deploys were only recorded from the start of this period.
-      deploys_since: w.start.toISOString(),
-      deploys_comparable: false,
-      deploys_backfill: "running",
-      daily: compareDaily(w.start, w.prevStart, Math.max(2, daysN)),
+      deploys_since: deployState === "counting" ? null : deployState === "known" ? new Date(w.prevStart.getTime() - 86_400_000).toISOString() : w.start.toISOString(),
+      deploys_comparable: deployState === "known",
+      deploys_previous_state: deployState,
+      deploys_backfill: deployState === "counting" ? "running" : "done",
+      deploys_no_access: noAccess,
+      daily: compareDaily(w.start, w.prevStart, Math.max(2, daysN)).map((d) => (deployState === "counting" ? { ...d, previous_deploys: null } : d)),
     },
     summary: { ...SUMMARY, prs_merged: Math.round(21 * scale), runs: Math.round(42 * scale) },
     previous: { ...SUMMARY, prs_merged: 15, merge_rate: 0.6, cost_per_merged_pr: 5.1, failed_runs: 6, median_hours_to_merge: 7.0, reviews: 40 },
@@ -98,7 +104,7 @@ function analytics(period: string, repo: string | null) {
     people: [
       { person: "", kind: "not_recorded", runs: 30, merged: 9 },
       { person: "Ada Lovelace", kind: "person", runs: 25, merged: 14 },
-      { person: "CoderHelm (E2E tests)", kind: "coderhelm", runs: 4, merged: 2 },
+      { person: "Coderhelm (E2E tests)", kind: "coderhelm", runs: 4, merged: 2 },
     ],
     failures: [
       { reason: "Timed out after #s", count: 3, last_run_id: "01RUNFAILED00000000000000A", last_at: new Date().toISOString() },
@@ -134,7 +140,7 @@ function analytics(period: string, repo: string | null) {
   };
 }
 
-interface Backend { calls: string[]; fail: boolean; empty: boolean; oldServer: boolean; estimated: number; recovered: number; deliveries?: "ok" | "refused" }
+interface Backend { calls: string[]; fail: boolean; empty: boolean; oldServer: boolean; estimated: number; recovered: number; deliveries?: "ok" | "refused"; deployState?: DeployState; noAccess?: string[] }
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = { calls: [], fail: false, empty: false, oldServer: false, estimated: 0, recovered: 0, ...init };
@@ -157,7 +163,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/analytics") {
       if (db.fail) return json(route, { error: "boom" }, 500);
       const period = url.searchParams.get("period") === "mtd" ? "mtd" : url.searchParams.get("days") || "30";
-      const { comparison, ...older } = analytics(period, url.searchParams.get("repo"));
+      const { comparison, ...older } = analytics(period, url.searchParams.get("repo"), db.deployState, db.noAccess);
       const body = db.oldServer ? older : { ...older, comparison };
       if (db.empty) {
         const zero = Object.fromEntries(Object.keys(SUMMARY).map((k) => [k, typeof (SUMMARY as Record<string, unknown>)[k] === "number" ? 0 : null]));
@@ -216,7 +222,7 @@ test("the scorecard answers whether it is worth it, against the previous period"
   await expect(page.getByRole("table", { name: "Lookups by source" })).toContainText("orders-db database");
   await views.getByRole("link", { name: "Teams and repos" }).click();
   // People first, Coderhelm's own work next, runs that recorded nobody last.
-  await expect(page.getByRole("table", { name: "By person" }).locator("tbody tr td:first-child")).toHaveText(["Ada Lovelace", "CoderHelm (E2E tests)", "Not recorded"]);
+  await expect(page.getByRole("table", { name: "By person" }).locator("tbody tr td:first-child")).toHaveText(["Ada Lovelace", "Coderhelm (E2E tests)", "Not recorded"]);
   // Drill-downs open the run behind a number.
   await expect(page.getByRole("link", { name: "Show the class schedule on the details page" })).toHaveAttribute("href", /^\/runs\/detail\/?\?id=01RUNMERGED00000000000000A$/);
   await expect(page.getByRole("link", { name: "#101" })).toHaveAttribute("href", "https://github.com/your-team/web/pull/101");
@@ -324,23 +330,58 @@ test("this period is compared with the one before, each thing counted once", asy
   // The previous period was a day shorter: its last value is a gap, not a zero.
   await expect(days.locator("tbody tr").last().locator("td").nth(1)).toHaveText("—");
 
-  // Deploys: counted, broken down by where they went, but not compared with a
-  // period that started before they were recorded.
-  await expect(row("Deploys started").locator("td").nth(1)).toHaveText("14");
+  // Deploys Coderhelm started: by environment, with failures; a real 0
+  // before is a change, not "Not comparable".
+  await expect(row("Deploys Coderhelm started").locator("td").nth(0)).toHaveText("0");
+  await expect(row("Deploys Coderhelm started").locator("td").nth(1)).toHaveText("14");
+  await expect(row("Deploys Coderhelm started").locator("td").nth(2)).toHaveText("↑ +14");
   await expect(row("To staging").locator("td").nth(1)).toHaveText("9");
-  await expect(row("To production").locator("td").nth(1)).toHaveText("3");
-  await expect(row("Deploys started").locator("td").nth(2)).toHaveText("Not comparable");
-  await expect(notes).toContainText("Deploys are known from");
-  await expect(notes).toContainText("still being read from GitHub");
-  await expect(notes).toContainText("once per label and commit");
+  await expect(row("To production").locator("td").nth(1)).toHaveText("3 (1 failed)");
+  await expect(row("Succeeded").locator("td").nth(1)).toHaveText("13");
+  await expect(row("Failed").locator("td").nth(1)).toHaveText("1");
+  await expect(notes).toContainText("a merge it made");
+  await expect(notes).toContainText("Runs a person starts or re-runs are not counted.");
+  await expect(notes).not.toContainText("still being read");
   const deploys = page.getByRole("group", { name: "Chart metric" }).getByRole("button", { name: "Deploys", exact: true });
   await expect(deploys).toHaveClass(/cursor-pointer/);
   // The table stays open from the Tickets check, and follows the metric.
   await deploys.click();
-  const deployDays = page.getByRole("table", { name: "Deploys started so far by day" });
+  const deployDays = page.getByRole("table", { name: "Deploys Coderhelm started so far by day" });
   await expect(deployDays.locator("tbody tr").first().locator("td").nth(2)).toHaveText("2");
   await expect(deployDays.locator("tbody tr").last().locator("td").nth(1)).toHaveText("—");
   await shot(page, "analytics-compare");
+});
+
+test("deploys still being read from GitHub say so instead of a fake 0", async ({ page }) => {
+  await mockApi(page, { deployState: "counting" });
+  await page.goto("/analytics?tab=trends");
+  const table = page.getByRole("table", { name: "Compared with the period before" });
+  const row = (name: string) => table.locator("tbody tr").filter({ has: page.getByRole("rowheader").filter({ hasText: name }) });
+  await expect(row("Deploys Coderhelm started").locator("td").nth(0)).toHaveText("Counting…");
+  await expect(row("Deploys Coderhelm started").locator("td").nth(1)).toHaveText("14");
+  await expect(row("Deploys Coderhelm started").locator("td").nth(2)).toHaveText("Counting earlier deploys…");
+  await expect(row("To production").locator("td").nth(0)).toHaveText("Counting…");
+  await expect(page.getByTestId("compare-notes")).toContainText("still being read from GitHub's run history");
+  // The rest of the table compares as usual.
+  await expect(row("Tickets worked on").locator("td").nth(2)).toHaveText("↑ +13%");
+});
+
+test("deploys from before GitHub's history was read are not compared", async ({ page }) => {
+  await mockApi(page, { deployState: "before_records" });
+  await page.goto("/analytics?tab=trends");
+  const table = page.getByRole("table", { name: "Compared with the period before" });
+  const row = (name: string) => table.locator("tbody tr").filter({ has: page.getByRole("rowheader").filter({ hasText: name }) });
+  await expect(row("Deploys Coderhelm started").locator("td").nth(0)).toHaveText("0");
+  await expect(row("Deploys Coderhelm started").locator("td").nth(2)).toHaveText("Not comparable");
+  await expect(page.getByTestId("compare-notes")).toContainText("Deploys are known from");
+});
+
+test("repositories Coderhelm can't read runs in are named, with the permission to grant", async ({ page }) => {
+  await mockApi(page, { noAccess: ["your-team/infra"] });
+  await page.goto("/analytics?tab=trends");
+  const notes = page.getByTestId("compare-notes");
+  await expect(notes).toContainText("can't read workflow runs in 1 repository (your-team/infra)");
+  await expect(notes).toContainText("Actions: read");
 });
 
 test("month to date compares the same days of last month and shows all of last month", async ({ page }) => {
