@@ -582,7 +582,7 @@ function Comparison({ c, period, previous, mtd }: { c: AnalyticsComparison; peri
   const progress = countingProgress(c.deploys_backfill_progress);
   if (deployState === "counting") {
     notes.push(
-      `Earlier deploys are still being read from GitHub's run history${progress ? ` (${progress} read so far)` : ""}, so ${prev} is not counted yet. Deploys in ${cur} are counted as they happen.`,
+      `Earlier deploys are still being read from GitHub's run history${progress ? ` (${progress} read so far)` : ""}, so ${prev} is not counted yet and ${cur} shows only what has been read so far. Both fill in as the rest is read.`,
     );
   } else if (deployState === "before_records") {
     const since = c.deploys_since ? new Date(c.deploys_since).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" }) : "";
@@ -630,7 +630,10 @@ function Comparison({ c, period, previous, mtd }: { c: AnalyticsComparison; peri
                 <td className={`${cell} text-zinc-300`}>
                   {m.note === "deploys" && deployState === "counting" ? <span className="text-zinc-500">Counting…</span> : withFailed(c.previous, m)}
                 </td>
-                <td className={`${cell} text-zinc-300`}>{withFailed(c.current, m)}</td>
+                <td className={`${cell} text-zinc-300`}>
+                  {withFailed(c.current, m)}
+                  {m.note === "deploys" && deployState === "counting" && <span className="text-zinc-500"> so far</span>}
+                </td>
                 <td className={cell}>
                   {m.note === "deploys" && deployState === "counting" ? (
                     m.sub ? <span className="text-zinc-500">Counting…</span> : <Change cur={0} prev={0} counting progress={progress} />
