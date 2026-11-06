@@ -399,7 +399,7 @@ test("deploys still being read from GitHub say so instead of a fake 0", async ({
   const table = page.getByRole("table", { name: "Compared with the period before" });
   const row = (name: string) => table.locator("tbody tr").filter({ has: page.getByRole("rowheader").filter({ hasText: name }) });
   await expect(row("Deploys Coderhelm started").locator("td").nth(0)).toHaveText("Counting…");
-  await expect(row("Deploys Coderhelm started").locator("td").nth(1)).toHaveText("14");
+  await expect(row("Deploys Coderhelm started").locator("td").nth(1)).toHaveText("14 so far");
   await expect(row("Deploys Coderhelm started").locator("td").nth(2)).toHaveText("Counting earlier deploys…");
   await expect(row("To production").locator("td").nth(0)).toHaveText("Counting…");
   await expect(page.getByTestId("compare-notes")).toContainText("still being read from GitHub's run history");
@@ -413,7 +413,7 @@ test("deploys being read say how many repositories are done, and keep this perio
   const table = page.getByRole("table", { name: "Compared with the period before" });
   const row = (name: string) => table.locator("tbody tr").filter({ has: page.getByRole("rowheader").filter({ hasText: name }) });
   await expect(row("Deploys Coderhelm started").locator("td").nth(2)).toHaveText("Counting earlier deploys: 12 of 40 repositories");
-  await expect(row("Deploys Coderhelm started").locator("td").nth(1)).toHaveText("14");
+  await expect(row("Deploys Coderhelm started").locator("td").nth(1)).toHaveText("14 so far");
   await expect(page.getByTestId("compare-notes")).toContainText("(12 of 40 repositories read so far)");
 });
 
