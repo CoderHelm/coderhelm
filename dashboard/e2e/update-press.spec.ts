@@ -21,6 +21,8 @@ const PENDING = (v: string, min = 1) => ({ version: v, checked_at: ago(min), sta
 type V = Record<string, unknown>;
 interface World {
   v: V;
+  checks?: unknown[];
+  blockers?: unknown[];
   update?: (body: V, w: World) => { status: number; body: unknown };
   rollback?: (w: World) => { status: number; body: unknown };
   apply?: (w: World) => { status: number; body: unknown };
@@ -56,7 +58,7 @@ async function setup(page: Page, w: World) {
         ...w.v,
       });
     }
-    if (p === "/api/system/preflight") return json(route, { checked_at: ago(0.2), ready: true, current: "v0.8.45", latest: null, blockers: [], checks: CHECKS });
+    if (p === "/api/system/preflight") return json(route, { checked_at: ago(0.2), ready: !(w.blockers ?? []).length, current: "v0.8.45", latest: null, blockers: w.blockers ?? [], checks: w.checks ?? CHECKS });
     if (p === "/api/system/update" && w.update) {
       await new Promise((r) => setTimeout(r, 600));
       const r = w.update(route.request().postDataJSON() as V, w);
@@ -244,7 +246,7 @@ test.describe("Update: error toasts only for real failures", () => {
       },
     });
     await page.goto("/settings/system/");
-    await page.getByRole("button", { name: "Apply v0.8.46" }).dblclick();
+    await page.getByRole("button", { name: "Apply update" }).dblclick();
     await expect(status(page)).toHaveAttribute("data-state", "updating");
     await expect(page.getByTestId("native-update-progress")).toContainText("It was applied in the AWS console.");
     await expect(toasts(page)).toHaveCount(0);
@@ -304,5 +306,135 @@ test.describe("Version and updates: the page", () => {
     await expect(page.getByText("Couldn't load this install's version")).toBeVisible();
     await expect(page.getByText("The server didn't answer.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+  });
+});
+
+test.describe("Install health: only the install's own problems", () => {
+  // The payload seen live: the next release's check running (sent by the
+  // gateway as a warning check), and Slack not set up.
+  const RUNNING_CHECK = {
+    key: "update_models", group: "Claude", label: "The next release's models answer", status: "warn",
+    detail: "Checking v0.8.47-beta.20261106's signature before reading the models it calls.",
+    why: "The update waits until every model it calls answers.",
+    fix: { text: "Wait a few minutes, then check again.", href: "/settings/system#readiness" },
+  };
+  const SLACK = { key: "slack", group: "Integrations", label: "Slack", status: "skip", detail: "Not connected.", why: "Run results and questions in your Slack channels." };
+  const live = {
+    v: {
+      settings: { ...SETTINGS, channel: "beta" },
+      latest: rel("v0.8.47-beta.20261106", { prerelease: true }), update_available: true,
+      model_check: PENDING("v0.8.47-beta.20261106", 1),
+    },
+    checks: [...CHECKS, RUNNING_CHECK, SLACK],
+    blockers: [{ key: "model_check_pending", severity: "block", detail: "Checking v0.8.47-beta.20261106's signature before reading the models it calls.", fix: { text: "Wait a few minutes, then check again." } }],
+  };
+
+  test("a release check in progress is the update card's state only, never a health warning", async ({ page }) => {
+    await setup(page, live);
+    await page.goto("/settings/system/");
+    await expect(status(page)).toHaveAttribute("data-state", "checking-release");
+    await expect(status(page)).toContainText("Checking v0.8.47-beta.20261106 before it can be applied");
+    const health = page.getByTestId("install-health");
+    await expect(health).toHaveAttribute("data-state", "healthy");
+    await expect(page.getByTestId("health-summary")).toHaveText("All 4 checks pass");
+    await expect(page.getByTestId("health-problems")).toHaveCount(0);
+    await expect(health).not.toContainText("Warning");
+    await expect(health).not.toContainText("signature");
+    await expect(health).not.toContainText("needs a look");
+    // Each line under the summary is exactly what it says: the optional item, by name.
+    await expect(page.getByTestId("health-optional").locator("li")).toHaveText(["Optional: Slack. Run results and questions in your Slack channels."]);
+    await expect(health.getByRole("link", { name: "Open in Coderhelm" })).toHaveCount(0);
+  });
+
+  test("a fix never links to the page it is on", async ({ page }) => {
+    const refused = { ...RUNNING_CHECK, status: "fail", detail: "Update to v0.8.47 needs your action: a model was refused.", fix: { text: "Accept the terms in the Bedrock console.", href: "/settings/system#readiness", url: "https://console.aws.amazon.com/bedrock/home#/modelaccess" } };
+    const elsewhere = { key: "github_app", group: "GitHub", label: "GitHub accepts the app's keys", status: "fail", detail: "GitHub refused the keys.", fix: { text: "Add new keys.", href: "/settings/integrations" } };
+    await setup(page, { v: {}, checks: [refused, elsewhere] });
+    await page.goto("/settings/system/");
+    await expect(page.locator("#check-update_models").getByRole("link", { name: "Open in Coderhelm" })).toHaveCount(0);
+    await expect(page.locator("#check-update_models").getByRole("link", { name: "Open the AWS console" })).toBeVisible();
+    await expect(page.locator("#check-github_app").getByRole("link", { name: "Open in Coderhelm" })).toHaveAttribute("href", /^\/settings\/integrations\/?$/);
+    await expect(page.getByTestId("health-summary")).toHaveText("2 checks fail");
+  });
+});
+
+test.describe("Update: one decision", () => {
+  const NATIVE = { stack: "coderhelm-acme", can_apply: true, auto_apply: true };
+  const ROLE_CHANGES = [
+    "LogAnalyzer.LogAnalyzerServiceRoleDefaultPolicy341691CC (AWS::IAM::Policy Modify: an IAM change)",
+    "LogAnalyzer.LogAnalyzerServiceRole1A2B3C4D (AWS::IAM::Role Modify: an IAM change)",
+    "Worker.WorkerServiceRoleDefaultPolicy5E6F7A8B (AWS::IAM::Policy Modify: an IAM change)",
+  ];
+  const prepared = (extra: Record<string, unknown>) => ({ version: "v0.8.46", status: "review", id: "UPDATE#2", counts: { add: 0, modify: 3, remove: 0 }, parts: ["LogAnalyzer", "Worker"], link: CS_LINK, can_apply: true, admin_changes: [], ...extra });
+  const applying = (extra: Record<string, unknown> = {}) => ({ ...NATIVE, pending: prepared({ status: "running", execution: "EXECUTE_IN_PROGRESS", executed_at: ago(0), applied_by: "admin@acme.example", ...extra }) });
+
+  test("an update that only changes what Coderhelm's roles may do: from Update available to Applying in one click", async ({ page }) => {
+    const bodies: V[] = [];
+    const w: World = {
+      v: { latest: rel("v0.8.46"), update_available: true, native: { ...NATIVE, pending: null }, model_check: { version: "v0.8.46", checked_at: ago(5), ok: true, results: [] } },
+      update: (b, w) => {
+        bodies.push(b);
+        // The press agreed to permission changes: the updater prepares, sees
+        // only role changes, and applies them by itself.
+        w.v = { ...w.v, running: true, native: applying({ permission_changes: ROLE_CHANGES }) };
+        return { status: 200, body: { id: "UPDATE#2", version: "v0.8.46", status: "preparing", state: "started" } };
+      },
+    };
+    const calls = await setup(page, w);
+    await page.goto("/settings/system/");
+    // What one press does is said next to the button, before pressing.
+    await expect(page.getByTestId("update-consent")).toHaveText(
+      "One press prepares and applies it. That includes any change to what Coderhelm's own roles may do, always inside this install's permission limit. If it would replace or remove data, it stops and asks you first.",
+    );
+    await page.getByRole("button", { name: "Update to v0.8.46" }).click();
+    await expect(status(page)).toHaveAttribute("data-state", "updating");
+    await expect(status(page)).toContainText("Applying v0.8.46");
+    expect(bodies).toEqual([{ accept_permissions: true }]);
+    expect(posts(calls, "/api/system/update/apply")).toBe(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(toasts(page)).toHaveCount(0);
+  });
+
+  test("a prepared update with role changes: a plain summary and one Apply update, the raw list under Technical details", async ({ page }) => {
+    const calls = await setup(page, {
+      v: { latest: rel("v0.8.46"), update_available: true, native: { ...NATIVE, pending: prepared({ confirm: "c".repeat(64), data_changes: [], permission_changes: ROLE_CHANGES }) } },
+      apply: (w) => { w.v = { ...w.v, running: true, native: applying({ permission_changes: ROLE_CHANGES }) }; return { status: 200, body: { id: "UPDATE#2", version: "v0.8.46", status: "running" } }; },
+    });
+    await page.goto("/settings/system/");
+    await expect(status(page)).toContainText("v0.8.46 is ready to apply");
+    await expect(page.getByTestId("native-update-permissions")).toHaveText("It changes what 2 of Coderhelm's own roles may do, all inside this install's permission limit.");
+    await expect(page.getByTestId("native-update-permission-changes")).toBeHidden();
+    await status(page).getByText("Technical details").click();
+    await expect(page.getByTestId("native-update-permission-changes")).toBeVisible();
+    await expect(page.getByTestId("native-update-permission-changes")).toContainText("LogAnalyzerServiceRoleDefaultPolicy341691CC");
+    await page.getByRole("button", { name: "Apply update" }).click();
+    await expect(status(page)).toHaveAttribute("data-state", "updating");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(posts(calls, "/api/system/update/apply")).toBe(1);
+  });
+
+  test("an update that would replace data: two clicks, the second one says exactly what it does", async ({ page }) => {
+    const data = ["Database.Table (AWS::DynamoDB::GlobalTable: Modify, replacement True)"];
+    const applied: V[] = [];
+    const w: World = {
+      v: { latest: rel("v0.8.46"), update_available: true, native: { ...NATIVE, pending: null }, model_check: { version: "v0.8.46", checked_at: ago(5), ok: true, results: [] } },
+      update: (_b, w) => {
+        w.v = { ...w.v, native: { ...NATIVE, pending: prepared({ confirm: "d".repeat(64), data_changes: data, permission_changes: [] }) } };
+        return { status: 200, body: { id: "UPDATE#2", version: "v0.8.46", status: "preparing", state: "started" } };
+      },
+    };
+    w.apply = (w) => { w.v = { ...w.v, running: true, native: applying({ data_changes: data }) }; return { status: 200, body: { id: "UPDATE#2", version: "v0.8.46", status: "running" } }; };
+    await setup(page, w);
+    await page.route((url) => url.pathname === "/api/system/update/apply", (route) => { applied.push(route.request().postDataJSON() as V); return route.fallback(); });
+    await page.goto("/settings/system/");
+    await page.getByRole("button", { name: "Update to v0.8.46" }).click();
+    await expect(status(page)).toContainText("v0.8.46 would replace or remove data");
+    await expect(page.getByTestId("native-update-hold")).toContainText("Applying it replaces or removes this data, which can't be undone:");
+    await expect(page.getByTestId("native-update-data-changes")).toHaveText("The Table table in Database (replaced)");
+    await expect(page.getByTestId("native-update-hold")).toContainText("If what it changes is different by then, it asks you again.");
+    await page.getByRole("button", { name: "Replace the data and apply" }).click();
+    await expect(status(page)).toHaveAttribute("data-state", "updating");
+    expect(applied).toEqual([{ id: "UPDATE#2", confirm: "d".repeat(64) }]);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 });

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { api, errorStatus, type AutoUpdateSettings, type ModelCheck, type SystemPreflight, type SystemVersion, type UpdateEntry } from "@/lib/api";
-import { deriveUpdateState, failureText, followEvery, isStateAnswer, nextAfter, STATE_ID, STARTING_HOLD_MS, withPress, type FailedTry, type UpdateState } from "@/lib/update-state";
+import { deriveUpdateState, failureText, healthChecks, followEvery, isStateAnswer, nextAfter, STATE_ID, STARTING_HOLD_MS, withPress, type FailedTry, type UpdateState } from "@/lib/update-state";
 import { CheckRow } from "@/components/install-checks";
 import { DomainSection } from "@/components/domain-section";
 import { HybridSection } from "@/components/hybrid-section";
@@ -264,7 +264,9 @@ function System() {
         // No version: the updater reads GitHub first and installs the newest
         // release at this moment. Skipping a model check names the release
         // whose check the admin read.
-        const r = await api.updateNow(skipCheck ? data.model_check?.version : undefined, skipCheck);
+        // A one-stack install that applies its own updates: the press is also
+        // the admin's OK for permission changes, as the card says next to it.
+        const r = await api.updateNow(skipCheck ? data.model_check?.version : undefined, skipCheck, !!data.native?.can_apply);
         if (r.ok) {
           // Started, or recorded while the release check runs (it starts by
           // itself once the check passes): either way the card shows it.
@@ -772,6 +774,11 @@ function UpdateStatus({
             </p>
           )}
           {l.prerelease && <p>A nightly beta: it reaches Stable after a day with no reported problem. You get these because the channel is Beta (nightly).</p>}
+          {data.native?.can_apply ? (
+            <p className="text-zinc-400" data-testid="update-consent">
+              One press prepares and applies it. That includes any change to what Coderhelm&apos;s own roles may do, always inside this install&apos;s permission limit. If it would replace or remove data, it stops and asks you first.
+            </p>
+          ) : null}
           {state.ended?.reason ? (
             <p data-testid="update-ended">
               The last press of Update{state.ended.requested_at ? <> (<Time iso={state.ended.requested_at} />)</> : null} didn&apos;t apply it: {state.ended.reason.replace(/\.$/, "")}.
@@ -1019,11 +1026,11 @@ function ReleaseNotes({ version, notes, url }: { version: string; notes: string;
  * while no check fails, and the Version status says so.
  */
 function InstallHealth({ pre, state, blocking, onRecheck }: { pre: SystemPreflight | null; state: "loading" | "ready" | "failed"; blocking: Set<string>; onRecheck: () => void }) {
-  const checks = pre?.checks ?? [];
+  const checks = healthChecks(pre?.checks ?? []);
   const failing = checks.filter((c) => c.status === "fail");
   const warning = checks.filter((c) => c.status === "warn");
   const passing = checks.filter((c) => c.status === "pass").length;
-  const optional = checks.filter((c) => c.status === "skip").length;
+  const optional = checks.filter((c) => c.status === "skip");
   const health = !pre ? state : failing.length ? "failing" : warning.length ? "warning" : "healthy";
   const rerun = (
     <button type="button" className={buttonClass("secondary", "sm")} onClick={onRecheck} disabled={state === "loading"}>
@@ -1056,7 +1063,6 @@ function InstallHealth({ pre, state, blocking, onRecheck }: { pre: SystemPreflig
             </p>
             <p className="mt-0.5 text-sm text-zinc-400">
               {failing.some((c) => blocking.has(c.key)) ? `Updates won't start until ${failing.length === 1 ? "it passes" : "they pass"}. ` : ""}
-              {optional ? `${plural(optional, "optional check")} not set up. ` : ""}
               Checked <Time iso={pre.checked_at} />.
             </p>
           </div>
@@ -1067,11 +1073,20 @@ function InstallHealth({ pre, state, blocking, onRecheck }: { pre: SystemPreflig
         </div>
       )}
       {pre && failing.length + warning.length > 0 && (
-        <ul className="divide-y divide-zinc-800 border-t border-zinc-800" aria-label="Checks that need a fix or a look">
+        <ul className="divide-y divide-zinc-800 border-t border-zinc-800" aria-label="Checks that need a fix or a look" data-testid="health-problems">
           {[...failing, ...warning].map((c) => (
             <CheckRow key={c.key} check={c}>
               {blocking.has(c.key) && <p className="mt-2"><Chip tone="danger">Stops updates</Chip></p>}
             </CheckRow>
+          ))}
+        </ul>
+      )}
+      {pre && optional.length > 0 && (
+        <ul className="space-y-1 border-t border-zinc-800 px-4 py-3 text-sm text-zinc-400" aria-label="Optional, not set up" data-testid="health-optional">
+          {optional.map((c) => (
+            <li key={c.key} className="min-w-0 break-words">
+              <span className="text-zinc-300">Optional: {c.label}.</span> {c.why ?? c.detail}
+            </li>
           ))}
         </ul>
       )}

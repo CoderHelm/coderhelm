@@ -1295,10 +1295,16 @@ export const api = {
    * the model check when a model the release calls was refused; `skipCheck`
    * passes only a failure on a model the release doesn't call.
    */
-  updateNow: (version?: string, skipCheck = false) =>
+  updateNow: (version?: string, skipCheck = false, acceptPermissions = false) =>
     requestWithBody<UpdateNowAnswer, { model_check: ModelCheck; waiting: boolean }>("/api/system/update", {
       method: "POST",
-      body: JSON.stringify({ ...(version ? { version } : {}), ...(skipCheck ? { skip_check: true } : {}) }),
+      body: JSON.stringify({
+        ...(version ? { version } : {}),
+        ...(skipCheck ? { skip_check: true } : {}),
+        // The press agrees to changes of what Coderhelm's own roles may do,
+        // inside the install's permission limit; never to data changes.
+        ...(acceptPermissions ? { accept_permissions: true } : {}),
+      }),
     }),
   /** The next release's model check, run again now. */
   checkUpdateModels: () => request<{ model_check: ModelCheck | null }>("/api/system/update-check", { method: "POST", body: "{}" }),

@@ -301,3 +301,13 @@ export function failureText(what: string, message: string | null | undefined, st
 export function isStateAnswer(status: number | undefined): boolean {
   return status === 409;
 }
+
+/**
+ * The checks that are about the install itself. The release check of the
+ * next release (running, or stopped without an answer) is the update's own
+ * state, shown only in the Version card; an older gateway still sends it as
+ * a check, so it is left out here unless a model really was refused.
+ */
+export function healthChecks<T extends { key: string; status: string }>(checks: T[]): T[] {
+  return checks.filter((c) => c.key !== "update_models" || c.status === "fail");
+}
