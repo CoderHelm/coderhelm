@@ -1,4 +1,4 @@
-import type { ModelCheck, NativeChangeSet, SystemPreflight, SystemVersion, UpdateBlocker, UpdateEntry } from "./api";
+import type { ModelCheck, NativeChangeSet, SystemPreflight, SystemVersion, UpdateBlocker, UpdateEntry, UpdateRequest } from "./api";
 
 /**
  * The one update state Settings, System shows, derived in one place from the
@@ -20,15 +20,17 @@ export type UpdateState =
   | { kind: "applying"; version: string; startedAt: string | null; startedBy: string | null; appliedBy: string | null; pending: NativeChangeSet | null }
   | { kind: "preparing"; version: string; startedAt: string | null; startedBy: string | null; pending: NativeChangeSet }
   | { kind: "review"; version: string; pending: NativeChangeSet; need: "confirm" | "apply" | "aws-admin" }
-  | { kind: "checking"; version: string; startedAt: string | null }
+  | { kind: "starting"; version: string; at: number }
+  | { kind: "checking"; version: string; startedAt: string | null; request: UpdateRequest | null }
   | { kind: "check-stalled"; version: string; note: string; check: ModelCheck }
   | { kind: "needs-action"; version: string; check: ModelCheck }
   | { kind: "failed"; failure: FailedTry }
   | { kind: "updater-down"; version: string; blocker: UpdateBlocker }
   | { kind: "blocked"; version: string; checks: number }
-  | { kind: "available"; version: string }
+  | { kind: "available"; version: string; ended: UpdateRequest | null }
   | { kind: "behind"; version: string }
   | { kind: "unreachable" }
+  | { kind: "stale"; fetchedAt: string | null }
   | { kind: "not-checked" }
   | { kind: "current"; done: UpdateEntry | null };
 
@@ -140,11 +142,23 @@ export function deriveUpdateState(data: SystemVersion, pre: SystemPreflight | nu
 
   if (!current) return { kind: "development" };
 
+  // An admin pressed Update while the release check ran: the update starts by
+  // itself once it passes, so the card says Checking (never a second Update
+  // button), for the version they pressed, whatever newer release is listed.
+  const req = data.update_request ?? null;
+  const asked = req?.status === "waiting" && !atLeast(current, req.version) ? req : null;
+  if (asked) {
+    const c = data.model_check?.version === asked.version ? data.model_check : null;
+    const started = c?.pending ? (c.progress?.started_at ?? c.started_at ?? c.checked_at ?? null) : null;
+    const old = !!started && now - new Date(started).getTime() > CHECK_LIMIT_MS;
+    if (!c || c.pending ? !old : c.ok) return { kind: "checking", version: asked.version, startedAt: started ?? asked.requested_at ?? null, request: asked };
+  }
+
   const mc = latest && data.model_check?.version === latest.version ? data.model_check : null;
   if (latest && mc && !mc.ok) {
     const started = mc.progress?.started_at ?? mc.started_at ?? mc.checked_at ?? null;
     const old = !!started && now - new Date(started).getTime() > CHECK_LIMIT_MS;
-    if (mc.pending && !old) return { kind: "checking", version: latest.version, startedAt: started };
+    if (mc.pending && !old) return { kind: "checking", version: latest.version, startedAt: started, request: null };
     if (mc.pending || mc.stalled) {
       const note = mc.stalled && mc.note ? mc.note : `Checking ${latest.version} didn't finish within 30 minutes.`;
       return { kind: "check-stalled", version: latest.version, note, check: mc };
@@ -161,11 +175,17 @@ export function deriveUpdateState(data: SystemVersion, pre: SystemPreflight | nu
   if (latest && updater) return { kind: "updater-down", version: latest.version, blocker: updater };
   const checks = new Set(blockers.filter((b) => checkKeys.has(b.key)).map((b) => b.key)).size;
   if (latest && checks > 0) return { kind: "blocked", version: latest.version, checks };
-  if (latest) return { kind: "available", version: latest.version };
+  if (latest) {
+    // A press that ended (its check failed since, or AWS refused to start it): why, once.
+    const ended = req && req.status === "ended" && req.version === latest.version ? req : null;
+    return { kind: "available", version: latest.version, ended };
+  }
 
   if (data.releases?.behind) return { kind: "behind", version: data.releases.behind.version };
   if (data.releases?.error) return { kind: "unreachable" };
   if (data.releases && !data.releases.fetched_at) return { kind: "not-checked" };
+  // An old copy of the release list can't say "up to date".
+  if (data.releases?.stale) return { kind: "stale", fetchedAt: new Date(data.releases.fetched_at! * 1000).toISOString() };
   return { kind: "current", done: recentSuccess(data, now) };
 }
 
@@ -184,6 +204,7 @@ export const STATE_ID: Record<UpdateState["kind"], string> = {
   applying: "updating",
   preparing: "preparing",
   review: "review",
+  starting: "starting",
   checking: "checking-release",
   "check-stalled": "check-stalled",
   "needs-action": "needs-action",
@@ -193,6 +214,7 @@ export const STATE_ID: Record<UpdateState["kind"], string> = {
   available: "available",
   behind: "behind",
   unreachable: "unreachable",
+  stale: "stale",
   "not-checked": "not-checked",
   current: "current",
 };
@@ -200,6 +222,9 @@ export const STATE_ID: Record<UpdateState["kind"], string> = {
 /** How often the page reads the version route again in this state (ms), or null: it moves on by itself. */
 export function followEvery(s: UpdateState): number | null {
   switch (s.kind) {
+    case "starting":
+      // Just pressed: read again soon, so the card moves on as soon as the updater does.
+      return 3_000;
     case "preparing":
     case "checking":
       return 10_000;
@@ -211,4 +236,68 @@ export function followEvery(s: UpdateState): number | null {
     default:
       return null;
   }
+}
+
+/** The version an update in progress (checking, preparing, waiting, applying) is for, or null. */
+export function inProgressVersion(s: UpdateState): string | null {
+  switch (s.kind) {
+    case "starting":
+    case "checking":
+    case "preparing":
+    case "review":
+    case "applying":
+      return s.version;
+    default:
+      return null;
+  }
+}
+
+/**
+ * A release newer than the update in progress: mentioned quietly ("it's
+ * next after this one"), never offered as a second Update button while one
+ * runs. Offered once the current one ends.
+ */
+export function nextAfter(s: UpdateState, data: SystemVersion): string | null {
+  const v = inProgressVersion(s);
+  const latest = data.latest?.version ?? null;
+  if (!v || !latest || latest === v || !atLeast(latest, v)) return null;
+  return latest;
+}
+
+/** How long a press shows "Starting" while the version route still reads as before it (a cache, a slow read). */
+export const STARTING_HOLD_MS = 90_000;
+
+/**
+ * The state with a press just made laid over it: until the updater's answer
+ * shows the update (checking, preparing, applying, or a reason it ended), a
+ * version read from before the press must not bring the Update button back.
+ */
+export function withPress(s: UpdateState, press: { version: string | null; at: number } | null, now: number = Date.now()): UpdateState {
+  if (!press || now - press.at > STARTING_HOLD_MS) return s;
+  if (s.kind !== "available" && s.kind !== "failed") return s;
+  if (s.kind === "failed" && s.failure.startedAt && new Date(s.failure.startedAt).getTime() >= press.at - 5_000) return s;
+  if (s.kind === "available" && s.ended?.ended_at && new Date(s.ended.ended_at).getTime() >= press.at - 5_000) return s;
+  const version = press.version ?? (s.kind === "available" ? s.version : s.failure.version);
+  return { kind: "starting", version, at: press.at };
+}
+
+/**
+ * The error toast for an update action that really failed: what went wrong
+ * and what to do, in plain words. Only for real failures (the server didn't
+ * answer, a refused permission, a refusal with its reason): a state such as
+ * "the release is being checked" is shown in the card instead.
+ */
+export function failureText(what: string, message: string | null | undefined, status: number | undefined): string {
+  if (status === undefined || status === 0 || status >= 500) {
+    return `Couldn't ${what}: the server didn't answer${status ? ` (error ${status})` : ""}. Nothing changed; try again in a minute.`;
+  }
+  if (status === 401) return `Couldn't ${what}: you're signed out. Sign in again, then try once more.`;
+  if (status === 403) return `Couldn't ${what}: only install admins can do this. Ask one of them, or sign in as one.`;
+  const why = (message ?? "").trim().replace(/\.$/, "");
+  return why ? `Couldn't ${what}: ${why}.` : `Couldn't ${what} (error ${status}). Reload the page to see where things stand.`;
+}
+
+/** A 4xx that is the install's state (it moved on since the page loaded), not a failure. */
+export function isStateAnswer(status: number | undefined): boolean {
+  return status === 409;
 }

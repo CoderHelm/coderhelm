@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { api, type NativeUpdate } from "@/lib/api";
+import { useRef, useState, type ReactNode } from "react";
+import { api, errorStatus, type NativeUpdate } from "@/lib/api";
+import { failureText } from "@/lib/update-state";
 import { Callout } from "@/components/callout";
 import { Time } from "@/components/list";
 import { Code } from "@/components/settings/code";
@@ -66,6 +67,7 @@ export function NativeUpdateCard({
   startedBy,
   appliedBy,
   from,
+  next,
 }: {
   native: NativeUpdate;
   phase: "preparing" | "review" | "applying";
@@ -78,10 +80,14 @@ export function NativeUpdateCard({
   appliedBy?: string | null;
   /** The version the install is on while it updates. */
   from?: string | null;
+  /** A quiet line about a newer release, next after this one. */
+  next?: ReactNode;
 }) {
   const { toast } = useToast();
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
+  // One apply per click, whatever the clicks.
+  const acting = useRef(false);
   const p = native.pending;
   if (!p) return null;
   const n = p.counts ?? { add: 0, modify: 0, remove: 0 };
@@ -94,17 +100,26 @@ export function NativeUpdateCard({
   const version = p.version ?? "the update";
 
   const apply = async () => {
-    if (!p.id) return;
+    if (!p.id || acting.current) return;
+    acting.current = true;
     setBusy(true);
     try {
       await api.applyUpdate(p.id, toConfirm ? p.confirm : "");
       setAsking(false);
-      toast(`Updating to ${version}. This takes 10 to 20 minutes.`);
-      onChanged?.();
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Could not apply the update", "error");
+      const status = errorStatus(e);
+      if (status === 400 || status === 409) {
+        // It moved on since this page read it (applied in the AWS console, or
+        // replaced by a newer one): the card shows where it is now.
+        setAsking(false);
+      } else {
+        toast(failureText(`apply ${version}`, e instanceof Error ? e.message : null, status), "error");
+      }
     } finally {
+      acting.current = false;
       setBusy(false);
+      // The card follows what happened: applying, or where the update is now.
+      onChanged?.();
     }
   };
 
@@ -163,6 +178,7 @@ export function NativeUpdateCard({
         ) : null}
         {waiting ? <UpdateSteps at="apply" waiting={canApply ? "waits for your OK" : "waits for an AWS admin"} /> : null}
         {p.reason && !waiting ? <p className="mt-2 text-zinc-400">{p.reason}</p> : null}
+        {next}
         <p className="mt-3 flex flex-wrap items-center gap-3">
           {canApply ? (
             <button type="button" className={primaryButton} disabled={busy} onClick={() => (toConfirm ? setAsking(true) : apply())} data-testid="native-update-apply">

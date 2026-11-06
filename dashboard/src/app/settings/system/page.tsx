@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { api, type AutoUpdateSettings, type ModelCheck, type SystemPreflight, type SystemVersion, type UpdateEntry } from "@/lib/api";
-import { deriveUpdateState, followEvery, STATE_ID, type FailedTry, type UpdateState } from "@/lib/update-state";
+import { api, errorStatus, type AutoUpdateSettings, type ModelCheck, type SystemPreflight, type SystemVersion, type UpdateEntry } from "@/lib/api";
+import { deriveUpdateState, failureText, followEvery, isStateAnswer, nextAfter, STATE_ID, STARTING_HOLD_MS, withPress, type FailedTry, type UpdateState } from "@/lib/update-state";
 import { CheckRow } from "@/components/install-checks";
 import { DomainSection } from "@/components/domain-section";
 import { HybridSection } from "@/components/hybrid-section";
@@ -137,24 +137,54 @@ function System() {
     loadPreflight();
   }, [loadPreflight]);
   const form = useDirtyForm<AutoUpdateSettings>(DEFAULTS, { disabled: !data });
+  // An Update press the version route may not show yet: until it does, the
+  // card says Starting and never offers the button again.
+  const [press, setPress] = useState<{ version: string | null; at: number } | null>(null);
+  // One action at a time, whatever the clicks: a double click sends one request.
+  const acting = useRef(false);
+  // Only the newest read of the version route is shown: a slow poll that
+  // started before a press never replaces what the press led to.
+  const reads = useRef(0);
 
   const load = useCallback(async () => {
+    const mine = ++reads.current;
     try {
       const v = await api.getSystemVersion();
+      if (mine !== reads.current) return;
       setData(v);
       setError(false);
-      form.reset(withChannel(v.settings));
+      // The saved settings, without dropping what someone is changing: the
+      // page reads the version route again every few seconds while an update runs.
+      if (!dirtyRef.current) form.reset(withChannel(v.settings));
     } catch {
-      setError(true);
+      if (mine !== reads.current) return;
+      // A failed poll keeps what is on screen; only a page with nothing yet shows the error.
+      setError((had) => had || !dataRef.current);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const dataRef = useRef<SystemVersion | null>(null);
+  dataRef.current = data;
+  const dirtyRef = useRef(false);
+  dirtyRef.current = form.dirty;
 
   useEffect(() => {
     load();
   }, [load]);
-  // The one update state, derived in one place (lib/update-state.ts).
-  const state: UpdateState | null = data ? deriveUpdateState(data, pre) : null;
+  // The one update state, derived in one place (lib/update-state.ts), with a
+  // press the version route doesn't show yet laid over it.
+  const derived: UpdateState | null = data ? deriveUpdateState(data, pre) : null;
+  const state: UpdateState | null = derived ? withPress(derived, press) : null;
+  useEffect(() => {
+    if (!press) return;
+    // The updater's answer is on screen (or the hold ran out): the press is done.
+    if (state && state.kind !== "starting") {
+      setPress(null);
+      return;
+    }
+    const t = window.setTimeout(() => setPress(null), Math.max(0, press.at + STARTING_HOLD_MS - Date.now()));
+    return () => window.clearTimeout(t);
+  }, [press, state]);
   // While something is happening (the release check, preparing, waiting for
   // an OK that can also be given in the AWS console, applying), follow it:
   // the version route reads CloudFormation each time, so the card moves from
@@ -170,7 +200,7 @@ function System() {
 
   const header = (
     <div className="mb-6">
-      <PageHeader title="Version and updates" lead="Which version of Coderhelm runs here, new releases, the health of the install, and every update so far." />
+      <PageHeader title="Version and updates" lead="Which version of Coderhelm runs here, new releases and how they install, every update so far, and the health of the install." />
     </div>
   );
 
@@ -178,7 +208,8 @@ function System() {
     return (
       <Page>
         {header}
-        <Callout variant="error" title="Could not load this install's version">
+        <Callout variant="error" title="Couldn't load this install's version">
+          <p>The server didn&apos;t answer. Nothing changed on the install; try again in a minute.</p>
           <button type="button" onClick={load} className={`mt-2 ${secondaryButton}`}>Try again</button>
         </Callout>
       </Page>
@@ -207,47 +238,60 @@ function System() {
   const blockers = (pre?.blockers ?? []).filter((b) => b.severity === "block");
   const checkKeys = new Set((pre?.checks ?? []).map((c) => c.key));
   const blocking = new Set(blockers.filter((b) => checkKeys.has(b.key)).map((b) => b.key));
-  const busyUpdating = ["applying", "preparing", "review"].includes(state.kind);
+  const busyUpdating = ["applying", "preparing", "review", "starting", "checking"].includes(state.kind);
   const failure = state.kind === "failed" ? state.failure : null;
   const offered = !!latest && ["available", "blocked", "updater-down", "needs-action", "checking", "check-stalled", "failed"].includes(state.kind);
 
   const save = async () => {
     try {
       const r = await api.setAutoUpdate(form.values);
-      form.reset({ ...DEFAULTS, ...r.settings });
+      form.reset(withChannel({ ...DEFAULTS, ...r.settings }));
       toast("Update settings saved");
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Could not save", "error");
+      // Your changes stay on the page: Save again once it answers.
+      toast(failureText("save the update settings", e instanceof Error ? e.message : null, errorStatus(e)), "error");
     }
   };
 
   const start = async (kind: "update" | "rollback", skipCheck = false) => {
+    if (acting.current) return;
+    acting.current = true;
     setBusy(kind);
+    // Any read already on its way is from before this press.
+    reads.current += 1;
     try {
       if (kind === "update") {
         // No version: the updater reads GitHub first and installs the newest
         // release at this moment. Skipping a model check names the release
         // whose check the admin read.
         const r = await api.updateNow(skipCheck ? data.model_check?.version : undefined, skipCheck);
-        if (!r.ok) {
-          // A model the release calls was refused: show which, with its fix.
-          if (r.model_check) setData({ ...data, model_check: r.model_check });
-          toast(r.error, "error");
+        if (r.ok) {
+          // Started, or recorded while the release check runs (it starts by
+          // itself once the check passes): either way the card shows it.
+          setPress({ version: r.version ?? null, at: Date.now() });
+          if (r.state === "checking") {
+            setData((d) => (d ? { ...d, model_check: r.model_check ?? d.model_check, update_request: r.request ?? d.update_request } : d));
+          }
+        } else if (r.model_check || r.waiting || isStateAnswer(r.httpStatus)) {
+          // The release check holds it (a model it calls was refused, or the
+          // release isn't ready): the card shows which, with the fix.
+          if (r.model_check) setData((d) => (d ? { ...d, model_check: r.model_check } : d));
           loadPreflight();
-          return;
+        } else {
+          toast(failureText("start the update", r.error, r.httpStatus), "error");
         }
-        toast(data.native ? `Preparing ${r.version}, then it applies. This takes 10 to 20 minutes.` : `Updating to ${r.version}. This takes 10 to 20 minutes.`);
       } else {
-        const e = await api.rollbackInstall();
-        toast(`Rolling back to ${e.version}.`);
+        await api.rollbackInstall();
       }
-      await load();
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Could not start", "error");
+      toast(failureText(kind === "update" ? "start the update" : "start the roll back", e instanceof Error ? e.message : null, errorStatus(e)), "error");
     } finally {
+      await load();
+      acting.current = false;
       setBusy("");
     }
   };
+  const next = nextAfter(state, data);
 
   return (
     <Page>
@@ -267,6 +311,7 @@ function System() {
                 load();
               }}
               onSkipModel={() => start("update", true)}
+              next={next}
             />
             {!busyUpdating && data.current.version && <ReleaseCheck data={data} onChecked={setData} />}
             <SettingsMore summary="Technical details">
@@ -274,22 +319,6 @@ function System() {
             </SettingsMore>
           </div>
           {latest && offered && <ReleaseNotes version={latest.version} notes={latest.notes} url={latest.url} />}
-        </SettingsSection>
-
-        <SettingsSection id="health" title="Install health" description="The checks Coderhelm runs on itself: its address, GitHub, email, Claude and its queues. An update starts only while none fails.">
-          <InstallHealth pre={pre} state={preState} blocking={blocking} onRecheck={loadPreflight} />
-        </SettingsSection>
-
-        <SettingsSection id="models" title="Models" description="How this install calls Claude: Amazon Bedrock in this AWS account, or each team's Anthropic API key. Change it at any time.">
-          <ModelsSection />
-        </SettingsSection>
-
-        <SettingsSection id="domain" title="Domain" description="The address people and GitHub use for this install: the AWS address, your own domain, or a coderhelm.com address.">
-          <DomainSection />
-        </SettingsSection>
-
-        <SettingsSection id="hybrid" title="Hybrid" description="Use Coderhelm's GitHub App, its other apps and a coderhelm.com address, while your code and work stay in this AWS account.">
-          <HybridSection />
         </SettingsSection>
 
         <SettingsSection id="auto" title="Automatic updates">
@@ -429,11 +458,36 @@ function System() {
               ))}
             </ul>
           )}
-          <div className="px-4 py-4">
-            <button type="button" className={secondaryButton} disabled={!canRollBack || !!busy || busyUpdating} onClick={() => start("rollback")}>
-              {busy === "rollback" ? "Starting…" : "Roll back to the previous version"}
-            </button>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-4">
+            {canRollBack ? (
+              <button type="button" className={secondaryButton} disabled={!!busy || busyUpdating} onClick={() => start("rollback")} data-testid="rollback">
+                {busy === "rollback" ? "Starting the roll back…" : "Roll back to the previous version"}
+              </button>
+            ) : null}
+            <p className="text-sm text-zinc-400" data-testid="rollback-note">
+              {!canRollBack
+                ? "Nothing to roll back to yet: once an update finishes here, you can go back to the version before it."
+                : busyUpdating
+                  ? "You can roll back once the update in progress finishes."
+                  : "Goes back to the version before the last update. Your data stays as it is."}
+            </p>
           </div>
+        </SettingsSection>
+
+        <SettingsSection id="health" title="Install health" description="The checks Coderhelm runs on itself: its address, GitHub, email, Claude and its queues. An update starts only while none fails.">
+          <InstallHealth pre={pre} state={preState} blocking={blocking} onRecheck={loadPreflight} />
+        </SettingsSection>
+
+        <SettingsSection id="models" title="Models" description="How this install calls Claude: Amazon Bedrock in this AWS account, or each team's Anthropic API key. Change it at any time.">
+          <ModelsSection />
+        </SettingsSection>
+
+        <SettingsSection id="domain" title="Domain" description="The address people and GitHub use for this install: the AWS address, your own domain, or a coderhelm.com address.">
+          <DomainSection />
+        </SettingsSection>
+
+        <SettingsSection id="hybrid" title="Hybrid" description="Use Coderhelm's GitHub App, its other apps and a coderhelm.com address, while your code and work stay in this AWS account.">
+          <HybridSection />
         </SettingsSection>
 
         <SettingsSection id="uninstall" title="Uninstall" description="Remove Coderhelm from your AWS account: delete its stack, keeping the data or not.">
@@ -504,6 +558,7 @@ function UpdateStatus({
   onChanged,
   onModelChecked,
   onSkipModel,
+  next,
 }: {
   state: UpdateState;
   data: SystemVersion;
@@ -512,6 +567,8 @@ function UpdateStatus({
   onChanged: () => void;
   onModelChecked: (c: ModelCheck | null) => void;
   onSkipModel: () => void;
+  /** A release newer than the update in progress: mentioned, never a second button. */
+  next: string | null;
 }) {
   const current = data.current.version;
   const latest = data.latest;
@@ -520,13 +577,14 @@ function UpdateStatus({
   const beta = withChannel(data.settings).channel === "beta";
   const healthLink = <a href="#health" className={linkButton}>See install health</a>;
   const id = STATE_ID[state.kind];
+  const nextLine = next ? <p className="mt-2 text-zinc-400" data-testid="update-next">{next} is out too; it&apos;s next after this one.</p> : null;
 
   switch (state.kind) {
     case "applying":
       if (state.pending && data.native) {
         return (
           <div data-testid="update-status" data-state={id}>
-            <NativeUpdateCard native={{ ...data.native, pending: state.pending }} phase="applying" onChanged={onChanged} startedAt={state.startedAt} startedBy={state.startedBy} appliedBy={state.appliedBy} from={current} />
+            <NativeUpdateCard native={{ ...data.native, pending: state.pending }} phase="applying" onChanged={onChanged} startedAt={state.startedAt} startedBy={state.startedBy} appliedBy={state.appliedBy} from={current} next={nextLine} />
           </div>
         );
       }
@@ -537,6 +595,7 @@ function UpdateStatus({
             This takes 10 to 20 minutes. Coderhelm keeps running {on} until it finishes, and this page updates by itself.
           </p>
           <Working label={`Updating to ${state.version}`} />
+          {nextLine}
         </StatusCard>
       );
 
@@ -551,21 +610,47 @@ function UpdateStatus({
             startedAt={state.kind === "preparing" ? state.startedAt : undefined}
             startedBy={state.kind === "preparing" ? state.startedBy : undefined}
             from={current}
+            next={nextLine}
           />
         </div>
       );
 
-    case "checking":
+    case "starting":
+      return (
+        <StatusCard state={id} variant="info" title={<>Starting the update to {state.version}…</>}>
+          <p data-testid="update-starting">
+            The updater has your request. This card moves on by itself in a few seconds; there&apos;s nothing more to press.
+          </p>
+          <UpdateSteps at="check" />
+          <Working label={`Starting the update to ${state.version}`} />
+        </StatusCard>
+      );
+
+    case "checking": {
+      const req = state.request;
+      const by = req?.actor && req.actor !== "AWS CLI" ? req.actor : null;
+      const waits = req?.waiting_for && req.waiting_for !== "the release check" ? req.waiting_for : null;
       return (
         <StatusCard state={id} variant="info" title={<>Checking {state.version} before it can be applied</>}>
           <p data-testid="update-checking">
             {state.startedAt ? <>Started <Time iso={state.startedAt} />. </> : null}
-            Coderhelm checks the release&apos;s signature and checksums, then tries each model it calls. This usually takes about 5 minutes; this page moves on by itself, and then you can update.
+            Coderhelm checks the release&apos;s signature and checksums, then tries each model it calls. It takes about 5 minutes; this page moves on by itself.
           </p>
+          {req ? (
+            <p data-testid="update-requested">
+              {by ? <>{by} pressed Update</> : <>Update was pressed</>}
+              {req.requested_at ? <> <Time iso={req.requested_at} /></> : null}: it starts by itself once the check passes{data.native ? ", then applies or asks for your OK as usual" : ""}. There&apos;s nothing more to press.
+              {waits ? <> Waiting because {waits.replace(/; try again.*$/, "")}.</> : null}
+            </p>
+          ) : (
+            <p className="text-zinc-400">Then you can update, or it installs by itself in your maintenance window if automatic updates are on.</p>
+          )}
           <UpdateSteps at="check" />
           <Working label={`Checking ${state.version}`} />
+          {nextLine}
         </StatusCard>
       );
+    }
 
     case "check-stalled":
       return (
@@ -687,6 +772,11 @@ function UpdateStatus({
             </p>
           )}
           {l.prerelease && <p>A nightly beta: it reaches Stable after a day with no reported problem. You get these because the channel is Beta (nightly).</p>}
+          {state.ended?.reason ? (
+            <p data-testid="update-ended">
+              The last press of Update{state.ended.requested_at ? <> (<Time iso={state.ended.requested_at} />)</> : null} didn&apos;t apply it: {state.ended.reason.replace(/\.$/, "")}.
+            </p>
+          ) : null}
         </StatusCard>
       );
     }
@@ -709,6 +799,15 @@ function UpdateStatus({
       return (
         <StatusCard state={id} variant="warning" title="Couldn't check for updates">
           <p>GitHub didn&apos;t answer, so it isn&apos;t known whether a newer release is out. You&apos;re on {current}.</p>
+        </StatusCard>
+      );
+
+    case "stale":
+      return (
+        <StatusCard state={id} variant="warning" title="Not checked for updates lately">
+          <p data-testid="update-stale">
+            You&apos;re on {current}. The list of releases was last read {state.fetchedAt ? <Time iso={state.fetchedAt} /> : "a while ago"}, so a newer release may be out. Check for updates reads it now.
+          </p>
         </StatusCard>
       );
 
@@ -751,7 +850,7 @@ function CheckAgain({ onChecked }: { onChecked: (c: ModelCheck | null) => void }
         try {
           onChecked((await api.checkUpdateModels()).model_check);
         } catch (e) {
-          toast(e instanceof Error ? e.message : "Could not start the check", "error");
+          toast(failureText("start the check again", e instanceof Error ? e.message : null, errorStatus(e)), "error");
         } finally {
           setBusy(false);
         }
@@ -783,12 +882,12 @@ function ReleaseCheck({ data, onChecked }: { data: SystemVersion; onChecked: (v:
     try {
       onChecked(await api.checkReleases());
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Could not check for updates", "error");
+      toast(failureText("check for updates", e instanceof Error ? e.message : null, errorStatus(e)), "error");
     } finally {
       setChecking(false);
     }
   };
-  const primary = !!r && (!r.fetched_at || !!r.error || !!r.behind) && !data.latest;
+  const primary = !!r && (!r.fetched_at || !!r.error || !!r.behind || r.stale) && !data.latest;
   return (
     <div data-testid="release-check" className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-zinc-400">
       <button type="button" className={buttonClass(primary ? "primary" : "secondary", "sm")} onClick={check} disabled={checking}>

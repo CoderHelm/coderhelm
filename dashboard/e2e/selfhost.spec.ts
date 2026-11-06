@@ -298,11 +298,6 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
       await expect(page.getByTestId("update-history")).toContainText("health check failed after deploying v1.1.5");
       await expect(page.getByTestId("update-history")).toContainText("auto-update window");
 
-      await page.getByRole("button", { name: "Update to v2.0.0" }).click();
-      await expect.poll(() => systemCalls.map((c) => c.path)).toContain("/api/system/update");
-      // No version: the updater reads GitHub first and installs the newest release at that moment.
-      expect(systemCalls.find((c) => c.path === "/api/system/update")!.body).toEqual({});
-
       await page.getByRole("switch", { name: "Install updates automatically" }).click();
       await pickOption(page.getByRole("combobox", { name: "Day" }), "sat");
       await pickOption(page.getByRole("combobox", { name: "Hour" }), "22");
@@ -311,6 +306,14 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
 
       await page.getByRole("button", { name: "Roll back to the previous version" }).click();
       await expect.poll(() => systemCalls.map((c) => c.path)).toContain("/api/system/rollback");
+
+      await page.getByRole("button", { name: "Update to v2.0.0" }).click();
+      await expect.poll(() => systemCalls.map((c) => c.path)).toContain("/api/system/update");
+      // No version: the updater reads GitHub first and installs the newest release at that moment.
+      expect(systemCalls.find((c) => c.path === "/api/system/update")!.body).toEqual({});
+      // Pressed: the card shows it starting at once, and the button isn't offered again.
+      await expect(status).toHaveAttribute("data-state", "starting");
+      await expect(page.getByRole("button", { name: /^Update to/ })).toHaveCount(0);
 
       const width = await page.evaluate(() => document.documentElement.scrollWidth);
       expect(width).toBeLessThanOrEqual(viewport.width);

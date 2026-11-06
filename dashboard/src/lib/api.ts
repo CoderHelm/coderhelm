@@ -93,7 +93,7 @@ export function movedUrl(v: unknown): string | null {
 async function requestWithBody<T, E>(
   path: string,
   options?: RequestInit,
-): Promise<({ ok: true } & T) | ({ ok: false; error: string } & Partial<E>)> {
+): Promise<({ ok: true } & T) | ({ ok: false; error: string; httpStatus: number } & Partial<E>)> {
   const res = await fetch(`${apiBase()}${path}`, {
     ...options,
     credentials: "include",
@@ -110,7 +110,7 @@ async function requestWithBody<T, E>(
   } catch {}
   if (!res.ok) {
     const error = typeof body.error === "string" && body.error ? body.error : httpErrorMessage(res.status);
-    return { ...(body as Partial<E>), ok: false, error };
+    return { ...(body as Partial<E>), ok: false, error, httpStatus: res.status };
   }
   return { ...(body as T), ok: true };
 }
@@ -1289,12 +1289,14 @@ export const api = {
     request<{ ok: boolean; uninstall: UninstallMode }>("/api/system/uninstall-mode", { method: "PUT", body: JSON.stringify({ delete_data: deleteData, confirm }) }),
   /**
    * Update to `version` (default: the newest release, read from GitHub at
-   * that moment, never the copy the page showed). Refused with the model check
-   * when a model the release calls was refused; `skipCheck` passes only a
-   * failure on a model the release doesn't call.
+   * that moment, never the copy the page showed). Pressed while the
+   * release's check runs, the press is recorded (`state: "checking"`) and
+   * the update starts by itself once the check passes. Refused (409) with
+   * the model check when a model the release calls was refused; `skipCheck`
+   * passes only a failure on a model the release doesn't call.
    */
   updateNow: (version?: string, skipCheck = false) =>
-    requestWithBody<UpdateEntry, { model_check: ModelCheck }>("/api/system/update", {
+    requestWithBody<UpdateNowAnswer, { model_check: ModelCheck; waiting: boolean }>("/api/system/update", {
       method: "POST",
       body: JSON.stringify({ ...(version ? { version } : {}), ...(skipCheck ? { skip_check: true } : {}) }),
     }),
@@ -4392,6 +4394,33 @@ export interface SystemModels {
   results?: ModelAccess[];
 }
 
+/**
+ * An admin's Update press that waits for the release check (lambda/updater,
+ * follow_request): it starts by itself once the check passes. `ended` says
+ * why it stopped; `started` names the update it became.
+ */
+export interface UpdateRequest {
+  version: string;
+  actor?: string;
+  requested_at?: string;
+  status: "waiting" | "started" | "ended";
+  /** What it waits for: the release check, or the release still publishing. */
+  waiting_for?: string;
+  reason?: string;
+  ended_at?: string;
+  id?: string;
+  /** The version an earlier press asked for, replaced by this one. */
+  replaces?: string;
+}
+
+/** What Update answers: the update it started, or the press recorded while the release check runs. */
+export type UpdateNowAnswer = Partial<UpdateEntry> & {
+  version: string;
+  state?: "checking" | "started";
+  request?: UpdateRequest | null;
+  model_check?: ModelCheck | null;
+};
+
 export interface SystemVersion {
   self_hosted: boolean;
   current: { version: string | null; commit: string | null; released_at: string | null; config_fingerprint: string | null };
@@ -4404,6 +4433,8 @@ export interface SystemVersion {
   history?: UpdateEntry[];
   /** The latest release's model check, once it has run. */
   model_check?: ModelCheck | null;
+  /** An admin's Update press waiting for the release check, or how it ended (a day). */
+  update_request?: UpdateRequest | null;
   /** Which install this is (its resources are coderhelm-<stage>-*), for the uninstall page. */
   install?: { stage: string; region: string } | null;
   /** A native install (one CloudFormation stack): the stack and the update waiting for review. */
