@@ -962,6 +962,27 @@ function RunDetailInner() {
                   ),
                   actions: undefined,
                 }
+              : run.status === "needs_input" && run.waiting_on?.action
+              ? {
+                  // A named wait: what to do, why, and where.
+                  tone: "waiting",
+                  title: run.waiting_on.action,
+                  body: run.waiting_on.detail ? <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{sanitizeError(run.waiting_on.detail)}</span> : null,
+                  actions: (
+                    <>
+                      {prLinks.length > 0
+                        ? openPrButtons("primary")
+                        : run.waiting_on.url && (
+                            <a href={run.waiting_on.url} target="_blank" rel="noopener noreferrer" className={`${buttonClass("primary")} gap-1.5`}>
+                              Open
+                              <ExternalLinkIcon />
+                              <span className="sr-only"> (opens in a new tab)</span>
+                            </a>
+                          )}
+                      {retryButton}
+                    </>
+                  ),
+                }
               : run.status === "needs_input"
               ? {
                   tone: "waiting",
