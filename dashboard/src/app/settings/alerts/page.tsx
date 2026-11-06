@@ -9,6 +9,7 @@ import {
   type AlertBudget,
   type AlertEvent,
   type AlertNotifySettings,
+  type AlertRepeat,
   type AlertRoute,
   type AlertRule,
   type AwsConnection,
@@ -17,6 +18,7 @@ import {
   type TopicAlarm,
 } from "@/lib/api";
 import { timeAgo } from "@/lib/data-sources";
+import { REPEAT_LABEL, REPEAT_OPTIONS, groupEpisodes, groupSummary, routeRepeat } from "@/lib/alert-episodes";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -59,7 +61,7 @@ export default function AlertsPageGuarded() {
   );
 }
 
-const EMPTY_ROUTE: AlertRoute = { topic_arn: "", rules: [], enabled: true, notify_mode: "team", post_recoveries: false };
+const EMPTY_ROUTE: AlertRoute = { topic_arn: "", rules: [], enabled: true, notify_mode: "team", post_recoveries: false, repeat: "every_time", alarm_repeat: {} };
 const EMPTY_RULE: AlertRule = { alarms: [], terms: [], repo: "", instructions: "" };
 
 const NOTIFY_LABEL: Record<string, string> = {
@@ -137,6 +139,9 @@ const OUTCOME_CHIP: Record<string, { label: string; tone: "success" | "warning" 
   deduplicated: { label: "Repeat, skipped", tone: "neutral" },
   recovery: { label: "Recovered", tone: "success" },
   recovery_not_posted: { label: "Recovered, not posted", tone: "neutral" },
+  suppressed: { label: "Still firing, held back", tone: "neutral" },
+  reminded: { label: "Daily reminder", tone: "info" },
+  clearing: { label: "OK, waiting to clear", tone: "neutral" },
 };
 
 /**
@@ -459,6 +464,9 @@ function RouteRow({
       meta={[
         `Chat: ${chat}`,
         mode !== "off" && (r.post_recoveries ? "Posts recoveries" : "Recoveries not posted"),
+        mode !== "off" && `Repeats: ${REPEAT_LABEL[routeRepeat(r)].toLowerCase()}`,
+        mode !== "off" && Object.keys(r.alarm_repeat ?? {}).length > 0 &&
+          `${Object.keys(r.alarm_repeat ?? {}).length} alarm${Object.keys(r.alarm_repeat ?? {}).length === 1 ? "" : "s"} with their own repeat setting`,
         r.rules.length === 0 ? "No rules: chat only" : `${r.rules.length} rule${r.rules.length === 1 ? "" : "s"}`,
       ]}
       summary={
@@ -955,13 +963,16 @@ function EventsTimeline({
         <p className="text-sm text-zinc-400">No alerts match. Choose All to see every alert.</p>
       ) : (
         <ol aria-label="Recent alerts" className="overflow-hidden rounded-lg border border-zinc-800 divide-y divide-zinc-800">
-          {shown.map((e) => {
+          {groupEpisodes(shown).map((g) => {
+            const e = g.head;
             const resolves = pairs.get(e.id);
             const recovery = resolvedBy.get(e.id);
+            const repeats = groupSummary(g);
+            const last = g.latest.received_at;
             return (
-              <li key={e.id} className="flex flex-col gap-1.5 px-4 py-3 sm:flex-row sm:items-start sm:gap-4">
-                <time dateTime={e.received_at ?? undefined} className="shrink-0 text-xs text-zinc-400 sm:w-28 sm:pt-0.5" title={e.received_at ?? ""}>
-                  {e.received_at ? timeAgo(e.received_at) : "Unknown time"}
+              <li key={e.id} data-testid={repeats ? "alert-episode" : undefined} className="flex flex-col gap-1.5 px-4 py-3 sm:flex-row sm:items-start sm:gap-4">
+                <time dateTime={last ?? undefined} className="shrink-0 text-xs text-zinc-400 sm:w-28 sm:pt-0.5" title={last ?? ""}>
+                  {last ? timeAgo(last) : "Unknown time"}
                 </time>
                 <div className="min-w-0 flex-1">
                   <Link
@@ -988,6 +999,24 @@ function EventsTimeline({
                     <p className="mt-1 text-xs text-zinc-400">
                       Recovered{recovery.received_at && e.received_at ? ` ${duration(e.received_at, recovery.received_at)} later` : ""}
                     </p>
+                  )}
+                  {repeats && (
+                    <details className="mt-1 text-xs text-zinc-400">
+                      <summary className={`cursor-pointer ${focusRing} rounded`}>
+                        {repeats}
+                        {e.received_at ? `, since ${timeAgo(e.received_at)}` : ""}
+                      </summary>
+                      <ol aria-label={`Firings of ${e.title || "this alert"}`} className="mt-1.5 flex flex-col gap-1 border-l border-zinc-800 pl-3">
+                        {g.members.map((m) => (
+                          <li key={m.id} className="flex flex-wrap items-center gap-2">
+                            <Link href={`/alerts/detail?id=${encodeURIComponent(m.id)}`} className={`${linkButton} !text-xs`}>
+                              {m.received_at ? timeAgo(m.received_at) : "Unknown time"}
+                            </Link>
+                            <OutcomeChip outcome={m.outcome} />
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
                   )}
                 </div>
                 <div className="shrink-0">
@@ -1297,6 +1326,108 @@ function RuleEditor({
   );
 }
 
+/**
+ * How often an alert that keeps firing posts: the route's setting, and the
+ * alarms (by name) that have their own.
+ */
+function RepeatSettings({
+  value,
+  overrides,
+  alarms,
+  onChange,
+}: {
+  value: AlertRepeat;
+  overrides: Record<string, AlertRepeat>;
+  alarms: TopicAlarm[] | null;
+  onChange: (repeat: AlertRepeat, overrides: Record<string, AlertRepeat>) => void;
+}) {
+  const [adding, setAdding] = useState("");
+  const names = Object.keys(overrides).sort();
+  const choices = (alarms ?? []).map((a) => a.name).filter((n) => !(n in overrides));
+  const setOne = (name: string, r: AlertRepeat) => onChange(value, { ...overrides, [name]: r });
+  const removeOne = (name: string) => {
+    const next = { ...overrides };
+    delete next[name];
+    onChange(value, next);
+  };
+  const add = () => {
+    const name = adding.trim();
+    if (!name || name in overrides) return;
+    // A new alarm starts from the other choice than the route's, the reason to add one.
+    setOne(name, value === "every_time" ? "until_clear" : "every_time");
+    setAdding("");
+  };
+  const options = REPEAT_OPTIONS.map((o) => ({ value: o.value, label: o.label }));
+  return (
+    <section aria-labelledby="repeat-heading" className="flex flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+      <h2 id="repeat-heading" className="font-semibold text-zinc-100">When an alarm keeps firing</h2>
+      <p className="text-sm text-zinc-400">
+        An alarm that flips between OK and ALARM can post over and over. Choose how often it posts while it is still firing. Every firing is
+        still recorded on the Alerts page.
+      </p>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="sr-only">How often this route posts an alarm that keeps firing</legend>
+        {REPEAT_OPTIONS.map((o) => (
+          <label key={o.value} className="flex items-start gap-3 text-sm text-zinc-300">
+            <input
+              type="radio"
+              name="route-repeat"
+              value={o.value}
+              checked={value === o.value}
+              onChange={() => onChange(o.value, overrides)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
+            />
+            <span>
+              {o.label}
+              {o.value === "every_time" && <span className="text-zinc-500"> (default)</span>}
+              <span className="block text-zinc-500">{o.help}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+
+      <div className="flex flex-col gap-2 border-t border-zinc-800 pt-3">
+        <h3 className="text-sm font-semibold text-zinc-100">Alarms with their own setting</h3>
+        <p className="text-sm text-zinc-400">An alarm listed here uses its own choice instead of the route&apos;s. It applies to CloudWatch alarms, by name.</p>
+        {names.length > 0 && (
+          <ul aria-label="Alarms with their own setting" className="flex flex-col divide-y divide-zinc-800 rounded-md border border-zinc-800">
+            {names.map((name) => (
+              <li key={name} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+                <span className="min-w-0 flex-1 wrap-anywhere text-zinc-200">{name}</span>
+                <Select aria-label={`Repeat setting for ${name}`} value={overrides[name]} onChange={(r) => setOne(name, r)} options={options} size="sm" />
+                <button type="button" onClick={() => removeOne(name)} className={`${linkButton} text-red-400`} aria-label={`Use the route's setting for ${name}`}>
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="flex flex-wrap items-end gap-2">
+          {choices.length > 0 ? (
+            <Select
+              aria-label="Alarm to give its own setting"
+              value={adding}
+              onChange={setAdding}
+              placeholder="Choose an alarm"
+              options={choices.map((n) => ({ value: n, label: n }))}
+              className="min-w-0 sm:max-w-80"
+            />
+          ) : (
+            <Field id="repeat-alarm" label="Alarm name" helper={alarms ? "Every alarm on this topic has its own setting." : "The exact CloudWatch alarm name."}>
+              {(props) => (
+                <input {...props} value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="example-queue-depth" className={inputClass} />
+              )}
+            </Field>
+          )}
+          <button type="button" onClick={add} disabled={!adding.trim()} className={buttonClass("secondary", "sm")}>
+            Give it its own setting
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function RouteEditor({
   initial,
   isNew,
@@ -1376,6 +1507,8 @@ function RouteEditor({
         notify_mode: mode,
         ...(mode === "custom" ? channelsPayload(channels, initial.webhooks) : {}),
         post_recoveries: !!route.post_recoveries,
+        repeat: routeRepeat(route),
+        alarm_repeat: route.alarm_repeat ?? {},
       });
       toast("Route saved");
       onSaved();
@@ -1501,6 +1634,15 @@ function RouteEditor({
               </label>
             )}
           </section>
+
+          {mode !== "off" && (
+            <RepeatSettings
+              value={routeRepeat(route)}
+              overrides={route.alarm_repeat ?? {}}
+              alarms={alarms}
+              onChange={(repeat, alarm_repeat) => setRoute({ ...route, repeat, alarm_repeat })}
+            />
+          )}
 
           <div className="flex flex-wrap items-center gap-4">
             <OnOffSwitch checked={route.enabled} onChange={(enabled) => setRoute({ ...route, enabled })} label="Route is on" onLabel="On" offLabel="Paused" />

@@ -66,6 +66,16 @@ With several accounts, the page lists every account's state with an update link 
 
 To start work from CloudWatch alarms, add an alert route under **Settings**, then **Alerts**, and subscribe your SNS topic to the address it shows. Save and turn on the route first: CoderHelm only confirms subscriptions for topics with a route that's on. See [Webhooks](/api/webhooks) for how messages are verified.
 
+### Alarms that keep firing
+
+An alarm that flips between OK and ALARM can post over and over. Each route has a setting, **When an alarm keeps firing**, and a CloudWatch alarm can have its own:
+
+- **Every time it fires** (the default): each alarm posts. Routes saved before this setting work this way.
+- **Once, until it clears**: the first alarm posts. While it keeps firing nothing more posts, and no second fix run starts.
+- **Once, then a daily reminder**: the same, plus one message a day saying it is still firing, since when and how many times.
+
+An alarm has cleared once it stays OK for 30 minutes, or two of its own evaluation spans when that is longer (up to 6 hours). Going back to ALARM inside that window still counts as the same firing. After a real clear the recovery posts once, if the route posts recoveries, and the next alarm posts right away. Every firing is still recorded; the Alerts page shows them as one row with a count.
+
 ## Running your own install
 
 On a self-hosted install, the role trusts **your install's own AWS account**, never CoderHelm's, and the stack links come from your install's release. Reading the install's own account works the same way. See [Integrations](/self-host/integrations) in the self-hosting guide.

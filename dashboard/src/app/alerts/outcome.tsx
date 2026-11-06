@@ -81,6 +81,26 @@ export const OUTCOMES: Record<
     tone: "muted",
     group: "ignored",
   },
+  suppressed: {
+    label: "Held back",
+    detail:
+      "Still firing: the route posts this alarm once until it clears, so this repeat was recorded but not posted, and no new run started.",
+    tone: "muted",
+    group: "handled",
+  },
+  reminded: {
+    label: "Daily reminder",
+    detail: "Still firing a day after it was last posted, so one reminder was posted saying since when and how many times it fired.",
+    tone: "info",
+    group: "handled",
+  },
+  clearing: {
+    label: "OK, waiting",
+    detail:
+      "The alarm went back to OK. It counts as cleared once it stays OK through a quiet window (30 minutes or more); an alarm inside the window keeps it the same episode.",
+    tone: "muted",
+    group: "handled",
+  },
   route_paused: {
     label: "Route paused",
     detail: "The route for this topic is paused.",

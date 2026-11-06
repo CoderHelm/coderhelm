@@ -2619,8 +2619,18 @@ export interface AlertRoute {
   webhooks?: WebhooksView;
   /** Post recoveries (one per open alert message) and other non-alarm state changes. Off by default. */
   post_recoveries?: boolean;
+  /** How often a firing alert posts. Absent on routes saved before the setting: every time. */
+  repeat?: AlertRepeat;
+  /** CloudWatch alarms, by exact name, with their own repeat setting. */
+  alarm_repeat?: Record<string, AlertRepeat>;
   updated_at?: string;
 }
+
+/**
+ * How often a route posts an alert that keeps firing: every time; once until
+ * it clears; or once, then a reminder a day while it is still firing.
+ */
+export type AlertRepeat = "every_time" | "until_clear" | "daily";
 
 /** The team's daily spending limit for alert runs, and the last 24 hours' spend. */
 export interface AlertBudget {
@@ -2685,6 +2695,15 @@ export interface AlertEvent {
   ticket_id?: string | null;
   /** For a recovery: the ticket of the alert it resolves (newer events only). */
   recovers_ticket?: string | null;
+  /**
+   * On routes that post once: the alert that opened this alert's episode
+   * (the first ALARM, which posted). Repeats while it kept firing carry it too.
+   */
+  episode?: string | null;
+  /** How many times the alert had fired in its episode when this arrived. */
+  episode_fires?: number | null;
+  /** Recorded but not posted: the alarm was still firing in its episode. */
+  suppressed?: boolean;
 }
 
 export interface AlertEventDetail {

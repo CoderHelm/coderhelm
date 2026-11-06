@@ -20,7 +20,9 @@ import {
   usePagedList,
   useTeamRepos,
 } from "@/components/list";
-import { KIND_LABEL, OUTCOMES, OUTCOME_GROUPS, humanize, outcomeDetail, outcomeLook } from "./outcome";
+import { KIND_LABEL, OUTCOMES, OUTCOME_GROUPS, OutcomeBadge, humanize, outcomeDetail, outcomeLook } from "./outcome";
+import { groupEpisodes, groupSummary } from "@/lib/alert-episodes";
+import { linkButton } from "@/components/ui";
 
 export default function AlertsHistoryGuarded() {
   return (
@@ -121,24 +123,42 @@ function AlertsHistory() {
           </ListEmpty>
         ) : (
           <List label="Alerts">
-            {shown.map((a) => {
+            {groupEpisodes(shown).map((g) => {
+              const a = g.head;
               const look = outcomeLook(a.outcome);
+              const repeats = groupSummary(g);
               return (
                 <ListRow
                   key={a.id}
-                  testId="alert-row"
+                  testId={repeats ? "alert-episode" : "alert-row"}
                   data={{ outcome: a.outcome }}
                   title={a.title || <span className="italic text-zinc-400">Alert with no title</span>}
                   titleText={a.title || undefined}
                   href={`/alerts/detail?id=${a.id}`}
                   meta={[a.kind ? KIND_LABEL[a.kind] ?? humanize(a.kind) : null, !repo ? a.repo || null : null]}
-                  summary={outcomeDetail(a.outcome)}
+                  summary={repeats ?? outcomeDetail(a.outcome)}
                   chips={
                     <span title={look.hover}>
                       <StatusText look={look} />
                     </span>
                   }
-                  time={a.received_at}
+                  time={g.latest.received_at}
+                  details={
+                    repeats ? (
+                      <ol aria-label={`Firings of ${a.title || "this alert"}`} className="flex flex-col gap-1.5">
+                        {g.members.map((m) => (
+                          <li key={m.id} className="flex flex-wrap items-center gap-2 text-xs">
+                            <Link href={`/alerts/detail?id=${m.id}`} className={`${linkButton} !text-xs`}>
+                              {m.received_at ? new Date(m.received_at).toLocaleString() : "Unknown time"}
+                            </Link>
+                            <OutcomeBadge outcome={m.outcome} />
+                          </li>
+                        ))}
+                      </ol>
+                    ) : undefined
+                  }
+                  detailsLabel={repeats ? `${g.members.length} firings` : undefined}
+                  detailsFor={repeats ? `firings of ${a.title || "this alert"}` : undefined}
                 />
               );
             })}
