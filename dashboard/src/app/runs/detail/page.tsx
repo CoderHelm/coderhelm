@@ -332,7 +332,7 @@ function RunDetailInner() {
   const [loading, setLoading] = useState(true);
   // "missing" when the gateway says there is no such run, "failed" for anything else.
   const [loadError, setLoadError] = useState<"missing" | "failed" | null>(null);
-  const [busy, setBusy] = useState<"retry" | "review" | "reset" | "cancel" | "close" | "reopen" | null>(null);
+  const [busy, setBusy] = useState<"retry" | "review" | "reset" | "cancel" | "close" | "reopen" | "close-superseded" | null>(null);
   const [closeOpen, setCloseOpen] = useState(false);
   const [specTab, setSpecTab] = useState<keyof Openspec>("proposal");
   const [usage, setUsage] = useState<UsageInfo | null>(null);
@@ -601,6 +601,30 @@ function RunDetailInner() {
       setBusy(null);
     }
   };
+  // Close the ticket's earlier pull request a covered run superseded: only on
+  // a person's click (the gateway closes only Coderhelm's own pull request).
+  const closeSuperseded = async (n: number) => {
+    const ok = await confirm({
+      title: `Close #${n}?`,
+      message: `#${n} is superseded: this ticket's change is in the pull request the run continued in. Closing it is visible to everyone on the repository; its branch is kept.`,
+      confirmLabel: `Close #${n}`,
+    });
+    if (ok !== "primary") return;
+    setBusy("close-superseded");
+    try {
+      const r = await api.closeSupersededPr(runId);
+      if (!r.ok) {
+        toast(r.message || actionError(new Error(r.error), `close #${n}`), "error");
+      } else {
+        toast(r.message || `Closed #${n}.`);
+      }
+      fetchRun();
+    } catch (e) {
+      toast(actionError(e, `close #${n}`), "error");
+    } finally {
+      setBusy(null);
+    }
+  };
   const cancel = async () => {
     setBusy("cancel");
     try {
@@ -781,34 +805,85 @@ function RunDetailInner() {
     );
   } else if (run.status === "covered_by_pr") {
     const cb = run.covered_by;
-    outcome = (
-      <OutcomeCard
-        tone="neutral"
-        title={cb ? `Already being fixed in #${cb.number}` : "Already being fixed in an open pull request"}
-        testId="run-outcome"
-        actions={
-          <>
-            {cb?.url && (
-              <a href={cb.url} target="_blank" rel="noopener noreferrer" className={secondaryButton} data-testid="covered-by-link">
-                Open #{cb.number}
-              </a>
+    const kind = cb?.outcome ?? "";
+    const carried = cb?.carried;
+    const sup = cb?.superseded;
+    // The work is in the covering pull request: Retry isn't what's next.
+    const done = kind === "continued" || kind === "complete";
+    const title = !cb
+      ? "Already being fixed in an open pull request"
+      : kind === "continued"
+        ? `Continued in #${cb.number}`
+        : kind === "complete"
+          ? `#${cb.number} already has everything this ticket asks for`
+          : kind === "person"
+            ? `Covered by ${cb.author || "a person"}'s pull request #${cb.number}`
+            : `Already being fixed in #${cb.number}`;
+    {
+      outcome = (
+        <OutcomeCard
+          tone="neutral"
+          title={title}
+          testId="run-outcome"
+          actions={
+            <>
+              {cb?.url && (
+                <a href={cb.url} target="_blank" rel="noopener noreferrer" className={done ? primaryButton : secondaryButton} data-testid="covered-by-link">
+                  Open #{cb.number}
+                </a>
+              )}
+              {canAct && sup && !sup.closed && done && (
+                <button type="button" onClick={() => closeSuperseded(sup.number)} disabled={busy !== null} className={secondaryButton} data-testid="close-superseded">
+                  Close #{sup.number}
+                </button>
+              )}
+              {!done && retryButton}
+            </>
+          }
+        >
+          <div className="min-w-0 space-y-2 [overflow-wrap:anywhere]" data-testid="covered-by">
+            {cb && (
+              <p>
+                <span className="font-medium text-zinc-100">{cb.title || `${cb.repo}#${cb.number}`}</span>
+                {cb.author ? <> by {cb.author}</> : null}
+              </p>
             )}
-            {retryButton}
-          </>
-        }
-      >
-        <div className="min-w-0 space-y-1 [overflow-wrap:anywhere]" data-testid="covered-by">
-          {cb && (
-            <p>
-              <span className="font-medium text-zinc-100">{cb.title || `${cb.repo}#${cb.number}`}</span>
-              {cb.author ? <> by {cb.author}</> : null}
+            {cb?.reason && <p className="text-zinc-300">{cb.reason}</p>}
+            {carried && (carried.commits ?? 0) > 0 && (
+              <p data-testid="covered-carried">
+                Carried over: {carried.commits} commit{carried.commits === 1 ? "" : "s"} onto <Code>{carried.branch}</Code>
+                {carried.rebuilt ? " (rebuilt on it)" : ""}
+                {carried.files?.length ? <>, changing {carried.files.slice(0, 6).map((f, i) => <span key={f}>{i > 0 ? ", " : ""}<Code>{f}</Code></span>)}{carried.files.length > 6 ? ` and ${carried.files.length - 6} more` : ""}</> : null}
+                .
+              </p>
+            )}
+            {!!cb?.open_items?.length && (
+              <div data-testid="covered-open-items">
+                <p className="text-sm font-medium text-zinc-200">Still open for this ticket in #{cb.number}</p>
+                <ul className="list-disc space-y-1 pl-5 text-sm">
+                  {cb.open_items.map((i) => (
+                    <li key={i}>{i}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {sup && (
+              <p data-testid="covered-superseded">
+                {sup.url ? <a href={sup.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">#{sup.number}</a> : <>#{sup.number}</>}
+                {sup.closed
+                  ? <> is closed{sup.closed_by ? <> by {sup.closed_by}</> : null}: superseded by #{cb?.number}.</>
+                  : <> is superseded by #{cb?.number}, which carries this ticket&apos;s change. It stays open until someone closes it: Coderhelm doesn&apos;t close a pull request by itself.</>}
+              </p>
+            )}
+            <p className="text-zinc-400">
+              {cb?.note
+                ? cb.note
+                : "Coderhelm built no second fix and linked this pull request on the ticket. If the ticket needs a separate change, say so on the ticket, then retry."}
             </p>
-          )}
-          {cb?.reason && <p className="text-zinc-300">{cb.reason}</p>}
-          <p className="text-zinc-400">Coderhelm built no second fix and linked this pull request on the ticket. If the ticket needs a separate change, say so on the ticket, then retry.</p>
-        </div>
-      </OutcomeCard>
-    );
+          </div>
+        </OutcomeCard>
+      );
+    }
   } else if (run.status === "failed") {
     outcome = (
       <Problem
