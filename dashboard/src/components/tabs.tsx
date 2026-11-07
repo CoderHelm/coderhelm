@@ -43,16 +43,20 @@ export function Tabs({
   const asSelect = items.length > selectAbove;
   const current = items.find((t) => t.value === value);
 
+  // The base line is the row's own bottom border, and each tab's underline
+  // pulls down 1px to sit on it. Both stay inside the row's box: a negative
+  // margin on the row itself would make the scroll box 1px taller inside than
+  // out, so it scrolled (and showed a scrollbar) even when every tab fit.
   const row = (
-    <ul className="-mb-px flex gap-x-1">
+    <ul className="flex min-w-max gap-x-1 border-b border-zinc-800">
       {items.map((t) => {
         const on = t.value === value;
         return (
-          <li key={t.value} className="shrink-0">
+          <li key={t.value} className="flex shrink-0">
             <Link
               href={t.href}
               aria-current={on ? "page" : undefined}
-              className={`inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-t border-b-2 px-3 text-sm ${
+              className={`-mb-px inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-t border-b-2 px-3 text-sm ${
                 on ? "border-zinc-100 font-medium text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-100"
               } ${focusRing}`}
             >
@@ -66,9 +70,9 @@ export function Tabs({
   );
 
   return (
-    <nav aria-label={label} className={`border-b border-zinc-800 ${className}`}>
+    <nav aria-label={label} className={className}>
       {asSelect && (
-        <div className="pb-3 sm:hidden">
+        <div className="border-b border-zinc-800 pb-3 sm:hidden">
           <Select
             aria-label={label}
             value={current?.value ?? ""}
@@ -81,7 +85,7 @@ export function Tabs({
           />
         </div>
       )}
-      <ScrollFade axis="x" className={asSelect ? "hidden sm:block" : ""}>
+      <ScrollFade axis="x" testId="tab-row" className={asSelect ? "hidden sm:block" : ""}>
         {row}
       </ScrollFade>
     </nav>
