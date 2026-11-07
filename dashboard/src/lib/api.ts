@@ -3324,7 +3324,7 @@ export interface AnalyticsComparison {
   /** Repositories the count gave up on after GitHub kept failing, with why (older servers: absent). */
   deploys_not_read?: { repo: string; reason: string }[];
   /** While earlier deploys are read: repositories read so far, of all (null once done, or before the first pass reports). */
-  deploys_backfill_progress?: { read: number; total: number } | null;
+  deploys_backfill_progress?: { read: number; total: number; resumes_at?: string | null } | null;
   /** Running totals by day; the previous values are null past the end of a shorter previous period. */
   daily: {
     offset: number;

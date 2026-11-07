@@ -140,7 +140,7 @@ function analytics(period: string, repo: string | null, deployState: DeployState
   };
 }
 
-interface Backend { calls: string[]; fail: boolean; empty: boolean; oldServer: boolean; estimated: number; recovered: number; deliveries?: "ok" | "refused"; deployState?: DeployState; noAccess?: string[]; notRead?: { repo: string; reason: string }[]; progress?: { read: number; total: number } | null }
+interface Backend { calls: string[]; fail: boolean; empty: boolean; oldServer: boolean; estimated: number; recovered: number; deliveries?: "ok" | "refused"; deployState?: DeployState; noAccess?: string[]; notRead?: { repo: string; reason: string }[]; progress?: { read: number; total: number; resumes_at?: string | null } | null }
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = { calls: [], fail: false, empty: false, oldServer: false, estimated: 0, recovered: 0, ...init };
@@ -415,6 +415,16 @@ test("deploys being read say how many repositories are done, and keep this perio
   await expect(row("Deploys Coderhelm started").locator("td").nth(2)).toHaveText("Counting earlier deploys: 12 of 40 repositories");
   await expect(row("Deploys Coderhelm started").locator("td").nth(1)).toHaveText("14 so far");
   await expect(page.getByTestId("compare-notes")).toContainText("(12 of 40 repositories read so far)");
+});
+
+test("deploys waiting out GitHub's hourly limit say when counting resumes", async ({ page }) => {
+  const at = new Date(Date.now() + 30 * 60_000);
+  await mockApi(page, { deployState: "counting", progress: { read: 9, total: 11, resumes_at: at.toISOString() } });
+  await page.goto("/analytics?tab=trends");
+  const table = page.getByRole("table", { name: "Compared with the period before" });
+  const cell = table.locator("tbody tr").filter({ has: page.getByRole("rowheader").filter({ hasText: "Deploys Coderhelm started" }) }).locator("td").nth(2);
+  const hhmm = await page.evaluate((iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }), at.toISOString());
+  await expect(cell).toHaveText(`Counting earlier deploys: 9 of 11 repositories, resumes at ${hhmm} after GitHub's hourly limit`);
 });
 
 test("repositories whose earlier deploys could not be read are named with why, not counted forever", async ({ page }) => {
