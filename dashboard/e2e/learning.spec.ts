@@ -1,7 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
-import { learningFixture } from "./wide-data/learning";
+import { learningFixture, learningHealthFixture } from "./wide-data/learning";
 import { pickOption } from "./select";
 
 // The Learning page: what Coderhelm learned from outcomes, the behavior it
@@ -22,6 +22,8 @@ interface Backend {
   pinned: string;
   weights: Record<string, number>;
   calls: { method: string; path: string; body: unknown }[];
+  /** The health check's answer, or its error status; left out, a gateway without it (404). */
+  health?: unknown;
 }
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
@@ -43,6 +45,12 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       db.calls.push({ method, path: `${p}${url.search}`, body });
       const data = learningFixture({ repo: REPO, repo2: REPO_2, text: "Ask for a test of the retry path in the payments client.", file: "src/payments/client.ts", canManage: db.canManage, empty: db.empty, reverted: db.reverted, pinned: db.pinned, weights: db.weights });
       return json(route, { ...data, days: Number(url.searchParams.get("days") || 30), repo: url.searchParams.get("repo") || "" });
+    }
+    if (p === "/api/learning/health" && method === "GET") {
+      db.calls.push({ method, path: p, body });
+      if (db.health === undefined) return json(route, { error: "Not found" }, 404);
+      if (typeof db.health === "number") return json(route, { error: "Internal error" }, db.health);
+      return json(route, db.health);
     }
     if (p.startsWith("/api/learning/")) {
       db.calls.push({ method, path: p, body });
@@ -439,4 +447,80 @@ test("examples show a skeleton while another repository loads", async ({ page })
   await expect(page.locator("#exemplars").getByTestId("list-skeleton")).toBeVisible();
   release();
   await expect(page.locator("#exemplars").getByTestId("list-skeleton")).toHaveCount(0);
+});
+
+// ── Learning health: is each loop still learning? ─────────────────────────
+
+test("a quiet loop turns the health check red and says what to check", async ({ page }) => {
+  await mockApi(page, { health: learningHealthFixture({ repo: REPO, text: "", quiet: ["pr_outcomes"], idle: ["coder_lessons", "stop_outcomes"] }) });
+  await page.goto("/learning");
+  const health = page.getByTestId("learning-health");
+  await expect(health).toHaveAttribute("data-state", "red");
+  await expect(health.getByText("1 loop stopped learning")).toBeVisible();
+
+  // The red loop comes first, in plain words: what it learns from, when it last learned, what to check.
+  const red = page.getByTestId("loop-pr_outcomes");
+  await expect(health.locator("li[data-state]").first()).toHaveAttribute("data-testid", "loop-pr_outcomes");
+  await expect(red).toHaveAttribute("data-state", "quiet");
+  await expect(red).toContainText("Not learning");
+  await expect(red).toContainText("Learns from: Whether Coderhelm's pull requests were merged as written");
+  await expect(red).toContainText(/Last learned: .*ago/);
+  await expect(red).toContainText("3 of 5 this week");
+  await expect(red).toContainText(`2 closed pull request(s) were never scored: ${REPO}#12345`);
+  await expect(page.getByTestId("loop-pr_outcomes-check")).toContainText("What to check: Pull requests closed this week were never scored.");
+
+  // An idle loop had nothing to learn from: no red, never learned.
+  const idle = page.getByTestId("loop-coder_lessons");
+  await expect(idle).toHaveAttribute("data-state", "idle");
+  await expect(idle).toContainText("Nothing to learn from yet");
+  await expect(idle).toContainText("Last learned: never");
+  await expect(idle).toContainText("Learns from: Repeated setbacks in one area of the code");
+  await expect(page.getByTestId("loop-coder_lessons-check")).toHaveCount(0);
+
+  // A working loop with no expected count shows its count alone.
+  const ok = page.getByTestId("loop-calibration");
+  await expect(ok).toContainText("Learning");
+  await expect(ok).toContainText("4 this week");
+  await expect(health.locator("li[data-state]")).toHaveCount(9);
+  await noSideways(page);
+  fs.mkdirSync(SHOTS_DIR, { recursive: true });
+  await page.locator("#health").screenshot({ path: path.join(SHOTS_DIR, "learning-health-desktop.png") });
+});
+
+test("every loop learning reads as fine, with no red", async ({ page }) => {
+  await mockApi(page, { health: learningHealthFixture({ repo: REPO, text: "", quiet: [], idle: ["stop_outcomes"] }) });
+  await page.goto("/learning");
+  const health = page.getByTestId("learning-health");
+  await expect(health).toHaveAttribute("data-state", "ok");
+  await expect(health).toContainText("Every loop that had something to learn from learned from it.");
+  await expect(health.getByText(/stopped learning/)).toHaveCount(0);
+  await expect(page.getByTestId("loop-stop_outcomes")).toContainText("Nothing to learn from yet");
+  await expect(health.getByText("What to check:")).toHaveCount(0);
+});
+
+test("a health check that fails says so and retries, and the rest of the page still loads", async ({ page }) => {
+  const db = await mockApi(page, { health: 500 });
+  await page.goto("/learning");
+  await expect(page.getByText("Couldn't check the learning loops")).toBeVisible();
+  await expect(page.getByTestId("tile-events")).toBeVisible();
+  db.health = learningHealthFixture({ repo: REPO, text: "" });
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByTestId("learning-health")).toHaveAttribute("data-state", "red");
+});
+
+test("a gateway without the health check shows no health section", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/learning");
+  await expect(page.getByTestId("tile-events")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Is it still learning?" })).toHaveCount(0);
+});
+
+test("the health check fits a phone at 375 wide", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 844 });
+  await mockApi(page, { health: learningHealthFixture({ repo: "your-team/payments-reconciliation-ledger-service", text: "packages/payments-reconciliation-ledger/src/adapters/stripe/webhooks/handlers/charge-refunded-partially.ts" }) });
+  await page.goto("/learning");
+  await expect(page.getByTestId("loop-pr_outcomes-check")).toBeVisible();
+  await noSideways(page);
+  fs.mkdirSync(SHOTS_DIR, { recursive: true });
+  await page.locator("#health").screenshot({ path: path.join(SHOTS_DIR, "learning-health-phone.png") });
 });

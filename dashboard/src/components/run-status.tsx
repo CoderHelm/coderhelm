@@ -70,8 +70,22 @@ export function runIsLive(status: string | null | undefined): boolean {
 /** A finished run whose pull request is open while its last fix round didn't finish. */
 const UNFINISHED_ROUND: RunLook = { label: "PR open, fix unfinished", tone: "attention", group: "done" };
 
-export function RunStatusBadge({ status, unfinishedRound }: { status: string | null | undefined; unfinishedRound?: boolean }) {
-  const look = unfinishedRound ? UNFINISHED_ROUND : runStatusLook(status);
+/** A finished run whose pull request is still a draft, for named reasons (`draft_hold`). */
+const DRAFT_HELD: RunLook = { label: "Finished, PR held", tone: "waiting", group: "waiting" };
+/** The same, when GitHub refused every try to mark it ready. */
+const DRAFT_NOT_MARKED: RunLook = { label: "Finished, PR held", tone: "attention", group: "waiting" };
+
+export function RunStatusBadge({
+  status,
+  unfinishedRound,
+  draftHold,
+}: {
+  status: string | null | undefined;
+  unfinishedRound?: boolean;
+  /** The run's `draft_hold.kind`, when its pull request is still a draft. */
+  draftHold?: string | null;
+}) {
+  const look = draftHold ? (draftHold === "failed" ? DRAFT_NOT_MARKED : DRAFT_HELD) : unfinishedRound ? UNFINISHED_ROUND : runStatusLook(status);
   return (
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${TONES[look.tone].chip}`}>
       <StatusDot tone={look.tone} live={look.live} className="!h-1.5 !w-1.5" />

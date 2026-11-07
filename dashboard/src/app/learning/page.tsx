@@ -12,6 +12,7 @@ import {
 } from "@/lib/api";
 import { CardSkeleton, ChartSkeleton } from "@/components/skeleton";
 import { Examples } from "./examples";
+import { LearningHealthSection } from "./health";
 import { StatGrid, StatTile } from "@/components/stat-tile";
 import { DataTable, type Column } from "@/components/data-table";
 import { Problem } from "@/components/problem";
@@ -585,7 +586,9 @@ export default function LearningPage() {
         lead="What Coderhelm learned from how its work was received: review comments acted on or dismissed, ratings, merges, reverts and CI. Every change it made because of that is listed with its evidence, and can be turned off."
       />
 
-      <div className="mt-5 flex flex-wrap items-center gap-3">
+      <LearningHealthSection />
+
+      <div className="mt-10 flex flex-wrap items-center gap-3">
         <Segmented label="Period" options={[...DAYS]} value={days} onChange={setDays} />
         <RepoFilter value={repo} onChange={setRepo} repos={repoNames} />
       </div>

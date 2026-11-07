@@ -169,7 +169,35 @@ export function exemplarsFixture(o: Pick<LearningOpts, "repo" | "repo2" | "text"
   return [...base, ...more];
 }
 
+/**
+ * GET /api/learning/health: every loop the gateway reports (common::rewards::health),
+ * with one quiet (red), some idle and the rest working. `text` goes in the
+ * detail lines, so the wide spec gets long strings.
+ */
+export function learningHealthFixture(o: { repo: string; text: string; quiet?: string[]; idle?: string[] }) {
+  const quiet = new Set(o.quiet ?? ["pr_outcomes"]);
+  const idle = new Set(o.idle ?? ["coder_lessons", "stop_outcomes"]);
+  const loop = (key: string, label: string, count: number, expected: number | null, detail: string) => {
+    const state = quiet.has(key) ? "quiet" : idle.has(key) ? "idle" : "ok";
+    return { key, label, state, last_signal_at: state === "idle" ? "" : iso(state === "quiet" ? 9 * DAY : 90), count: state === "idle" ? 0 : count, expected: state === "idle" && expected !== null ? 0 : expected, detail };
+  };
+  const loops = [
+    loop("pr_outcomes", "Outcomes of CoderHelm's pull requests", 3, 5, quiet.has("pr_outcomes") ? `2 closed pull request(s) were never scored: ${o.repo}#12345, ${o.repo}#67890 ${o.text}` : "5 of 5 pull requests that closed were scored"),
+    loop("review_outcomes", "Outcomes of review comments", 14, 6, "9 acted on, 3 dismissed, 2 left open, from 6 review(s)"),
+    loop("calibration", "Reviewer calibration", 4, null, "4 category counter(s) updated; changes: 1 raised, 0 downgraded, 0 suppressed, 0 back to none"),
+    loop("reviewer_variants", "Reviewer prompt variants", 6, 6, "3 arm(s), 41 pull(s) in all; 6 outcome(s) credited to a variant this window"),
+    loop("coder_variants", "Coder prompt variants", 2, 5, "2 arm(s), 9 pull(s) in all; 2 outcome(s) credited to a variant this window"),
+    loop("examples", "Good and avoid examples in prompts", 5, null, "5 of 12 example(s) used this window"),
+    loop("coder_lessons", "Coder lessons from outcomes", 0, 0, "0 setback(s) in 0 area(s); 0 area(s) with enough evidence for a lesson; 0 lesson(s) written or reinforced"),
+    loop("review_lessons", "Reviewer lessons from people's pushback", 2, 2, "2 pull request(s) with pushback, 2 judged, 1 lesson(s) learned, 0 stuck"),
+    loop("stop_outcomes", "What people did after asks, stops and blocks", 0, 0, "0 ask(s), stop(s) and block(s); 0 with a person's act recorded, 0 shown wrong (the judge is given those)"),
+  ];
+  const q = loops.filter((l) => l.state === "quiet").map((l) => l.key);
+  return { window_days: 7, generated_at: iso(0), state: q.length ? "red" : "ok", quiet: q, loops };
+}
+
 export const learningData: Handler = ({ method, path }) => {
+  if (path === "/api/learning/health" && method === "GET") return learningHealthFixture({ repo: REPO, text: `${SENTENCE} ${TOKEN}` });
   if (path === "/api/learning" && method === "GET") {
     return learningFixture({ repo: REPO, repo2: REPO_2, text: `${TITLE} ${SENTENCE} ${TOKEN}`, file: FILE, canManage: true });
   }

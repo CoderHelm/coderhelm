@@ -498,6 +498,8 @@ export const api = {
   /** The Learning page: rewards, finding categories, behavior changes, exemplars and variants. */
   getLearning: (days: number, repo?: string) =>
     request<Learning>(`/api/learning?days=${days}${repo ? `&repo=${encodeURIComponent(repo)}` : ""}`),
+  /** Each learning loop's last signal and its count over the last week; `red` when one that should have learned did not. */
+  getLearningHealth: () => request<LearningHealth>("/api/learning/health"),
   /** Pin one variant for an agent (admin), or `null` to let results choose again. */
   pinVariant: (agent: string, arm: string | null) =>
     request<{ ok: boolean }>("/api/learning/pin", { method: "POST", body: JSON.stringify({ agent, arm }) }),
@@ -2022,6 +2024,27 @@ export interface RunWaitingOn {
   since?: string | null;
 }
 
+/** Why a finished run's pull request is still a draft. */
+export interface RunDraftHold {
+  /** `held` (a person must act; the run is `needs_input`), `waiting` (settles by itself) or `failed` (GitHub refused to mark it ready). */
+  kind: "held" | "waiting" | "failed" | (string & {});
+  /** The run page's line, ready to show. */
+  summary: string;
+  /** Each reason, with what to do about it. */
+  reasons: RunDraftHoldReason[];
+  pr_number: number;
+  /** When it was first held for these reasons. */
+  since?: string | null;
+}
+
+/** One reason a pull request stays a draft. */
+export interface RunDraftHoldReason {
+  /** What holds it. */
+  what: string;
+  /** What to do about it. */
+  todo: string;
+}
+
 export interface CodegenEnvMissing {
   repo: string;
   command: string;
@@ -2108,6 +2131,10 @@ export interface RunDetail extends Run {
   questions?: RunQuestion[];
   /** While `needs_input`: what it waits for from a person, by name. */
   waiting_on?: RunWaitingOn | null;
+  /** Set when the run finished and its pull request is still a draft: why, and what to do about each reason. */
+  draft_hold?: RunDraftHold | null;
+  /** While the run waits for GitHub (its hourly limit, or GitHub not answering): when it goes on, in plain words. */
+  github_wait?: string | null;
   /** The comment with those questions on the ticket or issue. */
   questions_url?: string | null;
   /** Answers people gave to them in Coderhelm. */
@@ -4231,6 +4258,35 @@ export interface Learning {
   changes: LearningChange[];
   exemplars: LearningExemplar[];
   bandit: LearningBandit[];
+}
+
+/** `quiet`: the loop should have learned from this window's work and did not. */
+export type LearningLoopState = "ok" | "quiet" | "idle";
+
+/** One learning loop on the health check. */
+export interface LearningLoop {
+  /** `pr_outcomes`, `review_outcomes`, `calibration`, `reviewer_variants`, `coder_variants`, `examples`, `coder_lessons`, `review_lessons`, `stop_outcomes`. */
+  key: string;
+  label: string;
+  state: LearningLoopState | (string & {});
+  /** RFC 3339, or empty when it never learned. */
+  last_signal_at: string;
+  /** Signals over the window. */
+  count: number;
+  /** What should have fed it over the window, when that is countable. */
+  expected: number | null;
+  detail: string;
+}
+
+/** GET /api/learning/health: per learning loop, its last signal and its count over the window. */
+export interface LearningHealth {
+  window_days: number;
+  generated_at: string;
+  /** `red` when any loop is `quiet`. */
+  state: "ok" | "red" | (string & {});
+  /** Keys of the quiet loops. */
+  quiet: string[];
+  loops: LearningLoop[];
 }
 
 // ── This install (self-hosted) ──────────────────────────────────────────

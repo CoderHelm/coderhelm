@@ -55,6 +55,19 @@ const RUN = {
     { message: `Ran npm test -- --run ${FILE_2} and every test passed after the change`, timestamp: iso(17) },
     { message: TOKEN, timestamp: iso(16) },
   ],
+  // Finished with its pull request still a draft: the summary and each reason with what to do.
+  draft_hold: {
+    kind: "held",
+    summary: `Finished, but pull request #12345 stays a draft: ${TOKEN} is open under Open items. ${SENTENCE}`,
+    reasons: [
+      { what: `Security items are open under Open items: ${FILE}`, todo: `Fix them on branch ${BRANCH} (Coderhelm checks again on the next push), or delete each security line once a person has checked it. ${LONG_URL}` },
+      { what: TOKEN, todo: SENTENCE },
+    ],
+    pr_number: 12345,
+    since: iso(10),
+  },
+  // Shown only while the run works; here for the field's sake.
+  github_wait: `Waiting for GitHub's hourly limit to reset at 21:05 UTC; continues by itself ${TOKEN}`,
   fix_location: "both",
   outside_change_report: MARKDOWN,
   lesson: `${SENTENCE} ${LONG_URL}`,
