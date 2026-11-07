@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { api, type AwsAccountAbilities, type AwsAbilityReply, type Connector, type ConnectorId, type KeyConnectorKind } from "@/lib/api";
 import { errorMessage, timeAgo } from "@/lib/data-sources";
@@ -332,8 +333,10 @@ export function AwsAbilitiesPanel({
   return (
     <div className="mt-4 flex flex-col gap-4 border-t border-zinc-800 pt-4" data-testid={`aws-panel-${a.account}`}>
       <p className="text-sm text-zinc-400">
-        Coderhelm checks what the CoderHelmLogReader role can do (one read of metrics, one list of Airflow environments) and turns each
-        ability on when the role allows it. {a.checked_at ? `Last checked ${timeAgo(a.checked_at)}.` : "Not checked yet."}
+        {a.install_account
+          ? "This is the install's own AWS account: Coderhelm reads it with the install's own role, and each version update brings that role's read-only permissions. Coderhelm checks what it can do (one read of metrics, one list of Airflow environments) and turns each ability on when it can."
+          : "Coderhelm checks what the CoderHelmLogReader role can do (one read of metrics, one list of Airflow environments) and turns each ability on when the role allows it."}{" "}
+        {a.checked_at ? `Last checked ${timeAgo(a.checked_at)}.` : "Not checked yet."}
       </p>
       {a.check_error && (
         <Callout variant="error" title="Coderhelm couldn't take on the role" live={false}>
@@ -385,7 +388,17 @@ export function AwsAbilitiesPanel({
           </fieldset>
         )}
       </div>
-      {(missing.length > 0 || a.permissions?.status === "update_needed") && a.update_url && (
+      {a.install_account && (missing.length > 0 || a.permissions?.status === "update_needed") && (
+        <Callout variant="neutral" title="These read-only permissions come with the next version update" live={false}>
+          <p>Nothing is needed in AWS. Update Coderhelm and they are on the install&apos;s own role.</p>
+          <p className="mt-2">
+            <Link href="/settings/system#version" className={linkButton}>
+              Open Version and updates
+            </Link>
+          </p>
+        </Callout>
+      )}
+      {!a.install_account && (missing.length > 0 || a.permissions?.status === "update_needed") && a.update_url && (
         <Callout
           variant="warning"
           title={

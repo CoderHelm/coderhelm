@@ -3869,6 +3869,8 @@ export interface AwsAccountAbilities {
   missing?: string[];
   update_url?: string | null;
   stack_name?: string;
+  /** The self-hosted install's own account: read with the install's own role, which version updates keep current. */
+  install_account?: boolean;
   /** The last live check of this release's permissions. */
   permissions?: AwsPermissions | null;
 }
@@ -3898,6 +3900,8 @@ export interface AwsPermissions {
   missing_abilities: string[];
   abilities: AwsPermissionGroup[];
   update: { url: string; stack_name: string; template_url: string; sign_in_account: string; stacks_url: string } | null;
+  /** The self-hosted install's own account: its read-only permissions come with version updates, never from a stack in AWS. */
+  install_account?: boolean;
   problem: { code: string; message: string; fix: string } | null;
 }
 
