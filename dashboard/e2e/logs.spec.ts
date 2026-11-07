@@ -75,6 +75,8 @@ interface Backend {
   findings: Finding[];
   autofix: Record<string, unknown>;
   calls: Call[];
+  /** AWS accounts whose log checks are failing (GET /api/log-findings). */
+  analysis_failing?: unknown[];
 }
 
 const DEFAULT_AUTOFIX = { enabled: false, min_severity: "critical", daily_cap: 3, scope: "all", quiet_hours: null, overrides: [], enabled_at: "" };
@@ -117,6 +119,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
         counts,
         log_groups: [...new Set(db.findings.map((f) => f.log_group as string))].sort(),
         aws_connected: db.connected,
+        analysis_failing: db.analysis_failing ?? [],
       });
     }
     if (p === "/api/log-findings/autofix") {
@@ -198,6 +201,73 @@ test("a quiet finding says when it resolves on its own, and a resolved one says 
   await q.getByRole("button", { name: "Show details of Prerender cache writes fail with no space left" }).click();
   await expect(page.getByTestId("finding-quiet")).toContainText("Resolves on its own");
   await expect(page.getByRole("button", { name: "Mark as new" })).toBeVisible();
+});
+
+test("a resolve date that has passed is never shown as a promise", async ({ page }) => {
+  const day = 86_400_000;
+  const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
+  // Quiet for 7 days with an 8-day period that ended a day ago: the next check resolves it.
+  const due = finding({
+    rec_id: "rec_due",
+    status: "acknowledged",
+    title: "Prerender cache writes fail with no space left",
+    last_seen: ago(9 * day),
+    quiet_days: 8,
+    resolves_at: ago(1 * day),
+    resolve: { state: "due", at: ago(1 * day) },
+  });
+  // An older server sends only the date, already passed.
+  const legacy = finding({
+    rec_id: "rec_legacy",
+    status: "new",
+    title: "Upstream timed out reading the session store",
+    last_seen: ago(7 * day),
+    quiet_days: 3,
+    resolves_at: ago(4 * day),
+  });
+  await mockApi(page, { findings: [due, legacy] });
+  await page.goto("/logs/");
+
+  for (const id of ["rec_due", "rec_legacy"]) {
+    const row = page.getByTestId(`finding-${id}`);
+    await expect(row).toContainText("Resolves at the next log check (every 6 hours) unless seen again.");
+    await expect(row).not.toContainText("Resolves on its own");
+  }
+  await expect(page.getByTestId("analysis-failing")).toHaveCount(0);
+});
+
+test("when log checks fail, the page says so and why nothing resolves", async ({ page }) => {
+  const day = 86_400_000;
+  const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
+  const blocked = finding({
+    rec_id: "rec_blocked",
+    status: "acknowledged",
+    title: "Prerender cache writes fail with no space left",
+    last_seen: ago(7 * day),
+    quiet_days: 8,
+    resolves_at: ago(1 * day),
+    resolve: {
+      state: "blocked",
+      at: ago(1 * day),
+      analysis_ok_at: ago(5 * day),
+      reason: "this install's permissions boundary stops CoderHelm from reading your AWS logs through the log reader role (fixed by updating CoderHelm)",
+    },
+  });
+  await mockApi(page, {
+    findings: [blocked],
+    analysis_failing: [{ account_id: "111122223333", last_ok_at: ago(5 * day), reason: "this install's permissions boundary stops CoderHelm from reading your AWS logs through the log reader role (fixed by updating CoderHelm)" }],
+  });
+  await page.goto("/logs/");
+
+  const banner = page.getByTestId("analysis-failing");
+  await expect(banner).toContainText("Log checks are failing for AWS account 111122223333");
+  await expect(banner).toContainText("findings in this account don't update or resolve on their own");
+  await expect(banner).toContainText("permissions boundary");
+  await expect(banner.getByRole("link", { name: "Open AWS settings" })).toHaveAttribute("href", /\/settings\/integrations\/aws/);
+  const row = page.getByTestId("finding-rec_blocked");
+  await expect(row).toContainText("It was due to resolve on its own");
+  await expect(row).toContainText("but log checks have failed since");
+  await expect(row).not.toContainText("unless seen again");
 });
 
 test("Logs is its own menu item, with Logs and Alerts as its tabs", async ({ page }) => {
