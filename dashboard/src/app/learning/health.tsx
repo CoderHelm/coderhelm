@@ -14,41 +14,54 @@ import { smallSecondaryButton } from "@/components/ui";
 // loop that went quiet, what to check. The week is fixed by the gateway, so
 // the page's period and repository filters don't apply here.
 
-/** What each loop learns from, and what to check when it goes quiet. Unknown keys show the gateway's own detail. */
-const LOOPS: Record<string, { from: string; check: string }> = {
+/**
+ * Each loop's title, what it learns from, and what to check when it goes quiet,
+ * by the loop's id. The titles are the dashboard's own; the API's `label` is
+ * never shown. An id this dashboard doesn't know reads as its words.
+ */
+const LOOPS: Record<string, { title: string; from: string; check: string }> = {
   pr_outcomes: {
+    title: "What happens to Coderhelm's pull requests",
     from: "Whether Coderhelm's pull requests were merged as written, merged after people's edits, or closed.",
     check: "Pull requests closed this week were never scored. Check that the GitHub App still gets pull request events (Settings, Integrations, GitHub), then look in the gateway's log for the pull requests named above.",
   },
   review_outcomes: {
+    title: "What people do with review comments",
     from: "Whether people acted on the reviewer's comments, dismissed them, or left them open.",
     check: "Reviews ran this week but none of their comments was scored. Check that the GitHub App still gets review comment and pull request events.",
   },
   calibration: {
+    title: "What the reviewer raises",
     from: "How often each kind of review comment is acted on, per repository, which tunes what the reviewer raises.",
     check: "Comments were scored but no category moved. Look in the gateway's log for the learning step that follows a scored comment.",
   },
   reviewer_variants: {
+    title: "Ways of reviewing",
     from: "Which way of reviewing gets the better outcomes.",
     check: "Reviews ran but no variant was picked or credited this week. Look in the reviewer's log for the variant it chose.",
   },
   coder_variants: {
+    title: "Ways of writing code",
     from: "Which way of writing code gets its pull requests merged.",
     check: "Pull requests closed but no coding variant was picked or credited this week. Look in the worker's log for the variant each run chose.",
   },
   examples: {
+    title: "Examples to follow or avoid",
     from: "Past comments and changes that landed well or badly, put in the agents' prompts as examples to follow or to avoid.",
     check: "Reviews ran but no example was used in a prompt this week. Check that the repositories reviewed have examples under Examples in use.",
   },
   coder_lessons: {
+    title: "Lessons for the coding agent",
     from: "Repeated setbacks in one area of the code: closed pull requests, reverts, checks that failed.",
     check: "Some areas had enough setbacks for a lesson, but none was written or reinforced. Look in the worker's log for the lessons step.",
   },
   review_lessons: {
+    title: "Lessons for the reviewer",
     from: "People pushing back on the reviewer's comments.",
     check: "Pull requests with pushback have waited more than 2 hours to be judged. Look in the worker's log for the review lessons step.",
   },
   stop_outcomes: {
+    title: "What people do after Coderhelm asks or stops",
     from: "What people did after Coderhelm asked a question, stopped, or blocked a merge.",
     check: "Asks, stops and blocks from this week have no recorded follow up. Check that pull request and ticket events still arrive.",
   },
@@ -60,6 +73,14 @@ const STATE: Record<string, { label: string; tone: "success" | "neutral" | "erro
   quiet: { label: "Not learning", tone: "error" },
 };
 const stateOf = (s: string) => STATE[s] ?? { label: s, tone: "neutral" as const };
+
+/** "coder_lessons" reads "Coder lessons" when this dashboard has no title for it. */
+function titleOf(key: string): string {
+  const known = LOOPS[key]?.title;
+  if (known) return known;
+  const words = key.replace(/_/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 function amount(l: LearningLoop, days: number): string {
   const period = days === 7 ? "this week" : `in ${days} days`;
@@ -74,7 +95,7 @@ function LoopCard({ l, days }: { l: LearningLoop; days: number }) {
   return (
     <li className={quiet ? "min-w-0 rounded-lg border border-red-500/30 bg-red-500/5 p-4" : cardClass} data-testid={`loop-${l.key}`} data-state={l.state}>
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-1">
-        <h3 className="min-w-0 flex-1 basis-48 text-sm font-medium text-zinc-100 [overflow-wrap:anywhere]">{l.label}</h3>
+        <h3 className="min-w-0 flex-1 basis-48 text-sm font-medium text-zinc-100 [overflow-wrap:anywhere]">{titleOf(l.key)}</h3>
         <StatusPill tone={state.tone}>{state.label}</StatusPill>
       </div>
       {known && (

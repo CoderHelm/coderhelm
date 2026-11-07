@@ -474,8 +474,16 @@ test("a quiet loop turns the health check red and says what to check", async ({ 
   await expect(idle).toHaveAttribute("data-state", "idle");
   await expect(idle).toContainText("Nothing to learn from yet");
   await expect(idle).toContainText("Last learned: never");
+  await expect(idle).toContainText("0 this week");
   await expect(idle).toContainText("Learns from: Repeated setbacks in one area of the code");
   await expect(page.getByTestId("loop-coder_lessons-check")).toHaveCount(0);
+
+  // Titles are the dashboard's own words, never the API's names.
+  await expect(red.getByRole("heading")).toHaveText("What happens to Coderhelm's pull requests");
+  await expect(health.getByText("Outcomes of CoderHelm's pull requests")).toHaveCount(0);
+  await expect(health.getByText(/CoderHelm/)).toHaveCount(0);
+  await expect(page.getByTestId("loop-review_outcomes")).toContainText("4 of 6 this week");
+  await expect(page.getByTestId("loop-review_outcomes").getByRole("heading")).toHaveText("What people do with review comments");
 
   // A working loop with no expected count shows its count alone.
   const ok = page.getByTestId("loop-calibration");
@@ -523,4 +531,13 @@ test("the health check fits a phone at 375 wide", async ({ page }) => {
   await noSideways(page);
   fs.mkdirSync(SHOTS_DIR, { recursive: true });
   await page.locator("#health").screenshot({ path: path.join(SHOTS_DIR, "learning-health-phone.png") });
+});
+
+test("a loop this dashboard has no title for reads as its id in words", async ({ page }) => {
+  await mockApi(page, { health: learningHealthFixture({ repo: REPO, text: "", quiet: [], extra: true }) });
+  await page.goto("/learning");
+  const extra = page.getByTestId("loop-planner_lessons");
+  await expect(extra.getByRole("heading")).toHaveText("Planner lessons");
+  await expect(page.getByText("Planner lessons (API name)")).toHaveCount(0);
+  await expect(extra).toContainText("1 of 2 this week");
 });

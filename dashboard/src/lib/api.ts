@@ -4267,6 +4267,7 @@ export type LearningLoopState = "ok" | "quiet" | "idle";
 export interface LearningLoop {
   /** `pr_outcomes`, `review_outcomes`, `calibration`, `reviewer_variants`, `coder_variants`, `examples`, `coder_lessons`, `review_lessons`, `stop_outcomes`. */
   key: string;
+  /** The API's own name for it; the page shows its own title by `key` instead. */
   label: string;
   state: LearningLoopState | (string & {});
   /** RFC 3339, or empty when it never learned. */
