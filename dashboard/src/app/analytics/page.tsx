@@ -483,9 +483,14 @@ function change(cur: number, prev: number): { text: string; tone: "up" | "down" 
 
 const TONE = { up: "text-emerald-400", down: "text-rose-400", flat: "text-zinc-400" };
 
-/** How far the count of earlier deploys got: "12 of 40 repositories" once the first pass reports. */
+/** How far the count of earlier deploys got: "12 of 40 repositories" once the first pass reports, and when it resumes while it waits out GitHub's hourly limit. */
 function countingProgress(p: AnalyticsComparison["deploys_backfill_progress"]) {
-  return p && p.total > 0 ? `${count(p.read)} of ${plural(p.total, "repository", "repositories")}` : null;
+  if (!p || p.total <= 0) return null;
+  const done = `${count(p.read)} of ${plural(p.total, "repository", "repositories")}`;
+  const at = p.resumes_at ? new Date(p.resumes_at) : null;
+  if (!at || Number.isNaN(at.getTime())) return done;
+  const hhmm = at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return `${done}, resumes at ${hhmm} after GitHub's hourly limit`;
 }
 
 function Change({ cur, prev, comparable = true, counting = false, progress = null }: { cur: number; prev: number; comparable?: boolean; counting?: boolean; progress?: string | null }) {
