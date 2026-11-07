@@ -649,6 +649,12 @@ function RunDetailInner() {
         : [];
   const done = ["completed", "merged", "success"].includes(run.status);
   const live = runIsLive(run.status) || run.status === "queued" || run.status === "pending";
+  // Finished with its pull request still a draft (the gateway clears it once
+  // the pull request is ready or closed): held reads "Finished, PR held".
+  // An unfinished fix round on the same pull request says so first (Resume).
+  const hold = run.draft_hold && ["needs_input", "completed", "success"].includes(run.status) && !(done && run.round_incomplete) ? run.draft_hold : null;
+  // Waiting out GitHub's limit while still working; it goes on by itself.
+  const githubWait = run.github_wait && live ? run.github_wait.trim().replace(/[.;]\s*$/, "") : "";
   // Asks and stop notes are current while the run works or waits on an answer.
   const asksAreCurrent = live || run.status === "needs_input";
   const hasPr = !!run.pr_number || !!run.pr_url || runPrs.length > 0 || (run.pr_urls?.length ?? 0) > 0;
@@ -924,7 +930,50 @@ function RunDetailInner() {
   } else {
     // `body` is one sentence; `content` is a block of its own (a form, a list).
     const look: { tone: OutcomeTone; title: string; body: React.ReactNode; content?: React.ReactNode; actions?: React.ReactNode } =
-      run.status === "merged"
+      hold
+        ? {
+            // Finished, and the pull request stays a draft: why, and what to do about each reason.
+            tone: hold.kind === "failed" ? "attention" : "waiting",
+            title: hold.kind === "failed" ? "Finished, PR held: GitHub refused to mark it ready" : hold.kind === "waiting" ? "Finished, PR held until a check settles" : "Finished, PR held",
+            body: <span className="whitespace-pre-wrap [overflow-wrap:anywhere]" data-testid="draft-hold-summary">{hold.summary}</span>,
+            content: hold.reasons.length > 0 && (
+              <ul className="mt-2 space-y-2" data-testid="draft-hold-reasons" aria-label="Why the pull request is held">
+                {hold.reasons.map((r, i) => (
+                  <li key={i} className="min-w-0 rounded-md border border-zinc-800 bg-zinc-950/40 px-3 py-2 [overflow-wrap:anywhere]">
+                    <p className="font-medium text-zinc-100">{r.what}</p>
+                    <p className="mt-0.5 text-zinc-300">
+                      <span className="text-zinc-400">What to do: </span>
+                      {r.todo}
+                    </p>
+                  </li>
+                ))}
+                {hold.since && (
+                  <li className="list-none text-xs text-zinc-400">
+                    Held since <Time iso={hold.since} />
+                  </li>
+                )}
+              </ul>
+            ),
+            actions: (
+              <>
+                {openPrButtons("primary")}
+                {retryButton}
+              </>
+            ),
+          }
+        : githubWait
+          ? {
+              // GitHub's limit or an outage: the run goes on by itself at the time given.
+              tone: "waiting",
+              title: "Waiting for GitHub",
+              body: (
+                <span className="[overflow-wrap:anywhere]" data-testid="github-wait">
+                  {githubWait}. Nothing is needed from you.
+                </span>
+              ),
+              actions: openPrButtons("secondary"),
+            }
+          : run.status === "merged"
         ? { tone: "success", title: "Done. The change was merged.", body: "The pull request is merged, so the change is in.", actions: openPrButtons("secondary") }
         : done
           ? {
@@ -1043,7 +1092,7 @@ function RunDetailInner() {
       <PageHeader
         detail
         title={run.title || "Untitled run"}
-        status={<RunStatusBadge status={run.status} unfinishedRound={!!run.round_incomplete && ["completed", "success"].includes(run.status)} />}
+        status={<RunStatusBadge status={run.status} draftHold={hold?.kind} unfinishedRound={!!run.round_incomplete && ["completed", "success"].includes(run.status)} />}
         lead={
           <span className="[overflow-wrap:anywhere]">
             {run.repo || "Choosing a repository…"}

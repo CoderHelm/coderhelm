@@ -6,7 +6,7 @@
 // Nothing here runs; it is checked by the compiler only.
 
 import type { OpenApiFields } from "./openapi-fields";
-import type { AnswerRunResult, Plan, ReviewSession, Run, RunAnswer, RunDetail, RunQuestion, RunTrigger, SessionStep, Task, api } from "./api";
+import type { AnswerRunResult, Plan, ReviewSession, Run, RunAnswer, RunDetail, RunDraftHold, RunDraftHoldReason, RunQuestion, RunTrigger, SessionStep, Task, api } from "./api";
 
 type Answer<K extends keyof typeof api> = Awaited<ReturnType<(typeof api)[K]>>;
 
@@ -26,6 +26,9 @@ export type RunTriggerContract = None<Undocumented<RunTrigger, "RunTrigger">>;
 export type RunQuestionContract = None<Undocumented<RunQuestion, "RunQuestion">>;
 export type RunAnswerContract = None<Undocumented<RunAnswer, "RunAnswer">>;
 export type AnswerRunContract = None<Undocumented<AnswerRunResult, "AnswerRunResult">>;
+// Why a finished run's pull request is still a draft, and what to do about each reason.
+export type RunDraftHoldContract = None<Undocumented<RunDraftHold, "RunDraftHold">>;
+export type RunDraftHoldReasonContract = None<Undocumented<RunDraftHoldReason, "RunDraftHoldReason">>;
 
 // Plans and their tasks (the plan pages and the runs they start).
 export type PlansPageContract = None<Undocumented<Answer<"listPlans">, "PlansPage">>;
