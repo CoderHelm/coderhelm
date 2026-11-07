@@ -32,7 +32,7 @@ import {
 } from "@/lib/knowledge";
 import { useCan } from "@/hooks/use-can";
 import { SourceLogo } from "./logos";
-import { HybridAppChoice } from "@/components/hybrid-app-choice";
+import { HybridAppChoice, useHybridChoice, type Choice } from "@/components/hybrid-app-choice";
 import { Picker, continueLabel } from "./picker";
 import { AskAdmin, ConfluenceSteps, ConnectLoading, IntegrationsLink, NoTokenPath, NotionSteps, TokenForm } from "./token-connect";
 
@@ -404,7 +404,17 @@ export function AddFlow({
         )}
 
         {step === "connect" && kind && kind !== "upload" && !deciding && !conn?.member_sign_in && (
-          <ConnectStep kind={kind} conn={conn} busy={busy} error={error} onConnect={signIn} canSaveToken={canSaveToken} installAdmin={installAdmin} onTokenSaved={tokenSaved} />
+          <ConnectStep
+            kind={kind}
+            conn={conn}
+            busy={busy}
+            error={error}
+            onConnect={signIn}
+            canSaveToken={canSaveToken}
+            installAdmin={installAdmin}
+            onTokenSaved={tokenSaved}
+            onChoiceChanged={loadConnectors}
+          />
         )}
 
         {step === "pick" && kind && kind !== "upload" && tokenNote && (
@@ -680,6 +690,7 @@ function ConnectStep({
   canSaveToken,
   installAdmin,
   onTokenSaved,
+  onChoiceChanged,
 }: {
   kind: SourceKind;
   conn: Connector | null;
@@ -689,20 +700,41 @@ function ConnectStep({
   canSaveToken: boolean;
   installAdmin: boolean;
   onTokenSaved: (warning: string) => void;
+  /** The app choice changed: what can sign in is read again. */
+  onChoiceChanged: () => void;
 }) {
   const label = KIND_LABEL[kind];
   const tokenKind = conn?.token_path && (kind === "notion" || kind === "confluence") ? kind : null;
   const [showToken, setShowToken] = useState(false);
+  const fetchedChoice = useHybridChoice(kind);
+  const [pickedChoice, setPickedChoice] = useState<Choice | null>(null);
+  // On a hybrid install: Coderhelm's app means one sign-in button and
+  // nothing to fill in; token steps only under "Use my own app" or behind
+  // "Use a key instead".
+  const choice = HYBRID_KINDS.has(kind) ? (pickedChoice ?? fetchedChoice) : null;
+  const viaCoderhelm = choice === "coderhelm";
   const signIn = !!conn?.can_sign_in;
-  // Without sign-in, the token is the way in: shown at once.
-  const tokenOpen = !!tokenKind && canSaveToken && (!signIn || showToken);
-  const state = signIn ? "sign-in" : tokenKind ? (canSaveToken ? "token" : "ask-admin") : "no-way";
+  // Without sign-in, the token is the way in: shown at once (never under
+  // Coderhelm's app, where it stays behind "Use a key instead").
+  const tokenOpen = !!tokenKind && canSaveToken && (viaCoderhelm ? showToken : !signIn || showToken);
+  const state = viaCoderhelm
+    ? signIn
+      ? "sign-in"
+      : "app-not-ready"
+    : signIn
+      ? "sign-in"
+      : tokenKind
+        ? canSaveToken
+          ? "token"
+          : "ask-admin"
+        : "no-way";
   return (
     <div className="flex flex-col items-center py-4 text-center" data-testid="connect-step" data-state={state}>
       <SourceLogo kind={kind} size="lg" />
       <h3 className="mt-5 text-lg font-semibold text-zinc-100">
         {conn?.reconnect_reason ? `Reconnect ${label}` : `Connect ${label} to Coderhelm`}
       </h3>
+      {!viaCoderhelm && (
       <p className="mt-2 max-w-md text-sm leading-relaxed text-zinc-400">
         {conn?.reconnect_reason
           ? `Your ${label} connection stopped working. ${signIn ? "Sign in again" : "Connect it again"} and everything picks up where it left off.`
@@ -718,11 +750,28 @@ function ConnectStep({
                 : "Paste an Atlassian API token for an account that can read the spaces you want. Nothing is changed in Confluence."
               : `Coderhelm reads the folders and files you pick. Nothing is changed in ${label}.`}
       </p>
-      {HYBRID_KINDS.has(kind) && <HybridAppChoice id={kind} name={label} className="mt-5 w-full max-w-md text-left" />}
+      )}
+      {HYBRID_KINDS.has(kind) && (
+        <HybridAppChoice
+          id={kind}
+          name={label}
+          className="mt-5 w-full max-w-md text-left"
+          onChanged={(next) => {
+            setPickedChoice(next);
+            setShowToken(false);
+            onChoiceChanged();
+          }}
+        />
+      )}
       {signIn && (
         <button type="button" onClick={onConnect} className={`${buttonClass("primary", "lg")} mt-6`} disabled={busy} data-testid="connect-button">
-          {busy ? "Opening…" : `Connect ${label}`}
+          {busy ? "Opening…" : `Sign in with ${label}`}
         </button>
+      )}
+      {viaCoderhelm && !signIn && (
+        <p className="mt-6 max-w-md text-sm leading-relaxed text-zinc-400" data-testid="app-not-ready">
+          Coderhelm&apos;s {label} app isn&apos;t ready on this install yet. Check it in Settings, Version and updates, Hybrid, or use a key instead.
+        </p>
       )}
       {error && (
         <p className="mt-4 max-w-md text-sm text-red-300" role="alert">
@@ -735,7 +784,7 @@ function ConnectStep({
             {tokenKind === "notion" ? <NotionSteps /> : <ConfluenceSteps />}
             <TokenForm kind={tokenKind} onConnected={onTokenSaved} />
           </div>
-        ) : tokenKind && !canSaveToken && !signIn ? (
+        ) : viaCoderhelm ? null : tokenKind && !canSaveToken && !signIn ? (
           <AskAdmin kind={kind} />
         ) : !tokenKind && !signIn ? (
           kind === "google_drive" ? (
@@ -744,10 +793,10 @@ function ConnectStep({
             <p className="text-sm text-zinc-400">{conn?.hint}</p>
           )
         ) : null}
-        {signIn && tokenKind && canSaveToken && !showToken && (
+        {(signIn || viaCoderhelm) && tokenKind && canSaveToken && !showToken && (
           <div className="border-t border-zinc-800 pt-5">
             <button type="button" className={`${linkButton} text-sm`} onClick={() => setShowToken(true)} data-testid="use-token">
-              Use a {label} token instead
+              Use a key instead
             </button>
           </div>
         )}

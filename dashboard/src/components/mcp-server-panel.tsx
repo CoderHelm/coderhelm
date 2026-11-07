@@ -20,17 +20,79 @@ export function PluginPanel({ item, onChanged, onClose }: { item: Integration; o
   const d = item.detail as { plugin: PluginDef; enabled: boolean; has_credentials: boolean; custom_prompt: string; remote?: McpServer | null };
   const p = d.plugin;
   const keyForm = <PluginKeyPanel item={item} onChanged={onChanged} onClose={onClose} />;
-  if (!p.remote_url) return keyForm;
+  const noKey = p.key_unavailable ? (
+    <p className="text-sm text-zinc-400" data-testid="key-unavailable">
+      {p.key_unavailable}
+    </p>
+  ) : null;
+  if (!p.remote_url) return <div className="mt-4">{noKey ?? keyForm}</div>;
   const hasKeys = p.credential_fields.length > 0;
   return (
     <div className="mt-4 flex flex-col gap-4">
       {!d.remote && <OAuthOffer plugin={p} />}
-      {hasKeys && (
-        <Disclosure summary={d.remote ? "Or use a key instead" : "Use a key instead"} defaultOpen={d.has_credentials && !d.remote}>
+      {noKey}
+      {!noKey && hasKeys && !d.remote && (
+        <Disclosure summary="Use a key instead">
+          {p.remote_key ? <RemoteKeyForm plugin={p} onChanged={onChanged} /> : keyForm}
+        </Disclosure>
+      )}
+      {!noKey && hasKeys && d.remote && !p.remote_key && (
+        <Disclosure summary="Or use a key instead" defaultOpen={false}>
           {keyForm}
         </Disclosure>
       )}
     </div>
+  );
+}
+
+/** A key for a vendor whose own remote server takes one: it connects to that server, as a sign-in would. */
+function RemoteKeyForm({ plugin, onChanged }: { plugin: PluginDef; onChanged: () => Promise<void> }) {
+  const field = plugin.credential_fields[0];
+  const [key, setKey] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const { toast } = useToast();
+  return (
+    <form
+      className="flex flex-col gap-4"
+      data-testid="remote-key-form"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setSaving(true);
+        setError("");
+        try {
+          await api.addMcpServer({ catalog_id: plugin.id, key: key.trim() });
+          toast(`${plugin.name} is connected`);
+          await onChanged();
+        } catch (err) {
+          setError(errorMessage(err, `${plugin.name} didn't accept that key.`));
+        } finally {
+          setSaving(false);
+        }
+      }}
+    >
+      <p className="text-sm text-zinc-400">
+        {plugin.recommended_permissions && <>Use the least access that works: {plugin.recommended_permissions.toLowerCase()}. </>}
+        <a href={plugin.docs_url} target="_blank" rel="noreferrer" className={linkButton}>
+          Where to get one
+        </a>
+      </p>
+      <Field id={`${plugin.id}-remote-key`} label={field?.label ?? "API key"}>
+        {(props) => (
+          <SecretInput {...props} className={inputClass} placeholder={field?.placeholder} value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" />
+        )}
+      </Field>
+      {error && (
+        <p role="alert" className="text-sm text-red-400">
+          {error}
+        </p>
+      )}
+      <div>
+        <button type="submit" disabled={saving || !key.trim()} className={primaryButton}>
+          {saving ? "Connecting…" : "Connect with this key"}
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -41,7 +103,7 @@ function OAuthOffer({ plugin }: { plugin: PluginDef }) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3" data-testid="oauth-offer">
       <p className="text-sm text-zinc-300">
-        Sign in with {plugin.name}: nobody pastes a key, Coderhelm renews the sign-in on its own, and you pick which of its tools agents may use.
+        You sign in at {plugin.name} and choose which of its tools agents may use. No key to paste.
       </p>
       <div>
         <button
@@ -58,7 +120,7 @@ function OAuthOffer({ plugin }: { plugin: PluginDef }) {
             }
           }}
         >
-          {busy ? "Opening sign-in…" : `Connect with ${plugin.name}`}
+          {busy ? "Opening sign-in…" : `Sign in with ${plugin.name}`}
         </button>
       </div>
     </div>

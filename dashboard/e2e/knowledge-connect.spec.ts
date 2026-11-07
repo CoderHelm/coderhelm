@@ -223,7 +223,7 @@ test.describe("connecting without the app's sign-in", () => {
     await page.getByTestId("start-notion").click();
     const step = page.getByTestId("connect-step");
     await expect(step).toHaveAttribute("data-state", "sign-in");
-    await expect(step.getByTestId("connect-button")).toHaveText("Connect Notion");
+    await expect(step.getByTestId("connect-button")).toHaveText("Sign in with Notion");
     await expect(step.getByTestId("token-path")).toHaveCount(0);
     await shot(page, "notion-oauth");
     await step.getByTestId("use-token").click();

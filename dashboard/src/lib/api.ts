@@ -2981,6 +2981,10 @@ export interface PluginDef {
   recommended_permissions: string;
   /** The vendor's own remote server, signed in to with OAuth; empty when it runs none. */
   remote_url?: string;
+  /** The remote server also takes a key (`Authorization: Bearer`): a key saved here connects to it. */
+  remote_key?: boolean;
+  /** Why no key works for it, in plain words; empty when one does. */
+  key_unavailable?: string;
 }
 
 export interface EnabledPlugin {
@@ -3812,6 +3816,8 @@ export interface McpCall {
 }
 
 export interface McpAddRequest {
+  /** With `catalog_id`: a key for a catalog server whose remote server takes one. */
+  key?: string;
   url?: string;
   name?: string;
   catalog_id?: string;
