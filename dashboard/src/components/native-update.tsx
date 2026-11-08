@@ -173,14 +173,17 @@ export function NativeUpdateCard({
           </p>
         ) : waiting ? (
           <p className="mt-2" data-testid="native-update-hold">
-            {p.admin_changes?.length
-              ? "It changes the deploy role or a permissions boundary, which Coderhelm can't apply for itself. Someone with administrator rights in the AWS account opens it in the AWS console and chooses Execute."
-              : "This install's stack doesn't have the deploy role yet, so this one update is executed in the AWS console by someone with administrator rights in the account. It adds the role; every update after it applies from here."}
+            {"This install's stack doesn't have the deploy role yet, so this one update is executed in the AWS console by someone with administrator rights in the account. It adds the role; every update after it applies from here."}
           </p>
         ) : phase === "preparing" ? (
           <p className="mt-2">Nothing to do yet. It applies by itself once prepared; it only stops to ask if it would replace or remove data.</p>
         ) : null}
         {rolesLine}
+        {p.held?.length ? (
+          <p className="mt-2 text-zinc-400" data-testid="native-update-held">
+            This install&apos;s deploy role and permission limit stay as they are in this update (no update can change them). Any newer permissions are the separate Permissions item below.
+          </p>
+        ) : null}
         {waiting ? <UpdateSteps at="apply" waiting={canApply ? "waits for your OK" : "waits for an AWS admin"} /> : null}
         {p.reason && !waiting ? <p className="mt-2 text-zinc-400">{p.reason}</p> : null}
         {next}
