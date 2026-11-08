@@ -56,32 +56,49 @@ export function NativeAccessCard({ access }: { access: NativeAccess | null | und
   const lines = access.summary ?? [];
   const link = safeAccessLink(access.link);
   const existing = safeConsoleLink(access.existing?.link);
+  const creating = /_IN_PROGRESS$/.test(access.existing?.status ?? "") && !/DELETE/.test(access.existing?.status ?? "");
+  if (creating) {
+    return (
+      <div data-testid="native-access" data-state="creating">
+        <Callout variant="info" title="Allowing more AWS access…">
+          <p>
+            AWS is creating <Code className="text-xs">{access.stack}</Code>. It takes about a minute, and this card goes away by itself when it&apos;s done.
+          </p>
+        </Callout>
+      </div>
+    );
+  }
   return (
     <div data-testid="native-access" data-state="pending">
-      <Callout variant="info" title="Permissions: optional, for an AWS admin">
+      <Callout variant="info" title="Optional: allow more AWS access">
         <p>
-          {access.version ?? "This release"} can do more once this install&apos;s permission limit allows it. Updates don&apos;t wait for this:
-          what needs it says so where you use it.
-        </p>
-        {lines.length ? (
-          <ul className="mt-2 list-disc space-y-1 pl-5" data-testid="native-access-summary">
-            {lines.map((l) => <li key={l}>{l.charAt(0).toUpperCase() + l.slice(1)}.</li>)}
-          </ul>
-        ) : null}
-        <p className="mt-2">
-          Coderhelm can&apos;t apply this for itself. Someone with administrator rights in the AWS account opens the link, checks the box and
-          chooses Create stack; it runs with their own permissions and takes about a minute. Deleting that stack later changes nothing.
+          Your update is done and nothing here is required. {access.version ?? "This release"} can read more of your AWS account if an AWS admin allows it.
         </p>
         {access.existing ? (
           <p className="mt-2" data-testid="native-access-existing">
-            The stack <Code className="text-xs">{access.stack}</Code> exists from an earlier change: delete it first (that changes nothing), then open the link.{" "}
+            First delete the stack <Code className="text-xs">{access.stack}</Code> left from an earlier change (deleting it changes nothing).{" "}
             {existing ? <a href={existing} target="_blank" rel="noopener noreferrer" className={linkButton}>Open {access.stack}</a> : null}
           </p>
         ) : null}
+        <ol className="mt-2 list-decimal space-y-1 pl-5" data-testid="native-access-steps">
+          <li>Sign in to the AWS console as an admin of this account.</li>
+          <li>Click <strong>Open in the AWS console</strong> below. It opens a new stack, {access.stack ? <Code className="text-xs">{access.stack}</Code> : "this install's access stack"}, with everything filled in.</li>
+          <li>At the bottom, tick the box that says it creates IAM resources, then click <strong>Create stack</strong>.</li>
+          <li>Wait about a minute for CREATE_COMPLETE. This card then goes away by itself.</li>
+        </ol>
         {link ? (
           <p className="mt-3">
             <a href={link} target="_blank" rel="noopener noreferrer" className={primaryButton} data-testid="native-access-link">Open in the AWS console</a>
           </p>
+        ) : null}
+        {lines.length ? (
+          <details className="mt-3">
+            <summary className="cursor-pointer text-zinc-400">What it allows</summary>
+            <ul className="mt-2 list-disc space-y-1 pl-5" data-testid="native-access-summary">
+              {lines.map((l) => <li key={l}>{l.charAt(0).toUpperCase() + l.slice(1)}.</li>)}
+            </ul>
+            <p className="mt-2 text-zinc-400">It&apos;s a small stack of its own, next to the install&apos;s. Updates never change it and never wait for it.</p>
+          </details>
         ) : null}
       </Callout>
     </div>
