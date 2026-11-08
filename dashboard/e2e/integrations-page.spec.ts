@@ -163,6 +163,14 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       if (!at("admin")) return forbidden(r);
       return json(r, { own_app: { id: `app-${own[1]}`, client_id: body?.client_id, has_secret: true, status: "not_connected", status_reason: "", connected_by: "", connected_at: "", redirect_uri: "http://localhost:3000/settings/integrations/mcp-callback/" } });
     }
+    const ours = p.match(/^\/api\/mcp-servers\/apps\/([a-z]+)\/coderhelm$/);
+    if (ours && method === "POST") {
+      if (!at("admin")) return forbidden(r);
+      return json(r, {
+        authorize_url: "/settings/integrations/mcp-callback/?state=s2&code=c2",
+        own_app: { id: `app-${ours[1]}`, source: "coderhelm", client_id: "", has_secret: false, status: "not_connected", status_reason: "", connected_by: "", connected_at: "", redirect_uri: "http://localhost:3000/settings/integrations/mcp-callback/" },
+      });
+    }
     if (/^\/api\/mcp-servers\/app-[a-z]+\/connect$/.test(p)) return json(r, { authorize_url: "/settings/integrations/mcp-callback/?state=s1&code=c1" });
     if (p === "/api/mcp-servers/oauth/callback") return json(r, { server: { id: "app-figma", name: "Figma", catalog_id: "figma" }, tools_error: null, own_app: true });
     if (p === "/api/alert-notify" && method === "GET") return at("admin") ? json(r, db.notify) : forbidden(r);
@@ -649,4 +657,32 @@ test("Figma signs in with the team's own app, its redirect URL and scopes shown,
   expect(saved?.body).toEqual({ client_id: "client-1", client_secret: "secret-1" });
   expect(db.calls.some((c) => c.method === "POST" && c.path === "/api/mcp-servers/app-figma/connect")).toBe(true);
   await expect(page).toHaveURL(/\/settings\/integrations\/#integration-figma$/);
+});
+
+test("Figma signs in with Coderhelm's app in one click; my own app and a key are the other choices", async ({ page }) => {
+  const db = await mockApi(page);
+  const figma = db.items.find((i) => i.id === "figma")!;
+  const detail = figma.detail as Record<string, unknown> & { plugin: Record<string, unknown> };
+  detail.own_app_redirect_uri = "https://app.coderhelm.com/settings/integrations/mcp-callback/";
+  detail.coderhelm_app = true;
+  detail.plugin.own_app = {
+    authorize: "https://www.figma.com/oauth",
+    token: "https://api.figma.com/v1/oauth/token",
+    refresh: "https://api.figma.com/v1/oauth/refresh",
+    scopes: ["current_user:read", "file_content:read"],
+    console: "https://www.figma.com/developers/apps",
+    guide: "https://developers.figma.com/docs/rest-api/oauth-apps/",
+  };
+  await page.goto("/settings/integrations#integration-figma");
+  const card = row(page, "figma");
+  const ours = card.getByTestId("coderhelm-app");
+  await expect(ours).toContainText("current_user:read, file_content:read");
+  // The own app's steps and the key wait behind their disclosures.
+  await expect(card.getByText("Use my own Figma app", { exact: true }).first()).toBeVisible();
+  await expect(card.getByText("Use a key instead", { exact: true })).toBeVisible();
+  await expect(card.getByTestId("own-app")).toBeHidden();
+  await ours.getByRole("button", { name: "Sign in with Figma" }).click();
+  await expect.poll(() => db.calls.some((c) => c.path === "/api/mcp-servers/oauth/callback")).toBe(true);
+  expect(db.calls.some((c) => c.method === "POST" && c.path === "/api/mcp-servers/apps/figma/coderhelm")).toBe(true);
+  expect(db.calls.some((c) => c.method === "PUT" && c.path === "/api/mcp-servers/apps/figma")).toBe(false);
 });
