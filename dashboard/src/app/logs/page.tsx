@@ -89,7 +89,8 @@ const DAY_MS = 86_400_000;
  * Whether a finding is quiet, in words: "Quiet for 3 days. Resolves on its own
  * Nov 5 unless seen again." for an open one with no line for a day or more,
  * "Resolved on its own Nov 5 (no new lines for 3 days)." once the analyzer
- * resolved it; null otherwise.
+ * resolved it; null otherwise. A date that has passed is never shown as a
+ * promise: it says when the next check resolves it, or why none can.
  */
 function quietWords(f: LogFinding, now = Date.now()): string | null {
   if (f.status === "fixed" && f.resolved_at && f.fix?.state !== "merged") {
@@ -99,7 +100,15 @@ function quietWords(f: LogFinding, now = Date.now()): string | null {
   if ((f.status === "new" || f.status === "acknowledged") && f.resolves_at && f.last_seen) {
     const quiet = Math.floor((now - Date.parse(f.last_seen)) / DAY_MS);
     if (!(quiet >= 1)) return null;
-    return `Quiet for ${plural(quiet, "day")}. Resolves on its own ${formatDate(f.resolves_at)} unless seen again.`;
+    const lead = `Quiet for ${plural(quiet, "day")}.`;
+    // Older servers send only the date: decide "passed" here.
+    const state = f.resolve?.state ?? (Date.parse(f.resolves_at) > now ? "scheduled" : "due");
+    if (state === "blocked") {
+      const since = f.resolve?.analysis_ok_at ? ` since ${formatDate(f.resolve.analysis_ok_at)}` : "";
+      return `${lead} It was due to resolve on its own ${formatDate(f.resolves_at)}, but log checks have failed${since}: ${f.resolve?.reason ?? "checks of your AWS logs fail"}.`;
+    }
+    if (state === "due") return `${lead} Resolves at the next log check (every 6 hours) unless seen again.`;
+    return `${lead} Resolves on its own ${formatDate(f.resolves_at)} unless seen again.`;
   }
   return null;
 }
@@ -307,6 +316,23 @@ function LogsPage() {
         </div>
       ) : (
         <>
+          {(data?.analysis_failing ?? []).map((a) => (
+            <div key={a.account_id} className="mt-6">
+              <Callout
+                variant="error"
+                testId="analysis-failing"
+                title={`Log checks are failing for AWS account ${a.account_id}`}
+                actions={
+                  <Link href="/settings/integrations/aws" className={secondaryButton}>
+                    Open AWS settings
+                  </Link>
+                }
+              >
+                {a.last_ok_at ? `The last check that worked was ${formatDate(a.last_ok_at)}. ` : "No check has worked yet. "}
+                Until checks work again, findings in this account don&apos;t update or resolve on their own. Cause: {a.reason}.
+              </Callout>
+            </div>
+          ))}
           <ListToolbar
             className="mt-6 mb-4"
             search={{

@@ -2910,6 +2910,17 @@ export interface LogFinding {
   quiet_days?: number;
   /** Open: when it resolves on its own unless seen again. */
   resolves_at?: string | null;
+  /**
+   * Open: what can be promised about that date. `scheduled`: still ahead.
+   * `due`: passed, the next log check (every 6 hours) resolves it. `blocked`:
+   * passed, but log checks have failed since `analysis_ok_at`, for `reason`.
+   */
+  resolve?: {
+    state: "scheduled" | "due" | "blocked";
+    at: string;
+    analysis_ok_at?: string;
+    reason?: string;
+  } | null;
   /** When the analyzer resolved it, and why. */
   resolved_at?: string | null;
   resolved_reason?: string | null;
@@ -2939,6 +2950,8 @@ export interface LogFindingsList {
   counts: Record<LogFindingStatus, number>;
   log_groups: string[];
   aws_connected: boolean;
+  /** AWS accounts whose log checks are failing, so findings there can't resolve. */
+  analysis_failing?: { account_id: string; last_ok_at: string | null; reason: string }[];
 }
 
 export interface LogSample {
