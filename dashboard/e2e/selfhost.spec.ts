@@ -625,7 +625,8 @@ test("System: newer permissions are a separate, optional item with one link; the
   await expect(page.getByTestId("native-update-held")).toContainText("stay as they are");
   await expect(page.getByTestId("native-update-apply")).toBeVisible();
   const access = page.getByTestId("native-access");
-  await expect(access).toContainText("Permissions: optional, for an AWS admin");
+  await expect(access).toContainText("Optional: allow more AWS access");
+  await expect(page.getByTestId("native-access-steps")).toContainText("Create stack");
   await expect(page.getByTestId("native-access-summary")).toContainText("Adds read access to Airflow, ECR and ECS");
   await expect(page.getByTestId("native-access-link")).toHaveAttribute("href", ACCESS_LINK);
   // Nobody is sent to execute the update's change set in the console: it would run as the deploy role there too.

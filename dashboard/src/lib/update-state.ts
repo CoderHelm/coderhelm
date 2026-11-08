@@ -81,7 +81,10 @@ export function startedBy(actor: string | null | undefined): string | null {
 export function failedTry(data: SystemVersion, pre: SystemPreflight | null): FailedTry | null {
   const last = (data.history ?? []).find((h) => h.mode !== "rollback" && h.status !== "superseded");
   const newest = (data.history ?? []).find((h) => h.status !== "superseded");
-  if (last && newest === last && ["failed", "rolled_back", "not_started"].includes(last.status) && last.version !== data.current.version) {
+  // A newer release than the one that failed replaces it: the card offers
+  // that release (Update), never only a retry of the one that stopped.
+  const replaced = !!last && !!data.latest && data.latest.version !== last.version && atLeast(data.latest.version, last.version);
+  if (last && newest === last && !replaced && ["failed", "rolled_back", "not_started"].includes(last.status) && last.version !== data.current.version) {
     return { version: last.version, status: last.status as FailedTry["status"], reason: last.reason ?? null, from: last.from_version ?? data.current.version, startedAt: last.started_at ?? null };
   }
   const b = pre?.blockers.find((x) => x.key === "failed_before");

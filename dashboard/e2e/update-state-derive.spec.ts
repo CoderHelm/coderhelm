@@ -75,6 +75,15 @@ test.describe("deriveUpdateState: one coherent state", () => {
     });
   });
 
+  test("observed: a newer release after one that stopped partway is offered, never hidden behind the failure", () => {
+    const failed = [{ id: "UPDATE#f", version: "v0.8.36", from_version: "v0.8.32", actor: "owner@example.org", mode: "update" as const, status: "failed" as const, started_at: ago(300) }];
+    const s = derive({ history: failed });
+    expect(s.kind).toBe("available");
+    expect(s.kind === "available" && s.version).toBe("v0.8.39");
+    const same = derive({ history: [{ ...failed[0], version: "v0.8.39" }] });
+    expect(same.kind).toBe("failed");
+  });
+
   test("a superseded row is neither a failure nor the newest update", () => {
     const s = derive({ latest: null, update_available: false, current: { ...BASE.current, version: "v0.8.39" }, history: [
       { id: "UPDATE#c", version: "v0.8.39", actor: "owner@example.org", status: "succeeded", started_at: ago(30), finished_at: ago(10) },
