@@ -1456,7 +1456,7 @@ export const api = {
   connectMcpServer: (id: string) =>
     request<{ authorize_url: string }>(`/api/mcp-servers/${encodeURIComponent(id)}/connect`, { method: "POST" }),
   finishMcpSignIn: (body: { state: string; code?: string; error?: string; iss?: string }) =>
-    request<{ server: McpServer; tools_error: string | null }>("/api/mcp-servers/oauth/callback", {
+    request<{ server: McpServer; tools_error: string | null; own_app?: boolean }>("/api/mcp-servers/oauth/callback", {
       method: "POST",
       body: JSON.stringify(body),
     }),
@@ -1464,6 +1464,12 @@ export const api = {
     request<{ server: McpServer; revoked: boolean }>(`/api/mcp-servers/${encodeURIComponent(id)}/connection`, { method: "DELETE" }),
   removeMcpServer: (id: string) =>
     request<{ status: string }>(`/api/mcp-servers/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  /** Saves the team's own OAuth app for a catalog server (a blank secret keeps the saved one for the same client id). */
+  saveOwnApp: (catalogId: string, client_id: string, client_secret: string) =>
+    request<{ own_app: OwnAppState }>(`/api/mcp-servers/apps/${encodeURIComponent(catalogId)}`, {
+      method: "PUT",
+      body: JSON.stringify({ client_id, client_secret }),
+    }),
   setMcpClient: (id: string, client_id: string, client_secret: string) =>
     request<{ server: McpServer }>(`/api/mcp-servers/${encodeURIComponent(id)}/client`, {
       method: "PUT",
@@ -2998,6 +3004,35 @@ export interface PluginDef {
   remote_key?: boolean;
   /** Why no key works for it, in plain words; empty when one does. */
   key_unavailable?: string;
+  /** Its package also takes a token from the team's own OAuth app with the vendor (Figma). */
+  own_app?: OwnAppDef;
+}
+
+/** Where a team creates its own OAuth app for a catalog server, and what to give it. */
+export interface OwnAppDef {
+  authorize: string;
+  token: string;
+  refresh: string;
+  /** The scopes to tick on the app, exactly. */
+  scopes: string[];
+  /** Where the app is created. */
+  console: string;
+  /** The vendor's guide to creating one. */
+  guide: string;
+}
+
+/** A team's own app for a catalog server, as its card shows it (never the secret). */
+export interface OwnAppState {
+  /** The connection's id, for connect, disconnect and remove. */
+  id: string;
+  client_id: string;
+  has_secret: boolean;
+  status: "connected" | "not_connected" | "needs_reconnect" | "failed";
+  status_reason: string;
+  connected_by: string;
+  connected_at: string;
+  /** The redirect URL to add to the app. */
+  redirect_uri: string;
 }
 
 export interface EnabledPlugin {

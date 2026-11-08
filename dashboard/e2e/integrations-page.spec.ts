@@ -158,6 +158,13 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       return json(r, { status: "saved" });
     }
     if (/^\/api\/plugins\/[a-z]+\/test$/.test(p)) return json(r, { status: "ok", tool_count: 4 });
+    const own = p.match(/^\/api\/mcp-servers\/apps\/([a-z]+)$/);
+    if (own && method === "PUT") {
+      if (!at("admin")) return forbidden(r);
+      return json(r, { own_app: { id: `app-${own[1]}`, client_id: body?.client_id, has_secret: true, status: "not_connected", status_reason: "", connected_by: "", connected_at: "", redirect_uri: "http://localhost:3000/settings/integrations/mcp-callback/" } });
+    }
+    if (/^\/api\/mcp-servers\/app-[a-z]+\/connect$/.test(p)) return json(r, { authorize_url: "/settings/integrations/mcp-callback/?state=s1&code=c1" });
+    if (p === "/api/mcp-servers/oauth/callback") return json(r, { server: { id: "app-figma", name: "Figma", catalog_id: "figma" }, tools_error: null, own_app: true });
     if (p === "/api/alert-notify" && method === "GET") return at("admin") ? json(r, db.notify) : forbidden(r);
     if (p === "/api/alert-notify" && method === "PUT") {
       if (!at("admin")) return forbidden(r);
@@ -609,4 +616,37 @@ test("a saved webhook shows only as a hint, is tested without the page knowing i
     enabled: false,
     slack_webhook: { clear: true },
   });
+});
+
+test("Figma signs in with the team's own app, its redirect URL and scopes shown, a key still possible", async ({ page }) => {
+  const db = await mockApi(page);
+  const figma = db.items.find((i) => i.id === "figma")!;
+  (figma.detail as Record<string, unknown>).own_app_redirect_uri = "https://coderhelm.example.com/settings/integrations/mcp-callback/";
+  (figma.detail as { plugin: Record<string, unknown> }).plugin.own_app = {
+    authorize: "https://www.figma.com/oauth",
+    token: "https://api.figma.com/v1/oauth/token",
+    refresh: "https://api.figma.com/v1/oauth/refresh",
+    scopes: ["current_user:read", "file_content:read"],
+    console: "https://www.figma.com/developers/apps",
+    guide: "https://developers.figma.com/docs/rest-api/oauth-apps/",
+  };
+  await page.goto("/settings/integrations#integration-figma");
+  const panel = row(page, "figma").getByTestId("own-app");
+  await expect(panel).toContainText("Use my own Figma app");
+  await expect(panel.getByTestId("own-app-redirect")).toHaveText("https://coderhelm.example.com/settings/integrations/mcp-callback/");
+  await expect(panel).toContainText("current_user:read, file_content:read");
+  await expect(panel.getByRole("link", { name: "www.figma.com/developers/apps" })).toHaveAttribute("href", "https://www.figma.com/developers/apps");
+  // The key form waits behind its disclosure.
+  await expect(row(page, "figma").getByText("Use a key instead")).toBeVisible();
+  const go = panel.getByRole("button", { name: "Save and connect with Figma" });
+  await expect(go).toBeDisabled();
+  await panel.getByLabel("Client ID").fill("client-1");
+  await panel.getByLabel("Client secret").fill("secret-1");
+  await go.click();
+  // Saved, then sent to Figma's sign-in, whose answer the callback page finishes.
+  await expect.poll(() => db.calls.some((c) => c.path === "/api/mcp-servers/oauth/callback")).toBe(true);
+  const saved = db.calls.find((c) => c.method === "PUT" && c.path === "/api/mcp-servers/apps/figma");
+  expect(saved?.body).toEqual({ client_id: "client-1", client_secret: "secret-1" });
+  expect(db.calls.some((c) => c.method === "POST" && c.path === "/api/mcp-servers/app-figma/connect")).toBe(true);
+  await expect(page).toHaveURL(/\/settings\/integrations\/#integration-figma$/);
 });

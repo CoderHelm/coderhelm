@@ -27,7 +27,7 @@ export default function McpCallbackGuarded() {
   );
 }
 
-type View = { kind: "working" } | { kind: "idle" } | { kind: "failed"; message: string } | { kind: "done"; name: string; note: string };
+type View = { kind: "working" } | { kind: "idle" } | { kind: "failed"; message: string } | { kind: "done"; name: string; note: string; ownApp: boolean };
 
 function McpCallback() {
   const [view, setView] = useState<View>({ kind: "working" });
@@ -61,7 +61,7 @@ function McpCallback() {
       .then((r) => {
         const s = r.server;
         const knowledgeApp = s.catalog_id?.startsWith("source:");
-        setView({ kind: "done", name: knowledgeApp ? s.name.replace(/ \(knowledge\)$/, "") : s.name, note: knowledgeApp ? "" : (r.tools_error ?? "") });
+        setView({ kind: "done", name: knowledgeApp ? s.name.replace(/ \(knowledge\)$/, "") : s.name, note: knowledgeApp ? "" : (r.tools_error ?? ""), ownApp: !!r.own_app });
         // Opened as a popup (a sign-in card in a chat or a run, or Knowledge
         // signing in without leaving its page): tell the page that opened
         // it, and close. That page carries on by itself.
@@ -107,7 +107,15 @@ function McpCallback() {
         )}
         {view.kind === "done" && (
           <Callout variant="success" title={`${view.name} is connected`}>
-            <p>{view.note ? "Connected, but its tools couldn't be listed yet. Open Integrations to try again." : "Taking you back to pick its tools…"}</p>
+            <p>
+              {view.ownApp
+                ? view.note
+                  ? `Signed in, but ${view.name} didn't accept the token. Open Integrations to see why.`
+                  : "Taking you back to Integrations…"
+                : view.note
+                  ? "Connected, but its tools couldn't be listed yet. Open Integrations to try again."
+                  : "Taking you back to pick its tools…"}
+            </p>
             {view.note && <TechnicalDetails text={view.note} />}
           </Callout>
         )}
