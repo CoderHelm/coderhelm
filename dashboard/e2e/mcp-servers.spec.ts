@@ -83,6 +83,8 @@ function linearPlugin() {
     credential_fields: [{ key: "api_key", label: "API key", placeholder: "lin_api_...", secret: true }],
     docs_url: "https://example.com/docs", repo_url: "https://example.com/repo", default_prompt: "Read only.", recommended_permissions: "Read-only access",
     remote_url: "https://mcp.linear.example.com/mcp",
+    remote_key: true,
+    key_unavailable: "",
   };
 }
 
@@ -138,6 +140,12 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     }
     if (p === "/api/mcp-servers" && method === "POST") {
       if (!admin) return json(r, { error: "Only admins can change MCP servers." }, 403);
+      if (body?.catalog_id === "linear" && body?.key) {
+        // A key for a server that takes one connects at once.
+        const s = server({ id: "linear", name: "Linear", catalog_id: "linear", url: linearPlugin().remote_url, auth: "header", header_name: "Authorization", has_key: true, issuer: null, my_connection: null });
+        db.servers.push(s);
+        return json(r, { server: s, detected: { auth: "header" } });
+      }
       if (body?.catalog_id === "linear") {
         const s = server({ id: "linear", name: "Linear", catalog_id: "linear", url: linearPlugin().remote_url, status: "not_connected", my_connection: null, tools: [], tools_listed_at: "" });
         db.servers.push(s);
@@ -363,11 +371,11 @@ test("a catalog server offers its vendor's sign-in first and keeps the key as a 
   await page.goto("/settings/integrations");
   await row(page, "linear").getByRole("button", { name: /^Linear, Not connected/ }).click();
   const panel = row(page, "linear").getByTestId("integration-panel");
-  await expect(panel.getByTestId("oauth-offer")).toContainText("nobody pastes a key");
+  await expect(panel.getByTestId("oauth-offer")).toContainText("No key to paste");
   await expect(panel.getByText("Use a key instead")).toBeVisible();
   await expect(panel.getByLabel("API key")).toBeHidden();
   await shot(page, "mcp-catalog-oauth");
-  await panel.getByRole("button", { name: "Connect with Linear" }).click();
+  await panel.getByRole("button", { name: "Sign in with Linear" }).click();
   await expect(page).toHaveURL(/#integration-linear$/);
   expect(db.calls.find((c) => c.path === "/api/mcp-servers" && c.method === "POST")?.body).toEqual({ catalog_id: "linear" });
   await expect(row(page, "linear")).toHaveAttribute("data-status", "connected");
@@ -404,4 +412,53 @@ test("a sign-in that can't be finished says so and keeps no code in the address"
   await expect(page.getByTestId("mcp-callback")).toHaveAttribute("data-state", "failed");
   await expect(page.getByText("That sign-in was already used or has expired.")).toBeVisible();
   expect(page.url()).not.toContain("code=");
+});
+
+test("a key for a server whose vendor takes one connects to that server", async ({ page }) => {
+  const db = await mockApi(page);
+  await page.goto("/settings/integrations");
+  await row(page, "linear").getByRole("button", { name: /^Linear, Not connected/ }).click();
+  const panel = row(page, "linear").getByTestId("integration-panel");
+  await panel.getByText("Use a key instead").click();
+  const form = panel.getByTestId("remote-key-form");
+  await form.getByLabel("API key").fill("lin_api_example");
+  await form.getByRole("button", { name: "Connect with this key" }).click();
+  expect(db.calls.find((c) => c.path === "/api/mcp-servers" && c.method === "POST")?.body).toEqual({ catalog_id: "linear", key: "lin_api_example" });
+  await expect(row(page, "linear")).toHaveAttribute("data-status", "connected");
+});
+
+test("a server no key works for says why, with no key form", async ({ page }) => {
+  await mockApi(page);
+  const card = (id: string, name: string, remote: string, why: string) => ({
+    id, section: "other", name, does: `${name} tools.`, status: "not_connected", reason: "", action: "connect", last_check: "", manage_href: "",
+    detail: {
+      plugin: { ...linearPlugin(), id, name, remote_url: remote, remote_key: false, key_unavailable: why },
+      enabled: false, has_credentials: false, custom_prompt: "", last_test_ok: null, last_test_message: "", remote: null,
+    },
+  });
+  await page.route((url) => url.pathname === "/api/integrations", (r) =>
+    r.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        can_edit: true,
+        migrated: 0,
+        items: [
+          card("hosting", "Hosting", "https://mcp.hosting.example.com", "Hosting's MCP server takes no key: use Sign in with Hosting."),
+          card("cache", "Cache", "", "Cache's MCP server runs with Python, which Coderhelm can't run yet."),
+        ],
+      }),
+    }),
+  );
+  await page.goto("/settings/integrations");
+  await row(page, "hosting").getByRole("button", { name: /^Hosting, Not connected/ }).click();
+  const hosting = row(page, "hosting").getByTestId("integration-panel");
+  await expect(hosting.getByRole("button", { name: "Sign in with Hosting" })).toBeVisible();
+  await expect(hosting.getByTestId("key-unavailable")).toHaveText("Hosting's MCP server takes no key: use Sign in with Hosting.");
+  await expect(hosting.getByText("Use a key instead")).toHaveCount(0);
+  await expect(hosting.locator("input")).toHaveCount(0);
+  await row(page, "cache").getByRole("button", { name: /^Cache, Not connected/ }).click();
+  const cache = row(page, "cache").getByTestId("integration-panel");
+  await expect(cache.getByTestId("key-unavailable")).toContainText("runs with Python");
+  await expect(cache.locator("input")).toHaveCount(0);
+  await shot(page, "mcp-no-key");
 });

@@ -7,7 +7,21 @@ import { Segmented } from "./segmented";
 import { useToast } from "./toast";
 import { linkButton } from "./ui";
 
-type Choice = "coderhelm" | "own";
+export type Choice = "coderhelm" | "own";
+
+/**
+ * Which app this install uses for `id` right now, when there is a choice:
+ * "coderhelm" or "own". `null` on the hosted service, without hybrid, before
+ * it's registered, or when Coderhelm's app isn't available for `id`.
+ */
+export function useHybridChoice(id: string): Choice | null {
+  const s = useHybrid().status;
+  if (!s || !s.available || !s.registered) return null;
+  if (id === "github") return s.github.mode === "hosted" ? "coderhelm" : "own";
+  const integration = s.integrations.find((i) => i.id === id);
+  if (!canUseCoderhelm(integration)) return null;
+  return integration?.uses_coderhelm ? "coderhelm" : "own";
+}
 
 /**
  * On a self-hosted install: whether this integration uses Coderhelm's app
@@ -15,7 +29,18 @@ type Choice = "coderhelm" | "own";
  * settings as Settings, then System, Hybrid. Shows nothing on the hosted
  * service, on an install without hybrid, or where there is no choice.
  */
-export function HybridAppChoice({ id, name, className = "" }: { id: string; name: string; className?: string }) {
+export function HybridAppChoice({
+  id,
+  name,
+  className = "",
+  onChanged,
+}: {
+  id: string;
+  name: string;
+  className?: string;
+  /** After the choice is saved (what the dialog offers depends on it). */
+  onChanged?: (next: Choice) => void;
+}) {
   const hybrid = useHybrid();
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
@@ -46,6 +71,7 @@ export function HybridAppChoice({ id, name, className = "" }: { id: string; name
     try {
       await hybrid.save(id === "github" ? { github_mode: next === "coderhelm" ? "hosted" : "own" } : appChoice(id, next === "coderhelm"));
       toast(next === "coderhelm" ? `${name} now uses Coderhelm's app` : `${name} now uses your own app`);
+      onChanged?.(next);
     } catch (e) {
       toast(e instanceof Error ? e.message : "Could not save", "error");
     } finally {
