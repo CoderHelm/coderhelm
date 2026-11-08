@@ -17,7 +17,14 @@ interface State {
   name: { name: string; hostname: string; code: string } | null;
   mode: "own" | "hosted";
   links: { installation_id: number; account: string; repositories: string[]; ceiling?: string[] | null }[];
-  hosted: Set<string>;
+  /** Other apps, for the whole install. */
+  appsMode: "coderhelm" | "private";
+  /** Tools the install has its own app for (used whichever choice). */
+  ownApps?: Set<string>;
+  /** A gateway from before the one choice: no `apps_mode`, and it reads only the per-tool `apps`. */
+  olderGateway?: boolean;
+  /** Catalog entries a later release adds, appended as the gateway would list them. */
+  added?: { id: string; name: string }[];
   sharing: { enabled: boolean; payloads: boolean };
   /** Whether Coderhelm's own Google Drive app is set up (the hosted side's `offered`). */
   driveOffered?: boolean;
@@ -32,6 +39,8 @@ interface Call {
 }
 
 function status(s: State) {
+  const uses = (id: string, offered = true) => s.appsMode === "coderhelm" && offered && !s.ownApps?.has(id);
+  const tool = (id: string, name: string, offered = true) => ({ id, name, mode: "hosted", through_coderhelm: "The sign-in only.", stays_with_you: "Every page Coderhelm reads.", uses_coderhelm: uses(id, offered), offered, own_app: !!s.ownApps?.has(id) });
   const checks = [
     { id: "hybrid_registered", status: s.registered ? "pass" : "todo", code: s.registered ? "ok" : "not_registered", title: "Registered with Coderhelm", fix: s.registered ? null : "Press Register with Coderhelm." },
     ...(s.registered ? [{ id: "hybrid_relay", status: s.verified ? "pass" : "fail", code: s.verified ? "ok" : "signature_mismatch", title: "Events from Coderhelm are signed for this install", fix: s.verified ? null : "Register again so this install and Coderhelm share the same signing key." }] : []),
@@ -49,15 +58,18 @@ function status(s: State) {
     github: { mode: s.mode, links: s.links, app_slug: "coderhelm" },
     integrations: [
       { id: "github", name: "GitHub", mode: "hosted", through_coderhelm: "Webhook events, on their way to this install.", stays_with_you: "Your code: the install reads it straight from GitHub.", uses_coderhelm: s.mode === "hosted" },
-      { id: "jira", name: "Jira (Forge app)", mode: "hosted", through_coderhelm: "Ticket events and the sign-in.", stays_with_you: "Ticket contents Coderhelm reads later.", uses_coderhelm: s.hosted.has("jira") },
-      { id: "notion", name: "Notion", mode: "hosted", through_coderhelm: "The sign-in only.", stays_with_you: "Every page Coderhelm reads.", uses_coderhelm: s.hosted.has("notion") },
-      { id: "confluence", name: "Confluence (Atlassian)", mode: "hosted", through_coderhelm: "The sign-in only.", stays_with_you: "Every page Coderhelm reads.", uses_coderhelm: s.hosted.has("confluence") },
-      { id: "google_drive", name: "Google Drive", mode: "hosted", through_coderhelm: "The sign-in only.", stays_with_you: "Every file Coderhelm reads.", uses_coderhelm: s.hosted.has("google_drive"), offered: s.driveOffered !== false },
+      tool("jira", "Jira (Forge app)"),
+      tool("notion", "Notion"),
+      tool("confluence", "Confluence (Atlassian)"),
+      tool("google_drive", "Google Drive", s.driveOffered !== false),
+      tool("figma", "Figma"),
+      ...(s.added ?? []).map((t) => tool(t.id, t.name)),
       { id: "slack_notifications", name: "Slack and Teams notifications", mode: "direct", through_coderhelm: "", stays_with_you: "", uses_coderhelm: false },
-      { id: "mcp_apps", name: "Figma, Linear, Sentry, Sanity and other sign-in apps", mode: "direct", through_coderhelm: "", stays_with_you: "", uses_coderhelm: false },
+      { id: "mcp_apps", name: "Linear, Sentry, Sanity and other sign-in apps", mode: "direct", through_coderhelm: "", stays_with_you: "", uses_coderhelm: false },
       { id: "slack_commands", name: "Slack and Teams commands", mode: "unavailable", through_coderhelm: "", stays_with_you: "", reason: "CoderHelm has no shared Slack or Teams app: each team connects its own app's signing secret in Plugins settings, so there is nothing to relay. That keeps working the same way on a hybrid install.", uses_coderhelm: false },
       { id: "github_sign_in", name: "Sign in with GitHub", mode: "included", through_coderhelm: "Without a GitHub OAuth client of your own, GitHub's sign-in page is CoderHelm's GitHub App: CoderHelm passes GitHub's one-time code to your install, exchanges it when your install asks (with a secret only your install holds), and revokes the token at GitHub seconds later. It stores neither and doesn't ask GitHub who signed in.", stays_with_you: "Who signs in: your install asks GitHub itself whose account it is, then applies its own rules (team members and invites, two-factor). CoderHelm can't start a session on your install or choose who signs in.", reason: "", uses_coderhelm: false },
     ],
+    ...(s.olderGateway ? {} : { apps_mode: s.appsMode }),
     sharing: s.sharing,
     checks,
   };
@@ -70,7 +82,7 @@ const NAMES: Record<string, { available: boolean; code: string; error: string | 
 };
 
 async function setup(page: Page, cfg: Record<string, unknown> | null = SELF, init: Partial<State> = {}) {
-  const s: State = { registered: false, verified: false, name: null, mode: "own", links: [], hosted: new Set(["notion"]), sharing: { enabled: false, payloads: false }, ...init };
+  const s: State = { registered: false, verified: false, name: null, mode: "own", links: [], appsMode: "coderhelm", sharing: { enabled: false, payloads: false }, ...init };
   const calls: Call[] = [];
   const json = (route: Route, body: unknown, code = 200) => route.fulfill({ status: code, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.pathname === "/runtime-config.js", (route) =>
@@ -148,12 +160,10 @@ async function setup(page: Page, cfg: Record<string, unknown> | null = SELF, ini
     }
     if (p === "/api/system/hybrid/settings" && method === "PUT") {
       if (body?.github_mode) s.mode = body.github_mode as State["mode"];
-      if (Array.isArray(body?.integrations)) s.hosted = new Set(body!.integrations as string[]);
-      // Other apps, per tool: only the tools named change.
-      for (const [id, v] of Object.entries((body?.apps as Record<string, string> | undefined) ?? {})) {
-        if (v === "coderhelm") s.hosted.add(id);
-        else s.hosted.delete(id);
-      }
+      // Other apps: one choice. An older gateway reads only the per-tool `apps`.
+      const apps = Object.values((body?.apps as Record<string, string> | undefined) ?? {});
+      if (!s.olderGateway && body?.apps_mode) s.appsMode = body.apps_mode as State["appsMode"];
+      else if (apps.length) s.appsMode = apps.includes("coderhelm") ? "coderhelm" : "private";
       if (body?.sharing) s.sharing = body.sharing as State["sharing"];
       return json(route, status(s));
     }
@@ -331,57 +341,80 @@ for (const [outcome, words, tone] of [
   });
 }
 
-test("other apps: a new install shows Coderhelm's app selected for every tool", async ({ page }) => {
-  // What the install answers when nobody chose: Coderhelm's app for each tool.
-  const { puts } = await setup(page, SELF, { registered: true, verified: true, hosted: new Set(["jira", "notion", "confluence", "google_drive"]) });
+const ALL_TOOLS = { jira: "coderhelm", notion: "coderhelm", confluence: "coderhelm", google_drive: "coderhelm", figma: "coderhelm" };
+const ALL_OWN = { jira: "own", notion: "own", confluence: "own", google_drive: "own", figma: "own" };
+
+test("other apps: one choice, Coderhelm's apps by default, for every tool the catalog lists", async ({ page }) => {
+  const { puts } = await setup(page, SELF, { registered: true, verified: true });
   await page.goto("/settings/system/");
-  for (const id of ["jira", "notion", "confluence", "google_drive"]) {
-    const row = page.getByTestId(`hybrid-integration-${id}`);
-    await expect(row.getByRole("button", { name: "Use Coderhelm's app (easiest)" })).toHaveAttribute("aria-pressed", "true");
-    await expect(row.getByRole("button", { name: "Use my own app (fully private)" })).toHaveAttribute("aria-pressed", "false");
-    await expect(row).toContainText("Through Coderhelm");
+  const row = page.getByTestId("hybrid-integrations");
+  await expect(row).toHaveAttribute("data-apps-mode", "coderhelm");
+  await expect(row.getByRole("button", { name: "Use Coderhelm's apps (easiest)" })).toHaveAttribute("aria-pressed", "true");
+  await expect(row.getByRole("button", { name: "Fully private" })).toHaveAttribute("aria-pressed", "false");
+  // One choice: no per-tool switches and no per-tool paragraphs.
+  await expect(row.getByRole("button")).toHaveCount(2);
+  await expect(row).not.toContainText("Through Coderhelm");
+  await expect(row).not.toContainText("Stays with you");
+  await expect(row.getByTestId("hybrid-apps-line")).toContainText("and for any Coderhelm adds later");
+  // The tools come from the gateway's catalog, Figma among them.
+  const tools = row.getByTestId("hybrid-apps-tools");
+  for (const id of ["jira", "notion", "confluence", "google_drive", "figma"]) {
+    await expect(tools.getByTestId(`hybrid-integration-${id}`)).toHaveAttribute("data-uses-coderhelm", "true");
   }
-  // Showing the defaults saves nothing.
+  await expect(tools.getByTestId("hybrid-integration-figma")).toContainText("Figma");
+  await expect(row.getByTestId("hybrid-apps-direct")).not.toContainText("Figma");
+  await expect(row.getByTestId("hybrid-apps-direct")).toContainText("Slack and Teams notifications");
+  await expect(row.getByTestId("hybrid-apps-unavailable")).toContainText("Slack and Teams commands");
+  await expect(row.getByTestId("hybrid-apps-included")).toContainText("Sign in with GitHub");
+  // GitHub has its own row above, so it isn't listed again.
+  await expect(page.getByTestId("hybrid-integration-github")).toHaveCount(0);
+  // Showing the default saves nothing.
   expect(puts()).toEqual([]);
 });
 
-test("other apps: each choice sends only that tool; direct and unavailable say so", async ({ page }) => {
-  const { puts } = await setup(page, SELF, { registered: true, verified: true });
+test("other apps: a new hosted entry is on with nothing to choose", async ({ page }) => {
+  // A release adds an app to the catalog: the page lists it under the same choice.
+  const { puts } = await setup(page, SELF, { registered: true, verified: true, added: [{ id: "new_tool", name: "New tool" }] });
   await page.goto("/settings/system/");
-  const jira = page.getByTestId("hybrid-integration-jira");
-  await expect(jira).toContainText("Ticket events and the sign-in.");
-  await jira.getByRole("button", { name: "Use Coderhelm's app (easiest)" }).click();
-  await expect.poll(() => puts().at(-1)).toEqual({ apps: { jira: "coderhelm" } });
-  await expect(jira.getByRole("button", { name: "Use Coderhelm's app (easiest)" })).toHaveAttribute("aria-pressed", "true");
-  await page.getByTestId("hybrid-integration-notion").getByRole("button", { name: "Use my own app (fully private)" }).click();
-  await expect.poll(() => puts().at(-1)).toEqual({ apps: { notion: "own" } });
-  await expect(page.getByTestId("hybrid-integration-notion").getByRole("button", { name: "Use my own app (fully private)" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("hybrid-integration-confluence")).toHaveAttribute("data-mode", "hosted");
-  await expect(page.getByTestId("hybrid-integration-slack_notifications")).toContainText("Works from your install, no app needed");
-  await expect(page.getByTestId("hybrid-integration-mcp_apps")).toContainText("Works from your install, no app needed");
-  await expect(page.getByTestId("hybrid-integration-slack_commands")).toContainText("Not available");
-  // Sign in with GitHub works through Coderhelm's app: on, nothing to choose,
-  // and the card says the install decides who signs in.
-  const signIn = page.getByTestId("hybrid-integration-github_sign_in");
-  await expect(signIn).toHaveAttribute("data-mode", "included");
-  await expect(signIn).toContainText("On through Coderhelm's app");
-  await expect(signIn).toContainText("your install asks GitHub itself whose account it is");
-  await expect(signIn).not.toContainText("Google");
-  await expect(signIn).not.toContainText("Not available");
-  await expect(signIn.getByRole("button")).toHaveCount(0);
-  // GitHub has its own row above, so it isn't listed again.
-  await expect(page.getByTestId("hybrid-integration-github")).toHaveCount(0);
+  const tool = page.getByTestId("hybrid-apps-tools").getByTestId("hybrid-integration-new_tool");
+  await expect(tool).toContainText("New tool");
+  await expect(tool).toHaveAttribute("data-uses-coderhelm", "true");
+  await expect(page.getByTestId("hybrid-integrations").getByRole("button")).toHaveCount(2);
+  expect(puts()).toEqual([]);
 });
 
-test("other apps: Google Drive can't use Coderhelm's app while Coderhelm's Drive app isn't set up", async ({ page }) => {
-  await setup(page, SELF, { registered: true, verified: true, driveOffered: false });
+test("other apps: fully private sends one choice (and the per-tool copy for an older gateway)", async ({ page }) => {
+  const { puts } = await setup(page, SELF, { registered: true, verified: true });
   await page.goto("/settings/system/");
-  const drive = page.getByTestId("hybrid-integration-google_drive");
-  await expect(drive).toContainText("Coderhelm's app isn't set up yet");
-  await expect(drive).toContainText("Use your own Google Drive app for now.");
-  await expect(drive.getByRole("button", { name: "Use Coderhelm's app (easiest)" })).toHaveCount(0);
-  // The others still offer the choice.
-  await expect(page.getByTestId("hybrid-integration-notion").getByRole("button", { name: "Use Coderhelm's app (easiest)" })).toBeVisible();
+  const row = page.getByTestId("hybrid-integrations");
+  await row.getByRole("button", { name: "Fully private" }).click();
+  await expect.poll(() => puts().at(-1)).toEqual({ apps_mode: "private", apps: ALL_OWN });
+  await expect(row).toHaveAttribute("data-apps-mode", "private");
+  await expect(row.getByTestId("hybrid-apps-line")).toContainText("Nothing goes through Coderhelm");
+  await expect(row.getByTestId("hybrid-integration-notion")).toHaveAttribute("data-uses-coderhelm", "false");
+  await row.getByRole("button", { name: "Use Coderhelm's apps (easiest)" }).click();
+  await expect.poll(() => puts().at(-1)).toEqual({ apps_mode: "coderhelm", apps: ALL_TOOLS });
+  await expect(row).toHaveAttribute("data-apps-mode", "coderhelm");
+});
+
+test("other apps: an older gateway (no apps_mode) still shows and takes the choice", async ({ page }) => {
+  const { puts } = await setup(page, SELF, { registered: true, verified: true, olderGateway: true, appsMode: "private" });
+  await page.goto("/settings/system/");
+  const row = page.getByTestId("hybrid-integrations");
+  await expect(row).toHaveAttribute("data-apps-mode", "private");
+  await row.getByRole("button", { name: "Use Coderhelm's apps (easiest)" }).click();
+  await expect.poll(() => puts().at(-1)).toEqual({ apps_mode: "coderhelm", apps: ALL_TOOLS });
+  await expect(row).toHaveAttribute("data-apps-mode", "coderhelm");
+});
+
+test("other apps: a tool with its own app keeps it, and one Coderhelm can't offer yet says so", async ({ page }) => {
+  await setup(page, SELF, { registered: true, verified: true, driveOffered: false, ownApps: new Set(["notion"]) });
+  await page.goto("/settings/system/");
+  const tools = page.getByTestId("hybrid-apps-tools");
+  await expect(tools.getByTestId("hybrid-integration-notion")).toContainText("Notion, your own app");
+  await expect(tools.getByTestId("hybrid-integration-notion")).toHaveAttribute("data-uses-coderhelm", "false");
+  await expect(tools.getByTestId("hybrid-integration-google_drive")).toContainText("Google Drive, not ready yet");
+  await expect(tools.getByTestId("hybrid-integration-confluence")).toHaveAttribute("data-uses-coderhelm", "true");
 });
 
 test("sharing with support: off by default, exactly what is sent, payloads only when asked", async ({ page }) => {
@@ -438,7 +471,7 @@ test("domain: a Coderhelm address is the third choice and leads to the name pick
   await expect(page.getByTestId("domain-input")).toBeVisible();
 });
 
-test("integration pages: the app choice saves the same settings, and links to System before registering", async ({ page }) => {
+test("integration pages: GitHub keeps its own choice; other tools say which app and link to the one choice", async ({ page }) => {
   const { puts } = await setup(page, SELF, { registered: true, verified: true });
   await page.goto("/settings/integrations/github/");
   const choice = page.getByTestId("hybrid-app-choice");
@@ -449,8 +482,11 @@ test("integration pages: the app choice saves the same settings, and links to Sy
 
   await page.goto("/settings/integrations/jira/");
   const jira = page.getByTestId("hybrid-app-choice");
-  await jira.getByRole("button", { name: "Use Coderhelm's app (easiest)" }).click();
-  await expect.poll(() => puts().at(-1)).toEqual({ apps: { jira: "coderhelm" } });
+  await expect(jira).toHaveAttribute("data-state", "coderhelm");
+  await expect(jira).toContainText("Jira signs in through Coderhelm's app, like every tool on this install.");
+  await expect(jira.getByRole("button")).toHaveCount(0);
+  await expect(jira.getByRole("link", { name: "Change it for every tool in Settings, Version and updates, Hybrid" })).toHaveAttribute("href", /\/settings\/system\/?#hybrid$/);
+  expect(puts()).toHaveLength(1);
 });
 
 test("integration pages before registering point to Settings, System, Hybrid", async ({ page }) => {

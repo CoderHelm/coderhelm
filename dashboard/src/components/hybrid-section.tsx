@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { api, type HybridCheck, type HybridGithubLink, type HybridIntegration, type HybridNameCheck, type HybridStatus } from "@/lib/api";
-import { GITHUB_OUTCOMES, NAME_CODES, TRUST_MODEL_URL, appChoice, cleanName, useHybrid, type HybridState } from "@/lib/hybrid";
+import { api, type HybridAppsMode, type HybridCheck, type HybridGithubLink, type HybridNameCheck, type HybridStatus } from "@/lib/api";
+import { APPS_MODES, GITHUB_OUTCOMES, NAME_CODES, TRUST_MODEL_URL, appTools, appsModeOf, appsModePatch, cleanName, useHybrid, type HybridState } from "@/lib/hybrid";
 import { Callout } from "./callout";
 import { CopyButton } from "./copy-button";
 import { useConfirm } from "./confirm-dialog";
@@ -686,75 +686,77 @@ function GithubLinkCard({ link, hybrid }: { link: HybridGithubLink; hybrid: Hybr
   );
 }
 
-// ── Other integrations ─────────────────────────────────────────────
+// ── Other apps ─────────────────────────────────────────────────────
 
+/**
+ * One choice for the whole install: Coderhelm's apps for every tool the
+ * catalog has one for (new ones included), or fully private. The tools are
+ * the gateway's catalog, never a list kept here.
+ */
 function IntegrationsRow({ hybrid, s }: RowProps) {
-  const list = (s.integrations ?? []).filter((i) => i.id !== "github");
-  if (list.length === 0) return null;
-  return (
-    <div className={row} id="hybrid-integrations" data-testid="hybrid-integrations">
-      <RowHeading title="Other apps">
-        <p>For each tool, use Coderhelm&apos;s app, or create your own so nothing passes through Coderhelm.</p>
-      </RowHeading>
-      <ul className="mt-3 divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800">
-        {list.map((i) => (
-          <IntegrationItem key={i.id} i={i} hybrid={hybrid} s={s} />
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function IntegrationItem({ i, hybrid, s }: { i: HybridIntegration } & RowProps) {
   const { busy, act } = useAct();
-  const value = i.uses_coderhelm ? "coderhelm" : "own";
-  const notOffered = i.mode === "hosted" && i.offered === false;
+  const tools = appTools(s);
+  const others = (s.integrations ?? []).filter((i) => i.id !== "github" && !tools.includes(i));
+  if (tools.length === 0 && others.length === 0) return null;
+  const mode = appsModeOf(s);
+  const current = APPS_MODES.find((m) => m.value === mode) ?? APPS_MODES[0];
+  const direct = others.filter((i) => i.mode === "direct");
+  const included = others.filter((i) => i.mode === "included");
+  const unavailable = others.filter((i) => i.mode === "unavailable");
   return (
-    <li className="min-w-0 px-4 py-4" data-testid={`hybrid-integration-${i.id}`} data-mode={i.mode}>
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <p className="text-sm font-medium text-zinc-100">{i.name}</p>
-        {notOffered ? (
-          <Chip tone="muted">Coderhelm&apos;s app isn&apos;t set up yet</Chip>
-        ) : i.mode === "hosted" ? (
-          <Segmented<"coderhelm" | "own">
-            label={`Which ${i.name} app to use`}
-            value={value}
-            disabled={!!busy}
-            onChange={(v) =>
-              void act("set", () => hybrid.save(appChoice(i.id, v === "coderhelm")), v === "coderhelm" ? `${i.name} uses Coderhelm's app` : `${i.name} uses your own app`)
-            }
-            options={[
-              { value: "coderhelm", label: "Use Coderhelm's app (easiest)" },
-              { value: "own", label: "Use my own app (fully private)" },
-            ]}
-          />
-        ) : i.mode === "direct" ? (
-          <Chip tone="success">Works from your install, no app needed</Chip>
-        ) : i.mode === "included" ? (
-          <Chip tone="success">On through Coderhelm&apos;s app</Chip>
-        ) : (
-          <Chip tone="muted">Not available</Chip>
-        )}
-      </div>
-      {notOffered && <p className="mt-1 text-sm text-zinc-400">Use your own {i.name} app for now.</p>}
-      {(i.mode === "hosted" || i.mode === "included") && !notOffered && (i.through_coderhelm || i.stays_with_you) && (
-        <dl className="mt-2 grid min-w-0 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
-          {i.through_coderhelm && (
-            <div className={`min-w-0 ${value === "coderhelm" || i.mode === "included" ? "" : "opacity-60"}`}>
-              <dt className="text-zinc-300">Through Coderhelm</dt>
-              <dd className="text-zinc-400">{i.through_coderhelm}</dd>
+    <div className={row} id="hybrid-integrations" data-testid="hybrid-integrations" data-apps-mode={mode}>
+      <RowHeading title="Other apps">
+        <p>One choice for every tool Coderhelm has an app for, now and later. GitHub has its own choice above.</p>
+      </RowHeading>
+      {tools.length > 0 && (
+        <>
+          <div className="mt-3">
+            <Segmented<HybridAppsMode>
+              label="Other apps"
+              value={mode}
+              disabled={!!busy}
+              onChange={(v) =>
+                void act("apps", () => hybrid.save(appsModePatch(s, v)), v === "coderhelm" ? "Other apps use Coderhelm's apps" : "Other apps are fully private")
+              }
+              options={APPS_MODES.map(({ value, label }) => ({ value, label }))}
+            />
+          </div>
+          <p className="mt-2 max-w-prose text-sm text-zinc-400" data-testid="hybrid-apps-line">{current.line}</p>
+          <ul className="mt-3 flex min-w-0 flex-wrap gap-2" aria-label="Tools this covers" data-testid="hybrid-apps-tools">
+            {tools.map((i) => (
+              <li key={i.id} data-testid={`hybrid-integration-${i.id}`} data-mode={i.mode} data-uses-coderhelm={String(i.uses_coderhelm)}>
+                <Chip tone={i.uses_coderhelm ? "success" : "neutral"}>
+                  {i.name}
+                  {i.own_app ? ", your own app" : i.offered === false && mode === "coderhelm" ? ", not ready yet" : ""}
+                </Chip>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {(direct.length > 0 || included.length > 0 || unavailable.length > 0) && (
+        <dl className="mt-4 grid min-w-0 gap-y-1 text-sm">
+          {direct.length > 0 && (
+            <div className="min-w-0" data-testid="hybrid-apps-direct">
+              <dt className="inline text-zinc-300">No app needed: </dt>
+              <dd className="inline text-zinc-400">{direct.map((i) => i.name).join("; ")}</dd>
             </div>
           )}
-          {i.stays_with_you && (
-            <div className="min-w-0">
-              <dt className="text-zinc-300">Stays with you</dt>
-              <dd className="text-zinc-400">{i.stays_with_you}</dd>
+          {included.length > 0 && (
+            <div className="min-w-0" data-testid="hybrid-apps-included">
+              <dt className="inline text-zinc-300">Always through Coderhelm&apos;s app: </dt>
+              <dd className="inline text-zinc-400">{included.map((i) => i.name).join("; ")}</dd>
+            </div>
+          )}
+          {unavailable.length > 0 && (
+            <div className="min-w-0" data-testid="hybrid-apps-unavailable">
+              <dt className="inline text-zinc-300">Not through Coderhelm: </dt>
+              <dd className="inline text-zinc-400">{unavailable.map((i) => i.name).join("; ")}</dd>
             </div>
           )}
         </dl>
       )}
-      {i.mode === "unavailable" && i.reason && <p className="mt-1 text-sm text-zinc-400">{i.reason}</p>}
-    </li>
+    </div>
   );
 }
 

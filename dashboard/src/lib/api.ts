@@ -4950,6 +4950,8 @@ export interface HybridIntegration {
   uses_coderhelm: boolean;
   /** False when Coderhelm's own app for it isn't set up, so it can't be chosen now. Missing from older gateways. */
   offered?: boolean;
+  /** Tools under Other apps: the install has its own app for it, which it uses either way. Missing from older gateways. */
+  own_app?: boolean;
 }
 
 export interface HybridCheck {
@@ -4970,6 +4972,8 @@ export interface HybridStatus {
   name: { name: string; hostname: string; code: string } | null;
   github: { mode: "own" | "hosted"; links: HybridGithubLink[]; app_slug: string | null };
   integrations: HybridIntegration[];
+  /** Other apps, for the whole install. Missing from older gateways (then read from `integrations`). */
+  apps_mode?: HybridAppsMode;
   sharing: { enabled: boolean; payloads: boolean };
   /** Jira through Coderhelm: a hosted team's site linked to this install (absent on an older install). */
   jira?: { enabled: boolean; link: HybridJiraLink | null; synced: boolean };
@@ -5001,11 +5005,14 @@ export interface HybridNameCheck {
   error: string | null;
 }
 
+/** Other apps: every tool on Coderhelm's app (new ones included), or none. */
+export type HybridAppsMode = "coderhelm" | "private";
+
 export interface HybridSettingsPatch {
   github_mode?: "own" | "hosted";
-  /** The hosted-app integrations among jira, notion, confluence, google_drive (github follows github_mode). Older installs; newer ones take `apps`. */
-  integrations?: string[];
-  /** Other apps, per tool (jira, notion, confluence, google_drive): only the tools named change. A tool nobody chose uses Coderhelm's app. */
+  /** Other apps, for the whole install. */
+  apps_mode?: HybridAppsMode;
+  /** The same choice per tool, for a gateway from before `apps_mode` (it ignores `apps_mode`; a newer one ignores this). */
   apps?: Record<string, "coderhelm" | "own">;
   sharing?: { enabled: boolean; payloads: boolean };
   /** Settings, Integrations, Jira: link a hosted team's Jira site through Coderhelm. */

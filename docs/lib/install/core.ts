@@ -66,45 +66,41 @@ export const SETUPS: { id: Setup; title: string; tag?: string; gets: string[]; t
     id: 'hybrid',
     title: 'Hybrid',
     tag: 'Easiest',
-    gets: ['yourname.coderhelm.com, set up for you', 'CoderHelm\u2019s GitHub App: install it and you\u2019re done', 'CoderHelm\u2019s Jira app for your Jira site, linked in a minute', 'CoderHelm\u2019s Notion, Confluence and Google Drive apps: sign in with one click', 'Your code and data still stay in your AWS account'],
+    gets: ['yourname.coderhelm.com, set up for you', 'CoderHelm\u2019s GitHub App: install it and you\u2019re done', 'CoderHelm\u2019s Jira app for your Jira site, linked in a minute', 'CoderHelm\u2019s Notion, Confluence, Google Drive and Figma apps: sign in with one click', 'Your code and data still stay in your AWS account'],
     tradeoff: 'GitHub and Jira events pass through CoderHelm on their way to you (checked, re-signed, never stored past retries).',
   },
 ];
 
-// ── Other apps: CoderHelm's app or the install's own, per tool ──────────
-
-/** The tools besides GitHub and Jira a hybrid install can use CoderHelm's app for. */
-export type OtherApp = 'notion' | 'confluence' | 'google_drive';
-
-export type AppChoices = Record<OtherApp, 'own' | 'hosted'>;
+// ── Other apps: one choice for the whole install ─────────────────────────
 
 /**
- * Each tool's toggle under What CoderHelm sets up for you. The help is the
- * line Settings, System, Hybrid, Other apps shows for "Through Coderhelm".
+ * Settings, System, Hybrid, Other apps: CoderHelm's app for every tool it has
+ * one for (new ones included, with nothing more to choose), or fully private.
  */
-export const OTHER_APPS: { id: OtherApp; title: string; help: string }[] = [
-  { id: 'notion', title: 'Use CoderHelm\u2019s Notion app', help: 'You sign in through CoderHelm\u2019s Notion integration. CoderHelm keeps the sign-in (encrypted) and hands your install an access token when it syncs.' },
-  { id: 'confluence', title: 'Use CoderHelm\u2019s Confluence app', help: 'You sign in through CoderHelm\u2019s Atlassian app. CoderHelm keeps the sign-in (encrypted) and hands your install access tokens that expire within the hour.' },
-  { id: 'google_drive', title: 'Use CoderHelm\u2019s Google Drive app', help: 'You sign in through CoderHelm\u2019s Google app (read-only Drive access). CoderHelm keeps the sign-in (encrypted) and hands your install access tokens that expire within the hour.' },
+export type AppsMode = 'coderhelm' | 'private';
+
+/** The two options under What CoderHelm sets up for you, one line each. */
+export const APPS_MODES: { id: AppsMode; title: string; help: string }[] = [
+  { id: 'coderhelm', title: 'Use CoderHelm\u2019s apps (easiest)', help: 'Jira, Notion, Confluence, Google Drive, Figma and any app CoderHelm adds later sign in with one click. Nothing passes through CoderHelm until someone connects a tool.' },
+  { id: 'private', title: 'Fully private', help: 'Nothing goes through CoderHelm. Each tool uses your team\u2019s own app, set up on its card in Settings, Integrations.' },
 ];
 
-export const ALL_HOSTED_APPS: AppChoices = { notion: 'hosted', confluence: 'hosted', google_drive: 'hosted' };
-export const ALL_OWN_APPS: AppChoices = { notion: 'own', confluence: 'own', google_drive: 'own' };
+/** The tools an install from an earlier release reads per tool (`apps`); it ignores `apps_mode`. */
+const LEGACY_APP_TOOLS = ['jira', 'notion', 'confluence', 'google_drive'] as const;
 
 /**
- * The Other apps choices as the install takes them (`apps` on
- * /api/setup/hybrid/settings): every tool, Jira included. A tool with no
- * choice saved is CoderHelm's app, like the install's own default.
+ * The Other apps choice as the install takes it (/api/setup/hybrid/settings):
+ * `apps_mode`, and for one release the same choice per tool, which only an
+ * install from before `apps_mode` reads.
  */
-export function appsBody(s: Partial<Pick<InstallState, 'jiraChoice' | 'appChoices'>>): Record<'jira' | OtherApp, 'coderhelm' | 'own'> {
-  const c = { ...ALL_HOSTED_APPS, ...s.appChoices };
-  const one = (v: 'own' | 'hosted' | undefined) => (v === 'own' ? 'own' : 'coderhelm');
-  return { jira: one(s.jiraChoice), notion: one(c.notion), confluence: one(c.confluence), google_drive: one(c.google_drive) };
+export function appsBody(s: Partial<Pick<InstallState, 'appsMode'>>): { apps_mode: AppsMode; apps: Record<string, 'coderhelm' | 'own'> } {
+  const mode: AppsMode = s.appsMode === 'private' ? 'private' : 'coderhelm';
+  return { apps_mode: mode, apps: Object.fromEntries(LEGACY_APP_TOOLS.map((t) => [t, mode === 'coderhelm' ? 'coderhelm' : 'own'])) };
 }
 
 /** Does any choice need the install registered with CoderHelm? */
-export function wantsHybrid(s: Partial<Pick<InstallState, 'domainChoice' | 'githubChoice' | 'jiraChoice' | 'emailTransport' | 'appChoices'>>): boolean {
-  return s.domainChoice === 'coderhelm' || s.githubChoice === 'hosted' || s.jiraChoice === 'hosted' || s.emailTransport === 'coderhelm' || Object.values(s.appChoices ?? {}).includes('hosted');
+export function wantsHybrid(s: Partial<Pick<InstallState, 'domainChoice' | 'githubChoice' | 'jiraChoice' | 'emailTransport' | 'appsMode'>>): boolean {
+  return s.domainChoice === 'coderhelm' || s.githubChoice === 'hosted' || s.jiraChoice === 'hosted' || s.emailTransport === 'coderhelm' || s.appsMode === 'coderhelm';
 }
 
 /** The suffix every CoderHelm address has. */
@@ -299,11 +295,11 @@ export interface InstallState {
    */
   jiraChoice?: 'own' | 'hosted';
   /**
-   * Other apps, per tool (Settings, System, Hybrid, Other apps): CoderHelm's
-   * app or their own. Sent when the install registers. Older saved guides
-   * have none: they follow the setup they were saved with.
+   * Other apps, for the whole install (Settings, System, Hybrid, Other
+   * apps): CoderHelm's apps or fully private. Sent when the install
+   * registers. Older saved guides have per-tool `appChoices` instead.
    */
-  appChoices?: AppChoices;
+  appsMode?: AppsMode;
   /** The Jira site to link, as typed (example.atlassian.net). */
   jiraSite?: string;
   /** They chose to link the Jira site later, in Settings. */
@@ -388,7 +384,7 @@ export function newState(over: Partial<InstallState> = {}): InstallState {
     coderhelmName: '',
     githubChoice: 'hosted',
     jiraChoice: 'hosted',
-    appChoices: { ...ALL_HOSTED_APPS },
+    appsMode: 'coderhelm',
     jiraSite: '',
     jiraSkipped: false,
     dataChoice: 'fresh',
@@ -1067,7 +1063,7 @@ export function parseStored(raw: string | null): InstallState | null {
     // Saved before the setup choice existed: that guide was fully private
     // (the old default), so the hybrid default never applies to it.
     const before = v.setup !== 'private' && v.setup !== 'hybrid'
-      ? { setup: 'private' as const, domainChoice: 'aws' as const, githubChoice: 'own' as const, jiraChoice: 'own' as const, appChoices: { ...ALL_OWN_APPS } }
+      ? { setup: 'private' as const, domainChoice: 'aws' as const, githubChoice: 'own' as const, jiraChoice: 'own' as const, appsMode: 'private' as const }
       : {};
     const s: InstallState = { ...newState(), ...before, ...v };
     // Saved before the Your data step existed: the guide goes on as it was.
@@ -1081,12 +1077,16 @@ export function parseStored(raw: string | null): InstallState | null {
     if (v.jiraChoice !== 'own' && v.jiraChoice !== 'hosted') {
       s.jiraChoice = s.setup === 'hybrid' || s.githubChoice === 'hosted' ? 'hosted' : 'own';
     }
-    // Saved before the Other apps choices: on for hybrid, like the install's default.
-    if (!v.appChoices || typeof v.appChoices !== 'object') {
-      s.appChoices = s.setup === 'hybrid' ? { ...ALL_HOSTED_APPS } : { ...ALL_OWN_APPS };
-    } else {
-      s.appChoices = { ...ALL_HOSTED_APPS, ...v.appChoices };
+    // Saved before the one Other apps choice: per-tool choices count as
+    // CoderHelm's apps when any tool was on (a tool never set was on), as
+    // fully private when all were off; none saved follows the setup.
+    if (v.appsMode !== 'coderhelm' && v.appsMode !== 'private') {
+      const old = v.appChoices && typeof v.appChoices === 'object' ? (v.appChoices as Record<string, unknown>) : null;
+      s.appsMode = old
+        ? ['notion', 'confluence', 'google_drive'].some((t) => old[t] !== 'own') ? 'coderhelm' : 'private'
+        : s.setup === 'hybrid' ? 'coderhelm' : 'private';
     }
+    delete (s as { appChoices?: unknown }).appChoices;
     return s;
   } catch {
     return null;
@@ -1414,7 +1414,7 @@ export function optionalSetup(s: Pick<InstallState, 'url' | 'region' | 'provider
   });
   items.push({
     id: 'hybrid_apps', title: 'Integrations through CoderHelm\u2019s apps, or your own',
-    why: 'Jira, Notion, Confluence and Google Drive with one click through CoderHelm\u2019s apps, or your own apps to keep everything private.',
+    why: 'One choice for every tool: one-click sign-in through CoderHelm\u2019s apps (Jira, Notion, Confluence, Google Drive, Figma and any added later), or fully private with your own apps.',
     state: 'unknown', action: { label: 'Open Settings, System, Hybrid', href: at('/settings/system/#hybrid') }, doc: '/self-host/hybrid/',
   });
   items.push({
