@@ -9,6 +9,7 @@ import { DomainSection } from "@/components/domain-section";
 import { HybridSection } from "@/components/hybrid-section";
 import { UninstallSection } from "@/components/uninstall-section";
 import { NativeUpdateCard, UpdateSteps } from "@/components/native-update";
+import { NativeAccessCard, NativeRecoveryCard } from "@/components/native-access";
 import { ModelsSection, UpdateNeedsAction } from "@/components/models-section";
 import { CodeBlock } from "@/components/code-block";
 import { Code } from "@/components/settings/code";
@@ -315,6 +316,8 @@ function System() {
               onSkipModel={() => start("update", true)}
               next={next}
             />
+            <NativeRecoveryCard recovery={data.native?.recovery} />
+            <NativeAccessCard access={data.native?.access} />
             {!busyUpdating && data.current.version && <ReleaseCheck data={data} onChecked={setData} />}
             <SettingsMore summary="Technical details">
               <VersionDetails version={data} autoUpdates={!!data.settings?.auto} failure={failure} />

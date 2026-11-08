@@ -4613,8 +4613,12 @@ export interface NativeChangeSet {
   data_changes?: string[];
   /** Changes to who may do what. */
   permission_changes?: string[];
-  /** Changes to the deploy role or a boundary: only an AWS admin can apply those. */
+  /** Changes to the deploy role or a boundary (an update made with the deploy role never runs them). */
   admin_changes?: string[];
+  /** IAM calls the deploy role would be refused, found before it ran ("Part.Id: action on arn (denied by Sid)"). */
+  preflight?: string[];
+  /** The install's own deploy role and boundaries, kept as they are in this update. */
+  held?: string[];
   /** Whether Coderhelm can apply it here (otherwise: in the AWS console). */
   can_apply?: boolean;
   /** The token of exactly the data and permission changes to confirm ("" when none). */
@@ -4627,6 +4631,39 @@ export interface NativeUpdate {
   can_apply?: boolean;
   auto_apply: boolean;
   pending: NativeChangeSet | null;
+  /** A newer boundary or deploy role policy than the install has: optional, applied by an AWS admin. */
+  access?: NativeAccess | null;
+  /** A stack whose rollback stopped (UPDATE_ROLLBACK_FAILED), and what the updater did. */
+  recovery?: NativeRecovery | null;
+}
+
+/** The install's permissions against its release's access.json (lambda/updater, access_compute). */
+export interface NativeAccess {
+  /** pending | applied | none (a release before access.json) | unknown */
+  state: string;
+  version?: string;
+  /** What it adds, in plain words. */
+  summary?: string[];
+  resources?: string[];
+  /** The AWS console's quick-create link for the access stack. */
+  link?: string | null;
+  template_url?: string;
+  stack?: string;
+  /** The access stack exists from an earlier change (delete it first). */
+  existing?: { status?: string; link?: string } | null;
+  reason?: string;
+  error?: string;
+}
+
+export interface NativeRecovery {
+  /** continuing | recovered | stuck | failed */
+  status: string;
+  at?: string;
+  reason?: string;
+  skipped?: string[];
+  failed?: string[];
+  target?: string;
+  link?: string;
 }
 
 // ── Deliveries ──────────────────────────────────────────────────────────

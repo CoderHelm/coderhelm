@@ -608,21 +608,44 @@ test("System: a prepared update with nothing to confirm applies with one press",
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
-test("System: a change to the deploy role or a boundary is the one update that goes to the AWS console", async ({ page }) => {
+const ACCESS_LINK = "https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?stackName=coderhelm-prod-access&templateURL=https%3A%2F%2Fcoderhelm-public.s3.amazonaws.com%2Flaunch%2Fv2.0.0%2Faccess.json&param_Stage=prod";
+
+test("System: newer permissions are a separate, optional item with one link; the update applies without them", async ({ page }) => {
   await setup(page, SELF, {
     signedIn: true,
     native: { stack: "coderhelm-prod", can_apply: true, auto_apply: true,
-      pending: { ...PREPARED, can_apply: false, confirm: "", hold: "it changes the deploy role", data_changes: [], permission_changes: [], admin_changes: ["DeployBoundary (Modify)"] } },
+      pending: { ...PREPARED, can_apply: true, confirm: "", hold: "", data_changes: [], permission_changes: [], admin_changes: [], held: ["Boundary", "DeployBoundary"] },
+      access: { state: "pending", version: "v2.0.0", summary: ["adds read access to Airflow, ECR and ECS (airflow:Get*, ecs:Describe*, ecr:List*)"],
+        resources: ["Boundary", "DeployBoundary"], link: ACCESS_LINK, stack: "coderhelm-prod-access", existing: null } },
   });
   await page.goto("/settings/system/");
   const card = page.getByTestId("native-update");
-  await expect(card).toContainText("v2.0.0 needs an AWS admin");
-  await expect(card).toContainText("chooses Execute");
-  await expect(page.getByTestId("native-update-apply")).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Open it in the AWS console" })).toHaveAttribute("href", CS_LINK);
-  // The prepared update is the one thing to do: no second Update button, and it never blocks itself.
-  await expect(page.getByRole("button", { name: "Update to v2.0.0" })).toHaveCount(0);
-  await expect(page.locator("#update-blocked")).toHaveCount(0);
+  await expect(card).toContainText("v2.0.0 is ready to apply");
+  await expect(card).not.toContainText("needs an AWS admin");
+  await expect(page.getByTestId("native-update-held")).toContainText("stay as they are");
+  await expect(page.getByTestId("native-update-apply")).toBeVisible();
+  const access = page.getByTestId("native-access");
+  await expect(access).toContainText("Permissions: optional, for an AWS admin");
+  await expect(page.getByTestId("native-access-summary")).toContainText("Adds read access to Airflow, ECR and ECS");
+  await expect(page.getByTestId("native-access-link")).toHaveAttribute("href", ACCESS_LINK);
+  // Nobody is sent to execute the update's change set in the console: it would run as the deploy role there too.
+  await expect(page.getByRole("link", { name: "Open it in the AWS console" })).toHaveCount(0);
+});
+
+test("System: an applied permission change shows nothing; a stuck rollback says what stopped it", async ({ page }) => {
+  await setup(page, SELF, {
+    signedIn: true,
+    native: { stack: "coderhelm-prod", can_apply: true, auto_apply: true, pending: null,
+      access: { state: "applied", version: "v2.0.0" },
+      recovery: { status: "stuck", at: "2026-11-08T14:10:00Z", reason: "Boundary: its policy differs from the release it rolls back to",
+        link: "https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/events?stackId=x" } },
+  });
+  await page.goto("/settings/system/");
+  await expect(page.getByTestId("native-access")).toHaveCount(0);
+  const rec = page.getByTestId("native-recovery");
+  await expect(rec).toHaveAttribute("data-state", "stuck");
+  await expect(rec).toContainText("Boundary: its policy differs from the release it rolls back to");
+  await expect(page.getByTestId("native-recovery-link")).toBeVisible();
 });
 
 test("System: an older stack without the deploy role says its one console step adds it", async ({ page }) => {
