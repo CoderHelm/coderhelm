@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type AwsConnection, type AwsPermissions } from "@/lib/api";
 import { timeAgo } from "@/lib/data-sources";
 import { Callout } from "./callout";
 import { CheckIcon, ExternalLinkIcon, WarningIcon, AlertCircleIcon } from "./icons";
-import { buttonClass, primaryButton, secondaryButton } from "./ui";
+import { buttonClass, linkButton, primaryButton, secondaryButton } from "./ui";
 import { Code } from "./settings/code";
 
 // Whether each connected AWS account's read-only role has every permission
@@ -270,8 +271,16 @@ export function PermissionsPanel({ account, perms, canEdit }: { account: string;
 
         {v.problem && (
           <div className="sm:pl-8">
-            <Callout variant="error" title={v.problem.message}>
+            {/* The install's own account: its version update brings these, so nothing is wrong in AWS. */}
+            <Callout variant={v.install_account ? "neutral" : "error"} title={v.problem.message}>
               <p>{v.problem.fix}</p>
+              {v.install_account && (
+                <p className="mt-2">
+                  <Link href="/settings/system#version" className={linkButton}>
+                    Open Version and updates
+                  </Link>
+                </p>
+              )}
             </Callout>
           </div>
         )}

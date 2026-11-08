@@ -355,6 +355,32 @@ test("an AWS role without the permissions offers the one-click stack", async ({ 
   await expect(aws.getByRole("switch", { name: "Let agents read Airflow" })).toBeDisabled();
 });
 
+test("a self-hosted install's own account never asks for a stack in AWS: the version update brings the permissions", async ({ page }) => {
+  const list = items().map((i) =>
+    i.id === `aws-${ACCOUNT}`
+      ? {
+          ...i,
+          detail: awsDetail({
+            missing: [],
+            update_url: null,
+            install_account: true,
+            permissions: { status: "update_needed", missing_count: 12 },
+          }),
+        }
+      : i,
+  );
+  await mockApi(page, { items: list });
+  await page.goto("/settings/integrations");
+  const aws = row(page, `aws-${ACCOUNT}`);
+  await control(page, `aws-${ACCOUNT}`, `AWS account ${ACCOUNT}`).click();
+  const panel = aws.getByTestId(`aws-panel-${ACCOUNT}`);
+  await expect(panel.getByText("These read-only permissions come with the next version update")).toBeVisible();
+  await expect(panel.getByRole("link", { name: "Open Version and updates" })).toHaveAttribute("href", /\/settings\/system\/?#version$/);
+  await expect(panel.getByText("the install's own AWS account", { exact: false })).toBeVisible();
+  await expect(aws.getByRole("link", { name: "Update in AWS" })).toHaveCount(0);
+  await expect(panel.getByText("CoderHelmLogReader")).toHaveCount(0);
+});
+
 test("adding credentials to a switched-on server makes it connected", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/settings/integrations");
