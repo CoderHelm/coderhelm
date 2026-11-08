@@ -7,6 +7,42 @@ import { Code } from "@/components/settings/code";
 import { linkButton, primaryButton } from "@/components/ui";
 
 /**
+ * The access stack's quick-create link, only as the updater makes it: the AWS
+ * console, a quick-create of coderhelm-<name>-access from a release's signed
+ * access.json in the release bucket. Anything else is not linked.
+ */
+export function safeAccessLink(link: string | null | undefined): string | null {
+  if (!link) return null;
+  let u: URL;
+  try {
+    u = new URL(link);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "https:" || u.hostname !== "console.aws.amazon.com" || u.pathname !== "/cloudformation/home") return null;
+  const [route, query = ""] = u.hash.replace(/^#/, "").split("?");
+  if (route !== "/stacks/quickcreate") return null;
+  const q = new URLSearchParams(query);
+  if (!/^coderhelm-[a-z][a-z0-9]{0,19}-access$/.test(q.get("stackName") ?? "")) return null;
+  if (!/^https:\/\/coderhelm-public\.s3\.amazonaws\.com\/launch\/v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?\/access\.json$/.test(q.get("templateURL") ?? "")) return null;
+  return u.toString();
+}
+
+/** A link to a stack in the CloudFormation console of the install's region, or null. */
+export function safeConsoleLink(link: string | null | undefined): string | null {
+  if (!link) return null;
+  let u: URL;
+  try {
+    u = new URL(link);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "https:" || !/^([a-z]{2}(-gov)?-[a-z]+-\d\.)?console\.aws\.amazon\.com$/.test(u.hostname) || u.pathname !== "/cloudformation/home") return null;
+  if (!/^#\/stacks\/(stackinfo|events)\?/.test(u.hash)) return null;
+  return u.toString();
+}
+
+/**
  * A newer permission limit (boundary) or deploy role policy than the install
  * has. No update can apply it: the deploy role that runs updates may never
  * change itself or a boundary, and the stack runs every change as that role,
@@ -18,6 +54,8 @@ import { linkButton, primaryButton } from "@/components/ui";
 export function NativeAccessCard({ access }: { access: NativeAccess | null | undefined }) {
   if (!access || access.state !== "pending") return null;
   const lines = access.summary ?? [];
+  const link = safeAccessLink(access.link);
+  const existing = safeConsoleLink(access.existing?.link);
   return (
     <div data-testid="native-access" data-state="pending">
       <Callout variant="info" title="Permissions: optional, for an AWS admin">
@@ -37,12 +75,12 @@ export function NativeAccessCard({ access }: { access: NativeAccess | null | und
         {access.existing ? (
           <p className="mt-2" data-testid="native-access-existing">
             The stack <Code className="text-xs">{access.stack}</Code> exists from an earlier change: delete it first (that changes nothing), then open the link.{" "}
-            {access.existing.link ? <a href={access.existing.link} target="_blank" rel="noopener noreferrer" className={linkButton}>Open {access.stack}</a> : null}
+            {existing ? <a href={existing} target="_blank" rel="noopener noreferrer" className={linkButton}>Open {access.stack}</a> : null}
           </p>
         ) : null}
-        {access.link ? (
+        {link ? (
           <p className="mt-3">
-            <a href={access.link} target="_blank" rel="noopener noreferrer" className={primaryButton} data-testid="native-access-link">Open in the AWS console</a>
+            <a href={link} target="_blank" rel="noopener noreferrer" className={primaryButton} data-testid="native-access-link">Open in the AWS console</a>
           </p>
         ) : null}
       </Callout>
@@ -54,6 +92,7 @@ export function NativeAccessCard({ access }: { access: NativeAccess | null | und
 export function NativeRecoveryCard({ recovery }: { recovery: NativeRecovery | null | undefined }) {
   if (!recovery || recovery.status === "recovered" || recovery.status === "failed") return null;
   const stuck = recovery.status === "stuck";
+  const link = safeConsoleLink(recovery.link);
   return (
     <div data-testid="native-recovery" data-state={recovery.status}>
       <Callout
@@ -66,9 +105,9 @@ export function NativeRecoveryCard({ recovery }: { recovery: NativeRecovery | nu
             ? `Coderhelm keeps running, but no update can start until the rollback finishes. ${capital(recovery.reason)}.`
             : `${capital(recovery.reason)}. No update can start until it finishes; this page follows it by itself.`}
         </p>
-        {stuck && recovery.link ? (
+        {stuck && link ? (
           <p className="mt-2">
-            <a href={recovery.link} target="_blank" rel="noopener noreferrer" className={linkButton} data-testid="native-recovery-link">See the stack&apos;s events in the AWS console</a>
+            <a href={link} target="_blank" rel="noopener noreferrer" className={linkButton} data-testid="native-recovery-link">See the stack&apos;s events in the AWS console</a>
           </p>
         ) : null}
       </Callout>

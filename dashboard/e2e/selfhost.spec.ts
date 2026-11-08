@@ -632,6 +632,26 @@ test("System: newer permissions are a separate, optional item with one link; the
   await expect(page.getByRole("link", { name: "Open it in the AWS console" })).toHaveCount(0);
 });
 
+test("System: a permissions link that isn't the access stack's quick-create from the release bucket is never rendered", async ({ page }) => {
+  for (const link of [
+    "https://evil.example.com/#/stacks/quickcreate?stackName=coderhelm-prod-access&templateURL=https%3A%2F%2Fcoderhelm-public.s3.amazonaws.com%2Flaunch%2Fv2.0.0%2Faccess.json",
+    "https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?stackName=coderhelm-prod-access&templateURL=https%3A%2F%2Fevil.s3.amazonaws.com%2Faccess.json",
+    "https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?stackName=anything&templateURL=https%3A%2F%2Fcoderhelm-public.s3.amazonaws.com%2Flaunch%2Fv2.0.0%2Faccess.json",
+    "javascript:alert(1)",
+  ]) {
+    await setup(page, SELF, {
+      signedIn: true,
+      native: { stack: "coderhelm-prod", can_apply: true, auto_apply: true, pending: null,
+        access: { state: "pending", version: "v2.0.0", summary: ["adds read access to Airflow"], link, stack: "coderhelm-prod-access",
+          existing: { link: "https://evil.example.com/" } } },
+    });
+    await page.goto("/settings/system/");
+    await expect(page.getByTestId("native-access")).toBeVisible();
+    await expect(page.getByTestId("native-access-link")).toHaveCount(0);
+    await expect(page.getByTestId("native-access-existing").locator("a")).toHaveCount(0);
+  }
+});
+
 test("System: an applied permission change shows nothing; a stuck rollback says what stopped it", async ({ page }) => {
   await setup(page, SELF, {
     signedIn: true,
