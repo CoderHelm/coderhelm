@@ -1470,6 +1470,9 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ client_id, client_secret }),
     }),
+  /** Signs in with Coderhelm's own app for a catalog server (Figma): replaces the team's own app, if one was saved, and answers where to send the browser. */
+  connectCoderhelmApp: (catalogId: string) =>
+    request<{ authorize_url: string; own_app: OwnAppState }>(`/api/mcp-servers/apps/${encodeURIComponent(catalogId)}/coderhelm`, { method: "POST" }),
   setMcpClient: (id: string, client_id: string, client_secret: string) =>
     request<{ server: McpServer }>(`/api/mcp-servers/${encodeURIComponent(id)}/client`, {
       method: "PUT",
@@ -3025,6 +3028,9 @@ export interface OwnAppDef {
 export interface OwnAppState {
   /** The connection's id, for connect, disconnect and remove. */
   id: string;
+  /** Whose app it signs in with: Coderhelm's or the team's own. Missing from older gateways (own). */
+  source?: "coderhelm" | "own";
+  /** The team's own app's client id; empty for Coderhelm's app. */
   client_id: string;
   has_secret: boolean;
   status: "connected" | "not_connected" | "needs_reconnect" | "failed";

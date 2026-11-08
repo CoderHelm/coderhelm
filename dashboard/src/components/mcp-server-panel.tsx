@@ -11,6 +11,7 @@ import { useToast } from "./toast";
 import { inputClass, linkButton, primaryButton, secondaryButton } from "./ui";
 import { connectCatalogServer, startMcpSignIn } from "./mcp-servers";
 import { CopyButton } from "./copy-button";
+import { HybridAppChoice } from "./hybrid-app-choice";
 
 // A catalog MCP server (Sentry, Linear, Notion…), opened in place on
 // Integrations and on Connections: signing in through the vendor's remote
@@ -18,16 +19,45 @@ import { CopyButton } from "./copy-button";
 
 /** An MCP server: credentials (entered here, never shown again), its test, its instructions, and turning it off. */
 export function PluginPanel({ item, onChanged, onClose }: { item: Integration; onChanged: () => Promise<void>; onClose: () => void }) {
-  const d = item.detail as { plugin: PluginDef; enabled: boolean; has_credentials: boolean; custom_prompt: string; remote?: McpServer | null; own_app?: OwnAppState | null; own_app_redirect_uri?: string | null };
+  const d = item.detail as {
+    plugin: PluginDef;
+    enabled: boolean;
+    has_credentials: boolean;
+    custom_prompt: string;
+    remote?: McpServer | null;
+    own_app?: OwnAppState | null;
+    own_app_redirect_uri?: string | null;
+    coderhelm_app?: boolean;
+  };
   const p = d.plugin;
   const keyForm = <PluginKeyPanel item={item} onChanged={onChanged} onClose={onClose} />;
   // The vendor's MCP server takes only apps it approved, but its API takes
-  // the team's own app: sign in with that, or use a key.
+  // Coderhelm's app or the team's own: sign in with one, or use a key.
   if (p.own_app) {
     const signedIn = d.own_app?.status === "connected";
+    const mine = d.own_app && (d.own_app.source ?? "own") === "own" ? d.own_app : null;
+    const ownPanel = <OwnAppPanel plugin={p} state={mine} redirectUri={d.own_app_redirect_uri ?? ""} onChanged={onChanged} />;
+    if (d.coderhelm_app) {
+      // Coderhelm's app: one sign-in button; the team's own app and a key
+      // are the other choices, behind their disclosures.
+      const ours = d.own_app && d.own_app.source === "coderhelm" ? d.own_app : null;
+      return (
+        <div className="mt-4 flex flex-col gap-4">
+          <HybridAppChoice id={p.id} name={p.name} onChanged={() => void onChanged()} />
+          <CoderhelmAppSignIn plugin={p} state={ours} />
+          <Disclosure summary={`Use my own ${p.name} app`} defaultOpen={!!mine}>
+            {ownPanel}
+          </Disclosure>
+          <Disclosure summary="Use a key instead" defaultOpen={!signedIn && !mine && d.has_credentials}>
+            {keyForm}
+          </Disclosure>
+        </div>
+      );
+    }
     return (
       <div className="mt-4 flex flex-col gap-4">
-        <OwnAppPanel plugin={p} state={d.own_app ?? null} redirectUri={d.own_app_redirect_uri ?? ""} onChanged={onChanged} />
+        <HybridAppChoice id={p.id} name={p.name} onChanged={() => void onChanged()} />
+        {ownPanel}
         <Disclosure summary="Use a key instead" defaultOpen={!signedIn && d.has_credentials}>
           {keyForm}
         </Disclosure>
@@ -135,6 +165,51 @@ function OAuthOffer({ plugin }: { plugin: PluginDef }) {
           }}
         >
           {busy ? "Opening sign-in…" : `Sign in with ${plugin.name}`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Signing in with Coderhelm's own app with the vendor: nothing to create or paste. */
+function CoderhelmAppSignIn({ plugin, state }: { plugin: PluginDef; state: OwnAppState | null }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const scopes = plugin.own_app?.scopes ?? [];
+  const go = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const r = await api.connectCoderhelmApp(plugin.id);
+      window.location.assign(r.authorize_url);
+    } catch (e) {
+      setError(errorMessage(e, "Couldn't start the sign-in."));
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3" data-testid="coderhelm-app">
+      {state?.status === "connected" ? (
+        <p className="text-sm text-emerald-400" data-testid="coderhelm-app-status">
+          Signed in{state.connected_by ? ` by ${state.connected_by}` : ""} with Coderhelm&apos;s app. Agents read {plugin.name} with this sign-in.
+        </p>
+      ) : state?.status_reason ? (
+        <p role="alert" className="text-sm text-amber-400" data-testid="coderhelm-app-status">
+          {state.status_reason}
+        </p>
+      ) : (
+        <p className="text-sm text-zinc-300">
+          You sign in at {plugin.name} and allow Coderhelm to read{scopes.length ? ` (${scopes.join(", ")})` : ""}. Nothing is changed in {plugin.name}.
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="text-sm text-red-400">
+          {error}
+        </p>
+      )}
+      <div>
+        <button type="button" disabled={busy} className={primaryButton} onClick={() => void go()} data-testid="coderhelm-app-sign-in">
+          {busy ? "Opening sign-in…" : state?.status === "connected" ? "Sign in again" : `Sign in with ${plugin.name}`}
         </button>
       </div>
     </div>
