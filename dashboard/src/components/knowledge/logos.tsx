@@ -67,6 +67,17 @@ export function SourceLogo({ kind, size = "md", className = "" }: { kind: AddKin
           <path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z" />
         </svg>,
       );
+    case "bedrock_kb":
+      // A knowledge base in Amazon Bedrock: stacked records in AWS's orange
+      // (a plain mark, not Amazon's logo).
+      return tile(
+        "bg-[#FF9900]/15 ring-1 ring-[#FF9900]/40 text-[#FFB547]",
+        <svg width={s.px} height={s.px} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <ellipse cx="12" cy="5.5" rx="7.5" ry="2.75" />
+          <path d="M4.5 5.5v6.5c0 1.5 3.4 2.75 7.5 2.75s7.5-1.25 7.5-2.75V5.5" />
+          <path d="M4.5 12v6.5c0 1.5 3.4 2.75 7.5 2.75s7.5-1.25 7.5-2.75V12" />
+        </svg>,
+      );
     default:
       return tile(
         "bg-emerald-500/15 ring-1 ring-emerald-400/30 text-emerald-300",

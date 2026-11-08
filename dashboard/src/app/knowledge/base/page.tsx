@@ -5,11 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Page, PageHeader, Section } from "@/components/page";
 import { Chip, ListError, MoreMenu } from "@/components/list";
 import { Modal } from "@/components/modal";
+import { Code } from "@/components/settings/code";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
 import { useCan } from "@/hooks/use-can";
 import { buttonClass, focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
-import { AddFlow } from "@/components/knowledge/add-flow";
+import { AddFlow, ConnectProblemNote } from "@/components/knowledge/add-flow";
 import { SourceLogo } from "@/components/knowledge/logos";
 import { Picker } from "@/components/knowledge/picker";
 import { SourceCard } from "@/components/knowledge/source-card";
@@ -17,6 +18,8 @@ import { errorMessage } from "@/lib/data-sources";
 import {
   KIND_LABEL,
   READ_SENTENCE,
+  connectProblem,
+  connectedInPlace,
   fileSize,
   itemWord,
   knowledge,
@@ -27,6 +30,7 @@ import {
   type AddKind,
   type Base,
   type BaseInput,
+  type ConnectProblem,
   type Item,
   type KnowledgeLimits,
   type Selected,
@@ -38,6 +42,10 @@ import { BaseForm } from "../base-form";
 // One knowledge base: the apps it stays in sync with (each with whether it
 // is up to date and the one thing to do when it isn't), its uploaded files,
 // and every page in it with a search box. Drop files anywhere to add them.
+//
+// A base connected in place (a Bedrock knowledge base) has no files here: it
+// says so, where it lives and how it is reached, and can check its
+// connection with one test search.
 
 export default function BasePage() {
   return (
@@ -63,6 +71,8 @@ function BaseView() {
   const { confirm } = useConfirm();
   const { can } = useCan();
   const canManage = can("knowledge_manage");
+  const [checking, setChecking] = useState(false);
+  const [checked, setChecked] = useState<{ ok: true; at: string } | { ok: false; problem: ConnectProblem } | null>(null);
   const [base, setBase] = useState<Base | null>(null);
   const [items, setItems] = useState<Item[] | null>(null);
   const [sources, setSources] = useState<Source[]>([]);
@@ -272,11 +282,25 @@ function BaseView() {
     }
   };
 
+  const checkConnection = async () => {
+    setChecking(true);
+    try {
+      const r = await knowledge.check(id);
+      setChecked({ ok: true, at: r.checked_at });
+    } catch (e) {
+      setChecked({ ok: false, problem: connectProblem(e, "Couldn't check the connection.") });
+    } finally {
+      setChecking(false);
+    }
+  };
+
   const removeBase = async () => {
     if (!base) return;
     const ok = await confirm({
       title: `Delete ${base.name}?`,
-      message: "Everything in it is removed from Coderhelm. Nothing changes in the apps it came from. This can't be undone.",
+      message: connectedInPlace(base)
+        ? "It is disconnected from Coderhelm: Chat and the agents stop searching it. Nothing changes in your AWS account."
+        : "Everything in it is removed from Coderhelm. Nothing changes in the apps it came from. This can't be undone.",
       confirmLabel: "Delete knowledge base",
       destructive: true,
     });
@@ -325,6 +349,9 @@ function BaseView() {
     );
   }, [items, q, filter]);
   const uploadsCount = (items ?? []).filter((f) => !f.source_id).length;
+  const inPlace = connectedInPlace(base);
+  // Files go only to bases kept here.
+  const canUpload = canManage && !inPlace;
 
   if (error && !base) {
     return (
@@ -342,17 +369,17 @@ function BaseView() {
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
-    if (canManage) upload(Array.from(e.dataTransfer.files));
+    if (canUpload) upload(Array.from(e.dataTransfer.files));
   };
 
   return (
     <Page testId="knowledge-base-page">
       <div
         onDragEnter={(e) => {
-          if (canManage && e.dataTransfer.types.includes("Files")) setDragging(true);
+          if (canUpload && e.dataTransfer.types.includes("Files")) setDragging(true);
         }}
         onDragOver={(e) => {
-          if (canManage) e.preventDefault();
+          if (canUpload) e.preventDefault();
         }}
         onDragLeave={(e) => {
           if (e.currentTarget === e.target) setDragging(false);
@@ -367,7 +394,7 @@ function BaseView() {
           status={base?.authoritative ? <Chip tone="success">Source of truth</Chip> : undefined}
           lead={base?.description || undefined}
           actions={
-            canManage ? (
+            canUpload ? (
               <button type="button" onClick={() => setFlow({ open: true, start: null })} className={primaryButton} data-testid="add-source">
                 Add
               </button>
@@ -377,8 +404,8 @@ function BaseView() {
             canManage
               ? [
                   { label: "Settings", onSelect: () => setSettings(true) },
-                  { label: "Upload files", onSelect: () => fileRef.current?.click() },
-                  { label: "Delete knowledge base", onSelect: removeBase, danger: true },
+                  ...(inPlace ? [] : [{ label: "Upload files", onSelect: () => fileRef.current?.click() }]),
+                  { label: inPlace ? "Disconnect knowledge base" : "Delete knowledge base", onSelect: removeBase, danger: true },
                 ]
               : undefined
           }
@@ -394,6 +421,8 @@ function BaseView() {
           </p>
         )}
 
+        {!inPlace && (
+          <>
         <input
           ref={fileRef}
           type="file"
@@ -422,6 +451,8 @@ function BaseView() {
             replacing.current = null;
           }}
         />
+          </>
+        )}
 
         {problems.length > 0 && (
           <div className="mt-6 rounded-xl border border-orange-500/30 bg-orange-500/5 p-4 text-sm text-orange-200" data-testid="upload-problems" role="alert">
@@ -433,6 +464,14 @@ function BaseView() {
           </div>
         )}
 
+        {inPlace && (
+          <Section title="Where it comes from" id="sources">
+            <ConnectedCard base={base} canManage={canManage} checking={checking} checked={checked} onCheck={checkConnection} />
+          </Section>
+        )}
+
+        {!inPlace && (
+        <>
         <Section title="Where it comes from" id="sources">
           <ul className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="sources">
             {sources.map((s) => (
@@ -569,6 +608,8 @@ function BaseView() {
             </>
           )}
         </Section>
+        </>
+        )}
 
         {dragging && (
           <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm" data-testid="drop-overlay">
@@ -581,7 +622,7 @@ function BaseView() {
         )}
       </div>
 
-      {canManage && base && (
+      {canUpload && base && (
         <AddFlow
           open={flow.open}
           onOpenChange={(o) => {
@@ -642,6 +683,70 @@ function BaseView() {
         </Modal>
       )}
     </Page>
+  );
+}
+
+/** A base connected in place: where it lives, how it is reached, and a check of the connection. */
+function ConnectedCard({
+  base,
+  canManage,
+  checking,
+  checked,
+  onCheck,
+}: {
+  base: Base & { backend: Extract<NonNullable<Base["backend"]>, { kind: "remote" }> };
+  canManage: boolean;
+  checking: boolean;
+  checked: { ok: true; at: string } | { ok: false; problem: ConnectProblem } | null;
+  onCheck: () => void;
+}) {
+  const b = base.backend;
+  return (
+    <div className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5" data-testid="connected-in-place">
+      <div className="flex items-start gap-3">
+        <SourceLogo kind="bedrock_kb" size="md" />
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-zinc-100">{b.label}</h3>
+          <p className="mt-0.5 text-sm text-emerald-300" data-testid="connected-line">
+            Connected in place: searched live in your AWS account, nothing copied
+          </p>
+        </div>
+      </div>
+      <dl className="mt-4 grid min-w-0 gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
+        <dt className="text-zinc-500">Knowledge base</dt>
+        <dd className="min-w-0 text-xs leading-5" data-testid="connected-arn">
+          <Code>{b.target}</Code>
+        </dd>
+        <dt className="text-zinc-500">Where</dt>
+        <dd className="text-zinc-300">
+          AWS account {b.account}, {b.region}
+        </dd>
+        <dt className="text-zinc-500">Searched with</dt>
+        <dd className="text-zinc-300" data-testid="connected-access">
+          {b.access === "install"
+            ? "This install's own role, read-only"
+            : "The CoderHelmLogReader role in that account, with your team's private ID, read-only"}
+        </dd>
+        <dt className="text-zinc-500">Search</dt>
+        <dd className="text-zinc-300">{b.hybrid ? "Hybrid: meaning and exact words" : "By meaning (this vector store has no keyword search)"}</dd>
+      </dl>
+      <p className="mt-4 text-sm leading-relaxed text-zinc-400">
+        Chat and the agents it is attached to search it whenever they need it, so documents you add in Bedrock count as soon as Bedrock has them. Nothing is stored here, and deleting it here changes nothing in AWS.
+      </p>
+      {canManage && (
+        <div className="mt-4 space-y-3">
+          <button type="button" className={buttonClass("secondary", "sm")} onClick={onCheck} disabled={checking} data-testid="check-connection">
+            {checking ? "Checking…" : "Check connection"}
+          </button>
+          {checked?.ok && (
+            <p className="text-sm text-emerald-300" role="status" data-testid="check-ok">
+              Searched it just now. The connection works.
+            </p>
+          )}
+          {checked && !checked.ok && <ConnectProblemNote problem={checked.problem} />}
+        </div>
+      )}
+    </div>
   );
 }
 

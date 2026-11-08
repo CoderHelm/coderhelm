@@ -10,7 +10,7 @@ import { useCan } from "@/hooks/use-can";
 import { buttonClass, focusRing, primaryButton } from "@/components/ui";
 import { AddFlow } from "@/components/knowledge/add-flow";
 import { LogoStack, SourceLogo } from "@/components/knowledge/logos";
-import { KIND_LABEL, READ_SHORT, baseHealth, itemWord, knowledge, type AddKind, type Base, type KnowledgeLimits, type SourceKind } from "@/lib/knowledge";
+import { KIND_LABEL, READ_SHORT, baseHealth, itemWord, knowledge, type AddKind, type Base, type KnowledgeLimits, type SourceKind, connectedInPlace } from "@/lib/knowledge";
 
 // Knowledge: what the team's answers come from. Each knowledge base holds
 // pages from the apps the team already uses (kept up to date on their own)
@@ -161,8 +161,9 @@ function Empty({ canManage, onStart }: { canManage: boolean; onStart: (k?: AddKi
 
 function BaseCard({ b }: { b: Base }) {
   const health = baseHealth(b);
-  // Apps first, uploads last.
-  const kinds = b.kinds?.length ? [...b.kinds.filter((k) => k !== "upload"), ...b.kinds.filter((k) => k === "upload")] : ["upload"];
+  const inPlace = connectedInPlace(b);
+  // Apps first, uploads last; a base connected in place shows where it lives.
+  const kinds = inPlace ? ["bedrock_kb"] : b.kinds?.length ? [...b.kinds.filter((k) => k !== "upload"), ...b.kinds.filter((k) => k === "upload")] : ["upload"];
   const apps = kinds.filter((k) => k !== "upload");
   const size = [(b.synced ?? 0) ? itemWord(apps.length === 1 ? apps[0] : "page", b.synced) : "", b.uploads ? itemWord("upload", b.uploads) : ""].filter(Boolean).join(" and ");
   return (
@@ -179,7 +180,7 @@ function BaseCard({ b }: { b: Base }) {
         <h3 className="mt-4 text-base font-semibold text-zinc-100 [overflow-wrap:anywhere]">{b.name}</h3>
         {b.description && <p className="mt-1 line-clamp-2 text-sm text-zinc-400">{b.description}</p>}
         <div className="mt-auto pt-5">
-          <p className="text-sm text-zinc-300">{size || "Nothing in it yet"}</p>
+          <p className="text-sm text-zinc-300" data-testid="knowledge-size">{inPlace ? "Connected in place, searched live in AWS" : size || "Nothing in it yet"}</p>
           {health && (
             <p className="mt-1.5 flex min-w-0 items-center gap-2 text-sm" data-testid="knowledge-health" data-tone={health.tone}>
               <StatusDot tone={health.tone === "attention" ? "attention" : health.tone === "success" ? "success" : "live"} live={health.tone === "live"} />

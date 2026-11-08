@@ -1,6 +1,6 @@
 ---
 title: Knowledge sources
-description: Bring pages in from Notion, Confluence, Google Drive, Sanity, GitHub and websites, and keep them up to date on their own.
+description: Bring pages in from Notion, Confluence, Google Drive, Sanity, GitHub and websites, and keep them up to date on their own, or connect a Bedrock knowledge base in place.
 ---
 
 A knowledge base can hold pages from the apps your team already writes in, next to the files you upload. You pick what to bring in once; Coderhelm keeps it up to date, removes what is deleted, and Chat and the agents cite each page with a link back to where it lives.
@@ -79,6 +79,25 @@ Pages from an app follow the knowledge base's own setting, exactly like uploaded
 - Most connections belong to the team, not to the person who signed in, so syncs keep working when that person is away. The page shows who connected each app.
 - A Sanity source added by signing in syncs with that person's own sign-in, and says so. If they leave the team, it stops and asks any admin to sign in again; their sign-in is never used after they leave.
 - Sign-ins are sealed with your install's encryption key for one team and one connection, renewed before they expire, revoked when you disconnect, and never sent to the browser or to a model.
+
+## Bedrock knowledge bases, connected in place
+
+If your team already has a knowledge base in Amazon Bedrock, connect it in place instead of copying it. Coderhelm searches it live in your AWS account whenever Chat or an agent needs it, and copies nothing: no documents, no passages, no vectors. Bedrock turns each question into a search itself, so it doesn't matter which embedding model or vector store the knowledge base was built with.
+
+1. Connect the AWS account the knowledge base lives in, on **Settings**, **Integrations**, **AWS**. It creates the read-only `CoderHelmLogReader` role, which Coderhelm takes on with your team's private ID.
+2. On the **Knowledge** page, choose **New knowledge base**, then **Bedrock knowledge base**, and paste its ARN (it looks like `arn:aws:bedrock:us-east-1:111122223333:knowledge-base/ABCDE12345`). Coderhelm runs one test search before anything is saved.
+3. If the role can't search it yet, the dialog says "The role in your account does not allow Retrieve on this knowledge base" and offers one link: an update stack in that account that lets the role search exactly the knowledge bases you connected there (`bedrock:Retrieve` and `bedrock:GetDocumentContent` on their ARNs, and nothing else new). Create the stack, then connect again.
+
+The knowledge base's page then says **Connected in place: searched live in your AWS account, nothing copied** instead of listing files. It takes no uploads and no synced apps; you add documents in Bedrock as before, and they are searchable as soon as Bedrock has them.
+
+- **Searching.** Coderhelm asks for Bedrock's hybrid search (meaning and exact words) where your vector store supports it, and Bedrock's ranking joins the ranking of your other knowledge bases, so one answer can cite both. At most three passages come from one document.
+- **Citations.** A citation names the document and links to it: the original page for a web, Confluence or SharePoint source, or the object in the S3 console for an S3 document (it opens only for people who can sign in to that AWS account).
+- **When it can't be searched.** Your other knowledge bases still answer, and Chat says which one couldn't be searched and why.
+- **Who can read it.** Like any knowledge base, everyone who can read it in Coderhelm sees what the search returns, even documents they couldn't open where they came from. Agents search the knowledge bases attached to them, so anyone who can start a run reaches them too.
+
+Coderhelm never asks you to name its own account in a Bedrock resource policy: a grant to a shared role would let anyone who learned your knowledge base's ARN search it through another team. Access always goes through your own role and your team's private ID.
+
+Running your own install? A knowledge base in the install's own account needs no role at all, and the dialog lists them for you: see [Knowledge sources](/self-host/knowledge-sources#bedrock-knowledge-bases-connected-in-place) in the self-hosting guide.
 
 ## Citations
 
