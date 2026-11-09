@@ -3,10 +3,16 @@
 import { useState } from "react";
 import { Select } from "@/components/select";
 import { inputClass, primaryButton, secondaryButton } from "@/components/ui";
+import { ReadersEditor } from "@/components/knowledge/readers";
 import type { BaseInput, KnowledgeLimits } from "@/lib/knowledge";
 
-// A knowledge base's settings: its name and description, who may read it,
-// which agents search it, and whether it is a source of truth.
+// A knowledge base's settings: its name and description, who may read it
+// (a role, and optionally only some people or roles within it), which agents
+// search it (and who gets its results through them), and whether it is a
+// source of truth.
+
+/** Said when a base is attached to agents and the page hasn't said who reaches it through them. */
+export const AGENT_NOTE = "Everyone who can start an agent run gets results from this base when the agent searches it.";
 
 const ROLE_WORDS: Record<string, string> = {
   viewer: "Everyone on the team",
@@ -30,15 +36,19 @@ export function BaseForm({
   submitLabel,
   onSubmit,
   onCancel,
+  agentNote,
 }: {
   initial: BaseInput;
+  /** Who reaches the base through agents, as the gateway words it. */
+  agentNote?: string;
   limits: KnowledgeLimits | null;
   saving: boolean;
   submitLabel: string;
   onSubmit: (v: BaseInput) => void;
   onCancel?: () => void;
 }) {
-  const [v, setV] = useState<BaseInput>(initial);
+  const [v, setV] = useState<BaseInput>({ ...initial, readers: initial.readers ?? [] });
+  const attached = v.attach_team || v.agents.length > 0;
   const agents = limits?.agents ?? [];
   const toggleAgent = (k: string) => setV((x) => ({ ...x, agents: x.agents.includes(k) ? x.agents.filter((a) => a !== k) : [...x.agents, k] }));
   return (
@@ -74,6 +84,7 @@ export function BaseForm({
           options={(limits?.read_roles ?? ["viewer", "member", "admin"]).map((r) => ({ value: r, label: ROLE_WORDS[r] ?? r }))}
         />
       </label>
+      <ReadersEditor value={v.readers ?? []} onChange={(readers) => setV({ ...v, readers })} />
       <fieldset className="space-y-2">
         <legend className="mb-1 text-xs font-medium text-zinc-400">Agents that search it</legend>
         <label className="flex items-center gap-2 text-sm text-zinc-200">
@@ -91,6 +102,11 @@ export function BaseForm({
           </div>
         )}
         <p className="text-xs text-zinc-400">Chat can always use it for people who may read it.</p>
+        {attached && (
+          <p className="rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2 text-xs leading-relaxed text-zinc-300" data-testid="agent-access-form-note">
+            {agentNote || AGENT_NOTE}
+          </p>
+        )}
       </fieldset>
       <label className="flex items-start gap-2 text-sm text-zinc-200">
         <input type="checkbox" className="mt-0.5 accent-emerald-500" checked={v.authoritative} onChange={(e) => setV({ ...v, authoritative: e.target.checked })} />

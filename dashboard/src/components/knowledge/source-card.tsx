@@ -3,7 +3,7 @@
 import { StatusDot } from "@/components/list/status";
 import { MoreMenu } from "@/components/list";
 import { buttonClass } from "@/components/ui";
-import { KIND_LABEL, fixLabel, itemWord, sourceHealth, type Source } from "@/lib/knowledge";
+import { KIND_LABEL, fixLabel, itemWord, sourceHealth, truncatedLine, type KnowledgeLimits, type Source } from "@/lib/knowledge";
 import { ProgressBar } from "./add-flow";
 import { SourceLogo } from "./logos";
 
@@ -19,9 +19,14 @@ export function SourceCard({
   onEdit,
   onPause,
   onRemove,
+  onNewExport,
+  limits,
 }: {
   source: Source;
   canManage: boolean;
+  /** An archive source: upload a newer export to it. */
+  onNewExport?: () => void;
+  limits?: KnowledgeLimits | null;
   onSync: () => void;
   onFix: () => void;
   onEdit: () => void;
@@ -61,7 +66,11 @@ export function SourceCard({
             label={`${source.name} actions`}
             buttonLabel={`More for ${source.name}`}
             items={[
-              { label: "Choose pages", onSelect: onEdit },
+              ...(source.kind === "archive"
+                ? [{ label: "Upload a newer export", onSelect: () => onNewExport?.() }]
+                : source.kind === "s3"
+                  ? []
+                  : [{ label: "Choose pages", onSelect: onEdit }]),
               source.paused
                 ? { label: "Resume updates", onSelect: () => onPause(false) }
                 : { label: "Pause updates", onSelect: () => onPause(true), note: `Stops bringing in changes from ${label}` },
@@ -89,7 +98,21 @@ export function SourceCard({
       {source.failed_items > 0 && source.status !== "error" && (
         <p className="mt-2 text-xs text-zinc-400">{itemWord(source.kind, source.failed_items)} couldn&apos;t be read. They&apos;re tried again on the next check.</p>
       )}
-      {source.truncated && <p className="mt-2 text-xs text-zinc-400">Only the first 1,000 are kept. Choose fewer pages to keep everything.</p>}
+      {source.truncated && (
+        <p className="mt-2 text-xs text-zinc-400" data-testid="source-truncated">
+          {truncatedLine(source.kind, limits)}
+        </p>
+      )}
+      {source.kind === "s3" && typeof source.options.bucket === "string" && (
+        <p className="mt-2 truncate text-xs text-zinc-400" title={`s3://${source.options.bucket}`}>
+          s3://{source.options.bucket}
+        </p>
+      )}
+      {source.kind === "archive" && typeof source.options.file_name === "string" && (
+        <p className="mt-2 truncate text-xs text-zinc-400" data-testid="archive-file">
+          {source.options.file_name}
+        </p>
+      )}
 
       {canManage && (
         <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">

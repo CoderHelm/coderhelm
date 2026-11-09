@@ -163,7 +163,7 @@ function BaseCard({ b }: { b: Base }) {
   const health = baseHealth(b);
   const inPlace = connectedInPlace(b);
   // Apps first, uploads last; a base connected in place shows where it lives.
-  const kinds = inPlace ? ["bedrock_kb"] : b.kinds?.length ? [...b.kinds.filter((k) => k !== "upload"), ...b.kinds.filter((k) => k === "upload")] : ["upload"];
+  const kinds = inPlace ? [b.backend.provider] : b.kinds?.length ? [...b.kinds.filter((k) => k !== "upload"), ...b.kinds.filter((k) => k === "upload")] : ["upload"];
   const apps = kinds.filter((k) => k !== "upload");
   const size = [(b.synced ?? 0) ? itemWord(apps.length === 1 ? apps[0] : "page", b.synced) : "", b.uploads ? itemWord("upload", b.uploads) : ""].filter(Boolean).join(" and ");
   return (
@@ -180,7 +180,7 @@ function BaseCard({ b }: { b: Base }) {
         <h3 className="mt-4 text-base font-semibold text-zinc-100 [overflow-wrap:anywhere]">{b.name}</h3>
         {b.description && <p className="mt-1 line-clamp-2 text-sm text-zinc-400">{b.description}</p>}
         <div className="mt-auto pt-5">
-          <p className="text-sm text-zinc-300" data-testid="knowledge-size">{inPlace ? "Connected in place, searched live in AWS" : size || "Nothing in it yet"}</p>
+          <p className="text-sm text-zinc-300" data-testid="knowledge-size">{inPlace ? (b.backend.provider === "mcp" ? `Connected in place, searched live through ${b.backend.server_name}` : "Connected in place, searched live in AWS") : size || "Nothing in it yet"}</p>
           {health && (
             <p className="mt-1.5 flex min-w-0 items-center gap-2 text-sm" data-testid="knowledge-health" data-tone={health.tone}>
               <StatusDot tone={health.tone === "attention" ? "attention" : health.tone === "success" ? "success" : "live"} live={health.tone === "live"} />

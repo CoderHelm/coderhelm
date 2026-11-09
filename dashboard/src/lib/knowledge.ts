@@ -8,10 +8,17 @@ import type { BaseInput, KnowledgeFile, KnowledgeLimits, SignedUpload } from "./
 export { fileSize, uploadProblem, uploadToSignedUrl } from "./brain";
 export type { BaseInput, KnowledgeLimits, SignedUpload } from "./brain";
 
-/** The apps a knowledge base can hold pages from, plus uploads. */
-export type SourceKind = "notion" | "confluence" | "sanity" | "google_drive" | "github" | "web";
-/** What the add flow starts from: an app, uploads, or a Bedrock knowledge base connected in place. */
-export type AddKind = SourceKind | "upload" | "bedrock_kb";
+/** The apps a knowledge base can hold pages from, and imports (an S3 bucket, an archive). */
+export type SourceKind = "notion" | "confluence" | "sanity" | "google_drive" | "github" | "web" | "s3" | "archive";
+/**
+ * What the add flow starts from: an app, an import, uploads, a Bedrock
+ * knowledge base or a search tool (MCP) connected in place, or importing
+ * what a Bedrock knowledge base was built from.
+ */
+export type AddKind = SourceKind | "upload" | "bedrock_kb" | "mcp" | "bedrock_import";
+
+/** Sources that are imports: their own limit, and "connect in place" when they are bigger. */
+export const IMPORT_KINDS: readonly string[] = ["s3", "archive"];
 
 /** Where a base's passages are: kept here, or connected in place and searched live where it lives. */
 export type Backend =
@@ -29,7 +36,59 @@ export type Backend =
       access: "install" | "account";
       /** Bedrock's hybrid search is used (the vector store supports it). */
       hybrid: boolean;
+    }
+  | {
+      kind: "remote";
+      provider: "mcp";
+      /** "Search tool (MCP)". */
+      label: string;
+      /** The Connected apps server's id. */
+      target: string;
+      server_name: string;
+      /** `team`: the team's connection; `per_person`: each person's own sign-in. */
+      access: "team" | "per_person";
+      per_person: boolean;
+      search_tool: string;
+      fetch_tool: string | null;
     };
+
+/** A remote MCP server on Connected apps that can be searched in place. */
+export interface SearchToolServer {
+  id: string;
+  name: string;
+  url: string;
+  sharing: "shared" | "personal";
+  /** The team's connection works (shared), or yours does (personal). */
+  connected: boolean;
+  /** Coderhelm's best guess at the tool that searches. */
+  search_tool: string | null;
+  fetch_tool: string | null;
+  tools: { name: string; description: string }[];
+}
+
+/** One data source of a Bedrock knowledge base, for importing what it was built from. */
+export interface BedrockDataSource {
+  id: string;
+  name: string;
+  /** `S3`, `CONFLUENCE`, `SHAREPOINT`, `WEB`, `SALESFORCE`, `CUSTOM`, ... */
+  type: string;
+  status: string;
+  bucket: string;
+  prefixes: string[];
+  /** The account the bucket is in. */
+  bucket_account: string;
+  importable: boolean;
+  /** A Coderhelm connector that reads the originals instead. */
+  use_instead: "confluence" | "web" | "";
+  note: string;
+}
+
+export interface BedrockImport {
+  name: string;
+  account: string;
+  region: string;
+  data_sources: BedrockDataSource[];
+}
 
 /** A Bedrock knowledge base found in a self-hosted install's own account. */
 export interface BedrockListed {
@@ -53,6 +112,13 @@ export interface BedrockStart {
   /** The team's connected AWS accounts. */
   accounts: { account: string; region: string }[];
   /** ARNs already connected by this team. */
+  connected: string[];
+}
+
+/** What connecting a search tool starts from. */
+export interface SearchToolsStart {
+  servers: SearchToolServer[];
+  /** Server ids already connected as a knowledge base. */
   connected: string[];
 }
 
@@ -162,6 +228,10 @@ export interface Base {
   sources: SourceSummary[];
   /** Absent from an older gateway: kept here. */
   backend?: Backend;
+  /** Only these people (`user:<email>`) or roles (`role:<key>`) read it; empty: the read role decides. */
+  readers?: string[];
+  /** Said when agents search it: who gets its results through them. */
+  agent_access_note?: string;
 }
 
 /** The base is connected in place (searched live where it lives, nothing copied). */
@@ -186,7 +256,7 @@ export interface Connector {
   connected_by: string;
   hint: string;
   live_updates: boolean;
-  picker: "tree" | "address";
+  picker: "tree" | "address" | "s3" | "archive";
   /** You can sign in with your own account for this app, nothing to set up. */
   member_sign_in?: boolean;
   /** You have such a sign-in now. */
@@ -245,6 +315,25 @@ export interface WebhookSetup {
   dataset: string;
 }
 
+/** What the browser does with an archive: PUT it to `upload`, then say it arrived. */
+export interface ArchiveStart {
+  source: Source;
+  upload: SignedUpload;
+  note: string;
+}
+
+/** Where an S3 import reads from. */
+export interface S3Place {
+  account: string;
+  bucket: string;
+  region: string;
+}
+
+/** What a base is connected to in place, as the create call sends it. */
+export type ConnectInput =
+  | { provider: "bedrock_kb"; target: string }
+  | { provider: "mcp"; target: string; search_tool?: string; fetch_tool?: string };
+
 const post = (body: unknown): RequestInit => ({ method: "POST", body: JSON.stringify(body) });
 const put = (body: unknown): RequestInit => ({ method: "PUT", body: JSON.stringify(body) });
 const e = encodeURIComponent;
@@ -255,7 +344,7 @@ export const knowledge = {
     request<{ base: Base; files: Item[]; sources: Source[]; can_manage: boolean; limits: KnowledgeLimits; visibility_note: string }>(
       `/api/knowledge/${e(id)}`,
     ),
-  create: (input: BaseInput & { source?: SourceInput; connect?: { provider: "bedrock_kb"; target: string } }) =>
+  create: (input: BaseInput & { source?: SourceInput; connect?: ConnectInput }) =>
     request<{ base: Base; source: Source | null; setup: WebhookSetup | null }>("/api/knowledge", post(input)),
   update: (id: string, input: BaseInput) => request<{ base: Base }>(`/api/knowledge/${e(id)}`, put(input)),
   remove: (id: string) => request<{ ok: boolean }>(`/api/knowledge/${e(id)}`, { method: "DELETE" }),
@@ -269,6 +358,23 @@ export const knowledge = {
   check: (id: string) => request<{ ok: boolean; hybrid: boolean; checked_at: string }>(`/api/knowledge/${e(id)}/check`, { method: "POST" }),
   /** Connecting a Bedrock knowledge base: the install's own list (self-hosted) and the team's AWS accounts. */
   bedrock: () => request<BedrockStart>("/api/knowledge/bedrock"),
+  /** What a Bedrock knowledge base was built from, to import it here. */
+  bedrockImport: (arn: string) => request<BedrockImport>(`/api/knowledge/bedrock/import?arn=${e(arn)}`),
+  /** The team's Connected apps servers that can be searched in place. */
+  searchTools: () => request<SearchToolsStart>("/api/knowledge/search-tools"),
+  /** One level of an S3 bucket (the top without `parent`). */
+  browseS3: (place: S3Place, parent: string | null, q = "") => {
+    const qs = new URLSearchParams({ account: place.account, bucket: place.bucket, region: place.region });
+    if (parent) qs.set("parent", parent);
+    if (q) qs.set("q", q);
+    return request<{ nodes: PickerNode[] }>(`/api/knowledge/connectors/s3/browse?${qs.toString()}`);
+  },
+  /** Starts an archive import (or a newer export of one): the source and where to upload the .zip. */
+  startArchive: (kbId: string, file: { name: string; size: number; replace?: string }) =>
+    request<ArchiveStart>(`/api/knowledge/${e(kbId)}/archives`, post(file)),
+  /** The archive is uploaded: the import starts. */
+  finishArchive: (kbId: string, sourceId: string) =>
+    request<{ source: Source }>(`/api/knowledge/${e(kbId)}/archives/${e(sourceId)}/uploaded`, { method: "POST" }),
   connectors: () => request<{ connectors: Connector[]; visibility_note: string }>("/api/knowledge/connectors"),
   connect: (kind: SourceKind) => request<{ authorize_url: string }>(`/api/knowledge/connectors/${e(kind)}/connect`, { method: "POST" }),
   /** Your own sign-in for an app (Sanity): already signed in, or where to send the sign-in window. */
@@ -307,13 +413,52 @@ export const KIND_LABEL: Record<AddKind, string> = {
   google_drive: "Google Drive",
   github: "GitHub",
   web: "Website",
+  s3: "Amazon S3",
+  archive: "Archive upload",
   upload: "Files",
   bedrock_kb: "Bedrock knowledge base",
+  mcp: "Search tool (MCP)",
+  bedrock_import: "Import a Bedrock knowledge base",
 };
+
+/** Where a cited passage came from (a hit's `source_kind`), in words. */
+export function sourceKindLabel(key: string | undefined | null): string {
+  if (!key) return "Uploaded file";
+  return (KIND_LABEL as Record<string, string>)[key] ?? key;
+}
+
+/** The truncation line for a source: imports have their own limit and a way past it. */
+export function truncatedLine(kind: string, limits: Pick<KnowledgeLimits, "max_items_per_import"> | null | undefined): string {
+  if (IMPORT_KINDS.includes(kind)) {
+    const n = (limits?.max_items_per_import ?? 0).toLocaleString();
+    return `This import has more than ${n} documents; only the first ones are searchable. Connect the knowledge base in place instead to search all of it.`;
+  }
+  return "Only the first 1,000 are kept. Choose fewer pages to keep everything.";
+}
+
+/** A reader entry from what a person typed: an email is a person, anything else a role. */
+export function readerEntry(raw: string): string | null {
+  const t = raw.trim();
+  if (!t) return null;
+  if (/^(user|role):/.test(t)) return t.length > 3 ? t : null;
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) return `user:${t.toLowerCase()}`;
+  if (/^[a-z0-9_-]{1,64}$/i.test(t)) return `role:${t.toLowerCase()}`;
+  return null;
+}
+
+/** A reader entry as the page shows it. */
+export function readerWords(entry: string): string {
+  if (entry.startsWith("user:")) return entry.slice(5);
+  if (entry.startsWith("role:")) return `Role: ${entry.slice(5)}`;
+  return entry;
+}
+
+/** At most this many reader entries on one base. */
+export const MAX_READERS = 50;
 
 /** What one item of a kind is called: "page", "document", "file". */
 export function itemWord(kind: AddKind | string, n: number): string {
-  const one = kind === "sanity" ? "document" : kind === "upload" || kind === "google_drive" || kind === "github" ? "file" : "page";
+  const one = kind === "sanity" || kind === "s3" ? "document" : kind === "upload" || kind === "google_drive" || kind === "github" ? "file" : "page";
   return `${n.toLocaleString()} ${one}${n === 1 ? "" : "s"}`;
 }
 
@@ -386,7 +531,7 @@ export function fixLabel(s: Pick<Source, "error" | "kind">): string | null {
     case "sign_in":
       return "Sign in again";
     case "edit":
-      return "Choose pages again";
+      return s.kind === "archive" ? "Upload a newer export" : "Choose pages again";
     case "retry":
       return "Try again";
     default:

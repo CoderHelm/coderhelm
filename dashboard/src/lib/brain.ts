@@ -48,6 +48,10 @@ export interface KnowledgeLimits {
   extensions: string[];
   agents: { key: string; label: string }[];
   read_roles: string[];
+  /** Documents one import (an S3 bucket, an archive) keeps searchable. */
+  max_items_per_import?: number;
+  /** The largest archive (.zip) an import takes. */
+  max_archive_bytes?: number;
 }
 
 export interface BaseInput {
@@ -57,6 +61,8 @@ export interface BaseInput {
   attach_team: boolean;
   agents: string[];
   authoritative: boolean;
+  /** Only these people (`user:<email>`) or roles (`role:<key>`) read it, within the read role. Empty: everyone the read role allows. */
+  readers?: string[];
 }
 
 /** A signed upload: PUT the file's bytes to `url` with `headers`. */
