@@ -320,6 +320,9 @@ const ACTION_LABEL: Record<string, string> = {
   api_key_created: "API key made",
   api_key_revoked: "API key revoked",
   api_key_used: "API key used",
+  mcp_connected: "App connected",
+  mcp_revoked: "App removed",
+  mcp_call: "App used",
 };
 
 function RoleChanges({ version }: { version: string }) {

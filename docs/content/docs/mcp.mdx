@@ -1,0 +1,113 @@
+---
+title: Use CoderHelm from Claude, Cursor and VS Code
+description: Add CoderHelm to Claude, Cursor, VS Code or any other MCP app, sign in once, and see runs, start and retry them, and read or ask for reviews from where you already work.
+---
+
+CoderHelm is an MCP server. Add it to an AI app that supports remote MCP servers, sign in with your CoderHelm account, and the app can see your team's runs and reviews, start work from a ticket, retry a run that stopped, and ask the reviewer to look at a pull request.
+
+The app acts as you. It can do only what your role in CoderHelm allows, in the team you choose when you sign in.
+
+## The address to add
+
+| Where CoderHelm runs | Address |
+| --- | --- |
+| CoderHelm cloud | `https://api.coderhelm.com/mcp` |
+| Your own AWS account | `https://<your CoderHelm address>/mcp`, for example `https://coderhelm.example.com/mcp` |
+
+The same address is on **Settings**, **Connected AI apps** in CoderHelm, with a copy button.
+
+## Add it to your app
+
+### Claude
+
+1. In Claude, open **Settings**, then **Connectors**, and choose **Add custom connector**.
+2. Name it CoderHelm and paste the address.
+3. Choose **Connect**. A CoderHelm page opens in your browser.
+
+### Claude Code
+
+```bash
+claude mcp add --transport http coderhelm https://api.coderhelm.com/mcp
+```
+
+Then run `/mcp` in Claude Code and choose CoderHelm to sign in.
+
+### Cursor
+
+Add CoderHelm to `~/.cursor/mcp.json` (or `.cursor/mcp.json` in a project):
+
+```json
+{
+  "mcpServers": {
+    "coderhelm": { "url": "https://api.coderhelm.com/mcp" }
+  }
+}
+```
+
+Cursor shows CoderHelm under **Settings**, **MCP**. Choose **Connect** to sign in.
+
+### VS Code
+
+Add CoderHelm to `.vscode/mcp.json`, or run **MCP: Add Server** from the command palette and choose HTTP:
+
+```json
+{
+  "servers": {
+    "coderhelm": { "type": "http", "url": "https://api.coderhelm.com/mcp" }
+  }
+}
+```
+
+VS Code asks you to sign in the first time a chat uses CoderHelm.
+
+### Other apps
+
+Any app that supports remote MCP servers over Streamable HTTP with OAuth sign-in works. It finds how to sign in by itself: there is no key or client ID to copy.
+
+On a self-hosted install, use your own address in each of these instead of `https://api.coderhelm.com/mcp`.
+
+## Signing in
+
+When you connect, the app opens a CoderHelm page in your browser. Sign in if you aren't already, then check:
+
+- **Which app is asking.** The app chooses its own name, so check the address it will send you back to (for Claude, `claude.ai`). If you didn't just add CoderHelm to an app, choose **Don't allow**.
+- **What it may do.** Seeing runs and reviews is always included. Starting and retrying runs and asking for reviews is a separate choice: leave it off and the app can only read.
+
+The app gets access for the team you are signed in to. To connect it to another team, switch teams in CoderHelm first.
+
+## What the app can do
+
+| Tool | What it does | Needs |
+| --- | --- | --- |
+| `list_runs` | Lists runs, newest first. Filter by status, repository and start time. | Reading |
+| `get_run` | One run in full: its steps, pull requests, what it's waiting on, its error and its latest notes. | Reading |
+| `start_run` | Starts a run from a GitHub issue (its address, or `owner/name#42`), from a Jira key CoderHelm has seen, or from a task in words with its repository. | Starting runs |
+| `retry_run` | Starts a stopped run again, the same as **Retry** on the run's page. | Starting runs |
+| `list_reviews` | Lists the reviewer's reviews, newest first. | Reading |
+| `get_review` | One review with its findings, by its id or by pull request address. | Reading |
+| `request_review` | Asks the reviewer to review a pull request now, the same as **Re-review**. | Starting runs |
+
+The reading tools are marked read only, so apps that ask before acting know they change nothing.
+
+A Jira ticket reaches CoderHelm from Jira, so `start_run` with a Jira key works for tickets CoderHelm has received before. For a new Jira ticket, start it from Jira the way your team does, or give `start_run` a task and a repository.
+
+## What keeps it safe
+
+- **Your role decides.** Every call is checked exactly like the same click in the dashboard: your role, a custom role's choices, and your team's two-factor rule. A viewer's app can only read, whatever it was allowed.
+- **Changes end access.** If you leave the team, your role changes or your two-factor sign-in is reset, the app stops working until you connect it again.
+- **Short-lived access.** The app's access lasts an hour and is renewed while you use it. A renewal that is used twice ends the connection.
+- **Every call is in the log.** Each call an app makes is written to your team's log of access changes before it runs, with the app's name.
+- **Remove it any time.** **Settings**, **Connected AI apps** lists the apps you connected. **Remove** stops an app at once, everywhere it's signed in. Admins see and remove everyone's.
+
+## For app builders
+
+CoderHelm follows the MCP authorization spec:
+
+- Protected resource metadata: `/.well-known/oauth-protected-resource/mcp`
+- Authorization server metadata: `/.well-known/oauth-authorization-server`
+- Dynamic client registration at `/oauth/register`. Clients are public: PKCE with `S256` is required and there is no client secret.
+- Scopes: `runs:read` and `runs:write`. A first sign-in is asked for `runs:read`; a tool that needs `runs:write` answers `403` with `insufficient_scope`, so a client can ask again.
+- Access tokens last an hour. Refresh tokens last 30 days from their last use and are replaced on every use.
+- Tokens are revoked at `/oauth/revoke`.
+
+The server is stateless: every message is a `POST /mcp` answered with JSON, and there is no event stream.

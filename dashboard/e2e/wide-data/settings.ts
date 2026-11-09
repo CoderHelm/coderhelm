@@ -279,6 +279,24 @@ export const settingsData: Handler = ({ method, path, url }) => {
       limits: { default_rate_per_minute: 600, min_rate_per_minute: 10, max_rate_per_minute: 3000, max_expiry_days: 365, max_keys: 50 },
     };
   }
+  // Connected AI apps: a long app name, a long address and both scopes.
+  if (p === "/api/mcp/connections") {
+    return {
+      connections: [
+        {
+          id: "01jbgrant00000000000000001", client_name: "Nightly-release-notes-and-deploy-pipeline-assistant-for-the-whole-team",
+          redirect_host: "cursor://anysphere.cursor-retrieval-with-a-very-long-extension-name", scopes: ["runs:read", "runs:write"],
+          email: EMAIL, mine: false, created_at: iso(60 * 24 * 40), last_used_at: iso(4), revoked_at: null, status: "active",
+        },
+      ],
+      team_wide: true,
+      mcp_url: "https://a-very-long-install-address-for-testing.example.org/mcp",
+      scopes: [
+        { key: "runs:read", label: "See your team's runs and reviews" },
+        { key: "runs:write", label: "Start and retry runs, and ask for reviews" },
+      ],
+    };
+  }
   // Custom roles: a long name and description, and a long log line.
   if (p === "/api/roles") {
     return {

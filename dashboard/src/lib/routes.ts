@@ -90,6 +90,8 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/settings/notifications": { label: "Notifications", parent: "/settings", description: "Choose which emails Coderhelm sends you. These settings are yours alone." },
   "/settings/security": { label: "Password and two step sign in", parent: "/settings", description: "Your password and two step sign in: change them, and see how you sign in to this team." },
   "/settings/team": { label: "Members and roles", parent: "/settings", description: "Who is on the team, their roles and what each role may do." },
+  "/settings/connected-apps": { label: "Connected AI apps", parent: "/settings", description: "The AI apps you connected to Coderhelm, such as Claude, Cursor and VS Code, and how to connect one." },
+  "/authorize": { label: "Connect an app", description: "An app asks to use Coderhelm as you. Check who is asking and what it may do." },
   "/settings/api-keys": { label: "API keys", parent: "/settings", description: "API keys for scripts and tools that call Coderhelm, with their scopes and limits." },
   "/settings/sign-in": { label: "Sign-in rules", parent: "/settings", description: "How people may sign in to this team, and who may join." },
   "/settings/support-access": { label: "Support access", parent: "/settings", description: "Whether support may look at your team's setup, and for how long." },
