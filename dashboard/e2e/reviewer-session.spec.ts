@@ -1,5 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import {
+  activityHeading,
+  droppedNote,
   findingsLabel,
   isSessionId,
   kindLabel,
@@ -8,6 +10,7 @@ import {
   sessionSeconds,
   statusNote,
   stepOffset,
+  timeline,
   triggerLabel,
 } from "../src/app/reviewer/session/session";
 
@@ -15,7 +18,12 @@ import {
 // API call is answered here; nothing reaches a real backend.
 
 const ID = "3f2c9a1e-5b7d-4c8e-9a0b-1c2d3e4f5a6b";
-const now = Date.now();
+// Fresh for each test: a shard can reach a test minutes after the file loads,
+// and the running elapsed time is measured against the real clock.
+let now = Date.now();
+test.beforeEach(() => {
+  now = Date.now();
+});
 const iso = (secsAgo: number) => new Date(now - secsAgo * 1000).toISOString();
 
 // ---- The helpers ------------------------------------------------------------
@@ -69,6 +77,34 @@ test.describe("session helpers", () => {
     expect(sessionSeconds({ started_at: "", finished_at: end, in_flight: false })).toBeNull();
     expect(stepOffset(start, "2026-10-22T14:18:12+00:00")).toBe(12);
     expect(stepOffset(start, "not a time")).toBeNull();
+  });
+});
+
+test.describe("activity helpers", () => {
+  test("steps and activity groups merge into one timeline by time", () => {
+    const at = (s: number) => `2026-10-22T14:18:${String(s).padStart(2, "0")}.000Z`;
+    const steps = [{ at: at(0), text: "Started" }, { at: at(5), text: "Reviewing the code" }, { at: at(40), text: "Posted" }];
+    const groups = [
+      { started_at: at(5), title: "Checking callers" },
+      { started_at: at(9), title: "Search 3 times" },
+      { started_at: "not a time", title: "View 2 files" },
+    ];
+    const order = timeline(steps, groups).map((e) => (e.kind === "step" ? e.step.text : e.group.title));
+    // A step and a group at the same second keep the step first; a group
+    // without a readable time stays after the one before it.
+    expect(order).toEqual(["Started", "Reviewing the code", "Checking callers", "Search 3 times", "View 2 files", "Posted"]);
+    expect(timeline([], [])).toEqual([]);
+  });
+
+  test("the activity heading and the dropped note read as words", () => {
+    expect(activityHeading("reviewing")).toBe("Reviewing pull request");
+    expect(activityHeading("done")).toBe("Reviewed pull request");
+    expect(activityHeading("reviewing", "question")).toBe("Reading the comment");
+    expect(activityHeading("failed")).toBe("Reviewing pull request");
+    expect(droppedNote(0)).toBeNull();
+    expect(droppedNote(undefined)).toBeNull();
+    expect(droppedNote(1)).toBe("1 more step wasn't recorded.");
+    expect(droppedNote(12)).toBe("12 more steps weren't recorded.");
   });
 });
 
@@ -180,7 +216,7 @@ test("a running review shows its steps live, then its verdict and the posted rev
   await expect(page.getByTestId("session-facts")).toContainText("New commits");
   await expect(page.getByTestId("session-facts")).toContainText("Still running");
   await expect(page.getByRole("link", { name: /9fceb02/ })).toHaveAttribute("href", "https://github.com/acme/web/commit/9fceb02d0ae598e95dc970b74767f19372d61af8");
-  const steps = page.getByTestId("session-steps").getByRole("listitem");
+  const steps = page.locator('[data-testid="timeline-entry"][data-kind="step"]');
   await expect(steps).toHaveCount(2);
   await expect(steps.nth(1)).toContainText("Read the change: 2 files changed");
   // A step's detail opens on demand.
@@ -282,4 +318,175 @@ test("the PR page links to its latest review session", async ({ page }) => {
   await page.goto("/reviewer/pr?repo=acme/web&pr=318");
   await expect(page.getByRole("heading", { level: 1, name: "Rate-limit the login form" })).toBeVisible();
   await expect(page.getByRole("link", { name: "View session" })).toHaveCount(0);
+});
+
+// ---- What the reviewer did, and the overview --------------------------------
+
+const msIso = (secsAgo: number) => new Date(now - secsAgo * 1000).toISOString();
+
+function activity(): unknown[] {
+  return [
+    { kind: "note", title: "Evaluating rate-limit semantics", started_at: msIso(78), ended_at: msIso(78), text: "The limiter now counts failed logins per address.", items: [] },
+    {
+      kind: "search",
+      title: "Search 3 times",
+      started_at: msIso(76),
+      ended_at: msIso(70),
+      text: "",
+      items: [
+        { at: msIso(76), label: "checkLimit(", detail: "", failed: false },
+        { at: msIso(73), label: "LOGIN_LIMIT", detail: "", failed: false },
+        { at: msIso(70), label: "callers of checkLimit", detail: "", failed: false },
+      ],
+    },
+    {
+      kind: "view",
+      title: "View 2 files",
+      started_at: msIso(66),
+      ended_at: msIso(60),
+      text: "",
+      items: [
+        { at: msIso(66), label: "src/auth/limits.ts:1-48", detail: "", failed: false },
+        { at: msIso(63), label: "src/auth/limits.ts:90-120", detail: "", failed: false },
+        { at: msIso(60), label: "src/auth/login.test.ts", detail: "", failed: true },
+      ],
+    },
+  ];
+}
+
+function overview(files: number): Record<string, unknown> {
+  return {
+    summary: "Rate-limits the login form by address.",
+    changes: ["Counts failed logins per address", "Locks the form for a minute after five"],
+    files: Array.from({ length: files }, (_, i) =>
+      i === 0 ? { path: "src/auth/limits.ts", description: "Adds the per-address counter" } : { path: `src/auth/file-${i}.ts`, description: `Change ${i}` },
+    ),
+    files_total: files,
+  };
+}
+
+test("the activity timeline shows each step live, grouped like a run log", async ({ page }) => {
+  const errors = watchConsole(page);
+  const running = session({ activity: activity() });
+  const done = session({
+    status: "done",
+    in_flight: false,
+    finished_at: iso(5),
+    verdict: "REQUEST_CHANGES",
+    findings: 2,
+    activity: [
+      ...activity(),
+      {
+        kind: "comment",
+        title: "Store 2 comments",
+        started_at: msIso(20),
+        ended_at: msIso(20),
+        text: "",
+        items: [
+          { at: msIso(20), label: "src/auth/limits.ts:31", detail: "The counter never resets", failed: false },
+          { at: msIso(20), label: "src/auth/login.ts:12", detail: "Missing test for the lockout", failed: false },
+        ],
+      },
+    ],
+    activity_dropped: 3,
+    steps: [...(session().steps as unknown[]), { at: iso(5), text: "Posted the review on GitHub", detail: "" }],
+  });
+  // Running until the test says the review is done, whatever the poll timing.
+  const db = await mockApi(page, { sessions: [running] });
+  await page.goto(`/reviewer/session?id=${ID}`);
+
+  const card = page.getByTestId("session-activity");
+  await expect(card.getByRole("heading", { name: "Reviewing pull request" })).toBeVisible();
+  await expect(page.getByTestId("activity-elapsed")).toHaveText(/^1m \d+s$/);
+  const entries = card.getByTestId("timeline-entry");
+  // Two setup steps, then a note, the searches and the file views.
+  await expect(entries).toHaveCount(5);
+  await expect(entries.nth(0)).toHaveAttribute("data-kind", "step");
+  await expect(entries.nth(2)).toHaveAttribute("data-kind", "note");
+  await expect(entries.nth(2)).toContainText("Evaluating rate-limit semantics");
+  await expect(entries.nth(2)).toContainText("The limiter now counts failed logins per address.");
+  // Only the newest entry runs.
+  await expect(card.locator('[data-state="running"]')).toHaveCount(1);
+  await expect(entries.nth(4)).toHaveAttribute("data-state", "running");
+
+  // A group is one line until opened; then it lists its queries or files.
+  const search = entries.nth(3);
+  await expect(search).toContainText("Search 3 times");
+  await expect(search.getByText("LOGIN_LIMIT")).toBeHidden();
+  await search.getByText("Search 3 times").click();
+  await expect(search.getByText("LOGIN_LIMIT")).toBeVisible();
+  await expect(search.getByText("callers of checkLimit")).toBeVisible();
+  const views = entries.nth(4);
+  await expect(views).toContainText("1 failed");
+  await views.getByText("View 2 files").click();
+  await expect(views.getByText("src/auth/limits.ts:90-120")).toBeVisible();
+  await expect(views.getByTestId("activity-items").getByRole("listitem").nth(2)).toContainText("(failed)");
+
+  // The whole timeline folds away and back.
+  await card.getByRole("heading", { name: "Reviewing pull request" }).click();
+  await expect(page.getByTestId("session-timeline")).toBeHidden();
+  await card.getByRole("heading", { name: "Reviewing pull request" }).click();
+  await expect(page.getByTestId("session-timeline")).toBeVisible();
+
+  // Once the review ends: done, the comments it kept, the step it posted with.
+  db.sessions.push(done);
+  await expect(card.getByRole("heading", { name: "Reviewed pull request" })).toBeVisible({ timeout: 15_000 });
+  await expect(card.locator('[data-state="running"]')).toHaveCount(0);
+  await expect(entries).toHaveCount(7);
+  const comments = entries.nth(5);
+  await expect(comments).toHaveAttribute("data-kind", "comment");
+  await comments.getByText("Store 2 comments").click();
+  await expect(comments).toContainText("src/auth/limits.ts:31");
+  await expect(comments).toContainText("The counter never resets");
+  await expect(entries.nth(6)).toContainText("Posted the review on GitHub");
+  await expect(page.getByTestId("activity-elapsed")).toHaveText("1m 25s");
+  await expect(page.getByTestId("activity-dropped")).toHaveText("3 more steps weren't recorded.");
+  expect(errors).toEqual([]);
+});
+
+test("the overview says what the PR does, file by file", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page, { sessions: [session({ status: "done", in_flight: false, finished_at: iso(5), verdict: "APPROVE", findings: 0, overview: overview(3) })] });
+  await page.goto(`/reviewer/session?id=${ID}`);
+  const card = page.getByTestId("session-overview");
+  await expect(card.getByRole("heading", { name: "PR Overview" })).toBeVisible();
+  await expect(card).toContainText("Rate-limits the login form by address.");
+  await expect(page.getByTestId("overview-changes").getByRole("listitem")).toHaveText([
+    "Counts failed logins per address",
+    "Locks the form for a minute after five",
+  ]);
+  await expect(card).toContainText("3 changed files");
+  const table = card.getByRole("table", { name: "Reviewed changes" });
+  await expect(table.getByRole("columnheader")).toHaveText(["File", "Description"]);
+  await expect(table.getByRole("row")).toHaveCount(4);
+  await expect(table.getByRole("row").nth(1)).toContainText("src/auth/limits.ts");
+  await expect(table.getByRole("row").nth(1)).toContainText("Adds the per-address counter");
+  await expect(card.getByText("Show a summary per file")).toHaveCount(0);
+
+  // A session without an overview (an older review, or one still running) shows none.
+  await mockApi(page, { sessions: [session()] });
+  await page.goto(`/reviewer/session?id=${ID}`);
+  await expect(page.getByTestId("session-status")).toHaveText("Reviewing");
+  await expect(page.getByTestId("session-overview")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("a large PR's file table starts folded, and nothing scrolls sideways on a phone", async ({ page }) => {
+  const big = overview(20);
+  big.files_total = 140;
+  await mockApi(page, { sessions: [session({ status: "done", in_flight: false, finished_at: iso(5), verdict: "APPROVE", overview: big, activity: activity() })] });
+  await page.goto(`/reviewer/session?id=${ID}`);
+  const card = page.getByTestId("session-overview");
+  await expect(card).toContainText("140 changed files");
+  await expect(card).toContainText("And 120 more files.");
+  const table = card.getByRole("table", { name: "Reviewed changes" });
+  await expect(table).toBeHidden();
+  await card.getByText("Show a summary per file").click();
+  await expect(table).toBeVisible();
+  await expect(table.getByRole("row")).toHaveCount(21);
+
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.getByTestId("timeline-entry").nth(4).getByText("View 2 files").click();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
 });

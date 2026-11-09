@@ -44,6 +44,7 @@ export const SITE = {
     "GitHub issue to pull request",
     "Jira ticket to pull request",
     "AI code review on any GitHub pull request",
+    "Code reviews that show every step they took and a file by file overview",
     "Fixes failing CI on its own pull requests",
     "Answers review comments and pushes fixes",
     "Learns from pull request outcomes, CI results and review feedback",

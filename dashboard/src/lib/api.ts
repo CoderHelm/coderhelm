@@ -1944,6 +1944,55 @@ export interface ReviewSession {
   check_run_id?: number | null;
   /** Oldest first. */
   steps: SessionStep[];
+  /**
+   * What the reviewer did while it read the PR, in groups of one kind
+   * ("Search 3 times", "View 4 files") and the notes it wrote. Oldest first;
+   * live while it runs. Only where it looked, never what it read.
+   */
+  activity?: ActivityGroup[];
+  /** Steps left out of `activity` past the review's cap. */
+  activity_dropped?: number;
+  /** The "PR Overview" the review posted, once there is one. */
+  overview?: ReviewOverview | null;
+}
+
+/** One entry of an activity group: a query, a `path:lines`, a comment's place. */
+export interface ActivityItem {
+  /** RFC 3339. */
+  at: string;
+  /** Empty for a tool shown by its name only. */
+  label: string;
+  /** A comment's title, or the tool's name in words. */
+  detail: string;
+  failed: boolean;
+}
+
+/** Consecutive steps of one kind, or one note the reviewer wrote. */
+export interface ActivityGroup {
+  /** search · view · find · lookup · note · comment */
+  kind: string;
+  /** "Search 3 times", or a note's heading. */
+  title: string;
+  started_at: string;
+  ended_at: string;
+  /** A note's sentences. */
+  text: string;
+  items: ActivityItem[];
+}
+
+export interface OverviewFile {
+  path: string;
+  description: string;
+}
+
+/** The "PR Overview" a review leads with on GitHub. */
+export interface ReviewOverview {
+  /** What the PR does, in one sentence. */
+  summary: string;
+  changes: string[];
+  /** One line per changed file, in the diff's order (at most 100). */
+  files: OverviewFile[];
+  files_total: number;
 }
 
 export interface GateControlResult {

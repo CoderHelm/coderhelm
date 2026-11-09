@@ -1,14 +1,28 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { ReviewSession, SessionStep } from "@/lib/api";
+import type { ActivityGroup, OverviewFile, ReviewSession, SessionStep } from "@/lib/api";
 import { Callout } from "@/components/callout";
 import { cardClass } from "@/components/page";
 import { formatDate, formatDuration, Time } from "@/components/list";
-import { ExternalLinkIcon } from "@/components/icons";
+import { DataTable } from "@/components/data-table";
+import { Code } from "@/components/settings/code";
+import { Disclosure } from "@/components/disclosure";
+import { ChatIcon, ChevronRightIcon, EyeIcon, ExternalLinkIcon, LayersIcon, PenIcon, SearchIcon, WrenchIcon } from "@/components/icons";
 import { focusRing } from "@/components/ui";
 import { VerdictPill } from "../labels";
-import { findingsLabel, kindLabel, sessionSeconds, statusNote, stepOffset, triggerLabel } from "./session";
+import {
+  activityHeading,
+  droppedNote,
+  findingsLabel,
+  kindLabel,
+  offsetLabel,
+  OVERVIEW_FOLD_AFTER,
+  sessionSeconds,
+  statusNote,
+  timeline,
+  triggerLabel,
+} from "./session";
 
 // The session page's parts. Each takes the session and draws one card, so a
 // new kind of detail is one more section on the page.
@@ -106,47 +120,223 @@ export function SessionOutcome({ session }: { session: ReviewSession }) {
   );
 }
 
-function StepRow({ step, startedAt, last, live }: { step: SessionStep; startedAt: string; last: boolean; live: boolean }) {
-  const offset = stepOffset(startedAt, step.at);
+// ---- What the reviewer did ------------------------------------------------
+
+const GROUP_ICONS: Record<string, () => ReactNode> = {
+  search: SearchIcon,
+  view: EyeIcon,
+  find: LayersIcon,
+  lookup: WrenchIcon,
+  note: PenIcon,
+  comment: ChatIcon,
+};
+
+/** The dot on the timeline's line: pulsing while the entry is the one running now. */
+function Dot({ running }: { running: boolean }) {
   return (
-    <li className="relative flex min-w-0 gap-3 pb-3 last:pb-0">
+    <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${running ? "animate-pulse bg-sky-400 motion-reduce:animate-none" : "bg-zinc-500"}`} />
+  );
+}
+
+/** One row of the timeline, with the line down to the next row. */
+function Row({ kind, running, last, children }: { kind: string; running: boolean; last: boolean; children: ReactNode }) {
+  return (
+    <li className="relative flex min-w-0 gap-3 pb-3 last:pb-0" data-testid="timeline-entry" data-kind={kind} data-state={running ? "running" : "done"}>
       <span aria-hidden="true" className="relative flex w-3 shrink-0 justify-center">
-        <span className={`mt-1.5 h-2 w-2 rounded-full ${last && live ? "animate-pulse bg-sky-400 motion-reduce:animate-none" : "bg-zinc-500"}`} />
+        <Dot running={running} />
         {!last && <span className="absolute top-4 bottom-[-0.25rem] w-px bg-zinc-800" />}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-          <span className="min-w-0 text-sm text-zinc-200 [overflow-wrap:anywhere]">{step.text}</span>
-          <time dateTime={step.at} title={formatDate(step.at, { time: true })} className="whitespace-nowrap text-xs tabular-nums text-zinc-400">
-            {offset === null ? "" : `+${formatDuration(offset)}`}
-          </time>
-        </div>
-        {step.detail && (
-          <details className="mt-1 text-sm">
-            <summary className={`cursor-pointer text-xs text-zinc-400 hover:text-zinc-200 ${focusRing}`}>More</summary>
-            <div className="mt-1 whitespace-pre-wrap rounded border border-zinc-800 bg-zinc-950/60 p-2 text-xs text-zinc-300 [overflow-wrap:anywhere]">
-              {step.detail}
-            </div>
-          </details>
-        )}
+        {children}
+        {running && <span className="sr-only"> (running now)</span>}
       </div>
     </li>
   );
 }
 
-/** Every step so far, oldest first; the last one pulses while it runs. */
-export function SessionTimeline({ session }: { session: ReviewSession }) {
-  const steps = session.steps ?? [];
+function Offset({ startedAt, at }: { startedAt: string; at: string }) {
+  const label = offsetLabel(startedAt, at, formatDuration);
+  if (!label) return null;
   return (
-    <SessionCard id="session-steps-title" title="Steps">
-      {steps.length ? (
-        <ol className="mt-3" data-testid="session-steps">
-          {steps.map((s, i) => (
-            <StepRow key={`${s.at}-${i}`} step={s} startedAt={session.started_at} last={i === steps.length - 1} live={session.in_flight} />
-          ))}
-        </ol>
-      ) : (
-        <p className="mt-1 text-sm text-zinc-400">No steps yet.</p>
+    <time dateTime={at} title={formatDate(at, { time: true })} className="whitespace-nowrap text-xs tabular-nums text-zinc-400">
+      {label}
+    </time>
+  );
+}
+
+function StepEntry({ step, startedAt }: { step: SessionStep; startedAt: string }) {
+  return (
+    <>
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+        <span className="min-w-0 text-sm text-zinc-200 [overflow-wrap:anywhere]">{step.text}</span>
+        <Offset startedAt={startedAt} at={step.at} />
+      </div>
+      {step.detail && (
+        <details className="mt-1 text-sm">
+          <summary className={`cursor-pointer text-xs text-zinc-400 hover:text-zinc-200 ${focusRing}`}>More</summary>
+          <div className="mt-1 whitespace-pre-wrap rounded border border-zinc-800 bg-zinc-950/60 p-2 text-xs text-zinc-300 [overflow-wrap:anywhere]">
+            {step.detail}
+          </div>
+        </details>
+      )}
+    </>
+  );
+}
+
+function NoteEntry({ group, startedAt }: { group: ActivityGroup; startedAt: string }) {
+  return (
+    <>
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+        <span className="min-w-0 text-sm font-medium text-zinc-100 [overflow-wrap:anywhere]">{group.title}</span>
+        <Offset startedAt={startedAt} at={group.started_at} />
+      </div>
+      {group.text && <p className="mt-0.5 text-sm text-zinc-400 [overflow-wrap:anywhere]">{group.text}</p>}
+    </>
+  );
+}
+
+/** A group of steps of one kind: its title, and its queries, files or comments when opened. */
+function GroupEntry({ group, startedAt }: { group: ActivityGroup; startedAt: string }) {
+  const Icon = GROUP_ICONS[group.kind] ?? WrenchIcon;
+  const failed = group.items.filter((i) => i.failed).length;
+  return (
+    <details className="group/entry text-sm" data-testid="activity-group">
+      <summary className={`flex min-w-0 cursor-pointer list-none flex-wrap items-baseline gap-x-2 [&::-webkit-details-marker]:hidden ${focusRing}`}>
+        <span aria-hidden="true" className="inline-flex shrink-0 self-center text-zinc-400 transition-transform group-open/entry:rotate-90 motion-reduce:transition-none">
+          <ChevronRightIcon />
+        </span>
+        <span aria-hidden="true" className="inline-flex shrink-0 self-center text-zinc-400">
+          <Icon />
+        </span>
+        <span className="text-zinc-200 hover:text-zinc-100">{group.title}</span>
+        {failed > 0 && <span className="text-xs text-red-300">{failed} failed</span>}
+        <Offset startedAt={startedAt} at={group.started_at} />
+      </summary>
+      <ul className="mt-1.5 space-y-1 border-l border-zinc-800 pl-3 ml-1.5" data-testid="activity-items">
+        {group.items.map((item, i) => (
+          <li key={`${item.at}-${i}`} className="min-w-0 text-xs text-zinc-300">
+            {item.detail && group.kind === "lookup" && <span className="text-zinc-400">{item.detail}{item.label ? ": " : ""}</span>}
+            {item.label && <Code>{item.label}</Code>}
+            {item.detail && group.kind === "comment" && <span className="text-zinc-400"> {item.detail}</span>}
+            {item.failed && <span className="text-red-300"> (failed)</span>}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+/**
+ * The review as it happened, like a run log: setup steps, then what the
+ * reviewer searched, read and looked up (grouped by kind), the notes it wrote
+ * on what it was checking, and the comments it kept. Collapsible; the last
+ * entry pulses while the review runs.
+ */
+export function SessionActivity({ session, now }: { session: ReviewSession; now: number }) {
+  const entries = timeline(session.steps ?? [], session.activity ?? []);
+  const seconds = sessionSeconds(session, now);
+  const live = session.in_flight;
+  const dropped = droppedNote(session.activity_dropped);
+  return (
+    <section className={cardClass} aria-labelledby="session-activity-title" data-testid="session-activity">
+      <details open className="group/activity">
+        <summary className={`flex min-w-0 cursor-pointer list-none items-center gap-2 rounded [&::-webkit-details-marker]:hidden ${focusRing}`}>
+          <span aria-hidden="true" className="inline-flex shrink-0 text-zinc-400 transition-transform group-open/activity:rotate-90 motion-reduce:transition-none">
+            <ChevronRightIcon />
+          </span>
+          <h2 id="session-activity-title" className="text-sm font-medium text-zinc-100">
+            {activityHeading(session.status, session.kind)}
+          </h2>
+          {live && <span aria-hidden="true" className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-sky-400 motion-reduce:animate-none" />}
+          <span data-testid="activity-elapsed" className="ml-auto whitespace-nowrap text-xs tabular-nums text-zinc-400">
+            {seconds === null ? "" : formatDuration(seconds)}
+          </span>
+        </summary>
+        {entries.length ? (
+          <ol className="mt-3" data-testid="session-timeline">
+            {entries.map((e, i) => {
+              const last = i === entries.length - 1;
+              const running = last && live;
+              if (e.kind === "step") {
+                return (
+                  <Row key={`s-${e.at}-${i}`} kind="step" running={running} last={last}>
+                    <StepEntry step={e.step} startedAt={session.started_at} />
+                  </Row>
+                );
+              }
+              return (
+                <Row key={`g-${e.at}-${i}`} kind={e.group.kind} running={running} last={last}>
+                  {e.group.kind === "note" ? (
+                    <NoteEntry group={e.group} startedAt={session.started_at} />
+                  ) : (
+                    <GroupEntry group={e.group} startedAt={session.started_at} />
+                  )}
+                </Row>
+              );
+            })}
+          </ol>
+        ) : (
+          <p className="mt-2 text-sm text-zinc-400">No steps yet.</p>
+        )}
+        {dropped && <p className="mt-3 text-xs text-zinc-400" data-testid="activity-dropped">{dropped}</p>}
+      </details>
+    </section>
+  );
+}
+
+// ---- The overview the review posted ---------------------------------------
+
+function FilesTable({ files }: { files: OverviewFile[] }) {
+  return (
+    <DataTable
+      label="Reviewed changes"
+      testId="overview-files"
+      rows={files}
+      rowKey={(f) => f.path}
+      columns={[
+        { key: "file", header: "File", width: "grow", cell: (f) => <Code>{f.path}</Code> },
+        { key: "description", header: "Description", width: "grow", cell: (f) => <span className="text-zinc-300">{f.description}</span> },
+      ]}
+    />
+  );
+}
+
+/** What the PR does, its changes, and one line per file: the overview the review led with on GitHub. */
+export function SessionOverview({ session }: { session: ReviewSession }) {
+  const o = session.overview;
+  if (!o) return null;
+  const files = o.files ?? [];
+  const changes = o.changes ?? [];
+  const more = Math.max(0, (o.files_total ?? files.length) - files.length);
+  const total = o.files_total || files.length;
+  return (
+    <SessionCard id="session-overview-title" title="PR Overview" testId="session-overview">
+      {o.summary && <p className="mt-2 text-sm text-zinc-200 [overflow-wrap:anywhere]">{o.summary}</p>}
+      {changes.length > 0 && (
+        <>
+          <h3 className="mt-4 text-xs font-medium text-zinc-400">Changes</h3>
+          <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-zinc-300" data-testid="overview-changes">
+            {changes.map((c, i) => (
+              <li key={i} className="[overflow-wrap:anywhere]">{c}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {files.length > 0 && (
+        <>
+          <h3 className="mt-4 text-xs font-medium text-zinc-400">Reviewed Changes</h3>
+          <p className="mt-0.5 text-xs text-zinc-400">{total === 1 ? "1 changed file" : `${total} changed files`}</p>
+          <div className="mt-2">
+            {files.length > OVERVIEW_FOLD_AFTER ? (
+              <Disclosure summary="Show a summary per file">
+                <FilesTable files={files} />
+              </Disclosure>
+            ) : (
+              <FilesTable files={files} />
+            )}
+          </div>
+          {more > 0 && <p className="mt-2 text-xs text-zinc-400">And {more} more {more === 1 ? "file" : "files"}.</p>}
+        </>
       )}
     </SessionCard>
   );

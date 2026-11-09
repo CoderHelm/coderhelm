@@ -12,7 +12,7 @@ import { secondaryButton } from "@/components/ui";
 import { ExternalLinkIcon } from "@/components/icons";
 import { Page, PageHeader } from "@/components/page";
 import { isSessionId, SESSION_POLL_MS, sessionLook } from "./session";
-import { SessionFacts, SessionNotice, SessionOutcome, SessionTimeline } from "./sections";
+import { SessionActivity, SessionFacts, SessionNotice, SessionOutcome, SessionOverview } from "./sections";
 
 // One review job, step by step (`?id=<job id>`). A PR's "Coderhelm review"
 // check links here from its Details link. Each job has its own session, so an
@@ -117,8 +117,9 @@ function SessionPage() {
       />
       <SessionNotice session={session} />
       <SessionOutcome session={session} />
+      <SessionActivity session={session} now={now} />
+      <SessionOverview session={session} />
       <SessionFacts session={session} now={now} />
-      <SessionTimeline session={session} />
     </Page>
   );
 }
