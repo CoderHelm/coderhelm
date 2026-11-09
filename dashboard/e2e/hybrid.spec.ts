@@ -481,11 +481,9 @@ test("integration pages: GitHub keeps its own choice; other tools say which app 
   expect(puts().at(-1)).toEqual({ github_mode: "hosted" });
 
   await page.goto("/settings/integrations/jira/");
-  const jira = page.getByTestId("hybrid-app-choice");
-  await expect(jira).toHaveAttribute("data-state", "coderhelm");
-  await expect(jira).toContainText("Jira signs in through Coderhelm's app, like every tool on this install.");
-  await expect(jira.getByRole("button")).toHaveCount(0);
-  await expect(jira.getByRole("link", { name: "Change it for every tool in Settings, Version and updates, Hybrid" })).toHaveAttribute("href", /\/settings\/system\/?#hybrid$/);
+  // Jira follows the install's one choice: nothing about it on Jira's own page.
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByTestId("hybrid-app-choice")).toHaveCount(0);
   expect(puts()).toHaveLength(1);
 });
 

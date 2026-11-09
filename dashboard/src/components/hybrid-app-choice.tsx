@@ -26,10 +26,9 @@ export function useHybridChoice(id: string): Choice | null {
 /**
  * On a self-hosted install: which app this integration uses. GitHub has its
  * own choice, made here or in Settings, then System, Hybrid. Every other
- * tool follows the install's one Other apps choice (Coderhelm's apps or
- * fully private), so it only says which, with a link to change it. Shows
- * nothing on the hosted service, on an install without hybrid, or where
- * Coderhelm has no app for it.
+ * tool follows the install's one Other apps choice, set in Hybrid, so it
+ * shows nothing there. Nothing on the hosted service, on an install without
+ * hybrid, or where Coderhelm has no app for it.
  */
 export function HybridAppChoice({
   id,
@@ -66,22 +65,9 @@ export function HybridAppChoice({
   // Not hosted, or Coderhelm's app for it isn't set up: there is no choice.
   if (id !== "github" && !canUseCoderhelm(integration)) return null;
 
-  if (id !== "github") {
-    const value: Choice = integration?.uses_coderhelm ? "coderhelm" : "own";
-    const text = integration?.own_app
-      ? `${name} uses your own app, set up on this install.`
-      : appsModeOf(s) === "coderhelm"
-        ? `${name} signs in through Coderhelm's app, like every tool on this install.`
-        : `This install is fully private, so ${name} uses your team's own app.`;
-    return (
-      <div className={box} data-testid="hybrid-app-choice" data-state={value}>
-        <p className="text-sm text-zinc-300">
-          {text}{" "}
-          <Link href={HYBRID_HREF} className={`${linkButton} text-sm`}>Change it for every tool in Settings, Version and updates, Hybrid</Link>
-        </p>
-      </div>
-    );
-  }
+  // Every other tool follows the install's one choice, made in Settings,
+  // Version and updates, Hybrid: nothing to say on each tool's own page.
+  if (id !== "github") return null;
 
   const value: Choice = s.github.mode === "hosted" ? "coderhelm" : "own";
   const change = async (next: Choice) => {
