@@ -2,7 +2,7 @@
 // docs/api/openapi.json. Do not edit; run `npm run openapi:fields` instead.
 
 /** The platform commit this was generated from. */
-export const OPENAPI_REF = "96909edf327a381888d554ebd42c1a111147a6c7";
+export const OPENAPI_REF = "b933675131a8a5f9f927ee5370ee52f3660f31b3";
 
 /** The fields each public API schema has. */
 export interface OpenApiFields {
