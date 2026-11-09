@@ -110,7 +110,7 @@ for (const kind of ["notion", "confluence"] as const) {
       await page.getByTestId(`start-${kind}`).click();
       const step = page.getByTestId("connect-step");
       await expect(step).toHaveAttribute("data-state", "sign-in");
-      await expect(step.getByTestId("hybrid-app-choice")).toHaveAttribute("data-state", "coderhelm");
+      await expect(step.getByTestId("hybrid-app-choice")).toHaveCount(0);
       await expect(step.getByTestId("connect-button")).toHaveText(`Sign in with ${label}`);
       await expect(step.getByTestId("token-path")).toHaveCount(0);
       await expect(step.locator("input")).toHaveCount(0);
@@ -126,23 +126,21 @@ for (const kind of ["notion", "confluence"] as const) {
       await page.goto("/knowledge/");
       await page.getByTestId(`start-${kind}`).click();
       const step = page.getByTestId("connect-step");
-      await expect(step.getByTestId("hybrid-app-choice")).toHaveAttribute("data-state", "own");
+      await expect(step.getByTestId("hybrid-app-choice")).toHaveCount(0);
       await expect(step).toHaveAttribute("data-state", "token");
       await expect(step.getByTestId("connect-button")).toHaveCount(0);
       await expect(step.getByTestId("token-path")).toBeVisible();
       await shot(page, `${kind}-own`);
     });
 
-    test(`no per-tool switch here: the dialog says which app and links to the one choice`, async ({ page }) => {
+    test(`no per-tool note or switch here: the tool follows the install's one choice`, async ({ page }) => {
       const s: State = { coderhelm: new Set(), brokerReady: true, puts: [] };
       await mockApi(page, s);
       await page.goto("/knowledge/");
       await page.getByTestId(`start-${kind}`).click();
       const step = page.getByTestId("connect-step");
-      const choice = step.getByTestId("hybrid-app-choice");
-      await expect(choice).toContainText(`This install is fully private, so ${label} uses your team's own app.`);
-      await expect(choice.getByRole("button")).toHaveCount(0);
-      await expect(choice.getByRole("link", { name: "Change it for every tool in Settings, Version and updates, Hybrid" })).toHaveAttribute("href", /\/settings\/system\/?#hybrid/);
+      await expect(step).toBeVisible();
+      await expect(step.getByTestId("hybrid-app-choice")).toHaveCount(0);
       expect(s.puts).toEqual([]);
     });
 
