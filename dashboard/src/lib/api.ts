@@ -4714,7 +4714,8 @@ export interface NativeAccess {
   template_url?: string;
   stack?: string;
   /** The access stack exists from an earlier change (delete it first). */
-  existing?: { status?: string; link?: string } | null;
+  /** A stack already named `stack`. kind "access": a release's access.json made it (deleting it changes nothing); "other": something else did, never to delete. */
+  existing?: { status?: string; link?: string; kind?: "access" | "other"; version?: string | null } | null;
   reason?: string;
   error?: string;
 }

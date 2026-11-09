@@ -653,6 +653,48 @@ test("System: a permissions link that isn't the access stack's quick-create from
   }
 });
 
+const OLD_STACK = "https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?stackId=arn:aws:cloudformation:us-east-1:1:stack/coderhelm-prod-access/x";
+const accessWith = (existing: Record<string, unknown>) => ({ state: "pending", version: "v2.0.0", summary: ["adds access to Bedrock (bedrock:Retrieve)"],
+  resources: ["Boundary"], link: ACCESS_LINK, stack: "coderhelm-prod-access", existing: { link: OLD_STACK, ...existing } });
+
+test("System: an older access stack is deleted first, and the create link shows only once it's gone", async ({ page }) => {
+  await setup(page, SELF, { signedIn: true, native: { stack: "coderhelm-prod", can_apply: true, auto_apply: true, pending: null,
+    access: accessWith({ status: "CREATE_COMPLETE", kind: "access", version: "v1.0.0" }) } });
+  await page.goto("/settings/system/");
+  await expect(page.getByTestId("native-access-existing")).toContainText("First delete the stack coderhelm-prod-access that v1.0.0 made");
+  await expect(page.getByTestId("native-access-steps")).toContainText("then Delete");
+  await expect(page.getByTestId("native-access-existing-link")).toHaveAttribute("href", OLD_STACK);
+  // The create link would fail with AlreadyExistsException while it exists.
+  await expect(page.getByTestId("native-access-link")).toHaveCount(0);
+});
+
+test("System: while the old access stack is deleting, the card says so and still has no create link", async ({ page }) => {
+  await setup(page, SELF, { signedIn: true, native: { stack: "coderhelm-prod", can_apply: true, auto_apply: true, pending: null,
+    access: accessWith({ status: "DELETE_IN_PROGRESS", kind: "access", version: "v1.0.0" }) } });
+  await page.goto("/settings/system/");
+  await expect(page.getByTestId("native-access")).toHaveAttribute("data-state", "deleting");
+  await expect(page.getByTestId("native-access-link")).toHaveCount(0);
+});
+
+test("System: this release's access stack, just made, reads as being applied, never as one to delete", async ({ page }) => {
+  await setup(page, SELF, { signedIn: true, native: { stack: "coderhelm-prod", can_apply: true, auto_apply: true, pending: null,
+    access: accessWith({ status: "CREATE_COMPLETE", kind: "access", version: "v2.0.0" }) } });
+  await page.goto("/settings/system/");
+  await expect(page.getByTestId("native-access")).toHaveAttribute("data-state", "creating");
+  await expect(page.getByTestId("native-access-existing")).toHaveCount(0);
+});
+
+test("System: a stack of that name a release didn't make is never called safe to delete", async ({ page }) => {
+  await setup(page, SELF, { signedIn: true, native: { stack: "coderhelm-prod", can_apply: true, auto_apply: true, pending: null,
+    access: accessWith({ status: "UPDATE_COMPLETE", kind: "other", version: null }) } });
+  await page.goto("/settings/system/");
+  const card = page.getByTestId("native-access");
+  await expect(card).toHaveAttribute("data-state", "name-taken");
+  await expect(card).toContainText("Don't delete it");
+  await expect(card).not.toContainText("changes nothing");
+  await expect(page.getByTestId("native-access-link")).toHaveCount(0);
+});
+
 test("System: an applied permission change shows nothing; a stuck rollback says what stopped it", async ({ page }) => {
   await setup(page, SELF, {
     signedIn: true,
