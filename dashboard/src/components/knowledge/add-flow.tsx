@@ -28,8 +28,10 @@ import {
   type Connector,
   type Item,
   type KnowledgeLimits,
+  type S3Place,
   type Selected,
   type Source,
+  type SourceInput,
   type SourceKind,
   type Via,
   type WebhookSetup,
@@ -38,6 +40,8 @@ import { useCan } from "@/hooks/use-can";
 import { SourceLogo } from "./logos";
 import { HybridAppChoice, useHybridChoice, type Choice } from "@/components/hybrid-app-choice";
 import { Picker, continueLabel } from "./picker";
+import { ARCHIVE_WARNING, ArchiveStep, BedrockImportStep, ImportProblem, McpStep, S3Step, WHOLE_BUCKET, type ImportPlan, type McpChoice } from "./import-steps";
+import { ReadersEditor } from "./readers";
 import { AskAdmin, ConfluenceSteps, ConnectLoading, IntegrationsLink, NoTokenPath, NotionSteps, TokenForm } from "./token-connect";
 
 // The one way to add to Knowledge, for a new knowledge base or an existing
@@ -62,7 +66,17 @@ import { AskAdmin, ConfluenceSteps, ConnectLoading, IntegrationsLink, NoTokenPat
 // name it, and one test search runs before anything is saved. It is then
 // searched live in the team's AWS account; nothing is copied.
 
-type Step = "choose" | "connect" | "pick" | "upload" | "bedrock" | "name" | "progress";
+type Step = "choose" | "connect" | "pick" | "upload" | "bedrock" | "mcp" | "s3" | "bedrock_import" | "archive" | "name" | "progress";
+
+/** Kinds with a step of their own (no app connection to make first). */
+const OWN_STEP: Partial<Record<AddKind, Step>> = {
+  upload: "upload",
+  bedrock_kb: "bedrock",
+  mcp: "mcp",
+  s3: "s3",
+  bedrock_import: "bedrock_import",
+  archive: "archive",
+};
 
 export type FlowMode = { kind: "create" } | { kind: "add"; base: Base };
 
@@ -71,7 +85,15 @@ const HYBRID_KINDS = new Set<SourceKind>(["notion", "confluence", "google_drive"
 
 const TILES: SourceKind[] = ["notion", "confluence", "google_drive", "sanity", "github", "web"];
 
-const PICK_TITLE: Record<SourceKind, string> = {
+/** An app connected through its sign-in or key, picked from in the tree picker. */
+function isApp(k: AddKind | null): k is SourceKind {
+  return !!k && (TILES as string[]).includes(k);
+}
+
+/** Kinds connected in place: a new knowledge base only, searched live. */
+const IN_PLACE = new Set<AddKind>(["bedrock_kb", "mcp"]);
+
+const PICK_TITLE: Partial<Record<SourceKind, string>> = {
   notion: "Choose Notion pages",
   confluence: "Choose Confluence spaces or pages",
   google_drive: "Choose Drive folders or files",
@@ -128,6 +150,11 @@ export function AddFlow({
   const [arn, setArn] = useState("");
   const [arnName, setArnName] = useState("");
   const [problem, setProblem] = useState<ConnectProblem | null>(null);
+  const [mcp, setMcp] = useState<McpChoice | null>(null);
+  const [s3, setS3] = useState<S3Place>({ account: "", bucket: "", region: "" });
+  const [plan, setPlan] = useState<ImportPlan | null>(null);
+  const [archive, setArchive] = useState<File | null>(null);
+  const [readers, setReaders] = useState<string[]>([]);
   const { can, me } = useCan();
   const canSaveToken = can("integrations");
   const installAdmin = me?.platform_admin === true;
@@ -141,9 +168,9 @@ export function AddFlow({
     setSeenKey(openKey);
     if (openKey !== null) {
       const first = startWith ?? null;
-      setStep(first === null ? "choose" : first === "upload" ? "upload" : first === "bedrock_kb" ? "bedrock" : "connect");
+      setStep(first === null ? "choose" : (OWN_STEP[first] ?? "connect"));
       setKind(first);
-      setDeciding(first !== null && first !== "upload" && first !== "bedrock_kb");
+      setDeciding(first !== null && !OWN_STEP[first]);
       setConnectors(null);
       setLoadError(null);
       setPicked([]);
@@ -161,6 +188,11 @@ export function AddFlow({
       setArn("");
       setArnName("");
       setProblem(null);
+      setMcp(null);
+      setS3({ account: "", bucket: "", region: "" });
+      setPlan(null);
+      setArchive(null);
+      setReaders([]);
     }
   }
 
@@ -197,7 +229,7 @@ export function AddFlow({
 
   // Chosen while loading: go on once the connections are here.
   useEffect(() => {
-    if (!deciding || !connectors || !kind || kind === "upload" || kind === "bedrock_kb") return;
+    if (!deciding || !connectors || !kind || !isApp(kind)) return;
     setDeciding(false);
     setStep(stepFor(connectors.find((x) => x.kind === kind)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -208,13 +240,10 @@ export function AddFlow({
     setPicked([]);
     setError(null);
     setTokenNote("");
-    if (k === "upload") {
-      setStep("upload");
-      return;
-    }
-    if (k === "bedrock_kb") {
+    const own = OWN_STEP[k];
+    if (own) {
       setProblem(null);
-      setStep("bedrock");
+      setStep(own);
       return;
     }
     setVia("team");
@@ -237,7 +266,7 @@ export function AddFlow({
   // Signs in with your own account in a small window, then shows who you're
   // connected as. The flow stays where it is.
   const memberSignIn = async () => {
-    if (!kind || kind === "upload" || kind === "bedrock_kb") return;
+    if (!kind || !isApp(kind)) return;
     setError(null);
     setWaiting(true);
     try {
@@ -263,7 +292,7 @@ export function AddFlow({
   };
 
   const signIn = async () => {
-    if (!kind || kind === "upload" || kind === "bedrock_kb") return;
+    if (!kind || !isApp(kind)) return;
     setBusy(true);
     setError(null);
     try {
@@ -279,10 +308,32 @@ export function AddFlow({
 
   const afterPick = () => {
     if (!kind) return;
-    if (!named) setName(kind === "bedrock_kb" ? arnName || KIND_LABEL.bedrock_kb : suggestName(kind, picked, files.map((f) => f.file)));
+    if (!named) setName(defaultName());
     setProblem(null);
     setStep("name");
   };
+
+  /** What a new knowledge base is called until someone names it. */
+  const defaultName = (): string => {
+    if (!kind) return "";
+    if (kind === "bedrock_kb") return arnName || KIND_LABEL.bedrock_kb;
+    if (kind === "mcp") return mcp?.server.name ?? KIND_LABEL.mcp;
+    if (kind === "s3") return picked.length && picked[0].id !== WHOLE_BUCKET ? suggestName(kind, picked) : s3.bucket || KIND_LABEL.s3;
+    if (kind === "bedrock_import") return plan?.info.name ?? "Imported knowledge base";
+    if (kind === "archive") return archive ? archive.name.replace(/\.zip$/i, "") : KIND_LABEL.archive;
+    return suggestName(kind, picked, files.map((f) => f.file));
+  };
+
+  /** The base's who-can-read settings, as the create call takes them. */
+  const baseFields = (fallback: string) => ({
+    name: name.trim() || fallback,
+    description: "",
+    read_role: readRole,
+    attach_team: true,
+    agents: [] as string[],
+    authoritative: false,
+    ...(readers.length ? { readers } : {}),
+  });
 
   // Connected in place: one test search, then the base exists and opens.
   const connectBedrock = async () => {
@@ -290,13 +341,11 @@ export function AddFlow({
     setProblem(null);
     try {
       const r = await knowledge.create({
-        name: name.trim() || arnName || KIND_LABEL.bedrock_kb,
-        description: "",
-        read_role: readRole,
-        attach_team: true,
-        agents: [],
-        authoritative: false,
-        connect: { provider: "bedrock_kb", target: arn.trim() },
+        ...baseFields(arnName || KIND_LABEL.bedrock_kb),
+        connect:
+          kind === "mcp" && mcp
+            ? { provider: "mcp", target: mcp.server.id, search_tool: mcp.search_tool || undefined, fetch_tool: mcp.fetch_tool || undefined }
+            : { provider: "bedrock_kb", target: arn.trim() },
       });
       onOpenChange(false);
       onDone(r.base.id);
@@ -332,21 +381,91 @@ export function AddFlow({
     }
   };
 
-  const finish = async () => {
-    if (!kind) return;
-    if (kind === "bedrock_kb") return connectBedrock();
+  /** The sources an import makes: one S3 source, or one per data source of a Bedrock knowledge base. */
+  const importSources = (): SourceInput[] => {
+    if (kind === "s3") return [{ kind: "s3", selection: picked, options: { ...s3 } }];
+    if (kind === "bedrock_import" && plan) {
+      return plan.chosen.map((d) => ({
+        kind: "s3" as const,
+        name: d.name,
+        options: { account: d.bucket_account || plan.info.account, bucket: d.bucket, region: plan.info.region },
+        selection: d.prefixes.length
+          ? d.prefixes.map((p) => ({ id: p, title: p, kind: "prefix", path: [], include_children: true }))
+          : [{ id: WHOLE_BUCKET, title: d.bucket, kind: "prefix", path: [], include_children: true }],
+      }));
+    }
+    return [];
+  };
+
+  // An S3 import (or a Bedrock knowledge base's data sources): the first
+  // source makes the base, the rest join it.
+  const finishImport = async () => {
+    const list = importSources();
+    if (!list.length) return;
+    setBusy(true);
+    setProblem(null);
+    try {
+      let baseId: string;
+      let first: { id: string } | null;
+      let rest = list;
+      if (mode.kind === "create") {
+        const r = await knowledge.create({ ...baseFields(defaultName()), source: list[0] });
+        baseId = r.base.id;
+        first = r.source;
+        rest = list.slice(1);
+      } else {
+        baseId = mode.base.id;
+        first = null;
+      }
+      for (const src of rest) {
+        const r = await knowledge.addSource(baseId, src);
+        first = first ?? r.source;
+      }
+      setMade({ baseId, sourceId: first?.id ?? null, setup: null });
+      setStep("progress");
+    } catch (e) {
+      setProblem(connectProblem(e, "That didn't work. Try again."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // An archive: the base (when new), then the source and its upload, then
+  // the import starts.
+  const finishArchive = async () => {
+    if (!archive) return;
     setBusy(true);
     setError(null);
     try {
-      const source = kind === "upload" ? undefined : { kind, selection: picked, ...(via === "sign_in" ? { via: "sign_in" as const } : {}) };
+      const baseId = mode.kind === "create" ? (await knowledge.create(baseFields(defaultName()))).base.id : mode.base.id;
+      const r = await knowledge.startArchive(baseId, { name: archive.name, size: archive.size });
+      setMade({ baseId, sourceId: r.source.id, setup: null });
+      setStep("progress");
+      setFiles([{ key: "archive", file: archive, progress: 0 }]);
+      await uploadToSignedUrl(r.upload, archive, (p) => setFiles((cur) => cur.map((x) => ({ ...x, progress: p }))));
+      await knowledge.finishArchive(baseId, r.source.id);
+      setFiles((cur) => cur.map((x) => ({ ...x, progress: 1, done: true })));
+    } catch (e) {
+      const why = errorMessage(e, "The archive didn't upload.");
+      setFiles((cur) => (cur.length ? cur.map((x) => ({ ...x, error: why })) : cur));
+      setError(why);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const finish = async () => {
+    if (!kind) return;
+    if (IN_PLACE.has(kind)) return connectBedrock();
+    if (kind === "s3" || kind === "bedrock_import") return finishImport();
+    if (kind === "archive") return finishArchive();
+    setBusy(true);
+    setError(null);
+    try {
+      const source = !isApp(kind) ? undefined : { kind, selection: picked, ...(via === "sign_in" ? { via: "sign_in" as const } : {}) };
       if (mode.kind === "create") {
         const r = await knowledge.create({
-          name: name.trim() || suggestName(kind, picked, files.map((f) => f.file)),
-          description: "",
-          read_role: readRole,
-          attach_team: true,
-          agents: [],
-          authoritative: false,
+          ...baseFields(suggestName(kind, picked, files.map((f) => f.file))),
           source,
         });
         setMade({ baseId: r.base.id, sourceId: r.source?.id ?? null, setup: r.setup });
@@ -378,12 +497,20 @@ export function AddFlow({
         ? deciding
           ? label
           : `Connect ${label}`
-        : step === "pick" && kind && kind !== "upload" && kind !== "bedrock_kb"
+        : step === "pick" && kind && isApp(kind)
           ? PICK_TITLE[kind]
           : step === "upload"
             ? "Upload files"
             : step === "bedrock"
               ? "Connect a Bedrock knowledge base"
+            : step === "mcp"
+              ? "Connect a search tool"
+            : step === "s3"
+              ? "Import from Amazon S3"
+            : step === "bedrock_import"
+              ? "Import a Bedrock knowledge base"
+            : step === "archive"
+              ? "Upload an archive"
             : step === "name"
               ? creating
                 ? "Name your knowledge base"
@@ -400,7 +527,7 @@ export function AddFlow({
     setError(null);
     setDeciding(false);
     setProblem(null);
-    if (step === "name") setStep(kind === "upload" ? "upload" : kind === "bedrock_kb" ? "bedrock" : "pick");
+    if (step === "name") setStep((kind && OWN_STEP[kind]) || "pick");
     else if (step === "pick" && conn?.member_sign_in) setStep("connect");
     else setStep("choose");
   };
@@ -426,9 +553,32 @@ export function AddFlow({
             Continue
           </button>
         )}
+        {(step === "mcp" || step === "s3" || step === "bedrock_import" || step === "archive") && (
+          <button
+            type="button"
+            onClick={afterPick}
+            className={primaryButton}
+            disabled={step === "mcp" ? !mcp?.search_tool : step === "s3" ? !picked.length : step === "bedrock_import" ? !plan?.chosen.length : !archive}
+            data-testid="flow-continue"
+          >
+            Continue
+          </button>
+        )}
         {step === "name" && (
           <button type="button" onClick={finish} className={primaryButton} disabled={busy || (creating && !name.trim())} data-testid="flow-finish">
-            {busy ? (kind === "bedrock_kb" ? "Checking the connection…" : "Working…") : kind === "bedrock_kb" ? "Connect knowledge base" : creating ? "Create knowledge base" : "Add to knowledge base"}
+            {busy
+              ? kind && IN_PLACE.has(kind)
+                ? "Checking the connection…"
+                : kind === "s3" || kind === "bedrock_import"
+                  ? "Checking access…"
+                  : "Working…"
+              : kind && IN_PLACE.has(kind)
+                ? kind === "mcp"
+                  ? "Connect search tool"
+                  : "Connect knowledge base"
+                : creating
+                  ? "Create knowledge base"
+                  : "Add to knowledge base"}
           </button>
         )}
       </div>
@@ -441,9 +591,9 @@ export function AddFlow({
           <ChooseStep connectors={connectors} loadError={loadError} onRetry={loadConnectors} onChoose={(k) => choose(k)} creating={creating} />
         )}
 
-        {step === "connect" && kind && kind !== "upload" && kind !== "bedrock_kb" && deciding && <ConnectLoading kind={kind} error={loadError} onRetry={loadConnectors} />}
+        {step === "connect" && kind && isApp(kind) && deciding && <ConnectLoading kind={kind} error={loadError} onRetry={loadConnectors} />}
 
-        {step === "connect" && kind && kind !== "upload" && kind !== "bedrock_kb" && !deciding && conn?.member_sign_in && (
+        {step === "connect" && kind && isApp(kind) && !deciding && conn?.member_sign_in && (
           <SignInStep
             kind={kind}
             conn={conn}
@@ -456,7 +606,7 @@ export function AddFlow({
           />
         )}
 
-        {step === "connect" && kind && kind !== "upload" && kind !== "bedrock_kb" && !deciding && !conn?.member_sign_in && (
+        {step === "connect" && kind && isApp(kind) && !deciding && !conn?.member_sign_in && (
           <ConnectStep
             kind={kind}
             conn={conn}
@@ -470,12 +620,12 @@ export function AddFlow({
           />
         )}
 
-        {step === "pick" && kind && kind !== "upload" && kind !== "bedrock_kb" && tokenNote && (
+        {step === "pick" && kind && isApp(kind) && tokenNote && (
           <p className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm leading-relaxed text-amber-200" role="status" data-testid="token-note">
             {tokenNote}
           </p>
         )}
-        {step === "pick" && kind && kind !== "upload" && kind !== "bedrock_kb" && <Picker kind={kind} value={picked} onChange={setPicked} via={via} />}
+        {step === "pick" && kind && isApp(kind) && <Picker kind={kind} value={picked} onChange={setPicked} via={via} />}
 
         {step === "bedrock" && (
           <BedrockStep
@@ -487,6 +637,14 @@ export function AddFlow({
             }}
           />
         )}
+
+        {step === "mcp" && <McpStep value={mcp} onChange={(c) => {
+          setMcp(c);
+          setNamed(false);
+        }} />}
+        {step === "s3" && <S3Step place={s3} onPlace={setS3} picked={picked} onPicked={setPicked} />}
+        {step === "bedrock_import" && <BedrockImportStep plan={plan} onPlan={setPlan} onUseInstead={(k) => choose(k)} />}
+        {step === "archive" && <ArchiveStep limits={limits} file={archive} onFile={setArchive} />}
 
         {step === "upload" && <UploadStep limits={limits} files={files} onAdd={addFiles} onRemove={(k) => setFiles((f) => f.filter((x) => x.key !== k))} error={error} />}
 
@@ -501,6 +659,22 @@ export function AddFlow({
                     <span className="mt-1 block text-xs">
                       <Code>{arn.trim()}</Code>
                     </span>
+                  </span>
+                ) : kind === "mcp" ? (
+                  <span className="block wrap-anywhere" data-testid="connect-summary">
+                    Connected in place: searched live through {mcp?.server.name}, nothing copied.
+                  </span>
+                ) : kind === "s3" ? (
+                  <span className="block wrap-anywhere" data-testid="import-summary">
+                    {picked.some((p) => p.id === WHOLE_BUCKET) ? `Everything in s3://${s3.bucket}` : `${picked.length} ${picked.length === 1 ? "item" : "items"} from s3://${s3.bucket}`}, kept in sync
+                  </span>
+                ) : kind === "bedrock_import" ? (
+                  <span className="block wrap-anywhere" data-testid="import-summary">
+                    {plan?.chosen.length} data source{plan?.chosen.length === 1 ? "" : "s"} of {plan?.info.name}, read from S3 and indexed here
+                  </span>
+                ) : kind === "archive" ? (
+                  <span className="block wrap-anywhere" data-testid="import-summary">
+                    {archive?.name} ({archive ? fileSize(archive.size) : ""}), unpacked and read here
                   </span>
                 ) : kind === "upload" ? (
                   `${files.length} file${files.length === 1 ? "" : "s"} to upload`
@@ -535,6 +709,7 @@ export function AddFlow({
                     </button>
                   </p>
                 ) : (
+                  <div className="space-y-4">
                   <label className="block">
                     <span className="mb-2 block text-sm text-zinc-300">Who can read it</span>
                     <Select
@@ -549,10 +724,12 @@ export function AddFlow({
                       ]}
                     />
                   </label>
+                  <ReadersEditor value={readers} onChange={setReaders} />
+                </div>
                 )}
               </div>
             )}
-            {via === "sign_in" && kind !== "upload" && kind !== "bedrock_kb" && (
+            {via === "sign_in" && isApp(kind) && (
               <p className="text-sm leading-relaxed text-zinc-400" data-testid="signin-note">
                 It stays up to date through your {label} sign-in, checking for changes every 15 minutes. If your sign-in stops working, any admin can sign in again.
               </p>
@@ -566,7 +743,13 @@ export function AddFlow({
                 <span>
                   {kind === "bedrock_kb"
                     ? "Everyone who can read this knowledge base sees what a search of it returns, even documents they couldn't open where they came from. Agents it is attached to search it for anyone who starts a run."
-                    : note || "Everyone who can read this knowledge base can read what you add, even if they can't open it in the app it comes from."}
+                    : kind === "mcp"
+                      ? mcp?.server.sharing === "personal"
+                        ? "Each person's search uses their own sign-in, so they only see what that tool lets them see. Agent runs search as the person who started them; runs nobody started skip it."
+                        : "Everyone who can read this knowledge base sees what the team's connection to this tool can see. Agents it is attached to search it for anyone who starts a run."
+                      : kind === "archive"
+                        ? ARCHIVE_WARNING
+                        : note || "Everyone who can read this knowledge base can read what you add, even if they can't open it in the app it comes from."}
                 </span>
               </p>
             )}
@@ -575,7 +758,7 @@ export function AddFlow({
                 {error}
               </p>
             )}
-            {problem && <ConnectProblemNote problem={problem} />}
+            {problem && (kind === "s3" || kind === "bedrock_import" ? <ImportProblem problem={problem} /> : <ConnectProblemNote problem={problem} />)}
           </div>
         )}
 
@@ -610,6 +793,20 @@ function ChooseStep({
   /** A new knowledge base: it can also be a Bedrock one, connected in place. */
   creating: boolean;
 }) {
+  const wide = (k: AddKind, title: string, blurb: string) => (
+    <button
+      type="button"
+      onClick={() => onChoose(k)}
+      data-testid={`tile-${k}`}
+      className={`flex w-full items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 text-left transition hover:border-zinc-600 hover:bg-zinc-800/60 motion-reduce:transition-none ${focusRing}`}
+    >
+      <SourceLogo kind={k} size="lg" />
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-zinc-100">{title}</span>
+        <span className="block text-xs text-zinc-400">{blurb}</span>
+      </span>
+    </button>
+  );
   return (
     <div data-testid="choose-step">
       <p className="text-sm text-zinc-400">Pick where your team&apos;s knowledge lives. You can add more places later.</p>
@@ -660,6 +857,13 @@ function ChooseStep({
           <span className="block text-xs text-zinc-400">PDF, Word, Markdown, text, spreadsheets or web pages</span>
         </span>
       </button>
+      <p className="mt-6 text-xs font-medium uppercase tracking-wide text-zinc-400">Bring in a knowledge base you already have</p>
+      <div className="mt-2 grid gap-3 sm:grid-cols-3" data-testid="import-tiles">
+        {wide("s3", "Amazon S3", "Documents in a bucket or its folders, kept in sync")}
+        {wide("bedrock_import", "Import a Bedrock knowledge base", "Read what it was built from and index it here")}
+        {wide("archive", "Archive upload", "A Notion or Confluence export, or a zipped docs folder")}
+      </div>
+      {creating && <div className="mt-3">{wide("mcp", "Search tool (MCP)", "Your search tool's MCP server, searched live alongside the rest. Nothing copied.")}</div>}
       {creating && (
         <button
           type="button"
@@ -1138,6 +1342,7 @@ function ProgressStep({
   }, [kind, made.baseId, made.sourceId]);
 
   const allUploaded = kind === "upload" && files.length > 0 && files.every((f) => f.done || f.error);
+  const archiveFailed = kind === "archive" && files.some((f) => f.error);
   const imported = source?.status === "ready";
   useEffect(() => {
     if (allUploaded || imported) onFinished();
@@ -1188,7 +1393,12 @@ function ProgressStep({
       <div className="mt-5">
         <ProgressBar value={fraction} indeterminate={source?.status !== "ready" && !total} />
       </div>
-      {source?.status === "error" && source.error && (
+      {kind === "archive" && files[0] && !files[0].done && (
+        <p className="mt-4 text-sm text-zinc-300" data-testid="archive-upload">
+          {files[0].error ? files[0].error : `Uploading ${files[0].file.name}: ${Math.round(files[0].progress * 100)}%`}
+        </p>
+      )}
+      {source?.status === "error" && source.error && !archiveFailed && (
         <p className="mt-4 text-sm text-amber-300" role="alert">
           {source.error.fix}
         </p>

@@ -67,7 +67,34 @@ export function SourceLogo({ kind, size = "md", className = "" }: { kind: AddKin
           <path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z" />
         </svg>,
       );
+    case "s3":
+      // An S3 bucket: a plain bucket in AWS's green (not Amazon's logo).
+      return tile(
+        "bg-[#3F8624]/20 ring-1 ring-[#7AA116]/40 text-[#9BCB3B]",
+        <svg width={s.px} height={s.px} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <ellipse cx="12" cy="5.5" rx="8" ry="2.5" />
+          <path d="M4 5.5l1.8 13c.2 1.3 2.9 2.5 6.2 2.5s6-1.2 6.2-2.5L20 5.5" />
+        </svg>,
+      );
+    case "archive":
+      return tile(
+        "bg-violet-500/15 ring-1 ring-violet-400/30 text-violet-300",
+        <svg width={s.px} height={s.px} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="3.5" y="4" width="17" height="4" rx="1" />
+          <path d="M5 8v10.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V8M10 12h4" />
+        </svg>,
+      );
+    case "mcp":
+      // A search tool reached through MCP: a magnifier joined to a plug.
+      return tile(
+        "bg-sky-500/15 ring-1 ring-sky-400/30 text-sky-300",
+        <svg width={s.px} height={s.px} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="10" cy="10" r="5.5" />
+          <path d="M14 14l5.5 5.5M8 10h4M10 8v4" />
+        </svg>,
+      );
     case "bedrock_kb":
+    case "bedrock_import":
       // A knowledge base in Amazon Bedrock: stacked records in AWS's orange
       // (a plain mark, not Amazon's logo).
       return tile(

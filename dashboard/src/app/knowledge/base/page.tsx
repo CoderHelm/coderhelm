@@ -23,6 +23,7 @@ import {
   fileSize,
   itemWord,
   knowledge,
+  readerWords,
   rememberReturn,
   signInWindow,
   uploadProblem,
@@ -38,6 +39,7 @@ import {
   type SourceKind,
 } from "@/lib/knowledge";
 import { BaseForm } from "../base-form";
+import { ARCHIVE_WARNING, archiveProblem } from "@/components/knowledge/import-steps";
 
 // One knowledge base: the apps it stays in sync with (each with whether it
 // is up to date and the one thing to do when it isn't), its uploaded files,
@@ -91,6 +93,8 @@ function BaseView() {
   const fileRef = useRef<HTMLInputElement>(null);
   const replaceRef = useRef<HTMLInputElement>(null);
   const replacing = useRef<string | null>(null);
+  const archiveRef = useRef<HTMLInputElement>(null);
+  const archiveFor = useRef<Source | null>(null);
 
   const load = useCallback(() => {
     if (!id) return;
@@ -213,6 +217,32 @@ function BaseView() {
       }
     } catch (e) {
       toast(errorMessage(e, `Couldn't sign in to ${KIND_LABEL[s.kind]}.`), "error");
+    }
+  };
+
+  // A newer export of an archive source: warned first, then the same source
+  // reads it (unchanged pages kept, changed read again, missing removed).
+  const pickArchive = async (s: Source) => {
+    const ok = await confirm({ title: "Upload a newer export?", message: ARCHIVE_WARNING, confirmLabel: "Choose the archive" });
+    if (!ok) return;
+    archiveFor.current = s;
+    archiveRef.current?.click();
+  };
+  const replaceArchive = async (s: Source, f: File) => {
+    const bad = archiveProblem(f, limits);
+    if (bad) {
+      toast(bad, "error");
+      return;
+    }
+    try {
+      const r = await knowledge.startArchive(id, { name: f.name, size: f.size, replace: s.id });
+      setSources((cur) => cur.map((x) => (x.id === s.id ? r.source : x)));
+      await uploadToSignedUrl(r.upload, f, () => {});
+      const done = await knowledge.finishArchive(id, s.id);
+      setSources((cur) => cur.map((x) => (x.id === s.id ? done.source : x)));
+      toast("Uploaded. Reading the newer export now.");
+    } catch (e) {
+      toast(errorMessage(e, "The archive didn't upload."), "error");
     }
   };
 
@@ -413,6 +443,9 @@ function BaseView() {
         {base && (
           <p className="mt-3 text-sm text-zinc-400" data-testid="read-line">
             {READ_SENTENCE[base.read_role] ?? ""}{" "}
+            {!!base.readers?.length && (
+              <span data-testid="readers-line">Only {base.readers.map(readerWords).join(", ")}. </span>
+            )}
             {canManage && (
               <button type="button" className={linkButton} onClick={() => setSettings(true)}>
                 Change
@@ -420,9 +453,29 @@ function BaseView() {
             )}
           </p>
         )}
+        {base?.agent_access_note && (
+          <p className="mt-1.5 text-sm text-zinc-400" data-testid="agent-access-note">
+            {base.agent_access_note}
+          </p>
+        )}
 
         {!inPlace && (
           <>
+        <input
+          ref={archiveRef}
+          type="file"
+          className="hidden"
+          aria-label="Upload a newer export"
+          data-testid="archive-replace-input"
+          accept=".zip,application/zip"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            const s = archiveFor.current;
+            archiveFor.current = null;
+            if (f && s) void replaceArchive(s, f);
+          }}
+        />
         <input
           ref={fileRef}
           type="file"
@@ -479,6 +532,8 @@ function BaseView() {
                 key={s.id}
                 source={s}
                 canManage={canManage}
+                limits={limits}
+                onNewExport={() => pickArchive(s)}
                 onSync={() => sync(s)}
                 onFix={() =>
                   s.error?.action === "sign_in"
@@ -486,7 +541,9 @@ function BaseView() {
                     : s.error?.action === "reconnect"
                       ? reconnect(s)
                       : s.error?.action === "edit"
-                        ? setEditing({ source: s, picked: s.selection })
+                        ? s.kind === "archive"
+                          ? pickArchive(s)
+                          : setEditing({ source: s, picked: s.selection })
                         : sync(s)
                 }
                 onEdit={() => setEditing({ source: s, picked: s.selection })}
@@ -647,7 +704,9 @@ function BaseView() {
               attach_team: base.attach_team,
               agents: base.agents,
               authoritative: base.authoritative,
+              readers: base.readers ?? [],
             }}
+            agentNote={base.agent_access_note}
             limits={limits}
             saving={saving}
             submitLabel="Save"
@@ -701,6 +760,62 @@ function ConnectedCard({
   onCheck: () => void;
 }) {
   const b = base.backend;
+  const check = canManage && (
+    <div className="mt-4 space-y-3">
+      <button type="button" className={buttonClass("secondary", "sm")} onClick={onCheck} disabled={checking} data-testid="check-connection">
+        {checking ? "Checking…" : "Check connection"}
+      </button>
+      {checked?.ok && (
+        <p className="text-sm text-emerald-300" role="status" data-testid="check-ok">
+          Searched it just now. The connection works.
+        </p>
+      )}
+      {checked && !checked.ok && <ConnectProblemNote problem={checked.problem} />}
+    </div>
+  );
+  if (b.provider === "mcp") {
+    return (
+      <div className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5" data-testid="connected-in-place" data-provider="mcp">
+        <div className="flex items-start gap-3">
+          <SourceLogo kind="mcp" size="md" />
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-zinc-100">{b.label}</h3>
+            <p className="mt-0.5 text-sm text-emerald-300" data-testid="connected-line">
+              Connected in place: searched live through {b.server_name}, nothing copied
+            </p>
+          </div>
+        </div>
+        <dl className="mt-4 grid min-w-0 gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
+          <dt className="text-zinc-500">Server</dt>
+          <dd className="min-w-0 text-zinc-300">{b.server_name}</dd>
+          <dt className="text-zinc-500">Searches with</dt>
+          <dd className="min-w-0 text-xs leading-5">
+            <Code>{b.search_tool}</Code>
+            {b.fetch_tool && (
+              <>
+                {" "}
+                and reads results with <Code>{b.fetch_tool}</Code>
+              </>
+            )}
+          </dd>
+          <dt className="text-zinc-500">Whose access</dt>
+          <dd className="text-zinc-300" data-testid="connected-access">
+            {b.per_person ? "Each person's own sign-in" : "The team's one connection"}
+          </dd>
+        </dl>
+        {b.per_person ? (
+          <p className="mt-4 text-sm leading-relaxed text-zinc-400" data-testid="per-person-note">
+            Each person&apos;s search uses their own sign-in, so they only see what that tool lets them see. Agent runs search as the person who started them; runs nobody started skip it.
+          </p>
+        ) : (
+          <p className="mt-4 text-sm leading-relaxed text-zinc-400">
+            Chat and the agents it is attached to search it whenever they need it, through the team&apos;s connection. Nothing is stored here, and deleting it here changes nothing in the tool.
+          </p>
+        )}
+        {check}
+      </div>
+    );
+  }
   return (
     <div className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5" data-testid="connected-in-place">
       <div className="flex items-start gap-3">
@@ -733,19 +848,7 @@ function ConnectedCard({
       <p className="mt-4 text-sm leading-relaxed text-zinc-400">
         Chat and the agents it is attached to search it whenever they need it, so documents you add in Bedrock count as soon as Bedrock has them. Nothing is stored here, and deleting it here changes nothing in AWS.
       </p>
-      {canManage && (
-        <div className="mt-4 space-y-3">
-          <button type="button" className={buttonClass("secondary", "sm")} onClick={onCheck} disabled={checking} data-testid="check-connection">
-            {checking ? "Checking…" : "Check connection"}
-          </button>
-          {checked?.ok && (
-            <p className="text-sm text-emerald-300" role="status" data-testid="check-ok">
-              Searched it just now. The connection works.
-            </p>
-          )}
-          {checked && !checked.ok && <ConnectProblemNote problem={checked.problem} />}
-        </div>
-      )}
+      {check}
     </div>
   );
 }

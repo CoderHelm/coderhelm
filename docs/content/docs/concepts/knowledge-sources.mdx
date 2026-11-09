@@ -1,6 +1,6 @@
 ---
 title: Knowledge sources
-description: Bring pages in from Notion, Confluence, Google Drive, Sanity, GitHub and websites, and keep them up to date on their own, or connect a Bedrock knowledge base in place.
+description: Bring pages in from Notion, Confluence, Google Drive, Sanity, GitHub and websites and keep them up to date, import the knowledge base you already have (S3, a Bedrock knowledge base, an archive), or connect Bedrock or any MCP search tool in place.
 ---
 
 A knowledge base can hold pages from the apps your team already writes in, next to the files you upload. You pick what to bring in once; Coderhelm keeps it up to date, removes what is deleted, and Chat and the agents cite each page with a link back to where it lives.
@@ -9,7 +9,7 @@ A knowledge base can hold pages from the apps your team already writes in, next 
 
 On the **Knowledge** page, choose **New knowledge base** (or **Add** on an existing one):
 
-1. Pick the app: Notion, Confluence, Google Drive, Sanity, GitHub, a website, or **Upload files**.
+1. Pick the app: Notion, Confluence, Google Drive, Sanity, GitHub, a website, or **Upload files**. To bring in a knowledge base you already have, pick **Amazon S3**, **Import a Bedrock knowledge base** or **Archive upload** (see [Importing a knowledge base you already have](#importing-a-knowledge-base-you-already-have)). A new knowledge base can also be connected in place: a **Bedrock knowledge base** or a **Search tool (MCP)**.
 2. Sign in to the app. For Sanity, choose **Sign in with Sanity**: a small window opens, you sign in with your own Sanity account, and the dialog carries on where it was. If you're already signed in to Sanity on **Connected apps**, it says **Connected as** your account and you just continue. For other apps that aren't connected yet, choose **Connect**; you come back to the same step.
 3. Tick what to bring in. Ticking a page, space or folder includes everything inside it, including what is added there later.
 4. A new knowledge base is named after what you picked; change the name if you like. It is readable by your whole team unless you change that.
@@ -73,6 +73,10 @@ A page that couldn't be read says why in the list of pages, and is tried again o
 
 ## Who can read it
 
+Each knowledge base has a read role (everyone on the team, members, or admins). Within it, you can also name **only these people or roles**: add an email for one person, or a role (a built-in one such as `member`, or a custom role's key). With a list, only the people and roles on it read the knowledge base in Chat and on its page; people who manage knowledge still see it to manage it. Set it when you create the knowledge base (**Change** under who can read it) or later in its settings.
+
+**Agents.** Agents search the knowledge bases attached to them for whoever starts a run, so the settings and the knowledge base's page say who reaches it that way: "Everyone who can start an agent run gets results from this base when the agent searches it." A knowledge base limited to some people or roles is only searched in runs started by one of them. A search tool connected with each person's own sign-in is searched as the person who started the run, and runs nobody started skip it.
+
 Pages from an app follow the knowledge base's own setting, exactly like uploaded files: **everyone who can read the knowledge base can read every page brought into it, even if they can't open that page in the app.** The dialog says so when you add a source. Pick what you bring in with that in mind, or set the knowledge base to admins only.
 
 - Only people whose role includes managing knowledge add, change, pause and remove sources.
@@ -99,6 +103,51 @@ Coderhelm never asks you to name its own account in a Bedrock resource policy: a
 
 Running your own install? A knowledge base in the install's own account needs no role at all, and the dialog lists them for you: see [Knowledge sources](/self-host/knowledge-sources#bedrock-knowledge-bases-connected-in-place) in the self-hosting guide.
 
+## Search tools through MCP, connected in place
+
+If your team already runs a search tool with an MCP server (Glean, Atlassian Rovo, Dropbox Dash, Azure AI Search, a Pinecone Assistant, Bedrock through AgentCore Gateway, or your own), connect it in place. Chat and the agents search it live through that server, alongside your other knowledge bases, and nothing is copied.
+
+1. Add the tool's MCP server on **Connected accounts** (the same page agents use for remote servers), and sign in if it asks.
+2. On the **Knowledge** page, choose **New knowledge base**, then **Search tool (MCP)**, and pick the server. Coderhelm suggests the tool that searches (a `search` tool, as most servers name it) and the one that reads a whole result (`fetch`); change them if your server names them differently.
+3. Coderhelm runs one test search before anything is saved. If it fails, the dialog says why and what to do: nobody is signed in, the server has no tool that searches, its answer couldn't be read, or the server didn't answer.
+
+Whose access a search uses follows the server:
+
+- **One team connection.** Everyone who can read the knowledge base sees what that connection can see.
+- **Each person signs in.** Each person's search uses their own sign-in, so they only see what that tool lets them see. Agent runs search as the person who started them; runs nobody started skip it.
+
+The knowledge base's page says **Connected in place: searched live through** the server, **nothing copied**, with a **Check connection** button. A citation names the result and links to it when the tool gives a link. Nothing new is needed in AWS for this, on Coderhelm's hosted service or your own install.
+
+## Importing a knowledge base you already have
+
+Import copies the documents into Coderhelm and indexes them here, then keeps them in sync: changed documents are read again, duplicates are read once, and documents that are gone are removed. Progress shows as each document comes in. Use it for small and medium collections; for a bigger one, connect it in place instead (a Bedrock knowledge base or a search tool), which has no size limit here.
+
+### From Amazon S3
+
+1. Connect the AWS account the bucket is in, on **Settings**, **Integrations**, **AWS**. Coderhelm reads the bucket with that account's read-only `CoderHelmLogReader` role and your team's private ID.
+2. Choose **Amazon S3**, pick the account, type the bucket's name, then pick folders or files (or **The whole bucket**).
+3. Coderhelm checks it can read the bucket before anything is saved. If the role can't read it yet, the dialog offers **Update the role in one click**: an update stack in that account that names the bucket in the role's `ImportBuckets` parameter and allows only reading it (`s3:ListBucket`, `s3:GetObject`, and decrypting through S3 when the bucket uses a KMS key). Create the stack, then try again.
+
+Documents of the same kinds as uploads are read: PDF, Word, Markdown, text, CSV, Excel and HTML. A `<file>.metadata.json` next to a document (as Bedrock data sources have) gives its title, link and date. Each sync lists the bucket again and reads only what changed.
+
+### From a Bedrock knowledge base
+
+Choose **Import a Bedrock knowledge base** and paste its ARN. Coderhelm reads what it was built from: each of its data sources, and for an S3 data source the bucket and folders. Tick the ones to import; each becomes an Amazon S3 source as above. Coderhelm reads the documents in the knowledge base's S3 data source and indexes them itself. Nothing in Bedrock changes.
+
+A Confluence or web data source points you at Coderhelm's own Confluence or Website source, which reads the original pages instead of Bedrock's copy. SharePoint, Salesforce and custom data sources can't be imported this way; connect the knowledge base in place to search them. Reading the data sources uses the role's `ReadKnowledgeBases` statement, on the knowledge bases its `KnowledgeBases` parameter names.
+
+### From an archive
+
+Choose **Archive upload** and pick a `.zip`: a Notion export (Markdown and CSV), a Confluence HTML export, or a zipped docs folder. Coderhelm unpacks it on the server (long Notion paths are fine) and reads every page.
+
+**Every page in the archive becomes readable by everyone who can read this knowledge base. A Confluence Full Export also includes pages that are restricted in Confluence.** The dialog says so before you upload. A Notion export leaves out pages the person exporting couldn't open.
+
+To bring in a newer export, choose **Upload a newer export** on the archive's source: unchanged pages are kept, changed ones read again and missing ones removed.
+
+### Limits
+
+An import keeps up to the number of documents the Knowledge page shows (`max_items_per_import`); above that, only the first ones are searchable and the source says so, and suggests connecting the knowledge base in place. Archives have their own size limit (`max_archive_bytes`). Every import is embedded with Titan, like uploads.
+
 ## Citations
 
 A passage from a synced page is cited like one from an uploaded file, with its place in the page and the page's last edit date, and the citation links to the original page in Notion, Confluence, Drive, GitHub or on your site.
@@ -111,6 +160,6 @@ Indexing uses Titan embeddings and is recorded on your usage page like every oth
 
 Every source type implements one interface with three calls: list what can be picked one level at a time (with a search box), list every item a selection covers with the app's version marker (or, from a cursor, what changed and what was deleted), and fetch one item as text with its title, link and edit time. The sync engine does the rest: comparing, hashing, indexing only what changed, deleting, scheduling, status and citations.
 
-A plugin can add a source type by shipping a connector that answers those three calls; nothing else changes. The endpoints the dashboard uses are under `/api/knowledge/connectors` and `/api/knowledge/{kb_id}/sources`, and providers post change events to `POST /webhooks/knowledge/{token}` (see the [API reference](/api)).
+A plugin can add a source type by shipping a connector that answers those three calls; nothing else changes. The endpoints the dashboard uses are under `/api/knowledge/connectors`, `/api/knowledge/{kb_id}/sources` and `/api/knowledge/{kb_id}/archives`, with `/api/knowledge/search-tools` and `/api/knowledge/bedrock/import` for connecting a search tool and importing a Bedrock knowledge base, and providers post change events to `POST /webhooks/knowledge/{token}` (see the [API reference](/api)).
 
-Running your own install? Signing in to Sanity works with nothing to set up. One-click sign-in for Notion, Confluence and Google Drive, and Notion webhooks, need OAuth apps of your own: see [Knowledge sources](/self-host/knowledge-sources) in the self-hosting guide.
+Running your own install? Imports from S3 and from a Bedrock knowledge base use the connected account's `CoderHelmLogReader` role with the bucket named in its `ImportBuckets` parameter, exactly as on the hosted service: nothing changes in the install's own permissions and there is no admin step for the install itself. Search tools through MCP need nothing new in AWS. Signing in to Sanity works with nothing to set up. One-click sign-in for Notion, Confluence and Google Drive, and Notion webhooks, need OAuth apps of your own: see [Knowledge sources](/self-host/knowledge-sources) in the self-hosting guide.
