@@ -7,7 +7,8 @@ import path from "node:path";
 // - "Use Coderhelm's app" shows one "Sign in with <app>" button and the
 //   choice's one line: no token steps and no form fields;
 // - a key stays behind "Use a key instead";
-// - "Use my own app" without the install's own app shows the token steps;
+// - fully private, without the install's own app, shows the token steps;
+// - there is no per-tool switch: the one Other apps choice lives in Settings;
 // - when Coderhelm's app isn't ready yet, it says so, still with no form.
 // Every call is answered here; nothing reaches a real backend.
 
@@ -26,6 +27,7 @@ interface State {
 function hybridStatus(s: State) {
   const row = (id: string, name: string) => ({ id, name, mode: "hosted", through_coderhelm: "The sign-in only.", stays_with_you: "Every page Coderhelm reads.", uses_coderhelm: s.coderhelm.has(id) });
   return {
+    apps_mode: s.coderhelm.size > 0 ? "coderhelm" : "private",
     available: true,
     hosted_url: "https://app.coderhelm.com",
     registered: true,
@@ -101,7 +103,7 @@ async function shot(page: Page, name: string) {
 for (const kind of ["notion", "confluence"] as const) {
   const label = LABEL[kind];
 
-  test.describe(`${label}: the app choice decides what the dialog asks for`, () => {
+  test.describe(`${label}: the install's Other apps choice decides what the dialog asks for`, () => {
     test(`Coderhelm's app: one sign-in button, no token steps or fields`, async ({ page }) => {
       await mockApi(page, { coderhelm: new Set([kind]), brokerReady: true, puts: [] });
       await page.goto("/knowledge/");
@@ -119,7 +121,7 @@ for (const kind of ["notion", "confluence"] as const) {
       await expect(step.getByTestId("token-path")).toBeVisible();
     });
 
-    test(`my own app (none set up): the token steps, and no sign-in button`, async ({ page }) => {
+    test(`fully private (no own app set up): the token steps, and no sign-in button`, async ({ page }) => {
       await mockApi(page, { coderhelm: new Set(), brokerReady: true, puts: [] });
       await page.goto("/knowledge/");
       await page.getByTestId(`start-${kind}`).click();
@@ -131,18 +133,17 @@ for (const kind of ["notion", "confluence"] as const) {
       await shot(page, `${kind}-own`);
     });
 
-    test(`switching to Coderhelm's app swaps the form for the sign-in button`, async ({ page }) => {
+    test(`no per-tool switch here: the dialog says which app and links to the one choice`, async ({ page }) => {
       const s: State = { coderhelm: new Set(), brokerReady: true, puts: [] };
       await mockApi(page, s);
       await page.goto("/knowledge/");
       await page.getByTestId(`start-${kind}`).click();
       const step = page.getByTestId("connect-step");
-      await expect(step.getByTestId("token-path")).toBeVisible();
-      await step.getByRole("button", { name: "Use Coderhelm's app (easiest)" }).click();
-      await expect(step).toHaveAttribute("data-state", "sign-in");
-      await expect(step.getByTestId("connect-button")).toHaveText(`Sign in with ${label}`);
-      await expect(step.getByTestId("token-path")).toHaveCount(0);
-      expect(s.puts).toContainEqual({ apps: { [kind]: "coderhelm" } });
+      const choice = step.getByTestId("hybrid-app-choice");
+      await expect(choice).toContainText(`This install is fully private, so ${label} uses your team's own app.`);
+      await expect(choice.getByRole("button")).toHaveCount(0);
+      await expect(choice.getByRole("link", { name: "Change it for every tool in Settings, Version and updates, Hybrid" })).toHaveAttribute("href", /\/settings\/system\/?#hybrid/);
+      expect(s.puts).toEqual([]);
     });
 
     test(`Coderhelm's app not ready yet: says so, still no form`, async ({ page }) => {

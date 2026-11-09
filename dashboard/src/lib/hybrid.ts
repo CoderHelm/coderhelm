@@ -4,7 +4,7 @@
 // the System page, the integration pages and the tests agree.
 
 import { useCallback, useEffect, useState } from "react";
-import { api, errorStatus, type HybridIntegration, type HybridStatus, type HybridSettingsPatch } from "./api";
+import { api, errorStatus, type HybridAppsMode, type HybridIntegration, type HybridStatus, type HybridSettingsPatch } from "./api";
 import { apiBase, isSelfHosted } from "./runtime-config";
 
 /** Where the trust model is written down. */
@@ -80,9 +80,6 @@ export const NAME_CODES: Record<string, string> = {
 export function cleanName(raw: string): string {
   return raw.trim().toLowerCase().replace(/\.coderhelm\.com$/, "");
 }
-
-/** The integrations a person can switch between Coderhelm's app and their own. */
-export const HOSTED_CHOICES = ["github", "jira", "notion", "confluence", "google_drive"] as const;
 
 // ── Hosted dashboard hand-offs ─────────────────────────────────────────
 //
@@ -217,7 +214,28 @@ export function canUseCoderhelm(i: HybridIntegration | undefined): boolean {
   return i?.mode === "hosted" && i.offered !== false;
 }
 
-/** The settings change for one Other apps tool (GitHub follows its own mode). Only that tool changes. */
-export function appChoice(id: string, useCoderhelm: boolean): HybridSettingsPatch {
-  return { apps: { [id]: useCoderhelm ? "coderhelm" : "own" } };
+/** The tools the Other apps choice covers, from the catalog: every hosted one but GitHub, which has its own choice. */
+export function appTools(s: Pick<HybridStatus, "integrations">): HybridIntegration[] {
+  return (s.integrations ?? []).filter((i) => i.mode === "hosted" && i.id !== "github");
 }
+
+/** The install's Other apps choice. A gateway from before it says only which tools use Coderhelm's app. */
+export function appsModeOf(s: Pick<HybridStatus, "integrations" | "apps_mode">): HybridAppsMode {
+  if (s.apps_mode) return s.apps_mode;
+  const tools = appTools(s);
+  return tools.length === 0 || tools.some((i) => i.uses_coderhelm) ? "coderhelm" : "private";
+}
+
+/**
+ * The settings change for the Other apps choice. It also carries the same
+ * choice per tool, which only a gateway from before `apps_mode` reads.
+ */
+export function appsModePatch(s: Pick<HybridStatus, "integrations">, mode: HybridAppsMode): HybridSettingsPatch {
+  return { apps_mode: mode, apps: Object.fromEntries(appTools(s).map((i) => [i.id, mode === "coderhelm" ? "coderhelm" : "own"])) };
+}
+
+/** The two Other apps options, with their one line each. */
+export const APPS_MODES: { value: HybridAppsMode; label: string; line: string }[] = [
+  { value: "coderhelm", label: "Use Coderhelm's apps (easiest)", line: "Sign in with one click through Coderhelm's app for each tool below, and for any Coderhelm adds later." },
+  { value: "private", label: "Fully private", line: "Nothing goes through Coderhelm. Each tool uses your team's own app, set up on its card in Settings, Integrations." },
+];

@@ -1142,7 +1142,7 @@ test('hybrid Jira: the toggle sits next to GitHub, on by default, can be turned 
   await page.locator('[data-setup="hybrid"]').click();
   const options = page.getByTestId('hybrid-options');
   await expect(jira).toBeChecked();
-  await expect(options.locator('label')).toHaveText([/Use CoderHelm’s GitHub App/, /Use CoderHelm’s Jira app/, /Use CoderHelm’s Notion app/, /Use CoderHelm’s Confluence app/, /Use CoderHelm’s Google Drive app/, /Share delivery data/]);
+  await expect(options.locator('label')).toHaveText([/Use CoderHelm’s GitHub App/, /Use CoderHelm’s Jira app/, /Use CoderHelm’s apps \(easiest\)/, /Fully private/, /Share delivery data/]);
   await expect(options.locator('label').nth(1)).toContainText('your install never holds the app’s secret');
   await expect(options.locator('label').nth(1)).toContainText('Events come through CoderHelm, checked and re-signed');
   // The whole row is the control, with the hand cursor.
@@ -1167,32 +1167,55 @@ test('hybrid Jira: the toggle sits next to GitHub, on by default, can be turned 
   await expect(page.getByTestId('hosted-jira')).toBeChecked();
 });
 
-test('hybrid other apps: Notion, Confluence and Google Drive are on by default, each says what passes through CoderHelm, and fully private turns them off', async ({ page }) => {
+test('hybrid other apps: one choice, CoderHelm\u2019s apps by default, covering every tool and any added later', async ({ page }) => {
   await mock(page, newMock());
   await mockHybrid(page, newHybrid());
   await page.goto('/self-host/install/');
-  const options = page.getByTestId('hybrid-options');
-  for (const id of ['notion', 'confluence', 'google_drive']) await expect(page.getByTestId(`hosted-${id}`)).toBeChecked();
-  const notion = options.locator('label', { hasText: 'Use CoderHelm’s Notion app' });
-  await expect(notion).toContainText('CoderHelm keeps the sign-in (encrypted) and hands your install an access token when it syncs.');
-  await expect(notion).toContainText('Nothing passes through CoderHelm until someone connects it.');
-  await expect(options.locator('label', { hasText: 'Use CoderHelm’s Google Drive app' })).toContainText('read-only Drive access');
-  await notion.click();
-  await expect(page.getByTestId('hosted-notion')).not.toBeChecked();
-  await expect(page.getByTestId('hosted-confluence')).toBeChecked();
-  // Fully private hides them; hybrid again brings every one back on.
+  const apps = page.getByTestId('apps-mode');
+  await expect(page.getByTestId('apps-mode-coderhelm')).toBeChecked();
+  await expect(page.getByTestId('apps-mode-private')).not.toBeChecked();
+  // One line per option; the tools are named once, Figma among them.
+  await expect(apps.locator('label').nth(0)).toContainText('Jira, Notion, Confluence, Google Drive, Figma and any app CoderHelm adds later');
+  await expect(apps.locator('label').nth(1)).toContainText('Nothing goes through CoderHelm');
+  // No per-tool toggles any more.
+  for (const id of ['notion', 'confluence', 'google_drive', 'figma']) await expect(page.getByTestId(`hosted-${id}`)).toHaveCount(0);
+  // Fully private hides the Jira link too; CoderHelm's apps brings it back (off).
+  await page.getByTestId('apps-mode-private').check();
+  await expect(page.getByTestId('hosted-jira')).toHaveCount(0);
+  await page.getByTestId('apps-mode-coderhelm').check();
+  await expect(page.getByTestId('hosted-jira')).not.toBeChecked();
+  // The private setup hides the whole block; hybrid again starts on CoderHelm's apps.
   await page.locator('[data-setup="private"]').click();
-  await expect(page.getByTestId('hosted-notion')).toHaveCount(0);
+  await expect(apps).toHaveCount(0);
   await page.locator('[data-setup="hybrid"]').click();
-  for (const id of ['notion', 'confluence', 'google_drive']) await expect(page.getByTestId(`hosted-${id}`)).toBeChecked();
+  await expect(page.getByTestId('apps-mode-coderhelm')).toBeChecked();
 });
 
-test('hybrid other apps: the choices are applied to the install as it registers, a tool turned off as its own app', async ({ page }) => {
+test('hybrid other apps: the choice is applied as the install registers, with the per-tool copy for an older install', async ({ page, browser }) => {
   const m = newMock({ setup: withHybrid(setupDoc(NO_APP), REG_OK) });
   const h = newHybrid();
   await mockHybrid(page, h);
-  await seeded(page, m, { ...JIRA_STATE, jiraChoice: 'own', appChoices: { notion: 'hosted', confluence: 'own', google_drive: 'hosted' } });
-  await expect.poll(() => h.calls.find((c) => c.path === '/settings')?.body.apps).toEqual({ jira: 'own', notion: 'coderhelm', confluence: 'own', google_drive: 'coderhelm' });
+  await seeded(page, m, { ...JIRA_STATE, appsMode: 'private' });
+  await expect.poll(() => h.calls.find((c) => c.path === '/settings')?.body).toMatchObject({ apps_mode: 'private', apps: { jira: 'own', notion: 'own', confluence: 'own', google_drive: 'own' } });
+  expect(h.calls.find((c) => c.path === '/settings')!.body.jira_link).toBeUndefined();
+
+  // A guide saved with the per-tool choices: any tool on means CoderHelm's apps.
+  const p2 = await browser.newPage();
+  const m2 = newMock({ setup: withHybrid(setupDoc(NO_APP), REG_OK) });
+  const h2 = newHybrid();
+  await mockHybrid(p2, h2);
+  await seeded(p2, m2, { ...JIRA_STATE, jiraChoice: 'own', appChoices: { notion: 'hosted', confluence: 'own', google_drive: 'own' } });
+  await expect.poll(() => h2.calls.find((c) => c.path === '/settings')?.body).toMatchObject({ apps_mode: 'coderhelm', apps: { jira: 'coderhelm', notion: 'coderhelm', confluence: 'coderhelm', google_drive: 'coderhelm' } });
+  await p2.close();
+
+  // All off: fully private.
+  const p3 = await browser.newPage();
+  const m3 = newMock({ setup: withHybrid(setupDoc(NO_APP), REG_OK) });
+  const h3 = newHybrid();
+  await mockHybrid(p3, h3);
+  await seeded(p3, m3, { ...JIRA_STATE, jiraChoice: 'own', appChoices: { notion: 'own', confluence: 'own', google_drive: 'own' } });
+  await expect.poll(() => h3.calls.find((c) => c.path === '/settings')?.body?.apps_mode).toBe('private');
+  await p3.close();
 });
 
 test('hybrid Jira: the guide turns on Link through CoderHelm with the setup key, and only when chosen', async ({ page, browser }) => {

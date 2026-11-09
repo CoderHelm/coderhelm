@@ -31,9 +31,7 @@ import {
   HYBRID_GITHUB_OUTCOMES,
   NAME_ZONE,
   SETUPS,
-  ALL_HOSTED_APPS,
-  ALL_OWN_APPS,
-  OTHER_APPS,
+  APPS_MODES,
   appsBody,
   wantsHybrid,
   STEP_TIME,
@@ -898,7 +896,7 @@ export function InstallWizard() {
       // CoderHelm's Jira app: Link through CoderHelm turned on now, so the
       // install reports hybrid_jira and the Jira step can follow the link.
       // Other apps: each tool's choice, applied as the install registers.
-      body = { ...body, github_mode: s.githubChoice, sharing: { enabled: s.sharing, payloads: false }, apps: appsBody(s), ...(s.jiraChoice === 'hosted' ? { jira_link: true } : {}) };
+      body = { ...body, github_mode: s.githubChoice, sharing: { enabled: s.sharing, payloads: false }, ...appsBody(s), ...(s.jiraChoice === 'hosted' && s.appsMode !== 'private' ? { jira_link: true } : {}) };
     } else if (s.domainChoice === 'coderhelm' && !nm && !hyb.claimRefused && cleanName(s.coderhelmName)) {
       path = '/name';
       body = { ...body, name: cleanName(s.coderhelmName) };
@@ -999,8 +997,8 @@ export function InstallWizard() {
     const hybrid = s.setup === 'hybrid';
     const pickSetup = (id: Setup) =>
       update(id === 'hybrid'
-        ? { setup: 'hybrid', domainChoice: 'coderhelm', githubChoice: 'hosted', jiraChoice: 'hosted', appChoices: { ...ALL_HOSTED_APPS } }
-        : { setup: 'private', domainChoice: s.domainChoice === 'coderhelm' ? 'aws' : s.domainChoice, githubChoice: 'own', jiraChoice: 'own', appChoices: { ...ALL_OWN_APPS } });
+        ? { setup: 'hybrid', domainChoice: 'coderhelm', githubChoice: 'hosted', jiraChoice: 'hosted', appsMode: 'coderhelm' }
+        : { setup: 'private', domainChoice: s.domainChoice === 'coderhelm' ? 'aws' : s.domainChoice, githubChoice: 'own', jiraChoice: 'own', appsMode: 'private' });
     screen = (
       <section data-testid="screen-start">
         <Heading title="Install CoderHelm in your AWS account" lead="About 25 minutes, mostly waiting. You press a few buttons; this page does the rest and checks every step." />
@@ -1079,23 +1077,27 @@ export function InstallWizard() {
                 title="Use CoderHelm’s GitHub App"
                 help="Install one app on your organization instead of creating your own. Events come through CoderHelm, checked and re-signed; your install gets short-lived tokens only for the repositories you pick."
               />
-              <Toggle
-                checked={s.jiraChoice === 'hosted'}
-                onChange={(v) => update({ jiraChoice: v ? 'hosted' : 'own' })}
-                testId="hosted-jira"
-                title="Use CoderHelm’s Jira app"
-                help="Link your Jira site through CoderHelm’s Jira app instead of setting up your own. Events come through CoderHelm, checked and re-signed; your install never holds the app’s secret and calls Jira through CoderHelm. Needs a team on app.coderhelm.com that runs the Jira app on your site."
-              />
-              {OTHER_APPS.map((a) => (
+              {s.appsMode !== 'private' ? (
                 <Toggle
-                  key={a.id}
-                  checked={(s.appChoices ?? ALL_HOSTED_APPS)[a.id] !== 'own'}
-                  onChange={(v) => update({ appChoices: { ...ALL_HOSTED_APPS, ...s.appChoices, [a.id]: v ? 'hosted' : 'own' } })}
-                  testId={`hosted-${a.id}`}
-                  title={a.title}
-                  help={`${a.help} Nothing passes through CoderHelm until someone connects it.`}
+                  checked={s.jiraChoice === 'hosted'}
+                  onChange={(v) => update({ jiraChoice: v ? 'hosted' : 'own' })}
+                  testId="hosted-jira"
+                  title="Use CoderHelm’s Jira app"
+                  help="Link your Jira site through CoderHelm’s Jira app instead of setting up your own. Events come through CoderHelm, checked and re-signed; your install never holds the app’s secret and calls Jira through CoderHelm. Needs a team on app.coderhelm.com that runs the Jira app on your site."
                 />
-              ))}
+              ) : null}
+              <fieldset className="rounded-xl border border-fd-border p-3.5" data-testid="apps-mode">
+                <legend className="px-1 text-sm font-medium">Other apps</legend>
+                {APPS_MODES.map((m) => (
+                  <label key={m.id} className={`mt-2 flex cursor-pointer gap-3 rounded-xl border p-3 transition ${(s.appsMode ?? 'coderhelm') === m.id ? 'border-fd-primary bg-fd-primary/5' : 'border-fd-border hover:bg-fd-accent'}`}>
+                    <input type="radio" name="apps-mode" className="mt-1 accent-[var(--color-fd-primary)]" checked={(s.appsMode ?? 'coderhelm') === m.id} onChange={() => update({ appsMode: m.id, ...(m.id === 'private' ? { jiraChoice: 'own' as const } : {}) })} data-testid={`apps-mode-${m.id}`} />
+                    <span>
+                      <span className="block font-medium">{m.title}</span>
+                      <span className="block text-sm text-fd-muted-foreground">{m.help}</span>
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
               <Toggle
                 checked={s.sharing}
                 onChange={(v) => update({ sharing: v })}
