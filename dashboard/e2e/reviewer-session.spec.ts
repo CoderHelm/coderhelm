@@ -18,7 +18,12 @@ import {
 // API call is answered here; nothing reaches a real backend.
 
 const ID = "3f2c9a1e-5b7d-4c8e-9a0b-1c2d3e4f5a6b";
-const now = Date.now();
+// Fresh for each test: a shard can reach a test minutes after the file loads,
+// and the running elapsed time is measured against the real clock.
+let now = Date.now();
+test.beforeEach(() => {
+  now = Date.now();
+});
 const iso = (secsAgo: number) => new Date(now - secsAgo * 1000).toISOString();
 
 // ---- The helpers ------------------------------------------------------------
