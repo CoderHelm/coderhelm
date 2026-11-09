@@ -34,6 +34,7 @@ import { apiBase, githubAppUrl, runtimeConfig, siteUrl } from "@/lib/runtime-con
 import { SetupBanner } from "@/components/setup-banner";
 import { CopyButton } from "./copy-button";
 import { openInChromeHref, signInProblem, type SignInProblem } from "@/lib/sign-in-errors";
+import { rememberConsentReturn, takeConsentReturn } from "@/lib/connected-apps";
 import { TwoFactorSetup } from "./two-factor-setup";
 import { useSignInMethods } from "@/hooks/use-sign-in-methods";
 import type { MyTwoFactor } from "@/lib/api";
@@ -287,6 +288,12 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     api.me()
       .then(async (u) => {
+        // Signed in by Google or GitHub on the way to an app's consent page.
+        const back = takeConsentReturn(window.location);
+        if (back) {
+          window.location.replace(back);
+          return;
+        }
         setUser(u);
         pushToDataLayer({ event: "identify", user_id: u.user_id, team_id: u.team_id });
         await loadTwoFactor();
@@ -298,6 +305,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       })
       .catch((e) => {
         if (e instanceof ApiError && e.code === "team_moved") showMoved(movedUrl(e.url));
+        // An app's consent page, signed out: back to it after signing in.
+        rememberConsentReturn(window.location);
         setAuthChecked(true);
       });
   }, []);
@@ -359,6 +368,11 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <><title>Sign in · Coderhelm</title><AuthScreen onAuth={async (u) => {
+      const back = takeConsentReturn(window.location);
+      if (back) {
+        window.location.replace(back);
+        return;
+      }
       await loadTwoFactor();
       setUser(u);
       pushToDataLayer({ event: "identify", user_id: u.user_id, team_id: u.team_id });

@@ -50,6 +50,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     items: [
       { href: "/settings/notifications", title: "Notifications", description: "Which emails Coderhelm sends you.", icon: <BellIcon />, view: "own_account", edit: "own_account" },
       { href: "/settings/security", title: "Password and two step sign in", description: "Your password and your authenticator app.", icon: <LockIcon />, view: "own_account", edit: "own_account", status: "security" },
+      { href: "/settings/connected-apps", title: "Connected AI apps", description: "Claude, Cursor and other apps you let use Coderhelm as you.", icon: <PluginIcon />, view: "own_account", edit: "own_account" },
     ],
   },
   {

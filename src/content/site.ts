@@ -250,7 +250,7 @@ const home: Page = {
         },
         {
           type: "p",
-          text: "Works with GitHub, Jira, Microsoft Teams, AWS, Playwright, JUnit and Cucumber reports, 17 MCP servers, and Claude models through your own Anthropic API key or Amazon Bedrock. Build on it with the [public API](https://docs.coderhelm.com/api/) and [signed webhooks](https://docs.coderhelm.com/api/webhooks/) that tell your systems what it did.",
+          text: "Works with GitHub, Jira, Microsoft Teams, AWS, Playwright, JUnit and Cucumber reports, 17 MCP servers, and Claude models through your own Anthropic API key or Amazon Bedrock. Use it from Claude, Cursor or VS Code through [its MCP server](https://docs.coderhelm.com/mcp/): see runs, start and retry them, and ask for reviews, as yourself. Build on it with the [public API](https://docs.coderhelm.com/api/) and [signed webhooks](https://docs.coderhelm.com/api/webhooks/) that tell your systems what it did.",
         },
       ],
     },
