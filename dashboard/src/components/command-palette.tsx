@@ -155,7 +155,7 @@ const SETTINGS: { label: string; href: string; need?: string; keywords: string[]
   { label: "Alert routes", href: "/settings/alerts", need: "view_alerts", keywords: ["alarm", "sns", "topic"] },
   { label: "Notifications", href: "/settings/notifications", keywords: ["email"] },
   { label: "Members and roles", href: "/settings/team", keywords: ["team", "people", "roles", "invite"] },
-  { label: "Password and two step sign in", href: "/settings/security", keywords: ["security", "password", "two-factor", "mfa"] },
+  { label: "Security", href: "/settings/security", keywords: ["security", "password", "two-factor", "mfa"] },
   { label: "Token limit", href: "/settings/budget", need: ANY_CHANGE, keywords: ["budget", "usage", "cost"] },
 ];
 

@@ -64,7 +64,7 @@ test("settings pages show Settings' own menu in place of the app's, and destinat
   await page.goto("/settings/security");
   const main = page.getByRole("navigation", { name: "Main" });
   const nav = main.getByRole("navigation", { name: "Settings" });
-  await expect(nav.getByRole("link", { name: "Password and two step sign in" })).toHaveAttribute("aria-current", "page");
+  await expect(nav.getByRole("link", { name: "Security" })).toHaveAttribute("aria-current", "page");
   await expect(nav.getByRole("link", { name: /^Integrations/ })).toBeVisible();
   // One column of navigation: the app's menu gives way, with a way back.
   await expect(page.getByTestId("main-nav")).toHaveCount(0);

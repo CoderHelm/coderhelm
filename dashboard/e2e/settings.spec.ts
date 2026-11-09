@@ -13,7 +13,7 @@ type Role = "viewer" | "member" | "billing" | "admin" | "owner";
 // the spec for the hub: an item added to the hub without a row here fails.
 const ITEMS: { title: string; href: string; view: Role; edit: Role; heading: string | RegExp }[] = [
   { title: "Notifications", href: "/settings/notifications", view: "viewer", edit: "viewer", heading: "Notifications" },
-  { title: "Password and two step sign in", href: "/settings/security", view: "viewer", edit: "viewer", heading: "Password and two step sign in" },
+  { title: "Security", href: "/settings/security", view: "viewer", edit: "viewer", heading: "Security" },
   { title: "Members and roles", href: "/settings/team", view: "viewer", edit: "admin", heading: "Members and roles" },
   { title: "API keys", href: "/settings/api-keys", view: "admin", edit: "admin", heading: "API keys" },
   { title: "Repositories", href: "/settings/repos", view: "member", edit: "admin", heading: "Repositories" },
@@ -190,12 +190,12 @@ test("hub shows current values at a glance", async ({ page }) => {
   await expect(hubLink(page, "Integrations")).toContainText("1 needs credentials · 1 connected");
   await expect(hubLink(page, "Members and roles")).toContainText("1 person");
   await expect(hubLink(page, "Alert routes")).toContainText("No routes yet");
-  await expect(hubLink(page, "Password and two step sign in")).toContainText("Two step sign in off");
+  await expect(hubLink(page, "Security")).toContainText("Two step sign in off");
   // What needs someone comes first, and the menu marks the same pages.
   const attention = page.getByTestId("settings-attention");
   await expect(attention.getByRole("link")).toHaveCount(2);
   await expect(attentionLink(page, "Integrations")).toContainText("1 needs credentials · 1 connected");
-  await expect(attentionLink(page, "Password and two step sign in")).toContainText("Two step sign in off");
+  await expect(attentionLink(page, "Security")).toContainText("Two step sign in off");
   const menu = page.getByRole("navigation", { name: "Settings" });
   await expect(menu.getByRole("link", { name: /^Integrations/ })).toContainText("Needs attention");
   await expect(menu.getByRole("link", { name: /^Repositories/ })).not.toContainText("Needs attention");
