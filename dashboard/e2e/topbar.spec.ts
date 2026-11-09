@@ -37,7 +37,7 @@ test("every page has exactly one top bar and exactly one heading", async ({ page
 test("the trail names where you are, ending on the current page", async ({ page }) => {
   await mockDemoApi(page);
   const cases: { url: string; trail: string[] }[] = [
-    { url: "/settings/security", trail: ["your-team", "Settings", "Password and two step sign in"] },
+    { url: "/settings/security", trail: ["your-team", "Settings", "Security"] },
     { url: "/settings/guardrails", trail: ["your-team", "Settings", "Instructions", "Rules"] },
     { url: "/settings/integrations/jira", trail: ["your-team", "Settings", "Integrations", "Jira"] },
     { url: "/", trail: ["your-team", "Runs"] },
@@ -56,9 +56,9 @@ test("the trail names where you are, ending on the current page", async ({ page 
   // bar's last crumb marks where you are but is not a second heading.
   await page.goto("/settings/security");
   await settle(page);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Password and two step sign in");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Security");
   await expect(page.getByTestId("page-header").getByRole("heading", { level: 1 })).toBeVisible();
-  await expect(page.getByTestId("breadcrumb-current").locator('[aria-current="page"]')).toHaveText("Password and two step sign in");
+  await expect(page.getByTestId("breadcrumb-current").locator('[aria-current="page"]')).toHaveText("Security");
   await expect(page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Settings" })).toHaveAttribute("href", /^\/settings\/?$/);
   // An item's page shows its title under the bar; the bar's crumb is not a second heading.
   await page.goto(`/runs/detail?id=${RUN_ID}`);

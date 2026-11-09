@@ -104,7 +104,7 @@ export default function SecurityPage() {
   );
   const header = (
     <div className="mb-6">
-      <PageHeader title="Password and two step sign in" lead={`Your password and ${TWO_STEP.toLowerCase()}.`} />
+      <PageHeader title="Security" lead={`Your password and ${TWO_STEP.toLowerCase()}.`} />
     </div>
   );
 
