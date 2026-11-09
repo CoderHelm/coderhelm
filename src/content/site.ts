@@ -28,7 +28,7 @@ export const SITE = {
     "CoderHelm is an AI coding agent for GitHub and Jira. Assign it an issue or a ticket and it opens a pull request in your repository, then it stays on the code: it answers review comments, fixes its own failing CI, reviews your team's pull requests and turns production alerts into fixes that a person approves. Teams can also ask it about their code and documents in Chat, and run it hosted or in their own AWS account.",
   llmsDetails: [
     "Status: the hosted service is in open beta. Anyone can sign up at https://app.coderhelm.com; a team's admins choose who may join that team.",
-    "Self-hosting: runs in your own AWS account, installed from the browser at https://docs.coderhelm.com/self-host/install/ or from a terminal. Releases are published at https://github.com/CoderHelm/coderhelm-platform/releases. Updates apply from the app in one click or automatically in a maintenance window, on the Stable channel or the nightly Beta channel; admins are emailed only when they need to act or something went wrong, plus an optional weekly digest. License: FSL-1.1-ALv2 (each release becomes Apache 2.0 two years after it ships).",
+    "Self-hosting: runs in your own AWS account as one CloudFormation stack, installed from the browser at https://docs.coderhelm.com/self-host/install/ or from a terminal. Releases are published at https://github.com/CoderHelm/coderhelm-platform/releases. One press of Update installs the newest release, or it installs itself in a maintenance window, on the Stable channel or the nightly Beta channel. Updates never wait for an AWS admin: extra permissions a release can use are a separate, optional step. Admins are emailed only when they need to act or something went wrong, plus an optional weekly digest. A hybrid install makes one choice for the whole install: CoderHelm's apps (easiest, the default) or fully private. With CoderHelm's apps, Jira, Notion, Confluence, Google Drive, Figma and every app CoderHelm adds later work with no setup; a tool with its own app set up always uses it, and GitHub has its own choice. License: FSL-1.1-ALv2 (each release becomes Apache 2.0 two years after it ships).",
     "Models: Claude. Hosted teams use their own Anthropic API key; self-hosted installs use Amazon Bedrock in their own account or each team's Anthropic API key. Admins can set monthly token limits: one for new tokens, one for cache reads and one for cache writes.",
     "Chat: answers questions about the team's repositories and knowledge. It reads the code itself (overview, files, code search, code graph) and cites real file paths and lines.",
     "Knowledge sources: Notion, Confluence, Google Drive, Sanity, GitHub, websites and uploaded files, kept in sync.",
@@ -65,8 +65,8 @@ export const SITE = {
   ],
   sameAs: ["https://github.com/CoderHelm"],
   ctaNote: "CoderHelm is in open beta. Sign up and bring your own Anthropic API key.",
-  updated: "2026-11-05",
-  updatedLabel: "November 5, 2026",
+  updated: "2026-11-08",
+  updatedLabel: "November 8, 2026",
   year: 2026,
 } as const;
 
@@ -305,14 +305,18 @@ const home: Page = {
         {
           type: "list",
           items: [
-            "One click opens AWS with every value filled in, and the guide follows the install as it runs",
+            "One CloudFormation stack: one click opens AWS with every value filled in, and the guide follows the install as it runs",
             "Your GitHub App in one click, and a check that Claude answers on Amazon Bedrock",
             "Your own domain, set up in Route 53 for you or with DNS records to copy, checked live",
             "The same install checks in the guide, the `doctor` command and the dashboard's Setup page",
-            "Updates applied from the app in one click, or automatically in your maintenance window, from the Stable or nightly Beta channel",
+            "One press of Update installs the newest release, or it installs itself in your maintenance window, from the Stable or nightly Beta channel",
+            "Updates never wait for an AWS admin: extra permissions a release can use are a separate, optional step",
             "Quiet email: only when you need to act or something went wrong, plus an optional weekly what's new",
             "Every install and update checks the release's signature before anything runs",
-            "Fully private, or hybrid: use CoderHelm's GitHub App and event relay, and see every event in and out on the Deliveries page",
+            "Hybrid makes one choice for the whole install: CoderHelm's apps (easiest, the default) or fully private. With CoderHelm's apps, Jira, Notion, Confluence, Google Drive, Figma and every app CoderHelm adds later work with no setup",
+            "A tool with its own app set up always uses it, and GitHub sign in has its own choice",
+            "Hybrid sends events through CoderHelm's relay, and the Deliveries page shows every event in and out",
+            "Reads logs in its own AWS account with its own roles, so there is no second stack to launch",
             "One organization per install: nobody signs up on their own, and admins can require two factor sign in",
           ],
         },
@@ -453,8 +457,11 @@ const reviewer: Page = {
             "Context beyond the diff: a code graph of definitions and callers shows what a change reaches",
             "Comments on the exact lines, with GitHub suggestions you can apply",
             "A risk level of low, medium or high; migrations, auth, secrets and payments always rate high",
+            "Changes are requested only for a named correctness, security or data loss problem, with where it is and the evidence; everything else is a note on the approval",
             "A new review on every push, and its own comments resolved once they are fixed",
+            "Edit the description to answer a review and it reviews the same commit again",
             "Answers in the thread: `@coderhelm` with a question, `@coderhelm re-review`, or the Re-request review button",
+            "A CoderHelm review check on the commit from the moment a review is scheduled, naming what holds the merge and linking to a page that follows the review step by step",
             "Draft pull requests are skipped until they are marked ready",
           ],
         },
@@ -519,6 +526,9 @@ const maintenance: Page = {
             { title: "Fixes failing CI", text: "When a check fails on its pull request, it reads the logs, fixes the cause and pushes again. It stops when the same failure repeats, and caps automatic pushes at eight. When only [quarantined tests](/tests/) failed, it treats the run as passing instead." },
             { title: "Keeps the branch current", text: "Resolves merge conflicts with the base branch before it works on feedback, so a pull request does not go stale while it waits." },
             { title: "Tells your failures from its own", text: "When an end to end test fails for a reason the pull request did not cause, it runs it once more and says so, with the evidence." },
+            { title: "One pull request for the work", text: "When its own open pull request already covers a ticket, the run continues in it and says what it carried over. A person's pull request is never touched." },
+            { title: "Never a silent draft", text: "A finished run's pull request is marked ready, or stays a draft with each reason and what to do, shown on the run page." },
+            { title: "Waits out GitHub's limits", text: "When GitHub's hourly limit is reached, runs and reviews wait for the reset and continue, and the run page says when." },
           ],
         },
       ],
@@ -602,6 +612,7 @@ const alerts: Page = {
             "Every message must carry a valid SNS signature, from a topic in an AWS account your team connected",
             "Alert text is treated as data, never as instructions",
             "Repeats of the same alert are collapsed into one",
+            "An alarm that keeps firing or flaps can post once until it really clears, or once a day, per route or per alarm",
             "Each rule has a daily run cap, and alert runs stop for the day at your team's alert token budget",
           ],
         },
@@ -614,6 +625,10 @@ const alerts: Page = {
         {
           type: "p",
           text: "Connect AWS with a CloudFormation stack that creates a read only role, and CoderHelm scans the CloudWatch log groups you choose every six hours. Each finding has a severity, a summary and a suggested action, and becomes a plan with one click.",
+        },
+        {
+          type: "p",
+          text: "A finding that goes quiet resolves on its own after a quiet period that follows how often it happened, and the page says when. When checks of an AWS account fail, the page says so. A self hosted install reads the logs in its own AWS account with its own roles, so there is no stack to launch.",
         },
       ],
     },
@@ -764,6 +779,10 @@ const skills: Page = {
         {
           type: "p",
           text: "Connect any of 17 MCP servers and CoderHelm can use them while it plans and implements: Figma, Sentry, Linear, Notion, Vercel, Stripe, PostHog, GitLab, Neon, Turso, Snyk, LaunchDarkly, MongoDB Atlas, Grafana, Redis, Upstash and Sanity. Credentials are stored encrypted with AWS KMS.",
+        },
+        {
+          type: "p",
+          text: "Figma signs in with one click through CoderHelm's Figma app, on the hosted service and on hybrid installs, or with your team's own Figma app or a key. Agents read your Figma files (components, design tokens and layout) while they plan and build, so the UI they build can match the design. Access is read only: nothing in Figma is changed.",
         },
       ],
     },
@@ -929,7 +948,7 @@ const selfHost: Page = {
         {
           type: "steps",
           items: [
-            { title: "AWS", text: "Enter your email and pick a region. One click opens AWS on a quick create page with every value filled in. CoderHelm deploys inside your account in about 20 minutes, with live progress in the guide." },
+            { title: "AWS", text: "Enter your email and pick a region. One click opens AWS on a quick create page with every value filled in. CoderHelm deploys inside your account as one CloudFormation stack in about 20 minutes, with live progress in the guide." },
             { title: "GitHub and models", text: "Create your own GitHub App in one click; its keys go straight to your install. Your install then checks that Claude answers on Amazon Bedrock and opens the right page if access is missing." },
             { title: "Domain and the rest", text: "Keep the AWS address or add your own domain: in Route 53 it is set up for you, anywhere else you copy two DNS records and the guide checks them live. Then pick from the optional setup list." },
           ],
@@ -983,8 +1002,9 @@ const selfHost: Page = {
         {
           type: "cards",
           items: [
-            { title: "Updates from the app", text: "Apply a new release in one click from Settings, or let it install in your maintenance window. Choose Stable, or Beta for nightly builds. Admins get an email only when they need to act or something went wrong, plus an optional weekly what's new." },
-            { title: "Your models", text: "Amazon Bedrock in your account, with no API key anywhere, or each team's own Anthropic API key." },
+            { title: "Updates from the app", text: "One press of Update in Settings installs the newest release, or let it install in your maintenance window. Choose Stable, or Beta for nightly builds. An update that would replace data asks you to confirm first. Admins get an email only when they need to act or something went wrong, plus an optional weekly what's new." },
+            { title: "Never waiting on an AWS admin", text: "Updates install without an AWS admin. When a release can do more with extra permissions, that is a separate, optional item with one link for an AWS admin, and the update never waits for it." },
+            { title: "Hybrid or fully private", text: "One choice for the whole install: CoderHelm's apps (easiest, the default), with events through CoderHelm's relay, or fully private. With CoderHelm's apps, Jira, Notion, Confluence, Google Drive, Figma and every app CoderHelm adds later work with no setup. A tool with its own app set up always uses it, and GitHub sign in has its own choice." },            { title: "Your models", text: "Amazon Bedrock in your account, with no API key anywhere, or each team's own Anthropic API key." },
             { title: "Serverless on AWS", text: "Lambda, API Gateway, SQS, DynamoDB, S3, CloudFront, Cognito and SES. No servers to patch, and no Rust or Docker needed to install." },
             { title: "Prefer a terminal?", text: "The installer asks a few questions, deploys the release and creates your GitHub App: `npx -y github:CoderHelm/coderhelm-platform init`, then `deploy`." },
           ],
