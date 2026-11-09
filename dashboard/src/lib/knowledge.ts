@@ -2,7 +2,7 @@
 // words the pages use for where each one is. Uploads reuse the signed-upload
 // helpers in ./brain.
 
-import { request } from "./api";
+import { ApiError, request } from "./api";
 import type { BaseInput, KnowledgeFile, KnowledgeLimits, SignedUpload } from "./brain";
 
 export { fileSize, uploadProblem, uploadToSignedUrl } from "./brain";
@@ -10,7 +10,74 @@ export type { BaseInput, KnowledgeLimits, SignedUpload } from "./brain";
 
 /** The apps a knowledge base can hold pages from, plus uploads. */
 export type SourceKind = "notion" | "confluence" | "sanity" | "google_drive" | "github" | "web";
-export type AddKind = SourceKind | "upload";
+/** What the add flow starts from: an app, uploads, or a Bedrock knowledge base connected in place. */
+export type AddKind = SourceKind | "upload" | "bedrock_kb";
+
+/** Where a base's passages are: kept here, or connected in place and searched live where it lives. */
+export type Backend =
+  | { kind: "local" }
+  | {
+      kind: "remote";
+      provider: "bedrock_kb";
+      /** "Bedrock knowledge base". */
+      label: string;
+      /** The knowledge base's ARN. */
+      target: string;
+      region: string;
+      account: string;
+      /** `install`: this install's own role; `account`: the team's role in that account. */
+      access: "install" | "account";
+      /** Bedrock's hybrid search is used (the vector store supports it). */
+      hybrid: boolean;
+    };
+
+/** A Bedrock knowledge base found in a self-hosted install's own account. */
+export interface BedrockListed {
+  arn: string;
+  id: string;
+  name: string;
+  description: string;
+  status: string;
+  updated_at: string;
+}
+
+/** What connecting a Bedrock knowledge base starts from. */
+export interface BedrockStart {
+  /** A self-hosted install, which lists its own account's knowledge bases. */
+  install: boolean;
+  install_account: string;
+  region: string;
+  /** Null when not listed (hosted, or the list failed: see list_error). */
+  bases: BedrockListed[] | null;
+  list_error: { message: string; fix: string; code: string } | null;
+  /** The team's connected AWS accounts. */
+  accounts: { account: string; region: string }[];
+  /** ARNs already connected by this team. */
+  connected: string[];
+}
+
+/** Why connecting failed, with what to do and (when the role only lacks the permission) the update that grants it. */
+export interface ConnectProblem {
+  message: string;
+  fix: string;
+  code: string;
+  grant: { url: string; stack_name: string; account: string } | null;
+}
+
+/** A failed connect, read from the gateway's answer. */
+export function connectProblem(e: unknown, fallback: string): ConnectProblem {
+  const body = e instanceof ApiError ? e.body : undefined;
+  const grant = body?.grant as ConnectProblem["grant"] | undefined;
+  return {
+    message: e instanceof Error && e.message ? e.message : fallback,
+    fix: typeof body?.fix === "string" ? body.fix : "",
+    code: typeof body?.code === "string" ? body.code : "",
+    grant: grant && typeof grant.url === "string" && grant.url.startsWith("https://console.aws.amazon.com/") ? grant : null,
+  };
+}
+
+/** A Bedrock knowledge base ARN, as the gateway accepts it. */
+export const KB_ARN = /^arn:aws:bedrock:[a-z0-9-]+:\d{12}:knowledge-base\/[A-Z0-9]{10}$/;
 
 export type SourceStatus = "queued" | "syncing" | "ready" | "error";
 
@@ -93,6 +160,13 @@ export interface Base {
   synced: number;
   kinds: AddKind[];
   sources: SourceSummary[];
+  /** Absent from an older gateway: kept here. */
+  backend?: Backend;
+}
+
+/** The base is connected in place (searched live where it lives, nothing copied). */
+export function connectedInPlace(b: Pick<Base, "backend"> | null | undefined): b is Base & { backend: Extract<Backend, { kind: "remote" }> } {
+  return b?.backend?.kind === "remote";
 }
 
 export interface Item extends KnowledgeFile {
@@ -181,7 +255,7 @@ export const knowledge = {
     request<{ base: Base; files: Item[]; sources: Source[]; can_manage: boolean; limits: KnowledgeLimits; visibility_note: string }>(
       `/api/knowledge/${e(id)}`,
     ),
-  create: (input: BaseInput & { source?: SourceInput }) =>
+  create: (input: BaseInput & { source?: SourceInput; connect?: { provider: "bedrock_kb"; target: string } }) =>
     request<{ base: Base; source: Source | null; setup: WebhookSetup | null }>("/api/knowledge", post(input)),
   update: (id: string, input: BaseInput) => request<{ base: Base }>(`/api/knowledge/${e(id)}`, put(input)),
   remove: (id: string) => request<{ ok: boolean }>(`/api/knowledge/${e(id)}`, { method: "DELETE" }),
@@ -191,6 +265,10 @@ export const knowledge = {
     request<{ file: Item }>(`/api/knowledge/${e(id)}/files/${e(fileId)}/uploaded`, { method: "POST" }),
   removeFile: (id: string, fileId: string) => request<{ ok: boolean }>(`/api/knowledge/${e(id)}/files/${e(fileId)}`, { method: "DELETE" }),
 
+  /** One test search of a base connected in place, now. */
+  check: (id: string) => request<{ ok: boolean; hybrid: boolean; checked_at: string }>(`/api/knowledge/${e(id)}/check`, { method: "POST" }),
+  /** Connecting a Bedrock knowledge base: the install's own list (self-hosted) and the team's AWS accounts. */
+  bedrock: () => request<BedrockStart>("/api/knowledge/bedrock"),
   connectors: () => request<{ connectors: Connector[]; visibility_note: string }>("/api/knowledge/connectors"),
   connect: (kind: SourceKind) => request<{ authorize_url: string }>(`/api/knowledge/connectors/${e(kind)}/connect`, { method: "POST" }),
   /** Your own sign-in for an app (Sanity): already signed in, or where to send the sign-in window. */
@@ -230,6 +308,7 @@ export const KIND_LABEL: Record<AddKind, string> = {
   github: "GitHub",
   web: "Website",
   upload: "Files",
+  bedrock_kb: "Bedrock knowledge base",
 };
 
 /** What one item of a kind is called: "page", "document", "file". */

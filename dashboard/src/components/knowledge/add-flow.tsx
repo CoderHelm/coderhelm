@@ -8,8 +8,10 @@ import { Select } from "@/components/select";
 import { buttonClass, focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { errorMessage } from "@/lib/data-sources";
 import {
+  KB_ARN,
   KIND_LABEL,
   READ_SENTENCE,
+  connectProblem,
   fileSize,
   itemWord,
   knowledge,
@@ -21,6 +23,8 @@ import {
   uploadToSignedUrl,
   type AddKind,
   type Base,
+  type BedrockStart,
+  type ConnectProblem,
   type Connector,
   type Item,
   type KnowledgeLimits,
@@ -52,8 +56,13 @@ import { AskAdmin, ConfluenceSteps, ConnectLoading, IntegrationsLink, NoTokenPat
 // on this install, Notion and Confluence connect with a pasted token right
 // here (admins and owners), and Google Drive says its sign-in isn't set up
 // and who can set it up (with the steps for a platform admin).
+//
+// A Bedrock knowledge base is connected in place, only as a new knowledge
+// base: paste its ARN (a self-hosted install also lists its own account's),
+// name it, and one test search runs before anything is saved. It is then
+// searched live in the team's AWS account; nothing is copied.
 
-type Step = "choose" | "connect" | "pick" | "upload" | "name" | "progress";
+type Step = "choose" | "connect" | "pick" | "upload" | "bedrock" | "name" | "progress";
 
 export type FlowMode = { kind: "create" } | { kind: "add"; base: Base };
 
@@ -116,6 +125,9 @@ export function AddFlow({
   /** An app was chosen before the connections loaded: decide its step when they arrive. */
   const [deciding, setDeciding] = useState(false);
   const [tokenNote, setTokenNote] = useState("");
+  const [arn, setArn] = useState("");
+  const [arnName, setArnName] = useState("");
+  const [problem, setProblem] = useState<ConnectProblem | null>(null);
   const { can, me } = useCan();
   const canSaveToken = can("integrations");
   const installAdmin = me?.platform_admin === true;
@@ -129,9 +141,9 @@ export function AddFlow({
     setSeenKey(openKey);
     if (openKey !== null) {
       const first = startWith ?? null;
-      setStep(first === null ? "choose" : first === "upload" ? "upload" : "connect");
+      setStep(first === null ? "choose" : first === "upload" ? "upload" : first === "bedrock_kb" ? "bedrock" : "connect");
       setKind(first);
-      setDeciding(first !== null && first !== "upload");
+      setDeciding(first !== null && first !== "upload" && first !== "bedrock_kb");
       setConnectors(null);
       setLoadError(null);
       setPicked([]);
@@ -146,6 +158,9 @@ export function AddFlow({
       setVia("team");
       setWaiting(false);
       setTokenNote("");
+      setArn("");
+      setArnName("");
+      setProblem(null);
     }
   }
 
@@ -182,7 +197,7 @@ export function AddFlow({
 
   // Chosen while loading: go on once the connections are here.
   useEffect(() => {
-    if (!deciding || !connectors || !kind || kind === "upload") return;
+    if (!deciding || !connectors || !kind || kind === "upload" || kind === "bedrock_kb") return;
     setDeciding(false);
     setStep(stepFor(connectors.find((x) => x.kind === kind)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -195,6 +210,11 @@ export function AddFlow({
     setTokenNote("");
     if (k === "upload") {
       setStep("upload");
+      return;
+    }
+    if (k === "bedrock_kb") {
+      setProblem(null);
+      setStep("bedrock");
       return;
     }
     setVia("team");
@@ -217,7 +237,7 @@ export function AddFlow({
   // Signs in with your own account in a small window, then shows who you're
   // connected as. The flow stays where it is.
   const memberSignIn = async () => {
-    if (!kind || kind === "upload") return;
+    if (!kind || kind === "upload" || kind === "bedrock_kb") return;
     setError(null);
     setWaiting(true);
     try {
@@ -243,7 +263,7 @@ export function AddFlow({
   };
 
   const signIn = async () => {
-    if (!kind || kind === "upload") return;
+    if (!kind || kind === "upload" || kind === "bedrock_kb") return;
     setBusy(true);
     setError(null);
     try {
@@ -259,8 +279,32 @@ export function AddFlow({
 
   const afterPick = () => {
     if (!kind) return;
-    if (!named) setName(suggestName(kind, picked, files.map((f) => f.file)));
+    if (!named) setName(kind === "bedrock_kb" ? arnName || KIND_LABEL.bedrock_kb : suggestName(kind, picked, files.map((f) => f.file)));
+    setProblem(null);
     setStep("name");
+  };
+
+  // Connected in place: one test search, then the base exists and opens.
+  const connectBedrock = async () => {
+    setBusy(true);
+    setProblem(null);
+    try {
+      const r = await knowledge.create({
+        name: name.trim() || arnName || KIND_LABEL.bedrock_kb,
+        description: "",
+        read_role: readRole,
+        attach_team: true,
+        agents: [],
+        authoritative: false,
+        connect: { provider: "bedrock_kb", target: arn.trim() },
+      });
+      onOpenChange(false);
+      onDone(r.base.id);
+    } catch (e) {
+      setProblem(connectProblem(e, "That didn't work. Try again."));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const addFiles = (list: File[]) => {
@@ -290,6 +334,7 @@ export function AddFlow({
 
   const finish = async () => {
     if (!kind) return;
+    if (kind === "bedrock_kb") return connectBedrock();
     setBusy(true);
     setError(null);
     try {
@@ -333,10 +378,12 @@ export function AddFlow({
         ? deciding
           ? label
           : `Connect ${label}`
-        : step === "pick" && kind && kind !== "upload"
+        : step === "pick" && kind && kind !== "upload" && kind !== "bedrock_kb"
           ? PICK_TITLE[kind]
           : step === "upload"
             ? "Upload files"
+            : step === "bedrock"
+              ? "Connect a Bedrock knowledge base"
             : step === "name"
               ? creating
                 ? "Name your knowledge base"
@@ -352,7 +399,8 @@ export function AddFlow({
   const back = () => {
     setError(null);
     setDeciding(false);
-    if (step === "name") setStep(kind === "upload" ? "upload" : "pick");
+    setProblem(null);
+    if (step === "name") setStep(kind === "upload" ? "upload" : kind === "bedrock_kb" ? "bedrock" : "pick");
     else if (step === "pick" && conn?.member_sign_in) setStep("connect");
     else setStep("choose");
   };
@@ -373,9 +421,14 @@ export function AddFlow({
             Continue
           </button>
         )}
+        {step === "bedrock" && (
+          <button type="button" onClick={afterPick} className={primaryButton} disabled={!KB_ARN.test(arn.trim())} data-testid="flow-continue">
+            Continue
+          </button>
+        )}
         {step === "name" && (
           <button type="button" onClick={finish} className={primaryButton} disabled={busy || (creating && !name.trim())} data-testid="flow-finish">
-            {busy ? "Working…" : creating ? "Create knowledge base" : "Add to knowledge base"}
+            {busy ? (kind === "bedrock_kb" ? "Checking the connection…" : "Working…") : kind === "bedrock_kb" ? "Connect knowledge base" : creating ? "Create knowledge base" : "Add to knowledge base"}
           </button>
         )}
       </div>
@@ -385,12 +438,12 @@ export function AddFlow({
     <Modal open={open} onOpenChange={onOpenChange} title={title} wide={step === "pick" && kind !== "web" ? "xl" : true} footer={footer} testId="add-flow">
       <div data-step={step} data-testid="flow-step" className="animate-[kn-fade_160ms_ease-out] motion-reduce:animate-none">
         {step === "choose" && (
-          <ChooseStep connectors={connectors} loadError={loadError} onRetry={loadConnectors} onChoose={(k) => choose(k)} />
+          <ChooseStep connectors={connectors} loadError={loadError} onRetry={loadConnectors} onChoose={(k) => choose(k)} creating={creating} />
         )}
 
-        {step === "connect" && kind && kind !== "upload" && deciding && <ConnectLoading kind={kind} error={loadError} onRetry={loadConnectors} />}
+        {step === "connect" && kind && kind !== "upload" && kind !== "bedrock_kb" && deciding && <ConnectLoading kind={kind} error={loadError} onRetry={loadConnectors} />}
 
-        {step === "connect" && kind && kind !== "upload" && !deciding && conn?.member_sign_in && (
+        {step === "connect" && kind && kind !== "upload" && kind !== "bedrock_kb" && !deciding && conn?.member_sign_in && (
           <SignInStep
             kind={kind}
             conn={conn}
@@ -403,7 +456,7 @@ export function AddFlow({
           />
         )}
 
-        {step === "connect" && kind && kind !== "upload" && !deciding && !conn?.member_sign_in && (
+        {step === "connect" && kind && kind !== "upload" && kind !== "bedrock_kb" && !deciding && !conn?.member_sign_in && (
           <ConnectStep
             kind={kind}
             conn={conn}
@@ -417,12 +470,23 @@ export function AddFlow({
           />
         )}
 
-        {step === "pick" && kind && kind !== "upload" && tokenNote && (
+        {step === "pick" && kind && kind !== "upload" && kind !== "bedrock_kb" && tokenNote && (
           <p className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm leading-relaxed text-amber-200" role="status" data-testid="token-note">
             {tokenNote}
           </p>
         )}
-        {step === "pick" && kind && kind !== "upload" && <Picker kind={kind} value={picked} onChange={setPicked} via={via} />}
+        {step === "pick" && kind && kind !== "upload" && kind !== "bedrock_kb" && <Picker kind={kind} value={picked} onChange={setPicked} via={via} />}
+
+        {step === "bedrock" && (
+          <BedrockStep
+            arn={arn}
+            onArn={(v, listedName) => {
+              setArn(v);
+              setArnName(listedName ?? "");
+              setNamed(false);
+            }}
+          />
+        )}
 
         {step === "upload" && <UploadStep limits={limits} files={files} onAdd={addFiles} onRemove={(k) => setFiles((f) => f.filter((x) => x.key !== k))} error={error} />}
 
@@ -430,10 +494,19 @@ export function AddFlow({
           <div className="space-y-6" data-testid="name-step">
             <div className="flex items-center gap-3">
               <SourceLogo kind={kind} size="lg" />
-              <p className="text-sm text-zinc-300">
-                {kind === "upload"
-                  ? `${files.length} file${files.length === 1 ? "" : "s"} to upload`
-                  : `${picked.length} ${picked.length === 1 ? "item" : "items"} from ${label}${picked.some((p) => p.include_children) && kind !== "web" ? ", with everything inside" : ""}`}
+              <p className="min-w-0 text-sm text-zinc-300">
+                {kind === "bedrock_kb" ? (
+                  <span className="block wrap-anywhere" data-testid="connect-summary">
+                    Connected in place: searched live in your AWS account, nothing copied.
+                    <span className="mt-1 block text-xs">
+                      <Code>{arn.trim()}</Code>
+                    </span>
+                  </span>
+                ) : kind === "upload" ? (
+                  `${files.length} file${files.length === 1 ? "" : "s"} to upload`
+                ) : (
+                  `${picked.length} ${picked.length === 1 ? "item" : "items"} from ${label}${picked.some((p) => p.include_children) && kind !== "web" ? ", with everything inside" : ""}`
+                )}
               </p>
             </div>
             {creating && (
@@ -479,7 +552,7 @@ export function AddFlow({
                 )}
               </div>
             )}
-            {via === "sign_in" && kind !== "upload" && (
+            {via === "sign_in" && kind !== "upload" && kind !== "bedrock_kb" && (
               <p className="text-sm leading-relaxed text-zinc-400" data-testid="signin-note">
                 It stays up to date through your {label} sign-in, checking for changes every 15 minutes. If your sign-in stops working, any admin can sign in again.
               </p>
@@ -490,7 +563,11 @@ export function AddFlow({
                   <circle cx="12" cy="12" r="9" />
                   <path d="M12 8h.01M11 12h1v4h1" />
                 </svg>
-                <span>{note || "Everyone who can read this knowledge base can read what you add, even if they can't open it in the app it comes from."}</span>
+                <span>
+                  {kind === "bedrock_kb"
+                    ? "Everyone who can read this knowledge base sees what a search of it returns, even documents they couldn't open where they came from. Agents it is attached to search it for anyone who starts a run."
+                    : note || "Everyone who can read this knowledge base can read what you add, even if they can't open it in the app it comes from."}
+                </span>
               </p>
             )}
             {error && (
@@ -498,6 +575,7 @@ export function AddFlow({
                 {error}
               </p>
             )}
+            {problem && <ConnectProblemNote problem={problem} />}
           </div>
         )}
 
@@ -523,11 +601,14 @@ function ChooseStep({
   loadError,
   onRetry,
   onChoose,
+  creating,
 }: {
   connectors: Connector[] | null;
   loadError: string | null;
   onRetry: () => void;
   onChoose: (k: AddKind) => void;
+  /** A new knowledge base: it can also be a Bedrock one, connected in place. */
+  creating: boolean;
 }) {
   return (
     <div data-testid="choose-step">
@@ -579,6 +660,146 @@ function ChooseStep({
           <span className="block text-xs text-zinc-400">PDF, Word, Markdown, text, spreadsheets or web pages</span>
         </span>
       </button>
+      {creating && (
+        <button
+          type="button"
+          onClick={() => onChoose("bedrock_kb")}
+          data-testid="tile-bedrock_kb"
+          className={`mt-3 flex w-full items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 text-left transition hover:border-zinc-600 hover:bg-zinc-800/60 motion-reduce:transition-none ${focusRing}`}
+        >
+          <SourceLogo kind="bedrock_kb" size="lg" />
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-zinc-100">Bedrock knowledge base</span>
+            <span className="block text-xs text-zinc-400">Already in Amazon Bedrock? Connect it in place: searched live in your AWS account, nothing copied.</span>
+          </span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Paste a knowledge base's ARN, or (self-hosted) pick one of the install account's. */
+function BedrockStep({ arn, onArn }: { arn: string; onArn: (arn: string, listedName?: string) => void }) {
+  const [start, setStart] = useState<BedrockStart | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  useEffect(() => {
+    let stop = false;
+    knowledge
+      .bedrock()
+      .then((r) => !stop && setStart(r))
+      .catch((e) => !stop && setLoadError(errorMessage(e, "Couldn't load your AWS accounts.")));
+    return () => {
+      stop = true;
+    };
+  }, []);
+  const trimmed = arn.trim();
+  const bad = trimmed !== "" && !KB_ARN.test(trimmed);
+  const taken = !!start?.connected.includes(trimmed);
+  const account = KB_ARN.test(trimmed) ? trimmed.split(":")[4] : "";
+  const reachable = !account || account === start?.install_account || !!start?.accounts.some((a) => a.account === account);
+  return (
+    <div className="space-y-5" data-testid="bedrock-step">
+      <p className="text-sm leading-relaxed text-zinc-400">
+        Coderhelm searches the knowledge base live in your AWS account whenever Chat or an agent needs it. Nothing is copied, and Bedrock does its own search, so its embedding model and vector store don&apos;t matter.
+      </p>
+      {start?.install && (
+        <div data-testid="bedrock-list">
+          <p className="mb-2 text-sm font-medium text-zinc-300">In this install&apos;s account ({start.region})</p>
+          {start.bases === null ? (
+            start.list_error && (
+              <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm leading-relaxed text-amber-200" role="status" data-testid="bedrock-list-error">
+                {start.list_error.message} {start.list_error.fix}
+              </p>
+            )
+          ) : start.bases.length === 0 ? (
+            <p className="text-sm text-zinc-400" data-testid="bedrock-list-empty">
+              No knowledge bases in this account and region. Paste the ARN of one elsewhere below.
+            </p>
+          ) : (
+            <ul className="max-h-60 divide-y divide-zinc-800 overflow-y-auto rounded-xl border border-zinc-800" role="radiogroup" aria-label="Knowledge bases in this account">
+              {start.bases.map((b) => {
+                const on = trimmed === b.arn;
+                const used = start.connected.includes(b.arn);
+                return (
+                  <li key={b.arn}>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      disabled={used}
+                      onClick={() => onArn(b.arn, b.name)}
+                      data-testid="bedrock-option"
+                      className={`flex w-full min-w-0 items-center gap-3 px-3 py-2.5 text-left transition-colors motion-reduce:transition-none disabled:opacity-50 ${focusRing} ${on ? "bg-zinc-800" : "hover:bg-zinc-800/60"}`}
+                    >
+                      <span aria-hidden="true" className={`h-3.5 w-3.5 shrink-0 rounded-full border ${on ? "border-emerald-400 bg-emerald-400" : "border-zinc-600"}`} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm text-zinc-100">{b.name}</span>
+                        <span className="block truncate text-xs text-zinc-400">{used ? "Already connected" : b.description || b.id}</span>
+                      </span>
+                      {b.status !== "ACTIVE" && <span className="shrink-0 text-xs text-amber-300">{b.status.toLowerCase()}</span>}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+      <label className="block">
+        <span className="mb-2 block text-sm font-medium text-zinc-300">Knowledge base ARN</span>
+        <input
+          className={`${inputClass} text-sm`}
+          value={arn}
+          onChange={(e) => onArn(e.target.value)}
+          placeholder="arn:aws:bedrock:us-east-1:111122223333:knowledge-base/ABCDE12345"
+          spellCheck={false}
+          autoComplete="off"
+          data-testid="bedrock-arn"
+          aria-invalid={bad || taken}
+          autoFocus={!start?.install}
+        />
+        <span className="mt-1.5 block text-xs text-zinc-400">On the knowledge base&apos;s page in the Bedrock console. Its region and account are part of it.</span>
+      </label>
+      {bad && (
+        <p className="text-sm text-amber-300" role="alert" data-testid="bedrock-arn-bad">
+          That isn&apos;t a knowledge base ARN. It looks like arn:aws:bedrock:us-east-1:111122223333:knowledge-base/ABCDE12345.
+        </p>
+      )}
+      {taken && (
+        <p className="text-sm text-amber-300" role="alert">
+          That knowledge base is already connected.
+        </p>
+      )}
+      {start && !reachable && (
+        <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm leading-relaxed text-amber-200" data-testid="bedrock-account-missing">
+          AWS account {account} isn&apos;t connected to Coderhelm. Connect it on{" "}
+          <Link href="/settings/integrations/aws" className={linkButton} target="_blank" rel="noopener noreferrer">
+            Integrations, AWS
+          </Link>{" "}
+          first: Coderhelm searches with that account&apos;s read-only CoderHelmLogReader role and your team&apos;s private ID.
+        </p>
+      )}
+      {loadError && <p className="text-sm text-amber-300">{loadError}</p>}
+    </div>
+  );
+}
+
+/** Why connecting failed, what to do, and the update that grants the role access when that is all it lacks. */
+export function ConnectProblemNote({ problem }: { problem: ConnectProblem }) {
+  return (
+    <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm leading-relaxed" role="alert" data-testid="connect-problem" data-code={problem.code}>
+      <p className="font-medium text-red-200">{problem.message}</p>
+      {problem.fix && <p className="mt-1 text-zinc-300">{problem.fix}</p>}
+      {problem.grant && (
+        <div className="mt-3 space-y-2">
+          <a href={problem.grant.url} target="_blank" rel="noopener noreferrer" className={buttonClass("secondary", "sm")} data-testid="connect-grant">
+            Open the update in AWS
+          </a>
+          <p className="text-xs text-zinc-400">
+            Sign in to AWS account {problem.grant.account} and create the stack {problem.grant.stack_name}. It lets the CoderHelmLogReader role search this knowledge base and the others you connected there, read-only. Then connect again.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

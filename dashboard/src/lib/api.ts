@@ -21,7 +21,14 @@ export function httpErrorMessage(status: number): string {
 
 /** A failed request, with its HTTP status for pages that branch on it. */
 export class ApiError extends Error {
-  constructor(message: string, readonly status: number, readonly code?: string, readonly url?: string) {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+    readonly url?: string,
+    /** The whole JSON answer, for a page that shows more than the message (a fix, a link). */
+    readonly body?: Record<string, unknown>,
+  ) {
     super(message);
     this.name = "ApiError";
   }
@@ -47,8 +54,10 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
     let serverMsg = "";
     let serverCode: string | undefined;
     let serverUrl: string | undefined;
+    let parsedBody: Record<string, unknown> | undefined;
     try {
       const parsed = body ? JSON.parse(body) : {};
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) parsedBody = parsed;
       serverMsg = parsed.error || "";
       serverCode = typeof parsed.code === "string" ? parsed.code : undefined;
       serverUrl = typeof parsed.url === "string" ? parsed.url : undefined;
@@ -62,7 +71,7 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
     if (res.status === 403 && serverCode === "team_moved" && typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent(TEAM_MOVED, { detail: movedUrl(serverUrl) }));
     }
-    throw new ApiError(serverMsg || httpErrorMessage(res.status), res.status, serverCode, serverUrl);
+    throw new ApiError(serverMsg || httpErrorMessage(res.status), res.status, serverCode, serverUrl, parsedBody);
   }
   const text = await res.text();
   return text ? JSON.parse(text) : (undefined as T);
