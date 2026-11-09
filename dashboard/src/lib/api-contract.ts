@@ -6,7 +6,7 @@
 // Nothing here runs; it is checked by the compiler only.
 
 import type { OpenApiFields } from "./openapi-fields";
-import type { AnswerRunResult, Plan, ReviewSession, Run, RunAnswer, RunDetail, RunDraftHold, RunDraftHoldReason, RunQuestion, RunTrigger, SessionStep, Task, api } from "./api";
+import type { ActivityGroup, ActivityItem, AnswerRunResult, OverviewFile, Plan, ReviewOverview, ReviewSession, Run, RunAnswer, RunDetail, RunDraftHold, RunDraftHoldReason, RunQuestion, RunTrigger, SessionStep, Task, api } from "./api";
 
 type Answer<K extends keyof typeof api> = Awaited<ReturnType<(typeof api)[K]>>;
 
@@ -39,3 +39,8 @@ export type TaskContract = None<Undocumented<Task, "PlanTask">>;
 // A review's session (the page a PR's "Coderhelm review" check links to).
 export type ReviewSessionContract = None<Undocumented<ReviewSession, "ReviewSession">>;
 export type SessionStepContract = None<Undocumented<SessionStep, "SessionStep">>;
+// What the reviewer did while it read the PR, and the overview it posted.
+export type ActivityGroupContract = None<Undocumented<ActivityGroup, "ActivityGroup">>;
+export type ActivityItemContract = None<Undocumented<ActivityItem, "ActivityItem">>;
+export type ReviewOverviewContract = None<Undocumented<ReviewOverview, "ReviewOverview">>;
+export type OverviewFileContract = None<Undocumented<OverviewFile, "OverviewFile">>;

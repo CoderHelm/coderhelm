@@ -2,10 +2,12 @@
 // docs/api/openapi.json. Do not edit; run `npm run openapi:fields` instead.
 
 /** The platform commit this was generated from. */
-export const OPENAPI_REF = "bb81e2c5e8aa6a7eb152dbd602bc5406abc84aee";
+export const OPENAPI_REF = "96909edf327a381888d554ebd42c1a111147a6c7";
 
 /** The fields each public API schema has. */
 export interface OpenApiFields {
+  ActivityGroup: "ended_at" | "items" | "kind" | "started_at" | "text" | "title";
+  ActivityItem: "at" | "detail" | "failed" | "label";
   AnswerRun: "answers";
   AnswerRunResult: "comment_url" | "posted" | "run_id" | "status";
   Backfill: "complete";
@@ -37,6 +39,7 @@ export interface OpenApiFields {
   MeApiKey: "created_by" | "expires_at" | "id" | "name" | "rate_limit_per_minute";
   MeFlags: "plugins";
   NewPlanTask: "acceptance_criteria" | "description" | "destination" | "jira_project" | "repo" | "title";
+  OverviewFile: "description" | "path";
   Plan: "chat_id" | "created_at" | "description" | "destination" | "executed_at" | "executed_by" | "mcp_servers" | "plan_id" | "repo" | "status" | "task_count" | "title" | "tokens_in" | "tokens_out" | "updated_at";
   PlanDestination: never;
   PlanExecution: "status" | "tasks_queued";
@@ -56,7 +59,8 @@ export interface OpenApiFields {
   ReposList: "repos";
   Review: "action_summary" | "applied_standards" | "body" | "created_at" | "findings" | "head_sha" | "posted_as" | "pr_number" | "pr_title" | "rating_comments" | "repo" | "risk" | "sk" | "thumbs_down" | "thumbs_up" | "trigger" | "verdict";
   ReviewFinding: "blocks" | "body" | "category" | "end_line" | "evidence" | "file" | "line" | "lookups" | "severity" | "suggestion" | "title";
-  ReviewSession: "attempt" | "check_run_id" | "findings" | "finished_at" | "head_sha" | "id" | "in_flight" | "kind" | "pr_number" | "pr_title" | "reason" | "repo" | "review_url" | "started_at" | "status" | "steps" | "trigger" | "verdict";
+  ReviewOverview: "changes" | "files" | "files_total" | "summary";
+  ReviewSession: "activity" | "activity_dropped" | "attempt" | "check_run_id" | "findings" | "finished_at" | "head_sha" | "id" | "in_flight" | "kind" | "overview" | "pr_number" | "pr_title" | "reason" | "repo" | "review_url" | "started_at" | "status" | "steps" | "trigger" | "verdict";
   ReviewsPage: "next" | "reviews";
   RotateBody: "overlap_hours";
   RotatedSecret: "previous_secret_expires_at" | "secret";

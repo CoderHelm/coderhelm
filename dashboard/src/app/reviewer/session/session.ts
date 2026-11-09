@@ -112,3 +112,60 @@ export function findingsLabel(n: number | null | undefined): string | null {
 export function sessionHref(id: string): string {
   return `/reviewer/session?${new URLSearchParams({ id })}`;
 }
+
+/** One row of the activity timeline: a session step, or a group of what the reviewer did. */
+export type TimelineEntry<S, G> = { kind: "step"; at: string; step: S } | { kind: "group"; at: string; group: G };
+
+/**
+ * The session's steps (setup, posting) and the reviewer's activity groups in
+ * one list, oldest first. A step and a group at the same moment keep the
+ * step first; entries without a readable time keep their place after the
+ * ones before them.
+ */
+export function timeline<S extends { at: string }, G extends { started_at: string }>(
+  steps: S[],
+  groups: G[],
+): TimelineEntry<S, G>[] {
+  const keyed: { entry: TimelineEntry<S, G>; order: number; t: number }[] = [];
+  let last = -Infinity;
+  steps.forEach((step, i) => {
+    const t = ms(step.at) ?? last;
+    last = t;
+    keyed.push({ entry: { kind: "step", at: step.at, step }, order: i, t });
+  });
+  last = -Infinity;
+  groups.forEach((group, i) => {
+    const t = ms(group.started_at) ?? last;
+    last = t;
+    keyed.push({ entry: { kind: "group", at: group.started_at, group }, order: i, t });
+  });
+  keyed.sort(
+    (a, b) =>
+      a.t - b.t || (a.entry.kind === b.entry.kind ? a.order - b.order : a.entry.kind === "step" ? -1 : 1),
+  );
+  return keyed.map((k) => k.entry);
+}
+
+/** The activity card's heading, by how the review stands. */
+export function activityHeading(status: string, kind = "review"): string {
+  const answering = kind === "question";
+  if (status === "reviewing") return answering ? "Reading the comment" : "Reviewing pull request";
+  if (status === "done") return answering ? "Read the comment" : "Reviewed pull request";
+  if (status === "skipped") return "Looked at the pull request";
+  return answering ? "Reading the comment" : "Reviewing pull request";
+}
+
+/** "+1m 4s" from the session's start; empty without a time. */
+export function offsetLabel(startedAt: string, at: string, format: (s: number) => string): string {
+  const s = stepOffset(startedAt, at);
+  return s === null ? "" : `+${format(s)}`;
+}
+
+/** "3 more steps weren't recorded" past the review's cap; null when none were left out. */
+export function droppedNote(n: number | null | undefined): string | null {
+  if (!n || n <= 0) return null;
+  return n === 1 ? "1 more step wasn't recorded." : `${n} more steps weren't recorded.`;
+}
+
+/** Above this many files the overview's table starts folded, as on GitHub. */
+export const OVERVIEW_FOLD_AFTER = 15;
