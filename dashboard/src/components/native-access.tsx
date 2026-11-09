@@ -56,7 +56,45 @@ export function NativeAccessCard({ access }: { access: NativeAccess | null | und
   const lines = access.summary ?? [];
   const link = safeAccessLink(access.link);
   const existing = safeConsoleLink(access.existing?.link);
-  const creating = /_IN_PROGRESS$/.test(access.existing?.status ?? "") && !/DELETE/.test(access.existing?.status ?? "");
+  const status = access.existing?.status ?? "";
+  // This release's own stack, made a moment ago: the card goes once the next read sees it applied.
+  const justMade = !!access.existing?.version && access.existing.version === access.version && /_COMPLETE$/.test(status) && !/ROLLBACK|DELETE/.test(status);
+  const creating = (/_IN_PROGRESS$/.test(status) && !/DELETE/.test(status)) || justMade;
+  const deleting = status === "DELETE_IN_PROGRESS";
+  // A stack of that name blocks the create link (CloudFormation refuses a
+  // second one), so the link shows only once it's gone. Only a stack a
+  // release's access.json made is ever called safe to delete.
+  const blocked = !!access.existing && !creating;
+  const ours = access.existing?.kind !== "other";
+  if (deleting) {
+    return (
+      <div data-testid="native-access" data-state="deleting">
+        <Callout variant="info" title="Deleting the old access stack…">
+          <p>
+            AWS is deleting <Code className="text-xs">{access.stack}</Code>. When it&apos;s done, this card shows the link that creates the new one.
+          </p>
+        </Callout>
+      </div>
+    );
+  }
+  if (blocked && !ours) {
+    return (
+      <div data-testid="native-access" data-state="name-taken">
+        <Callout variant="warning" title="Optional: allow more AWS access">
+          <p>
+            {access.version ?? "This release"} can read more of your AWS account if an AWS admin allows it, but a stack named{" "}
+            <Code className="text-xs">{access.stack}</Code> already exists and wasn&apos;t made by a Coderhelm release. Don&apos;t delete it: it may hold this
+            install&apos;s permissions. Ask Coderhelm support how to apply this release&apos;s permissions on your install.
+          </p>
+          {existing ? (
+            <p className="mt-2">
+              <a href={existing} target="_blank" rel="noopener noreferrer" className={linkButton} data-testid="native-access-existing-link">Open {access.stack}</a>
+            </p>
+          ) : null}
+        </Callout>
+      </div>
+    );
+  }
   if (creating) {
     return (
       <div data-testid="native-access" data-state="creating">
@@ -74,19 +112,33 @@ export function NativeAccessCard({ access }: { access: NativeAccess | null | und
         <p>
           Your update is done and nothing here is required. {access.version ?? "This release"} can read more of your AWS account if an AWS admin allows it.
         </p>
-        {access.existing ? (
-          <p className="mt-2" data-testid="native-access-existing">
-            First delete the stack <Code className="text-xs">{access.stack}</Code> left from an earlier change (deleting it changes nothing).{" "}
-            {existing ? <a href={existing} target="_blank" rel="noopener noreferrer" className={linkButton}>Open {access.stack}</a> : null}
-          </p>
-        ) : null}
-        <ol className="mt-2 list-decimal space-y-1 pl-5" data-testid="native-access-steps">
-          <li>Sign in to the AWS console as an admin of this account.</li>
-          <li>Click <strong>Open in the AWS console</strong> below. It opens a new stack, {access.stack ? <Code className="text-xs">{access.stack}</Code> : "this install's access stack"}, with everything filled in.</li>
-          <li>At the bottom, tick the box that says it creates IAM resources, then click <strong>Create stack</strong>.</li>
-          <li>Wait about a minute for CREATE_COMPLETE. This card then goes away by itself.</li>
-        </ol>
-        {link ? (
+        {blocked ? (
+          <>
+            <p className="mt-2" data-testid="native-access-existing">
+              First delete the stack <Code className="text-xs">{access.stack}</Code>
+              {access.existing?.version ? <> that {access.existing.version} made</> : " left from an earlier change"}. Deleting it changes nothing: the permissions it
+              wrote stay. AWS can&apos;t create the new one while it exists.
+            </p>
+            <ol className="mt-2 list-decimal space-y-1 pl-5" data-testid="native-access-steps">
+              <li>Sign in to the AWS console as an admin of this account.</li>
+              <li>Click <strong>Open {access.stack}</strong> below, then <strong>Delete</strong>, and confirm.</li>
+              <li>Come back here. Once it&apos;s deleted, this card shows the link that creates the new one.</li>
+            </ol>
+            {existing ? (
+              <p className="mt-3">
+                <a href={existing} target="_blank" rel="noopener noreferrer" className={primaryButton} data-testid="native-access-existing-link">Open {access.stack}</a>
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <ol className="mt-2 list-decimal space-y-1 pl-5" data-testid="native-access-steps">
+            <li>Sign in to the AWS console as an admin of this account.</li>
+            <li>Click <strong>Open in the AWS console</strong> below. It opens a new stack, {access.stack ? <Code className="text-xs">{access.stack}</Code> : "this install's access stack"}, with everything filled in.</li>
+            <li>At the bottom, tick the box that says it creates IAM resources, then click <strong>Create stack</strong>.</li>
+            <li>Wait about a minute for CREATE_COMPLETE. This card then goes away by itself.</li>
+          </ol>
+        )}
+        {link && !blocked ? (
           <p className="mt-3">
             <a href={link} target="_blank" rel="noopener noreferrer" className={primaryButton} data-testid="native-access-link">Open in the AWS console</a>
           </p>
