@@ -376,10 +376,12 @@ export const knowledge = {
   finishArchive: (kbId: string, sourceId: string) =>
     request<{ source: Source }>(`/api/knowledge/${e(kbId)}/archives/${e(sourceId)}/uploaded`, { method: "POST" }),
   connectors: () => request<{ connectors: Connector[]; visibility_note: string }>("/api/knowledge/connectors"),
-  connect: (kind: SourceKind) => request<{ authorize_url: string }>(`/api/knowledge/connectors/${e(kind)}/connect`, { method: "POST" }),
+  /** Starts the team's sign-in; the API keeps this page as where the callback returns to. */
+  connect: (kind: SourceKind) =>
+    request<{ authorize_url: string }>(`/api/knowledge/connectors/${e(kind)}/connect`, { method: "POST", body: JSON.stringify({ return_to: herePath() }) }),
   /** Your own sign-in for an app (Sanity): already signed in, or where to send the sign-in window. */
   signIn: (kind: SourceKind) =>
-    request<{ signed_in: boolean; authorize_url?: string }>(`/api/knowledge/connectors/${e(kind)}/signin`, { method: "POST" }),
+    request<{ signed_in: boolean; authorize_url?: string }>(`/api/knowledge/connectors/${e(kind)}/signin`, { method: "POST", body: JSON.stringify({ return_to: herePath() }) }),
   /** Checks a pasted token with the app and saves it the way Integrations does (admins and owners). */
   saveToken: (kind: SourceKind, input: TokenInput) =>
     request<{ connected: boolean; shared: number | null; warning: string }>(`/api/knowledge/connectors/${e(kind)}/token`, post(input)),
@@ -551,6 +553,12 @@ export function suggestName(kind: AddKind, picked: { title: string }[], files: {
 }
 
 // ── Coming back from a sign-in ───────────────────────────────────────
+
+/** This page's path and query, which a sign-in started here returns to. */
+export function herePath(): string {
+  if (typeof window === "undefined") return "";
+  return `${window.location.pathname}${window.location.search}`;
+}
 
 const RETURN_KEY = "knowledge-return";
 

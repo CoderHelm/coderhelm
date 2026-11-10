@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCan } from "@/hooks/use-can";
 import { api, type Integration, type Repo } from "@/lib/api";
@@ -32,6 +32,14 @@ function safeHttpUrl(url: string | undefined): string | null {
     return null;
   }
 }
+
+/** What "Connect GitHub to link" did (?github_link=), as the API reports it. */
+const LINK_OUTCOMES: Record<string, { ok: boolean; text: string }> = {
+  linked: { ok: true, text: "GitHub is connected and the installation is linked to this team." },
+  not_admin: { ok: false, text: "GitHub is connected to your account, but only a team owner or admin can link the app's installation. Ask one of them to press Connect GitHub to link." },
+  owned_elsewhere: { ok: false, text: "That GitHub installation already belongs to another Coderhelm team, so it wasn't linked here. Remove it from that team first." },
+  none_visible: { ok: false, text: "GitHub showed your account no installation of the Coderhelm app. Press Install first, or ask an owner of the GitHub organization to install it." },
+};
 
 export default function GitHubSettingsPageGuarded() {
   return (
@@ -104,15 +112,55 @@ function GitHubSettingsPage() {
   }, []);
 
   // On mount: load the status, then finish an install GitHub sent us back from.
+  // GitHub's return is handled once: the stored state is used up the first
+  // time, so a second run (React runs effects twice in development) would
+  // otherwise report a mismatch over a link that worked.
+  const handled = useRef(false);
   useEffect(() => {
+    if (handled.current) return;
+    handled.current = true;
     loadStatus().then(() => {
       const installationParam = searchParams.get("installation_id");
       const setupAction = searchParams.get("setup_action");
       const returnedState = searchParams.get("state");
-      if (!installationParam) return;
+      // Back from "Connect GitHub to link": the API says what linking did.
+      const linkOutcome = searchParams.get("github_link");
+      if (linkOutcome) {
+        window.history.replaceState({}, "", "/settings/integrations/github/");
+        const said = LINK_OUTCOMES[linkOutcome];
+        if (said?.ok) {
+          setError(null);
+          setLinkResult(said.text);
+        } else if (said) {
+          setError({ title: "The GitHub installation wasn't linked", body: said.text });
+        }
+        return;
+      }
       // A self-hosted install's GitHub link: the shell passes it on to the
       // install (lib/hybrid.ts). It is never linked to this team.
       if (returnedState?.startsWith("hyb_")) return;
+
+      // Asked an organization owner to approve the app: GitHub comes back
+      // without an installation id, and nothing is linked yet.
+      if (setupAction === "request") {
+        sessionStorage.removeItem(STATE_STORAGE_KEY);
+        window.history.replaceState({}, "", "/settings/integrations/github/");
+        setError(null);
+        setLinkResult("Request sent. Someone with admin rights on your GitHub organization needs to approve the Coderhelm app; it connects by itself once they do.");
+        return;
+      }
+      if (!installationParam) return;
+
+      // Changed which repositories the app can use, on GitHub ("Choose
+      // repositories on GitHub"): GitHub sends no state for that, and nothing
+      // needs linking, so this only reloads what changed.
+      if (setupAction === "update") {
+        window.history.replaceState({}, "", "/settings/integrations/github/");
+        setError(null);
+        setLinkResult("Repository access updated on GitHub.");
+        api.listRepos().then((r) => setRepos(r.repos)).catch(() => {});
+        return;
+      }
 
       // The state we stored before sending the person to GitHub must come back unchanged.
       const savedState = sessionStorage.getItem(STATE_STORAGE_KEY);
@@ -121,12 +169,6 @@ function GitHubSettingsPage() {
 
       if (!savedState || savedState !== returnedState) {
         setError({ title: "The GitHub connection didn't finish", body: "Start again with Install. If it keeps happening, open the install from this page rather than from GitHub." });
-        return;
-      }
-
-      if (setupAction === "request") {
-        setError(null);
-        setLinkResult("Request sent. Someone with admin rights on your GitHub organization needs to approve the Coderhelm app; it connects by itself once they do.");
         return;
       }
 
@@ -155,8 +197,15 @@ function GitHubSettingsPage() {
           } else {
             setStatus("connected");
             setGithubOrg(result.github_org ?? null);
-            setLinkResult(`Connected to ${result.github_org}. ${result.repos_synced ?? 0} repositories found.`);
-            api.listRepos().then((r) => setRepos(r.repos)).catch(() => {});
+            // The link answer has no repository count: count what the list says.
+            setLinkResult(`Connected to ${result.github_org ?? "GitHub"}.`);
+            api
+              .listRepos()
+              .then((r) => {
+                setRepos(r.repos);
+                setLinkResult(`Connected to ${result.github_org ?? "GitHub"}. ${r.repos.length} ${r.repos.length === 1 ? "repository" : "repositories"} found.`);
+              })
+              .catch(() => {});
           }
         })
         .catch((e) => {
