@@ -2,7 +2,8 @@
 
 import { useCan } from "@/hooks/use-can";
 import { ANY_CHANGE } from "@/lib/capabilities";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api, type ReviewerConfig as ApiReviewerConfig, type Repo } from "@/lib/api";
 import { ChannelPicker, channelsPayload, channelsSummary, draftFrom, draftValid, type ChannelsDraft } from "@/components/chat-channels";
@@ -18,10 +19,10 @@ import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { Segmented } from "@/components/segmented";
 import { StatusText, type StatusLook } from "@/components/list";
-import { focusRing, inputClass, linkButton, monoInputClass } from "@/components/ui";
+import { inputClass, linkButton, monoInputClass, secondaryButton } from "@/components/ui";
 import { EmptyState } from "@/components/empty-state";
 import { Problem } from "@/components/problem";
-import { Select } from "@/components/select";
+import { Tabs } from "@/components/tabs";
 import {
   Code,
   Field,
@@ -42,7 +43,10 @@ import { StaleSection } from "./stale";
 export default function ReviewerConfigGuarded() {
   return (
     <RoleGuard need={ANY_CHANGE}>
-      <ReviewerConfigPage />
+      {/* The open section comes from ?section= (useSearchParams), which a static export reads inside Suspense. */}
+      <Suspense fallback={<Page><Skeleton className="h-40 w-full" /></Page>}>
+        <ReviewerConfigPage />
+      </Suspense>
     </RoleGuard>
   );
 }
@@ -98,7 +102,7 @@ const TAG_MODES = [
   { value: "date", label: "Date and time" },
 ];
 
-/** The page's sections, in order. The nav shows one at a time (?section=). */
+/** The page's repo sections, in order, as tabs; one shows at a time (?section=). */
 const SECTIONS = [
   { id: "reviews", title: "Reviews" },
   { id: "tests", title: "Tests" },
@@ -107,17 +111,18 @@ const SECTIONS = [
   { id: "after-merge", title: "Tags and health check" },
   { id: "release-notes", title: "Release notes" },
   { id: "reminders", title: "Review reminders" },
-  { id: "stop", title: "Stop everything" },
 ] as const;
 type SectionId = (typeof SECTIONS)[number]["id"];
-/** What the right-hand side shows: one repo section, the standards shared by every repo, or stale pull requests (every repo, or one). */
+/** What the page shows under the tabs: one repo section, the standards shared by every repo, or stale pull requests (every repo, or one). */
 type View = SectionId | "standards" | "stale";
 const VIEWS: View[] = [...SECTIONS.map((s) => s.id), "standards", "stale"];
 const isView = (v: string | null): v is View => !!v && (VIEWS as string[]).includes(v);
+/** Stop everything sits at the foot of Reviews as its danger zone; ?section=stop (older links) opens Reviews there. */
+const STOP_SECTION = "stop";
 
-/** Which settings each section holds, for its "on/off" word and its unsaved dot. */
+/** Which settings each section holds, for its tab's unsaved dot. */
 const SECTION_KEYS: Record<SectionId, Key[]> = {
-  reviews: ["enabled", "label", "instructions"],
+  reviews: ["enabled", "label", "instructions", "killed"],
   tests: ["verify_tests", "require_tests"],
   labels: ["auto_labels", "auto_label_allow", "auto_label_requires", "auto_label_guide"],
   merge: ["auto_merge", "merge_method", "require_human_approval", "deploy_label", "deploy_workflows"],
@@ -128,7 +133,6 @@ const SECTION_KEYS: Record<SectionId, Key[]> = {
     "release_notes_email_webhook_secret_clear", "release_notes_guide", "release_notes_instructions",
   ],
   reminders: ["reminders_enabled", "channels", "reminder_cooldown_hours"],
-  stop: ["killed"],
 };
 
 /** What the backend refuses with a bare 400, said before saving. */
@@ -159,20 +163,6 @@ function stateOf(cfg: ReviewerConfig): StatusLook {
   if (cfg.killed) return { label: "Stopped", tone: "danger" };
   if (!cfg.enabled) return { label: "Off", tone: "muted" };
   return { label: "On", tone: "success" };
-}
-
-/** The short word the nav shows next to each section. */
-function sectionWord(id: SectionId, cfg: ReviewerConfig): string {
-  switch (id) {
-    case "reviews": return cfg.enabled ? "On" : "Off";
-    case "tests": return cfg.verify_tests || cfg.require_tests ? "On" : "Off";
-    case "labels": return cfg.auto_labels ? "On" : "Off";
-    case "merge": return cfg.auto_merge ? "On" : "Off";
-    case "after-merge": return cfg.auto_tag || cfg.health_check ? "On" : "Off";
-    case "release-notes": return cfg.release_notes ? "On" : "Off";
-    case "reminders": return cfg.reminders_enabled ? "On" : "Off";
-    case "stop": return cfg.killed ? "Stopped" : "";
-  }
 }
 
 /** What the reviewer does on this repo, one plain sentence per area. */
@@ -210,8 +200,8 @@ function summaryLines(cfg: ReviewerConfig): string[] {
 
 const shortInput = "sm:w-64";
 
-/** ?repo= and ?section= in the address, so a refresh or a shared link opens the same view. */
-function writeParams(next: { repo?: string; section?: View }) {
+/** ?repo= in the address, so a refresh or a shared link opens the same repo (the tabs carry ?section=). */
+function writeParams(next: { repo?: string }) {
   const url = new URL(window.location.href);
   for (const [k, v] of Object.entries(next)) {
     if (v) url.searchParams.set(k, v);
@@ -226,7 +216,11 @@ function ReviewerConfigPage() {
   const { toast } = useToast();
   const { confirm } = useConfirm();
   const [repos, setRepos] = useState<Repo[]>([]);
-  const [repo, setRepo] = useState("");
+  const params = useSearchParams();
+  // ?repo=owner/name keeps a refresh or a shared link on the same repo. It is
+  // read on the first render, with ?section=, so the section that opens has
+  // its repo from the start (Stale pull requests picks its target on mount).
+  const [repo, setRepo] = useState(() => params.get("repo") ?? "");
   const [loading, setLoading] = useState(false);
   // A failed load must not show the defaults as if they were saved: saving
   // them would overwrite the repo's real settings.
@@ -249,23 +243,8 @@ function ReviewerConfigPage() {
   const [orgSaved, setOrgSaved] = useState("");
   const [orgState, setOrgState] = useState<"loading" | "ready" | "error">("loading");
   const [savingOrg, setSavingOrg] = useState(false);
-  const [view, setView] = useState<View>("reviews");
-
-  // Restore the selected repo from the URL (?repo=owner/name) so a refresh keeps
-  // the page on the same repo. Read window.location directly (not useSearchParams)
-  // to stay compatible with the static export without a Suspense boundary.
-  useEffect(() => {
-    const q = new URLSearchParams(window.location.search);
-    const r = q.get("repo");
-    if (r) setRepo(r);
-    const sec = q.get("section");
-    if (isView(sec)) setView(sec);
-  }, []);
-
-  const goTo = (v: View) => {
-    setView(v);
-    writeParams({ section: v === "reviews" ? undefined : v });
-  };
+  const asked = params.get("section");
+  const view: View = isView(asked) ? asked : "reviews";
 
   useEffect(() => {
     // Members can read these settings; only admins can save them.
@@ -402,84 +381,53 @@ function ReviewerConfigPage() {
   const state = stateOf(cfg);
 
   const repoReady = !!repo && !loading && !loadFailed;
-  const navItems = SECTIONS.map((s) => ({
-    ...s,
-    word: repoReady ? sectionWord(s.id, cfg) : "",
-    unsaved: SECTION_KEYS[s.id].some((k) => unsavedKeys.includes(k)),
-  }));
-  const stopItem = navItems.find((s) => s.id === "stop");
   const viewTitle = view === "standards" ? "Every repository" : view === "stale" ? "Stale pull requests" : SECTIONS.find((s) => s.id === view)?.title ?? "";
-  const navLink = (id: View, title: string, opts: { word?: string; unsaved?: boolean; danger?: boolean } = {}) => (
-    <a
-      href={`?${new URLSearchParams({ ...(repo ? { repo } : {}), ...(id === "reviews" ? {} : { section: id }) }).toString()}`}
-      aria-current={view === id ? "page" : undefined}
-      onClick={(e) => {
-        e.preventDefault();
-        goTo(id);
-      }}
-      className={`flex min-h-8 items-center justify-between gap-3 rounded-md px-2.5 py-1 text-sm ${
-        view === id
-          ? opts.danger
-            ? "bg-red-500/10 text-red-200"
-            : "bg-zinc-800 text-zinc-100"
-          : opts.danger
-            ? "text-red-300 hover:bg-red-500/10"
-            : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
-      } ${focusRing}`}
-    >
-      <span className="flex min-w-0 items-center gap-1.5">
-        {title}
-        {opts.unsaved && <span aria-label="unsaved" className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />}
-      </span>
-      {opts.word && (
-        <span className={`text-xs ${opts.word === "On" ? "text-emerald-300" : opts.word === "Stopped" ? "text-red-300" : "text-zinc-400"}`}>{opts.word}</span>
-      )}
-    </a>
-  );
+  // The tabs keep the repo, so each one opens the same repo's section and can be shared.
+  const tabHref = (id: View) => {
+    const q = new URLSearchParams({ ...(repo ? { repo } : {}), ...(id === "reviews" ? {} : { section: id }) }).toString();
+    return q ? `/reviewer/config?${q}` : "/reviewer/config";
+  };
+  // A dot on a tab with unsaved edits, as the save bar counts them. The
+  // repo's own state (On, Off, Stopped) sits beside the repository picker and
+  // the summary on Reviews says what each section does there.
+  const tabs = SECTIONS.map((s) => {
+    const unsaved = SECTION_KEYS[s.id].some((k) => unsavedKeys.includes(k));
+    return {
+      value: s.id,
+      label: s.title,
+      href: tabHref(s.id),
+      count: unsaved ? <span aria-label="unsaved" className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" /> : undefined,
+      countText: unsaved ? "unsaved" : undefined,
+    };
+  });
+
+  // ?section=stop (older links) opens Reviews scrolled to Stop everything, once the settings are in.
+  useEffect(() => {
+    if (asked === STOP_SECTION && repoReady) document.getElementById(STOP_SECTION)?.scrollIntoView({ block: "center" });
+  }, [asked, repoReady]);
 
   return (
     <Page>
       <PageHeader
         title="Reviewer settings"
         lead="What the pull request reviewer does, set one repository at a time. A new repository starts with everything off."
+        actions={
+          // Not one repo's settings, so they open from the header, as Tests opens its setup and settings.
+          <>
+            <Link href={tabHref("standards")} aria-current={view === "standards" ? "page" : undefined} className={secondaryButton}>
+              Every repository
+              {orgDirty && <span aria-label="unsaved" className="ml-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />}
+            </Link>
+            <Link href={tabHref("stale")} aria-current={view === "stale" ? "page" : undefined} className={secondaryButton}>
+              Stale pull requests
+            </Link>
+          </>
+        }
       />
 
-      <div className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-8">
-        {/* Section nav: one section at a time. A column on wide screens, a select on a phone. */}
-        <nav aria-label="Settings sections" className="min-w-0 lg:sticky lg:top-20 lg:self-start">
-          <div className="lg:hidden">
-            <label htmlFor="rc-section" className="mb-1.5 block text-sm font-medium text-zinc-200">
-              Section
-            </label>
-            <Select<string>
-              id="rc-section"
-              value={view}
-              onChange={(v) => goTo(v as View)}
-              className="w-full"
-              options={[
-                ...navItems
-                  .filter((s) => s.id !== "stop")
-                  .map((s) => ({ value: s.id, label: `${s.title}${s.word ? ` (${s.word})` : ""}${s.unsaved ? " · unsaved" : ""}` })),
-                { value: "standards", label: `Every repository${orgDirty ? " · unsaved" : ""}` },
-                { value: "stale", label: "Stale pull requests" },
-                { value: "stop", label: `Stop everything${stopItem?.word ? ` (${stopItem.word})` : ""}` },
-              ]}
-            />
-          </div>
-          <ul className="hidden flex-col gap-0.5 lg:flex">
-            {navItems
-              .filter((s) => s.id !== "stop")
-              .map((s) => (
-                <li key={s.id}>{navLink(s.id, s.title, { word: s.word, unsaved: s.unsaved })}</li>
-              ))}
-            <li className="mt-3 border-t border-zinc-800 pt-3">{navLink("standards", "Every repository", { unsaved: orgDirty })}</li>
-            <li>{navLink("stale", "Stale pull requests")}</li>
-            <li className="mt-3 border-t border-zinc-800 pt-3">
-              {navLink("stop", "Stop everything", { word: stopItem?.word, unsaved: stopItem?.unsaved, danger: true })}
-            </li>
-          </ul>
-        </nav>
+      <Tabs label="Settings sections" value={view} items={tabs} />
 
+      <div className="mt-6 min-w-0">
         <div className="min-w-0" data-testid="reviewer-config-view" data-view={view}>
           {readOnly && (
             <div className="mb-4">
@@ -743,6 +691,8 @@ function ReviewerConfigPage() {
                     <Switch id={inputId} checked={cfg.require_human_approval} onChange={(v) => set("require_human_approval", v)} labelledBy={labelId} describedBy={helpId} />
                   )}
                 />
+                {/* A row's padding, so the field sits inside the box like the rows above it. */}
+                <div className="min-w-0 px-4 py-4">
                 <Field
                   label="Deploy workflows (optional)"
                   {...marks("deploy_workflows")}
@@ -757,6 +707,7 @@ function ReviewerConfigPage() {
                   onChange={(e) => set("deploy_workflows", e.target.value)}
                   placeholder="apply.yml=production"
                 />
+                </div>
               </SettingsSection>
               )}
 
@@ -1042,16 +993,19 @@ function ReviewerConfigPage() {
               </SettingsSection>
               )}
 
-              {view === "stop" && (
-              <SettingsSection id="stop" title="Stop everything" danger>
+              {/* The danger zone, last on Reviews: it overrides every section. */}
+              {view === "reviews" && (
+              <div className="mt-10">
+              <SettingsSection id={STOP_SECTION} title="Stop everything" danger>
                 <SettingsRow
                   label="Stop everything"
-                  help="Stops every reviewer action on this repo at once, whatever is set above. Use it if something goes wrong."
+                  help="Stops every reviewer action on this repo at once, whatever the other sections say. Use it if something goes wrong."
                   {...marks("killed")}
                   layout="toggle"
                   control={({ labelId, helpId, inputId }) => <Switch id={inputId} checked={cfg.killed} onChange={(v) => set("killed", v)} labelledBy={labelId} describedBy={helpId} />}
                 />
               </SettingsSection>
+              </div>
               )}
                   </fieldset>
 

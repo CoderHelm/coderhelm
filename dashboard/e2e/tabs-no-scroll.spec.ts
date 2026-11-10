@@ -20,6 +20,7 @@ const PAGES = [
   "/settings/deliveries",
   "/skills/agent",
   "/reviewer", // the section's pages (Reviewer, Tests, Releases)
+  "/reviewer/config", // the repo sections of Reviewer settings
   "/logs", // the section's pages (Logs, Alerts)
   "/settings/instructions", // the Instructions pages
 ];

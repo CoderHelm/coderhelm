@@ -190,7 +190,7 @@ test("viewers see the formatted text only, with no box and no Edit", async ({ pa
   await expect(field.getByRole("toolbar")).toHaveCount(0);
 
   // The team standards too, in their own view.
-  await page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "Every repository" }).click();
+  await page.getByRole("link", { name: "Every repository" }).click();
   const standards = page.getByTestId("org-standards-field");
   await expect(standards).toHaveAttribute("data-mode", "read");
   await expect(standards.getByTestId("md-reading").getByRole("listitem").first()).toContainText("Auth changes");
