@@ -70,22 +70,38 @@ export function runIsLive(status: string | null | undefined): boolean {
 /** A finished run whose pull request is open while its last fix round didn't finish. */
 const UNFINISHED_ROUND: RunLook = { label: "PR open, fix unfinished", tone: "attention", group: "done" };
 
-/** A finished run whose pull request is still a draft, for named reasons (`draft_hold`). */
-const DRAFT_HELD: RunLook = { label: "Finished, PR held", tone: "waiting", group: "waiting" };
+/**
+ * A run whose pull request is still a draft, for named reasons (`draft_hold`).
+ * Never "Finished": the work isn't handed over while the pull request is held.
+ */
+const DRAFT_HELD: RunLook = { label: "PR held", tone: "waiting", group: "waiting" };
 /** The same, when GitHub refused every try to mark it ready. */
-const DRAFT_NOT_MARKED: RunLook = { label: "Finished, PR held", tone: "attention", group: "waiting" };
+const DRAFT_NOT_MARKED: RunLook = { label: "PR held", tone: "attention", group: "waiting" };
+/** Waiting on a person for something that isn't a question (`waiting_on`): reviewing the pull request, say. */
+const WAITING_ON_YOU: RunLook = { label: "Waiting on you", tone: "waiting", group: "waiting" };
 
 export function RunStatusBadge({
   status,
   unfinishedRound,
   draftHold,
+  waitingOn,
 }: {
   status: string | null | undefined;
   unfinishedRound?: boolean;
   /** The run's `draft_hold.kind`, when its pull request is still a draft. */
   draftHold?: string | null;
+  /** A `needs_input` run waits for a named action, not an answer. */
+  waitingOn?: boolean;
 }) {
-  const look = draftHold ? (draftHold === "failed" ? DRAFT_NOT_MARKED : DRAFT_HELD) : unfinishedRound ? UNFINISHED_ROUND : runStatusLook(status);
+  const look = draftHold
+    ? draftHold === "failed"
+      ? DRAFT_NOT_MARKED
+      : DRAFT_HELD
+    : unfinishedRound
+      ? UNFINISHED_ROUND
+      : waitingOn && status === "needs_input"
+        ? WAITING_ON_YOU
+        : runStatusLook(status);
   return (
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${TONES[look.tone].chip}`}>
       <StatusDot tone={look.tone} live={look.live} className="!h-1.5 !w-1.5" />

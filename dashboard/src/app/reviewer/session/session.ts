@@ -152,7 +152,32 @@ export function activityHeading(status: string, kind = "review"): string {
   if (status === "reviewing") return answering ? "Reading the comment" : "Reviewing pull request";
   if (status === "done") return answering ? "Read the comment" : "Reviewed pull request";
   if (status === "skipped") return "Looked at the pull request";
+  // Over without a result: past tense, never "Reviewing" under a red status.
+  if (status === "failed" || status === "stalled" || status === "retrying") return answering ? "Stopped reading the comment" : "Review stopped";
   return answering ? "Reading the comment" : "Reviewing pull request";
+}
+
+/** The review page's address for a review's key. */
+export function reviewHref(sk: string): string {
+  return `/reviewer/detail?${new URLSearchParams({ sk })}`;
+}
+
+/**
+ * The session that produced a review: its own `session_id` when the backend
+ * keeps one; otherwise the PR's latest session, only when that session is
+ * this review (same commit, finished within minutes of the review being
+ * kept). Anything else would show an older review someone else's session.
+ */
+export function sessionForReview(
+  review: { session_id?: string | null; head_sha: string; created_at: string },
+  latest: { id: string; head_sha: string; finished_at: string; in_flight: boolean } | null,
+): "own" | "latest" | null {
+  if (review.session_id) return "own";
+  if (!latest || latest.in_flight || !latest.head_sha || latest.head_sha !== review.head_sha) return null;
+  const made = ms(review.created_at);
+  const done = ms(latest.finished_at);
+  if (made === null || done === null) return null;
+  return Math.abs(made - done) <= 15 * 60_000 ? "latest" : null;
 }
 
 /** "+1m 4s" from the session's start; empty without a time. */

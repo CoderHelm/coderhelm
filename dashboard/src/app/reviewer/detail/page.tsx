@@ -4,7 +4,7 @@ import { ANY_CHANGE } from "@/lib/capabilities";
 import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { api, type Review } from "@/lib/api";
+import { api, type GateDetail, type Review, type ReviewSession } from "@/lib/api";
 import { RoleGuard } from "@/components/role-guard";
 import { InlineMarkdown, Markdown } from "@/components/markdown";
 import { ChatMarkdown } from "@/components/chat-markdown";
@@ -18,10 +18,13 @@ import { Skeleton } from "@/components/skeleton";
 import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Page, PageHeader, SectionHeading, cardClass } from "@/components/page";
 import { ExternalLinkIcon, ThumbsDownIcon, ThumbsUpIcon } from "@/components/icons";
-import { Chip, TONES, Time, type Tone } from "@/components/list";
+import { Chip, StatusText, TONES, Time, type Tone } from "@/components/list";
 import { VerdictPill, RiskText } from "../labels";
 import { WorkUsedLine } from "@/components/work-used";
 import { bySeverity, fileUrl, reviewParts, type Finding } from "./findings";
+import { statusLook } from "../status";
+import { isSessionId, sessionForReview, sessionHref } from "../session/session";
+import { SessionActivity, SessionOverview } from "../session/sections";
 
 export default function ReviewDetailGuarded() {
   return (
@@ -76,7 +79,7 @@ function postedNote(verdict: string, postedAs: string): string | null {
   if (verdict === "QUESTION") return "Answered in a comment on the PR.";
   if (verdict === "COMMENT") return "Posted as a comment. Reviews from before verdicts were always an approval or a change request.";
   if (postedAs === "COMMENT" && (verdict === "APPROVE" || verdict === "REQUEST_CHANGES")) {
-    return "Posted as a comment (GitHub doesn't let Coderhelm approve or request changes on a PR it opened).";
+    return "Posted as a comment: Coderhelm opened this PR, and GitHub doesn't let a PR's author approve it.";
   }
   if (postedAs === "APPROVE") return "Posted on GitHub as an approval.";
   if (postedAs === "REQUEST_CHANGES") return "Posted on GitHub as a change request.";
@@ -131,6 +134,8 @@ function ReviewDetailPage() {
     };
   }, [repo, prNumber, hasTitle]);
 
+  const { gate, session, latest } = useReviewSession(review);
+
   if (state === "loading") return <DetailSkeleton />;
   if (state === "missing" || (state === "ready" && !review)) {
     return (
@@ -162,8 +167,28 @@ function ReviewDetailPage() {
   const created = review.created_at && !isNaN(new Date(review.created_at).getTime()) ? review.created_at : "";
 
   return (
-    <Page>
-      <Header review={review} title={review.pr_title || liveTitle} />
+    <Page className="space-y-6">
+      <Header review={review} title={review.pr_title || gate?.pr_title || liveTitle} />
+
+      <ReviewBody review={review} gate={gate} latest={latest} />
+
+      {review.action_summary && (
+        <section className={`${cardClass} overflow-x-auto`} aria-labelledby="after-review" data-testid="after-review">
+          <h2 id="after-review" className="mb-2 text-sm font-semibold text-zinc-100">What happened after the review</h2>
+          <Markdown>{review.action_summary}</Markdown>
+        </section>
+      )}
+
+      {session && (
+        <>
+          <SessionActivity session={session} now={Date.now()} />
+          <SessionOverview session={session} />
+        </>
+      )}
+
+      <Findings review={review} />
+
+      <Rating review={review} onSaved={load} />
 
       <WorkUsedLine
         query={
@@ -179,24 +204,22 @@ function ReviewDetailPage() {
         }
         standardNames={review.applied_standards}
         title="What the reviewer used"
-        className="mt-6"
       />
 
-      <ReviewBody review={review} />
-
-      {review.action_summary && (
-        <section className={`mt-6 ${cardClass} overflow-x-auto`} aria-labelledby="after-review">
-          <h2 id="after-review" className="mb-2 text-sm font-semibold text-zinc-200">What happened after the review</h2>
-          <Markdown>{review.action_summary}</Markdown>
-        </section>
-      )}
-
-      <Rating review={review} onSaved={load} />
-
-      <p className="mt-6 flex flex-wrap items-center justify-between gap-3">
-        <Link href={`/reviewer?repo=${encodeURIComponent(review.repo)}`} className={linkButton}>
-          More reviews of {shortRepo(review.repo)}
-        </Link>
+      <p className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <span className="flex flex-wrap gap-x-4 gap-y-2">
+          <Link href={prPageHref(review.repo, review.pr_number)} className={linkButton}>
+            This PR in the reviewer
+          </Link>
+          {session && (
+            <Link href={sessionHref(session.id)} className={linkButton} data-testid="session-page-link">
+              Open the review session
+            </Link>
+          )}
+          <Link href={`/reviewer?repo=${encodeURIComponent(review.repo)}`} className={linkButton}>
+            More reviews of {shortRepo(review.repo)}
+          </Link>
+        </span>
         <HelpLink item={{ kind: "review", id: sk, label: `${review.repo} #${review.pr_number}`, repo: review.repo }}>
           Something wrong with this review?
         </HelpLink>
@@ -206,6 +229,45 @@ function ReviewDetailPage() {
 }
 
 const shortRepo = (repo: string) => repo.split("/").pop() || repo;
+
+const prPageHref = (repo: string, pr: number) => `/reviewer/pr?${new URLSearchParams({ repo, pr: String(pr) })}`;
+
+/**
+ * The PR's live state (its gate) and the session that produced this review:
+ * the review's own `session_id`, or the PR's latest session when that one is
+ * this review (same commit, finished as the review was kept). `latest` is the
+ * PR's latest session when it is a different, newer review.
+ */
+function useReviewSession(review: Review | null) {
+  const [gate, setGate] = useState<GateDetail | null>(null);
+  const [session, setSession] = useState<ReviewSession | null>(null);
+  const [latest, setLatest] = useState<ReviewSession | null>(null);
+  const repo = review?.repo ?? "";
+  const pr = review?.pr_number ?? 0;
+  const own = review?.session_id ?? "";
+  const sha = review?.head_sha ?? "";
+  const made = review?.created_at ?? "";
+  useEffect(() => {
+    if (!repo || !pr) return;
+    let live = true;
+    (async () => {
+      const g = await api.getGate(repo, pr).catch(() => null);
+      if (!live) return;
+      setGate(g);
+      const id = own || g?.session_id || "";
+      if (!isSessionId(id)) return;
+      const s = await api.getReviewSession(id).catch(() => null);
+      if (!live || !s) return;
+      const which = sessionForReview({ session_id: own, head_sha: sha, created_at: made }, s);
+      if (which) setSession(s);
+      else if (!own && s.id !== own) setLatest(s);
+    })();
+    return () => {
+      live = false;
+    };
+  }, [repo, pr, own, sha, made]);
+  return { gate, session, latest };
+}
 
 const externalLink = `rounded hover:underline ${focusRing}`;
 
@@ -287,11 +349,11 @@ const KIND_WORD: Record<string, string> = {
 
 const sentence = (w: string) => (w ? w.charAt(0).toUpperCase() + w.slice(1).replace(/_/g, " ").toLowerCase() : w);
 
-function FindingCard({ f, repo, sha }: { f: Finding; repo: string; sha: string }) {
+function FindingCard({ f, repo, sha, id }: { f: Finding; repo: string; sha: string; id: string }) {
   const url = fileUrl(repo, sha, f.file, f.line);
   const where = f.file ? `${f.file}${f.line > 0 ? `:${f.line}` : ""}` : "";
   return (
-    <li className={`${cardClass} space-y-2`} data-testid="finding">
+    <li id={id} className={`${cardClass} scroll-mt-20 space-y-2`} data-testid="finding">
       <div className="flex flex-wrap items-center gap-1.5">
         <Chip tone={SEVERITY_TONE[f.severity] ?? "neutral"}>{sentence(f.severity)}</Chip>
         {f.kind && <Chip tone="muted">{KIND_WORD[f.kind] ?? sentence(f.kind)}</Chip>}
@@ -315,53 +377,112 @@ function FindingCard({ f, repo, sha }: { f: Finding; repo: string; sha: string }
   );
 }
 
-function FindingGroup({ id, title, list, repo, sha }: { id: string; title: string; list: Finding[]; repo: string; sha: string }) {
+function FindingGroup({ id, title, list, start, repo, sha }: { id: string; title: string; list: Finding[]; start: number; repo: string; sha: string }) {
   if (list.length === 0) return null;
   return (
-    <section className="mt-6" aria-labelledby={id}>
+    <section aria-labelledby={id}>
       <SectionHeading id={id} count={list.length}>
         {title}
       </SectionHeading>
       <ul className="mt-2 space-y-3">
         {list.map((f, i) => (
-          <FindingCard key={`${f.file}:${f.line}:${i}`} f={f} repo={repo} sha={sha} />
+          <FindingCard key={`${f.file}:${f.line}:${i}`} f={f} repo={repo} sha={sha} id={findingId(start + i)} />
         ))}
       </ul>
     </section>
   );
 }
 
-function ReviewBody({ review }: { review: Review }) {
+/** "1 to fix · 2 notes", or "3 findings" when the record can't tell which hold the merge. */
+function findingGroups(review: Review) {
   const { summary, findings, rest } = reviewParts(review);
   const known = findings.every((f) => f.holds !== null);
   const toFix = known ? findings.filter((f) => f.holds).sort(bySeverity) : [];
   const notes = known ? findings.filter((f) => !f.holds).sort(bySeverity) : [];
+  const all = known ? [...toFix, ...notes] : [...findings].sort(bySeverity);
   const counts = known
     ? [toFix.length > 0 && `${toFix.length} to fix`, notes.length > 0 && plural(notes.length, "note", "notes")].filter(Boolean).join(" · ")
     : plural(findings.length, "finding", "findings");
+  return { summary, rest, known, toFix, notes, all, counts };
+}
+
+const findingId = (i: number) => `finding-${i + 1}`;
+
+/**
+ * The verdict's card: the summary, then every finding as one line (its
+ * severity, title and place) that jumps to the finding below, and where the
+ * PR is now, since a review is a snapshot of one commit.
+ */
+function ReviewBody({ review, gate, latest }: { review: Review; gate: GateDetail | null; latest: ReviewSession | null }) {
+  const { summary, all, counts } = findingGroups(review);
+  // "Reviewed" says nothing the verdict doesn't; every other state is news.
+  const now = gate?.status && gate.status !== "reviewed" ? statusLook(gate.status) : null;
+  const newer = latest && latest.head_sha && latest.head_sha !== review.head_sha ? latest : null;
+  return (
+    <section className={cardClass} aria-labelledby="review-summary">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="review-summary" className="text-sm font-semibold text-zinc-100">Summary</h2>
+        {all.length > 0 && <span className="text-sm text-zinc-400" data-testid="finding-counts">{counts}</span>}
+      </div>
+      <div className="min-w-0 overflow-x-auto [&_p:last-child]:mb-0">
+        <Markdown>{summary || (all.length > 0 ? "_No summary._" : "_The review has no text._")}</Markdown>
+      </div>
+      {all.length > 0 && (
+        <ol className="mt-3 divide-y divide-zinc-800/70 border-t border-zinc-800" aria-label="Findings at a glance" data-testid="finding-index">
+          {all.map((f, i) => (
+            <li key={`${f.file}:${f.line}:${i}`} className="min-w-0">
+              <a href={`#${findingId(i)}`} className={`flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 rounded py-1.5 text-sm hover:bg-zinc-800/40 ${focusRing}`}>
+                <Chip tone={SEVERITY_TONE[f.severity] ?? "neutral"}>{sentence(f.severity)}</Chip>
+                <span className="min-w-0 flex-1 basis-48 text-zinc-200 [overflow-wrap:anywhere]">{f.title ? <InlineMarkdown>{f.title}</InlineMarkdown> : "Untitled finding"}</span>
+                {f.file && (
+                  <span className="min-w-0 font-mono text-xs text-zinc-400 [overflow-wrap:anywhere]">
+                    {f.file}
+                    {f.line > 0 ? `:${f.line}` : ""}
+                  </span>
+                )}
+              </a>
+            </li>
+          ))}
+        </ol>
+      )}
+      {(now || newer) && (
+        <div className="mt-3 space-y-1 border-t border-zinc-800 pt-3 text-sm text-zinc-300" data-testid="pr-now">
+          {now && (
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="text-zinc-400">The PR now:</span>
+              <StatusText look={now} />
+            </p>
+          )}
+          {newer && (
+            <p data-testid="newer-review">
+              {newer.in_flight ? "Coderhelm is reviewing a newer commit" : "A newer review ran"}
+              {newer.head_sha ? <> on <span className="font-mono text-xs">{newer.head_sha.slice(0, 7)}</span></> : null}.{" "}
+              <Link href={sessionHref(newer.id)} className="text-sky-300 underline-offset-2 hover:underline">
+                {newer.in_flight ? "Watch it" : "See it"}
+              </Link>
+            </p>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** The comments the review left: what to fix first, then the notes. */
+function Findings({ review }: { review: Review }) {
+  const { known, toFix, notes, all, rest } = findingGroups(review);
   return (
     <>
-      <section className={`mt-6 ${cardClass}`} aria-labelledby="review-summary">
-        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="review-summary" className="text-sm font-semibold text-zinc-200">Summary</h2>
-          {findings.length > 0 && <span className="text-sm text-zinc-400" data-testid="finding-counts">{counts}</span>}
-        </div>
-        <div className="min-w-0 overflow-x-auto [&_p:last-child]:mb-0">
-          <Markdown>{summary || (findings.length > 0 ? "_No summary._" : "_The review has no text._")}</Markdown>
-        </div>
-      </section>
-
       {known ? (
         <>
-          <FindingGroup id="findings-fix" title="To fix" list={toFix} repo={review.repo} sha={review.head_sha} />
-          <FindingGroup id="findings-notes" title="Notes" list={notes} repo={review.repo} sha={review.head_sha} />
+          <FindingGroup id="findings-fix" title="To fix" list={toFix} start={0} repo={review.repo} sha={review.head_sha} />
+          <FindingGroup id="findings-notes" title="Notes" list={notes} start={toFix.length} repo={review.repo} sha={review.head_sha} />
         </>
       ) : (
-        <FindingGroup id="findings-all" title="Findings" list={[...findings].sort(bySeverity)} repo={review.repo} sha={review.head_sha} />
+        <FindingGroup id="findings-all" title="Findings" list={all} start={0} repo={review.repo} sha={review.head_sha} />
       )}
-
       {rest && (
-        <section className={`mt-6 ${cardClass} overflow-x-auto`} aria-label="More from the review">
+        <section className={`${cardClass} overflow-x-auto`} aria-label="More from the review">
           <Markdown>{rest}</Markdown>
         </section>
       )}
@@ -441,7 +562,7 @@ function Rating({ review, onSaved }: { review: Review; onSaved: () => void }) {
 
   const total = review.thumbs_up + review.thumbs_down;
   return (
-    <section className={`mt-6 ${cardClass}`} aria-labelledby="rate-review">
+    <section className={`${cardClass} py-3`} aria-labelledby="rate-review">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <h2 id="rate-review" className="text-sm font-semibold text-zinc-200">Was this review right?</h2>
         <div className="flex items-center gap-2" role="group" aria-labelledby="rate-review">
@@ -492,7 +613,7 @@ function Rating({ review, onSaved }: { review: Review; onSaved: () => void }) {
         </div>
       )}
 
-      <p className="mt-3 text-sm text-zinc-400">
+      <p className="mt-2 text-xs text-zinc-400">
         Coderhelm also learns from your replies on the PR on its own, so there is no need to repeat them here.
       </p>
 

@@ -8,7 +8,8 @@ import { formatDate, formatDuration, Time } from "@/components/list";
 import { DataTable } from "@/components/data-table";
 import { Code } from "@/components/settings/code";
 import { Disclosure } from "@/components/disclosure";
-import { ChatIcon, ChevronRightIcon, EyeIcon, ExternalLinkIcon, LayersIcon, PenIcon, SearchIcon, WrenchIcon } from "@/components/icons";
+import { ChatIcon, CheckIcon, ChevronRightIcon, EyeIcon, ExternalLinkIcon, LayersIcon, PenIcon, SearchIcon, WrenchIcon, XIcon } from "@/components/icons";
+import { InlineMarkdown } from "@/components/markdown";
 import { focusRing } from "@/components/ui";
 import { VerdictPill } from "../labels";
 import {
@@ -131,154 +132,188 @@ const GROUP_ICONS: Record<string, () => ReactNode> = {
   comment: ChatIcon,
 };
 
-/** The dot on the timeline's line: pulsing while the entry is the one running now. */
-function Dot({ running }: { running: boolean }) {
-  return (
-    <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${running ? "animate-pulse bg-sky-400 motion-reduce:animate-none" : "bg-zinc-500"}`} />
-  );
-}
-
-/** One row of the timeline, with the line down to the next row. */
-function Row({ kind, running, last, children }: { kind: string; running: boolean; last: boolean; children: ReactNode }) {
-  return (
-    <li className="relative flex min-w-0 gap-3 pb-3 last:pb-0" data-testid="timeline-entry" data-kind={kind} data-state={running ? "running" : "done"}>
-      <span aria-hidden="true" className="relative flex w-3 shrink-0 justify-center">
-        <Dot running={running} />
-        {!last && <span className="absolute top-4 bottom-[-0.25rem] w-px bg-zinc-800" />}
-      </span>
-      <div className="min-w-0 flex-1">
-        {children}
-        {running && <span className="sr-only"> (running now)</span>}
-      </div>
-    </li>
-  );
-}
-
 function Offset({ startedAt, at }: { startedAt: string; at: string }) {
   const label = offsetLabel(startedAt, at, formatDuration);
   if (!label) return null;
   return (
-    <time dateTime={at} title={formatDate(at, { time: true })} className="whitespace-nowrap text-xs tabular-nums text-zinc-400">
+    <time dateTime={at} title={formatDate(at, { time: true })} className="ml-auto shrink-0 whitespace-nowrap pl-2 text-xs tabular-nums text-zinc-400">
       {label}
     </time>
   );
 }
 
-function StepEntry({ step, startedAt }: { step: SessionStep; startedAt: string }) {
+/** The icon at the start of a row: the kind's icon, or a pulsing dot while it is the one running now. */
+function RowMark({ running, children }: { running: boolean; children: ReactNode }) {
   return (
-    <>
-      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-        <span className="min-w-0 text-sm text-zinc-200 [overflow-wrap:anywhere]">{step.text}</span>
+    <span aria-hidden="true" className="inline-flex h-5 w-4 shrink-0 items-center justify-center text-zinc-400">
+      {running ? <span className="h-2 w-2 animate-pulse rounded-full bg-sky-400 motion-reduce:animate-none" /> : children}
+    </span>
+  );
+}
+
+/** A setup or posting step: one line, its detail behind "More". */
+function StepRow({ step, startedAt, running }: { step: SessionStep; startedAt: string; running: boolean }) {
+  return (
+    <li className="min-w-0" data-testid="timeline-entry" data-kind="step" data-state={running ? "running" : "done"}>
+      <div className="flex min-w-0 items-start gap-2 text-sm">
+        <RowMark running={running}>
+          <CheckIcon />
+        </RowMark>
+        <span className="min-w-0 text-zinc-300 [overflow-wrap:anywhere]">
+          <InlineMarkdown>{step.text}</InlineMarkdown>
+          {running && <span className="sr-only"> (running now)</span>}
+        </span>
         <Offset startedAt={startedAt} at={step.at} />
       </div>
       {step.detail && (
-        <details className="mt-1 text-sm">
-          <summary className={`cursor-pointer text-xs text-zinc-400 hover:text-zinc-200 ${focusRing}`}>More</summary>
-          <div className="mt-1 whitespace-pre-wrap rounded border border-zinc-800 bg-zinc-950/60 p-2 text-xs text-zinc-300 [overflow-wrap:anywhere]">
+        <details className="mt-0.5 pl-6 text-sm">
+          <summary className={`w-fit cursor-pointer rounded text-xs text-zinc-400 hover:text-zinc-200 ${focusRing}`}>More</summary>
+          <div className="mt-1 whitespace-pre-wrap rounded border border-zinc-800 bg-zinc-950/60 p-2 font-mono text-xs text-zinc-300 [overflow-wrap:anywhere]">
             {step.detail}
           </div>
         </details>
       )}
-    </>
-  );
-}
-
-function NoteEntry({ group, startedAt }: { group: ActivityGroup; startedAt: string }) {
-  return (
-    <>
-      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-        <span className="min-w-0 text-sm font-medium text-zinc-100 [overflow-wrap:anywhere]">{group.title}</span>
-        <Offset startedAt={startedAt} at={group.started_at} />
-      </div>
-      {group.text && <p className="mt-0.5 text-sm text-zinc-400 [overflow-wrap:anywhere]">{group.text}</p>}
-    </>
-  );
-}
-
-/** A group of steps of one kind: its title, and its queries, files or comments when opened. */
-function GroupEntry({ group, startedAt }: { group: ActivityGroup; startedAt: string }) {
-  const Icon = GROUP_ICONS[group.kind] ?? WrenchIcon;
-  const failed = group.items.filter((i) => i.failed).length;
-  return (
-    <details className="group/entry text-sm" data-testid="activity-group">
-      <summary className={`flex min-w-0 cursor-pointer list-none flex-wrap items-baseline gap-x-2 [&::-webkit-details-marker]:hidden ${focusRing}`}>
-        <span aria-hidden="true" className="inline-flex shrink-0 self-center text-zinc-400 transition-transform group-open/entry:rotate-90 motion-reduce:transition-none">
-          <ChevronRightIcon />
-        </span>
-        <span aria-hidden="true" className="inline-flex shrink-0 self-center text-zinc-400">
-          <Icon />
-        </span>
-        <span className="text-zinc-200 hover:text-zinc-100">{group.title}</span>
-        {failed > 0 && <span className="text-xs text-red-300">{failed} failed</span>}
-        <Offset startedAt={startedAt} at={group.started_at} />
-      </summary>
-      <ul className="mt-1.5 space-y-1 border-l border-zinc-800 pl-3 ml-1.5" data-testid="activity-items">
-        {group.items.map((item, i) => (
-          <li key={`${item.at}-${i}`} className="min-w-0 text-xs text-zinc-300">
-            {item.detail && group.kind === "lookup" && <span className="text-zinc-400">{item.detail}{item.label ? ": " : ""}</span>}
-            {item.label && <Code>{item.label}</Code>}
-            {item.detail && group.kind === "comment" && <span className="text-zinc-400"> {item.detail}</span>}
-            {item.failed && <span className="text-red-300"> (failed)</span>}
-          </li>
-        ))}
-      </ul>
-    </details>
+    </li>
   );
 }
 
 /**
- * The review as it happened, like a run log: setup steps, then what the
- * reviewer searched, read and looked up (grouped by kind), the notes it wrote
- * on what it was checking, and the comments it kept. Collapsible; the last
- * entry pulses while the review runs.
+ * Steps of one kind in a row ("Search 3 times", "View 4 files"): one line
+ * that opens to the queries, `path:lines` or comments, in small monospace.
  */
-export function SessionActivity({ session, now }: { session: ReviewSession; now: number }) {
-  const entries = timeline(session.steps ?? [], session.activity ?? []);
+function ToolRow({ group, startedAt, running }: { group: ActivityGroup; startedAt: string; running: boolean }) {
+  const Icon = GROUP_ICONS[group.kind] ?? WrenchIcon;
+  const failed = group.items.filter((i) => i.failed).length;
+  return (
+    <li className="min-w-0" data-testid="timeline-entry" data-kind={group.kind} data-state={running ? "running" : "done"}>
+      <details className="group/entry text-sm" data-testid="activity-group">
+        <summary className={`flex min-w-0 cursor-pointer list-none items-start gap-2 rounded [&::-webkit-details-marker]:hidden ${focusRing}`}>
+          <RowMark running={running}>
+            <Icon />
+          </RowMark>
+          <span className="min-w-0 text-zinc-300 group-hover/entry:text-zinc-100">{group.title}</span>
+          <span aria-hidden="true" className="inline-flex h-5 shrink-0 items-center text-zinc-500 transition-transform group-open/entry:rotate-90 motion-reduce:transition-none">
+            <ChevronRightIcon />
+          </span>
+          {failed > 0 && <span className="whitespace-nowrap text-xs leading-5 text-red-300">{failed} failed</span>}
+          {running && <span className="sr-only"> (running now)</span>}
+          <Offset startedAt={startedAt} at={group.started_at} />
+        </summary>
+        <ul className="mt-1 mb-1 ml-2 space-y-0.5 border-l border-zinc-800 pl-4" data-testid="activity-items">
+          {group.items.map((item, i) => (
+            <li key={`${item.at}-${i}`} className="min-w-0 text-xs leading-5 text-zinc-400 [overflow-wrap:anywhere]">
+              {item.detail && group.kind === "lookup" && <span>{item.detail}{item.label ? ": " : ""}</span>}
+              {item.label && <span className="font-mono text-zinc-300">{item.label}</span>}
+              {item.detail && group.kind === "comment" && <span> {item.detail}</span>}
+              {item.failed && <span className="text-red-300"> (failed)</span>}
+            </li>
+          ))}
+        </ul>
+      </details>
+    </li>
+  );
+}
+
+/** What the timeline draws: a note heads the tool rows that follow it, as Copilot's session log does. */
+type Block =
+  | { kind: "step"; step: SessionStep; index: number }
+  | { kind: "tool"; group: ActivityGroup; index: number }
+  | { kind: "section"; note: ActivityGroup; index: number; tools: { group: ActivityGroup; index: number }[] };
+
+function blocks(session: ReviewSession): { list: Block[]; count: number } {
+  const list: Block[] = [];
+  let open: Extract<Block, { kind: "section" }> | null = null;
+  let index = 0;
+  for (const e of timeline(session.steps ?? [], session.activity ?? [])) {
+    if (e.kind === "step") {
+      open = null;
+      list.push({ kind: "step", step: e.step, index: index++ });
+    } else if (e.group.kind === "note") {
+      open = { kind: "section", note: e.group, index: index++, tools: [] };
+      list.push(open);
+    } else if (open) {
+      open.tools.push({ group: e.group, index: index++ });
+    } else {
+      list.push({ kind: "tool", group: e.group, index: index++ });
+    }
+  }
+  return { list, count: index };
+}
+
+/**
+ * The review as it happened, in the order it happened: setup steps, then
+ * each thing the reviewer set out to check (a bold heading and its reasoning)
+ * with what it searched, read and looked up for it as one-line rows, then the
+ * comments it kept and the posting. The newest row pulses while it runs.
+ */
+export function SessionActivity({ session, now, defaultOpen = true }: { session: ReviewSession; now: number; defaultOpen?: boolean }) {
+  const { list, count } = blocks(session);
   const seconds = sessionSeconds(session, now);
   const live = session.in_flight;
+  const runningIndex = live ? count - 1 : -1;
   const dropped = droppedNote(session.activity_dropped);
+  const start = session.started_at;
+  const failed = session.status === "failed" || session.status === "stalled";
   return (
-    <section className={cardClass} aria-labelledby="session-activity-title" data-testid="session-activity">
-      <details open className="group/activity">
-        <summary className={`flex min-w-0 cursor-pointer list-none items-center gap-2 rounded [&::-webkit-details-marker]:hidden ${focusRing}`}>
+    <section className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50" aria-labelledby="session-activity-title" data-testid="session-activity">
+      <details open={defaultOpen} className="group/activity">
+        <summary
+          className={`flex min-w-0 cursor-pointer list-none items-center gap-2 rounded-lg px-4 py-3 group-open/activity:rounded-b-none group-open/activity:border-b group-open/activity:border-zinc-800 group-open/activity:bg-zinc-900 [&::-webkit-details-marker]:hidden ${focusRing}`}
+        >
           <span aria-hidden="true" className="inline-flex shrink-0 text-zinc-400 transition-transform group-open/activity:rotate-90 motion-reduce:transition-none">
             <ChevronRightIcon />
           </span>
-          <h2 id="session-activity-title" className="text-sm font-medium text-zinc-100">
+          <h2 id="session-activity-title" className="min-w-0 text-sm font-semibold text-zinc-100">
             {activityHeading(session.status, session.kind)}
           </h2>
-          {live && <span aria-hidden="true" className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-sky-400 motion-reduce:animate-none" />}
-          <span data-testid="activity-elapsed" className="ml-auto whitespace-nowrap text-xs tabular-nums text-zinc-400">
+          {live ? (
+            <span aria-hidden="true" className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-sky-400 motion-reduce:animate-none" />
+          ) : (
+            <span aria-hidden="true" className={`inline-flex shrink-0 ${failed ? "text-red-300" : "text-emerald-400"}`}>
+              {failed ? <XIcon /> : <CheckIcon />}
+            </span>
+          )}
+          <span data-testid="activity-elapsed" className="ml-auto whitespace-nowrap font-mono text-xs tabular-nums text-zinc-400">
             {seconds === null ? "" : formatDuration(seconds)}
           </span>
         </summary>
-        {entries.length ? (
-          <ol className="mt-3" data-testid="session-timeline">
-            {entries.map((e, i) => {
-              const last = i === entries.length - 1;
-              const running = last && live;
-              if (e.kind === "step") {
+        <div className="px-4 pb-4 pt-3">
+          {list.length ? (
+            <ol className="space-y-1.5" data-testid="session-timeline">
+              {list.map((b) => {
+                if (b.kind === "step") return <StepRow key={`s-${b.index}`} step={b.step} startedAt={start} running={b.index === runningIndex} />;
+                if (b.kind === "tool") return <ToolRow key={`t-${b.index}`} group={b.group} startedAt={start} running={b.index === runningIndex} />;
+                const running = b.index === runningIndex;
                 return (
-                  <Row key={`s-${e.at}-${i}`} kind="step" running={running} last={last}>
-                    <StepEntry step={e.step} startedAt={session.started_at} />
-                  </Row>
+                  <li
+                    key={`n-${b.index}`}
+                    className="min-w-0 pt-2.5 first:pt-0"
+                    data-testid="timeline-entry"
+                    data-kind="note"
+                    data-state={running ? "running" : "done"}
+                  >
+                    <div className="flex min-w-0 items-baseline gap-2">
+                      <h3 className="min-w-0 text-sm font-semibold text-zinc-100 [overflow-wrap:anywhere]">{b.note.title}</h3>
+                      {running && <span className="sr-only"> (running now)</span>}
+                      <Offset startedAt={start} at={b.note.started_at} />
+                    </div>
+                    {b.note.text && <p className="mt-0.5 text-sm leading-relaxed text-zinc-300 [overflow-wrap:anywhere]">{b.note.text}</p>}
+                    {b.tools.length > 0 && (
+                      <ul className="mt-1.5 space-y-1" aria-label={`What it did for: ${b.note.title}`}>
+                        {b.tools.map((t) => (
+                          <ToolRow key={`t-${t.index}`} group={t.group} startedAt={start} running={t.index === runningIndex} />
+                        ))}
+                      </ul>
+                    )}
+                  </li>
                 );
-              }
-              return (
-                <Row key={`g-${e.at}-${i}`} kind={e.group.kind} running={running} last={last}>
-                  {e.group.kind === "note" ? (
-                    <NoteEntry group={e.group} startedAt={session.started_at} />
-                  ) : (
-                    <GroupEntry group={e.group} startedAt={session.started_at} />
-                  )}
-                </Row>
-              );
-            })}
-          </ol>
-        ) : (
-          <p className="mt-2 text-sm text-zinc-400">No steps yet.</p>
-        )}
-        {dropped && <p className="mt-3 text-xs text-zinc-400" data-testid="activity-dropped">{dropped}</p>}
+              })}
+            </ol>
+          ) : (
+            <p className="text-sm text-zinc-400">No steps yet.</p>
+          )}
+          {dropped && <p className="mt-3 text-xs text-zinc-400" data-testid="activity-dropped">{dropped}</p>}
+        </div>
       </details>
     </section>
   );
@@ -310,7 +345,7 @@ export function SessionOverview({ session }: { session: ReviewSession }) {
   const more = Math.max(0, (o.files_total ?? files.length) - files.length);
   const total = o.files_total || files.length;
   return (
-    <SessionCard id="session-overview-title" title="PR Overview" testId="session-overview">
+    <SessionCard id="session-overview-title" title="PR overview" testId="session-overview">
       {o.summary && <p className="mt-2 text-sm text-zinc-200 [overflow-wrap:anywhere]">{o.summary}</p>}
       {changes.length > 0 && (
         <>
@@ -324,7 +359,7 @@ export function SessionOverview({ session }: { session: ReviewSession }) {
       )}
       {files.length > 0 && (
         <>
-          <h3 className="mt-4 text-xs font-medium text-zinc-400">Reviewed Changes</h3>
+          <h3 className="mt-4 text-xs font-medium text-zinc-400">Reviewed changes</h3>
           <p className="mt-0.5 text-xs text-zinc-400">{total === 1 ? "1 changed file" : `${total} changed files`}</p>
           <div className="mt-2">
             {files.length > OVERVIEW_FOLD_AFTER ? (

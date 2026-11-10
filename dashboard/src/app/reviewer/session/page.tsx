@@ -11,7 +11,9 @@ import { StatusText } from "@/components/list";
 import { secondaryButton } from "@/components/ui";
 import { ExternalLinkIcon } from "@/components/icons";
 import { Page, PageHeader } from "@/components/page";
-import { isSessionId, SESSION_POLL_MS, sessionLook } from "./session";
+import { ReReviewButton } from "@/components/re-review-button";
+import { useCan } from "@/hooks/use-can";
+import { isSessionId, reviewHref, SESSION_POLL_MS, sessionLook } from "./session";
 import { SessionActivity, SessionFacts, SessionNotice, SessionOutcome, SessionOverview } from "./sections";
 
 // One review job, step by step (`?id=<job id>`). A PR's "Coderhelm review"
@@ -50,6 +52,8 @@ function SessionPage() {
   const [session, setSession] = useState<ReviewSession | null>(null);
   const [state, setState] = useState<LoadState>(valid ? "loading" : "missing");
   const [now, setNow] = useState(() => Date.now());
+  // Anyone may read a session; asking for a new review is for those who may.
+  const { can } = useCan();
 
   const load = useCallback(() => {
     if (!valid) return;
@@ -108,11 +112,19 @@ function SessionPage() {
         status={<span data-testid="session-status"><StatusText look={look} /></span>}
         lead={<span className="[overflow-wrap:anywhere]">{session.repo} #{session.pr_number}</span>}
         actions={
-          <a href={prUrl} target="_blank" rel="noreferrer" className={`${secondaryButton} gap-1.5`}>
-            Open on GitHub
-            <span aria-hidden="true" className="inline-flex"><ExternalLinkIcon /></span>
-            <span className="sr-only"> (opens in a new tab)</span>
-          </a>
+          <>
+            {session.review_sk && (
+              <Link href={reviewHref(session.review_sk)} className={secondaryButton} data-testid="session-review-link">
+                See the findings
+              </Link>
+            )}
+            <a href={prUrl} target="_blank" rel="noreferrer" className={`${secondaryButton} gap-1.5`}>
+              Open on GitHub
+              <span aria-hidden="true" className="inline-flex"><ExternalLinkIcon /></span>
+              <span className="sr-only"> (opens in a new tab)</span>
+            </a>
+            {(session.status === "failed" || session.status === "stalled") && can("reviews") && <ReReviewButton repo={session.repo} pr={session.pr_number} size="md" />}
+          </>
         }
       />
       <SessionNotice session={session} />

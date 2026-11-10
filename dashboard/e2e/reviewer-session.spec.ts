@@ -5,6 +5,8 @@ import {
   findingsLabel,
   isSessionId,
   kindLabel,
+  reviewHref,
+  sessionForReview,
   sessionHref,
   sessionLook,
   sessionSeconds,
@@ -80,6 +82,24 @@ test.describe("session helpers", () => {
   });
 });
 
+test.describe("review and session", () => {
+  test("a review shows a session only when it is that review's", () => {
+    const sha = "9fceb02d0ae598e95dc970b74767f19372d61af8";
+    const review = { head_sha: sha, created_at: "2026-10-22T14:20:05Z" };
+    const latest = { id: ID, head_sha: sha, finished_at: "2026-10-22T14:20:01Z", in_flight: false };
+    // The review's own session wins whatever the PR's latest is.
+    expect(sessionForReview({ ...review, session_id: ID }, null)).toBe("own");
+    // Same commit, finished as the review was kept: this review's session.
+    expect(sessionForReview(review, latest)).toBe("latest");
+    // Another commit, still running, or hours apart: someone else's session.
+    expect(sessionForReview(review, { ...latest, head_sha: "4e1a2b0" })).toBeNull();
+    expect(sessionForReview(review, { ...latest, in_flight: true, finished_at: "" })).toBeNull();
+    expect(sessionForReview(review, { ...latest, finished_at: "2026-10-22T18:00:00Z" })).toBeNull();
+    expect(sessionForReview(review, null)).toBeNull();
+    expect(reviewHref("REVIEW#acme/web#000318#2026-10-22T14:20:05Z")).toBe("/reviewer/detail?sk=REVIEW%23acme%2Fweb%23000318%232026-10-22T14%3A20%3A05Z");
+  });
+});
+
 test.describe("activity helpers", () => {
   test("steps and activity groups merge into one timeline by time", () => {
     const at = (s: number) => `2026-10-22T14:18:${String(s).padStart(2, "0")}.000Z`;
@@ -100,7 +120,9 @@ test.describe("activity helpers", () => {
     expect(activityHeading("reviewing")).toBe("Reviewing pull request");
     expect(activityHeading("done")).toBe("Reviewed pull request");
     expect(activityHeading("reviewing", "question")).toBe("Reading the comment");
-    expect(activityHeading("failed")).toBe("Reviewing pull request");
+    // Over without a result reads in the past tense, never "Reviewing" under a red status.
+    expect(activityHeading("failed")).toBe("Review stopped");
+    expect(activityHeading("stalled")).toBe("Review stopped");
     expect(droppedNote(0)).toBeNull();
     expect(droppedNote(undefined)).toBeNull();
     expect(droppedNote(1)).toBe("1 more step wasn't recorded.");
@@ -131,6 +153,7 @@ function session(over: Session = {}): Session {
     findings: null,
     review_url: "",
     check_run_id: 31337000,
+    review_sk: null,
     steps: [
       { at: iso(90), text: "Started reviewing `9fceb02`", detail: "" },
       { at: iso(80), text: "Read the change: 2 files changed", detail: "src/auth/login.ts\nsrc/auth/limits.ts" },
@@ -281,6 +304,24 @@ test("a skipped or retried review says why", async ({ page }) => {
   await expect(page.getByTestId("session-facts")).toContainText("Review, try 2");
 });
 
+test("a session links back to the review it posted, and a failed one offers a new review", async ({ page }) => {
+  const errors = watchConsole(page);
+  const sk = "REVIEW#acme/web#000318#2026-10-22T14:20:05Z";
+  await mockApi(page, { sessions: [session({ status: "done", in_flight: false, finished_at: iso(5), verdict: "APPROVE", findings: 0, review_sk: sk })] });
+  await page.goto(`/reviewer/session?id=${ID}`);
+  await expect(page.getByTestId("session-review-link")).toHaveAttribute("href", /\/reviewer\/detail\/?\?sk=REVIEW%23acme%2Fweb%23000318/);
+  await expect(page.getByRole("button", { name: /^Review .* again$/ })).toHaveCount(0);
+
+  // An older backend leaves review_sk out: no link.
+  await mockApi(page, { sessions: [session({ status: "failed", in_flight: false, finished_at: iso(5), reason: "The model timed out." })] });
+  await page.goto(`/reviewer/session?id=${ID}`);
+  await expect(page.getByTestId("session-status")).toHaveText("Failed");
+  await expect(page.getByTestId("session-review-link")).toHaveCount(0);
+  await expect(page.getByTestId("session-activity").getByRole("heading", { name: "Review stopped" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Review acme/web #318 again" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test("a missing, malformed or forbidden session shows nothing to read", async ({ page }) => {
   const errors = watchConsole(page, true);
   const db = await mockApi(page, { sessions: [404] });
@@ -405,6 +446,12 @@ test("the activity timeline shows each step live, grouped like a run log", async
   await expect(entries.nth(2)).toHaveAttribute("data-kind", "note");
   await expect(entries.nth(2)).toContainText("Evaluating rate-limit semantics");
   await expect(entries.nth(2)).toContainText("The limiter now counts failed logins per address.");
+  // A note is a heading over what the reviewer did for it, as on Copilot's session log.
+  await expect(entries.nth(2).getByRole("heading", { level: 3, name: "Evaluating rate-limit semantics" })).toBeVisible();
+  await expect(entries.nth(2).getByTestId("timeline-entry")).toHaveCount(2);
+  // Step text reads code as code, not backticks.
+  await expect(entries.nth(0).locator("code", { hasText: "9fceb02" })).toBeVisible();
+  await expect(entries.nth(0)).not.toContainText("`");
   // Only the newest entry runs.
   await expect(card.locator('[data-state="running"]')).toHaveCount(1);
   await expect(entries.nth(4)).toHaveAttribute("data-state", "running");
@@ -449,7 +496,7 @@ test("the overview says what the PR does, file by file", async ({ page }) => {
   await mockApi(page, { sessions: [session({ status: "done", in_flight: false, finished_at: iso(5), verdict: "APPROVE", findings: 0, overview: overview(3) })] });
   await page.goto(`/reviewer/session?id=${ID}`);
   const card = page.getByTestId("session-overview");
-  await expect(card.getByRole("heading", { name: "PR Overview" })).toBeVisible();
+  await expect(card.getByRole("heading", { name: "PR overview" })).toBeVisible();
   await expect(card).toContainText("Rate-limits the login form by address.");
   await expect(page.getByTestId("overview-changes").getByRole("listitem")).toHaveText([
     "Counts failed logins per address",

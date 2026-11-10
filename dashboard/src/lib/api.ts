@@ -1796,6 +1796,8 @@ export interface Review {
   pr_title?: string;
   /** The findings, one object each (null on older reviews: read them from `body`). */
   findings?: ReviewFinding[] | null;
+  /** The session (review job) that produced this review (`getReviewSession`); null when its session page doesn't exist (missing on older backends). */
+  session_id?: string | null;
 }
 
 /** One finding of a review, as the reviewer kept it. */
@@ -1954,6 +1956,8 @@ export interface ReviewSession {
   activity_dropped?: number;
   /** The "PR Overview" the review posted, once there is one. */
   overview?: ReviewOverview | null;
+  /** The review this session posted (`getReview`'s `sk`); missing before one is posted and on older backends. */
+  review_sk?: string | null;
 }
 
 /** One entry of an activity group: a query, a `path:lines`, a comment's place. */
@@ -2210,6 +2214,43 @@ export interface RunDetail extends Run {
   answers_url?: string | null;
   /** The run that picked the answers up. */
   continued_run_id?: string | null;
+  /** The checks on the open pull request's head commit; null with no open pull request or when GitHub couldn't be read (missing on older backends). */
+  checks?: RunChecks | null;
+  /** The reviewer's newest verdict on the run's pull request; null before one (missing on older backends). */
+  pr_review?: RunPrReview | null;
+}
+
+/** One check (a CI job or status) on a run's pull request. */
+export interface RunCheck {
+  name: string;
+  /** Where it stands. A required check that hasn't reported yet is `queued`. */
+  state: "passed" | "failed" | "running" | "queued" | "skipped";
+  /** GitHub's own conclusion (success, failure, timed_out, …); null until it completes. */
+  conclusion: string | null;
+  /** The repository requires it to merge. */
+  required: boolean;
+  started_at: string | null;
+  completed_at: string | null;
+  url: string | null;
+}
+
+/** The checks on a run's pull request, on one commit. */
+export interface RunChecks {
+  /** The commit they ran on. */
+  sha: string;
+  /** Failed, running, queued, passed, skipped, then by name. */
+  items: RunCheck[];
+  counts: { passed: number; failed: number; running: number; queued: number; skipped: number };
+}
+
+/** The reviewer's review of a run's own pull request. */
+export interface RunPrReview {
+  verdict: "APPROVE" | "REQUEST_CHANGES";
+  /** Opens the review page (`/reviewer/detail?sk=`). */
+  review_sk: string;
+  session_id: string | null;
+  reviewed_sha: string;
+  at: string;
 }
 
 /** A question a run asked a person. */
