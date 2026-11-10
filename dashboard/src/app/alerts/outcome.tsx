@@ -25,13 +25,14 @@ export const OUTCOMES: Record<
   duplicate: {
     label: "Repeat",
     detail:
-      "The same alert already started a run in the last 6 hours, so this one was folded into it.",
+      "The same alert already started a run in the last 6 hours, so this one was folded into it. While the alert's card is still open in chat, nothing new is posted; after a recovery closed it, one card says it fired again.",
     tone: "muted",
     group: "handled",
   },
   in_flight: {
     label: "Already handled",
-    detail: "A run for this alert is in progress or already finished.",
+    detail:
+      "A run for this alert is in progress or already finished, so no new run started. While the alert's card is still open in chat, nothing new is posted; after a recovery closed it, one card says it fired again.",
     tone: "muted",
     group: "handled",
   },
