@@ -132,6 +132,7 @@ export function RunTimeline({
   live,
   end,
   upcoming,
+  build,
 }: {
   steps: TimelineStep[];
   now: number;
@@ -141,7 +142,10 @@ export function RunTimeline({
   live: boolean;
   end?: ReactNode;
   upcoming: string[];
+  /** Drawn under the last build step: the agent log's digest of what it did. */
+  build?: ReactNode;
 }) {
+  const buildAt = build ? steps.map((s) => s.pass.split(":")[0]).lastIndexOf("implement") : -1;
   return (
     <section className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50" aria-labelledby="run-steps-title" data-testid="run-timeline">
       <div className="flex min-w-0 items-center gap-2 rounded-t-lg border-b border-zinc-800 bg-zinc-900 px-4 py-3">
@@ -154,6 +158,7 @@ export function RunTimeline({
           <ol aria-label="Steps" className="space-y-0.5">
             {steps.map((s, i) => (
               <StepRow key={s.key} step={s} now={now}>
+                {i === buildAt ? build : null}
                 {i === steps.length - 1 ? end : null}
               </StepRow>
             ))}

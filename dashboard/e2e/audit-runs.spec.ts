@@ -576,9 +576,11 @@ test("the agent log opens with the keyboard state announced, and a failed load c
   await expect(page.getByText("Couldn't load the agent log.")).toBeVisible();
   db.agentLogFail = false;
   await page.getByRole("button", { name: "Try again" }).click();
-  await expect(page.getByText("Tool calls (1)")).toBeVisible();
-  await page.getByRole("button", { name: /Build \(1 turn\)/ }).click();
-  await expect(page.getByText("Agent", { exact: true })).toBeVisible();
+  // An old log: a call with no id and no result still reads as a sentence under the agent's words.
+  const panel = page.getByTestId("agent-log-panel");
+  await expect(panel.getByRole("heading", { name: /^Build/ })).toBeVisible();
+  await expect(panel.getByText("Adding the table.")).toBeVisible();
+  await expect(panel.getByTestId("log-step")).toContainText("Wrote");
   await shot(page, "runs-detail-agent-log");
 });
 
