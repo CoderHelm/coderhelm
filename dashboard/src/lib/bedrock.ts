@@ -79,12 +79,29 @@ export interface SyncPage {
 
 const json = (method: string, body?: unknown): RequestInit => ({ method, body: body === undefined ? undefined : JSON.stringify(body) });
 
+// A reply missing the parts the page reads (an older server, a proxy's error
+// page) is an error the page can show, never a crash.
+const SHAPE_ERROR = "Coderhelm's server answered in a form this page can't read. Update the install, then reload.";
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
+export function checkKeyList(r: unknown): KeyList {
+  if (!isObj(r) || !Array.isArray(r.keys) || !Array.isArray(r.bases) || !isObj(r.connect) || typeof r.connect.mcp_url !== "string") {
+    throw new Error(SHAPE_ERROR);
+  }
+  return r as unknown as KeyList;
+}
+export function checkSyncPage(r: unknown): SyncPage {
+  if (!isObj(r) || !isObj(r.sync) || !Array.isArray(r.bases) || !Array.isArray(r.sync.bases) || !isObj(r.sync.target) || !isObj(r.sync.status)) {
+    throw new Error(SHAPE_ERROR);
+  }
+  return r as unknown as SyncPage;
+}
+
 export const bedrockApi = {
-  keys: () => request<KeyList>("/api/knowledge/keys"),
+  keys: () => request<unknown>("/api/knowledge/keys").then(checkKeyList),
   createKey: (body: { name: string; bases: string[]; expires_in_days: number | null }) =>
     request<{ key: KnowledgeKey; token: string; connect: ConnectInfo }>("/api/knowledge/keys", json("POST", body)),
   revokeKey: (id: string) => request<{ status: string; id: string }>(`/api/knowledge/keys/${encodeURIComponent(id)}`, json("DELETE")),
-  sync: () => request<SyncPage>("/api/knowledge/bedrock-sync"),
+  sync: () => request<unknown>("/api/knowledge/bedrock-sync").then(checkSyncPage),
   saveSync: (body: { enabled: boolean; target: SyncTarget; bases: string[]; acknowledged: boolean }) =>
     request<{ sync: SyncConfig; check: string | null; role_update: SyncPage["role_update"] }>("/api/knowledge/bedrock-sync", json("PUT", body)),
   runSync: () => request<{ status: string }>("/api/knowledge/bedrock-sync/run", json("POST")),

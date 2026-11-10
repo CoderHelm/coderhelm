@@ -120,6 +120,20 @@ async function mockApi(page: Page, init: Partial<Db> = {}): Promise<Db> {
   return db;
 }
 
+test("a reply the page can't read shows an error, never a crash", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await mockApi(page);
+  await page.route(
+    (url) => url.pathname === "/api/knowledge/keys" || url.pathname === "/api/knowledge/bedrock-sync",
+    (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ base: { id: "kb_x" } }) }),
+  );
+  await page.goto("/knowledge/bedrock/");
+  await expect(page.getByTestId("bedrock-page")).toBeVisible();
+  await expect(page.getByText("answered in a form this page can't read").first()).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test("a knowledge key is made for chosen bases, shown once with how to connect, and can be revoked", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/knowledge/bedrock/");
