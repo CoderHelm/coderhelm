@@ -37,6 +37,7 @@ import {
 } from "@/components/settings";
 import { Page, PageHeader } from "@/components/page";
 import { MarkdownEditor } from "@/components/markdown-editor";
+import { StaleSection } from "./stale";
 
 export default function ReviewerConfigGuarded() {
   return (
@@ -109,9 +110,9 @@ const SECTIONS = [
   { id: "stop", title: "Stop everything" },
 ] as const;
 type SectionId = (typeof SECTIONS)[number]["id"];
-/** What the right-hand side shows: one repo section, or the standards shared by every repo. */
-type View = SectionId | "standards";
-const VIEWS: View[] = [...SECTIONS.map((s) => s.id), "standards"];
+/** What the right-hand side shows: one repo section, the standards shared by every repo, or stale pull requests (every repo, or one). */
+type View = SectionId | "standards" | "stale";
+const VIEWS: View[] = [...SECTIONS.map((s) => s.id), "standards", "stale"];
 const isView = (v: string | null): v is View => !!v && (VIEWS as string[]).includes(v);
 
 /** Which settings each section holds, for its "on/off" word and its unsaved dot. */
@@ -407,7 +408,7 @@ function ReviewerConfigPage() {
     unsaved: SECTION_KEYS[s.id].some((k) => unsavedKeys.includes(k)),
   }));
   const stopItem = navItems.find((s) => s.id === "stop");
-  const viewTitle = view === "standards" ? "Every repository" : SECTIONS.find((s) => s.id === view)?.title ?? "";
+  const viewTitle = view === "standards" ? "Every repository" : view === "stale" ? "Stale pull requests" : SECTIONS.find((s) => s.id === view)?.title ?? "";
   const navLink = (id: View, title: string, opts: { word?: string; unsaved?: boolean; danger?: boolean } = {}) => (
     <a
       href={`?${new URLSearchParams({ ...(repo ? { repo } : {}), ...(id === "reviews" ? {} : { section: id }) }).toString()}`}
@@ -460,6 +461,7 @@ function ReviewerConfigPage() {
                   .filter((s) => s.id !== "stop")
                   .map((s) => ({ value: s.id, label: `${s.title}${s.word ? ` (${s.word})` : ""}${s.unsaved ? " · unsaved" : ""}` })),
                 { value: "standards", label: `Every repository${orgDirty ? " · unsaved" : ""}` },
+                { value: "stale", label: "Stale pull requests" },
                 { value: "stop", label: `Stop everything${stopItem?.word ? ` (${stopItem.word})` : ""}` },
               ]}
             />
@@ -471,6 +473,7 @@ function ReviewerConfigPage() {
                 <li key={s.id}>{navLink(s.id, s.title, { word: s.word, unsaved: s.unsaved })}</li>
               ))}
             <li className="mt-3 border-t border-zinc-800 pt-3">{navLink("standards", "Every repository", { unsaved: orgDirty })}</li>
+            <li>{navLink("stale", "Stale pull requests")}</li>
             <li className="mt-3 border-t border-zinc-800 pt-3">
               {navLink("stop", "Stop everything", { word: stopItem?.word, unsaved: stopItem?.unsaved, danger: true })}
             </li>
@@ -497,6 +500,16 @@ function ReviewerConfigPage() {
               dirty={orgDirty}
               readOnly={readOnly}
             />
+          ) : view === "stale" ? (
+            <>
+              <div className="flex min-w-0 flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 sm:flex-row sm:items-center sm:gap-4">
+                <span aria-hidden="true" className="shrink-0 text-sm font-medium text-zinc-300">Repository</span>
+                <div className="min-w-0 sm:w-96">
+                  <RepoCombobox id="rc-repo" repos={repos} selected={repo} onSelect={selectRepo} placeholder="Choose a repository" className="" />
+                </div>
+              </div>
+              <StaleSection repo={repo} readOnly={readOnly} />
+            </>
           ) : (
             <>
               {/* Repository switcher: the one choice a repo section depends on. */}
