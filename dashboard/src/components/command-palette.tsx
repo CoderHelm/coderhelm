@@ -153,6 +153,7 @@ const SETTINGS: { label: string; href: string; need?: string; keywords: string[]
   { label: "AWS accounts", href: "/settings/integrations/aws", need: "view_integrations", keywords: ["cloud", "role"] },
   { label: "Reviewer settings", href: "/reviewer/config", need: ANY_CHANGE, keywords: ["review label", "auto-merge", "release notes"] },
   { label: "Alert routes", href: "/settings/alerts", need: "view_alerts", keywords: ["alarm", "sns", "topic"] },
+  { label: "Security fixes policy", href: "/security/policy", keywords: ["cve", "advisory", "vulnerability", "dependabot", "deadline", "dependencies"] },
   { label: "Notifications", href: "/settings/notifications", keywords: ["email"] },
   { label: "Members and roles", href: "/settings/team", keywords: ["team", "people", "roles", "invite"] },
   { label: "Security", href: "/settings/security", keywords: ["security", "password", "two-factor", "mfa"] },

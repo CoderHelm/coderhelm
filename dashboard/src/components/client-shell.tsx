@@ -18,7 +18,7 @@ import { Logo, TopBar, TopBarProvider } from "./top-bar";
 import { tabTitle as routeTabTitle } from "@/lib/routes";
 import { focusRing } from "./ui";
 import { helpHref, helpTargetFromUrl } from "@/lib/support";
-import { BookIcon, ChatIcon, GearIcon, LifeBuoyIcon, PlanIcon, PlayIcon, ReviewerIcon, ShieldIcon, TemplateIcon, TrendingUpIcon } from "./icons";
+import { BookIcon, ChatIcon, GearIcon, LifeBuoyIcon, PlanIcon, PlayIcon, ReviewerIcon, ShieldCheckIcon, ShieldIcon, TemplateIcon, TrendingUpIcon } from "./icons";
 import { ADMIN_SECTIONS, NAV_SECTIONS, sectionFor, visiblePages, type NavIconKey, type NavSection } from "@/lib/nav";
 import { SETTINGS_ITEMS, offered } from "./settings-items";
 import { isSelfHosted } from "@/lib/runtime-config";
@@ -38,6 +38,7 @@ import { rememberConsentReturn, takeConsentReturn } from "@/lib/connected-apps";
 import { TwoFactorSetup } from "./two-factor-setup";
 import { useSignInMethods } from "@/hooks/use-sign-in-methods";
 import type { MyTwoFactor } from "@/lib/api";
+import { securityApi } from "@/lib/security";
 
 /** Sign out everywhere the same way: end the session, then the sign-in screen. */
 async function signOut() {
@@ -86,6 +87,7 @@ const NAV_ICONS: Record<NavIconKey, ReactNode> = {
   admin: <ShieldIcon />,
   queue: <LifeBuoyIcon />,
   plugins: <TemplateIcon />,
+  security: <ShieldCheckIcon />,
 };
 
 /** A page's capability check, for this person. */
@@ -685,6 +687,20 @@ function Sidebar({
     };
   }, [pathname]);
 
+  // Open P0 and P1 security findings, beside Security. Refetched on
+  // navigation; with the feature off, or an older backend (404), no badge.
+  const [securityUrgent, setSecurityUrgent] = useState(0);
+  useEffect(() => {
+    let live = true;
+    securityApi.overview().then(
+      (o) => live && setSecurityUrgent(o.enabled ? o.counts.p0 + (o.counts.p1 ?? 0) : 0),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [pathname]);
+
   const handleSwitch = async (teamId: string) => {
     setSwitching(true);
     try {
@@ -724,7 +740,14 @@ function Sidebar({
       <>
       <ul className="space-y-0.5" data-testid="main-nav">
         {visibleSections(user, pluginsOn).filter((x) => !x.section.superAdminOnly).map(({ section, href }) => (
-          <NavItemLink key={section.key} href={href} label={section.label} icon={NAV_ICONS[section.icon]} current={currentSection === section.key} />
+          <NavItemLink
+            key={section.key}
+            href={href}
+            label={section.label}
+            icon={NAV_ICONS[section.icon]}
+            current={currentSection === section.key}
+            badge={section.countKey === "securityUrgent" ? <CountBadge n={securityUrgent} label="urgent security findings" tone="danger" /> : null}
+          />
         ))}
       </ul>
 
@@ -1576,10 +1599,11 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
 }
 
 /** A small count beside a menu item; nothing when zero. */
-function CountBadge({ n, label }: { n: number; label: string }) {
+function CountBadge({ n, label, tone = "waiting" }: { n: number; label: string; tone?: "waiting" | "danger" }) {
   if (!n) return null;
+  const look = tone === "danger" ? "bg-red-500/15 text-red-300" : "bg-amber-500/15 text-amber-300";
   return (
-    <span className="min-w-5 rounded-full bg-amber-500/15 px-1.5 text-center text-xs font-semibold tabular-nums leading-5 text-amber-300" data-testid="count-badge">
+    <span className={`min-w-5 rounded-full px-1.5 text-center text-xs font-semibold tabular-nums leading-5 ${look}`} data-testid="count-badge">
       {n}
       <span className="sr-only"> {label}</span>
     </span>

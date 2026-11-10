@@ -159,6 +159,8 @@ async function mockApi(page: Page, init: { me?: string; ticket?: Partial<Ticket>
     if (p === "/api/repos") return json(route, { repos: [{ name: "acme/web", enabled: true, ticket_source: "github" }] });
     if (p === "/api/users") return json(route, { users: TEAM });
     if (p === "/api/search") return json(route, { q: "", runs: [], reviews: [], releases: [], plans: [] });
+    // Security is off: no count beside it in the sidebar.
+    if (p === "/api/security/overview") return json(route, { enabled: false, dry_run: true, counts: { open: 0, p0: 0, p1: 0 } });
     if (p === "/api/support/badge") return json(route, { waiting: 0, queue_open: null });
     if (p === "/api/support/access") return json(route, { grant: null, windows: [24, 72, 168], log: [] });
     if (p === "/api/support/tickets" && method === "POST") {

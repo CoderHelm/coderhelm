@@ -63,6 +63,9 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/infrastructure": { label: "Infrastructure", description: "The cloud resources Coderhelm can see, and what changed in them." },
   "/alerts": { label: "Alerts", description: "Alerts Coderhelm picked up from your monitoring, and what it did about each one." },
   "/alerts/detail": { label: "Alert", parent: "/alerts", detail: true, description: "One alert: when it fired, what Coderhelm found and the fix it proposed." },
+  "/security": { label: "Security", description: "Advisories that touch your dependencies, whether your code reaches the vulnerable part, and the fix for each one." },
+  "/security/detail": { label: "Finding", parent: "/security", detail: true, description: "One security finding: the advisory, why Coderhelm thinks the repo is affected, the fix and its deadline." },
+  "/security/policy": { label: "Policy", parent: "/security", tab: "Security policy", description: "What Coderhelm does about advisories: which get a pull request and when, what is posted, the deadlines and labels." },
   "/health": { label: "System health", description: "Whether every part of this install is working: services, queues, integrations and checks." },
   "/memory": { label: "Memory", description: "What Coderhelm remembers about your team, code and conventions, and where it learned it." },
 

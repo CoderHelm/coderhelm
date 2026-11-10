@@ -138,6 +138,8 @@ export async function mockDemoApi(page: Page, opts: DemoOptions = {}) {
     if (p === "/api/me") return json(route, { user_id: "u_self", team_id: "t_1", github_login: "dana-dev", email: "dana@example.com", avatar_url: "", role, mfa_enabled: false });
     if (p === "/api/usage") return json(route, { month: "2026-01", total_tokens: 1_200_000, tokens_in: 0, tokens_out: 0, total_runs: 4, max_tokens: 10_000_000 });
     if (p === "/api/banners") return json(route, { banners: [] });
+    // Security is off: no count beside it in the sidebar.
+    if (p === "/api/security/overview") return json(route, { enabled: false, dry_run: true, counts: { open: 0, p0: 0, p1: 0 } });
     if (p === "/api/support/badge") return json(route, { waiting: 0, queue_open: null });
     if (p === "/api/integrations") return json(route, { can_edit: false, items: [], migrated: 0 });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }] });

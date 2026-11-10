@@ -35,6 +35,8 @@ async function mockApi(page: Page, opts: { cards: Card[]; install: string; repos
     }
     if (p === "/api/integrations/jira/config") return json(r, { site_url: "https://your-team.atlassian.net", list_projects_url: "https://x/list", create_ticket_url: "https://x/create", add_comment_url: "https://x/comment", projects: [], default_project: "", trigger_label: "coderhelm" });
     if (p === "/api/integrations/jira/events") return json(r, { events: [] });
+    // Security is off: no count beside it in the sidebar.
+    if (p === "/api/security/overview") return json(r, { enabled: false, dry_run: true, counts: { open: 0, p0: 0, p1: 0 } });
     if (p === "/api/support/badge") return json(r, { waiting: 0, queue_open: null });
     return json(r, {});
   });

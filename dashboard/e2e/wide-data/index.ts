@@ -9,6 +9,7 @@ import { brainData } from "./brain";
 import { knowledgeData } from "./knowledge";
 import { agentsData } from "./agents";
 import { pluginsData } from "./plugins";
+import { securityData } from "./security";
 
 // An invented backend whose records are full of long, unbroken strings
 // (long.ts), for the no-sideways-scroll spec. Each file answers one part of
@@ -47,7 +48,7 @@ const base: Handler = ({ method, path }) => {
 };
 
 // Knowledge answers /api/knowledge before the chat's file does.
-const HANDLERS: Handler[] = [base, runsData, reviewData, settingsData, logsData, learningData, knowledgeData, brainData, agentsData, pluginsData];
+const HANDLERS: Handler[] = [base, runsData, reviewData, settingsData, logsData, learningData, knowledgeData, brainData, agentsData, pluginsData, securityData];
 
 /** Mocks the whole API. Returns the list of GETs no handler answered. */
 export async function mockWideApi(page: Page): Promise<{ unanswered: string[] }> {

@@ -1,0 +1,97 @@
+---
+title: Security fixes
+description: How CoderHelm checks each advisory that touches your dependencies against your code, opens one fix pull request per fix, and posts the urgent ones to your alerts channel with a deadline.
+---
+
+When an advisory is published for a package one of your repositories uses, CoderHelm works out whether your code actually reaches the vulnerable part. It then gives the finding a tier and a deadline, opens a fix pull request and gets its CI green. For urgent findings it also posts a card to the same channel as your production alerts.
+
+Security fixes are off for new teams. Turn them on in **Security**, then **Policy** (admins only). Dry run starts on: CoderHelm finds and checks advisories but opens nothing and posts nothing, and **Preview** shows what it would do.
+
+## Where the advisories come from
+
+| Source | What it is used for |
+| --- | --- |
+| **OSV.dev** | The main advisory database: about 30 package ecosystems plus the Linux distributions behind base images. CoderHelm keeps a copy of OSV's daily export and matches your dependency lists against it locally. |
+| **Dependabot alerts** | The fastest signal when Dependabot alerts are on for a repository. CoderHelm hears about each alert as it is created, fixed, dismissed or withdrawn, and reads its direct or indirect and runtime or development details. |
+| **GitHub advisories** | Every new GitHub advisory is checked against the stored dependency list of each repository, including repositories where Dependabot alerts are off. |
+| **CISA's known exploited list** | Vulnerabilities being exploited now. Its due date for each one can become the deadline. |
+| **FIRST EPSS** | A daily score for how likely each vulnerability is to be exploited in the next 30 days. |
+
+NVD is read only when nothing else has a score. OSV and GitHub data are licensed CC-BY, so the dashboard and every pull request credit them.
+
+CoderHelm stores each repository's dependency list when its default branch changes: GitHub's dependency graph, plus its own reading of lockfiles the graph misses and of Dockerfile `FROM` lines. A new advisory is then a lookup, not a scan of every repository.
+
+### What is sent where on a self-hosted install
+
+Your dependency lists never leave your AWS account. The install makes these outbound calls, none of which carry anything about your code:
+
+- the OSV export (`osv-vulnerabilities` on Google Cloud Storage), read daily for changed records only. Without the optional mirror bucket, the install asks OSV's API about each package and version instead, which does send package names and versions to OSV;
+- CISA's exploited list (a public JSON file), a few times a day;
+- FIRST's EPSS scores, for the vulnerability IDs the install holds;
+- GitHub's API, as for everything else CoderHelm does.
+
+## The four verdicts
+
+Each finding goes through cheap checks first, so the agent spends tokens only where it changes the answer: the version ranges, then whether the package is loaded at runtime, then a tool check (govulncheck for Go, or the functions named in the advisory or its fix), and only then the agent reading the call sites and configuration.
+
+| Verdict | Meaning |
+| --- | --- |
+| **Reachable** | Your code calls the vulnerable part of the package. |
+| **Present, not reachable** | The package is loaded, but nothing calls the vulnerable part. |
+| **Not loaded** | Development or test only, never loaded in production. |
+| **Unknown** | The evidence is missing. Unknown is treated as reachable when the service faces the internet. |
+
+Each verdict comes with its evidence: the files and lines that show it, the dependency path, what was checked and how confident CoderHelm is. A verdict never closes an alert on its own. "Not reachable" lowers the tier and shows its evidence; only a person can dismiss a finding.
+
+## Tiers and deadlines
+
+These are the defaults. You can change when each tier gets a pull request, which tiers post to the alerts channel, and the number of days for each deadline.
+
+| Tier | When | What CoderHelm does | Due |
+| --- | --- | --- | --- |
+| **P0** | On the exploited list and loaded at runtime; or CVSS 9 or more and reachable (or unknown and facing the internet); or a malicious package | Opens the pull request at once and posts a card | 3 days, or the exploited list's date when sooner |
+| **P1** | CVSS 7 or more and reachable; or an EPSS score of 0.1 or more and loaded at runtime | Opens the pull request within the hour and posts a card | 7 days |
+| **P2** | Reachable and medium; or high but not reachable | Opens pull requests once a day, grouped by ecosystem | 30 days |
+| **P3** | Development only, not loaded, or low | One grouped pull request a week, with no notifications | 90 days |
+
+The defaults follow CISA BOD 19-02 (critical in 15 days, high in 30), PCI DSS 4.0.1 requirement 6.3.3 (critical within a month) and FedRAMP's deadlines by exploitability and exposure.
+
+## The pull request
+
+One pull request per fix, not per alert. The same flaw listed under its CVE, GHSA and ecosystem IDs counts once, and a bump that clears three advisories is one pull request.
+
+- **Branch:** `coderhelm/security-<package>-<version>`.
+- **Title:** `fix(deps): bump <package> <from> to <to> [SECURITY] (<ID>)`, for example `fix(deps): bump undici 6.19.2 to 6.21.1 [SECURITY] (CVE-2026-31337)`. The prefix follows your repository's commit style, or your team's git conventions.
+- **Labels**, created when missing:
+  - the labels you set in the policy (by default `security` and `dependencies`);
+  - `severity:critical`, `severity:high`, `severity:medium` or `severity:low`;
+  - `reachable`, `not-reachable` or `reachability:unknown`;
+  - `exploited` when it is on CISA's list;
+  - `breaking` when a major version bump was needed;
+  - the ecosystem label Dependabot would use, so your existing filters keep working.
+- **Body:** a summary with the tier and due date; the advisory (IDs, CVSS, EPSS, the exploited list, the weakness); what is affected (the dependency path, runtime or development, direct or indirect); the reachability verdict with its files and lines; the change, with the release notes between the two versions; and the proof (the CI run, a re-check showing the advisory gone, and a regression test when one can be written). It ends with the Dependabot alert it closes and the data credit.
+
+The pull request has the public facts about the advisory. How exposed your own production is stays in the dashboard and the card, never in a public repository.
+
+Lockfiles are regenerated with the real package manager at the repository's own version, never edited by hand. When the fix is in an indirect dependency, CoderHelm tries a lockfile-only refresh first, then the ecosystem's override, with a comment saying when to remove it. When a major bump is needed, the policy decides whether CoderHelm fixes the breaking changes in the same pull request or opens an issue only. When Dependabot or Renovate already opened a pull request for the fix, CoderHelm takes it over instead of opening a second one.
+
+`security` is already a label the stale pull request cleanup never closes.
+
+## The alert cards
+
+P0 and P1 findings post a card to the same Teams or Slack channels as your production alerts, through your alert routes (**Settings**, then **Alerts**). The card says which repository is affected and why, the fix pull request and its CI, the package versions and the deadline, with buttons to open the pull request, see why and snooze.
+
+The same card is updated when the pull request opens, when CI passes and when it merges. It also posts an update at half the deadline and at the deadline, when an open finding is added to the exploited list, and when its EPSS score jumps. A finding your team already handled never posts twice.
+
+## Dismissing and ignoring
+
+**Dismiss** a finding from its page when it doesn't apply (admins only). A reason is required, and you can give a date for it to come back if it still applies. The reason is kept with the finding and, when there is a Dependabot alert, sent to that alert too. **Reopen** undoes it.
+
+**Ignore** an advisory in the policy, for one repository or every repository. Every ignore needs a reason and an end date, so nothing is ignored forever by accident. When the date passes, the advisory is checked again.
+
+## The GitHub App permission to add
+
+Reading Dependabot alerts needs one more permission on the CoderHelm GitHub App: **Dependabot alerts: read**, and the **Dependabot alert** event. Until it has them, the Security page says so. CoderHelm still checks your dependencies against OSV and GitHub's advisories, but it hears about new Dependabot alerts later and can't mark them dismissed.
+
+- **Hosted:** an owner of your GitHub organization opens GitHub, then **Settings**, then **GitHub Apps**, then **Coderhelm**, and accepts the request for new permissions.
+- **Self-hosted:** the App's owner adds **Dependabot alerts: read** under the App's repository permissions and subscribes to the **Dependabot alert** event. Each organization that installed the App then accepts the new permission the same way.

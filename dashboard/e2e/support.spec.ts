@@ -152,6 +152,8 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
 
     // Customer routes: only the session's team.
     const team = db.tickets.filter((t) => t.team_id === db.team);
+    // Security is off: no count beside it in the sidebar.
+    if (p === "/api/security/overview") return json(route, { enabled: false, dry_run: true, counts: { open: 0, p0: 0, p1: 0 } });
     if (p === "/api/support/badge") {
       return json(route, { waiting: team.filter((t) => t.status === "waiting").length, queue_open: isAdmin() ? db.tickets.filter((t) => t.status === "open").length : null });
     }
