@@ -1861,6 +1861,8 @@ export interface Review {
   created_at: string;
   /** Team standards the review was given in full ("Always apply"). */
   applied_standards?: string[];
+  /** One line on why the review approved or requested changes, naming the findings that decided it (empty on older reviews). */
+  verdict_reason?: string;
   /** The PR's title when the review was written (empty on older reviews). */
   pr_title?: string;
   /** The findings, one object each (null on older reviews: read them from `body`). */
