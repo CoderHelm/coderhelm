@@ -180,8 +180,8 @@ function summaryLines(cfg: ReviewerConfig): string[] {
   if (cfg.killed) return ["Every reviewer action on this repo is stopped, whatever else is set below."];
   if (!cfg.enabled) return ["The reviewer ignores this repo. Turn it on under Reviews."];
   const lines = [`Reviews pull requests labelled “${cfg.label || DEFAULTS.label}”.`];
-  if (cfg.verify_tests) lines.push(`Runs the affected tests before it reviews${cfg.require_tests ? ", and blocks changes that come without tests" : ""}.`);
-  else lines.push(`Reads the code without running tests${cfg.require_tests ? ", and blocks changes that come without tests" : ""}.`);
+  if (cfg.verify_tests) lines.push(`Runs the affected tests before it reviews${cfg.require_tests ? ", and requests changes when a behavior change comes without tests" : ""}.`);
+  else lines.push(`Reads the code without running tests${cfg.require_tests ? ", and requests changes when a behavior change comes without tests" : ""}.`);
   if (cfg.auto_labels) lines.push("Adds the CI labels each pull request needs.");
   if (cfg.auto_merge) {
     const method = MERGE_METHODS.find((m) => m.value === cfg.merge_method)?.label.toLowerCase() ?? cfg.merge_method;
@@ -584,7 +584,7 @@ function ReviewerConfigPage() {
                 <SettingsRow
                   layout="stacked"
                   label="Review focus"
-                  help="Optional. What to look at closely on this repo, on top of the team standards and the repo's AGENTS.md."
+                  help="Optional. What to look at closely on this repo, on top of the team standards and the repo's AGENTS.md. A line written with MUST, MUST NOT, NEVER, REQUIRED or ALWAYS in capitals is a required rule: a change that breaks it gets changes requested. Other lines are advice."
                   {...marks("instructions")}
                   control={({ inputId, helpId }) => (
                     <MarkdownEditor
@@ -616,13 +616,15 @@ function ReviewerConfigPage() {
                 />
                 <SettingsRow
                   label="Require tests"
-                  help="Flags new or changed behavior that comes without tests, as a Suggestion on the approval."
+                  help="Requests changes when new or changed behavior comes without tests."
                   more={
                     <p>
                       New features need new tests; changed or fixed behavior needs its tests added or updated. Coderhelm writes those tests itself
-                      when it plans and codes a change (following your AGENTS.md / CLAUDE.md test conventions), and the reviewer always flags a
-                      missing or stale test as a Suggestion. Changes are requested only for a correctness, security or data-loss problem, so a
-                      missing test alone never holds the merge. Refactors, docs, config and dependency bumps are exempt.
+                      when it plans and codes a change (following your AGENTS.md / CLAUDE.md test conventions). The reviewer requests changes for a
+                      missing or stale test and says what to test, where, and with which case. A package with no test runner is not exempt: the
+                      review says which runner, script and config to add, matching the rest of the repo, and on Coderhelm&apos;s own pull
+                      requests its fix round adds them. Only these are exempt, checked against the changed files: docs only, config or
+                      dependency versions only, generated files only, tests only, and a refactor with the existing test that covers it.
                     </p>
                   }
                   {...marks("require_tests")}

@@ -325,6 +325,11 @@ function Header({ review, title }: { review: Review; title: string }) {
           </li>
         )}
       </ul>
+      {review.verdict_reason && (
+        <p className="mt-1.5 max-w-prose text-sm text-zinc-300 [overflow-wrap:anywhere]" data-testid="verdict-reason">
+          {review.verdict_reason}
+        </p>
+      )}
       {posted && <p className="mt-1.5 max-w-prose text-sm text-zinc-400" data-testid="posted-note">{posted}</p>}
     </div>
   );
