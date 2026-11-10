@@ -295,6 +295,41 @@ async function askIt(page: Page, q = "How long is parental leave?") {
   await box(page).press("Enter");
 }
 
+test.describe("chat: the answer stream's request", () => {
+  /** The headers of the one answer stream request a question makes. */
+  async function streamHeaders(page: Page, selfHosted: boolean) {
+    await mockApi(page);
+    if (selfHosted) {
+      await page.route((url) => url.pathname === "/runtime-config.js", (r) =>
+        r.fulfill({ contentType: "text/javascript", body: `window.__CODERHELM_CONFIG__ = ${JSON.stringify({ apiUrl: "", streamUrl: "", selfHosted: true })};` }),
+      );
+    }
+    const req = page.waitForRequest((r) => r.url().endsWith("/api/brain/stream") && r.method() === "POST");
+    await page.goto("/chat");
+    await askIt(page);
+    const r = await req;
+    return { headers: await r.allHeaders(), body: r.postData() ?? "" };
+  }
+
+  test("self-hosted: through the install's CloudFront, the token in its own header and the body's SHA-256", async ({ page }) => {
+    const { headers, body } = await streamHeaders(page, true);
+    // CloudFront signs the call to the function URL (its signature is the
+    // Authorization header): the token can't travel there.
+    expect(headers["authorization"]).toBeUndefined();
+    expect(headers["x-coderhelm-stream-token"]).toBe("t");
+    const { createHash } = await import("node:crypto");
+    expect(headers["x-amz-content-sha256"]).toBe(createHash("sha256").update(body, "utf8").digest("hex"));
+    expect(JSON.parse(body).question).toBe("How long is parental leave?");
+  });
+
+  test("a stream on another hostname: a bearer token, nothing else", async ({ page }) => {
+    const { headers } = await streamHeaders(page, false);
+    expect(headers["authorization"]).toBe("Bearer t");
+    expect(headers["x-coderhelm-stream-token"]).toBeUndefined();
+    expect(headers["x-amz-content-sha256"]).toBeUndefined();
+  });
+});
+
 test.describe("chat: the empty page", () => {
   test("opens on a focused question box with starter questions, and no scope it wasn't given", async ({ page }) => {
     const db = await mockApi(page);

@@ -4,6 +4,7 @@
 
 import { request, ApiError } from "./api";
 import { streamBase } from "./runtime-config";
+import { streamPost } from "./stream-client";
 
 // ── Knowledge bases ───────────────────────────────────────────────
 
@@ -318,10 +319,11 @@ async function brainToken(): Promise<string> {
 /** Asks a question; events arrive through `onEvent` until `done`. */
 export async function askBrain(body: AskBody, onEvent: (e: BrainEvent) => void, signal?: AbortSignal): Promise<void> {
   const token = await brainToken();
+  const post = await streamPost(token, body);
   const res = await fetch(`${streamBase()}/api/brain/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify(body),
+    headers: post.headers,
+    body: post.body,
     signal,
   });
   if (!res.ok || !res.body) {

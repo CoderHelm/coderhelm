@@ -5,7 +5,37 @@
 import type { StreamEvent } from "./stream-types";
 import { apiBase, streamBase } from "@/lib/runtime-config";
 
+/**
+ * A chat stream POST: its headers and body.
+ *
+ * On the dashboard's own hostname (a self-hosted install) the stream goes
+ * through the install's CloudFront, which signs each call to the streaming
+ * function (origin access control: the function URL takes only signed calls).
+ * CloudFront's signature is the Authorization header, so the token goes in
+ * its own header, and Lambda needs the body's SHA-256 in
+ * x-amz-content-sha256 to accept a signed POST. A stream on another hostname
+ * (the hosted service) takes the token as a bearer token, as before.
+ */
+export async function streamPost(token: string, payload: unknown): Promise<{ headers: Record<string, string>; body: string }> {
+  const body = JSON.stringify(payload);
+  if (streamBase() !== "") {
+    return { headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body };
+  }
+  return {
+    headers: {
+      "Content-Type": "application/json",
+      "x-coderhelm-stream-token": token,
+      "x-amz-content-sha256": await sha256Hex(body),
+    },
+    body,
+  };
+}
 
+/** The SHA-256 of `text` (UTF-8), in lowercase hex. */
+export async function sha256Hex(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 /** How long to wait for the token fetch or initial stream connection */
 const CONNECT_TIMEOUT_MS = 15_000;
@@ -138,15 +168,13 @@ export async function streamChat(
   assertOnline();
 
   const token = await fetchStreamToken(signal);
+  const post = await streamPost(token, { messages, chat_id: chatId });
 
   const res = await withTimeout(
     fetch(`${streamBase()}/api/plans/chat/stream`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ messages, chat_id: chatId }),
+      headers: post.headers,
+      body: post.body,
       signal,
     }),
     CONNECT_TIMEOUT_MS,
