@@ -5,8 +5,7 @@ import type { ActivityGroup, OverviewFile, ReviewSession, SessionStep } from "@/
 import { Callout } from "@/components/callout";
 import { cardClass } from "@/components/page";
 import { formatDate, formatDuration, Time } from "@/components/list";
-import { DataTable } from "@/components/data-table";
-import { Code } from "@/components/settings/code";
+import { FilePath } from "@/components/file-path";
 import { Disclosure } from "@/components/disclosure";
 import { ChatIcon, CheckIcon, ChevronRightIcon, EyeIcon, ExternalLinkIcon, LayersIcon, PenIcon, SearchIcon, WrenchIcon, XIcon } from "@/components/icons";
 import { InlineMarkdown } from "@/components/markdown";
@@ -67,7 +66,7 @@ export function SessionNotice({ session }: { session: ReviewSession }) {
   return (
     <div data-testid="session-notice">
       <Callout variant={variant} title={title} live={false}>
-        {session.reason && <p className="[overflow-wrap:anywhere]">{session.reason}</p>}
+        {session.reason && <p className="[overflow-wrap:anywhere]"><InlineMarkdown>{session.reason}</InlineMarkdown></p>}
         {note && <p>{note}</p>}
       </Callout>
     </div>
@@ -204,7 +203,7 @@ function ToolRow({ group, startedAt, running }: { group: ActivityGroup; startedA
             <li key={`${item.at}-${i}`} className="min-w-0 text-xs leading-5 text-zinc-400 [overflow-wrap:anywhere]">
               {item.detail && group.kind === "lookup" && <span>{item.detail}{item.label ? ": " : ""}</span>}
               {item.label && <span className="font-mono text-zinc-300">{item.label}</span>}
-              {item.detail && group.kind === "comment" && <span> {item.detail}</span>}
+              {item.detail && group.kind === "comment" && <span> <InlineMarkdown>{item.detail}</InlineMarkdown></span>}
               {item.failed && <span className="text-red-300"> (failed)</span>}
             </li>
           ))}
@@ -293,11 +292,11 @@ export function SessionActivity({ session, now, defaultOpen = true }: { session:
                     data-state={running ? "running" : "done"}
                   >
                     <div className="flex min-w-0 items-baseline gap-2">
-                      <h3 className="min-w-0 text-sm font-semibold text-zinc-100 [overflow-wrap:anywhere]">{b.note.title}</h3>
+                      <h3 className="min-w-0 text-sm font-semibold text-zinc-100 [overflow-wrap:anywhere]"><InlineMarkdown>{b.note.title}</InlineMarkdown></h3>
                       {running && <span className="sr-only"> (running now)</span>}
                       <Offset startedAt={start} at={b.note.started_at} />
                     </div>
-                    {b.note.text && <p className="mt-0.5 text-sm leading-relaxed text-zinc-300 [overflow-wrap:anywhere]">{b.note.text}</p>}
+                    {b.note.text && <p className="mt-0.5 text-sm leading-relaxed text-zinc-300 [overflow-wrap:anywhere]"><InlineMarkdown>{b.note.text}</InlineMarkdown></p>}
                     {b.tools.length > 0 && (
                       <ul className="mt-1.5 space-y-1" aria-label={`What it did for: ${b.note.title}`}>
                         {b.tools.map((t) => (
@@ -321,18 +320,39 @@ export function SessionActivity({ session, now, defaultOpen = true }: { session:
 
 // ---- The overview the review posted ---------------------------------------
 
+/**
+ * One row per file: the path as wide as it needs (at most two fifths of the
+ * card, then it wraps), the description in the rest, its `code` as code. A
+ * grid, not a table layout, so the path column fits its content; on a phone
+ * each row stacks the path over its description.
+ */
 function FilesTable({ files }: { files: OverviewFile[] }) {
   return (
-    <DataTable
-      label="Reviewed changes"
-      testId="overview-files"
-      rows={files}
-      rowKey={(f) => f.path}
-      columns={[
-        { key: "file", header: "File", width: "grow", cell: (f) => <Code>{f.path}</Code> },
-        { key: "description", header: "Description", width: "grow", cell: (f) => <span className="text-zinc-300">{f.description}</span> },
-      ]}
-    />
+    <div
+      role="table"
+      aria-label="Reviewed changes"
+      data-testid="overview-files"
+      className="grid min-w-0 grid-cols-1 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/30 text-sm sm:grid-cols-[fit-content(40%)_minmax(0,1fr)]"
+    >
+      <div role="row" className="col-span-full hidden grid-cols-subgrid border-b border-zinc-800 text-left text-xs text-zinc-400 sm:grid">
+        <span role="columnheader" className="px-4 py-2.5 font-medium">File</span>
+        <span role="columnheader" className="px-4 py-2.5 font-medium">Description</span>
+      </div>
+      {files.map((f, i) => (
+        <div
+          role="row"
+          key={f.path}
+          className={`col-span-full grid grid-cols-subgrid gap-y-1 px-4 py-2.5 sm:gap-y-0 sm:px-0 ${i > 0 ? "border-t border-zinc-800" : ""}`}
+        >
+          <span role="cell" className="min-w-0 sm:px-4">
+            <FilePath path={f.path} />
+          </span>
+          <span role="cell" className="min-w-0 leading-relaxed text-zinc-300 [overflow-wrap:anywhere] sm:px-4">
+            <InlineMarkdown>{f.description}</InlineMarkdown>
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -346,13 +366,13 @@ export function SessionOverview({ session }: { session: ReviewSession }) {
   const total = o.files_total || files.length;
   return (
     <SessionCard id="session-overview-title" title="PR overview" testId="session-overview">
-      {o.summary && <p className="mt-2 text-sm text-zinc-200 [overflow-wrap:anywhere]">{o.summary}</p>}
+      {o.summary && <p className="mt-2 text-sm text-zinc-200 [overflow-wrap:anywhere]"><InlineMarkdown>{o.summary}</InlineMarkdown></p>}
       {changes.length > 0 && (
         <>
           <h3 className="mt-4 text-xs font-medium text-zinc-400">Changes</h3>
           <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-zinc-300" data-testid="overview-changes">
             {changes.map((c, i) => (
-              <li key={i} className="[overflow-wrap:anywhere]">{c}</li>
+              <li key={i} className="[overflow-wrap:anywhere]"><InlineMarkdown>{c}</InlineMarkdown></li>
             ))}
           </ul>
         </>

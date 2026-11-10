@@ -518,6 +518,73 @@ test("the overview says what the PR does, file by file", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test("the file table fits the paths, reads code as code, and stacks on a phone", async ({ page }) => {
+  const errors = watchConsole(page);
+  const LONG = "src/features/reporting/dashboards/widgets/table/columns/use-fetch-columns-with-a-long-name.ts";
+  await mockApi(page, {
+    sessions: [
+      session({
+        status: "done",
+        in_flight: false,
+        finished_at: iso(5),
+        verdict: "APPROVE",
+        findings: 0,
+        activity: [{ kind: "note", title: "Checking `PHONE_BAR_ITEMS` order", started_at: msIso(78), ended_at: msIso(78), text: "It ends with `More`.", items: [] }],
+        overview: {
+          summary: "Moves the phone bar's extra links into a `More` menu.",
+          changes: ["Adds `PHONE_BAR_ITEMS` with the links in order", "Keeps `fetchColumns` as it was"],
+          files: [
+            { path: "src/nav/phone-bar.tsx", description: "Reads the links from `PHONE_BAR_ITEMS` and renders the last three inside a `More` menu, so the bar fits a phone screen." },
+            { path: "src/nav/items.ts", description: "Adds `PHONE_BAR_ITEMS`." },
+            { path: LONG, description: "No behaviour change: `fetchColumns` is only renamed in a comment." },
+          ],
+          files_total: 3,
+        },
+      }),
+    ],
+  });
+  await page.goto(`/reviewer/session?id=${ID}`);
+  const card = page.getByTestId("session-overview");
+  const table = card.getByRole("table", { name: "Reviewed changes" });
+  await expect(table.getByRole("columnheader")).toHaveText(["File", "Description"]);
+  await expect(table.getByRole("row")).toHaveCount(4);
+
+  // Backticks are code everywhere on the page: the summary, the changes, each file's line, the notes.
+  for (const word of ["More", "PHONE_BAR_ITEMS", "fetchColumns"]) await expect(card.locator("code", { hasText: word }).first()).toBeVisible();
+  await expect(table.getByRole("row").nth(1).getByRole("cell").nth(1).locator("code")).toHaveText(["PHONE_BAR_ITEMS", "More"]);
+  await expect(card).not.toContainText("`");
+  await expect(page.getByTestId("session-activity").getByRole("heading", { level: 3 }).locator("code")).toHaveText("PHONE_BAR_ITEMS");
+  await expect(page.getByTestId("session-activity")).not.toContainText("`");
+
+  // The directory is muted and the file name plain; the full path is the hover text.
+  const longCell = table.getByRole("row").nth(3).getByRole("cell").first();
+  await expect(longCell.locator("[title]")).toHaveAttribute("title", LONG);
+  await expect(longCell).toHaveText(LONG);
+
+  // The path column is as wide as its paths, at most two fifths: the description gets the rest.
+  const widths = async () => {
+    const row = table.getByRole("row").nth(1);
+    const [file, desc] = await Promise.all([row.getByRole("cell").nth(0).boundingBox(), row.getByRole("cell").nth(1).boundingBox()]);
+    const all = await table.boundingBox();
+    return { file: file!.width, desc: desc!.width, all: all!.width };
+  };
+  const desk = await widths();
+  expect(desk.file).toBeLessThanOrEqual(desk.all * 0.4 + 1);
+  expect(desk.desc).toBeGreaterThan(desk.all * 0.55);
+
+  // On a phone each row stacks: the path, then its description, nothing sideways.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(table.getByRole("columnheader").first()).toBeHidden();
+  // The header row is gone on a phone, so the rows are the files alone.
+  await expect(table.getByRole("row")).toHaveCount(3);
+  const row = table.getByRole("row").filter({ hasText: LONG });
+  const [path, desc] = await Promise.all([row.getByRole("cell").nth(0).boundingBox(), row.getByRole("cell").nth(1).boundingBox()]);
+  expect(desc!.y).toBeGreaterThanOrEqual(path!.y + path!.height - 1);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+  expect(errors).toEqual([]);
+});
+
 test("a large PR's file table starts folded, and nothing scrolls sideways on a phone", async ({ page }) => {
   const big = overview(20);
   big.files_total = 140;
