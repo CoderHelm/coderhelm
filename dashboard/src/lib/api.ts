@@ -1136,6 +1136,27 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(config),
     }),
+  /** Stale pull request cleanup: the team's settings, the repository's own (null: it follows the team) and what applies. */
+  getStaleConfig: (repo?: string) =>
+    request<StaleConfigView>(`/api/reviewer/stale/config${repo ? `?repo=${encodeURIComponent(repo)}` : ""}`),
+  /** Saves the team's settings (no repo), or one repository's; `config: null` makes the repository follow the team. Admin. */
+  saveStaleConfig: (config: StaleConfig | null, repo?: string) =>
+    request<{ config: StaleConfig | null }>(`/api/reviewer/stale/config`, {
+      method: "PUT",
+      body: JSON.stringify(repo ? { repo, config } : { config }),
+    }),
+  /** The latest plan for a repository, the actions taken and the pull requests kept open. */
+  getStaleActivity: (repo: string) =>
+    request<StaleActivity>(`/api/reviewer/stale?repo=${encodeURIComponent(repo)}`),
+  /** Works the plan out again now, changing nothing on GitHub. */
+  previewStale: (repo: string) =>
+    request<{ queued: boolean }>(`/api/reviewer/stale/preview`, { method: "POST", body: JSON.stringify({ repo }) }),
+  /** Keeps one pull request open (never closed as stale), or lets it be closed again. Admin. */
+  setStaleKeepOpen: (repo: string, pr: number, keep: boolean, title = "", url = "") =>
+    request<{ pr: number; keep: boolean }>(`/api/reviewer/stale/keep-open`, {
+      method: "PUT",
+      body: JSON.stringify({ repo, pr, keep, title, url }),
+    }),
   getOrgReviewInstructions: () =>
     request<{ instructions: string }>(`/api/reviewer/org-config`),
   updateOrgReviewInstructions: (instructions: string) =>
@@ -1704,6 +1725,63 @@ export interface GraphNeighborhood {
   imports: string[];
   importers: string[];
   symbols: { name: string; callers: string[] }[];
+}
+
+/** Stale pull request cleanup settings (a team's, or one repository's). */
+export interface StaleConfig {
+  enabled: boolean;
+  stale_days: number;
+  close_days: number;
+  label: string;
+  warn_message: string;
+  close_message: string;
+  exempt_labels: string[];
+  exempt_drafts: boolean;
+  exempt_authors: string[];
+  scope: "all" | "own";
+  delete_branch: boolean;
+  max_closes_per_run: number;
+  dry_run: boolean;
+}
+
+export interface StaleConfigView {
+  team: StaleConfig;
+  team_saved: boolean;
+  repo: StaleConfig | null;
+  effective: StaleConfig;
+  defaults: StaleConfig;
+}
+
+/** One pull request in the plan: what happens to it next and why. */
+export interface StalePlanItem {
+  pr: number;
+  title: string;
+  author: string;
+  url: string;
+  action: "mark" | "close" | "unmark" | "wait" | "exempt";
+  why: string;
+  last_activity: string;
+  last_what: string;
+  next_at?: string;
+}
+
+export interface StaleLogEntry {
+  at: string;
+  repo: string;
+  pr: number;
+  action: "marked" | "closed" | "unstaled" | "kept_open" | "allowed_to_close";
+  title: string;
+  url: string;
+  author: string;
+  why: string;
+  by: string;
+  run_id: string;
+}
+
+export interface StaleActivity {
+  plan: { computed_at: string; dry_run: boolean; stopped: string; items: StalePlanItem[] } | null;
+  log: StaleLogEntry[];
+  kept_open: { pr: number; title: string; url: string; by: string; via: string; at: string }[];
 }
 
 export interface ReviewerConfig {
