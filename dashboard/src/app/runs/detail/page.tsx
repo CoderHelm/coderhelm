@@ -33,6 +33,10 @@ import { CodeBlock } from "@/components/code-block";
 import { ChevronRightIcon, ExternalLinkIcon } from "@/components/icons";
 import { RunTriggerLine } from "@/components/run-trigger";
 import { activePass, PASSES, runSteps } from "@/lib/run-steps";
+import { checksSentence, runTimeline, spanSeconds, stillToCome } from "@/lib/run-timeline";
+import { ChecksPanel, FilesChanged, RunTimeline } from "./run-timeline";
+import { VerdictPill } from "@/app/reviewer/labels";
+import { reviewHref } from "@/app/reviewer/session/session";
 
 /** Words people read for each step name the worker records. */
 const PASS_LABEL: Record<string, string> = {
@@ -42,7 +46,9 @@ const PASS_LABEL: Record<string, string> = {
   test: "Test",
   security: "Security",
   pr: "Pull request",
-  review: "Review",
+  // After the pull request: its checks and the run's own look at it. Not the
+  // Reviewer, and not "Address PR comments".
+  review: "Checks",
   feedback: "Feedback",
   ci_fix: "CI fix",
 };
@@ -77,56 +83,6 @@ function actionError(e: unknown, what: string): string {
   if (msg.includes("409")) return "The pull request is already merged.";
   if (msg.includes("400")) return `This run can't ${what} in its current state. Refresh the page to see where it is now.`;
   return `Couldn't ${what}. Try again in a moment.`;
-}
-
-function PassProgress({ currentPass, status, passHistory, hasPr }: { currentPass?: string; status: string; passHistory?: { pass: string }[]; hasPr: boolean }) {
-  const { doneIdx, activeIdx } = runSteps({ currentPass, status, passHistory, hasPr });
-  const awaiting = status === "awaiting_ci";
-  return (
-    <ol aria-label="Steps" className="flex flex-wrap items-center gap-y-2">
-      {PASSES.map((pass, i) => {
-        const done = i < doneIdx;
-        const active = i === activeIdx;
-        const failed = status === "failed" && i === doneIdx;
-        return (
-          <li key={pass} className="flex items-center" aria-current={active ? "step" : undefined}>
-            {i > 0 && (
-              <div aria-hidden="true" className={`w-3 sm:w-6 h-px ${done ? "bg-emerald-500/50" : active ? (awaiting ? "bg-cyan-500/30" : "bg-blue-500/30") : "bg-zinc-700/60"}`} />
-            )}
-            <div
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                done
-                  ? "text-emerald-400"
-                  : active
-                    ? awaiting ? "bg-cyan-500/10 text-cyan-400" : "bg-blue-500/10 text-blue-400"
-                    : failed
-                      ? "bg-red-500/10 text-red-400"
-                      : "text-zinc-400"
-              }`}
-            >
-              {done ? (
-                <svg aria-hidden="true" className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              ) : active ? (
-                awaiting ? (
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                ) : (
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                )
-              ) : failed ? (
-                <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-              ) : (
-                <span className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
-              )}
-              {PASS_LABEL[pass]}
-              {(done || failed) && <span className="sr-only">{done ? " (done)" : " (failed)"}</span>}
-            </div>
-          </li>
-        );
-      })}
-    </ol>
-  );
 }
 
 /** A run's four token parts (missing ones count as 0). */
@@ -188,41 +144,25 @@ function parseTaskItems(tasks?: string): TaskItem[] {
   return items;
 }
 
-/** Check if a task item is done based on run state and file matching. */
-function isTaskDone(
-  task: TaskItem,
-  filesModified: string[],
-  runStatus: string,
-  maxPassIdx: number,
-): boolean {
-  const section = task.section.toLowerCase();
-  const isPostDeploy = section.includes("post-deploy");
-  const isVerification = section.includes("verification") && !isPostDeploy;
-  const isPrereq = section.includes("prerequisit");
+/**
+ * A task is done only when the plan says so (its own checkbox). The run
+ * doesn't report tasks one by one, so the page never guesses from file
+ * names or the run's status.
+ */
+function isTaskDone(task: TaskItem): boolean {
+  return task.checked;
+}
 
-  // If the openspec itself marks it checked, it's done
-  if (task.checked) return true;
-
-  // For completed runs: all non-post-deploy tasks are done
-  if (runStatus === "completed" && !isPostDeploy) return true;
-
-  // Prerequisites done once we're past plan
-  if (isPrereq && maxPassIdx >= 2) return true;
-
-  // Verification done once review pass completed
-  if (isVerification && (maxPassIdx >= 4 || runStatus === "completed")) return true;
-
-  // File-path matching for real-time progress during implement
-  if (task.filePaths.length > 0) {
-    return task.filePaths.some((tp) =>
-      filesModified.some((fm) => fm.endsWith(tp) || tp.endsWith(fm) || fm.includes(tp.replace(/^.*\//, "")))
-    );
-  }
-
-  // Implementation tasks without file paths: done if we're past implement
-  if (maxPassIdx >= 3) return true;
-
-  return false;
+/** The time now, once a second while `on`: a live elapsed time. */
+function useNow(on: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!on) return;
+    setNow(Date.now());
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [on]);
+  return now;
 }
 
 function AgentLogPassView({ pass }: { pass: AgentLogPass }) {
@@ -422,6 +362,8 @@ function RunDetailInner() {
 
   // Approvals and sign-ins the run's agents asked for: open ones on the overview, the rest in Activity.
   const asks = useRunApprovals(runId, !!run && (isActive(run.status) || run.status === "needs_input"));
+  // The elapsed time ticks while the run works or waits.
+  const now = useNow(!!run && (isActive(run.status) || run.status === "needs_input"));
 
   const taskItems = useMemo(() => parseTaskItems(openspec?.tasks), [openspec?.tasks]);
 
@@ -494,7 +436,7 @@ function RunDetailInner() {
   const showTaskSidebar = taskItems.length > 0 && implementStarted;
   const filesModified = run.files_modified ?? [];
 
-  const doneCount = taskItems.filter((t) => isTaskDone(t, filesModified, run.status, maxPassIdx)).length;
+  const doneCount = taskItems.filter(isTaskDone).length;
 
   // What each action is allowed for, matching the gateway's own checks.
   const canRetry = ["failed", "needs_input", "needs_outside_change", "covered_by_pr", "cancelled", "closed"].includes(run.status) && run.current_pass !== "feedback";
@@ -660,6 +602,38 @@ function RunDetailInner() {
   const hasPr = !!run.pr_number || !!run.pr_url || runPrs.length > 0 || (run.pr_urls?.length ?? 0) > 0;
   // One answer for the steps and the sentence: they can't disagree.
   const currentStep = PASS_LABEL[activePass(runSteps({ currentPass: run.current_pass, status: run.status, passHistory: run.pass_history, hasPr }), run.current_pass)] ?? null;
+  // The timeline, the run's time, and what is still to come.
+  const prNumber = run.pr_number ?? runPrs[0]?.pr_number ?? null;
+  const prWords = prNumber ? `Pull request #${prNumber}` : "The pull request";
+  const steps = runTimeline({
+    status: run.status,
+    current_pass: run.current_pass,
+    pass_history: run.pass_history,
+    progress_notes: run.progress_notes,
+    updated_at: run.updated_at,
+    created_at: run.created_at,
+    pr_number: prNumber,
+    hasPr,
+    hold: hold?.kind ?? null,
+    questions: run.status === "needs_input" ? run.questions?.length ?? 0 : 0,
+    waitingOn: run.status === "needs_input" ? run.waiting_on?.action ?? null : null,
+    closedBy: run.closed_by,
+  });
+  const upcoming = stillToCome({ status: run.status, current_pass: run.current_pass, pass_history: run.pass_history, hasPr });
+  const ticking = isActive(run.status) || run.status === "needs_input";
+  const runSecs = ticking ? spanSeconds(run.created_at, null, now) : run.duration_s ?? null;
+  const elapsed = runSecs ? (ticking ? `${sharedDuration(runSecs)} so far` : `Took ${sharedDuration(runSecs)}`) : "";
+  const checks = run.checks && (run.checks.items?.length || run.checks.counts) ? run.checks : null;
+  const reviewLine = run.pr_review?.review_sk ? (
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1" data-testid="run-pr-review">
+      <span className="text-zinc-400">Coderhelm&apos;s reviewer:</span>
+      <VerdictPill verdict={run.pr_review.verdict} />
+      {run.pr_review.reviewed_sha && <span className="font-mono text-xs text-zinc-400">on {run.pr_review.reviewed_sha.slice(0, 7)}</span>}
+      <Link href={reviewHref(run.pr_review.review_sk)} className="text-sky-300 underline-offset-2 hover:underline">
+        See the review
+      </Link>
+    </p>
+  ) : null;
   const tab: RunTab = (RUN_TABS as readonly string[]).includes(searchParams.get("tab") ?? "") ? (searchParams.get("tab") as RunTab) : "overview";
   const tabHref = (t: RunTab) => `/runs/detail?id=${encodeURIComponent(runId)}${t === "overview" ? "" : `&tab=${t}`}`;
   const sourceWord = run.ticket_source === "jira" ? "Jira ticket" : run.ticket_source === "alert" ? "Alert" : "Issue";
@@ -674,11 +648,14 @@ function RunDetailInner() {
         <span className="sr-only"> (opens in a new tab)</span>
       </a>
     ));
-  const retryButton = canAct && canRetry && (
-    <button type="button" onClick={retry} disabled={busy !== null || tokensExceeded} title={limitTitle} className={primaryButton}>
-      {busy === "retry" ? "Starting…" : "Retry"}
-    </button>
-  );
+  const retryAs = (variant: "primary" | "secondary") =>
+    canAct &&
+    canRetry && (
+      <button type="button" onClick={retry} disabled={busy !== null || tokensExceeded} title={limitTitle} className={variant === "primary" ? primaryButton : secondaryButton}>
+        {busy === "retry" ? "Starting…" : "Retry"}
+      </button>
+    );
+  const retryButton = retryAs("primary");
   const reviewButton = canAct && canReview && (
     <button
       type="button"
@@ -687,7 +664,7 @@ function RunDetailInner() {
       title={limitTitle ?? "Read the pull request comments again and push fixes"}
       className={secondaryButton}
     >
-      {busy === "review" ? "Starting review…" : "Review again"}
+      {busy === "review" ? "Starting…" : "Address PR comments"}
     </button>
   );
   const helpLink = (
@@ -899,6 +876,7 @@ function RunDetailInner() {
         action={
           <>
             {retryButton}
+            {openPrButtons("secondary")}
             {helpLink}
           </>
         }
@@ -929,21 +907,42 @@ function RunDetailInner() {
     );
   } else {
     // `body` is one sentence; `content` is a block of its own (a form, a list).
-    const look: { tone: OutcomeTone; title: string; body: React.ReactNode; content?: React.ReactNode; actions?: React.ReactNode } =
+    // `who`: whether a person must act now ("you") or nothing is needed ("none").
+    const look: { tone: OutcomeTone; title: string; body: React.ReactNode; content?: React.ReactNode; actions?: React.ReactNode; next?: React.ReactNode; who?: "you" | "none" } =
       hold
         ? {
             // Finished, and the pull request stays a draft: why, and what to do about each reason.
+            // Never "Finished": the work isn't handed over while the pull request is held.
             tone: hold.kind === "failed" ? "attention" : "waiting",
-            title: hold.kind === "failed" ? "Finished, PR held: GitHub refused to mark it ready" : hold.kind === "waiting" ? "Finished, PR held until a check settles" : "Finished, PR held",
-            body: <span className="whitespace-pre-wrap [overflow-wrap:anywhere]" data-testid="draft-hold-summary">{hold.summary}</span>,
-            content: hold.reasons.length > 0 && (
+            title:
+              hold.kind === "failed"
+                ? `${prWords} couldn't be marked ready`
+                : hold.kind === "waiting"
+                  ? `${prWords} stays a draft until a check finishes`
+                  : hold.reasons.length > 1
+                    ? `${prWords} is a draft: ${hold.reasons.length} things to deal with`
+                    : `${prWords} is a draft: 1 thing to deal with`,
+            who: hold.kind === "waiting" ? "none" : "you",
+            next:
+              hold.kind === "waiting"
+                ? "Coderhelm marks it ready for review once the check passes."
+                : hold.kind === "failed"
+                  ? "Mark it ready on GitHub; nothing else is left."
+                  : "Once each item is dealt with, Coderhelm checks again and marks it ready for review.",
+            // The summary repeats the first reason word for word; it shows only when there are no reasons.
+            body: hold.reasons.length === 0 ? <span className="whitespace-pre-wrap [overflow-wrap:anywhere]" data-testid="draft-hold-summary">{hold.summary}</span> : null,
+            content: (hold.reasons.length > 0 || (run.status === "needs_input" && !!run.questions?.length)) && (
+              <>
+              {hold.reasons.length > 0 && (
               <ul className="mt-2 space-y-2" data-testid="draft-hold-reasons" aria-label="Why the pull request is held">
                 {hold.reasons.map((r, i) => (
                   <li key={i} className="min-w-0 rounded-md border border-zinc-800 bg-zinc-950/40 px-3 py-2 [overflow-wrap:anywhere]">
-                    <p className="font-medium text-zinc-100">{r.what}</p>
+                    <p className="font-medium text-zinc-100">
+                      <InlineMarkdown>{r.what}</InlineMarkdown>
+                    </p>
                     <p className="mt-0.5 text-zinc-300">
                       <span className="text-zinc-400">What to do: </span>
-                      {r.todo}
+                      <InlineMarkdown>{r.todo}</InlineMarkdown>
                     </p>
                   </li>
                 ))}
@@ -953,11 +952,19 @@ function RunDetailInner() {
                   </li>
                 )}
               </ul>
+              )}
+              {/* A held run can also have asked something: the hold never hides the questions. */}
+              {run.status === "needs_input" && !!run.questions?.length && (
+                <div className="mt-3">
+                  <RunQuestions run={run} canAnswer={canAct} limitTitle={limitTitle} onAnswered={fetchRun} />
+                </div>
+              )}
+              </>
             ),
             actions: (
               <>
                 {openPrButtons("primary")}
-                {retryButton}
+                {retryAs("secondary")}
               </>
             ),
           }
@@ -966,6 +973,7 @@ function RunDetailInner() {
               // GitHub's limit or an outage: the run goes on by itself at the time given.
               tone: "waiting",
               title: "Waiting for GitHub",
+              who: "none",
               body: (
                 <span className="[overflow-wrap:anywhere]" data-testid="github-wait">
                   {githubWait}. Nothing is needed from you.
@@ -974,12 +982,14 @@ function RunDetailInner() {
               actions: openPrButtons("secondary"),
             }
           : run.status === "merged"
-        ? { tone: "success", title: "Done. The change was merged.", body: "The pull request is merged, so the change is in.", actions: openPrButtons("secondary") }
+        ? { tone: "success", title: "Done. The change was merged.", body: "The pull request is merged, so the change is in.", who: "none", actions: openPrButtons("secondary") }
         : done
           ? {
               tone: "success",
-              title: prLinks.length ? "Done. The change is ready for review." : "Done.",
-              body: prLinks.length ? "Coderhelm opened a pull request. Someone on your team reviews and merges it." : "Coderhelm finished this work.",
+              title: prLinks.length ? `${prWords} is ready for review` : "Done.",
+              body: prLinks.length ? "Coderhelm finished its work on it and handed it over." : "Coderhelm finished this work.",
+              who: prLinks.length ? "you" : "none",
+              next: prLinks.length ? "Someone on your team reviews and merges it." : undefined,
               actions: (
                 <>
                   {openPrButtons("primary")}
@@ -988,11 +998,19 @@ function RunDetailInner() {
               ),
             }
           : run.status === "awaiting_ci"
-            ? { tone: "waiting", title: "Waiting for the automated checks", body: "The change is ready. Coderhelm fixes the checks if they fail, then hands it over for review.", actions: openPrButtons("secondary") }
+            ? {
+                tone: "waiting",
+                title: hasPr ? `${prWords} is open; waiting for its checks` : "Waiting for the checks",
+                body: checks ? <span data-testid="checks-line">{checksSentence(checks)}.</span> : "Coderhelm is watching the checks on GitHub.",
+                who: "none",
+                next: "If a check fails, Coderhelm fixes it and pushes again. When they pass, it hands the pull request over for review.",
+                actions: openPrButtons("secondary"),
+              }
             : run.status === "needs_input" && run.questions?.length
               ? {
                   tone: "waiting",
                   title: "Coderhelm needs your answer",
+                  who: "you",
                   body: null,
                   content: (
                     <RunQuestions
@@ -1016,6 +1034,7 @@ function RunDetailInner() {
                   // A named wait: what to do, why, and where.
                   tone: "waiting",
                   title: run.waiting_on.action,
+                  who: "you",
                   body: run.waiting_on.detail ? <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{sanitizeError(run.waiting_on.detail)}</span> : null,
                   actions: (
                     <>
@@ -1036,6 +1055,7 @@ function RunDetailInner() {
               ? {
                   tone: "waiting",
                   title: "Coderhelm needs more detail",
+                  who: "you",
                   body: run.error ? <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{sanitizeError(run.error)}</span> : "Add the missing detail to the ticket, then retry.",
                   actions: retryButton,
                 }
@@ -1056,6 +1076,7 @@ function RunDetailInner() {
                         tone: "live",
                         title: run.status === "running" ? "Coderhelm is working on this" : "About to start",
                         body: run.status === "running" && currentStep ? `Now on the ${currentStep.toLowerCase()} step. This page updates by itself.` : "This page updates by itself.",
+                        who: "none",
                         actions:
                           canAct && run.status === "running" ? (
                             <button type="button" onClick={cancel} disabled={busy !== null} className={dangerButton}>
@@ -1065,9 +1086,10 @@ function RunDetailInner() {
                       }
                     : { tone: "neutral", title: runStatusLabel(run.status), body: null, actions: undefined };
     outcome = (
-      <OutcomeCard tone={look.tone} title={look.title} testId="run-outcome" actions={look.actions}>
+      <OutcomeCard tone={look.tone} title={look.title} testId="run-outcome" actions={look.actions} next={look.next} who={look.who}>
         {look.body && <p>{look.body}</p>}
         {look.content}
+        {reviewLine && <div className="pt-1">{reviewLine}</div>}
       </OutcomeCard>
     );
   }
@@ -1080,7 +1102,7 @@ function RunDetailInner() {
     : [];
 
   const tasksCard = showTaskSidebar ? (
-    <TasksCard items={taskItems} done={(t) => isTaskDone(t, filesModified, run.status, maxPassIdx)} doneCount={doneCount} />
+    <TasksCard items={taskItems} done={isTaskDone} doneCount={doneCount} />
   ) : null;
 
   return (
@@ -1092,7 +1114,14 @@ function RunDetailInner() {
       <PageHeader
         detail
         title={run.title || "Untitled run"}
-        status={<RunStatusBadge status={run.status} draftHold={hold?.kind} unfinishedRound={!!run.round_incomplete && ["completed", "success"].includes(run.status)} />}
+        status={
+          <RunStatusBadge
+            status={run.status}
+            draftHold={hold?.kind}
+            waitingOn={!run.questions?.length && !!run.waiting_on?.action}
+            unfinishedRound={!!run.round_incomplete && ["completed", "success"].includes(run.status)}
+          />
+        }
         lead={
           <span className="[overflow-wrap:anywhere]">
             {run.repo || "Choosing a repository…"}
@@ -1128,10 +1157,7 @@ function RunDetailInner() {
         more={more.length ? more : undefined}
       />
 
-      <div className="mt-6 space-y-4">
-        {outcome}
-        <PassProgress currentPass={run.current_pass} status={run.status} passHistory={run.pass_history} hasPr={hasPr} />
-      </div>
+      <div className="mt-6">{outcome}</div>
 
       <Tabs
         label="Run views"
@@ -1143,50 +1169,87 @@ function RunDetailInner() {
       <CloseRunDialog open={closeOpen} onOpenChange={setCloseOpen} count={1} prNumbers={openPrs} tickets={[{ source: run.ticket_source, id: run.ticket_id }]} busy={busy === "close"} onConfirm={closeRun} />
 
       {tab === "overview" && (
-        <div className={`mt-6 ${tasksCard ? "grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]" : ""}`} data-testid="run-tab-overview">
-          {/* On a phone the tasks come first, right under the progress; beside the overview from lg up. */}
-          {tasksCard && <div className="min-w-0 lg:order-last">{tasksCard}</div>}
-          <div className="min-w-0 space-y-6">
-            <div className="grid grid-cols-2 gap-3" title={usageBreakdown(usageOf(run))}>
-              <StatTile label="Time taken" value={formatDuration(run.duration_s)} testId="stat-time" />
-              <StatTile
-                label="AI usage"
-                value={totalTokens > 0 ? `${formatTokens(totalTokens)} tokens` : "None yet"}
-                note={
-                  totalTokens > 0 ? (
-                    <Link href={tabHref("details")} className="underline underline-offset-4 hover:text-zinc-200">
-                      See the breakdown
-                    </Link>
-                  ) : undefined
+        <div className="mt-6 space-y-6" data-testid="run-tab-overview">
+          {/* What waits on a person comes first, before the steps and the numbers. */}
+          <WaitingOnYou data={asks} live={asksAreCurrent} note={run.policy_note} prompts={run.sign_in_prompts} />
+          <div className={tasksCard ? "grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]" : ""}>
+            <div className="min-w-0 lg:col-start-1">
+              <RunTimeline
+                steps={steps}
+                now={now}
+                elapsed={elapsed}
+                heading={
+                  run.status === "running" || run.status === "queued" || run.status === "pending"
+                    ? "Working on it"
+                    : run.status === "awaiting_ci"
+                      ? "Waiting for the checks"
+                      : run.status === "needs_input"
+                        ? "Waiting on a person"
+                        : "What Coderhelm did"
                 }
-                testId="stat-usage"
+                live={run.status === "running" || run.status === "queued"}
+                upcoming={upcoming}
+                end={
+                  hasPr && checks ? (
+                    <ChecksPanel checks={checks} now={now} />
+                  ) : run.status === "awaiting_ci" ? (
+                    <p className="text-xs text-zinc-400" data-testid="checks-unknown">
+                      Open the pull request to see each check and how far it has got.
+                    </p>
+                  ) : null
+                }
               />
             </div>
-            <WaitingOnYou data={asks} live={asksAreCurrent} note={run.policy_note} prompts={run.sign_in_prompts} />
+            {/* On a phone the tasks sit right under the steps; beside them from lg up. */}
+            {tasksCard && <div className="min-w-0 lg:col-start-2 lg:row-span-3 lg:row-start-1">{tasksCard}</div>}
+            <div className="min-w-0 space-y-6 lg:col-start-1">
+              {(filesModified.length > 0 || hasPr) && (
+                <FilesChanged files={filesModified} live={live} diffUrl={prLinks.length === 1 && run.pr_url ? `${run.pr_url.replace(/\/$/, "")}/files` : undefined} />
+              )}
 
-            {run.outside_change_report && (
-              <section aria-labelledby="outside-change-heading" className="min-w-0 rounded-lg border border-orange-500/25 bg-orange-500/5 p-4 [overflow-wrap:anywhere]">
-                <h2 id="outside-change-heading" className="mb-2 text-sm font-semibold text-orange-200">
-                  {outsideHeading(run.status, run.fix_location)}
-                </h2>
-                <div className="min-w-0 overflow-x-auto">
-                  <Markdown>{reportBody(run.outside_change_report)}</Markdown>
+              {run.outside_change_report && (
+                <section aria-labelledby="outside-change-heading" className="min-w-0 rounded-lg border border-orange-500/25 bg-orange-500/5 p-4 [overflow-wrap:anywhere]">
+                  <h2 id="outside-change-heading" className="mb-2 text-sm font-semibold text-orange-200">
+                    {outsideHeading(run.status, run.fix_location)}
+                  </h2>
+                  <div className="min-w-0 overflow-x-auto">
+                    <Markdown>{reportBody(run.outside_change_report)}</Markdown>
+                  </div>
+                </section>
+              )}
+
+              {run.lesson && (
+                <Callout variant="info" title="Coderhelm learned" live={false}>
+                  <p className="line-clamp-3 [overflow-wrap:anywhere]" title={run.lesson}>
+                    {run.lesson}
+                  </p>
+                </Callout>
+              )}
+
+              <dl className="flex flex-wrap gap-x-6 gap-y-2 text-sm" title={usageBreakdown(usageOf(run))} aria-label="About this run">
+                <div className="flex items-baseline gap-2" data-testid="stat-time">
+                  <dt className="text-zinc-400">Time</dt>
+                  <dd className="font-mono tabular-nums text-zinc-200">{runSecs ? sharedDuration(runSecs) : "—"}</dd>
                 </div>
-              </section>
-            )}
-
-            {run.lesson && (
-              <Callout variant="info" title="Coderhelm learned" live={false}>
-                <p className="line-clamp-3 [overflow-wrap:anywhere]" title={run.lesson}>
-                  {run.lesson}
-                </p>
-              </Callout>
-            )}
-
-
-            {prLinks.length > 0 && !done && run.status !== "awaiting_ci" && (
-              <div className="flex flex-wrap gap-2">{openPrButtons("secondary")}</div>
-            )}
+                <div className="flex flex-wrap items-baseline gap-x-2" data-testid="stat-usage">
+                  <dt className="text-zinc-400">AI usage</dt>
+                  <dd className="text-zinc-200">
+                    {totalTokens > 0 ? `${formatTokens(totalTokens)} tokens` : "None yet"}
+                    {totalTokens > 0 && (
+                      <Link href={tabHref("details")} className="ml-2 text-zinc-400 underline underline-offset-4 hover:text-zinc-200">
+                        See the breakdown
+                      </Link>
+                    )}
+                  </dd>
+                </div>
+                {run.branch && (
+                  <div className="flex min-w-0 items-baseline gap-2">
+                    <dt className="text-zinc-400">Branch</dt>
+                    <dd className="min-w-0 font-mono text-xs text-zinc-300 [overflow-wrap:anywhere]">{run.branch}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
           </div>
         </div>
       )}
@@ -1270,7 +1333,6 @@ function RunDetailInner() {
             </Callout>
           )}
           <AsksHistory data={asks} live={asksAreCurrent} note={run.policy_note} prompts={run.sign_in_prompts} />
-          <ActivityTrail run={run} />
           <TeamAgentAsks runId={runId} status={run.status} traces={traces} />
           <WorkUsedLine
             query={run.created_at ? { run_id: run.run_id || runId, since: run.created_at } : null}
@@ -1416,19 +1478,28 @@ const OUTCOME_LOOK: Record<OutcomeTone, { box: string; dot: string }> = {
   neutral: { box: "border-zinc-800 bg-zinc-900/50", dot: "bg-zinc-400" },
 };
 
-/** The run's outcome in one sentence, with the one thing to do next. */
+/**
+ * Where the run is, at the top of the page: what is true now in one line,
+ * whether it needs a person, the next thing that happens, and the one action.
+ */
 function OutcomeCard({
   tone,
   title,
   children,
   actions,
   testId,
+  next,
+  who,
 }: {
   tone: OutcomeTone;
   title: string;
   children?: React.ReactNode;
   actions?: React.ReactNode;
   testId?: string;
+  /** What happens next, in one sentence. */
+  next?: React.ReactNode;
+  /** A person must act now ("you"), or nothing is needed ("none"). */
+  who?: "you" | "none";
 }) {
   const look = OUTCOME_LOOK[tone];
   return (
@@ -1436,8 +1507,26 @@ function OutcomeCard({
       <div className="flex min-w-0 items-start gap-3">
         <span aria-hidden="true" className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${look.dot}`} />
         <div className="min-w-0 flex-1 space-y-1 text-sm text-zinc-300">
-          <p className="text-base font-semibold text-zinc-50">{title}</p>
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+            <p className="min-w-0 text-base font-semibold text-zinc-50 [overflow-wrap:anywhere]">{title}</p>
+            {who === "you" && (
+              <span className="whitespace-nowrap rounded-full border border-amber-500/40 bg-amber-500/10 px-2 text-xs font-medium leading-5 text-amber-200" data-testid="run-who">
+                Needs a person
+              </span>
+            )}
+            {who === "none" && (
+              <span className="whitespace-nowrap text-xs text-zinc-400" data-testid="run-who">
+                Nothing needed from you
+              </span>
+            )}
+          </div>
           {children}
+          {next && (
+            <p className="text-zinc-300" data-testid="run-next">
+              <span className="font-medium text-zinc-100">Next: </span>
+              {next}
+            </p>
+          )}
           {actions && <div className="flex flex-wrap items-center gap-2 pt-2">{actions}</div>}
         </div>
       </div>
@@ -1452,12 +1541,14 @@ function TasksCard({ items, done, doneCount }: { items: TaskItem[]; done: (t: Ta
       <summary className={`flex cursor-pointer list-none items-center justify-between gap-3 border-b border-zinc-800 px-4 py-3 [&::-webkit-details-marker]:hidden ${focusRing}`}>
         <h2 className="text-sm font-semibold text-zinc-100">Tasks</h2>
         <span className="text-sm tabular-nums text-zinc-400">
-          {doneCount} of {items.length}
+          {doneCount > 0 ? `${doneCount} of ${items.length} done` : items.length === 1 ? "1 task" : `${items.length} tasks`}
         </span>
       </summary>
-      <div className="h-1 bg-zinc-800" aria-hidden="true">
-        <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${items.length > 0 ? (doneCount / items.length) * 100 : 0}%` }} />
-      </div>
+      {doneCount > 0 && (
+        <div className="h-1 bg-zinc-800" aria-hidden="true">
+          <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${(doneCount / items.length) * 100}%` }} />
+        </div>
+      )}
       <div className="max-h-96 space-y-1 overflow-y-auto p-3 lg:max-h-[calc(100vh-14rem)]">
         {items.map((task, i) => {
           const isDone = done(task);
@@ -1594,59 +1685,6 @@ function PassPipeline({ traces, open, onToggle }: { traces: PassTrace[]; open: b
   );
 }
 
-/** When each step started, with the tool calls under it, ending on how the run ended. */
-function ActivityTrail({ run }: { run: RunDetail }) {
-  if (!run.pass_history?.length && !run.created_at) return null;
-  const passEvents: { label: string; time: string; idx: number; tools: { label: string; time: string }[] }[] = [];
-  run.pass_history?.forEach((entry, i) => passEvents.push({ label: `${passLabel(entry.pass)} started`, time: entry.started_at, idx: i, tools: [] }));
-  const notes = [...(run.progress_notes || [])].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-  for (const note of notes) {
-    let target = passEvents.length - 1;
-    for (let j = passEvents.length - 1; j >= 0; j--) {
-      if (passEvents[j].time <= note.timestamp) {
-        target = j;
-        break;
-      }
-    }
-    if (target >= 0) passEvents[target].tools.push({ label: note.message, time: note.timestamp });
-  }
-  const lastPassIdx = (run.pass_history?.length ?? 0) - 1;
-  const end: { label: string; status: "done" | "failed"; time?: string } | null =
-    run.status === "merged"
-      ? { label: "Pull request merged", status: "done", time: run.updated_at }
-      : run.status === "completed"
-        ? { label: "Run completed", status: "done", time: run.updated_at }
-        : run.status === "needs_outside_change"
-          ? { label: "Reported the change to make outside the code", status: "done", time: run.updated_at }
-          : run.status === "failed"
-            ? { label: "Run failed", status: "failed", time: run.updated_at }
-            : run.status === "cancelled"
-              ? { label: "Run cancelled", status: "failed", time: run.updated_at }
-              : run.status === "closed"
-                ? { label: run.closed_by ? `Closed by ${run.closed_by}` : "Closed", status: "done", time: run.closed_at ?? run.updated_at }
-                : null;
-  return (
-    <section aria-labelledby="activity-heading" className="space-y-3">
-      <SectionHeading id="activity-heading">Activity</SectionHeading>
-      <div className="rounded-lg border border-zinc-800 p-4">
-        <div className="relative">
-          <div className="absolute bottom-2 left-[5px] top-2 w-px bg-zinc-800" />
-          <div className="space-y-3">
-            <TrailEntry label="Run started" time={run.created_at} status="done" />
-            {passEvents.map((ev, i) => {
-              let status: "done" | "active" | "failed" = "done";
-              if (run.status === "failed" && ev.idx === lastPassIdx) status = "failed";
-              else if (run.status === "running" && ev.idx === lastPassIdx) status = "active";
-              return <TrailEntry key={i} label={ev.label} time={ev.time} status={status} tools={ev.tools} />;
-            })}
-            {end && <TrailEntry label={end.label} time={end.time} status={end.status} />}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function sanitizeError(msg: string): string {
   // Strip model IDs and internal service names
   return msg
@@ -1657,51 +1695,4 @@ function sanitizeError(msg: string): string {
     .replace(/service error/gi, "service temporarily unavailable")
     .replace(/\s{2,}/g, " ")
     .trim();
-}
-
-function TrailEntry({ label, time, status, tools }: { label: string; time?: string; status: "done" | "active" | "failed"; tools?: { label: string; time: string }[] }) {
-  const [expanded, setExpanded] = useState(false);
-  const dotColor =
-    status === "failed" ? "bg-red-400" :
-    status === "active" ? "bg-blue-400 animate-pulse motion-reduce:animate-none" :
-    "bg-emerald-400";
-  const dotSize = "w-[11px] h-[11px]";
-  const hasTools = tools && tools.length > 0;
-  return (
-    <div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 relative pl-0">
-        <div aria-hidden="true" className={`${dotSize} rounded-full ${dotColor} z-10 flex-shrink-0`} />
-        <span className={`min-w-0 text-sm ${status === "failed" ? "text-red-300" : status === "active" ? "text-blue-300" : "text-zinc-300"}`}>
-          {label}
-        </span>
-        {hasTools && (
-          <button
-            type="button"
-            aria-expanded={expanded}
-            onClick={() => setExpanded(!expanded)}
-            className={`text-xs text-zinc-400 hover:text-zinc-200 underline underline-offset-2 transition-colors ml-1 rounded ${focusRing}`}
-          >
-            {expanded ? "Hide tool calls" : `${tools.length} tool call${tools.length > 1 ? "s" : ""}`}
-          </button>
-        )}
-        {time && (
-          <span className="text-xs text-zinc-400 ml-auto whitespace-nowrap">
-            {new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-          </span>
-        )}
-      </div>
-      {expanded && hasTools && (
-        <div className="ml-6 mt-1 mb-1 space-y-0.5 border-l border-zinc-800 pl-3">
-          {tools.map((t, i) => (
-            <div key={i} className="flex items-start gap-2 text-xs text-zinc-400">
-              <span className="min-w-0 [overflow-wrap:anywhere]">{t.label}</span>
-              <span className="text-zinc-400 ml-auto whitespace-nowrap">
-                {new Date(t.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }

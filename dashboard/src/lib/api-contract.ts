@@ -6,7 +6,7 @@
 // Nothing here runs; it is checked by the compiler only.
 
 import type { OpenApiFields } from "./openapi-fields";
-import type { ActivityGroup, ActivityItem, AnswerRunResult, OverviewFile, Plan, ReviewOverview, ReviewSession, Run, RunAnswer, RunDetail, RunDraftHold, RunDraftHoldReason, RunQuestion, RunTrigger, SessionStep, Task, api } from "./api";
+import type { ActivityGroup, ActivityItem, AnswerRunResult, OverviewFile, Plan, Review, ReviewOverview, ReviewSession, Run, RunAnswer, RunCheck, RunChecks, RunPrReview, RunDetail, RunDraftHold, RunDraftHoldReason, RunQuestion, RunTrigger, SessionStep, Task, api } from "./api";
 
 type Answer<K extends keyof typeof api> = Awaited<ReturnType<(typeof api)[K]>>;
 
@@ -20,6 +20,11 @@ type None<T extends never> = T;
 export type RunsPageContract = None<Undocumented<Answer<"listRuns">, "RunsPage">>;
 export type RunListContract = None<Undocumented<Run, "RunSummary">>;
 export type RunContract = None<Undocumented<RunDetail, "Run">>;
+// The checks on a run's pull request, and the reviewer's verdict on it.
+export type RunChecksContract = None<Undocumented<RunChecks, "RunChecks">>;
+export type RunCheckContract = None<Undocumented<RunCheck, "RunCheck">>;
+export type RunCheckCountsContract = None<Undocumented<RunChecks["counts"], "RunCheckCounts">>;
+export type RunPrReviewContract = None<Undocumented<RunPrReview, "RunPrReview">>;
 // How a run was started (the runs list and the run page's header).
 export type RunTriggerContract = None<Undocumented<RunTrigger, "RunTrigger">>;
 // What a run asked, the answers given in Coderhelm, and answering.
@@ -38,6 +43,8 @@ export type TaskContract = None<Undocumented<Task, "PlanTask">>;
 
 // A review's session (the page a PR's "Coderhelm review" check links to).
 export type ReviewSessionContract = None<Undocumented<ReviewSession, "ReviewSession">>;
+// One review (the review page), with the session that produced it.
+export type ReviewContract = None<Undocumented<Review, "Review">>;
 export type SessionStepContract = None<Undocumented<SessionStep, "SessionStep">>;
 // What the reviewer did while it read the PR, and the overview it posted.
 export type ActivityGroupContract = None<Undocumented<ActivityGroup, "ActivityGroup">>;

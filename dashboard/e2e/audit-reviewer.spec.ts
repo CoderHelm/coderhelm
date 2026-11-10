@@ -26,6 +26,8 @@ function review(over: Record<string, unknown> = {}) {
     thumbs_down: 0,
     rating_comments: [{ by: "a-person", text: "Right call on the retry.", rating: "up", at: iso(30) }],
     created_at: iso(5),
+    // Set only when the review's session page exists.
+    session_id: null as string | null,
     ...over,
   };
 }
@@ -183,13 +185,18 @@ interface Backend {
   used: { skills: unknown[]; agents: unknown[]; sources: unknown[]; standards: unknown[] };
   /** What GET /api/releases/pending answers. */
   pending: { waiting: unknown[]; blocked: unknown[] };
+  /** Merged over GET /api/reviewer/gate's answer; `null` answers 404 (a repo the reviewer isn't on). */
+  gate: Record<string, unknown> | null;
+  /** GET /api/reviewer/session answers, by id. */
+  sessions: Record<string, Record<string, unknown>>;
 }
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = {
     calls: [], bodies: [], role: "admin", empty: false, failList: false, failMore: false,
     failConfig: false, failOrg: false, failDetail: false, missingDetail: false, live: livePrs(), noLive: false,
-    newReviews: [], pending: { waiting: [], blocked: [] }, used: { skills: [], agents: [], sources: [], standards: [] }, ...init,
+    newReviews: [], pending: { waiting: [], blocked: [] }, used: { skills: [], agents: [], sources: [], standards: [] },
+    gate: {}, sessions: {}, ...init,
   };
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -229,10 +236,19 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       if (db.failDetail) return json(route, { error: "boom" }, 500);
       if (db.missingDetail) return route.fulfill({ status: 404, body: "" });
       const sk = url.searchParams.get("sk");
-      const r = [...REVIEWS, ...DETAIL_REVIEWS].find((x) => x.sk === sk);
+      const r = [...db.newReviews, ...REVIEWS, ...DETAIL_REVIEWS].find((x) => x.sk === sk);
       return r ? json(route, r) : route.fulfill({ status: 404, body: "" });
     }
     if (p === "/api/reviewer/review/rate") return route.fulfill({ status: 200, body: "" });
+    if (p === "/api/reviewer/gate") {
+      if (!db.gate) return json(route, { error: "not found" }, 404);
+      const pr = Number(url.searchParams.get("pr"));
+      return json(route, { repo: url.searchParams.get("repo"), pr_number: pr, pr_title: "", session_id: "", auto_merge: false, status: "reviewed", group: "done", gate: null, ...db.gate });
+    }
+    if (p === "/api/reviewer/session") {
+      const s = db.sessions[url.searchParams.get("id") ?? ""];
+      return s ? json(route, s) : json(route, { error: "not found" }, 404);
+    }
     if (p === "/api/reviewer/re-review") return json(route, { status: "queued" });
     if (p === "/api/reviewer/org-config") {
       if (req.method() === "PUT") return route.fulfill({ status: 200, body: "" });
@@ -531,7 +547,7 @@ test("findings read from a review's text become cards, grouped into what to fix 
   await expect(header.getByText("Medium risk")).toBeVisible();
   await expect(header.getByText("Triggered by new commits")).toBeVisible();
   await expect(page.getByTestId("posted-note")).toHaveText(
-    "Posted as a comment (GitHub doesn't let Coderhelm approve or request changes on a PR it opened).",
+    "Posted as a comment: Coderhelm opened this PR, and GitHub doesn't let a PR's author approve it.",
   );
   await expect(page.getByText("COMMENT", { exact: true })).toHaveCount(0);
 
@@ -596,6 +612,97 @@ test("findings kept as data show their kind, and a note can be left without rati
   expect(db.bodies.filter((b) => b.rating === "none")).toEqual([{ sk: DETAIL_REVIEWS[1].sk, rating: "none", comment: "Right call on the cache key." }]);
   await shot(page, "audit-reviewer-detail-kept");
   expect(errors).toEqual([]);
+});
+
+// ── The review's session, inline ──────────────────────────────────────
+
+const SESSION_ID = "3f2c9a1e-5b7d-4c8e-9a0b-1c2d3e4f5a6b";
+const NEWER_ID = "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+
+/** The session that posted REVIEWS[0] (commit abcdef1, finished as the review was kept). */
+function sessionOf(over: Record<string, unknown> = {}) {
+  return {
+    id: SESSION_ID, repo: "your-team/web", pr_number: 101, pr_title: "Faster checkout with a clearer receipt page",
+    head_sha: "abcdef1234567", trigger: "label", kind: "review", status: "done", in_flight: false, attempt: 0,
+    started_at: iso(7), finished_at: iso(5), reason: "", verdict: "APPROVE", findings: 1,
+    review_url: "https://github.com/your-team/web/pull/101#pullrequestreview-1", steps: [
+      { at: iso(7), text: "Started reviewing `abcdef1`", detail: "" },
+      { at: iso(5), text: "Posted the review on GitHub", detail: "" },
+    ],
+    activity: [
+      { kind: "note", title: "Checking the retry loop", started_at: iso(6.5), ended_at: iso(6.5), text: "The loop retries on every error, so a declined card is charged again.", items: [] },
+      { kind: "view", title: "View 2 files", started_at: iso(6.4), ended_at: iso(6), text: "", items: [
+        { at: iso(6.4), label: "src/checkout/pay.ts:1-80", detail: "", failed: false },
+        { at: iso(6.2), label: "src/checkout/pay.test.ts", detail: "", failed: false },
+      ] },
+    ],
+    review_sk: null,
+    overview: { summary: "Shows a receipt page after checkout.", changes: ["Adds the receipt page"], files: [{ path: "src/checkout/receipt.tsx", description: "The new page" }], files_total: 1 },
+    ...over,
+  };
+}
+
+test("a review with its own session shows how it was done, Copilot style, then the comments", async ({ page }) => {
+  const errors = watchConsole(page);
+  const own = { ...REVIEWS[0], sk: "REVIEW#your-team/web#000101#2026-01-04T10:00:00Z", pr_title: "Faster checkout with a clearer receipt page", session_id: SESSION_ID };
+  const db = await mockApi(page, { newReviews: [own], sessions: { [SESSION_ID]: sessionOf() }, gate: { status: "merged", session_id: NEWER_ID } });
+  await page.goto(`/reviewer/detail?sk=${encodeURIComponent(own.sk)}`);
+  const activity = page.getByTestId("session-activity");
+  await expect(activity.getByRole("heading", { name: "Reviewed pull request" })).toBeVisible();
+  await expect(activity.getByRole("heading", { level: 3, name: "Checking the retry loop" })).toBeVisible();
+  await activity.getByText("View 2 files").click();
+  await expect(activity.getByText("src/checkout/pay.ts:1-80")).toBeVisible();
+  await expect(page.getByTestId("session-overview").getByRole("table", { name: "Reviewed changes" })).toContainText("src/checkout/receipt.tsx");
+  // The PR has moved on since: said beside the verdict, which stays the review's own.
+  await expect(page.getByTestId("pr-now")).toContainText("Merged");
+  await expect(page.getByTestId("review-header").getByText("Approved")).toBeVisible();
+  await expect(page.getByTestId("session-page-link")).toHaveAttribute("href", new RegExp(`/reviewer/session/?\\?id=${SESSION_ID}`));
+  // Its own session id wins: the PR's latest session is never asked for.
+  expect(db.calls.some((c) => c.includes(`id=${NEWER_ID}`))).toBe(false);
+  // Summary, then the session and its overview, then the rating.
+  const order = await page.evaluate(() =>
+    ["review-summary", "session-activity-title", "session-overview-title", "rate-review"].map((id) => document.getElementById(id)?.getBoundingClientRect().top ?? -1),
+  );
+  expect(order.every((y, i) => y >= 0 && (i === 0 || y > order[i - 1]))).toBe(true);
+  await shot(page, "audit-reviewer-detail-session");
+  expect(errors).toEqual([]);
+});
+
+test("an older review finds its session through the PR, and never borrows a newer one", async ({ page }) => {
+  const errors = watchConsole(page);
+  // No session_id on the record: the PR's latest session is the review's when it ran on the same commit.
+  await mockApi(page, { sessions: { [SESSION_ID]: sessionOf() }, gate: { session_id: SESSION_ID } });
+  await page.goto(`/reviewer/detail?sk=${encodeURIComponent(REVIEWS[0].sk)}`);
+  await expect(page.getByTestId("session-activity")).toBeVisible();
+  await expect(page.getByTestId("newer-review")).toHaveCount(0);
+
+  // The PR's latest session reviewed another commit: no timeline, a pointer to the newer review instead.
+  await mockApi(page, { sessions: { [NEWER_ID]: sessionOf({ id: NEWER_ID, head_sha: "4e1a2b0c9d8e", started_at: iso(2), finished_at: iso(1) }) }, gate: { session_id: NEWER_ID, status: "waiting_ci" } });
+  await page.goto(`/reviewer/detail?sk=${encodeURIComponent(REVIEWS[0].sk)}`);
+  await expect(page.getByTestId("newer-review")).toContainText("A newer review ran on 4e1a2b0");
+  await expect(page.getByTestId("newer-review").getByRole("link", { name: "See it" })).toHaveAttribute("href", new RegExp(`id=${NEWER_ID}`));
+  await expect(page.getByTestId("pr-now")).toContainText("Waiting for CI");
+  await expect(page.getByTestId("session-activity")).toHaveCount(0);
+
+  // A repo the reviewer isn't on (no gate): the review alone, nothing broken.
+  await mockApi(page, { gate: null });
+  await page.goto(`/reviewer/detail?sk=${encodeURIComponent(REVIEWS[0].sk)}`);
+  await expect(page.getByRole("region", { name: "Summary" })).toBeVisible();
+  await expect(page.getByTestId("session-activity")).toHaveCount(0);
+  await expect(page.getByTestId("pr-now")).toHaveCount(0);
+  expect(errors.filter((e) => !e.startsWith("Failed to load resource"))).toEqual([]);
+});
+
+test("each finding is one line under the summary that jumps to its card", async ({ page }) => {
+  await mockApi(page);
+  await page.goto(`/reviewer/detail?sk=${encodeURIComponent(DETAIL_REVIEWS[0].sk)}`);
+  const index = page.getByTestId("finding-index");
+  await expect(index.getByRole("listitem")).toHaveCount(3);
+  await expect(index.getByRole("listitem").first()).toContainText("Payment can be sent twice");
+  await expect(index.getByRole("listitem").first()).toContainText("src/app/checkout/page.tsx:84");
+  await index.getByRole("link").first().click();
+  await expect(page).toHaveURL(/#finding-1$/);
+  await expect(page.locator("#finding-1")).toContainText("Payment can be sent twice");
 });
 
 test("a review page with no ?sk says the link is wrong instead of loading forever", async ({ page }) => {

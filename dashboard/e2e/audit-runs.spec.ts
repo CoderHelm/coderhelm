@@ -52,6 +52,9 @@ function baseRun(over: Record<string, unknown> = {}) {
       { message: "Read src/lib/schedule.ts", timestamp: iso(24) },
       { message: "Ran npm test -- --run src/lib/schedule.test.ts and every test passed after the change", timestamp: iso(17) },
     ],
+    // Null when the run has no open pull request or GitHub couldn't be read; null before a review.
+    checks: null,
+    pr_review: null,
     ...over,
   };
 }
@@ -227,10 +230,25 @@ test("a finished run shows its pull request, steps, documents and tasks without 
   await expect(page.getByText("Done", { exact: true }).first()).toBeVisible();
   // The outcome leads, with the one next step: open the pull request.
   const outcome = page.getByTestId("run-outcome");
-  await expect(outcome).toContainText("Done. The change is ready for review.");
+  await expect(outcome).toContainText("Pull request #101 is ready for review");
+  await expect(page.getByTestId("run-who")).toHaveText("Needs a person");
+  await expect(page.getByTestId("run-next")).toContainText("Someone on your team reviews and merges it.");
   await expect(outcome.getByRole("link", { name: /Open pull request #101/ })).toHaveAttribute("href", "https://github.com/your-team/web/pull/101");
-  // Step names are words, not the worker's ids.
-  await expect(page.getByRole("list", { name: "Steps" })).toContainText("Pull request");
+  // The steps read as what Coderhelm did, in words, not the worker's ids, ending on where the run is.
+  const steps = page.getByRole("list", { name: "Steps" });
+  await expect(steps.getByTestId("run-step")).toHaveText([/Read the ticket/, /Planned the change/, /Built the change/, /Ran the tests/, /Opened pull request #101/, /Checked the pull request/, /Handed pull request #101 over for review/]);
+  await expect(steps.locator('[data-state="done"]')).toHaveCount(7);
+  // Each step's notes fold behind a count; the build's opens to what it did.
+  const build = steps.getByTestId("run-step").nth(2);
+  await expect(build).toContainText("1 note");
+  await expect(build).toContainText("7m 0s");
+  await build.getByText("Built the change").click();
+  await expect(build.getByTestId("step-notes")).toContainText("Read src/lib/schedule.ts");
+  // The files the run changed, with the diff on GitHub.
+  await expect(page.getByTestId("run-files")).toContainText("schedule.ts");
+  await expect(page.getByTestId("run-files").getByRole("link", { name: /See the diff on GitHub/ })).toHaveAttribute("href", "https://github.com/your-team/web/pull/101/files");
+  // Tasks are ticked only by the plan itself, never guessed from the run's status.
+  await expect(page.getByText("3 tasks")).toBeVisible();
   await expect(page.getByText("Tasks", { exact: true })).toBeVisible();
   await expect(page.getByTestId("stat-time")).toContainText("12m 34s");
   // Token parts are technical detail: not on the overview.
@@ -242,7 +260,8 @@ test("a finished run shows its pull request, steps, documents and tasks without 
   await expect(page.getByText("Linear")).toBeVisible();
   await expect(page.getByRole("heading", { name: /Files changed/ })).toBeVisible();
   await openTab(page, "Activity");
-  await expect(page.getByText("Build started")).toBeVisible();
+  // The steps live on the overview; Activity doesn't repeat them.
+  await expect(page.getByRole("list", { name: "Steps" })).toHaveCount(0);
   await openTab(page, "Details");
   // Trace names read as words too ("CI fix #2", not "ci_fix:2").
   await expect(page.getByText("CI fix #2")).toBeVisible();
@@ -326,14 +345,13 @@ test("a run whose fix is outside the code shows what to change there and opens n
   // The box has its own heading; the report's first line is not repeated as text.
   await expect(report.getByText("Needs a change outside the code")).toHaveCount(0);
   await expect(page.getByRole("link", { name: /pull request #/i })).toHaveCount(0);
-  // Triage and plan are done; nothing after them ran, on purpose.
-  await expect(page.getByRole("list", { name: "Steps" }).locator("svg")).toHaveCount(2);
+  // Triage and plan ran; nothing after them ran, on purpose, and the steps end on the report.
+  const steps = page.getByRole("list", { name: "Steps" }).getByTestId("run-step");
+  await expect(steps).toHaveText([/Read the ticket/, /Planned the change/, /Reported the change to make outside the code/]);
   await shot(page, "runs-detail-outside-code");
   await page.getByTestId("page-actions").getByRole("button", { name: "More" }).click();
   await expect(page.getByRole("menuitem", { name: /Start over from scratch/ })).toBeVisible();
   await page.keyboard.press("Escape");
-  await openTab(page, "Activity");
-  await expect(page.getByText("Reported the change to make outside the code")).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -363,9 +381,96 @@ test("a merged run offers no start over, since that would close a merged pull re
   await expect(page.getByText("Merged", { exact: true }).first()).toBeVisible();
   await expect(page.getByTestId("run-outcome")).toContainText("The change was merged");
   await expect(page.getByRole("button", { name: "More" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Address PR comments" })).toHaveCount(0);
+  await expect(page.getByRole("list", { name: "Steps" }).getByTestId("run-step").last()).toContainText("Pull request #101 merged");
+});
+
+// The checks on the run's pull request, as GitHub's merge box says them:
+// sorted failed, running, queued, passed, skipped by the server.
+const CHECKS = {
+  sha: "4e1a2b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a",
+  items: [
+    { name: "e2e (chromium)", state: "running", conclusion: null, required: true, started_at: iso(6), completed_at: null, url: "https://github.com/your-team/web/actions/runs/4" },
+    { name: "deploy-preview", state: "queued", conclusion: null, required: true, started_at: null, completed_at: null, url: null },
+    { name: "build", state: "passed", conclusion: "success", required: true, started_at: iso(9), completed_at: iso(7), url: "https://github.com/your-team/web/actions/runs/1" },
+    { name: "lint", state: "passed", conclusion: "success", required: false, started_at: iso(9), completed_at: iso(8), url: "https://github.com/your-team/web/actions/runs/2" },
+  ],
+  counts: { passed: 2, failed: 0, running: 1, queued: 1, skipped: 0 },
+};
+
+test("a run waiting for CI says the pull request is open and which checks are still running", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page, { run: baseRun({ status: "awaiting_ci", duration_s: null, checks: CHECKS }) });
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  const outcome = page.getByTestId("run-outcome");
+  await expect(outcome).toContainText("Pull request #101 is open; waiting for its checks");
+  // Never "the change is ready" while checks run.
+  await expect(outcome).not.toContainText("The change is ready");
+  await expect(page.getByTestId("checks-line")).toHaveText("1 running, 1 queued, 2 passed.");
+  await expect(page.getByTestId("run-who")).toHaveText("Nothing needed from you");
+  await expect(page.getByTestId("run-next")).toContainText("If a check fails, Coderhelm fixes it");
+  // The steps end on the wait, with the checks: still to finish first, the passed ones folded.
+  const last = page.getByRole("list", { name: "Steps" }).getByTestId("run-step").last();
+  await expect(last).toHaveAttribute("data-state", "waiting");
+  await expect(last).toContainText("Waiting for the checks on pull request #101");
+  const panel = page.getByTestId("run-checks");
+  await expect(panel).toContainText("Some checks haven't finished yet");
+  await expect(panel.getByTestId("checks-sentence")).toHaveText("1 running, 1 queued, 2 passed on 4e1a2b0");
+  await expect(panel.getByTestId("check").filter({ visible: true })).toHaveText([/e2e \(chromium\)\s*\(running\)\s*Required/, /deploy-preview\s*\(queued\)\s*Required\s*waiting to start/]);
+  await expect(panel.getByRole("link", { name: /Details for e2e \(chromium\)/ })).toHaveAttribute("href", "https://github.com/your-team/web/actions/runs/4");
+  await panel.getByText("2 passed or skipped checks").click();
+  await expect(panel.getByTestId("check").filter({ hasText: "build" })).toHaveAttribute("data-group", "passed");
+  await shot(page, "runs-detail-awaiting-ci");
+  expect(errors).toEqual([]);
+});
+
+test("a failed check comes first, and an older backend without checks still reads plainly", async ({ page }) => {
+  const failed = {
+    ...CHECKS,
+    items: [{ ...CHECKS.items[0], state: "failed", conclusion: "failure", completed_at: iso(2) }, ...CHECKS.items.slice(2)],
+    counts: { passed: 2, failed: 1, running: 0, queued: 0, skipped: 0 },
+  };
+  await mockApi(page, { run: baseRun({ status: "awaiting_ci", duration_s: null, checks: failed }) });
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  const panel = page.getByTestId("run-checks");
+  await expect(panel).toContainText("1 check failed");
+  await expect(panel.getByTestId("check").first()).toHaveAttribute("data-group", "failed");
+
+  // checks: null (no open pull request, or GitHub couldn't be read): a plain line, no panel.
+  await mockApi(page, { run: baseRun({ status: "awaiting_ci", duration_s: null, checks: null }) });
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  await expect(page.getByTestId("run-outcome")).toContainText("Coderhelm is watching the checks on GitHub.");
+  await expect(page.getByTestId("checks-unknown")).toBeVisible();
+  await expect(page.getByTestId("run-checks")).toHaveCount(0);
+});
+
+test("a run links the reviewer's verdict on its own pull request", async ({ page }) => {
+  await mockApi(page, {
+    run: baseRun({ pr_review: { verdict: "REQUEST_CHANGES", review_sk: "REVIEW#your-team/web#000101#2026-01-02T10:00:00Z", session_id: null, reviewed_sha: "4e1a2b0c9d8e", at: iso(11) } }),
+  });
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  const line = page.getByTestId("run-pr-review");
+  await expect(line).toContainText("Changes requested");
+  await expect(line).toContainText("on 4e1a2b0");
+  await expect(line.getByRole("link", { name: "See the review" })).toHaveAttribute("href", /\/reviewer\/detail\/?\?sk=REVIEW%23your-team%2Fweb%23000101/);
+  // "Review" means one thing: the reviewer. The run's own button says what it does.
+  await expect(page.getByRole("button", { name: "Address PR comments" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Review again" })).toHaveCount(0);
-  await openTab(page, "Activity");
-  await expect(page.getByText("Pull request merged")).toBeVisible();
+});
+
+test("a running run ticks its time, pulses the step it is on and says what is still to come", async ({ page }) => {
+  await mockApi(page, {
+    run: baseRun({ status: "running", current_pass: "implement", pr_url: null, pr_number: null, duration_s: null, created_at: iso(5), pass_history: [{ pass: "triage", started_at: iso(5) }, { pass: "implement", started_at: iso(2) }], progress_notes: [{ message: "Edited src/lib/schedule.ts", timestamp: iso(1) }] }),
+  });
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  const steps = page.getByRole("list", { name: "Steps" }).getByTestId("run-step");
+  await expect(steps.last()).toHaveAttribute("data-state", "running");
+  await expect(steps.last()).toContainText("Building the change");
+  // The running step is open on what it is doing.
+  await expect(steps.last().getByTestId("step-notes")).toContainText("Edited src/lib/schedule.ts");
+  await expect(page.getByTestId("run-upcoming")).toHaveText("Still to come: tests, a security check, the pull request, its checks");
+  const before = await page.getByTestId("run-elapsed").textContent();
+  await expect.poll(async () => page.getByTestId("run-elapsed").textContent(), { timeout: 5_000 }).not.toBe(before);
 });
 
 test("start over asks in the app's own dialog, then calls reset", async ({ page }) => {
@@ -432,7 +537,7 @@ test("a viewer sees the run but no buttons the server would refuse", async ({ pa
   await expect(page.getByRole("link", { name: /Open pull request #101/ }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Retry" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Start over/ })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Review again" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Address PR comments" })).toHaveCount(0);
 });
 
 test("a link without a run id explains itself", async ({ page }) => {
@@ -550,7 +655,7 @@ test("eight asks group by step, open one at a time, and say what each step did",
 test("a finished run with an old error says it's done; the old error waits in Activity", async ({ page }) => {
   await mockApi(page, { run: baseRun({ status: "completed", error: "TypeError: Cannot read properties of undefined (reading 'times')" }) });
   await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
-  await expect(page.getByTestId("run-outcome")).toContainText("Done");
+  await expect(page.getByTestId("run-outcome")).toContainText("Pull request #101 is ready for review");
   await expect(page.getByText(/TypeError/)).toHaveCount(0);
   await expect(page.getByText("Coderhelm stopped before it finished")).toHaveCount(0);
   await openTab(page, "Activity");

@@ -2,9 +2,9 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-// A run that finished with its pull request still a draft (`draft_hold`) says
-// "Finished, PR held" at the top, with the summary and each reason with what
-// to do. A run waiting out GitHub's hourly limit (`github_wait`) says when it
+// A run whose pull request is still a draft (`draft_hold`) says so at the
+// top, never "Finished": the pull request, how many things hold it, and each
+// reason with what to do. A run waiting out GitHub's hourly limit (`github_wait`) says when it
 // goes on, and that nothing is needed. Every API call is answered here.
 
 const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots");
@@ -46,6 +46,8 @@ function run(over: Partial<Run> = {}): Run {
       { pass: "review", started_at: iso(10) },
     ],
     progress_notes: [],
+    checks: null,
+    pr_review: null,
     waiting_on: { action: "Review pull request #318", detail: "It stays a draft until the items below are dealt with.", url: "https://github.com/your-team/web/pull/318", since: iso(5) },
     draft_hold: {
       kind: "held",
@@ -95,19 +97,25 @@ async function shot(page: Page, name: string) {
   await page.screenshot({ path: path.join(SHOTS_DIR, `${name}.png`), fullPage: true });
 }
 
-test("a held run reads Finished, PR held, with each reason and what to do", async ({ page }) => {
+test("a held run says its pull request is a draft, with each reason and what to do", async ({ page }) => {
   await mockApi(page, run());
   await page.goto("/runs/detail?id=01RUNHOLD");
 
   const outcome = page.getByTestId("run-outcome");
   await expect(outcome).toBeVisible();
   await expect(outcome).toHaveAttribute("data-tone", "waiting");
-  await expect(outcome.getByText("Finished, PR held", { exact: true })).toBeVisible();
+  await expect(outcome).toContainText("Pull request #318 is a draft: 2 things to deal with");
+  await expect(page.getByText(/Finished/)).toHaveCount(0);
+  await expect(page.getByTestId("run-who")).toHaveText("Needs a person");
   // The status beside the title says the same, not "Needs your answer".
-  await expect(page.getByText("Finished, PR held", { exact: true })).toHaveCount(2);
+  await expect(page.getByTestId("page-header").getByText("PR held", { exact: true })).toBeVisible();
   await expect(page.getByText("Needs your answer")).toHaveCount(0);
-
-  await expect(page.getByTestId("draft-hold-summary")).toHaveText(/pull request #318 stays a draft: Security items are open/);
+  // The summary repeats the first reason word for word: the reasons say it once.
+  await expect(page.getByTestId("draft-hold-summary")).toHaveCount(0);
+  // Retry is there, but the pull request is the one primary action.
+  await expect(outcome.getByRole("button", { name: "Retry" })).toBeVisible();
+  // The steps end on the hold, waiting on a person.
+  await expect(page.getByRole("list", { name: "Steps" }).getByTestId("run-step").last()).toHaveAttribute("data-state", "needs_you");
   const reasons = page.getByTestId("draft-hold-reasons");
   await expect(reasons.getByRole("listitem").filter({ hasText: SECURITY.what })).toContainText(`What to do: ${SECURITY.todo}`);
   await expect(reasons.getByRole("listitem").filter({ hasText: SANDBOX.what })).toContainText(`What to do: ${SANDBOX.todo}`);
@@ -127,18 +135,26 @@ test("a pull request GitHub refused to mark ready reads as needing attention", a
   await page.goto("/runs/detail?id=01RUNHOLD");
   const outcome = page.getByTestId("run-outcome");
   await expect(outcome).toHaveAttribute("data-tone", "attention");
-  await expect(outcome).toContainText("Finished, PR held: GitHub refused to mark it ready");
+  await expect(outcome).toContainText("Pull request #318 couldn't be marked ready");
   await expect(outcome).toContainText("What to do: Mark it ready on GitHub");
   await expect(outcome).not.toContainText("Held since");
   // Not "Done. The change is ready for review."
-  await expect(page.getByText("Done. The change is ready for review.")).toHaveCount(0);
+  await expect(page.getByText("Pull request #318 is ready for review")).toHaveCount(0);
+});
+
+test("a held run that also asked something shows its questions, not only the hold", async ({ page }) => {
+  await mockApi(page, run({ questions: [{ id: "q1", question: "Should the limit apply to signed-in people too?", why: "It changes who gets locked out.", suggestions: [] }] }));
+  await page.goto("/runs/detail?id=01RUNHOLD");
+  const outcome = page.getByTestId("run-outcome");
+  await expect(outcome).toContainText("Pull request #318 is a draft");
+  await expect(outcome.getByTestId("run-question")).toContainText("Should the limit apply to signed-in people too?");
 });
 
 test("a run with no hold still reads as before", async ({ page }) => {
   await mockApi(page, run({ status: "completed", waiting_on: null, draft_hold: null }));
   await page.goto("/runs/detail?id=01RUNHOLD");
-  await expect(page.getByTestId("run-outcome")).toContainText("Done. The change is ready for review.");
-  await expect(page.getByText("Finished, PR held")).toHaveCount(0);
+  await expect(page.getByTestId("run-outcome")).toContainText("Pull request #318 is ready for review");
+  await expect(page.getByText("PR held")).toHaveCount(0);
 });
 
 test("a run waiting for GitHub's hourly limit says when it goes on", async ({ page }) => {
@@ -160,7 +176,7 @@ test("a run waiting for GitHub's hourly limit says when it goes on", async ({ pa
 test("a finished run ignores a stale GitHub wait", async ({ page }) => {
   await mockApi(page, run({ status: "completed", waiting_on: null, draft_hold: null, github_wait: "Waiting for GitHub's hourly limit to reset at 21:05 UTC; continues by itself" }));
   await page.goto("/runs/detail?id=01RUNHOLD");
-  await expect(page.getByTestId("run-outcome")).toContainText("Done. The change is ready for review.");
+  await expect(page.getByTestId("run-outcome")).toContainText("Pull request #318 is ready for review");
   await expect(page.getByTestId("github-wait")).toHaveCount(0);
 });
 
