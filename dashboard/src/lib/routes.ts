@@ -115,7 +115,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/settings/integrations/aws": { label: "AWS", parent: "/settings/integrations", tab: "AWS integration", description: "Connect AWS so Coderhelm can read your logs, alarms and resources." },
   "/settings/integrations/github": { label: "GitHub", parent: "/settings/integrations", tab: "GitHub integration", description: "Connect GitHub so Coderhelm can read issues and open pull requests." },
   "/settings/integrations/jira": { label: "Jira", parent: "/settings/integrations", tab: "Jira integration", description: "Connect Jira so tickets can start runs and get updates." },
-  "/settings/integrations/mcp-callback": { label: "Connect a server", parent: "/settings/integrations", tab: "Connect an MCP server", description: "Finish connecting an MCP server to Coderhelm." },
+  "/settings/integrations/mcp-callback": { label: "Finish a sign-in", parent: "/settings/integrations", tab: "Finish a sign-in", description: "Finish signing Coderhelm in to an app, an MCP server or a knowledge source." },
   // Old addresses that redirect to their new place.
   "/settings/aws": { label: "AWS", parent: "/settings/integrations", description: "Connect AWS so Coderhelm can read your logs, alarms and resources." },
   "/settings/github": { label: "GitHub", parent: "/settings/integrations", description: "Connect GitHub so Coderhelm can read issues and open pull requests." },

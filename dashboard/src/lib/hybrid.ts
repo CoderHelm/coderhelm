@@ -51,6 +51,11 @@ export const GITHUB_OUTCOMES: Record<string, { ok: boolean; title: string; fix: 
     title: "Your GitHub account can't push to any repository in that installation, so nothing was linked.",
     fix: "Ask someone who can push to those repositories to press Install on GitHub, or get write access on GitHub and try again.",
   },
+  requested: {
+    ok: true,
+    title: "Request sent to your GitHub organization's owners.",
+    fix: "Once an owner approves the Coderhelm app, press Install on GitHub again to link it.",
+  },
   declined: {
     ok: false,
     title: "Nothing was linked: you chose Cancel on Coderhelm's confirmation page.",
@@ -106,7 +111,10 @@ export function hybridGithubSetupTarget(loc: { pathname: string; search: string 
   const state = q.get("state") ?? "";
   if (!state.startsWith("hyb_")) return null;
   const out = new URLSearchParams();
-  out.set("installation_id", q.get("installation_id") ?? "");
+  // Only when GitHub sent one: a request for an owner's approval has none,
+  // and an empty value isn't a number the hosted API can read.
+  const iid = q.get("installation_id") ?? "";
+  if (iid) out.set("installation_id", iid);
   out.set("state", state);
   out.set("setup_action", q.get("setup_action") ?? "");
   return `${apiBase()}/hybrid/github/setup?${out.toString()}`;
@@ -138,7 +146,7 @@ export function hybridOAuthHandoff(): Promise<boolean> {
     credentials: "omit",
     cache: "no-store",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code: q.get("code"), state: q.get("state"), error: q.get("error"), iss: q.get("iss") }),
+    body: JSON.stringify({ code: q.get("code"), state: q.get("state"), error: q.get("error"), error_description: q.get("error_description"), iss: q.get("iss") }),
   })
     .then(async (res) => {
       if (res.status !== 200) return false;

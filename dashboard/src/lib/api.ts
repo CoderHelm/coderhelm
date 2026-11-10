@@ -1454,8 +1454,9 @@ export const api = {
   /** Where to send the browser to sign in. */
   connectMcpServer: (id: string) =>
     request<{ authorize_url: string }>(`/api/mcp-servers/${encodeURIComponent(id)}/connect`, { method: "POST" }),
-  finishMcpSignIn: (body: { state: string; code?: string; error?: string; iss?: string }) =>
-    request<{ server: McpServer; tools_error: string | null; own_app?: boolean }>("/api/mcp-servers/oauth/callback", {
+  /** Finishes any sign-in that came back to the callback page; `flow` and `return_to` say where it goes next. */
+  finishMcpSignIn: (body: { state: string; code?: string; error?: string; error_description?: string; iss?: string }) =>
+    request<{ server: McpServer; tools_error: string | null; own_app?: boolean; flow?: string; return_to?: string }>("/api/mcp-servers/oauth/callback", {
       method: "POST",
       body: JSON.stringify(body),
     }),

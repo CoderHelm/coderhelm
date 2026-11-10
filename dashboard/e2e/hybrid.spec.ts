@@ -520,7 +520,7 @@ test("hosted: an OAuth callback that belongs to an install is passed on to it", 
   await page.goto("/settings/integrations/mcp-callback/?code=c1&state=hyb_s1&iss=https%3A%2F%2Fauth.example.com");
   await expect(page).toHaveURL(/\/settings\/\?from=hybrid$/);
   const post = calls.find((c) => c.path === "/hybrid/oauth/callback");
-  expect(post?.body).toEqual({ code: "c1", state: "hyb_s1", error: null, iss: "https://auth.example.com" });
+  expect(post?.body).toEqual({ code: "c1", state: "hyb_s1", error: null, error_description: null, iss: "https://auth.example.com" });
   expect(calls.some((c) => c.path === "/api/mcp-servers/oauth/callback")).toBe(false);
 });
 
