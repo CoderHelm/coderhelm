@@ -35,6 +35,7 @@ interface Db {
 interface Opts {
   me?: Record<string, unknown>;
   writeRequested?: boolean;
+  knowledgeRequested?: boolean;
   canAct?: boolean;
   teamWide?: boolean;
   signedIn?: boolean;
@@ -79,6 +80,7 @@ async function mockApi(page: Page, o: Opts = {}): Promise<Db> {
         scopes: [
           { key: "runs:read", label: "See your team's runs and reviews", requested: true, always: true },
           { key: "runs:write", label: "Start and retry runs, and ask for reviews", requested: o.writeRequested ?? true, always: false },
+          { key: "knowledge:read", label: "Search the knowledge bases you can read in Chat", requested: o.knowledgeRequested ?? false, always: false },
         ],
         email: "ann@example.com",
         team_id: "t_1",
@@ -144,7 +146,7 @@ test("allowing sends the answer and goes back to the app with its code", async (
   await page.waitForURL(/claude\.ai\/api\/mcp\/auth_callback\?code=chc_test_code/);
   await expect(page.getByRole("heading", { name: "Back in the app" })).toBeVisible();
   const decision = db.calls.find((c) => c.path === "/api/mcp/authorize");
-  expect(decision?.body).toEqual({ request: REQUEST, approve: true, allow_write: false });
+  expect(decision?.body).toEqual({ request: REQUEST, approve: true, allow_write: false, allow_knowledge: false });
 });
 
 test("not allowing goes back to the app with a refusal", async ({ page }) => {
@@ -152,7 +154,7 @@ test("not allowing goes back to the app with a refusal", async ({ page }) => {
   await page.goto(`/authorize/?request=${REQUEST}`);
   await page.getByRole("button", { name: "Don't allow" }).click();
   await page.waitForURL(/error=access_denied/);
-  expect(db.calls.find((c) => c.path === "/api/mcp/authorize")?.body).toEqual({ request: REQUEST, approve: false, allow_write: false });
+  expect(db.calls.find((c) => c.path === "/api/mcp/authorize")?.body).toEqual({ request: REQUEST, approve: false, allow_write: false, allow_knowledge: false });
 });
 
 test("a role that only reads can't give an app more", async ({ page }) => {
@@ -218,4 +220,24 @@ test("people who manage API keys see everyone's apps and who connected them", as
   await expect(list.getByTestId("connected-app")).toHaveCount(2);
   await expect(list.getByText("Connected by bob@example.com")).toBeVisible();
   await expect(list.getByText("Not used yet")).toBeVisible();
+});
+
+test("an app that asks to search knowledge gets it only with the box ticked", async ({ page }) => {
+  const db = await mockApi(page, { knowledgeRequested: true });
+  await page.goto(`/authorize/?request=${REQUEST}`);
+  const know = page.getByRole("checkbox", { name: /Search the knowledge bases you can read in Chat/ });
+  await expect(know).toBeChecked();
+  await expect(page.getByText("The app gets passages from the knowledge bases you can read in Chat, nothing more.")).toBeVisible();
+  await page.getByRole("button", { name: "Allow", exact: true }).click();
+  await page.waitForURL(/code=chc_test_code/);
+  expect(db.calls.find((c) => c.path === "/api/mcp/authorize")?.body).toMatchObject({ approve: true, allow_knowledge: true });
+});
+
+test("knowledge stays off when the app didn't ask, or the person unticks it", async ({ page }) => {
+  const db = await mockApi(page, { knowledgeRequested: true });
+  await page.goto(`/authorize/?request=${REQUEST}`);
+  await page.getByRole("checkbox", { name: /Search the knowledge bases/ }).uncheck();
+  await page.getByRole("button", { name: "Allow", exact: true }).click();
+  await page.waitForURL(/code=chc_test_code/);
+  expect(db.calls.find((c) => c.path === "/api/mcp/authorize")?.body).toMatchObject({ allow_knowledge: false });
 });

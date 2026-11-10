@@ -116,6 +116,72 @@ const CONNECTORS = [
   { kind: "web", label: "Website", blurb: "Public pages or a whole sitemap", connected: true, via: "public", can_sign_in: false, reconnect_reason: "", connected_by: "", hint: "", live_updates: false, picker: "address" },
 ];
 
+// Use in Bedrock: a key in every state and a copy that partly failed, with
+// long names, addresses and errors.
+const CONNECT = {
+  mcp_url: `${LONG_URL}/mcp`,
+  scope: "knowledge:read",
+  token_endpoint: `${LONG_URL}/oauth/token`,
+  authorization_endpoint: `${LONG_URL}/oauth/authorize`,
+  issuer: LONG_URL,
+  discovery_url: `${LONG_URL}/.well-known/oauth-authorization-server`,
+};
+const key = (id: string, status: "active" | "expired" | "revoked") => ({
+  id,
+  name: `${TITLE} agent`,
+  hint: `chkb_${TOKEN.slice(0, 4)}`,
+  client_id: `chkbc_${id}`,
+  bases: [KB_ID],
+  created_at: iso(30),
+  created_by: EMAIL,
+  expires_at: status === "expired" ? iso(1) : null,
+  last_used_at: status === "active" ? iso(2) : null,
+  revoked_at: status === "revoked" ? iso(3) : null,
+  revoked_by: status === "revoked" ? EMAIL : null,
+  status,
+});
+const BEDROCK_KEYS = {
+  keys: [key("k1", "active"), key("k2", "expired"), key("k3", "revoked")],
+  bases: [{ id: KB_ID, name: TITLE, named_readers: true }],
+  connect: CONNECT,
+  limits: { max_keys: 20, max_expiry_days: 365 },
+};
+const BEDROCK_SYNC = {
+  sync: {
+    enabled: true,
+    target: {
+      kind: "s3",
+      bucket: `coderhelm-${FILE}-bedrock-export`,
+      prefix: `knowledge/${FILE}/`,
+      region: "us-east-1",
+      knowledge_base_arn: `arn:aws:bedrock:us-east-1:123456789012:knowledge-base/${TOKEN}`,
+      data_source_id: TOKEN,
+    },
+    bases: [KB_ID],
+    acknowledged_at: iso(20),
+    acknowledged_by: EMAIL,
+    updated_at: iso(20),
+    updated_by: EMAIL,
+    status: {
+      state: "partial",
+      last_sync_at: iso(1),
+      last_success_at: iso(5),
+      documents: 1284,
+      added: 12,
+      updated: 40,
+      removed: 3,
+      errors: [SENTENCE],
+      ingestion_job_id: TOKEN,
+      needs_ingestion: true,
+      syncing: false,
+    },
+  },
+  bases: [{ id: KB_ID, name: TITLE, can_copy: true, named_readers: true, read_role: "member" }],
+  self_hosted: true,
+  warning: SENTENCE,
+  role_update: null,
+};
+
 export const knowledgeData: Handler = ({ method, path }) => {
   if (method !== "GET") return undefined;
   if (path === "/api/knowledge") return { bases: [BASE, { ...BASE, id: "kb_wide_2", name: TOKEN, sources: [], kinds: ["upload"], synced: 0, uploads: 1, description: "" }], can_manage: true, limits: LIMITS };
@@ -129,6 +195,8 @@ export const knowledgeData: Handler = ({ method, path }) => {
       options: {},
     };
   }
+  if (path === "/api/knowledge/keys") return BEDROCK_KEYS;
+  if (path === "/api/knowledge/bedrock-sync") return BEDROCK_SYNC;
   if (path.startsWith("/api/knowledge/")) {
     return { base: BASE, files: ITEMS, sources: SOURCES, can_manage: true, limits: LIMITS, visibility_note: SENTENCE };
   }

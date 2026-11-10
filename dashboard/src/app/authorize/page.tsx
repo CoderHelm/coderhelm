@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/skeleton";
 import { Code } from "@/components/settings/code";
 import { CheckIcon } from "@/components/icons";
 import { focusRing, fullWidthOnPhone, primaryButton, secondaryButton } from "@/components/ui";
-import { connectedAppsApi, WRITE_SCOPE, type ConsentRequest } from "@/lib/connected-apps";
+import { connectedAppsApi, KNOWLEDGE_SCOPE, WRITE_SCOPE, type ConsentRequest } from "@/lib/connected-apps";
 
 // The consent page an MCP client (Claude, Cursor, VS Code...) sends someone
 // to: who is asking, where the answer goes, what the app may do. The answer
@@ -42,9 +42,11 @@ function Consent() {
   const [req, setReq] = useState<ConsentRequest | null>(null);
   const [error, setError] = useState(token ? "" : "This page needs the link the app opened. Go back to the app and connect again.");
   const [allowWrite, setAllowWrite] = useState(false);
+  const [allowKnowledge, setAllowKnowledge] = useState(false);
   const [sending, setSending] = useState<"" | "allow" | "deny">("");
   const [leaving, setLeaving] = useState("");
   const writeId = useId();
+  const knowledgeId = useId();
 
   useEffect(() => {
     if (!token) return;
@@ -56,6 +58,7 @@ function Consent() {
         setReq(r);
         const write = r.scopes.find((s) => s.key === WRITE_SCOPE);
         setAllowWrite(!!write?.requested && r.can_act);
+        setAllowKnowledge(!!r.scopes.find((s) => s.key === KNOWLEDGE_SCOPE)?.requested);
       })
       .catch((e) => live && setError(e instanceof Error ? e.message : "The request failed."));
     return () => {
@@ -67,7 +70,7 @@ function Consent() {
     if (!req) return;
     setSending(approve ? "allow" : "deny");
     try {
-      const r = await connectedAppsApi.decide(token, approve, approve && allowWrite);
+      const r = await connectedAppsApi.decide(token, approve, approve && allowWrite, approve && allowKnowledge);
       setLeaving(approve ? `Done. Going back to ${req.client_name}…` : `Going back to ${req.client_name}…`);
       window.location.assign(r.redirect_to);
     } catch (e) {
@@ -90,8 +93,9 @@ function Consent() {
   }
   if (!req) return <Loading />;
 
-  const read = req.scopes.filter((s) => s.key !== WRITE_SCOPE);
+  const read = req.scopes.filter((s) => s.key !== WRITE_SCOPE && s.key !== KNOWLEDGE_SCOPE);
   const write = req.scopes.find((s) => s.key === WRITE_SCOPE);
+  const know = req.scopes.find((s) => s.key === KNOWLEDGE_SCOPE);
 
   return (
     <Page narrow testId="consent">
@@ -152,6 +156,26 @@ function Consent() {
                 <label htmlFor={writeId} className={req.can_act ? "text-zinc-200" : "text-zinc-400"}>
                   {write.label}
                   {!write.requested && req.can_act && <span className="block text-xs text-zinc-400">The app didn&apos;t ask for this. Leave it off unless you want the app to act.</span>}
+                </label>
+              </li>
+            )}
+            {know && (
+              <li className="flex items-start gap-2" data-testid="consent-scope">
+                <input
+                  id={knowledgeId}
+                  type="checkbox"
+                  className={`mt-0.5 h-4 w-4 shrink-0 accent-blue-500 ${focusRing}`}
+                  checked={allowKnowledge}
+                  onChange={(e) => setAllowKnowledge(e.target.checked)}
+                  data-testid="consent-knowledge"
+                />
+                <label htmlFor={knowledgeId} className="text-zinc-200">
+                  {know.label}
+                  <span className="block text-xs text-zinc-400">
+                    {know.requested
+                      ? "The app gets passages from the knowledge bases you can read in Chat, nothing more."
+                      : "The app didn't ask to search knowledge. Leave it off unless you want it to."}
+                  </span>
                 </label>
               </li>
             )}
