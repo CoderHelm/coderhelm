@@ -41,6 +41,9 @@ export interface TimelineInput {
   closedBy?: string | null;
 }
 
+/** A note the worker writes for each tool call. */
+export const TOOL_NOTE = /^Tool: /;
+
 const OVER = ["completed", "success", "merged", "failed", "cancelled", "closed", "needs_outside_change", "covered_by_pr", "retried", "archived"];
 
 /** A step's title: done in the past tense, running in the present. */
@@ -161,7 +164,9 @@ export function runTimeline(i: TimelineInput): TimelineStep[] {
     steps.push({ key: "end", pass: "end", title: i.status === "failed" ? "Stopped before its first step" : "Over", state: i.status === "failed" ? "failed" : "stopped", notes: [] });
   }
   // Each note goes under the step that was running when it was written.
-  const notes = [...(i.progress_notes ?? [])].filter((n) => n && n.message).sort((a, b) => (a.timestamp || "").localeCompare(b.timestamp || ""));
+  // "Tool: read_file — …" notes repeat the agent log's steps one by one; the
+  // build's digest (from the agent log) says what they add up to instead.
+  const notes = [...(i.progress_notes ?? [])].filter((n) => n && n.message && !TOOL_NOTE.test(n.message)).sort((a, b) => (a.timestamp || "").localeCompare(b.timestamp || ""));
   for (const note of notes) {
     const t = ms(note.timestamp);
     let target = -1;

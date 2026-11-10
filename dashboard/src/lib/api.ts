@@ -395,17 +395,7 @@ export const api = {
     ),
   getRun: (id: string) => request<RunDetail>(`/api/runs/${id}`),
   getRunOpenspec: (id: string) => request<Openspec>(`/api/runs/${id}/openspec`),
-  getAgentLog: (id: string) =>
-    request<{
-      passes: AgentLogPass[];
-      live_events: {
-        tool: string;
-        input_summary: string;
-        duration_ms: number;
-        is_error: boolean;
-        timestamp: string;
-      }[];
-    }>(`/api/runs/${id}/agent-log`),
+  getAgentLog: (id: string) => request<AgentLog>(`/api/runs/${id}/agent-log`),
   retryRun: (id: string) =>
     request<{ status: string }>(`/api/runs/${id}/retry`, { method: "POST" }),
   answerRun: (id: string, answers: { question_id: string; answer: string }[]) =>
@@ -2356,22 +2346,88 @@ export interface Openspec {
   spec?: string;
 }
 
-export interface AgentLogTurn {
-  turn: number;
-  role: string;
-  content: unknown[];
-  usage?: {
-    input_tokens: number;
-    output_tokens: number;
-    cache_read: number;
-    cache_write: number;
-  };
-  stop_reason?: string;
+/** How a tool call ended, as the tool itself noted it (format 2 logs). */
+export interface AgentLogOutcome {
+  status: "ok" | "soft_fail" | "refused" | "error";
+  /** A short plain summary: "12 matches in 3 files", "1 edit(s), +4/-1 lines". */
+  summary?: string;
 }
 
+export interface AgentLogUsage {
+  input_tokens: number;
+  output_tokens: number;
+  cache_read?: number;
+  cache_write?: number;
+}
+
+/** One Messages API block of an assistant entry, kept verbatim. */
+export type AgentLogBlock =
+  | { type: "text"; text: string }
+  | { type: "thinking"; thinking?: string; signature?: string }
+  | { type: "redacted_thinking"; data?: string }
+  | { type: "tool_use"; id?: string; name: string; input?: Record<string, unknown> }
+  | { type: string; [k: string]: unknown };
+
+export interface AgentLogToolResult {
+  type: "tool_result";
+  tool_use_id?: string;
+  /** As the model saw it: JSON-encoded (`content_encoding: "json"`, parse once) or plain text. */
+  content: unknown;
+  is_error?: boolean;
+  /** Format 2 only. */
+  tool?: string;
+  started_at?: string;
+  duration_ms?: number;
+  content_encoding?: "json" | "text";
+  outcome?: AgentLogOutcome | null;
+}
+
+/**
+ * One log entry. Format 1 logs have only `turn`, `role`, `content`, `usage`
+ * and `stop_reason`; format 2 adds `call`, the times, `call_started` and
+ * `system_note` entries.
+ */
+export type AgentLogEntry =
+  | { role: "call_started"; call?: number; turn: number; started_at?: string; model?: string; max_turns?: number }
+  | { role: "system_note"; call?: number; turn: number; kind: "turn_budget" | "wrap_up" | "tools_off" | string; text: string; started_at?: string }
+  | { role: "assistant"; call?: number; turn: number; content: AgentLogBlock[]; usage?: AgentLogUsage; stop_reason?: string; started_at?: string; ended_at?: string }
+  | { role: "tool_results"; call?: number; turn: number; content: AgentLogToolResult[]; started_at?: string; ended_at?: string };
+
+/** One stored log: a pass, or one round or agent of it, in run order. */
 export interface AgentLogPass {
   pass: string;
-  conversation: AgentLogTurn[];
+  conversation: AgentLogEntry[];
+  /** The log's key (format 2 and newer gateways). */
+  id?: string;
+  /** 1-based: the how-manyth log of this pass in the run. */
+  round?: number | null;
+  /** The agent that ran it: planner, coder, reviewer. */
+  step?: string | null;
+  started_at?: string | null;
+  ended_at?: string | null;
+  format?: 1 | 2;
+}
+
+/** A finished tool call the worker reported while the run worked. */
+export interface AgentLogLiveEvent {
+  tool: string;
+  input_summary: string;
+  duration_ms: number;
+  is_error: boolean;
+  /** When the call ended. */
+  timestamp: string;
+  /** Null on events written before the log had them. */
+  pass?: string | null;
+  tool_use_id?: string | null;
+  started_at?: string | null;
+  outcome?: AgentLogOutcome | null;
+}
+
+export interface AgentLog {
+  passes: AgentLogPass[];
+  live_events: AgentLogLiveEvent[];
+  /** More events existed than the gateway read. */
+  live_events_truncated?: boolean;
 }
 
 export interface SearchResults {

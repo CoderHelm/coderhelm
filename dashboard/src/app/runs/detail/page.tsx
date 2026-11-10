@@ -4,7 +4,7 @@ import { useCan } from "@/hooks/use-can";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, type RunDetail, type Openspec, type UsageInfo, type PluginDef, type PassTrace, type AgentLogPass, errorStatus } from "@/lib/api";
+import { api, type RunDetail, type Openspec, type UsageInfo, type PluginDef, type PassTrace, type AgentLog, errorStatus } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
 import { limitName, reachedLimit, usageBreakdown, usageTotal } from "@/lib/usage";
 import { useToast } from "@/components/toast";
@@ -35,6 +35,7 @@ import { RunTriggerLine } from "@/components/run-trigger";
 import { activePass, PASSES, runSteps } from "@/lib/run-steps";
 import { checksSentence, runTimeline, spanSeconds, stillToCome } from "@/lib/run-timeline";
 import { ChecksPanel, FilesChanged, noFilesNote, RunTimeline } from "./run-timeline";
+import { AgentLogPanel, BuildDigest } from "./agent-log";
 import { VerdictPill } from "@/app/reviewer/labels";
 import { reviewHref } from "@/app/reviewer/session/session";
 import { planCheckResult, taskPath } from "@/lib/plan-check";
@@ -167,103 +168,6 @@ function useNow(on: boolean): number {
   return now;
 }
 
-function AgentLogPassView({ pass }: { pass: AgentLogPass }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="p-3">
-      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={`text-xs font-medium text-zinc-300 flex items-center gap-1 hover:text-zinc-100 cursor-pointer rounded ${focusRing}`}>
-        <span aria-hidden="true" className={`inline-flex transition-transform ${open ? "rotate-90" : ""}`}><ChevronRightIcon /></span>
-        {passLabel(pass.pass)} ({pass.conversation.length} {pass.conversation.length === 1 ? "turn" : "turns"})
-      </button>
-      {open && (
-        <div className="mt-2 space-y-2 max-h-[600px] overflow-y-auto">
-          {pass.conversation.map((turn, i) => (
-            <AgentLogTurnView key={i} turn={turn} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AgentLogTurnView({ turn }: { turn: AgentLogPass["conversation"][number] }) {
-  const [open, setOpen] = useState(false);
-  const roleColors: Record<string, string> = {
-    assistant: "text-blue-400",
-    tool_results: "text-amber-400",
-  };
-
-  const contentSummary = useMemo(() => {
-    if (turn.role === "assistant") {
-      // Show text blocks and list tool_use names
-      const texts: string[] = [];
-      const tools: string[] = [];
-      for (const block of turn.content as Record<string, unknown>[]) {
-        if (block.type === "text" && typeof block.text === "string") {
-          texts.push(block.text.slice(0, 200));
-        } else if (block.type === "tool_use" && typeof block.name === "string") {
-          tools.push(block.name as string);
-        }
-      }
-      return { texts, tools };
-    }
-    if (turn.role === "tool_results") {
-      return {
-        texts: [],
-        tools: (turn.content as Record<string, unknown>[]).map((r) => {
-          const content = typeof r.content === "string" ? r.content : "";
-          const isErr = !!r.is_error;
-          return `${isErr ? "Error: " : ""}${content.slice(0, 150)}${content.length > 150 ? "…" : ""}`;
-        }),
-      };
-    }
-    return { texts: [], tools: [] };
-  }, [turn]);
-
-  return (
-    <div className="border border-zinc-800 rounded text-xs">
-      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={`w-full flex flex-wrap items-center gap-x-2 gap-y-0.5 px-2 py-1.5 text-left hover:bg-zinc-800/50 cursor-pointer ${focusRing}`}>
-        <span aria-hidden="true" className={`inline-flex scale-75 transition-transform ${open ? "rotate-90" : ""}`}><ChevronRightIcon /></span>
-        <span className={`font-medium ${roleColors[turn.role] ?? "text-zinc-400"}`}>
-          {turn.role === "tool_results" ? "Tool results" : turn.role === "assistant" ? "Agent" : turn.role}
-        </span>
-        <span className="text-zinc-400">Turn {turn.turn}</span>
-        {contentSummary.tools.length > 0 && turn.role === "assistant" && (
-          <span className="min-w-0 text-zinc-400 [overflow-wrap:anywhere]">{contentSummary.tools.join(", ")}</span>
-        )}
-        {turn.usage && (
-          <span className="text-zinc-400 ml-auto">
-            {((turn.usage.input_tokens + (turn.usage.cache_read ?? 0) + (turn.usage.cache_write ?? 0) + turn.usage.output_tokens) / 1000).toFixed(1)}k tokens
-          </span>
-        )}
-      </button>
-      {open && (
-        <div className="px-3 py-2 border-t border-zinc-800 bg-zinc-900/50 font-mono whitespace-pre-wrap [overflow-wrap:anywhere] text-zinc-400 max-h-80 overflow-y-auto">
-          {turn.role === "assistant" && contentSummary.texts.map((t, i) => (
-            <div key={i} className="mb-2">{t}</div>
-          ))}
-          {turn.role === "assistant" && contentSummary.tools.length > 0 && (
-            <div className="text-blue-400/70">
-              {contentSummary.tools.map((t, i) => <div key={i}>Calls {t}</div>)}
-            </div>
-          )}
-          {turn.role === "tool_results" && (turn.content as Record<string, unknown>[]).map((r, i) => {
-            const content = typeof r.content === "string" ? r.content : JSON.stringify(r.content);
-            return (
-              <details key={i} className="mb-1">
-                <summary className={`cursor-pointer rounded ${focusRing} ${r.is_error ? "text-red-400" : "text-zinc-400"}`}>
-                  {r.is_error ? "Error " : "Result "}{i + 1} ({content.length > 1000 ? `${(content.length / 1024).toFixed(1)}KB` : `${content.length}B`})
-                </summary>
-                <pre className="mt-1 max-w-full text-xs leading-relaxed overflow-x-auto">{content.slice(0, 5000)}{content.length > 5000 ? "\n… (truncated)" : ""}</pre>
-              </details>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function RunDetailInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -283,8 +187,9 @@ function RunDetailInner() {
   const [traces, setTraces] = useState<PassTrace[]>([]);
   const tracesLoaded = useRef(false);
   const [pipelineOpen, setPipelineOpen] = useState(false);
-  const [agentLog, setAgentLog] = useState<{ passes: AgentLogPass[]; live_events: { tool: string; input_summary: string; duration_ms: number; is_error: boolean; timestamp: string }[] } | null>(null);
-  const [agentLogOpen, setAgentLogOpen] = useState(false);
+  const [agentLog, setAgentLog] = useState<AgentLog | null>(null);
+  // A link into the log (a step, a search, a filter) opens it.
+  const [agentLogOpen, setAgentLogOpen] = useState(() => ["step", "log_q", "log_filter", "log_file", "log_view", "log_time"].some((k) => searchParams.has(k)));
   const [agentLogFailed, setAgentLogFailed] = useState(false);
   const agentLogLoaded = useRef(false);
   const { toast } = useToast();
@@ -341,15 +246,27 @@ function RunDetailInner() {
     api.getAgentLog(runId).then(setAgentLog).catch(() => { agentLogLoaded.current = false; setAgentLogFailed(true); });
   }, [runId]);
 
-  // Refresh the agent log every 10s while the panel is open and the run is working.
+  // The log loads when the panel opens, and on the Overview for the build's digest.
+  const tabParam = searchParams.get("tab");
+  const wantsLog = (agentLogOpen && tabParam === "details") || (!tabParam || tabParam === "overview");
+  const hasBuild = !!run?.pass_history?.some((h) => h.pass.startsWith("implement"));
   useEffect(() => {
-    if (!agentLogOpen || !run || !isActive(run.status)) return;
+    if (!run || agentLogLoaded.current) return;
+    if (!(agentLogOpen && tabParam === "details") && !hasBuild) return;
+    if (!wantsLog) return;
+    agentLogLoaded.current = true;
+    loadAgentLog();
+  }, [run, wantsLog, hasBuild, agentLogOpen, tabParam, loadAgentLog]);
+
+  // Refresh the agent log every 10s while it is shown and the run is working.
+  useEffect(() => {
+    if (!wantsLog || !run || !isActive(run.status)) return;
     const interval = setInterval(() => {
       api.getAgentLog(runId).then(setAgentLog).catch(() => {});
     }, 10000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentLogOpen, run?.status, runId]);
+  }, [wantsLog, run?.status, runId]);
 
   // ⌘K "Close this run" while the run can be closed and the person may.
   const closable = !!run && canAct && runCanClose(run.status);
@@ -1203,6 +1120,16 @@ function RunDetailInner() {
                 }
                 live={run.status === "running" || run.status === "queued"}
                 upcoming={upcoming}
+                build={
+                  agentLog ? (
+                    <BuildDigest
+                      log={agentLog}
+                      traces={traces}
+                      live={run.status === "running"}
+                      href={(step) => `/runs/detail?id=${encodeURIComponent(runId)}&tab=details${step ? `&step=${encodeURIComponent(step)}` : ""}`}
+                    />
+                  ) : undefined
+                }
                 end={
                   hasPr && checks ? (
                     <ChecksPanel checks={checks} now={now} />
@@ -1418,28 +1345,7 @@ function RunDetailInner() {
                 ) : !agentLog ? (
                   <div className="p-4 text-sm text-zinc-400">Loading…</div>
                 ) : (
-                  <div className="divide-y divide-zinc-800">
-                    {agentLog.live_events.length > 0 && (
-                      <div className="p-3">
-                        <h3 className="mb-2 text-xs font-medium text-zinc-400">Tool calls ({agentLog.live_events.length})</h3>
-                        <div className="max-h-64 space-y-1 overflow-y-auto" ref={(el) => { if (el) el.scrollTop = el.scrollHeight; }}>
-                          {agentLog.live_events.map((evt, i) => (
-                            <div key={i} className={`flex min-w-0 items-start gap-2 font-mono text-xs ${evt.is_error ? "text-red-300" : "text-zinc-400"}`}>
-                              <span className="shrink-0 text-zinc-400">{new Date(evt.timestamp).toLocaleTimeString()}</span>
-                              <span className="text-zinc-200">{evt.tool}</span>
-                              {evt.input_summary && <span className="min-w-0 truncate text-zinc-400">{evt.input_summary}</span>}
-                              <span className="ml-auto shrink-0 text-zinc-400">{formatMs(evt.duration_ms)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {agentLog.passes.length > 0 ? (
-                      agentLog.passes.map((p) => <AgentLogPassView key={p.pass} pass={p} />)
-                    ) : agentLog.live_events.length === 0 ? (
-                      <div className="p-4 text-sm text-zinc-400">No agent log yet. The log starts once the build step begins.</div>
-                    ) : null}
-                  </div>
+                  <AgentLogPanel log={agentLog} traces={traces} runId={runId} live={isActive(run.status)} diffUrl={prLinks.length === 1 && run.pr_url ? `${run.pr_url.replace(/\/$/, "")}/files` : undefined} />
                 )}
               </div>
             )}
