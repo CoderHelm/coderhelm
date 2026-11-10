@@ -68,6 +68,7 @@ export const ROUTES: Record<string, RouteInfo> = {
 
   "/chat": { label: "Chat", description: "Ask Coderhelm about your code, runs and documents, with answers that cite their sources." },
   "/knowledge": { label: "Knowledge", description: "The documents and sources Chat answers from, and how fresh each one is." },
+  "/knowledge/bedrock": { label: "Use in Bedrock", parent: "/knowledge", description: "Let Amazon Bedrock search your team's knowledge live, or keep chosen knowledge bases copied into your AWS account." },
   "/knowledge/base": { label: "Knowledge base", parent: "/knowledge", detail: true, description: "One knowledge base: its sources, what it holds and when it was last read." },
   // Knowledge's old addresses, which redirect to it.
   "/brain/knowledge": { label: "Knowledge", description: "The documents and sources Chat answers from, and how fresh each one is." },

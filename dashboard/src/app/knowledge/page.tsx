@@ -7,7 +7,7 @@ import { Page, PageHeader } from "@/components/page";
 import { ListError } from "@/components/list";
 import { StatusDot } from "@/components/list/status";
 import { useCan } from "@/hooks/use-can";
-import { buttonClass, focusRing, primaryButton } from "@/components/ui";
+import { buttonClass, focusRing, primaryButton, secondaryButton } from "@/components/ui";
 import { AddFlow } from "@/components/knowledge/add-flow";
 import { LogoStack, SourceLogo } from "@/components/knowledge/logos";
 import { KIND_LABEL, READ_SHORT, baseHealth, itemWord, knowledge, type AddKind, type Base, type KnowledgeLimits, type SourceKind, connectedInPlace } from "@/lib/knowledge";
@@ -75,9 +75,14 @@ function Knowledge() {
         lead="What your team's answers come from. Bring in pages from the apps you already use, and they stay up to date on their own."
         actions={
           canManage && bases && bases.length > 0 ? (
-            <button type="button" onClick={() => start()} className={primaryButton} data-testid="new-knowledge">
-              New knowledge base
-            </button>
+            <>
+              <Link href="/knowledge/bedrock/" className={secondaryButton} data-testid="use-in-bedrock">
+                Use in Bedrock
+              </Link>
+              <button type="button" onClick={() => start()} className={primaryButton} data-testid="new-knowledge">
+                New knowledge base
+              </button>
+            </>
           ) : undefined
         }
       />
