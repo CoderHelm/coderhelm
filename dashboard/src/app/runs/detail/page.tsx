@@ -34,9 +34,10 @@ import { ChevronRightIcon, ExternalLinkIcon } from "@/components/icons";
 import { RunTriggerLine } from "@/components/run-trigger";
 import { activePass, PASSES, runSteps } from "@/lib/run-steps";
 import { checksSentence, runTimeline, spanSeconds, stillToCome } from "@/lib/run-timeline";
-import { ChecksPanel, FilesChanged, RunTimeline } from "./run-timeline";
+import { ChecksPanel, FilesChanged, noFilesNote, RunTimeline } from "./run-timeline";
 import { VerdictPill } from "@/app/reviewer/labels";
 import { reviewHref } from "@/app/reviewer/session/session";
+import { planCheckResult, taskPath } from "@/lib/plan-check";
 
 /** Words people read for each step name the worker records. */
 const PASS_LABEL: Record<string, string> = {
@@ -132,9 +133,9 @@ function parseTaskItems(tasks?: string): TaskItem[] {
       currentSection = sectionMatch[1].trim();
       continue;
     }
-    const taskMatch = line.match(/^\s*-\s+\[([ x])\]\s+(.+)/);
+    const taskMatch = line.match(/^\s*[-*]\s+\[([ xX])\]\s+(.+)/);
     if (taskMatch) {
-      const checked = taskMatch[1] === "x";
+      const checked = taskMatch[1] !== " ";
       const text = taskMatch[2].trim();
       // Extract file paths mentioned with backticks
       const paths = Array.from(text.matchAll(/`([^`]+\.[a-z]{1,4}[x]?)`/gi)).map((m) => m[1]);
@@ -145,12 +146,13 @@ function parseTaskItems(tasks?: string): TaskItem[] {
 }
 
 /**
- * A task is done only when the plan says so (its own checkbox). The run
- * doesn't report tasks one by one, so the page never guesses from file
- * names or the run's status.
+ * Whether a task is done: the plan check's word for its file when the run has
+ * one (the run's own measure of the branch), else the checklist's own box.
+ * Never a guess from file names or the run's status.
  */
-function isTaskDone(task: TaskItem): boolean {
-  return task.checked;
+function taskDone(task: TaskItem, planCheck: Map<string, boolean> | null): boolean {
+  const path = taskPath(task.text);
+  return path !== null && planCheck?.has(path) ? planCheck.get(path) === true : task.checked;
 }
 
 /** The time now, once a second while `on`: a live elapsed time. */
@@ -366,6 +368,7 @@ function RunDetailInner() {
   const now = useNow(!!run && (isActive(run.status) || run.status === "needs_input"));
 
   const taskItems = useMemo(() => parseTaskItems(openspec?.tasks), [openspec?.tasks]);
+  const planCheck = useMemo(() => planCheckResult(run?.progress_notes), [run?.progress_notes]);
 
   // Compute the highest pass index ever reached (not just current_pass, which regresses during CI fix cycles)
   const maxPassIdx = useMemo(() => {
@@ -436,12 +439,13 @@ function RunDetailInner() {
   const showTaskSidebar = taskItems.length > 0 && implementStarted;
   const filesModified = run.files_modified ?? [];
 
-  const doneCount = taskItems.filter(isTaskDone).length;
-
   // What each action is allowed for, matching the gateway's own checks.
   const canRetry = ["failed", "needs_input", "needs_outside_change", "covered_by_pr", "cancelled", "closed"].includes(run.status) && run.current_pass !== "feedback";
   // A closed run is reopened first; the gateway refuses a re-review of it.
-  const canReview = !!run.pr_url && !["running", "queued", "merged", "closed"].includes(run.status);
+  // Offered only when there is something to address: the reviewer asked for
+  // changes. (The run doesn't report other people's review comments yet.)
+  const canReview =
+    !!run.pr_url && !["running", "queued", "merged", "closed"].includes(run.status) && run.pr_review?.verdict === "REQUEST_CHANGES";
   // Starting over closes the pull request: never offered once it is merged.
   const canReset = ["completed", "failed", "needs_input", "needs_outside_change", "covered_by_pr", "cancelled", "closed", "success"].includes(run.status);
   // Close is a button while the run works or waits on an answer; otherwise it sits in More.
@@ -1101,8 +1105,18 @@ function RunDetailInner() {
       ].filter((x): x is { label: string; onSelect: () => void } => !!x)
     : [];
 
+  // The plan check measures the tasks that name a file; with no such result a
+  // finished run's checklist can be stale, so it says where the work is
+  // instead of showing boxes nobody ticked.
+  const isDone = (t: TaskItem) => taskDone(t, planCheck);
+  const doneCount = taskItems.filter(isDone).length;
+  const planCovers = !!planCheck && taskItems.some((t) => {
+    const p = taskPath(t.text);
+    return p !== null && planCheck.has(p);
+  });
+  const doneIn = !planCovers && done && hasPr && doneCount < taskItems.length ? (prNumber ? `Done in pull request #${prNumber}` : "Done in the pull request") : null;
   const tasksCard = showTaskSidebar ? (
-    <TasksCard items={taskItems} done={isTaskDone} doneCount={doneCount} />
+    <TasksCard items={taskItems} done={isDone} doneCount={doneCount} doneIn={doneIn} />
   ) : null;
 
   return (
@@ -1204,7 +1218,7 @@ function RunDetailInner() {
             {tasksCard && <div className="min-w-0 lg:col-start-2 lg:row-span-3 lg:row-start-1">{tasksCard}</div>}
             <div className="min-w-0 space-y-6 lg:col-start-1">
               {(filesModified.length > 0 || hasPr) && (
-                <FilesChanged files={filesModified} live={live} diffUrl={prLinks.length === 1 && run.pr_url ? `${run.pr_url.replace(/\/$/, "")}/files` : undefined} />
+                <FilesChanged files={filesModified} live={live} hasPr={hasPr} prNumber={prNumber} diffUrl={prLinks.length === 1 && run.pr_url ? `${run.pr_url.replace(/\/$/, "")}/files` : undefined} />
               )}
 
               {run.outside_change_report && (
@@ -1279,8 +1293,19 @@ function RunDetailInner() {
                 ))}
               </ul>
             ) : (
-              <EmptyState title="No files changed yet">
-                {live ? "Files show here as Coderhelm changes them." : "This run didn't change any code."}
+              <EmptyState
+                title={live ? "No files changed yet" : hasPr ? "Files not recorded" : "No files changed"}
+                action={
+                  !live && prLinks.length === 1 && run.pr_url ? (
+                    <a href={`${run.pr_url.replace(/\/$/, "")}/files`} target="_blank" rel="noopener noreferrer" className={`${secondaryButton} gap-1.5`}>
+                      See the files on GitHub
+                      <ExternalLinkIcon />
+                      <span className="sr-only"> (opens in a new tab)</span>
+                    </a>
+                  ) : undefined
+                }
+              >
+                <span data-testid="run-files-empty">{noFilesNote({ live, prNumber, hasPr })}</span>
               </EmptyState>
             )}
           </section>
@@ -1534,17 +1559,23 @@ function OutcomeCard({
   );
 }
 
-function TasksCard({ items, done, doneCount }: { items: TaskItem[]; done: (t: TaskItem) => boolean; doneCount: number }) {
+/**
+ * The plan's tasks, ticked from the plan check (or the checklist). `doneIn`
+ * ("Done in pull request #12") replaces the boxes when a finished run has no
+ * per-task result: its work is in the pull request, and empty boxes would say
+ * nothing was done.
+ */
+function TasksCard({ items, done, doneCount, doneIn }: { items: TaskItem[]; done: (t: TaskItem) => boolean; doneCount: number; doneIn: string | null }) {
   let lastSection = "";
   return (
-    <details open className="group overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/50 lg:sticky lg:top-16">
+    <details open className="group overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/50 lg:sticky lg:top-16" data-testid="run-tasks">
       <summary className={`flex cursor-pointer list-none items-center justify-between gap-3 border-b border-zinc-800 px-4 py-3 [&::-webkit-details-marker]:hidden ${focusRing}`}>
         <h2 className="text-sm font-semibold text-zinc-100">Tasks</h2>
-        <span className="text-sm tabular-nums text-zinc-400">
-          {doneCount > 0 ? `${doneCount} of ${items.length} done` : items.length === 1 ? "1 task" : `${items.length} tasks`}
+        <span className="text-right text-sm tabular-nums text-zinc-400" data-testid="run-tasks-count">
+          {doneIn ?? (doneCount > 0 ? `${doneCount} of ${items.length} done` : items.length === 1 ? "1 task" : `${items.length} tasks`)}
         </span>
       </summary>
-      {doneCount > 0 && (
+      {!doneIn && doneCount > 0 && (
         <div className="h-1 bg-zinc-800" aria-hidden="true">
           <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${(doneCount / items.length) * 100}%` }} />
         </div>
@@ -1557,7 +1588,10 @@ function TasksCard({ items, done, doneCount }: { items: TaskItem[]; done: (t: Ta
           return (
             <div key={i}>
               {header && <p className="mb-1.5 mt-3 text-xs font-medium text-zinc-400 first:mt-0">{header}</p>}
-              <div className="flex items-start gap-2 py-1">
+              <div className="flex items-start gap-2 py-1" data-testid="run-task" data-done={doneIn ? undefined : String(isDone)}>
+                {doneIn ? (
+                  <span aria-hidden="true" className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-zinc-500" />
+                ) : (
                 <div
                   aria-hidden="true"
                   className={`mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border transition-colors ${
@@ -1570,8 +1604,9 @@ function TasksCard({ items, done, doneCount }: { items: TaskItem[]; done: (t: Ta
                     </svg>
                   )}
                 </div>
-                <span className={`line-clamp-3 min-w-0 text-sm leading-relaxed [overflow-wrap:anywhere] ${isDone ? "text-zinc-400" : "text-zinc-200"}`} title={task.text}>
-                  <span className="sr-only">{isDone ? "Done: " : "To do: "}</span>
+                )}
+                <span className={`line-clamp-3 min-w-0 text-sm leading-relaxed [overflow-wrap:anywhere] ${isDone && !doneIn ? "text-zinc-400" : "text-zinc-200"}`} title={task.text}>
+                  {!doneIn && <span className="sr-only">{isDone ? "Done: " : "To do: "}</span>}
                   <InlineMarkdown>{task.text}</InlineMarkdown>
                 </span>
               </div>

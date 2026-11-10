@@ -5,6 +5,7 @@ import type { RunCheck, RunChecks } from "@/lib/api";
 import { formatDate, formatDuration, Time } from "@/components/list";
 import { CheckIcon, ChevronRightIcon, ExternalLinkIcon, XIcon } from "@/components/icons";
 import { focusRing } from "@/components/ui";
+import { FilePath } from "@/components/file-path";
 import { checkGroup, checksHeadline, checksSentence, sortedChecks, spanSeconds, type StepState, type TimelineStep } from "@/lib/run-timeline";
 
 // The run page's timeline in the review session's visual language: one
@@ -255,24 +256,45 @@ export function ChecksPanel({ checks, now }: { checks: RunChecks; now: number })
 const FILES_SHOWN = 8;
 
 function FileLine({ path }: { path: string }) {
-  const cut = path.lastIndexOf("/");
   return (
-    <li className="min-w-0 py-1 font-mono text-xs leading-5 [overflow-wrap:anywhere]">
-      {cut > 0 && <span className="text-zinc-400">{path.slice(0, cut + 1)}</span>}
-      <span className="text-zinc-200">{path.slice(cut + 1)}</span>
+    <li className="min-w-0 py-1">
+      <FilePath path={path} />
     </li>
   );
 }
 
+/**
+ * What the Files changed card says with no file list: still working, a pull
+ * request whose list wasn't recorded (never "didn't change any code" beside
+ * an open pull request), or truly no change.
+ */
+export function noFilesNote({ live, prNumber, hasPr }: { live: boolean; prNumber?: number | null; hasPr: boolean }): string {
+  if (live) return "Files show here as Coderhelm changes them.";
+  if (hasPr) return `Coderhelm didn't record which files this run changed. ${prNumber ? `Pull request #${prNumber}` : "The pull request"} has every change.`;
+  return "This run didn't change any code.";
+}
+
 /** The files the run changed: the first few, the rest folded, and the diff on GitHub. */
-export function FilesChanged({ files, diffUrl, live }: { files: string[]; diffUrl?: string; live: boolean }) {
+export function FilesChanged({
+  files,
+  diffUrl,
+  live,
+  hasPr = false,
+  prNumber = null,
+}: {
+  files: string[];
+  diffUrl?: string;
+  live: boolean;
+  hasPr?: boolean;
+  prNumber?: number | null;
+}) {
   const first = files.slice(0, FILES_SHOWN);
   const rest = files.slice(FILES_SHOWN);
   return (
     <section className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3" aria-labelledby="run-files-title" data-testid="run-files">
       <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-2">
         <h2 id="run-files-title" className="text-sm font-semibold text-zinc-100">
-          Files changed <span className="font-normal tabular-nums text-zinc-400">{files.length}</span>
+          Files changed {files.length > 0 && <span className="font-normal tabular-nums text-zinc-400">{files.length}</span>}
         </h2>
         {diffUrl && (
           <a href={diffUrl} target="_blank" rel="noreferrer" className={`inline-flex items-center gap-1 rounded text-sm text-sky-300 hover:text-sky-200 ${focusRing}`}>
@@ -283,7 +305,7 @@ export function FilesChanged({ files, diffUrl, live }: { files: string[]; diffUr
         )}
       </div>
       {files.length === 0 ? (
-        <p className="mt-1 text-sm text-zinc-400">{live ? "Files show here as Coderhelm changes them." : "This run didn't change any code."}</p>
+        <p className="mt-1 text-sm text-zinc-400" data-testid="run-files-empty">{noFilesNote({ live, prNumber, hasPr })}</p>
       ) : (
         <>
           <ul className="mt-1 divide-y divide-zinc-800/60">

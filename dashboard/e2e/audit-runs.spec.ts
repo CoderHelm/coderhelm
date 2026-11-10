@@ -247,8 +247,9 @@ test("a finished run shows its pull request, steps, documents and tasks without 
   // The files the run changed, with the diff on GitHub.
   await expect(page.getByTestId("run-files")).toContainText("schedule.ts");
   await expect(page.getByTestId("run-files").getByRole("link", { name: /See the diff on GitHub/ })).toHaveAttribute("href", "https://github.com/your-team/web/pull/101/files");
-  // Tasks are ticked only by the plan itself, never guessed from the run's status.
-  await expect(page.getByText("3 tasks")).toBeVisible();
+  // Tasks are never guessed from the run's status: with no plan check result
+  // and nothing ticked, a finished run says where the work is, not empty boxes.
+  await expect(page.getByTestId("run-tasks-count")).toHaveText("Done in pull request #101");
   await expect(page.getByText("Tasks", { exact: true })).toBeVisible();
   await expect(page.getByTestId("stat-time")).toContainText("12m 34s");
   // Token parts are technical detail: not on the overview.
