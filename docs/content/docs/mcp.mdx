@@ -1,9 +1,9 @@
 ---
 title: Use CoderHelm from Claude, Cursor and VS Code
-description: Add CoderHelm to Claude, Cursor, VS Code or any other MCP app, sign in once, and see runs, start and retry them, and read or ask for reviews from where you already work.
+description: Add CoderHelm to Claude, Cursor, VS Code or any other MCP app, sign in once, and see runs, start and retry them, read or ask for reviews, and search your team's knowledge from where you already work.
 ---
 
-CoderHelm is an MCP server. Add it to an AI app that supports remote MCP servers, sign in with your CoderHelm account, and the app can see your team's runs and reviews, start work from a ticket, retry a run that stopped, and ask the reviewer to look at a pull request.
+CoderHelm is an MCP server. Add it to an AI app that supports remote MCP servers, sign in with your CoderHelm account, and the app can see your team's runs and reviews, start work from a ticket, retry a run that stopped, ask the reviewer to look at a pull request, and search the knowledge bases you can read in Chat.
 
 The app acts as you. It can do only what your role in CoderHelm allows, in the team you choose when you sign in.
 
@@ -71,7 +71,7 @@ On a self-hosted install, use your own address in each of these instead of `http
 When you connect, the app opens a CoderHelm page in your browser. Sign in if you aren't already, then check:
 
 - **Which app is asking.** The app chooses its own name, so check the address it will send you back to (for Claude, `claude.ai`). If you didn't just add CoderHelm to an app, choose **Don't allow**.
-- **What it may do.** Seeing runs and reviews is always included. Starting and retrying runs and asking for reviews is a separate choice: leave it off and the app can only read.
+- **What it may do.** Seeing runs and reviews is always included. Starting and retrying runs and asking for reviews is a separate choice: leave it off and the app can only read. Searching your knowledge is a choice too, ticked when the app asks for it.
 
 The app gets access for the team you are signed in to. To connect it to another team, switch teams in CoderHelm first.
 
@@ -86,8 +86,10 @@ The app gets access for the team you are signed in to. To connect it to another 
 | `list_reviews` | Lists the reviewer's reviews, newest first. | Reading |
 | `get_review` | One review with its findings, by its id or by pull request address. | Reading |
 | `request_review` | Asks the reviewer to review a pull request now, the same as **Re-review**. | Starting runs |
+| `knowledge_list` | Lists the knowledge bases you can read in Chat. | Searching knowledge |
+| `knowledge_search` | Finds the best passages for a question in those knowledge bases (or one of them), each with its source's title, link, last updated time and score. | Searching knowledge |
 
-The reading tools are marked read only, so apps that ask before acting know they change nothing.
+The reading and knowledge tools are marked read only, so apps that ask before acting know they change nothing. The knowledge tools read exactly what Chat would show you: knowledge bases your role reaches and that are open to you by name, and search tools that sign each person in are searched as you.
 
 A Jira ticket reaches CoderHelm from Jira, so `start_run` with a Jira key works for tickets CoderHelm has received before. For a new Jira ticket, start it from Jira the way your team does, or give `start_run` a task and a repository.
 
@@ -106,8 +108,9 @@ CoderHelm follows the MCP authorization spec:
 - Protected resource metadata: `/.well-known/oauth-protected-resource/mcp`
 - Authorization server metadata: `/.well-known/oauth-authorization-server`
 - Dynamic client registration at `/oauth/register`. Clients are public: PKCE with `S256` is required and there is no client secret.
-- Scopes: `runs:read` and `runs:write`. A first sign-in is asked for `runs:read`; a tool that needs `runs:write` answers `403` with `insufficient_scope`, so a client can ask again.
+- Scopes: `runs:read`, `runs:write` and `knowledge:read`. A first sign-in is asked for `runs:read`; a tool that needs `runs:write` or `knowledge:read` answers `403` with `insufficient_scope`, so a client can ask again.
 - Access tokens last an hour. Refresh tokens last 30 days from their last use and are replaced on every use.
 - Tokens are revoked at `/oauth/revoke`.
+- Programs that sign in without a person, such as Amazon Bedrock AgentCore Gateway, use a **knowledge key** made on **Knowledge**, **Use in Bedrock**. It holds only `knowledge:read`, and works as an API key (`Authorization: Bearer chkb_...` or `X-Api-Key`) or as OAuth client credentials (`grant_type=client_credentials` at `/oauth/token`, with `client_secret_basic` or `client_secret_post`). See [Connect Coderhelm knowledge to Amazon Bedrock](/bedrock).
 
 The server is stateless: every message is a `POST /mcp` answered with JSON, and there is no event stream.

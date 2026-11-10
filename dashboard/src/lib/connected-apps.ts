@@ -78,10 +78,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 export const connectedAppsApi = {
   describe: (requestToken: string) =>
     request<ConsentRequest>("/api/mcp/authorize/describe", { method: "POST", body: JSON.stringify({ request: requestToken }) }),
-  decide: (requestToken: string, approve: boolean, allowWrite: boolean) =>
+  decide: (requestToken: string, approve: boolean, allowWrite: boolean, allowKnowledge = false) =>
     request<{ redirect_to: string }>("/api/mcp/authorize", {
       method: "POST",
-      body: JSON.stringify({ request: requestToken, approve, allow_write: allowWrite }),
+      body: JSON.stringify({ request: requestToken, approve, allow_write: allowWrite, allow_knowledge: allowKnowledge }),
     }),
   list: () => request<ConnectionList>("/api/mcp/connections"),
   revoke: (id: string) => request<{ status: string; id: string }>(`/api/mcp/connections/${encodeURIComponent(id)}`, { method: "DELETE" }),
@@ -89,6 +89,8 @@ export const connectedAppsApi = {
 
 /** The scope that lets an app act (start runs, ask for reviews). */
 export const WRITE_SCOPE = "runs:write";
+/** The scope that lets an app search the knowledge bases the person can read in Chat. */
+export const KNOWLEDGE_SCOPE = "knowledge:read";
 
 // ── Coming back to the consent page after signing in ────────────────
 //
