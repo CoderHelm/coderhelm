@@ -450,7 +450,7 @@ function StaleFrame() {
         <li className="flex gap-3">
           <Dot tone="info" />
           <p className="min-w-0 text-text-secondary">
-            Last activity from a person: <b className="text-text-primary">a review comment</b>, 21 days ago
+            Last activity from a person: <b className="text-text-primary">a review comment</b>, 7 days ago
           </p>
         </li>
         <li className="rounded-lg border border-line p-3">
@@ -459,7 +459,7 @@ function StaleFrame() {
             <span className="text-text-secondary">CoderHelm added the <span className="font-mono text-[12px] text-text-primary">stale</span> label and commented</span>
           </div>
           <p className="mt-2 leading-relaxed text-text-primary">
-            This pull request has had no activity for 21 days, so CoderHelm marked it stale. It will be closed in 7 days if nothing happens here.
+            This pull request has had no activity for 7 days, so CoderHelm marked it stale. It will be closed in 7 days if nothing happens here.
           </p>
           <p className="mt-1.5 leading-relaxed text-text-secondary">
             To keep it open, push a commit, leave a comment, remove the <span className="font-mono text-[12px]">stale</span> label, or comment <span className="font-mono text-[12px]">@coderhelm keep open</span>.

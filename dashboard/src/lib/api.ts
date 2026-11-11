@@ -1762,10 +1762,13 @@ export interface StaleConfig {
 
 export interface StaleConfigView {
   team: StaleConfig;
+  /** False: nothing is saved for all repositories, so `team` is the defaults (off). */
   team_saved: boolean;
   repo: StaleConfig | null;
   effective: StaleConfig;
   defaults: StaleConfig;
+  /** Without a repo: every repository with its own settings (Setup saves them per repository). */
+  repo_configs?: { repo: string; config: StaleConfig }[];
 }
 
 /** One pull request in the plan: what happens to it next and why. */

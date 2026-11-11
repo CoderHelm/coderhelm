@@ -11,7 +11,41 @@ export function staleState(c: Pick<StaleConfig, "enabled" | "dry_run"> | null | 
   return c.dry_run ? "dry_run" : "on";
 }
 
-export const STATE_WORD: Record<StaleState, string> = { off: "Off", dry_run: "Dry run", on: "On" };
+/** The three modes, in the same words everywhere: the page, the tabs and the settings. */
+export const STATE_WORD: Record<StaleState, string> = { off: "Off", dry_run: "Preview only", on: "On" };
+
+/** One plain line under each mode in the settings. */
+export function modeHelp(mode: StaleState, c: Pick<StaleConfig, "stale_days" | "close_days" | "max_closes_per_run">): string {
+  if (mode === "off") return "Nothing happens. Coderhelm never labels, comments on or closes a pull request.";
+  if (mode === "dry_run")
+    return "Coderhelm lists which pull requests it would mark and close in the Would mark or close tab. Nothing is labeled, commented on or closed on GitHub.";
+  return `After ${plural(c.stale_days, "day")} with no activity Coderhelm labels the pull request stale and comments; if nothing happens in the next ${plural(c.close_days, "day")} it closes it. Up to ${c.max_closes_per_run} an hour per repository.`;
+}
+
+/** The settings with a mode picked: Off, Preview only (enabled, dry run) or On. */
+export function withMode<C extends Pick<StaleConfig, "enabled" | "dry_run">>(c: C, mode: StaleState): C {
+  if (mode === "off") return { ...c, enabled: false };
+  return { ...c, enabled: true, dry_run: mode === "dry_run" };
+}
+
+/** "7 days quiet + 7 days to close = closed after 14 days with no activity." */
+export function timingLine(c: Pick<StaleConfig, "stale_days" | "close_days">): string {
+  return `${plural(c.stale_days, "day")} quiet + ${plural(c.close_days, "day")} to close = closed after ${plural(c.stale_days + c.close_days, "day")} with no activity.`;
+}
+
+/** Repositories whose own settings put them in another mode than `base`, by mode. */
+export function otherRepoModes(
+  configs: { repo: string; config: Pick<StaleConfig, "enabled" | "dry_run"> }[] | undefined,
+  base: StaleState,
+): { state: StaleState; repos: string[] }[] {
+  const by = new Map<StaleState, string[]>();
+  for (const { repo, config } of configs ?? []) {
+    const st = staleState(config);
+    if (st === base) continue;
+    by.set(st, [...(by.get(st) ?? []), repo]);
+  }
+  return (["on", "dry_run", "off"] as StaleState[]).filter((st) => by.has(st)).map((state) => ({ state, repos: by.get(state)! }));
+}
 
 /** One plan item with the repository and whether its plan was a dry run. */
 export interface StaleRow extends StalePlanItem {
@@ -102,7 +136,7 @@ export function summaryLine(state: StaleState, a: StaleActivity | null | undefin
     const close = rows.filter((r) => r.action === "close").length;
     if (!mark && !close) return null;
     const bits = [mark ? `mark ${mark}` : "", close ? `close ${close}` : ""].filter(Boolean).join(" and ");
-    return `Stale pull requests, dry run: would ${bits} ${mark + close === 1 ? "pull request" : "pull requests"}`;
+    return `Stale pull requests, preview only: would ${bits} ${mark + close === 1 ? "pull request" : "pull requests"}`;
   }
   const marked = rows.filter(isMarked);
   if (!marked.length) return null;

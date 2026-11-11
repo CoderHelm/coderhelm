@@ -1,9 +1,9 @@
 ---
 title: Stale pull requests
-description: How CoderHelm marks pull requests nobody has worked on for a while, warns on them, and closes them after a grace period, with every setting, the dry run, exemptions and how to reopen.
+description: How CoderHelm marks pull requests nobody has worked on for a while, warns on them, and closes them after a grace period, with every setting, the three modes, exemptions and how to reopen.
 ---
 
-Old pull requests pile up and hide the ones that matter. With stale pull requests on, CoderHelm marks a pull request that no person has worked on for a while, warns on it, and closes it after a grace period if nothing happens. It never counts its own comments or other bots as activity, it starts as a dry run, and it keeps the branch.
+Old pull requests pile up and hide the ones that matter. With stale pull requests on, CoderHelm marks a pull request that no person has worked on for a while, warns on it, and closes it after a grace period if nothing happens. It never counts its own comments or other bots as activity, it starts as **Preview only**, and it keeps the branch.
 
 It is off by default. It works on the repositories the [reviewer](/getting-started/reviewer) is on for.
 
@@ -11,9 +11,17 @@ It is off by default. It works on the repositories the [reviewer](/getting-start
 
 Stale pull requests have their own tab under **Code review**: **Reviewer**, **Stale PRs**, **Tests**, **Releases**. You can also search for "Stale pull requests" in the command palette.
 
-1. Open **Code review**, then **Stale PRs**. The top of the page says whether it is **Off**, a **Dry run** or **On**.
-2. Press **Turn on**. It starts as a dry run, so nothing changes on GitHub.
-3. Open **Would mark or close** and look at what it would do. When it looks right, open **Settings**, turn **Dry run** off and press **Save settings**.
+1. Open **Code review**, then **Stale PRs**. The top of the page says which mode it is in: **Off**, **Preview only** or **On**.
+2. Press **Turn on Preview only**. Nothing changes on GitHub.
+3. Open **Would mark or close** and look at what it would do. When it looks right, open **Settings**, pick **On** under **Mode** and press **Save settings**.
+
+| Mode | What happens |
+| --- | --- |
+| **Off** | Nothing happens. |
+| **Preview only** | CoderHelm lists which pull requests it would mark and close in the **Would mark or close** tab. Nothing is labeled, commented on or closed on GitHub. |
+| **On** | After 7 days with no activity CoderHelm labels the pull request stale and comments; if nothing happens in the next 7 days it closes it. Up to 10 an hour per repository. |
+
+While it is off, every tab still lists what it holds: pull requests that carry the stale label (marked earlier, or labeled by hand) under **Marked stale**, and what it would do under **Would mark or close**.
 
 Admins can change these settings and keep pull requests open. Everyone else can see them. The **Reviewer** page shows a line such as "3 pull requests marked stale, 1 closing tomorrow" that links to this page.
 
@@ -22,7 +30,7 @@ Admins can change these settings and keep pull requests open. Everyone else can 
 | View | What it lists |
 | --- | --- |
 | **Marked stale** | Pull requests marked stale now, soonest to close first: the repository, the author, how many days it has been quiet and when it closes. **Keep open** keeps one open. |
-| **Would mark or close** (**Up next** once the dry run is off) | What the next check would mark or close. **Check now** works it out again. |
+| **Would mark or close** (**Up next** once it is **On**) | What the next check would mark or close. **Check now** works it out again. |
 | **Recently closed** | Pull requests closed as stale in the last 90 days, each with a **Reopen on GitHub** link. |
 | **Exempt** | Pull requests left alone because of a label, an author or a draft, and the ones kept open, with **Allow closing**. |
 | **Settings** | The settings below, for all repositories or one. |
@@ -33,9 +41,11 @@ Filter every view by repository, or search by number, title or author.
 
 About once an hour, CoderHelm looks at the open pull requests of each repository:
 
-1. A pull request with no activity from a person for **21 days** gets the `stale` label and a warning comment that says how to keep it open.
+1. A pull request with no activity from a person for **7 days** gets the `stale` label and a warning comment that says how to keep it open.
 2. Any activity after the warning takes the label off on its own, and so does a person removing the label.
 3. If nothing happens in the next **7 days**, it closes the pull request with a comment that says how to reopen it. The branch is kept.
+
+By default that is 7 days quiet + 7 days to close = closed after 14 days with no activity. Settings saved before the default changed keep their own numbers.
 
 When it closes a pull request that CoderHelm opened, the run behind it is closed too, with the reason on the run page.
 
@@ -74,13 +84,13 @@ On GitHub, any of these keeps a pull request open:
 
 In the dashboard, **Keep open** on a pull request in the list does the same. The **Exempt** view shows who kept each one open and how, and **Allow closing** undoes it.
 
-## Dry run and the preview
+## Preview only
 
-A new setup starts as a dry run. CoderHelm works out what it would do and changes nothing on GitHub: no labels, no comments, no closes.
+Turned on, it starts as **Preview only**. CoderHelm works out what it would do and changes nothing on GitHub: no labels, no comments, no closes.
 
 **Would mark or close** on the **Stale PRs** page lists every pull request a check would mark or close, across your repositories, with who opened it, how long it has been quiet and its last activity. **Check now** works the list out again at any time, for the repository picked or all of them; it reads GitHub and changes nothing. The list updates in a minute or two.
 
-Turn **Dry run** off once the list looks right. **Marked stale** then shows what is marked and when each one closes.
+Pick **On** under **Mode** once the list looks right. **Marked stale** then shows what is marked and when each one closes.
 
 ## What the comments say
 
@@ -88,7 +98,7 @@ These are the default messages. `{stale_days}`, `{close_days}` and `{label}` are
 
 **The warning:**
 
-> This pull request has had no activity for 21 days, so CoderHelm marked it stale. It will be closed in 7 days if nothing happens here.
+> This pull request has had no activity for 7 days, so CoderHelm marked it stale. It will be closed in 7 days if nothing happens here.
 >
 > To keep it open, push a commit, leave a comment, remove the `stale` label, or comment `@coderhelm keep open`.
 
@@ -96,7 +106,7 @@ These are the default messages. `{stale_days}`, `{close_days}` and `{label}` are
 
 > CoderHelm closed this pull request: it was marked stale 7 days ago and nothing happened since. Nothing is lost: the commits and this conversation stay here.
 >
-> To pick it back up, reopen this pull request. It won't be marked stale again until it has gone 21 days without activity.
+> To pick it back up, reopen this pull request. It won't be marked stale again until it has gone 7 days without activity.
 
 When the branch was deleted with it, the closing comment also says to use **Restore branch** on the pull request before reopening.
 
@@ -110,9 +120,8 @@ Open **Settings** on the **Stale PRs** page. **Settings for** at the top picks w
 
 | Setting | What it does | Default |
 | --- | --- | --- |
-| **Close stale pull requests** | Turns it on. | Off |
-| **Dry run** | Shows what would be marked and closed, and changes nothing on GitHub. | On |
-| **Mark stale after (days)** | Days with no activity before the label and the warning. From 1 to 365. | 21 |
+| **Mode** | **Off**, **Preview only** (shows what would be marked and closed, changes nothing on GitHub) or **On**. Nothing saved reads as off, and the page says so. | Off |
+| **Mark stale after (days)** | Days with no activity before the label and the warning. From 1 to 365. | 7 |
 | **Close after (more days)** | Days after the warning before it closes. From 1 to 90. | 7 |
 | **Closes per hour** | The most pull requests closed per repository in each hourly check. From 1 to 50. | 10 |
 | **Which pull requests** | **Every pull request**, or **Only CoderHelm's own**. | Every pull request |
