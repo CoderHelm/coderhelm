@@ -42,6 +42,11 @@ const source = (over: Record<string, unknown>) => ({
   live_updates: true,
   created_at: iso(9000),
   created_by: EMAIL,
+  via: "oauth",
+  account: LONG_URL,
+  webhook_seen_at: iso(3),
+  interval_mins: 360,
+  connected_used_at: iso(4),
   ...over,
 });
 
@@ -72,6 +77,8 @@ const BASE = {
   ready: 4,
   processing: 1,
   failed: 1,
+  skipped: 1,
+  passages: 182_304,
   uploads: 2,
   synced: 4,
   kinds: ["upload", "notion", "confluence", "google_drive", "sanity"],
@@ -106,6 +113,36 @@ const ITEMS = [
   item({ id: "i_5", source_id: undefined, url: null, path: undefined, kind: "pdf", name: `${FILE.replace(/\//g, "_")}.pdf`, uploaded_by: EMAIL, size: 4_200_000 }),
   item({ id: "i_6", source_id: undefined, url: null, path: undefined, kind: "docx", status: "processing", name: `${TOKEN}.docx` }),
 ];
+
+// The page's own reads: one page of items with the tree's groups, and how a
+// source connects, every string long.
+const ITEMS_PAGE = {
+  items: ITEMS,
+  total: ITEMS.length,
+  next: "6",
+  states: { searchable: 3, failed: 1, working: 1, skipped: 1 },
+  groups: [
+    { key: `src_ok|${TITLE}`, source: "src_ok", top: TITLE, items: 1284, failed: 3, newest: "2026-10-01" },
+    { key: `src_sync|${TITLE}`, source: "src_sync", top: TITLE, items: 12, failed: 0, newest: "2026-10-01" },
+    { key: `src_err|${TITLE}`, source: "src_err", top: TITLE, items: 1, failed: 1, newest: "2026-10-01" },
+    { key: `src_paused|${TITLE}`, source: "src_paused", top: TITLE, items: 1, failed: 0, newest: "2026-10-01" },
+    { key: "upload|", source: "upload", top: "", items: 2, failed: 0, newest: "2026-10-01" },
+  ],
+  all: 1300,
+};
+
+const CONNECTION = {
+  via: "oauth",
+  owner: "team",
+  by: EMAIL,
+  account: LONG_URL,
+  connected_at: iso(9000),
+  used_at: iso(4),
+  token: { status: "stopped", status_reason: `${SENTENCE} ${TOKEN}`, expires_at: iso(-30), scopes: [TOKEN, `read:${TOKEN}`, "read:confluence-content.all"] },
+  if_they_leave: `It belongs to the team, so it keeps working if ${EMAIL} leaves. ${SENTENCE}`,
+  team: { connected: true, via: "oauth", connected_by: EMAIL, reconnect_reason: SENTENCE, can_sign_in: true, has_saved_key: true },
+  switch: { oauth: false, saved_key: true, my_sign_in: false },
+};
 
 const CONNECTORS = [
   { kind: "notion", label: "Notion", blurb: "Pages and databases, with the pages under them", connected: true, via: "oauth", can_sign_in: true, reconnect_reason: "", connected_by: EMAIL, hint: "", live_updates: true, picker: "tree" },
@@ -197,8 +234,11 @@ export const knowledgeData: Handler = ({ method, path }) => {
   }
   if (path === "/api/knowledge/keys") return BEDROCK_KEYS;
   if (path === "/api/knowledge/bedrock-sync") return BEDROCK_SYNC;
+  if (/^\/api\/knowledge\/[^/]+\/items$/.test(path)) return ITEMS_PAGE;
+  if (/^\/api\/knowledge\/[^/]+\/sources$/.test(path)) return { base: BASE, sources: SOURCES, uploads_working: true };
+  if (/^\/api\/knowledge\/[^/]+\/sources\/[^/]+\/connection$/.test(path)) return CONNECTION;
   if (path.startsWith("/api/knowledge/")) {
-    return { base: BASE, files: ITEMS, sources: SOURCES, can_manage: true, limits: LIMITS, visibility_note: SENTENCE };
+    return { base: BASE, files: null, sources: SOURCES, can_manage: true, limits: LIMITS, visibility_note: SENTENCE };
   }
   return undefined;
 };
