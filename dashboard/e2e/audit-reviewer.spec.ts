@@ -748,24 +748,58 @@ test("reviewer settings load for a repo, with labelled fields and switches", asy
   const summary = page.getByTestId("reviewer-summary");
   await expect(summary).toContainText("Reviews pull requests labelled “ch-review”.");
   await expect(summary).toContainText("Leaves merging to people.");
-  // Every section is one click away, and only that section shows.
+  // Every repo section is one tab away across the top, as on the other pages, and only that section shows.
   const nav = page.getByRole("navigation", { name: "Settings sections" });
-  for (const name of ["Reviews", "Tests", "CI labels", "Auto-merge", "Tags and health check", "Release notes", "Review reminders", "Stop everything", "Every repository"]) {
+  for (const name of ["Reviews", "Tests", "CI labels", "Auto-merge", "Tags and health check", "Release notes", "Review reminders"]) {
     await expect(nav.getByRole("link", { name: new RegExp(`^${name}`) })).toBeVisible();
   }
+  await expect(nav.getByRole("link", { name: /^Reviews/ })).toHaveAttribute("aria-current", "page");
+  // The row fits the page: no tab is cut off at desktop width.
+  const row = await nav.getByTestId("tab-row").evaluate((el) => {
+    const scroller = el.querySelector<HTMLElement>(".overflow-x-auto")!;
+    return scroller.scrollWidth - scroller.clientWidth;
+  });
+  expect(row, "the tab row scrolls at 1280px").toBeLessThanOrEqual(0);
+  // Stop everything is the danger zone at the foot of Reviews.
+  await expect(page.getByRole("heading", { name: "Stop everything" })).toBeVisible();
+  // The views shared by every repo open from the header, keeping the repo.
+  await expect(page.getByRole("link", { name: "Every repository" })).toHaveAttribute("href", /repo=your-team%2Fweb&section=standards/);
+  await expect(page.getByRole("link", { name: "Stale pull requests" })).toHaveAttribute("href", /section=stale/);
   await expect(page.getByRole("switch", { name: /Auto-merge on approve/ })).toHaveCount(0);
   await nav.getByRole("link", { name: /^Auto-merge/ }).click();
   await expect(page).toHaveURL(/section=merge/);
   await expect(page.getByRole("textbox", { name: "Trigger label" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Stop everything" })).toHaveCount(0);
   // Options of a switched-off setting stay folded away until it is on.
   await expect(page.getByRole("group", { name: "Merge method" })).toHaveCount(0);
   await page.getByRole("switch", { name: /Auto-merge on approve/ }).click();
   await expect(page.getByRole("group", { name: "Merge method" })).toBeVisible();
   await page.getByRole("switch", { name: /Auto-merge on approve/ }).click();
   // The shared standards are their own view.
-  await nav.getByRole("link", { name: "Every repository" }).click();
+  await page.getByRole("link", { name: "Every repository" }).click();
+  await expect(page).toHaveURL(/section=standards/);
+  await expect(page.getByRole("link", { name: "Every repository" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("textbox", { name: "Review standards for every repo" })).toHaveValue("Never log secrets.");
   await shot(page, "audit-reviewer-config");
+  expect(errors).toEqual([]);
+});
+
+test("an old ?section=stop link opens Reviews at Stop everything, and a phone gets the sections as a select", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page);
+  await page.goto("/reviewer/config?repo=your-team%2Fweb&section=stop");
+  const nav = page.getByRole("navigation", { name: "Settings sections" });
+  await expect(nav.getByRole("link", { name: /^Reviews/ })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("switch", { name: /Stop everything/ })).toBeInViewport();
+  await page.setViewportSize({ width: 400, height: 800 });
+  const pick = nav.getByRole("combobox", { name: "Settings sections" });
+  await expect(pick).toBeVisible();
+  await pick.click();
+  await page.getByRole("option", { name: "Release notes" }).click();
+  await expect(page).toHaveURL(/repo=your-team%2Fweb&section=release-notes/);
+  await expect(page.getByRole("switch", { name: /Write release notes/ })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
   expect(errors).toEqual([]);
 });
 
@@ -905,9 +939,10 @@ test("unsaved edits can be discarded, and switching repos with them asks first",
   await expect(page.getByRole("switch", { name: /Check the change by running tests/ })).toHaveAttribute("aria-checked", "false");
   await expect(page.getByTestId("save-bar")).toContainText("All changes saved");
 
-  await nav.getByRole("link", { name: /^Stop everything/ }).click();
+  await nav.getByRole("link", { name: /^Reviews/ }).click();
   await page.getByRole("switch", { name: /Stop everything/ }).click();
-  await expect(nav.getByRole("link", { name: /^Stop everything/ })).toContainText("Stopped");
+  await expect(page.getByTestId("reviewer-summary")).toContainText("Every reviewer action on this repo is stopped");
+  await expect(nav.getByRole("link", { name: /^Reviews/ }).getByLabel("unsaved")).toBeVisible();
   await page.getByRole("button", { name: /Repository: your-team\/web/ }).click();
   await page.getByRole("option", { name: "your-team/backend" }).first().click();
   await expect(page.getByText("Leave without saving?")).toBeVisible();
