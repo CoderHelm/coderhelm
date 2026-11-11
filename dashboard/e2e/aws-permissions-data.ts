@@ -10,11 +10,29 @@ const GROUPS = [
   { key: "code", name: "Finding the code behind a log group", why: "Reads function, image and log group tags, the names in a stack's resource list and image manifests to work out which repository a log group's code lives in, so a fix goes to the right repo. Never a function's configuration or code, or a stack's parameters.", actions: ["lambda:ListTags", "logs:ListTagsForResource", "cloudformation:ListStackResources", "ecr:BatchGetImage", "ecr:ListTagsForResource"] },
 ];
 
+/** The optional reads (log_reader.rs OPTIONAL): off unless switched on. */
+export const OPTIONAL_GROUPS = [
+  { key: "infra", name: "Infrastructure vulnerabilities", why: "Reads which versions run in the account so they can be matched against security advisories. Only when the stack's InfrastructureVulnerabilities parameter is on.", actions: ["ec2:DescribeInstances", "ec2:DescribeImages", "eks:ListClusters", "rds:DescribeDBInstances", "ssm:GetParameters"] },
+  { key: "inspector", name: "Amazon Inspector findings", why: "Reads Amazon Inspector's findings when a team runs Inspector. Only when the stack's InspectorFindings parameter is on.", actions: ["inspector2:ListFindings", "inspector2:ListCoverage", "inspector2:BatchGetAccountStatus"] },
+  { key: "health", name: "AWS Health events", why: "Reads the account's AWS Health events through the Health API. Only when the stack's HealthEvents parameter is on.", actions: ["health:DescribeEvents", "health:DescribeAffectedEntities", "health:DescribeEventDetails"] },
+];
+
 export const UPDATE_STACK = "CoderHelmLogReaderUpdate-3f9a1c2e";
 
 export function permissionsView(
   account: string,
-  opts: { missing?: string[]; problem?: { code: string; message: string; fix: string } | null; status?: "error"; region?: string; templateBase?: string } = {},
+  opts: {
+    missing?: string[];
+    problem?: { code: string; message: string; fix: string } | null;
+    status?: "error";
+    region?: string;
+    templateBase?: string;
+    /** The install's own account (its next version update brings what's missing). */
+    install?: boolean;
+    /** Optional reads that are off ("infra", "inspector", "health"), and those a permissions boundary blocks. */
+    optionalOff?: string[];
+    optionalBlocked?: string[];
+  } = {},
 ) {
   const missing = opts.missing ?? [];
   const region = opts.region ?? "us-east-1";
@@ -35,9 +53,28 @@ export function permissionsView(
       return { action: a, ability: g?.key ?? null, ability_name: g?.name ?? null };
     }),
     missing_abilities: GROUPS.filter((g) => g.actions.some((a) => missing.includes(a))).map((g) => g.key),
-    abilities: GROUPS.map((g) => ({ ...g, missing: g.actions.filter((a) => missing.includes(a)) })),
+    abilities: [
+      ...GROUPS.map((g) => ({ ...g, missing: g.actions.filter((a) => missing.includes(a)), optional: false, boundary_blocked: [], turn_on_url: null })),
+      ...(opts.optionalOff || opts.optionalBlocked
+        ? OPTIONAL_GROUPS.map((g) => {
+            const off = (opts.optionalOff ?? []).includes(g.key) || (opts.optionalBlocked ?? []).includes(g.key);
+            const param = { infra: "InfrastructureVulnerabilities", inspector: "InspectorFindings", health: "HealthEvents" }[g.key];
+            return {
+              ...g,
+              optional: true,
+              missing: off ? g.actions : [],
+              boundary_blocked: (opts.optionalBlocked ?? []).includes(g.key) ? g.actions : [],
+              turn_on_url:
+                off && !opts.install
+                  ? `https://console.aws.amazon.com/cloudformation/home?region=${region}#/stacks/quickcreate?stackName=${UPDATE_STACK}&templateURL=${encodeURIComponent(template)}&param_RoleName=CoderHelmLogReader&param_${param}=on`
+                  : null,
+            };
+          })
+        : []),
+    ],
+    install_account: !!opts.install,
     update:
-      status === "update_needed"
+      status === "update_needed" && !opts.install
         ? {
             url: `https://console.aws.amazon.com/cloudformation/home?region=${region}#/stacks/quickcreate?stackName=${UPDATE_STACK}&templateURL=${encodeURIComponent(template)}&param_RoleName=CoderHelmLogReader`,
             stack_name: UPDATE_STACK,

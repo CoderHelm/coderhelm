@@ -52,7 +52,25 @@ What it never reads:
 
 Switching the option on when the role lacks these reads shows a warning that names the feature, with the one-click update: an AWS admin signs in to the account and creates the update stack, which adds only these permissions. The stack's `InfrastructureVulnerabilities` parameter is set to `on` by the link.
 
-On a self-hosted install, accounts you connect with their own role work the same way. The install's own account isn't read yet: its role needs the permissions boundary to allow these calls, which comes with a later access stack step.
+On a self-hosted install, accounts you connect with their own role work the same way. The install's own account is different: there is no stack for you to launch, so you turn these reads on from the AWS card instead.
+
+## Turning reads on from the AWS card
+
+**Settings**, **Integrations**, **AWS** shows each account's role. What the role still needs is split in two:
+
+- **Needed now**: a read-only permission this release uses that the role doesn't have yet.
+- **Optional, off**, collapsed: infrastructure vulnerabilities, Amazon Inspector findings and AWS Health events. They are never needed, so they never make the card say an update is needed.
+
+For an account you connected with its own role, **Turn on in AWS** opens the role's one-click update stack with that read's parameter set to `on`. An AWS admin creates the stack, and the card checks again by itself when you come back.
+
+For a self-hosted install's own account, the card does it for you. Install admins see:
+
+- **Update now to add it** when a permission arrives with a newer release. It is the same update as **Settings**, **System**, with the same review of anything it would change.
+- **Arrives with the update installing now** while that update runs.
+- When the running version already grants the permission, the reason it is still missing (the install's permission limit, or a change made to the role in AWS) and the fix.
+- A **Turn on** or **Turn off** switch for each optional read. CoderHelm prepares a change to the install's own stack that sets only the `InfrastructureVulnerabilities`, `InspectorFindings` or `HealthEvents` parameter, on the version you run. The card lists the read-only permissions it adds, and nothing changes until you press **Confirm and turn on**. It runs through the install's update role like a version update, appears in the update history with who confirmed it, and AWS puts everything back if it fails.
+
+Infrastructure vulnerabilities are on by default on the install's own account; Inspector and Health are off. The reads also need the install's permission limit to allow them. When it doesn't yet, the card says so: an AWS admin applies the install's access update once (**Settings**, **System**, **Permissions**), because no update can widen that limit.
 
 ## Three kinds of fix
 

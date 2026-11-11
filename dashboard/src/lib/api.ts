@@ -1363,6 +1363,14 @@ export const api = {
    * `confirm` is the token of the data and permission changes the admin
    * confirmed; the updater applies only when it names exactly those.
    */
+  /**
+   * Switch what the install reads in its own account (a one-stack install):
+   * the updater prepares a change set of only these parameters on the
+   * running release, which waits for the admin to confirm its permission
+   * changes (applyUpdate with the pending switch's id and confirm token).
+   */
+  setInstallOptions: (options: Partial<Record<InstallOption, "on" | "off">>) =>
+    request<UpdateEntry>("/api/system/options", { method: "POST", body: JSON.stringify({ options }) }),
   applyUpdate: (id: string, confirm = "") =>
     request<UpdateEntry>("/api/system/update/apply", { method: "POST", body: JSON.stringify({ id, ...(confirm ? { confirm } : {}) }) }),
   // Setup checks and update readiness (install admins), each with its fix.
@@ -4264,7 +4272,16 @@ export interface AwsPermissionGroup {
   why: string;
   actions: string[];
   missing: string[];
+  /** An optional read (infrastructure vulnerabilities, Inspector, Health): never makes the role "need an update" by itself. */
+  optional?: boolean;
+  /** Missing actions a permissions boundary blocks (on a self-hosted install: its permission limit). */
+  boundary_blocked?: string[];
+  /** Another account's role: the one-click stack update that turns this optional read on. */
+  turn_on_url?: string | null;
 }
+
+/** The install's switches for what it reads in its own account (lambda/updater, OPTION_PARAMS). */
+export type InstallOption = "InfrastructureVulnerabilities" | "InspectorFindings" | "HealthEvents";
 
 /** A live check of a connected account's role against this release's permissions. */
 export interface AwsPermissions {
@@ -4696,7 +4713,13 @@ export interface UpdateEntry {
   version: string;
   from_version?: string;
   actor: string;
-  mode?: "update" | "rollback";
+  mode?: "update" | "rollback" | "domain" | "options";
+  /** A switch (mode options): each parameter it changed, from and to. */
+  options?: Partial<Record<InstallOption, { from: "on" | "off"; to: "on" | "off" }>> | null;
+  /** Plain words for a try that didn't succeed, and AWS's own text. */
+  summary?: string;
+  fix?: string;
+  technical?: string;
   /** preparing: the change set is being made; review: it waits for an admin;
    * not_started: refused before anything changed (the reason says why);
    * superseded: prepared, never run, replaced by a newer update (nothing changed). */
@@ -4915,6 +4938,10 @@ export interface UninstallMode {
 /** The change set the updater prepared for a release (lambda/updater, change_set_summary). */
 export interface NativeChangeSet {
   version?: string | null;
+  /** update | rollback | domain | options (a switch of what the install reads: parameters only). */
+  mode?: string | null;
+  /** A switch: each parameter it changes, from and to. */
+  options?: Partial<Record<InstallOption, { from: "on" | "off"; to: "on" | "off" }>> | null;
   /** preparing | review | running | succeeded | failed */
   status?: string | null;
   name?: string;
@@ -4963,6 +4990,8 @@ export interface NativeUpdate {
   access?: NativeAccess | null;
   /** A stack whose rollback stopped (UPDATE_ROLLBACK_FAILED), and what the updater did. */
   recovery?: NativeRecovery | null;
+  /** What the install reads in its own account, as its stack has it; null for a switch its release doesn't have yet. */
+  options?: Record<InstallOption, "on" | "off" | null> | null;
 }
 
 /** The install's permissions against its release's access.json (lambda/updater, access_compute). */

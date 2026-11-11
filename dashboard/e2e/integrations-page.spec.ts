@@ -389,8 +389,8 @@ test("a self-hosted install's own account never asks for a stack in AWS: the ver
   const aws = row(page, `aws-${ACCOUNT}`);
   await control(page, `aws-${ACCOUNT}`, `AWS account ${ACCOUNT}`).click();
   const panel = aws.getByTestId(`aws-panel-${ACCOUNT}`);
-  await expect(panel.getByText("These read-only permissions come with the next version update")).toBeVisible();
-  await expect(panel.getByRole("link", { name: "Open Version and updates" })).toHaveAttribute("href", /\/settings\/system\/?#version$/);
+  await expect(panel.getByText(/read-only permissions? arrives? with the next update/)).toBeVisible();
+  await expect(panel.getByRole("link", { name: "Update from the AWS page" })).toHaveAttribute("href", /\/settings\/integrations\/aws\/?#aws-account-/);
   await expect(panel.getByText("the install's own AWS account", { exact: false })).toBeVisible();
   await expect(aws.getByRole("link", { name: "Update in AWS" })).toHaveCount(0);
   await expect(panel.getByText("CoderHelmLogReader")).toHaveCount(0);
