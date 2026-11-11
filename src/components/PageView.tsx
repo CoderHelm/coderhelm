@@ -193,7 +193,7 @@ export function Shell({ page, children }: { page: Page; children: React.ReactNod
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(pageJsonLd(page)) }} />
-      <Nav />
+      <Nav key={page.slug} />
       <main id="main">{children}</main>
       <Footer />
     </>
@@ -216,6 +216,11 @@ export default function PageView({ page }: { page: Page }) {
         {page.eyebrow && <p className="mt-8 font-mono text-xs uppercase tracking-[0.14em] text-accent-text">{page.eyebrow}</p>}
         <h1 className="mt-3 max-w-4xl text-balance text-4xl font-semibold tracking-tight sm:text-6xl">{page.h1}</h1>
         <p className="mt-6 max-w-2xl text-lg leading-relaxed text-text-secondary"><Inline text={page.lede} /></p>
+        {page.heroNote && (
+          <p className="mt-6 max-w-2xl rounded-lg border border-accent/40 bg-accent/10 px-4 py-3 text-[15px] leading-relaxed text-text-primary">
+            <Inline text={page.heroNote} />
+          </p>
+        )}
         <div className="mt-8 flex flex-wrap gap-3">
           <a href={page.heroCta?.href ?? SITE.appUrl} className="rounded-md bg-white px-5 py-2.5 text-[15px] font-semibold text-black hover:opacity-90">{page.heroCta?.label ?? "Get started"}</a>
           <a href={`/${page.slug}.md`} className="rounded-md border border-line px-5 py-2.5 text-[15px] font-medium text-text-secondary hover:text-text-primary">Read as Markdown</a>

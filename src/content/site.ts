@@ -69,8 +69,8 @@ export const SITE = {
   ],
   sameAs: ["https://github.com/CoderHelm"],
   ctaNote: "CoderHelm is in open beta. Sign up and bring your own Anthropic API key.",
-  updated: "2026-11-08",
-  updatedLabel: "November 8, 2026",
+  updated: "2026-11-10",
+  updatedLabel: "November 10, 2026",
   year: 2026,
 } as const;
 
@@ -151,6 +151,16 @@ const home: Page = {
                   caption: "A CoderHelm review: a risk level with the reason, a comment on the exact line with a suggested fix, and earlier comments it resolved after they were fixed.",
                   href: "/reviewer/",
                   linkLabel: "Everything the reviewer does",
+                },
+                {
+                  id: "stale",
+                  title: "Close stale pull requests",
+                  heading: "Quiet pull requests get a warning first, then a clean close.",
+                  text: "Turned on, it marks a pull request stale after 21 days with no activity from a person and warns on it. If nothing happens in the next 7 days, it closes it with a comment that says how to reopen. Bot comments never count as activity, it starts as a dry run, and the branch is kept.",
+                  frame: "stale",
+                  caption: "A quiet pull request on GitHub: the stale label and the warning, a bot comment that does not count as activity, and the close a week later with the branch kept.",
+                  href: "/stale-pull-requests/",
+                  linkLabel: "How stale pull requests work",
                 },
                 {
                   id: "merge",
@@ -495,7 +505,7 @@ const reviewer: Page = {
             { title: "Release tags", text: "Tags a release after merges, grouping merges that land close together (within 15 minutes by default)." },
             { title: "Deploy check", text: "With auto merge on, it waits for the deploy checks after the merge and reports only failures that are new. It never rolls back a shared branch." },
             { title: "Learns from your team", text: "Rate a review and add a note. Later reviews on that repository follow the feedback, on top of AGENTS.md and your review instructions." },
-            { title: "Closes stale pull requests", text: "Off by default. After 21 days with no activity from a person it adds a stale label and warns; 7 days later, if nothing happened, it closes the pull request and says how to reopen. Its own comments and bots never count, and it starts as a dry run that lists what it would close." },
+            { title: "Closes stale pull requests", text: "Off by default. After 21 days with no activity from a person it adds a stale label and warns; 7 days later, if nothing happened, it closes the pull request and says how to reopen. Its own comments and bots never count, and it starts as a dry run that lists what it would close.", href: "/stale-pull-requests/" },
           ],
         },
       ],
@@ -510,13 +520,117 @@ const reviewer: Page = {
             { q: "Does it review pull requests written by people?", a: "Yes. Any pull request with the review label is reviewed, whoever wrote it." },
             { q: "Can it merge on its own?", a: "Only if you turn on auto merge for the repository, and even then only the exact commit it reviewed, after a person approves and every check passes." },
             { q: "Where do I see past reviews?", a: "The Reviewer page in the dashboard lists every review with its ratings, and lets you review a pull request on demand." },
-            { q: "Will it close a pull request someone still needs?", a: "Only after a warning and a grace period with no activity from a person, and never one with an exempt label like `keep-open` or `security`, a draft, or one CoderHelm is still working on. Comment `@coderhelm keep open`, push or remove the stale label to keep it. Closing keeps the branch, and reopening picks it back up." },
+            { q: "Will it close a pull request someone still needs?", a: "Only after a warning and a grace period with no activity from a person, and never one with an exempt label like `keep-open` or `security`, a draft, or one CoderHelm is still working on. Comment `@coderhelm keep open`, push or remove the stale label to keep it. Closing keeps the branch, and reopening picks it back up. See [stale pull requests](/stale-pull-requests/)." },
           ],
         },
       ],
     },
   ],
-  related: ["maintenance", "tests", "pull-requests"],
+  related: ["stale-pull-requests", "maintenance", "tests"],
+};
+
+const stalePrs: Page = {
+  slug: "stale-pull-requests",
+  path: "/stale-pull-requests/",
+  navLabel: "Stale pull requests",
+  title: "Close stale pull requests without losing work",
+  description:
+    "CoderHelm marks a pull request stale after 21 days with no activity from a person, warns on it, and closes it 7 days later if nothing happened. Bot comments never count, it starts as a dry run and the branch is kept.",
+  eyebrow: "Stale pull requests",
+  h1: "Close the pull requests nobody is working on. Warn first.",
+  lede:
+    "Old pull requests pile up and hide the ones that matter. CoderHelm finds the ones no person has touched in weeks, warns on them, and closes them only if nothing happens, with a comment that says how to reopen.",
+  heroFrame: { id: "stale", caption: "A quiet pull request: the stale label and the warning, a bot comment that does not count as activity, and the close a week later with the branch kept." },
+  sections: [
+    {
+      id: "how",
+      heading: "How it decides",
+      blocks: [
+        {
+          type: "steps",
+          items: [
+            { title: "Quiet for 21 days", text: "A pull request with no activity from a person for 21 days gets the `stale` label and a warning comment that says how to keep it open." },
+            { title: "Grace period of 7 days", text: "Any activity in that time takes the label off on its own, and so does a person removing the label." },
+            { title: "Closed, with a way back", text: "If nothing happened, it closes the pull request with a comment that says how to reopen. The commits and the conversation stay, and the branch is kept." },
+          ],
+        },
+        { type: "p", text: "It looks at the open pull requests of each repository the reviewer is on for, about once an hour. Both numbers, the label and both comments are settings." },
+      ],
+    },
+    {
+      id: "activity",
+      heading: "Bot noise never keeps a pull request alive",
+      blocks: [
+        {
+          type: "p",
+          text: "Activity is read from the pull request's timeline, not from its last updated time, which every bot comment and label moves. So its own warning never counts as activity, and neither do other bots.",
+        },
+        {
+          type: "table",
+          head: ["Counts as activity", "Never counts"],
+          rows: [
+            ["A commit, including CoderHelm's own", "CoderHelm's warning, its label and its other comments"],
+            ["A force push", "Comments and commits from other bots"],
+            ["A person's comment, review or review comment", "CI runs"],
+            ["A person changing a label, requesting a review, changing the draft state or reopening", "Pushes to the base branch"],
+          ],
+        },
+      ],
+    },
+    {
+      id: "never",
+      heading: "Never marked, never closed",
+      blocks: [
+        {
+          type: "list",
+          items: [
+            "Pull requests with an exempt label: `keep-open`, `pinned`, `security` and `do-not-close` by default, and you choose the list",
+            "Drafts, unless you turn that off",
+            "Pull requests by authors you list, people or bots",
+            "A pull request a CoderHelm run is working on, one it will check again on its own, or one auto merge is waiting to merge",
+            "Any pull request someone kept open, from the dashboard or with `@coderhelm keep open`",
+            "With **Only CoderHelm's own** chosen, every pull request CoderHelm didn't open",
+          ],
+        },
+      ],
+    },
+    {
+      id: "safe",
+      heading: "Safe from the first day",
+      blocks: [
+        {
+          type: "cards",
+          items: [
+            { title: "Off by default", text: "Nothing happens until an admin turns it on." },
+            { title: "Starts as a dry run", text: "The dashboard lists what would be marked and closed, and when, and nothing changes on GitHub until you turn the dry run off. Check now works the list out again at any time." },
+            { title: "Keep open, anywhere", text: "Comment `@coderhelm keep open`, push a commit, comment or remove the label. The author or anyone with write access can keep a pull request open." },
+            { title: "The branch is kept", text: "Closing keeps the branch unless you choose to delete it, and even then never a fork's branch, the default branch or a branch another pull request is based on." },
+            { title: "Closes are capped", text: "At most 10 closes per repository each hour by default, writes one at a time, and it waits out GitHub's rate limit." },
+            { title: "Every action listed", text: "Each pull request marked, closed, un-staled or kept open is listed in the dashboard with the reason." },
+          ],
+        },
+      ],
+    },
+    {
+      id: "settings",
+      heading: "Your team's settings, or one repository's",
+      blocks: [
+        {
+          type: "p",
+          text: "Set it once for every repository, and give any repository its own settings. Both comments are yours to edit: leave one empty for the default, and the days and the label are filled in for you. See the [docs](https://docs.coderhelm.com/getting-started/stale-pull-requests/) for every setting.",
+        },
+        {
+          type: "faq",
+          items: [
+            { q: "Will it close a pull request someone still needs?", a: "Only after a warning and 7 more days with no activity from a person, and never one that is exempt. A comment, a push or `@coderhelm keep open` keeps it." },
+            { q: "What happens when someone reopens it?", a: "It is treated like any other open pull request: reopening counts as activity, so the stale label comes off and it won't be marked again until it has gone the full quiet period (21 days by default) without activity." },
+            { q: "Does it need new GitHub permissions?", a: "No. It uses the permissions the CoderHelm GitHub App already has, and needs the permission to change contents only if you turn on deleting branches." },
+          ],
+        },
+      ],
+    },
+  ],
+  related: ["reviewer", "maintenance", "pull-requests"],
 };
 
 const maintenance: Page = {
@@ -911,6 +1025,8 @@ const security: Page = {
   h1: "Guarded in code, not in a prompt.",
   lede:
     "Every guard on this page is enforced by the platform itself, so it holds whatever the model writes.",
+  heroNote:
+    "This page is about how CoderHelm protects your code and data. Looking for how CoderHelm fixes vulnerable dependencies in your code? See [Security fixes](/security-fixes/).",
   sections: [
     {
       id: "code",
@@ -956,7 +1072,7 @@ const security: Page = {
       ],
     },
   ],
-  related: ["data-sources", "alerts", "pull-requests"],
+  related: ["security-fixes", "data-sources", "self-host"],
 };
 
 const chat: Page = {
@@ -1139,6 +1255,7 @@ export const pages: Page[] = [
   home,
   pullRequests,
   reviewer,
+  stalePrs,
   maintenance,
   alerts,
   securityFixes,
@@ -1162,6 +1279,18 @@ export function mdPath(page: Page): string {
   return page.slug === "" ? "/index.md" : `/${page.slug}.md`;
 }
 
+// The header: a Features menu with every feature page in groups, then a few
+// pages that stand on their own.
+export const featureGroups: { title: string; slugs: string[] }[] = [
+  { title: "Write and review", slugs: ["pull-requests", "reviewer", "stale-pull-requests", "maintenance"] },
+  { title: "In production", slugs: ["alerts", "security-fixes", "tests"] },
+  { title: "Context", slugs: ["chat", "data-sources", "skills"] },
+];
+
+export function featureMenu(): { title: string; pages: Page[] }[] {
+  return featureGroups.map((g) => ({ title: g.title, pages: g.slugs.map((s) => pageBySlug(s)!) }));
+}
+
 export function navPages(): Page[] {
-  return ["pull-requests", "reviewer", "maintenance", "chat", "self-host", "security"].map((s) => pageBySlug(s)!);
+  return ["reviewer", "security-fixes", "chat", "self-host", "security"].map((s) => pageBySlug(s)!);
 }

@@ -17,7 +17,8 @@ export type FrameId =
   | "cifix"
   | "reply"
   | "merge"
-  | "secfix";
+  | "secfix"
+  | "stale";
 
 // Screenshots of the dashboard in public/shots/, taken from its end to end
 // tests' made up data (see src/content/shots.ts).
@@ -74,6 +75,9 @@ export type Page = {
   eyebrow?: string;
   h1: string;
   lede: string;
+  // A short pointer under the lede, for a page people often open while
+  // looking for another one.
+  heroNote?: string;
   heroFrame?: { id: FrameId; caption: string };
   // The main button under the heading, when it is not "Get started".
   heroCta?: { label: string; href: string };

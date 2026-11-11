@@ -439,6 +439,51 @@ function SecFixFrame() {
   );
 }
 
+function StaleFrame() {
+  return (
+    <Window url="github.com/example/web/pull/1408" label="Pull request">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="min-w-0 text-[15px] font-medium text-text-primary">Add retries to the export job <span className="font-normal text-text-muted">#1408</span></p>
+        <Pill tone="warn">stale</Pill>
+      </div>
+      <ol className="mt-4 grid gap-3">
+        <li className="flex gap-3">
+          <Dot tone="info" />
+          <p className="min-w-0 text-text-secondary">
+            Last activity from a person: <b className="text-text-primary">a review comment</b>, 21 days ago
+          </p>
+        </li>
+        <li className="rounded-lg border border-line p-3">
+          <div className="flex items-center gap-2">
+            <Bot />
+            <span className="text-text-secondary">CoderHelm added the <span className="font-mono text-[12px] text-text-primary">stale</span> label and commented</span>
+          </div>
+          <p className="mt-2 leading-relaxed text-text-primary">
+            This pull request has had no activity for 21 days, so CoderHelm marked it stale. It will be closed in 7 days if nothing happens here.
+          </p>
+          <p className="mt-1.5 leading-relaxed text-text-secondary">
+            To keep it open, push a commit, leave a comment, remove the <span className="font-mono text-[12px]">stale</span> label, or comment <span className="font-mono text-[12px]">@coderhelm keep open</span>.
+          </p>
+        </li>
+        <li className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-line px-3 py-2 text-[12px] text-text-muted">
+          <span className="min-w-0">example-ci[bot] commented: coverage report updated</span>
+          <Pill tone="muted">Not activity</Pill>
+        </li>
+        <li className="rounded-lg border border-line p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Bot />
+            <span className="text-text-secondary">7 days later, CoderHelm closed this pull request</span>
+            <Pill tone="ok">Branch kept</Pill>
+          </div>
+          <p className="mt-2 leading-relaxed text-text-secondary">
+            Nothing is lost: the commits and this conversation stay here. To pick it back up, reopen this pull request.
+          </p>
+        </li>
+      </ol>
+    </Window>
+  );
+}
+
 const FRAMES: Record<FrameId, () => ReactNode> = {
   maintain: MaintainFrame,
   review: ReviewFrame,
@@ -452,6 +497,7 @@ const FRAMES: Record<FrameId, () => ReactNode> = {
   reply: ReplyFrame,
   merge: MergeFrame,
   secfix: SecFixFrame,
+  stale: StaleFrame,
 };
 
 export function Frame({ id, caption, priority = false, hideCaption = false }: { id: FrameId; caption: string; priority?: boolean; hideCaption?: boolean }) {

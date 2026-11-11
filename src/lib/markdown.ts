@@ -77,6 +77,7 @@ export function pageToMarkdown(page: Page, opts: { frontmatter?: boolean } = {})
   }
   out.push(`# ${page.h1}`);
   out.push(`> ${absolutize(page.lede)}`);
+  if (page.heroNote) out.push(`**Note:** ${absolutize(page.heroNote)}`);
   if (page.slug === "") out.push(SITE.entity);
   if (page.heroFrame) out.push(`*Product view: ${page.heroFrame.caption}*`);
   for (const s of page.sections) {

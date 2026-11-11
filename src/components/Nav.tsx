@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { SITE, navPages } from "@/content/site";
+import { SITE, featureMenu, navPages } from "@/content/site";
 import { Logo } from "./Logo";
 
-// Server rendered. The phone menu is a <details> element, so the nav works
-// with no JavaScript at all.
+// Server rendered. The Features menu and the phone menu are <details>
+// elements, so the nav works with no JavaScript at all. Each page renders its
+// own Nav (keyed by page), so an open menu closes on the next page.
 export default function Nav() {
   const links = navPages();
+  const groups = featureMenu();
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-surface/85 backdrop-blur-md">
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:rounded focus:bg-white focus:px-3 focus:py-1.5 focus:text-sm focus:text-black">
@@ -18,6 +20,32 @@ export default function Nav() {
         </Link>
 
         <ul className="hidden items-center gap-7 lg:flex">
+          <li>
+            <details className="group relative">
+              <summary className="flex cursor-pointer list-none items-center gap-1 text-sm text-text-secondary transition-colors hover:text-text-primary group-open:text-text-primary [&::-webkit-details-marker]:hidden">
+                Features
+                <svg className="h-3.5 w-3.5 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
+                </svg>
+              </summary>
+              <div className="absolute left-0 top-full mt-4 grid w-[600px] grid-cols-3 gap-6 rounded-xl border border-line bg-surface p-5 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8)]">
+                {groups.map((g) => (
+                  <div key={g.title}>
+                    <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-text-muted">{g.title}</p>
+                    <ul className="mt-3 grid gap-2.5">
+                      {g.pages.map((p) => (
+                        <li key={p.slug}>
+                          <Link href={p.path} className="text-sm text-text-secondary transition-colors hover:text-text-primary">
+                            {p.navLabel}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </details>
+          </li>
           {links.map((p) => (
             <li key={p.slug}>
               <Link href={p.path} className="text-sm text-text-secondary transition-colors hover:text-text-primary">
@@ -48,9 +76,23 @@ export default function Nav() {
               <path strokeLinecap="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </summary>
-          <div className="fixed inset-x-0 top-14 border-b border-line bg-surface px-4 pb-6 pt-2">
-            <ul className="flex flex-col">
-              {links.map((p) => (
+          <div className="fixed inset-x-0 top-14 max-h-[calc(100dvh-3.5rem)] overflow-y-auto border-b border-line bg-surface px-4 pb-6 pt-2">
+            {groups.map((g) => (
+              <div key={g.title} className="mt-3">
+                <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-text-muted">{g.title}</p>
+                <ul className="mt-1 grid grid-cols-2 gap-x-4">
+                  {g.pages.map((p) => (
+                    <li key={p.slug}>
+                      <Link href={p.path} className="block border-b border-line py-2.5 text-[15px] text-text-secondary hover:text-text-primary">
+                        {p.navLabel}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+            <ul className="mt-3 flex flex-col">
+              {links.filter((p) => !groups.some((g) => g.pages.includes(p))).map((p) => (
                 <li key={p.slug}>
                   <Link href={p.path} className="block border-b border-line py-3 text-[15px] text-text-secondary hover:text-text-primary">
                     {p.navLabel}
