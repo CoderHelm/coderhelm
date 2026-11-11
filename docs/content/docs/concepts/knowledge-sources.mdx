@@ -3,7 +3,7 @@ title: Knowledge sources
 description: Bring pages in from Notion, Confluence, Google Drive, Sanity, GitHub and websites and keep them up to date, import the knowledge base you already have (S3, a Bedrock knowledge base, an archive), or connect Bedrock or any MCP search tool in place.
 ---
 
-A knowledge base can hold pages from the apps your team already writes in, next to the files you upload. You pick what to bring in once; Coderhelm keeps it up to date, removes what is deleted, and Chat and the agents cite each page with a link back to where it lives.
+A knowledge base can hold pages from the apps your team already writes in, next to the files you upload. You pick what to bring in once; CoderHelm keeps it up to date, removes what is deleted, and Chat and the agents cite each page with a link back to where it lives.
 
 ## Adding a source
 
@@ -26,14 +26,14 @@ If a sign-in doesn't finish, the page you land on names the app and says what it
 | Confluence | Spaces or page trees | Each current page's body | An Atlassian sign-in, or the Confluence email and API token saved on the Integrations page |
 | Google Drive | Folders (with their subfolders) or single files | Docs, Sheets and Slides as text; PDF, Word, Excel, Markdown, CSV, HTML and text files | A Google sign-in with read-only access to Drive |
 | Sanity | A project, then a dataset or document types in it | Each published document's text (drafts never) | Your own Sanity sign-in, or the Sanity token and project id saved on the Integrations page (a Viewer token is enough) |
-| GitHub | Repositories, folders or files | Markdown, MDX, text, reStructuredText and AsciiDoc files on the default branch | The Coderhelm GitHub App |
+| GitHub | Repositories, folders or files | Markdown, MDX, text, reStructuredText and AsciiDoc files on the default branch | The CoderHelm GitHub App |
 | Website | Page addresses or a sitemap | Each page's readable text | Nothing: public pages only |
 
-A source keeps up to 1,000 pages. Coderhelm only ever reads: nothing is changed, created or deleted in the app.
+A source keeps up to 1,000 pages. CoderHelm only ever reads: nothing is changed, created or deleted in the app.
 
 ### Sanity: signing in or a token
 
-Signing in is the first choice: there is nothing to set up and no key to copy. The source syncs with the sign-in of the person who added it, and its card says so: **Synced with Ada's Sanity sign-in**. Coderhelm reads through Sanity's own MCP server and only ever reads.
+Signing in is the first choice: there is nothing to set up and no key to copy. The source syncs with the sign-in of the person who added it, and its card says so: **Synced with Ada's Sanity sign-in**. CoderHelm reads through Sanity's own MCP server and only ever reads.
 
 **Use an API token instead** is the second choice. A token adds instant updates: changes arrive the moment they are published, instead of at the next check.
 
@@ -46,7 +46,7 @@ By default a document's title is its first `title`, `name`, `heading` or `label`
 | App | Changes arrive | Scheduled check |
 |---|---|---|
 | Sanity, signed in | At the next check, which asks only for documents changed since the last one | Every 15 minutes |
-| Sanity, with a token | The moment they are published (Coderhelm adds the webhook itself when the token may manage webhooks; otherwise the dialog shows the address and secret to add) | Every 6 hours |
+| Sanity, with a token | The moment they are published (CoderHelm adds the webhook itself when the token may manage webhooks; otherwise the dialog shows the address and secret to add) | Every 6 hours |
 | Notion | Within moments, when your install has Notion webhooks set up | Every hour, or every 6 hours with webhooks |
 | GitHub | On every push to the default branch | Every 6 hours |
 | Confluence, Google Drive, websites | At the scheduled check | Every hour |
@@ -69,7 +69,7 @@ Each source on a knowledge base's page shows one line: **Up to date, checked 5 m
 | The sign-in expired or was revoked | **Reconnect Notion** |
 | The Sanity sign-in a source syncs with expired, or that person left the team | One sentence saying whose sign-in stopped, and **Sign in again**. Any admin can press it; the source then syncs with their sign-in. The team's owner and admins are told once, in your chat channels and by email. |
 | What you picked was moved or deleted | **Choose pages again** |
-| The app asked Coderhelm to slow down, or didn't answer | **Try again** (it also retries on its own) |
+| The app asked CoderHelm to slow down, or didn't answer | **Try again** (it also retries on its own) |
 
 A page that couldn't be read says why in the list of pages, and is tried again on the next check.
 
@@ -88,20 +88,20 @@ Pages from an app follow the knowledge base's own setting, exactly like uploaded
 
 ## Bedrock knowledge bases, connected in place
 
-If your team already has a knowledge base in Amazon Bedrock, connect it in place instead of copying it. Coderhelm searches it live in your AWS account whenever Chat or an agent needs it, and copies nothing: no documents, no passages, no vectors. Bedrock turns each question into a search itself, so it doesn't matter which embedding model or vector store the knowledge base was built with.
+If your team already has a knowledge base in Amazon Bedrock, connect it in place instead of copying it. CoderHelm searches it live in your AWS account whenever Chat or an agent needs it, and copies nothing: no documents, no passages, no vectors. Bedrock turns each question into a search itself, so it doesn't matter which embedding model or vector store the knowledge base was built with.
 
-1. Connect the AWS account the knowledge base lives in, on **Settings**, **Integrations**, **AWS**. It creates the read-only `CoderHelmLogReader` role, which Coderhelm takes on with your team's private ID.
-2. On the **Knowledge** page, choose **New knowledge base**, then **Bedrock knowledge base**, and paste its ARN (it looks like `arn:aws:bedrock:us-east-1:111122223333:knowledge-base/ABCDE12345`). Coderhelm runs one test search before anything is saved.
+1. Connect the AWS account the knowledge base lives in, on **Settings**, **Integrations**, **AWS**. It creates the read-only `CoderHelmLogReader` role, which CoderHelm takes on with your team's private ID.
+2. On the **Knowledge** page, choose **New knowledge base**, then **Bedrock knowledge base**, and paste its ARN (it looks like `arn:aws:bedrock:us-east-1:111122223333:knowledge-base/ABCDE12345`). CoderHelm runs one test search before anything is saved.
 3. If the role can't search it yet, the dialog says "The role in your account does not allow Retrieve on this knowledge base" and offers one link: an update stack in that account that lets the role search exactly the knowledge bases you connected there (`bedrock:Retrieve` and `bedrock:GetDocumentContent` on their ARNs, and nothing else new). Create the stack, then connect again.
 
 The knowledge base's page then says **Connected in place: searched live in your AWS account, nothing copied** instead of listing files. It takes no uploads and no synced apps; you add documents in Bedrock as before, and they are searchable as soon as Bedrock has them.
 
-- **Searching.** Coderhelm asks for Bedrock's hybrid search (meaning and exact words) where your vector store supports it, and Bedrock's ranking joins the ranking of your other knowledge bases, so one answer can cite both. At most three passages come from one document.
+- **Searching.** CoderHelm asks for Bedrock's hybrid search (meaning and exact words) where your vector store supports it, and Bedrock's ranking joins the ranking of your other knowledge bases, so one answer can cite both. At most three passages come from one document.
 - **Citations.** A citation names the document and links to it: the original page for a web, Confluence or SharePoint source, or the object in the S3 console for an S3 document (it opens only for people who can sign in to that AWS account).
 - **When it can't be searched.** Your other knowledge bases still answer, and Chat says which one couldn't be searched and why.
-- **Who can read it.** Like any knowledge base, everyone who can read it in Coderhelm sees what the search returns, even documents they couldn't open where they came from. Agents search the knowledge bases attached to them, so anyone who can start a run reaches them too.
+- **Who can read it.** Like any knowledge base, everyone who can read it in CoderHelm sees what the search returns, even documents they couldn't open where they came from. Agents search the knowledge bases attached to them, so anyone who can start a run reaches them too.
 
-Coderhelm never asks you to name its own account in a Bedrock resource policy: a grant to a shared role would let anyone who learned your knowledge base's ARN search it through another team. Access always goes through your own role and your team's private ID.
+CoderHelm never asks you to name its own account in a Bedrock resource policy: a grant to a shared role would let anyone who learned your knowledge base's ARN search it through another team. Access always goes through your own role and your team's private ID.
 
 Running your own install? A knowledge base in the install's own account needs no role at all, and the dialog lists them for you: see [Knowledge sources](/self-host/knowledge-sources#bedrock-knowledge-bases-connected-in-place) in the self-hosting guide.
 
@@ -110,37 +110,37 @@ Running your own install? A knowledge base in the install's own account needs no
 If your team already runs a search tool with an MCP server (Glean, Atlassian Rovo, Dropbox Dash, Azure AI Search, a Pinecone Assistant, Bedrock through AgentCore Gateway, or your own), connect it in place. Chat and the agents search it live through that server, alongside your other knowledge bases, and nothing is copied.
 
 1. Add the tool's MCP server on **Connected accounts** (the same page agents use for remote servers), and sign in if it asks.
-2. On the **Knowledge** page, choose **New knowledge base**, then **Search tool (MCP)**, and pick the server. Coderhelm suggests the tool that searches (a `search` tool, as most servers name it) and the one that reads a whole result (`fetch`); change them if your server names them differently.
-3. Coderhelm runs one test search before anything is saved. If it fails, the dialog says why and what to do: nobody is signed in, the server has no tool that searches, its answer couldn't be read, or the server didn't answer.
+2. On the **Knowledge** page, choose **New knowledge base**, then **Search tool (MCP)**, and pick the server. CoderHelm suggests the tool that searches (a `search` tool, as most servers name it) and the one that reads a whole result (`fetch`); change them if your server names them differently.
+3. CoderHelm runs one test search before anything is saved. If it fails, the dialog says why and what to do: nobody is signed in, the server has no tool that searches, its answer couldn't be read, or the server didn't answer.
 
 Whose access a search uses follows the server:
 
 - **One team connection.** Everyone who can read the knowledge base sees what that connection can see.
 - **Each person signs in.** Each person's search uses their own sign-in, so they only see what that tool lets them see. Agent runs search as the person who started them; runs nobody started skip it.
 
-The knowledge base's page says **Connected in place: searched live through** the server, **nothing copied**, with a **Check connection** button. A citation names the result and links to it when the tool gives a link. Nothing new is needed in AWS for this, on Coderhelm's hosted service or your own install.
+The knowledge base's page says **Connected in place: searched live through** the server, **nothing copied**, with a **Check connection** button. A citation names the result and links to it when the tool gives a link. Nothing new is needed in AWS for this, on CoderHelm's hosted service or your own install.
 
 ## Importing a knowledge base you already have
 
-Import copies the documents into Coderhelm and indexes them here, then keeps them in sync: changed documents are read again, duplicates are read once, and documents that are gone are removed. Progress shows as each document comes in. Use it for small and medium collections; for a bigger one, connect it in place instead (a Bedrock knowledge base or a search tool), which has no size limit here.
+Import copies the documents into CoderHelm and indexes them here, then keeps them in sync: changed documents are read again, duplicates are read once, and documents that are gone are removed. Progress shows as each document comes in. Use it for small and medium collections; for a bigger one, connect it in place instead (a Bedrock knowledge base or a search tool), which has no size limit here.
 
 ### From Amazon S3
 
-1. Connect the AWS account the bucket is in, on **Settings**, **Integrations**, **AWS**. Coderhelm reads the bucket with that account's read-only `CoderHelmLogReader` role and your team's private ID.
+1. Connect the AWS account the bucket is in, on **Settings**, **Integrations**, **AWS**. CoderHelm reads the bucket with that account's read-only `CoderHelmLogReader` role and your team's private ID.
 2. Choose **Amazon S3**, pick the account, type the bucket's name, then pick folders or files (or **The whole bucket**).
-3. Coderhelm checks it can read the bucket before anything is saved. If the role can't read it yet, the dialog offers **Update the role in one click**: an update stack in that account that names the bucket in the role's `ImportBuckets` parameter and allows only reading it (`s3:ListBucket`, `s3:GetObject`, and decrypting through S3 when the bucket uses a KMS key). Create the stack, then try again.
+3. CoderHelm checks it can read the bucket before anything is saved. If the role can't read it yet, the dialog offers **Update the role in one click**: an update stack in that account that names the bucket in the role's `ImportBuckets` parameter and allows only reading it (`s3:ListBucket`, `s3:GetObject`, and decrypting through S3 when the bucket uses a KMS key). Create the stack, then try again.
 
 Documents of the same kinds as uploads are read: PDF, Word, Markdown, text, CSV, Excel and HTML. A `<file>.metadata.json` next to a document (as Bedrock data sources have) gives its title, link and date. Each sync lists the bucket again and reads only what changed.
 
 ### From a Bedrock knowledge base
 
-Choose **Import a Bedrock knowledge base** and paste its ARN. Coderhelm reads what it was built from: each of its data sources, and for an S3 data source the bucket and folders. Tick the ones to import; each becomes an Amazon S3 source as above. Coderhelm reads the documents in the knowledge base's S3 data source and indexes them itself. Nothing in Bedrock changes.
+Choose **Import a Bedrock knowledge base** and paste its ARN. CoderHelm reads what it was built from: each of its data sources, and for an S3 data source the bucket and folders. Tick the ones to import; each becomes an Amazon S3 source as above. CoderHelm reads the documents in the knowledge base's S3 data source and indexes them itself. Nothing in Bedrock changes.
 
-A Confluence or web data source points you at Coderhelm's own Confluence or Website source, which reads the original pages instead of Bedrock's copy. SharePoint, Salesforce and custom data sources can't be imported this way; connect the knowledge base in place to search them. Reading the data sources uses the role's `ReadKnowledgeBases` statement, on the knowledge bases its `KnowledgeBases` parameter names.
+A Confluence or web data source points you at CoderHelm's own Confluence or Website source, which reads the original pages instead of Bedrock's copy. SharePoint, Salesforce and custom data sources can't be imported this way; connect the knowledge base in place to search them. Reading the data sources uses the role's `ReadKnowledgeBases` statement, on the knowledge bases its `KnowledgeBases` parameter names.
 
 ### From an archive
 
-Choose **Archive upload** and pick a `.zip`: a Notion export (Markdown and CSV), a Confluence HTML export, or a zipped docs folder. Coderhelm unpacks it on the server (long Notion paths are fine) and reads every page.
+Choose **Archive upload** and pick a `.zip`: a Notion export (Markdown and CSV), a Confluence HTML export, or a zipped docs folder. CoderHelm unpacks it on the server (long Notion paths are fine) and reads every page.
 
 **Every page in the archive becomes readable by everyone who can read this knowledge base. A Confluence Full Export also includes pages that are restricted in Confluence.** The dialog says so before you upload. A Notion export leaves out pages the person exporting couldn't open.
 

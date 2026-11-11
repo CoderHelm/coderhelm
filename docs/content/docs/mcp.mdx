@@ -1,5 +1,5 @@
 ---
-title: Use CoderHelm from Claude, Cursor and VS Code
+title: Claude, Cursor and VS Code
 description: Add CoderHelm to Claude, Cursor, VS Code or any other MCP app, sign in once, and see runs, start and retry them, read or ask for reviews, and search your team's knowledge from where you already work.
 ---
 
@@ -111,6 +111,6 @@ CoderHelm follows the MCP authorization spec:
 - Scopes: `runs:read`, `runs:write` and `knowledge:read`. A first sign-in is asked for `runs:read`; a tool that needs `runs:write` or `knowledge:read` answers `403` with `insufficient_scope`, so a client can ask again.
 - Access tokens last an hour. Refresh tokens last 30 days from their last use and are replaced on every use.
 - Tokens are revoked at `/oauth/revoke`.
-- Programs that sign in without a person, such as Amazon Bedrock AgentCore Gateway, use a **knowledge key** made on **Knowledge**, **Use in Bedrock**. It holds only `knowledge:read`, and works as an API key (`Authorization: Bearer chkb_...` or `X-Api-Key`) or as OAuth client credentials (`grant_type=client_credentials` at `/oauth/token`, with `client_secret_basic` or `client_secret_post`). See [Connect Coderhelm knowledge to Amazon Bedrock](/bedrock).
+- Programs that sign in without a person, such as Amazon Bedrock AgentCore Gateway, use a **knowledge key** made on **Knowledge**, **Use in Bedrock**. It holds only `knowledge:read`, and works as an API key (`Authorization: Bearer chkb_...` or `X-Api-Key`) or as OAuth client credentials (`grant_type=client_credentials` at `/oauth/token`, with `client_secret_basic` or `client_secret_post`). See [Connect CoderHelm knowledge to Amazon Bedrock](/bedrock).
 
 The server is stateless: every message is a `POST /mcp` answered with JSON, and there is no event stream.
