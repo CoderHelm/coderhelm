@@ -23,7 +23,7 @@ export const LIMITS = {
   read_roles: ["viewer", "member", "admin"],
 };
 
-export type State = "healthy" | "first_sync" | "error" | "empty" | "in_place";
+export type State = "healthy" | "first_sync" | "error" | "empty" | "in_place" | "waiting";
 
 export interface Src {
   id: string;
@@ -74,9 +74,11 @@ export interface KItem {
   path: string;
   skipped?: string;
   indexed_at?: string;
+  reason?: string;
+  retry_at?: string;
 }
 
-export const source = (over: Partial<Src>): Src => ({
+export const source = (over: Partial<Src> & { waiting_items?: number; next_retry_at?: string }): Src => ({
   id: "src_conf",
   kind: "confluence",
   label: "Confluence",
@@ -132,8 +134,23 @@ export const kitem = (over: Partial<KItem>): KItem => ({
   ...over,
 });
 
+/** Two Sanity projects after a sync Sanity rate limited: most documents wait to be read again, a few are read, two can't be seen. */
+function waitingItems(): KItem[] {
+  const out: KItem[] = [];
+  const doc = (i: number, over: Partial<KItem>) =>
+    kitem({ id: `w${i}`, kind: "sanity", source_id: "src_sanity", name: `Location page ${i + 1}`, path: "Marketing site / production", url: `https://www.sanity.io/docs/w${i}`, ...over });
+  for (let i = 0; i < 6; i++) out.push(doc(i, { name: ["Membership policy", "Guest policy", "Summer camp page", "Gift cards", "Parking", "Accessibility"][i], chunks: 40 + i }));
+  for (let i = 6; i < 171; i++) {
+    if (i < 168) out.push(doc(i, { status: "failed", searchable: false, chunks: 0, error: "Sanity is limiting how fast Coderhelm reads. The server asked Coderhelm to slow down (429).", reason: "rate_limited", retry_at: iso(-4) }));
+    else if (i < 169) out.push(doc(i, { status: "failed", searchable: false, chunks: 0, error: "Sanity didn't answer in time. The server is overloaded right now (503).", reason: "unavailable", retry_at: iso(-6) }));
+    else out.push(doc(i, { name: `Private draft ${i}`, status: "failed", searchable: false, chunks: 0, error: "The Sanity connection can't see this.", reason: "forbidden" }));
+  }
+  return out;
+}
+
 function itemsFor(state: State): KItem[] {
   if (state === "empty" || state === "in_place") return [];
+  if (state === "waiting") return waitingItems();
   const out: KItem[] = [
     kitem({ id: "i1" }),
     kitem({ id: "i2", name: "Snowflake key rotation", chunks: 11, as_of: "2026-09-01" }),
@@ -189,6 +206,30 @@ function sourcesFor(state: State): Src[] {
           account: "ada@sanity.example",
         }),
       ];
+    case "waiting":
+      return [
+        source({
+          id: "src_sanity",
+          kind: "sanity",
+          label: "Sanity",
+          name: "Marketing site",
+          options: { project_id: "p1abc", dataset: "production" },
+          selection: [{ id: "dataset:p1abc:production", title: "production", kind: "dataset", path: [], include_children: true }],
+          status: "syncing",
+          progress: { phase: "waiting", done: 6, total: 171 },
+          items: 6,
+          failed_items: 2,
+          waiting_items: 163,
+          next_retry_at: iso(-4),
+          live_updates: false,
+          interval_mins: 15,
+          next_sync_at: iso(-4),
+          connection: "sign_in",
+          signin: { name: "Ada Lovelace", email: "ada@example.com", account: "ada@sanity.example" },
+          via: "sign_in",
+          account: "ada@sanity.example",
+        }),
+      ];
     case "first_sync":
       return [source({ status: "syncing", progress: { phase: "fetching", done: 350, total: 1000 }, items: 350, failed_items: 0, last_success_at: "", last_sync_at: "" })];
     case "error":
@@ -236,7 +277,8 @@ export function baseJson(db: Backend) {
     files: it.length,
     ready: it.filter((i) => i.status === "ready").length,
     processing: it.filter((i) => i.status === "processing").length,
-    failed: it.filter((i) => i.status === "failed" && !i.skipped).length,
+    failed: it.filter((i) => i.status === "failed" && !i.skipped && !i.retry_at).length,
+    waiting: it.filter((i) => i.status === "failed" && !i.skipped && i.retry_at).length,
     skipped: it.filter((i) => i.skipped).length,
     passages: it.filter((i) => i.status === "ready").reduce((a, i) => a + i.chunks, 0),
     uploads: it.filter((i) => !i.source_id).length,
@@ -252,7 +294,7 @@ export function baseJson(db: Backend) {
   };
 }
 
-const stateOf = (i: KItem) => (i.skipped ? "skipped" : i.status === "failed" ? "failed" : i.status === "processing" || i.status === "uploading" ? "working" : i.truncated ? "cut_short" : "searchable");
+const stateOf = (i: KItem) => (i.skipped ? "skipped" : i.status === "failed" && i.retry_at ? "waiting" : i.status === "failed" ? "failed" : i.status === "processing" || i.status === "uploading" ? "working" : i.truncated ? "cut_short" : "searchable");
 
 /** The gateway's `/items`, worked out the same way. */
 export function itemsPage(items: KItem[], q: URLSearchParams) {
@@ -261,7 +303,8 @@ export function itemsPage(items: KItem[], q: URLSearchParams) {
   const src = q.get("source") ?? "";
   const group = q.get("group") ?? "";
   const states: Record<string, number> = {};
-  const groups = new Map<string, { key: string; source: string; top: string; items: number; failed: number; newest: string }>();
+  const groups = new Map<string, { key: string; source: string; top: string; items: number; failed: number; waiting: number; newest: string }>();
+  const reasons = new Map<string, { source: string; state: string; reason: string; items: number; next_try_at: string }>();
   const matching: KItem[] = [];
   for (const f of items) {
     const g = { source: f.source_id || "upload", top: (f.path || "").split(" / ")[0] };
@@ -269,11 +312,20 @@ export function itemsPage(items: KItem[], q: URLSearchParams) {
     if (term && !term.split(/\s+/).every((w) => `${f.name} ${f.path}`.toLowerCase().includes(w))) continue;
     const s = stateOf(f);
     states[s] = (states[s] ?? 0) + 1;
+    if (s === "waiting" || s === "failed" || s === "skipped") {
+      const reason = f.reason || f.skipped || "failed";
+      const rk = `${g.source}|${s}|${reason}`;
+      const r = reasons.get(rk) ?? { source: g.source, state: s, reason, items: 0, next_try_at: "" };
+      r.items += 1;
+      if (f.retry_at && (!r.next_try_at || f.retry_at < r.next_try_at)) r.next_try_at = f.retry_at;
+      reasons.set(rk, r);
+    }
     if (status && s !== status) continue;
     const key = `${g.source}|${g.top}`;
-    const e = groups.get(key) ?? { key, ...g, items: 0, failed: 0, newest: "" };
+    const e = groups.get(key) ?? { key, ...g, items: 0, failed: 0, waiting: 0, newest: "" };
     e.items += 1;
     if (s === "failed") e.failed += 1;
+    if (s === "waiting") e.waiting += 1;
     if (f.as_of > e.newest) e.newest = f.as_of;
     groups.set(key, e);
     if (group && key !== group) continue;
@@ -289,6 +341,7 @@ export function itemsPage(items: KItem[], q: URLSearchParams) {
     next: start + page.length < matching.length ? String(start + page.length) : null,
     states,
     groups: [...groups.values()],
+    reasons: [...reasons.values()].sort((a, b) => b.items - a.items),
     all: items.length,
   };
 }
@@ -300,7 +353,7 @@ export interface Run {
   started_at: string;
   ended_at: string;
   took_secs: number;
-  result: "done" | "problems" | "stopped";
+  result: "done" | "problems" | "waiting" | "stopped";
   listed: number;
   added: number;
   updated: number;
@@ -312,7 +365,9 @@ export interface Run {
   reused: number;
   via: string;
   error?: { message: string; fix: string; action: string; at: string } | null;
-  problems: { name: string; url: string; kind: string; error: string; fix: string }[];
+  problems: { name: string; url: string; kind: string; error: string; fix: string; reason?: string }[];
+  waiting?: number;
+  reasons?: { kind: string; reason: string; count: number }[];
 }
 
 export const run = (over: Partial<Run>): Run => ({
@@ -338,6 +393,45 @@ export const run = (over: Partial<Run>): Run => ({
 });
 
 export function runsFor(db: Backend): Run[] {
+  if (db.state === "waiting") {
+    const limited = Array.from({ length: 48 }, (_, i) => ({
+      name: `Location page ${i + 7}`,
+      url: `https://www.sanity.io/docs/w${i + 6}`,
+      kind: "waiting",
+      error: "Sanity is limiting how fast Coderhelm reads. The server asked Coderhelm to slow down (429).",
+      fix: "Nothing to do: it's read again on its own.",
+      reason: "rate_limited",
+    }));
+    return [
+      run({
+        source_id: "src_sanity",
+        trigger: "added",
+        started_at: iso(6),
+        ended_at: iso(5),
+        took_secs: 64,
+        result: "problems",
+        listed: 171,
+        added: 6,
+        updated: 0,
+        unchanged: 0,
+        failed: 2,
+        waiting: 163,
+        embedded: 251,
+        reused: 0,
+        via: "sign_in",
+        reasons: [
+          { kind: "waiting", reason: "rate_limited", count: 162 },
+          { kind: "failed", reason: "forbidden", count: 2 },
+          { kind: "waiting", reason: "unavailable", count: 1 },
+        ],
+        problems: [
+          ...limited,
+          { name: "Location page 169", url: "https://www.sanity.io/docs/w168", kind: "waiting", error: "Sanity didn't answer in time. The server is overloaded right now (503).", fix: "Nothing to do: it's read again on its own.", reason: "unavailable" },
+          { name: "Private draft 169", url: "", kind: "failed", error: "The Sanity connection can't see this.", fix: "Give the connection access to it in the app, then check for changes.", reason: "forbidden" },
+        ],
+      }),
+    ];
+  }
   if (db.state === "empty" || db.state === "in_place") return [];
   if (db.state === "first_sync") return [];
   if (db.state === "error")

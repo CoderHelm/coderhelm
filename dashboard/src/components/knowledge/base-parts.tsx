@@ -58,6 +58,8 @@ export interface TileData {
   searchable: number;
   failed: number;
   skipped: number;
+  /** Waiting to be read again on their own (a rate limit, a busy server). */
+  waiting?: number;
   working: number;
   passages: number;
   /** Searches this week, when the gateway counts them. */
@@ -76,7 +78,7 @@ function DayBars({ days }: { days: number[] }) {
   );
 }
 
-export function Tiles({ data, sources, onShow }: { data: TileData; sources: PageSource[]; onShow: (status: "failed" | "skipped") => void }) {
+export function Tiles({ data, sources, onShow }: { data: TileData; sources: PageSource[]; onShow: (status: "failed" | "skipped" | "waiting") => void }) {
   const newest = sources.map((s) => s.last_success_at).filter(Boolean).sort().reverse()[0];
   const next = sources
     .filter((s) => !s.paused && s.next_sync_at)
@@ -91,8 +93,13 @@ export function Tiles({ data, sources, onShow }: { data: TileData; sources: Page
       <Tile label="Pages searchable" value={data.searchable.toLocaleString()} testId="tile-pages">
         {firstSync ? (
           <span data-testid="tile-first-sync">{firstSync}</span>
-        ) : data.failed || data.skipped ? (
+        ) : data.failed || data.skipped || data.waiting ? (
           <span className="flex flex-wrap gap-x-2">
+            {(data.waiting ?? 0) > 0 && (
+              <button type="button" className={linkButton} onClick={() => onShow("waiting")} data-testid="tile-waiting">
+                {(data.waiting ?? 0).toLocaleString()} waiting to retry
+              </button>
+            )}
             {data.failed > 0 && (
               <button type="button" className={linkButton} onClick={() => onShow("failed")} data-testid="tile-failed">
                 {data.failed.toLocaleString()} couldn&apos;t read

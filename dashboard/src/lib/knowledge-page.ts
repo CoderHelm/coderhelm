@@ -23,7 +23,7 @@ export interface PageSource extends Source {
 }
 
 /** The state an item shows: one word the filters use. */
-export type ItemState = "searchable" | "working" | "failed" | "skipped" | "cut_short";
+export type ItemState = "searchable" | "working" | "waiting" | "failed" | "skipped" | "cut_short";
 
 export interface ItemsQuery {
   q?: string;
@@ -43,7 +43,20 @@ export interface ItemGroup {
   top: string;
   items: number;
   failed: number;
+  /** Items waiting to be read again on their own (newer gateways). */
+  waiting?: number;
   newest: string;
+}
+
+/** Items that aren't searchable, by source, state and reason: "165 waiting, rate limited". */
+export interface ReasonGroup {
+  source: string;
+  state: "waiting" | "failed" | "skipped";
+  /** `rate_limited`, `unavailable`, `requested`, `too_large`, `forbidden`, `not_found`, `empty`, `unsupported`, `failed`. */
+  reason: string;
+  items: number;
+  /** For waiting items: the soonest next try. */
+  next_try_at: string;
 }
 
 export interface ItemsPage {
@@ -54,6 +67,8 @@ export interface ItemsPage {
   /** How many items are in each state, ignoring the state filter. */
   states: Partial<Record<ItemState, number>>;
   groups: ItemGroup[];
+  /** Items that aren't searchable, grouped by reason (newer gateways). */
+  reasons?: ReasonGroup[];
   /** Items in the base. */
   all: number;
 }
@@ -63,6 +78,10 @@ export interface PageItem extends Item {
   skipped?: string;
   /** When its text was last indexed. */
   indexed_at?: string;
+  /** Why it isn't searchable, as one word (see `ReasonGroup.reason`). */
+  reason?: string;
+  /** Refused for a passing reason: when it is read again. */
+  retry_at?: string;
 }
 
 /** How a source connects, for the people who manage it. Never a secret. */
@@ -86,6 +105,8 @@ export interface PageBase extends Base {
   passages?: number;
   /** Items left out (no text, a file it doesn't read, too large). */
   skipped?: number;
+  /** Items waiting to be read again on their own (newer gateways). */
+  waiting?: number;
 }
 
 export interface BaseLoad {
@@ -127,6 +148,7 @@ export const kbPage = {
 
 export function itemState(f: PageItem): ItemState {
   if (f.skipped) return "skipped";
+  if (f.status === "failed" && f.retry_at) return "waiting";
   if (f.status === "failed") return "failed";
   if (f.status === "processing" || f.status === "uploading") return "working";
   return f.truncated ? "cut_short" : "searchable";
@@ -148,6 +170,7 @@ export function itemsPage(files: PageItem[], q: ItemsQuery, now = Date.now()): I
   const [wantSource, wantTop] = q.group ? [q.group.slice(0, q.group.indexOf("|")), q.group.slice(q.group.indexOf("|") + 1)] : ["", ""];
   const states: Partial<Record<ItemState, number>> = {};
   const groups = new Map<string, ItemGroup>();
+  const reasons = new Map<string, ReasonGroup>();
   const matching: PageItem[] = [];
   for (const f of files) {
     const g = itemGroup(f);
@@ -161,11 +184,20 @@ export function itemsPage(files: PageItem[], q: ItemsQuery, now = Date.now()): I
     if (words.length && !words.every((w) => hay.includes(w))) continue;
     const s = itemState(f);
     states[s] = (states[s] ?? 0) + 1;
+    if (s === "waiting" || s === "failed" || s === "skipped") {
+      const reason = f.reason || (s === "skipped" ? f.skipped ?? "" : s === "failed" ? "failed" : "unavailable");
+      const rk = `${g.source}|${s}|${reason}`;
+      const r = reasons.get(rk) ?? { source: g.source, state: s, reason, items: 0, next_try_at: "" };
+      r.items += 1;
+      if (s === "waiting" && f.retry_at && (!r.next_try_at || f.retry_at < r.next_try_at)) r.next_try_at = f.retry_at;
+      reasons.set(rk, r);
+    }
     if (q.status && s !== q.status) continue;
     const key = `${g.source}|${g.top}`;
-    const grp = groups.get(key) ?? { key, source: g.source, top: g.top, items: 0, failed: 0, newest: "" };
+    const grp = groups.get(key) ?? { key, source: g.source, top: g.top, items: 0, failed: 0, waiting: 0, newest: "" };
     grp.items += 1;
     if (s === "failed") grp.failed += 1;
+    if (s === "waiting") grp.waiting = (grp.waiting ?? 0) + 1;
     if ((f.as_of ?? "") > grp.newest) grp.newest = f.as_of ?? "";
     groups.set(key, grp);
     if (q.group && (g.source !== wantSource || g.top !== wantTop)) continue;
@@ -183,6 +215,7 @@ export function itemsPage(files: PageItem[], q: ItemsQuery, now = Date.now()): I
     next: end < matching.length ? String(end) : null,
     states,
     groups: [...groups.values()].sort((a, b) => (a.key < b.key ? -1 : 1)),
+    reasons: [...reasons.values()].sort((a, b) => b.items - a.items),
     all: files.length,
   };
 }
@@ -296,6 +329,7 @@ export function placeWords(s: Pick<PageSource, "kind" | "options" | "account">):
 export const STATE_WORDS: Record<ItemState, string> = {
   searchable: "Searchable",
   working: "Reading",
+  waiting: "Waiting to retry",
   failed: "Couldn't read",
   skipped: "Skipped",
   cut_short: "Cut short",
@@ -307,6 +341,39 @@ export const SKIP_WORDS: Record<string, string> = {
   too_large: "It's too large to read",
 };
 
+/**
+ * One group of items that aren't searchable, in words: "rate limited by
+ * Sanity, retrying", "too large to read". `label` is the app's name.
+ */
+export function reasonWords(state: ReasonGroup["state"], reason: string, label: string): string {
+  if (state === "waiting") {
+    if (reason === "rate_limited") return `rate limited by ${label}, retrying`;
+    if (reason === "requested") return "asked to be read again";
+    return `not answered in time by ${label}, retrying`;
+  }
+  if (state === "skipped") return reason === "empty" ? "no text to read" : reason === "unsupported" ? "a kind of file that isn't read" : reason === "too_large" ? "too large to read" : "left out";
+  switch (reason) {
+    case "too_large":
+      return "too large to read";
+    case "forbidden":
+      return `not visible to the ${label} connection`;
+    case "not_found":
+      return `not found in ${label}`;
+    default:
+      return "couldn't be read";
+  }
+}
+
+/** When a waiting item is tried again: "next try 14:20", "next try Nov 12, 09:00", "next try in a moment". */
+export function nextTryWords(iso: string | null | undefined, now = Date.now()): string {
+  if (!iso) return "next try on the next check";
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return "next try on the next check";
+  if (t <= now + 30_000) return "next try in a moment";
+  const sameDay = new Date(t).toDateString() === new Date(now).toDateString();
+  return sameDay ? `next try ${clockWords(iso)}` : `next try ${dayWords(iso).replace(/, \d{4}$/, "")}, ${clockWords(iso)}`;
+}
+
 export function isKind(k: string): k is SourceKind {
   return k in KIND_LABEL;
 }
@@ -317,9 +384,18 @@ export function isKind(k: string): k is SourceKind {
 export interface RunProblem {
   name: string;
   url: string;
-  kind: "failed" | "skipped";
+  kind: "failed" | "skipped" | "waiting";
   error: string;
   fix: string;
+  /** Why, as one word (newer gateways). */
+  reason?: string;
+}
+
+/** How many items of a run had one kind of problem for one reason. */
+export interface RunReason {
+  kind: RunProblem["kind"];
+  reason: string;
+  count: number;
 }
 
 /** One sync of a source. */
@@ -331,8 +407,8 @@ export interface SyncRun {
   started_at: string;
   ended_at: string;
   took_secs: number;
-  /** `done`, `problems` or `stopped`. */
-  result: "done" | "problems" | "stopped";
+  /** `done`, `problems`, `waiting` (some items are read again on their own) or `stopped`. */
+  result: "done" | "problems" | "waiting" | "stopped";
   listed: number;
   added: number;
   updated: number;
@@ -340,6 +416,10 @@ export interface SyncRun {
   removed: number;
   failed: number;
   skipped: number;
+  /** Items refused for a passing reason, read again on their own (newer gateways). */
+  waiting?: number;
+  /** Every problem item counted by kind and reason (newer gateways). */
+  reasons?: RunReason[];
   embedded: number;
   reused: number;
   via: string;
@@ -367,12 +447,13 @@ export const TRIGGER_WORDS: Record<string, string> = {
 export const RESULT_WORDS: Record<SyncRun["result"], string> = {
   done: "Done",
   problems: "Done with problems",
+  waiting: "Done, some waiting to retry",
   stopped: "Stopped",
 };
 
 /** A run that changed nothing: folded with its neighbours. */
 export function quietRun(r: SyncRun): boolean {
-  return r.result === "done" && !r.added && !r.updated && !r.removed && !r.failed && !r.skipped;
+  return r.result === "done" && !r.added && !r.updated && !r.removed && !r.failed && !r.skipped && !r.waiting;
 }
 
 /** Runs, with each stretch of runs that changed nothing folded into one row. */
@@ -395,4 +476,27 @@ export function tookWords(secs: number): string {
   if (secs < 60) return `${Math.max(0, Math.round(secs))} s`;
   const m = Math.round(secs / 60);
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
+}
+
+/** A run's problem items grouped by kind and reason, most first, each with a few examples. */
+export interface ProblemGroup {
+  kind: RunProblem["kind"];
+  reason: string;
+  count: number;
+  examples: RunProblem[];
+}
+
+export function problemGroups(r: Pick<SyncRun, "problems" | "reasons">): ProblemGroup[] {
+  const groups = new Map<string, ProblemGroup>();
+  const key = (kind: string, reason: string) => `${kind}|${reason}`;
+  const reasonOf = (p: RunProblem) => p.reason || (p.kind === "waiting" ? "unavailable" : p.kind === "skipped" ? "" : "failed");
+  for (const c of r.reasons ?? []) groups.set(key(c.kind, c.reason), { kind: c.kind, reason: c.reason, count: c.count, examples: [] });
+  for (const p of r.problems) {
+    const k = key(p.kind, reasonOf(p));
+    const g = groups.get(k) ?? { kind: p.kind, reason: reasonOf(p), count: 0, examples: [] };
+    if (!r.reasons?.length) g.count += 1;
+    g.examples.push(p);
+    groups.set(k, g);
+  }
+  return [...groups.values()].sort((a, b) => b.count - a.count);
 }

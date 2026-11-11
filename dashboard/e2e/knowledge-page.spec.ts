@@ -241,7 +241,11 @@ test.describe("knowledge base page: sync history and reading pages again", () =>
     await big.getByTestId("history-open").click();
     const problems = history.getByTestId("history-problem");
     await expect(problems).toHaveCount(2);
-    await expect(problems.first()).toContainText("Upload a version with selectable text");
+    // Grouped by reason: each group says its fix once, its items under it.
+    await expect(history.getByTestId("history-group")).toHaveCount(2);
+    await expect(history.getByTestId("history-group").first()).toContainText("1 couldn't be read · Couldn't read");
+    await expect(history.getByTestId("history-group").first()).toContainText("Upload a version with selectable text");
+    await expect(problems.first()).toContainText("Legacy export (PDF)");
     await expect(problems.first().getByRole("link")).toHaveAttribute("href", /atlassian/);
     // One source at a time.
     await history.getByRole("button", { name: "Engineering wiki" }).click();

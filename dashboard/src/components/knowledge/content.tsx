@@ -14,23 +14,29 @@ import {
   itemsPage,
   kbPage,
   missingRoute,
+  nextTryWords,
+  reasonWords,
   type ItemGroup,
   type ItemState,
   type ItemsPage,
   type ItemsQuery,
   type PageItem,
   type PageSource,
+  type ReasonGroup,
 } from "@/lib/knowledge-page";
 import { SourceLogo } from "./logos";
 
 // Content: every page in the base as a tree (source, then space or folder,
 // then parent), with filters and a search box answered by the gateway one
 // page at a time. Each item says its state in words and links to the
-// original. Failed and skipped items can be read again.
+// original. Items that aren't searchable are summed up by reason first
+// ("165 rate limited by Sanity, retrying"), never as rows of the same
+// error. Waiting, failed and skipped items can be read again.
 
 const STATE_TONE: Record<ItemState, Tone> = {
   searchable: "success",
   working: "live",
+  waiting: "waiting",
   failed: "attention",
   skipped: "muted",
   cut_short: "waiting",
@@ -156,7 +162,7 @@ export function Content({ kbId, sources, files, canManage, version, wantStatus, 
 
   const states = top?.states ?? {};
   const allCount = Object.values(states).reduce((a, b) => a + (b ?? 0), 0);
-  const canRetry = canManage && !!onRetry && (status === "failed" || status === "skipped");
+  const canRetry = canManage && !!onRetry && (status === "failed" || status === "skipped" || status === "waiting");
   const retry = async () => {
     if (!onRetry || !picked.size) return;
     setRetrying(true);
@@ -191,7 +197,7 @@ export function Content({ kbId, sources, files, canManage, version, wantStatus, 
 
   const chip = (on: boolean) =>
     `inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors motion-reduce:transition-none ${focusRing} ${on ? "border-zinc-500 bg-zinc-800 text-zinc-100" : "border-zinc-800 text-zinc-400 hover:text-zinc-200"}`;
-  const stateKeys: ItemState[] = ["searchable", "working", "failed", "skipped", "cut_short"];
+  const stateKeys: ItemState[] = ["searchable", "working", "waiting", "failed", "skipped", "cut_short"];
   return (
     <div className="min-w-0" data-testid="content">
       <div className="flex min-w-0 flex-col gap-3">
@@ -257,6 +263,19 @@ export function Content({ kbId, sources, files, canManage, version, wantStatus, 
         <p className="mt-4 text-sm text-orange-300" role="alert">
           {error}
         </p>
+      )}
+
+      {!!top?.reasons?.length && (
+        <Reasons
+          reasons={top.reasons}
+          sourceById={sourceById}
+          many={sources.length > 1}
+          active={{ source, status }}
+          onShow={(src, st) => {
+            setSource(src === "upload" || sources.length > 1 ? src : "");
+            setStatus(st);
+          }}
+        />
       )}
 
       {canRetry && (
@@ -394,7 +413,12 @@ function GroupRow({
           <path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         <span className="min-w-0 flex-1 truncate text-sm text-zinc-200">{g.top || "Top level"}</span>
-        {g.failed > 0 && <Chip tone="attention">{`${g.failed} couldn't read`}</Chip>}
+        {((g.waiting ?? 0) > 0 || g.failed > 0) && (
+          <span className="flex shrink-0 flex-wrap justify-end gap-1">
+            {(g.waiting ?? 0) > 0 && <Chip tone="waiting">{`${g.waiting} waiting`}</Chip>}
+            {g.failed > 0 && <Chip tone="attention">{`${g.failed} couldn't read`}</Chip>}
+          </span>
+        )}
         <span className="shrink-0 text-xs tabular-nums text-zinc-400">
           {g.items.toLocaleString()}
           <span className="hidden sm:inline">{g.newest ? ` · newest ${dayWords(g.newest)}` : ""}</span>
@@ -433,10 +457,11 @@ function ItemRow({
   ]
     .filter(Boolean)
     .join(" · ");
-  const why = state === "failed" ? f.error || "It couldn't be read." : state === "skipped" ? SKIP_WORDS[f.skipped ?? ""] ?? f.error ?? "Left out." : state === "cut_short" ? "Only the first passages are searchable; split the page to search the rest." : "";
+  const label = KIND_LABEL[kind] ?? "the app";
+  const why = state === "waiting" ? `${capital(reasonWords("waiting", f.reason ?? "", label))} · ${nextTryWords(f.retry_at)}` : state === "failed" ? f.error || "It couldn't be read." : state === "skipped" ? SKIP_WORDS[f.skipped ?? ""] ?? f.error ?? "Left out." : state === "cut_short" ? "Only the first passages are searchable; split the page to search the rest." : "";
   return (
     <div className="flex min-w-0 items-center gap-3 px-4 py-2.5 sm:pl-10" data-testid="item-row" data-status={f.status} data-state={state}>
-      {picking && (state === "failed" || state === "skipped") && f.source_id && (
+      {picking && (state === "failed" || state === "skipped" || state === "waiting") && f.source_id && (
         <input type="checkbox" className="h-4 w-4 shrink-0 accent-emerald-500" checked={picked} onChange={(e) => onPick(e.target.checked)} aria-label={`Pick ${f.name}`} data-testid="item-pick" />
       )}
       <div className="min-w-0 flex-1">
@@ -449,7 +474,11 @@ function ItemRow({
           <span className="block truncate text-sm text-zinc-100">{f.name}</span>
         )}
         {meta && <span className="block truncate text-xs text-zinc-400">{meta}</span>}
-        {why && <span className={`block text-xs [overflow-wrap:anywhere] ${state === "failed" ? "text-orange-300" : "text-zinc-400"}`}>{why}</span>}
+        {why && (
+          <span className={`block text-xs [overflow-wrap:anywhere] ${state === "failed" ? "text-orange-300" : state === "waiting" ? "text-amber-200/90" : "text-zinc-400"}`} title={state === "waiting" ? f.error : undefined} data-testid={state === "waiting" ? "item-retry" : undefined}>
+            {why}
+          </span>
+        )}
       </div>
       {state !== "searchable" && <Chip tone={STATE_TONE[state]}>{STATE_WORDS[state]}</Chip>}
       {canManage && kind === "upload" && (
@@ -464,5 +493,58 @@ function ItemRow({
         />
       )}
     </div>
+  );
+}
+
+function capital(s: string): string {
+  return s ? s[0].toUpperCase() + s.slice(1) : s;
+}
+
+const REASON_TONE: Record<ReasonGroup["state"], Tone> = { waiting: "waiting", failed: "attention", skipped: "muted" };
+
+/** The items that aren't searchable, one line per source and reason, each opening its items. */
+function Reasons({
+  reasons,
+  sourceById,
+  many,
+  active,
+  onShow,
+}: {
+  reasons: ReasonGroup[];
+  sourceById: Map<string, PageSource>;
+  many: boolean;
+  active: { source: string; status: ItemState | "" };
+  onShow: (source: string, state: ReasonGroup["state"]) => void;
+}) {
+  const shown = reasons.slice(0, 8);
+  return (
+    <section className="mt-4 min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2.5" aria-label="Not searchable yet" data-testid="reasons">
+      <h3 className="text-xs font-medium text-zinc-400">Not searchable yet</h3>
+      <ul className="mt-1.5 space-y-1.5">
+        {shown.map((r) => {
+          const src = sourceById.get(r.source);
+          const label = src ? KIND_LABEL[src.kind] : "the app";
+          const on = active.status === r.state && (!many || active.source === r.source);
+          return (
+            <li key={`${r.source}|${r.state}|${r.reason}`} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm" data-testid="reason" data-state={r.state} data-reason={r.reason}>
+              <span className="inline-flex min-w-0 flex-1 basis-56 items-baseline gap-2">
+                <span className="shrink-0 tabular-nums">
+                  <Chip tone={REASON_TONE[r.state]}>{r.items.toLocaleString()}</Chip>
+                </span>
+                <span className="min-w-0 text-zinc-200 [overflow-wrap:anywhere]">
+                  {reasonWords(r.state, r.reason, label)}
+                  {r.state === "waiting" && <span className="text-zinc-400"> · {nextTryWords(r.next_try_at)}</span>}
+                  {many && src && <span className="text-zinc-500"> · {src.name}</span>}
+                </span>
+              </span>
+              <button type="button" aria-pressed={on} className={`shrink-0 rounded text-xs text-zinc-400 underline underline-offset-4 hover:text-zinc-100 ${focusRing}`} onClick={() => onShow(r.source, r.state)} data-testid="reason-show">
+                {on ? "Shown below" : "Show them"}
+              </button>
+            </li>
+          );
+        })}
+        {reasons.length > shown.length && <li className="text-xs text-zinc-400">{`And ${reasons.length - shown.length} more reasons`}</li>}
+      </ul>
+    </section>
   );
 }
