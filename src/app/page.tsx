@@ -52,7 +52,7 @@ export default function Home() {
           </div>
           <p className="mt-4 text-sm text-text-muted">{SITE.ctaNote}</p>
           <nav aria-label="The life of a ticket" className="mt-14 sm:mt-20">
-            <ol className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-4 lg:grid-cols-8">
+            <ol className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-5">
               {steps.map((st, i) => (
                 <li key={st.id} className="bg-surface">
                   <a href={`#${st.id}`} className="group flex h-full flex-col gap-1.5 p-3.5 transition-colors hover:bg-surface-raised sm:p-4">

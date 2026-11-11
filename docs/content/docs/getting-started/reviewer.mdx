@@ -47,7 +47,7 @@ When the review is done, the check ends as neutral if the review has findings, a
 | `@coderhelm <question>` | Answers a question about the change, in the thread. |
 | `@coderhelm stop auto-merge` | Stops an automatic merge. The stop holds until someone resumes it. |
 | `@coderhelm resume auto-merge` | Re-arms auto-merge; every check is evaluated again from the start. |
-| `@coderhelm keep open` | Keeps the pull request open: it is never marked stale or closed as stale. From its author or anyone with write access. |
+| `@coderhelm keep open` | Keeps the pull request open: it is never marked stale or closed as stale. From its author or anyone with write access. See [Stale pull requests](/getting-started/stale-pull-requests). |
 
 ## Settings
 
@@ -60,7 +60,7 @@ When the review is done, the check ends as neutral if the review has findings, a
 | Tags and health check | Tag after merge, tag style and prefix, batch window, health check after merge |
 | Release notes | Where notes are written: GitHub, a Confluence page, a webhook; a writing guide |
 | Review reminders | Remind people in Slack or Teams |
-| Stale pull requests | For every repository, or one repository's own: on or off, dry run, days before it is marked and closed, the stale label, labels and authors never marked, drafts, which pull requests, deleting the branch, closes per hour, the two messages |
+| Stale pull requests | Opened from the **Stale pull requests** button at the top of the page. See [Stale pull requests](/getting-started/stale-pull-requests) |
 
 ## Auto-merge is careful
 
@@ -72,34 +72,15 @@ When someone disagrees with a review (replies under a comment, dismisses the rev
 
 ## Stale pull requests
 
-Off by default. When a team turns it on, CoderHelm looks at the open pull requests of every repository the reviewer is on for, about once an hour:
+Off by default. Turned on, CoderHelm marks a pull request stale after 21 days with no activity from a person, warns on it, and closes it 7 days later if nothing happened, with a comment that says how to reopen. Its own comments and other bots never count as activity, exempt labels and drafts are never touched, it starts as a dry run, and the branch is kept. Open it from the **Stale pull requests** button at the top of **Reviewer settings**.
 
-1. After **21 days** with no activity from a person, it adds the `stale` label and posts a warning that says how to keep the pull request open.
-2. If nothing happens in the next **7 days**, it closes the pull request with a comment that says how to reopen it. The branch is kept.
-
-Both numbers, the label and both messages can be changed, for every repository under **Reviewer settings**, then **Stale pull requests**, or for one repository with its own settings.
-
-**What counts as activity:** a commit (CoderHelm's too), a force push, and a person's comment, review, review comment, label change, review request or draft change. CoderHelm's own warning, its label and every other bot's comments never count, so a warning never keeps a pull request alive by itself. CI runs and pushes to the base branch don't count either.
-
-**Keeping one open:** push a commit, comment, remove the stale label, or comment `@coderhelm keep open`. Any activity after the warning takes the label off on its own. In the dashboard, **Keep open** on a pull request does the same, and **Allow closing** undoes it.
-
-**Never marked or closed:**
-
-- pull requests with an exempt label (`keep-open`, `pinned`, `security` and `do-not-close` by default)
-- drafts (unless you turn that off), and pull requests by authors you list, people or bots
-- with **Only CoderHelm's own** chosen, every pull request CoderHelm didn't open
-- a pull request a CoderHelm run is working on, one CoderHelm will check again on its own (a draft waiting for checks), or one auto-merge is waiting to merge
-
-**Safe by default:**
-
-- It starts as a dry run: the dashboard lists what would be marked and closed, and nothing changes on GitHub until you turn the dry run off. **Check now** works the list out again at any time.
-- Branches are kept. If you turn on **Delete the branch when closing**, it still never deletes a fork's branch, the default branch, or a branch another pull request is based on; GitHub's **Restore branch** brings a deleted one back.
-- At most 10 pull requests are closed per repository each hour (you can change it), writes go one at a time, and it stops for GitHub's rate limit and carries on later.
-- Every pull request marked, closed, un-staled or kept open is listed in the dashboard with the reason.
-- When it closes a pull request CoderHelm opened, the run behind it is closed too, with the reason on the run page.
-
-It uses the GitHub App permissions CoderHelm already has: **Pull requests: write** to close, **Issues: write** for the label and comments, and **Contents: write** only to delete a branch when you turn that on.
+How it decides, every setting, the dry run and how to keep one open: [Stale pull requests](/getting-started/stale-pull-requests).
 
 ## Release notes
 
 With release notes on, every release tag gets notes written from the merged pull requests, published to GitHub and, if you set them up, Confluence and email. They are listed on the **Releases** page.
+
+## Related
+
+- [Stale pull requests](/getting-started/stale-pull-requests): close the pull requests nobody is working on, with a warning first.
+- [Security fixes](/getting-started/security-fixes): fix pull requests for the advisories your code actually reaches, reviewed like any other pull request.
