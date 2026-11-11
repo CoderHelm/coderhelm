@@ -590,3 +590,29 @@ test("Insights hides the Deliveries card from anyone who can't open Deliveries",
   await expect(page.getByTestId("tile-merged")).toBeVisible();
   await expect(page.getByTestId("insights-deliveries")).toHaveCount(0);
 });
+
+test("infrastructure security shows its counts when the server has them", async ({ page }) => {
+  await mockApi(page);
+  await page.route((url) => url.pathname === "/api/security/infrastructure/insights", (r) =>
+    r.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ open: 3, by_tier: { P0: 0, P1: 1, P2: 2, P3: 0 }, opened_30d: 7, fixed_30d: 4, median_days_to_fix: 3.5, prs_opened_30d: 3, runbooks_open: 1, aws_managed: 2 }),
+    }),
+  );
+  await page.goto("/analytics?tab=security");
+  const block = page.getByTestId("analytics-infra-security");
+  await expect(block.getByTestId("infra-open")).toContainText("P0 0, P1 1, P2 2, P3 0");
+  await expect(block.getByTestId("infra-fixed")).toContainText("7 opened");
+  await expect(block.getByTestId("infra-time-to-fix")).toContainText("3.5 d");
+  await expect(block.getByTestId("infra-work")).toContainText("2 AWS-managed, not counted");
+  await expect(page.getByRole("link", { name: "See the findings" })).toHaveAttribute("href", /^\/security\/infrastructure\/?$/);
+  const dir = process.env.E2E_SHOTS_DIR;
+  if (dir) {
+    for (const width of [1280, 400]) {
+      await page.setViewportSize({ width, height: 900 });
+      await block.scrollIntoViewIfNeeded();
+      await block.screenshot({ path: path.join(dir, `analytics-infra-security-${width}.png`) });
+    }
+  }
+});

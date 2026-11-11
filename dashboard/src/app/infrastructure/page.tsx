@@ -4,7 +4,9 @@ import { Time } from "@/components/list/time";
 import { useCan } from "@/hooks/use-can";
 import { CodeBlock } from "@/components/code-block";
 import Link from "next/link";
-import { useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
+import { InfraViews, LiveResources } from "./live-resources";
 import { api, type InfraAnalysis, type InfraFinding, type Repo } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { StatusPill } from "@/components/status-pill";
@@ -261,7 +263,7 @@ function parseInfraError(raw: string | undefined): { message: string; hint: stri
 const POLL_TIMEOUT_MS = 2 * 60 * 1000;
 const RETRY_SHOW_MS = 30 * 1000;
 
-export default function InfrastructurePage() {
+function InfraReview() {
   const [repos, setRepos] = useState<Repo[] | null>(null);
   // "" means every repository.
   const [selectedRepo, setSelectedRepo] = useState("");
@@ -346,7 +348,7 @@ export default function InfrastructurePage() {
     <Page>
       <PageHeader
         title="Infrastructure"
-        lead="Security, cost and reliability review of the code that sets up your cloud infrastructure."
+        lead="Security, cost and reliability review of the code that sets up your cloud infrastructure, and what runs in your AWS accounts."
         actions={canScan ? (
           <button
             type="button"
@@ -358,6 +360,8 @@ export default function InfrastructurePage() {
           </button>
         ) : undefined}
       />
+
+      <InfraViews value="review" />
 
       {repos && repos.length > 1 && (
         <div className="mt-6">
@@ -384,4 +388,17 @@ export default function InfrastructurePage() {
       )}
     </Page>
   );
+}
+
+export default function InfrastructurePage() {
+  return (
+    <Suspense fallback={<Page><PageHeader title="Infrastructure" /><div className="mt-6"><ListSkeleton rows={4} label="Loading" /></div></Page>}>
+      <InfrastructureView />
+    </Suspense>
+  );
+}
+
+/** The code review of the infrastructure repos, or what runs in AWS (`?view=running`). */
+function InfrastructureView() {
+  return useSearchParams().get("view") === "running" ? <LiveResources /> : <InfraReview />;
 }

@@ -1544,7 +1544,7 @@ export const api = {
     ),
   checkAwsAbilities: (account: string) =>
     request<AwsAbilityReply>(`/api/aws-connections/${encodeURIComponent(account)}/abilities/check`, { method: "POST" }),
-  setAwsAbilities: (account: string, body: { metrics?: boolean; airflow?: boolean; airflow_environments?: string[] }) =>
+  setAwsAbilities: (account: string, body: { metrics?: boolean; airflow?: boolean; airflow_environments?: string[]; infrastructure?: boolean }) =>
     request<AwsAbilityReply>(`/api/aws-connections/${encodeURIComponent(account)}/abilities`, {
       method: "PUT",
       body: JSON.stringify(body),
@@ -4179,6 +4179,8 @@ export interface AwsAccountAbilities {
   logs: AwsAbility;
   metrics: AwsAbility;
   airflow: AwsAbility & { found: string[]; skipped: string[]; environments: string[] };
+  /** Infrastructure vulnerabilities: an admin switched it on, and whether the role has the reads (null: not checked). */
+  infrastructure?: { available: boolean | null; on: boolean; missing: string[] };
   /** Abilities the role lacks that the add-on stack gives. */
   missing?: string[];
   update_url?: string | null;

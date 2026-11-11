@@ -71,6 +71,7 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: "security",
     pages: [
       { href: "/security", label: "Overview" },
+      { href: "/security/infrastructure", label: "Infrastructure" },
       { href: "/security/policy", label: "Policy" },
     ],
     countKey: "securityUrgent",

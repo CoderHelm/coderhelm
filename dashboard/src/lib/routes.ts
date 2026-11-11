@@ -65,6 +65,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/alerts/detail": { label: "Alert", parent: "/alerts", detail: true, description: "One alert: when it fired, what Coderhelm found and the fix it proposed." },
   "/security": { label: "Security", description: "Advisories that touch your dependencies, whether your code reaches the vulnerable part, and the fix for each one." },
   "/security/detail": { label: "Finding", parent: "/security", detail: true, description: "One security finding: the advisory, why Coderhelm thinks the repo is affected, the fix and its deadline." },
+  "/security/infrastructure": { label: "Infrastructure", parent: "/security", tab: "Infrastructure vulnerabilities", description: "What runs in your AWS accounts, checked against AWS's security bulletins: the fix PR, the step in AWS, or AWS-managed." },
   "/security/policy": { label: "Policy", parent: "/security", tab: "Security policy", description: "What Coderhelm does about advisories: which get a pull request and when, what is posted, the deadlines and labels." },
   "/health": { label: "System health", description: "Whether every part of this install is working: services, queues, integrations and checks." },
   "/memory": { label: "Memory", description: "What Coderhelm remembers about your team, code and conventions, and where it learned it." },
