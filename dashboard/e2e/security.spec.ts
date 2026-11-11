@@ -234,6 +234,12 @@ const INSIGHTS = {
   enabled: true,
 };
 
+interface Select {
+  all: true;
+  filters: { status: string; tier: string; repo: string; q: string };
+  except_ids: string[];
+}
+
 interface Db {
   role: string;
   overview: unknown;
@@ -244,8 +250,10 @@ interface Db {
   config: unknown;
   synced: boolean;
   dismissRefuse: string | null;
-  /** Plans by the request: the panel asks again when a row is removed. */
-  planFor?: (ids: string[], combine: string) => unknown;
+  /** Plans by the request: the panel asks again when a row is removed. `select`: the filter form. */
+  planFor?: (ids: string[], combine: string, select?: Select) => unknown;
+  /** The plan answers this error (400) instead. */
+  planError?: string | null;
   slowFix?: boolean;
   calls: { call: string; url: string; body: unknown }[];
 }
@@ -285,18 +293,20 @@ async function mockApi(page: Page, init: Partial<Db> = {}): Promise<Db> {
     if (p === "/api/repos") return json(route, { repos: [{ name: "acme/web-app" }, { name: "acme/api" }] });
     if (p === "/api/security/overview") return json(route, db.overview);
     if (p === "/api/security/findings" && method === "GET") return json(route, db.findings);
-    if (p === "/api/security/groups") return json(route, db.groups);
+    if (p === "/api/security/groups") return json(route, typeof db.groups === "function" ? db.groups(url) : db.groups);
     if (p === "/api/security/insights") return json(route, INSIGHTS);
     if (p === "/api/security/fix/plan") {
-      const b = body as { finding_ids: string[]; combine: string };
-      return json(route, db.planFor ? db.planFor(b.finding_ids, b.combine) : db.plan);
+      if (db.planError) return json(route, { error: db.planError }, 400);
+      const b = body as { finding_ids?: string[]; select?: Select; combine: string };
+      return json(route, db.planFor ? db.planFor(b.finding_ids ?? [], b.combine, b.select) : db.plan);
     }
     if (p === "/api/security/fix") {
       if (db.role !== "admin") return json(route, { error: "Forbidden" }, 403);
-      const ids = (body as { finding_ids: string[]; raise_limit: boolean }).finding_ids;
-      const raise = (body as { raise_limit: boolean }).raise_limit;
-      const plan = (db.planFor ? db.planFor(ids, (body as { combine: string }).combine) : db.plan) as typeof PLAN;
-      const units = plan.units.filter((u) => u.finding_ids.some((id) => ids.includes(id)));
+      const b = body as { finding_ids?: string[]; select?: Select; raise_limit: boolean; combine: string };
+      const ids = b.finding_ids ?? [];
+      const raise = b.raise_limit;
+      const plan = (db.planFor ? db.planFor(ids, b.combine, b.select) : db.plan) as typeof PLAN;
+      const units = b.select ? plan.units : plan.units.filter((u) => u.finding_ids.some((id) => ids.includes(id)));
       const room = raise ? units.length : Math.max(0, 3 - plan.runs_today);
       if (db.slowFix) await new Promise((r) => setTimeout(r, 400));
       return json(route, {
@@ -336,6 +346,87 @@ async function mockApi(page: Page, init: Partial<Db> = {}): Promise<Db> {
 }
 
 const call = (db: Db, c: string) => db.calls.filter((x) => x.call === c);
+
+// Screenshots for a person to look at: SECURITY_SHOTS=<dir> writes them.
+const SHOTS = process.env.SECURITY_SHOTS;
+async function shot(page: Page, name: string) {
+  if (!SHOTS) return;
+  // The bar at the top of the view (below the page's top bar), as a person who just used it sees it.
+  await page.getByTestId("bulk-bar").evaluate((e) => e.scrollIntoView({ block: "start" }));
+  await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: false });
+}
+
+/** The bar and every message in it sit in the page's flow: none of it covers a row, and nothing scrolls sideways. */
+async function expectClearOfRows(page: Page) {
+  const r = await page.evaluate(() => {
+    const bar = document.querySelector('[data-testid="bulk-bar"]')!.getBoundingClientRect();
+    const rows = [...document.querySelectorAll<HTMLElement>('[data-testid="finding-row"], [data-testid="finding-card"]')]
+      .map((e) => e.getBoundingClientRect())
+      .filter((b) => b.width > 0 && b.height > 0);
+    const hits = rows.filter((b) => b.left < bar.right && bar.left < b.right && b.top < bar.bottom && bar.top < b.bottom).length;
+    const doc = document.documentElement;
+    return { hits, rows: rows.length, barBottom: bar.bottom, firstRowTop: rows[0]?.top ?? Infinity, sideways: doc.scrollWidth - doc.clientWidth };
+  });
+  expect(r.rows).toBeGreaterThan(0);
+  expect(r.hits).toBe(0);
+  expect(r.barBottom).toBeLessThanOrEqual(r.firstRowTop);
+  expect(r.sideways).toBeLessThanOrEqual(0);
+}
+
+// A long list for "select all": fixes in three repos, 50 a page, as the server pages them.
+const REPOS3 = ["acme/web-app", "acme/api", "acme/docs"];
+function manyGroups(n: number, idsEach = 1) {
+  return Array.from({ length: n }, (_, i) => {
+    const pkg = `pkg-${String(i).padStart(3, "0")}`;
+    const f = finding({
+      id: `f${i}`,
+      repo: REPOS3[i % 3],
+      package: pkg,
+      version: "1.0.0",
+      fixed_version: "1.0.1",
+      tier: "P2",
+      verdict: "unknown",
+      status: "open",
+      pr: null,
+      due_at: iso(20 * 24 + i),
+      advisory: { ...finding().advisory, ids: [`GHSA-${pkg}`], primary: `GHSA-${pkg}`, title: `${pkg} advisory`, kev: false, epss: 0.01 },
+    });
+    const ids = Array.from({ length: idsEach }, (_, k) => (k === 0 ? f.id : `${f.id}_${k}`));
+    return group(f, { finding_ids: ids });
+  });
+}
+function paged(all: ReturnType<typeof manyGroups>) {
+  return (url: URL) => {
+    const at = Number(url.searchParams.get("cursor") || 0);
+    const next = at + 50 < all.length ? String(at + 50) : null;
+    return { groups: all.slice(at, at + 50), total: all.length, fixable_total: all.length, next_cursor: next };
+  };
+}
+/** The server's plan for a long selection: one PR per repo; past today's runs the last repo waits for tomorrow. */
+function repoPlan(selected: number, note: string | null = null) {
+  return () => {
+    const units = REPOS3.map((r, i) =>
+      unit(r, `fix(deps): security updates for ${r.split("/")[1]} (${Math.ceil(selected / 3)} packages)`, [bump(`pkg-00${i}`, "1.0.0", "1.0.1", [`f${i}`])], {
+        starts_now: i < 2,
+        waits: i < 2 ? null : "Waiting: today's 3 fix runs are used. Next starts tomorrow.",
+      }),
+    );
+    return {
+      units,
+      skipped: [],
+      runs_today: 1,
+      runs_limit: 3,
+      pr_count: 3,
+      joins: 0,
+      starting_now: 2,
+      waiting: 1,
+      tokens_today: 310_000,
+      tokens_limit: 2_000_000,
+      estimated_tokens: 360_000,
+      selection: { by_filter: true, fixes: selected, findings: selected, matched: selected, left_fixes: 0, left_findings: 0, limit: 1000, note },
+    };
+  };
+}
 
 
 // A fix still being checked, in the same repo as tar: the mixed list.
@@ -866,11 +957,8 @@ test.describe("Security", () => {
     await rowOf(page, "ws").getByTestId("pick").click({ modifiers: ["Shift"] });
     await expect(summary).toContainText("3 fixes selected in 2 repos");
     await expect(rowOf(page, "undici").getByTestId("pick")).not.toBeChecked();
-    // The bar never covers the last row.
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    const last = await page.getByTestId("finding-row").last().boundingBox();
-    const barBox = await bar.boundingBox();
-    expect(last!.y + last!.height).toBeLessThanOrEqual(barBox!.y + 1);
+    // The bar sits in the flow above the list: it never covers a row.
+    await expectClearOfRows(page);
 
     // One repo: one PR, reviewed in the page.
     await page.keyboard.press("Escape");
@@ -936,6 +1024,152 @@ test.describe("Security", () => {
     await expect(page.getByTestId("fix-results")).toContainText("1 started");
     expect(call(db, "POST /api/security/fix/plan")[0].body).toEqual({ finding_ids: ["tar_3"], combine: "one_pr" });
     expect(call(db, "POST /api/security/fix")[0].body).toEqual({ finding_ids: ["tar_3"], raise_limit: false, combine: "one_pr" });
+  });
+
+  test("select all: the header box takes the page, then every fix that matches, sent as the list's filters; the plan says which repos wait", async ({ page }) => {
+    const all = manyGroups(350);
+    const db = await mockApi(page, { groups: paged(all), planFor: repoPlan(349) });
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/security?tier=P2");
+    await expect(page.getByTestId("finding-row")).toHaveCount(50);
+    const bar = page.getByTestId("bulk-bar");
+    const summary = bar.getByTestId("bulk-summary");
+    // A few rows: the count is in the bar.
+    await page.getByTestId("finding-row").nth(0).getByTestId("pick").click();
+    await page.getByTestId("finding-row").nth(1).getByTestId("pick").click();
+    await expect(summary).toHaveText(/^2 fixes selected in 2 repos: 2 pull requests/);
+    await expect(page.getByTestId("pick-all")).toHaveJSProperty("indeterminate", true);
+    await expect(bar.getByTestId("select-all-matching")).toHaveCount(0);
+    await expectClearOfRows(page);
+    await shot(page, "1280-selection-bar");
+    // The header box: every fix on the page, then Gmail's offer.
+    await page.getByTestId("pick-all").check();
+    await expect(summary).toHaveText(/^50 fixes selected in 3 repos: 3 pull requests · 50 advisories/);
+    const offer = bar.getByTestId("select-all-matching");
+    await expect(offer).toContainText("All 50 fixes on this page are selected.");
+    await expect(offer.getByRole("button", { name: "Select all 350 fixes that match" })).toBeVisible();
+    await expectClearOfRows(page);
+    await shot(page, "1280-select-page-offer");
+    await offer.getByRole("button", { name: "Select all 350 fixes that match" }).click();
+    await expect(summary).toHaveText("350 fixes selected: every fix that matches the filters · one pull request per repo");
+    await expect(offer).toContainText("All 350 fixes that match the filters are selected.");
+    await expect(bar.getByTestId("bulk-open")).toHaveText("Fix in one PR per repo");
+    await expectClearOfRows(page);
+    await shot(page, "1280-select-all-matching-bar");
+    // A row unticked by hand is an exception.
+    await page.getByTestId("finding-row").nth(4).getByTestId("pick").click();
+    await expect(summary).toHaveText("349 fixes selected: every fix that matches the filters, less 1 unticked · one pull request per repo");
+    await expect(offer).toHaveCount(0);
+    await page.getByTestId("finding-row").nth(4).getByTestId("pick").click();
+    await expect(summary).toHaveText(/^350 fixes selected/);
+    await page.getByTestId("finding-row").nth(4).getByTestId("pick").click();
+    await expectClearOfRows(page);
+    await bar.getByTestId("bulk-open").click();
+    const req = page.getByTestId("fix-request");
+    await expect(req.getByTestId("fix-unit")).toHaveCount(3);
+    expect(call(db, "POST /api/security/fix/plan").at(-1)?.body).toEqual({
+      select: { all: true, filters: { status: "open", tier: "P2", repo: "", q: "" }, except_ids: ["f4"] },
+      combine: "one_pr",
+    });
+    // One PR per repo; which start now and which wait for tomorrow, said plainly.
+    await expect(req.getByTestId("fix-heading")).toHaveText("3 pull requests");
+    expect(await req.getByTestId("fix-unit").evaluateAll((els) => els.map((e) => e.getAttribute("data-repo")))).toEqual(["acme/web-app", "acme/api", "acme/docs"]);
+    await expect(req.getByTestId("fix-when")).toHaveText(["Starts now", "Starts now", "Waits for tomorrow's limit"]);
+    await expect(req.getByTestId("fix-waits")).toHaveText("Waiting: today's 3 fix runs are used. Next starts tomorrow.");
+    await expect(req.getByTestId("fix-budget")).toContainText("Uses 2 of today's 3 fix runs (1 used so far)");
+    await expect(req.getByTestId("fix-budget")).toContainText("1 waits for tomorrow unless you raise today's limit.");
+    await expectClearOfRows(page);
+    await shot(page, "1280-plan");
+    await req.getByTestId("fix-confirm").click();
+    await expect(page.getByTestId("fix-results")).toContainText("2 started, 1 waiting");
+    expect(call(db, "POST /api/security/fix").at(-1)?.body).toEqual({
+      select: { all: true, filters: { status: "open", tier: "P2", repo: "", q: "" }, except_ids: ["f4"] },
+      raise_limit: false,
+      combine: "one_pr",
+    });
+    await page.getByRole("button", { name: "Done" }).click();
+    // Clear is one click.
+    await page.getByTestId("pick-all").check();
+    await bar.getByTestId("select-all-matching-button").click();
+    await bar.getByTestId("bulk-clear").click();
+    await expect(bar).toHaveCount(0);
+    await expect(page.getByTestId("pick-all")).not.toBeChecked();
+  });
+
+  test("picked rows past 200 finding ids are sent as the list's filters less every row not picked", async ({ page }) => {
+    // 120 fixes of 5 advisories: the first page alone is 250 ids.
+    const all = manyGroups(120, 5);
+    const db = await mockApi(page, { groups: paged(all), planFor: repoPlan(50) });
+    await page.goto("/security");
+    await page.getByTestId("pick-all").check();
+    await page.getByTestId("finding-row").nth(0).getByTestId("pick").click();
+    await expect(page.getByTestId("bulk-summary")).toHaveText(/^49 fixes selected/);
+    await page.getByTestId("bulk-open").click();
+    await expect(page.getByTestId("fix-unit")).toHaveCount(3);
+    // The pages not loaded were read, so their rows are excepted too.
+    expect(call(db, "GET /api/security/groups").map((c) => new URL(c.url, "http://x").searchParams.get("cursor"))).toEqual(expect.arrayContaining(["50", "100"]));
+    const body = call(db, "POST /api/security/fix/plan").at(-1)?.body as { select: Select; finding_ids?: string[] };
+    expect(body.finding_ids).toBeUndefined();
+    expect(body.select.filters).toEqual({ status: "open", tier: "", repo: "", q: "" });
+    const except = new Set(body.select.except_ids);
+    expect(except.size).toBe((120 - 49) * 5);
+    expect(except.has("f0") && except.has("f0_4") && except.has("f50") && except.has("f119_4")).toBe(true);
+    expect(except.has("f1")).toBe(false);
+  });
+
+  test("an error from the plan shows inside the bar, in the flow, never over a row; trying again works", async ({ page }) => {
+    const all = manyGroups(350);
+    const db = await mockApi(page, { groups: paged(all), planFor: repoPlan(350), planError: "finding_ids is at most 200 finding ids; to ask for more, send select with the list's filters" });
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/security");
+    await page.getByTestId("pick-all").check();
+    await page.getByTestId("select-all-matching-button").click();
+    await page.getByTestId("bulk-open").click();
+    const bar = page.getByTestId("bulk-bar");
+    const err = bar.getByTestId("fix-error");
+    await expect(err).toContainText("We couldn't work out the fix PRs");
+    await expect(err).toContainText("finding_ids is at most 200 finding ids");
+    await expect(err).toHaveAttribute("role", "alert");
+    expect(await err.evaluate((e) => getComputedStyle(e).position)).toBe("static");
+    await expectClearOfRows(page);
+    await shot(page, "1280-error");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByTestId("finding-card").first()).toBeVisible();
+    await expectClearOfRows(page);
+    await shot(page, "390-error");
+    db.planError = null;
+    await bar.getByRole("button", { name: "Try again" }).click();
+    await expect(bar.getByTestId("fix-unit")).toHaveCount(3);
+    await expect(bar.getByTestId("fix-error")).toHaveCount(0);
+  });
+
+  test("at 390 wide: select all on the page, every fix that matches, the plan; nothing covers a row or scrolls sideways", async ({ page }) => {
+    const all = manyGroups(350);
+    await mockApi(page, {
+      groups: paged(all),
+      planFor: repoPlan(350, "This request takes the first 1000 fixes (1000 findings), the most urgent first. The other 12 fixes (12 findings) are left for the next request: select every fix that matches again once these have started."),
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/security");
+    await expect(page.getByTestId("finding-card")).toHaveCount(50);
+    const bar = page.getByTestId("bulk-bar");
+    await page.getByTestId("finding-card").nth(0).getByTestId("pick").click();
+    await expect(bar.getByTestId("bulk-summary")).toHaveText(/^1 fix selected in web-app/);
+    await expectClearOfRows(page);
+    await shot(page, "390-selection-bar");
+    await page.getByTestId("pick-all-cards").check();
+    await expect(bar.getByTestId("select-all-matching")).toContainText("All 50 fixes on this page are selected.");
+    await expectClearOfRows(page);
+    await shot(page, "390-select-page-offer");
+    await bar.getByTestId("select-all-matching-button").click();
+    await expect(bar.getByTestId("bulk-summary")).toHaveText(/^350 fixes selected/);
+    await expectClearOfRows(page);
+    await shot(page, "390-select-all-matching-bar");
+    await bar.getByTestId("bulk-open").click();
+    await expect(bar.getByTestId("fix-unit")).toHaveCount(3);
+    await expect(bar.getByTestId("fix-selection-note")).toContainText("This request takes the first 1000 fixes");
+    await expectClearOfRows(page);
+    await shot(page, "390-plan");
   });
 
   test("a tier still being checked is a muted pill with a clock, never a question mark, and sorts below settled rows", async ({ page }) => {
