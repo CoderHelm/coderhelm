@@ -13,7 +13,7 @@ import { Callout } from "@/components/callout";
 import { InlineMarkdown, Markdown } from "@/components/markdown";
 import { buttonClass, dangerButton, focusRing, fullWidthOnPhone, primaryButton, secondaryButton } from "@/components/ui";
 import { Page, PageHeader, SectionHeading } from "@/components/page";
-import { RunStatusBadge, runCanClose, runCloseIsLikely, runIsLive, runStatusLabel } from "@/components/run-status";
+import { RunStatusBadge, runCanClose, runCloseIsLikely, runHeldOn, runIsLive, runStatusLabel } from "@/components/run-status";
 import { CloseRunDialog } from "@/components/close-run-dialog";
 import { Chip, Time, formatDuration as sharedDuration, formatMs } from "@/components/list";
 import { usePaletteActions, type PageAction } from "@/components/command-palette";
@@ -1050,6 +1050,7 @@ function RunDetailInner() {
             status={run.status}
             draftHold={hold?.kind}
             waitingOn={!run.questions?.length && !!run.waiting_on?.action}
+            heldOn={run.status === "needs_input" || hold ? runHeldOn([...(hold?.reasons ?? []).map((r) => r.what), run.status === "needs_input" ? run.waiting_on?.detail : null]) : null}
             unfinishedRound={!!run.round_incomplete && ["completed", "success"].includes(run.status)}
           />
         }

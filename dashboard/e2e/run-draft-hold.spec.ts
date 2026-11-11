@@ -150,6 +150,43 @@ test("a held run that also asked something shows its questions, not only the hol
   await expect(outcome.getByTestId("run-question")).toContainText("Should the limit apply to signed-in people too?");
 });
 
+test("a run whose pull request's CI fails reads CI failing, with the check and the error, never Done", async ({ page }) => {
+  const ci = {
+    what: "CI is failing on this head: `Deploy Preview`",
+    todo: "Fix the failing checks on this branch (Coderhelm decides again on the push), or re-run them if the failure isn't the change's; the pull request leaves draft once CI is green.",
+  };
+  await mockApi(page, run({
+    waiting_on: {
+      action: "Review pull request #318",
+      detail: "CI is failing: Deploy Preview: Error: expect(received).toBeLessThanOrEqual(expected). Coderhelm made 3 fix attempt(s) without getting it green. The pull request stays a draft until CI passes",
+      url: "https://github.com/your-team/web/pull/318",
+      since: iso(5),
+    },
+    draft_hold: { kind: "held", summary: `Finished, but pull request #318 stays a draft: ${ci.what}.`, reasons: [ci], pr_number: 318, since: iso(5) },
+  }));
+  await page.goto("/runs/detail?id=01RUNHOLD");
+  await expect(page.getByTestId("page-header").getByText("CI failing", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("page-header").getByText("Done", { exact: true })).toHaveCount(0);
+  await expect(page.getByTestId("draft-hold-reasons")).toContainText("CI is failing on this head: Deploy Preview");
+  await expect(page.getByTestId("run-outcome")).toHaveAttribute("data-tone", "waiting");
+  await noSideways(page);
+  await shot(page, "run-ci-failing");
+});
+
+test("a run stopped with planned work left reads Stopped, not finished", async ({ page }) => {
+  await mockApi(page, run({
+    waiting_on: {
+      action: "Review pull request #318",
+      detail: "Stopped: steps 2 and 3 made no progress. The branch stayed at a8c8814 and the run was stuck at the implement work (planned tasks) while working on task 8 of 8.",
+      url: "https://github.com/your-team/web/pull/318",
+      since: iso(5),
+    },
+    draft_hold: null,
+  }));
+  await page.goto("/runs/detail?id=01RUNHOLD");
+  await expect(page.getByTestId("page-header").getByText("Stopped, not finished", { exact: true })).toBeVisible();
+});
+
 test("a run with no hold still reads as before", async ({ page }) => {
   await mockApi(page, run({ status: "completed", waiting_on: null, draft_hold: null }));
   await page.goto("/runs/detail?id=01RUNHOLD");
