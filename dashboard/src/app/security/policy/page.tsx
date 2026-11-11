@@ -246,8 +246,8 @@ export default function SecurityPolicyPage() {
                 )}
               />
               <SettingsRow
-                label="Take over Dependabot and Renovate pull requests"
-                help="When one already exists for the fix, Coderhelm adds its findings and fixes its CI instead of opening a second one."
+                label="Adopt Dependabot and Renovate pull requests"
+                help="When one already exists for the fix, Coderhelm adopts it instead of opening a duplicate."
                 unsaved={form.isDirty("adopt_bot_prs")}
                 layout="toggle"
                 control={({ labelId, helpId, inputId }) => (

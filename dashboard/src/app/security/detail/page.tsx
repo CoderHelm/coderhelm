@@ -280,13 +280,13 @@ function FixBlock({ f }: { f: Finding }) {
           the repo&apos;s own package manager to update the lockfile.
         </p>
       ) : (
-        <p className="text-zinc-200">No fixed version is out yet. Coderhelm looks for another way (a newer major, a patch, or a replacement) and checks again when the advisory gets a fix.</p>
+        <p className="text-zinc-200">No fixed version is out yet. Coderhelm checks again when the advisory gets one.</p>
       )}
       {f.pr ? (
         <p className="text-zinc-300">
           <OutLink href={f.pr.url}>Pull request #{f.pr.number}</OutLink>{" "}
           {f.pr.state === "merged" ? "is merged." : f.pr.state === "closed" ? "was closed without merging." : ci ? `is open; ${ci}.` : "is open."}
-          {f.pr.adopted && " Coderhelm took over the pull request Dependabot or Renovate had opened, instead of opening a second one."}
+          {f.pr.adopted && " Coderhelm adopted the pull request Dependabot or Renovate had opened, instead of opening a duplicate."}
         </p>
       ) : (
         isActive(f) && <p className="text-zinc-400">No pull request yet. The policy decides when this tier gets one.</p>
