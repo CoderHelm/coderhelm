@@ -27,6 +27,11 @@ jobs:
       - name: Dashboard UI lint
         run: node dashboard/scripts/ui-lint.mjs
       - run: npm run build
+      # The site's own browser tests (e2e/), against the static build above.
+      - name: Install Playwright's Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
+      - name: Site end-to-end tests
+        run: npm run test:e2e
 
   # One build, its end-to-end tests split across 4 machines, and "Dashboard"
   # (the required check) passing only when the build and every part did.
