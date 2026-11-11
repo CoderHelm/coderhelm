@@ -23,6 +23,7 @@ async function mockApi(page: Page) {
     if (p === "/api/banners") return json(route, { banners: [] });
     // Security is off: no count beside it in the sidebar.
     if (p === "/api/security/overview") return json(route, { enabled: false, dry_run: true, counts: { open: 0, p0: 0, p1: 0 } });
+    if (p === "/api/setup") return json(route, { repos: [], new_recommendations: [], auto_setup_new_repos: false });
     if (p === "/api/support/badge") return json(route, { waiting: 1, queue_open: 2 });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }] });
     if (p === "/api/admin/beta-signups") return json(route, { signups: [], counts: { new: 0, invited: 0, joined: 0, total: 0 } });

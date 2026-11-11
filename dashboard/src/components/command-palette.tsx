@@ -129,6 +129,7 @@ function actionsFor(who: PaletteUser): (Entry & { need?: string })[] {
     { id: "act:new-tool", group: "actions", label: "Write a tool", sub: "A named lookup Coderhelm can call", href: "/data-sources/tools/new", need: "data_sources", keywords: ["lookup", "query"] },
     { id: "act:invite", group: "actions", label: "Invite a teammate", sub: "Team", href: "/settings/team", need: "people", keywords: ["member", "add person", "user"] },
     { id: "act:skills-repo", group: "actions", label: "Connect a skills repository", sub: "Skills", href: "/skills", need: "data_sources", keywords: ["skill", "agent", "command"] },
+    { id: "act:setup", group: "actions", label: "Set up repos", sub: "Setup: recommended settings for each repo", href: "/setup/run", need: "setup", keywords: ["setup", "onboard", "recommended", "configure", "wizard", "new repo"] },
     { id: "act:reviewer-config", group: "actions", label: "Configure the reviewer", sub: "Reviewer settings", href: "/reviewer/config", need: ANY_CHANGE, keywords: ["label", "auto-merge", "release notes"] },
     // The href is filled in when the palette opens, with the page it opened on.
     { id: "act:get-help", group: "actions", label: "Get help…", sub: "Open a support ticket about this page", href: "/support?new=1", keywords: ["support", "ticket", "help", "contact", "broken", "bug"] },

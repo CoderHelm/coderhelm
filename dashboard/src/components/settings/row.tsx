@@ -17,12 +17,21 @@ export interface SettingsRowIds {
 
 /**
  * The marks after a setting's name. "Unsaved" beats "Not default": what the
- * person just did matters most.
+ * person just did matters most. "Recommended" and "Custom" are Setup's
+ * opinion (components/setup-marks.tsx): the value it recommends, or one
+ * someone changed by hand after Setup applied it.
  */
-export function RowMarks({ unsaved, notDefault, recommended }: { unsaved?: boolean; notDefault?: boolean; recommended?: boolean }) {
+export function RowMarks({ unsaved, notDefault, recommended, custom }: { unsaved?: boolean; notDefault?: boolean; recommended?: boolean; custom?: boolean }) {
   return (
     <>
       {recommended && <Chip tone="neutral">Recommended</Chip>}
+      {custom && (
+        <span data-testid="mark-custom" className="inline-flex">
+          <Chip tone="info" title="Changed by hand after Setup applied it. Setup leaves it alone unless you choose to replace it.">
+            Custom
+          </Chip>
+        </span>
+      )}
       {unsaved ? (
         <Chip tone="waiting">Unsaved</Chip>
       ) : notDefault ? (
@@ -81,6 +90,8 @@ export interface SettingsRowProps {
   notDefault?: boolean;
   /** Shows a "Recommended" chip. */
   recommended?: boolean;
+  /** Setup's mark for this setting (useSetupMarks): "Recommended" or "Custom". */
+  setup?: "recommended" | "custom" | null;
   /** Any other marks after the name. */
   marks?: ReactNode;
   /** The setting's own options, indented under it (show them only while it is on). */
@@ -103,6 +114,7 @@ export function SettingsRow({
   unsaved,
   notDefault,
   recommended,
+  setup,
   marks,
   children,
   testId,
@@ -124,7 +136,7 @@ export function SettingsRow({
         <div className={`min-w-0 flex-1 ${toggle || stacked ? "" : "sm:basis-60"}`}>
           <div className="flex flex-wrap items-center gap-2">
             <label id={ids.labelId} htmlFor={ids.inputId} className="text-sm font-medium text-zinc-100">{label}</label>
-            <RowMarks unsaved={unsaved} notDefault={notDefault} recommended={recommended} />
+            <RowMarks unsaved={unsaved} notDefault={notDefault} recommended={recommended || setup === "recommended"} custom={setup === "custom"} />
             {marks}
           </div>
           {help && <p id={ids.helpId} className="mt-0.5 max-w-prose text-sm text-zinc-400">{help}</p>}

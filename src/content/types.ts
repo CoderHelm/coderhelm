@@ -18,7 +18,8 @@ export type FrameId =
   | "reply"
   | "merge"
   | "secfix"
-  | "stale";
+  | "stale"
+  | "setup";
 
 // Screenshots of the dashboard in public/shots/, taken from its end to end
 // tests' made up data (see src/content/shots.ts).

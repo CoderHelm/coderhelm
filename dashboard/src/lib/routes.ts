@@ -30,6 +30,9 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/": { label: "Runs", description: "Every run Coderhelm is working on or has finished: tickets and issues turned into pull requests, with their status." },
   "/runs/detail": { label: "Run", parent: "/", detail: true, description: "One run, step by step: from the ticket to the plan, the code, the tests and the pull request." },
 
+  "/setup": { label: "Setup", description: "Recommended settings for every repo: what Coderhelm found in each one, what it recommends and why, and the runs that applied them." },
+  "/setup/run": { label: "Run", parent: "/setup", detail: true, tab: "Setup run", description: "One Setup run: pick repos, see what Coderhelm found, review each recommendation next to the current value, then apply or undo." },
+
   "/reviewer": { label: "Reviewer", description: "Pull requests Coderhelm reviewed: findings, verdicts and what holds each merge." },
   "/reviewer/detail": { label: "Review", parent: "/reviewer", detail: true, description: "One review: its findings on the pull request, each with the code it points at." },
   "/reviewer/pr": { label: "Pull request", parent: "/reviewer", detail: true, description: "One pull request's reviews over time, and whether its merge check passes." },

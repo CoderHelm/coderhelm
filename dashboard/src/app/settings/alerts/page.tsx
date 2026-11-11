@@ -52,6 +52,7 @@ import {
   type ChannelsDraft,
 } from "@/components/chat-channels";
 import { buttonClass, focusRing, inputClass, linkButton, monoInputClass, primaryButton, secondaryButton } from "@/components/ui";
+import { ReviewInSetup, useSetupMarks } from "@/components/setup-marks";
 
 export default function AlertsPageGuarded() {
   return (
@@ -328,6 +329,7 @@ function AlertsPage() {
           </>
         }
       />
+      <SetupLink />
 
       {!canEdit && load.state === "ready" && (
         <div className="mt-6">
@@ -1700,4 +1702,10 @@ function RouteEditor({
       </form>
     </div>
   );
+}
+
+/** Setup recommends alert settings; the way back to it. */
+function SetupLink() {
+  const { available } = useSetupMarks(null);
+  return <ReviewInSetup available={available} />;
 }

@@ -44,6 +44,7 @@ const BUILT_IN_MIN: Record<string, "viewer" | "member" | "admin" | "owner"> = {
   delete_plans: "admin",
   repos: "admin",
   agent_settings: "admin",
+  setup: "admin",
   memory: "admin",
   learning: "admin",
   "agents.permissions": "admin",

@@ -26,6 +26,9 @@ export const BellIcon = () => <svg {...s}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9
 export const DollarIcon = () => <svg {...s}><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>;
 export const TargetIcon = () => <svg {...s}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg>;
 
+/** Three sliders: Setup, the recommended settings for each repo. */
+export const SlidersIcon = () => <svg {...s}><path d="M4 6h9" /><path d="M17 6h3" /><circle cx="15" cy="6" r="2" /><path d="M4 12h3" /><path d="M11 12h9" /><circle cx="9" cy="12" r="2" /><path d="M4 18h11" /><path d="M19 18h1" /><circle cx="17" cy="18" r="2" /></svg>;
+
 // Security section icons
 export const ShieldCheckIcon = () => <svg {...s}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" /></svg>;
 export const LockIcon = () => <svg {...s}><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>;

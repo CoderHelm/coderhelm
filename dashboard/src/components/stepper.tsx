@@ -9,12 +9,23 @@ export interface Step {
  * Vertical list of steps. On a phone it is one line, "Step 2 of 5 · Where
  * your API is", over a thin progress bar, instead of a ragged wrapped row.
  */
-export function Stepper({ steps, current, label = "Steps" }: { steps: Step[]; current: string; label?: string }) {
+export function Stepper({
+  steps,
+  current,
+  label = "Steps",
+  wideFrom = "md",
+}: {
+  steps: Step[];
+  current: string;
+  label?: string;
+  /** Where the full list replaces the one-line view: "lg" for a page whose steps sit in a side column from `lg:` up. */
+  wideFrom?: "md" | "lg";
+}) {
   const at = steps.findIndex((s) => s.id === current);
   const shownAt = Math.max(0, at);
   return (
     <>
-    <div className="md:hidden" data-testid="stepper-compact">
+    <div className={wideFrom === "lg" ? "lg:hidden" : "md:hidden"} data-testid="stepper-compact">
       <p className="text-sm text-zinc-300">
         <span className="font-semibold text-zinc-100">
           Step {shownAt + 1} of {steps.length}
@@ -25,7 +36,7 @@ export function Stepper({ steps, current, label = "Steps" }: { steps: Step[]; cu
         <div className="h-full rounded-full bg-zinc-200" style={{ width: `${((shownAt + 1) / Math.max(1, steps.length)) * 100}%` }} />
       </div>
     </div>
-    <ol aria-label={label} className="hidden flex-col gap-3 md:flex">
+    <ol aria-label={label} className={`hidden flex-col gap-3 ${wideFrom === "lg" ? "lg:flex" : "md:flex"}`}>
       {steps.map((step, i) => {
         const state = i < at ? "done" : i === at ? "current" : "upcoming";
         return (

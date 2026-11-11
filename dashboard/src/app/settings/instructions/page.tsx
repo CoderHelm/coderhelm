@@ -14,6 +14,7 @@ import { MarkdownEditor } from "@/components/markdown-editor";
 import { Markdown } from "@/components/markdown";
 import { ScopeBar } from "../scope-bar";
 import { useScopedText } from "../use-scoped-text";
+import { ReviewInSetup, useSetupMarks } from "@/components/setup-marks";
 
 export default function InstructionsPageGuarded() {
   return <RoleGuard need="agent_settings"><InstructionsPage /></RoleGuard>;
@@ -102,6 +103,7 @@ function InstructionsPage() {
           title="Conventions"
           lead="Conventions Coderhelm follows when it writes code. A repository's own instructions are added after the ones for every repository."
         />
+        <SetupLink />
       </div>
 
       <ScopeBar label="Whose instructions" scope={scope} onScope={text.setScope} repos={repos} repo={repo} onRepo={text.setRepo} />
@@ -224,4 +226,10 @@ function AgentFileUpdated({ file }: { file: AgentFile }) {
       {line}
     </p>
   );
+}
+
+/** Setup recommends coder instructions per repo; the way back to it. */
+function SetupLink() {
+  const { available } = useSetupMarks(null);
+  return <ReviewInSetup available={available} />;
 }

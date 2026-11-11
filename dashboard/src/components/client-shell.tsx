@@ -18,7 +18,7 @@ import { Logo, TopBar, TopBarProvider } from "./top-bar";
 import { tabTitle as routeTabTitle } from "@/lib/routes";
 import { focusRing } from "./ui";
 import { helpHref, helpTargetFromUrl } from "@/lib/support";
-import { BookIcon, ChatIcon, GearIcon, LifeBuoyIcon, PlanIcon, PlayIcon, ReviewerIcon, ShieldCheckIcon, ShieldIcon, TemplateIcon, TrendingUpIcon } from "./icons";
+import { BookIcon, ChatIcon, GearIcon, LifeBuoyIcon, PlanIcon, PlayIcon, ReviewerIcon, ShieldCheckIcon, ShieldIcon, SlidersIcon, TemplateIcon, TrendingUpIcon } from "./icons";
 import { ADMIN_SECTIONS, NAV_SECTIONS, sectionFor, visiblePages, type NavIconKey, type NavSection } from "@/lib/nav";
 import { SETTINGS_ITEMS, offered } from "./settings-items";
 import { isSelfHosted } from "@/lib/runtime-config";
@@ -39,6 +39,7 @@ import { TwoFactorSetup } from "./two-factor-setup";
 import { useSignInMethods } from "@/hooks/use-sign-in-methods";
 import type { MyTwoFactor } from "@/lib/api";
 import { securityApi } from "@/lib/security";
+import { SETUP_CHANGED, badgeCount, badgeText, readDismissed, setupApi } from "@/lib/setup";
 
 /** Sign out everywhere the same way: end the session, then the sign-in screen. */
 async function signOut() {
@@ -88,6 +89,7 @@ const NAV_ICONS: Record<NavIconKey, ReactNode> = {
   queue: <LifeBuoyIcon />,
   plugins: <TemplateIcon />,
   security: <ShieldCheckIcon />,
+  setup: <SlidersIcon />,
 };
 
 /** A page's capability check, for this person. */
@@ -701,6 +703,25 @@ function Sidebar({
     };
   }, [pathname]);
 
+  // Beside Setup: new recommendations plus repos not set up yet. Refetched on
+  // navigation and when Setup changes (a dismissal, a run); an older backend
+  // (404) shows no badge.
+  const [setupTodo, setSetupTodo] = useState(0);
+  useEffect(() => {
+    let live = true;
+    const load = () =>
+      setupApi.home().then(
+        (h) => live && setSetupTodo(badgeCount(h, readDismissed())),
+        () => {},
+      );
+    load();
+    window.addEventListener(SETUP_CHANGED, load);
+    return () => {
+      live = false;
+      window.removeEventListener(SETUP_CHANGED, load);
+    };
+  }, [pathname]);
+
   const handleSwitch = async (teamId: string) => {
     setSwitching(true);
     try {
@@ -746,7 +767,13 @@ function Sidebar({
             label={section.label}
             icon={NAV_ICONS[section.icon]}
             current={currentSection === section.key}
-            badge={section.countKey === "securityUrgent" ? <CountBadge n={securityUrgent} label="urgent security findings" tone="danger" /> : null}
+            badge={
+              section.countKey === "securityUrgent" ? (
+                <CountBadge n={securityUrgent} label="urgent security findings" tone="danger" />
+              ) : section.countKey === "setupTodo" ? (
+                <CountBadge n={setupTodo} text={badgeText(setupTodo)} label={setupTodo === 1 ? "thing to set up" : "things to set up"} tone="info" />
+              ) : null
+            }
           />
         ))}
       </ul>
@@ -1599,12 +1626,12 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
 }
 
 /** A small count beside a menu item; nothing when zero. */
-function CountBadge({ n, label, tone = "waiting" }: { n: number; label: string; tone?: "waiting" | "danger" }) {
+function CountBadge({ n, text, label, tone = "waiting" }: { n: number; text?: string; label: string; tone?: "waiting" | "danger" | "info" }) {
   if (!n) return null;
-  const look = tone === "danger" ? "bg-red-500/15 text-red-300" : "bg-amber-500/15 text-amber-300";
+  const look = tone === "danger" ? "bg-red-500/15 text-red-300" : tone === "info" ? "bg-sky-500/15 text-sky-300" : "bg-amber-500/15 text-amber-300";
   return (
     <span className={`min-w-5 rounded-full px-1.5 text-center text-xs font-semibold tabular-nums leading-5 ${look}`} data-testid="count-badge">
-      {n}
+      {text ?? n}
       <span className="sr-only"> {label}</span>
     </span>
   );
@@ -1617,7 +1644,7 @@ function NavItemLink({ href, label, icon, current, badge }: { href: string; labe
         href={href}
         prefetch={false}
         aria-current={current ? "page" : undefined}
-        className={`flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm transition-colors motion-reduce:transition-none ${focusRing} ${
+        className={`flex items-center justify-between gap-2 rounded-md px-2 py-1 text-sm transition-colors motion-reduce:transition-none ${focusRing} ${
           current ? "bg-zinc-800 font-medium text-zinc-50" : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100"
         }`}
       >

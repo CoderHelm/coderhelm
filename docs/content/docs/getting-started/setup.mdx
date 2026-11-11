@@ -1,0 +1,90 @@
+---
+title: Set up repos
+description: How CoderHelm reads each repository, recommends a value for every setting with the reason next to it, and applies them for you or after you review each one, with undo for one setting or a whole run.
+---
+
+**Setup** is the first item in the dashboard's left menu. You pick repositories, CoderHelm reads each one and recommends a value for every setting it manages, and then either turns them on for you or shows you each one first. Every run is saved to the audit log and can be undone.
+
+Running Setup needs the **Run Setup** permission, which admins have, and each change also needs the permission its own settings page needs. Anyone on the team can see the state of each repository.
+
+## Two ways to run it
+
+| | Do it for me | Review each setting |
+| --- | --- | --- |
+| **What you do** | Pick the repositories and click once | Pick the repositories, then choose Use, Keep or Edit for each recommendation |
+| **Your own settings** | Stay as they are (you can switch this off) | You see each one next to the recommendation |
+| **Settings that act on their own** | Stale pull request closing starts as a preview that changes nothing | You see what each would have done before you turn it on |
+| **When it finishes** | A results page with what changed, what was kept and what waits as a preview | A results page with what changed on each repository |
+
+**Do it for me** is the recommended choice. Use **Review each setting** when you want to see every value before anything changes.
+
+Both start the same way, from the Setup page, from a repository's row, or from **Set up repos** in the command menu (Command K on a Mac, Ctrl K elsewhere).
+
+## What CoderHelm reads
+
+Each recommendation is labelled with where it came from:
+
+| Label | Meaning | Examples |
+| --- | --- | --- |
+| **Detected** | Read straight from the repository or GitHub | The test runner in `package.json`, the workflows that run your end-to-end tests, the labels a workflow reacts to, branch protection and its required checks, the pull request template, `CODEOWNERS`, `AGENTS.md` and `CLAUDE.md` |
+| **Inferred** | A judgment from those facts and the repository's last 50 merged pull requests | The review focus, whether to require tests, coder instructions, which CI labels to add, how long before a pull request counts as stale |
+| **Default** | Nothing in the repository says otherwise, so CoderHelm's own default | |
+
+Each recommendation shows its evidence beside it, with a link to the file when there is one. Inferred values are suggestions: check them before you rely on them.
+
+Reading uses tokens from your team's monthly budget. CoderHelm checks the run's estimate against your monthly limits before it starts, and refuses a run that doesn't fit. The estimate shows next to what the run has used so far, and reading itself changes nothing.
+
+## Your settings are not overwritten by surprise
+
+**Keep my settings** is on by default. A setting someone already chose stays as it is; only settings nobody has set get the recommendation.
+
+- In **Do it for me**, switching it off reads **Replace mine with recommended**, and the page warns you before you start.
+- In **Review each setting**, the choice at the top of the Review step is **Keep my settings**, **Use recommended everywhere** or **Decide one by one**. When applying would replace a value someone chose, the page lists each one and asks before it applies.
+
+A setting someone changes by hand after Setup applied it is marked **Custom**. Later runs leave it alone unless you choose to replace it.
+
+## Settings that act on their own
+
+Some settings close, merge or post things: closing stale pull requests, merging when checks pass, and opening security fix pull requests. Their recommendation shows what they would have done over the last 14 days, for example how many pull requests would have been marked stale and closed.
+
+With **Do it for me** each one lands on its safe start:
+
+- Stale pull request closing is turned on with its dry run on: a preview that reports what it would mark and close, and changes nothing. **Switch on** on the results page opens its settings for that repository, where you turn the dry run off.
+- Auto-merge is only recommended where branch protection requires checks.
+- Security fix pull requests follow your security policy's schedule, and the evidence names it.
+
+## Results, retry and undo
+
+The results page shows each repository:
+
+- a one-line summary, such as "Turned on 9 settings, kept 3 of yours, 2 are previews you can switch on";
+- lists of what was turned on, what was kept and what waits as a preview, each with its evidence.
+
+Setup changes CoderHelm's own settings only. It opens no pull requests in your repositories; the test setup pull request is still opened from the **Tests** page.
+
+If a repository fails, its reason shows on its row, and **Retry** runs again for the failed repositories only.
+
+**Undo** next to a change puts that one setting back. **Undo this run** puts back every setting the run changed. A setting someone changed again after the run is left as it is and listed. Every change, and every undo, is recorded in the audit log.
+
+## New recommendations and new repositories
+
+When a CoderHelm release adds a recommendation, Setup lists it under **New recommendations** and counts it on the menu badge. Nothing new turns itself on. Review it on every repository, or dismiss it.
+
+The badge counts new recommendations plus repositories not set up yet.
+
+A newly connected repository starts as **Not set up**. The team setting **Set up new repos on their own** (off by default) applies the choices from your last reviewed run to new repositories and lists what it changed on the Setup page.
+
+## Repository states
+
+| State | Meaning |
+| --- | --- |
+| **Not set up** | Setup has never run on this repository |
+| **Set up** | Every setting matches what Setup last applied |
+| **Custom** | Someone changed a setting by hand after Setup applied it |
+| **Update available** | A CoderHelm release added recommendations this repository hasn't reviewed |
+| **Failed** | The last run couldn't change some settings here; the reason is on its row |
+| **Analyzing** | CoderHelm is reading the repository now |
+
+## On the settings pages
+
+On the reviewer, stale pull request, tests, security and workflow settings pages, a setting whose value is what Setup recommends is marked **Recommended**, and one changed by hand after Setup applied it is marked **Custom**. **Review in Setup** at the top of those pages opens Setup for that repository.
