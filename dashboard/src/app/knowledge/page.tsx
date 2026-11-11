@@ -9,6 +9,7 @@ import { StatusDot } from "@/components/list/status";
 import { useCan } from "@/hooks/use-can";
 import { buttonClass, focusRing, primaryButton, secondaryButton } from "@/components/ui";
 import { AddFlow } from "@/components/knowledge/add-flow";
+import { SyncLimits } from "@/components/knowledge/sync-limits";
 import { LogoStack, SourceLogo } from "@/components/knowledge/logos";
 import { KIND_LABEL, READ_SHORT, baseHealth, itemWord, knowledge, type AddKind, type Base, type KnowledgeLimits, type SourceKind, connectedInPlace } from "@/lib/knowledge";
 
@@ -36,6 +37,7 @@ function Knowledge() {
   const [limits, setLimits] = useState<KnowledgeLimits | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [flow, setFlow] = useState<{ open: boolean; start: AddKind | null }>({ open: false, start: null });
+  const [limitsOpen, setLimitsOpen] = useState(false);
 
   const load = useCallback(() => {
     setError(null);
@@ -74,14 +76,21 @@ function Knowledge() {
         title="Knowledge"
         lead="What your team's answers come from. Bring in pages from the apps you already use, and they stay up to date on their own."
         actions={
-          canManage && bases && bases.length > 0 ? (
+          bases && bases.length > 0 ? (
             <>
-              <Link href="/knowledge/bedrock/" className={secondaryButton} data-testid="use-in-bedrock">
-                Use in Bedrock
-              </Link>
-              <button type="button" onClick={() => start()} className={primaryButton} data-testid="new-knowledge">
-                New knowledge base
+              <button type="button" onClick={() => setLimitsOpen(true)} className={secondaryButton} data-testid="sync-limits-open">
+                Sync limits
               </button>
+              {canManage && (
+                <>
+                  <Link href="/knowledge/bedrock/" className={secondaryButton} data-testid="use-in-bedrock">
+                    Use in Bedrock
+                  </Link>
+                  <button type="button" onClick={() => start()} className={primaryButton} data-testid="new-knowledge">
+                    New knowledge base
+                  </button>
+                </>
+              )}
             </>
           ) : undefined
         }
@@ -107,6 +116,7 @@ function Knowledge() {
           </ul>
         )}
       </div>
+      <SyncLimits open={limitsOpen} onOpenChange={setLimitsOpen} />
       {canManage && (
         <AddFlow
           open={flow.open}

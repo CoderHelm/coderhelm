@@ -18,7 +18,7 @@ export type SourceKind = "notion" | "confluence" | "sanity" | "google_drive" | "
  */
 export type AddKind = SourceKind | "upload" | "bedrock_kb" | "mcp" | "bedrock_import";
 
-/** Sources that are imports: their own limit, and "connect in place" when they are bigger. */
+/** Sources that are imports (an S3 bucket, an archive): read once and kept in sync like the apps. */
 export const IMPORT_KINDS: readonly string[] = ["s3", "archive"];
 
 /** Where a base's passages are: kept here, or connected in place and searched live where it lives. */
@@ -146,7 +146,8 @@ export function connectProblem(e: unknown, fallback: string): ConnectProblem {
 /** A Bedrock knowledge base ARN, as the gateway accepts it. */
 export const KB_ARN = /^arn:aws:bedrock:[a-z0-9-]+:\d{12}:knowledge-base\/[A-Z0-9]{10}$/;
 
-export type SourceStatus = "queued" | "syncing" | "ready" | "error";
+/** `approval`: a large first sync waits for an admin to start it. */
+export type SourceStatus = "queued" | "syncing" | "ready" | "error" | "approval";
 
 export interface Selected {
   id: string;
@@ -185,10 +186,23 @@ export interface Source {
   paused: boolean;
   status: SourceStatus;
   error: SourceError | null;
-  progress: { phase: string; done: number; total: number } | null;
+  /** `fetching` counts what this sync brings in (it can span several runs); `waiting`: the app asked us to slow down. */
+  progress: { phase: "listing" | "fetching" | "removing" | "waiting" | string; done: number; total: number } | null;
+  /** Documents searchable now (kept up to date while a sync runs). */
   items: number;
   failed_items: number;
+  /** The selection covers more than `item_limit`. */
   truncated: boolean;
+  /** How many items the selection really covers; null when not listed yet or the app can't count past the limit. */
+  total?: number | null;
+  /** Items kept from the latest listing (never more than `item_limit`). */
+  listed?: number;
+  /** The most this source keeps now. */
+  item_limit?: number;
+  /** Why it is truncated: the team's per-source limit, or the knowledge base's own cap. */
+  limit_reason?: "" | "source" | "base";
+  /** What embedding a large first sync costs, shown before an admin starts it. */
+  estimate?: SyncEstimate | null;
   last_sync_at: string;
   last_success_at: string;
   next_sync_at: string;
@@ -197,6 +211,29 @@ export interface Source {
   created_by: string;
   connection?: SourceConnection;
   signin?: SourceSignIn | null;
+}
+
+export interface SyncEstimate {
+  items: number;
+  tokens: number;
+  usd: number;
+  /** Tokens left under the team's monthly token limit; null when there is no limit. */
+  token_left: number | null;
+}
+
+/** The team's sync limits (GET /api/knowledge/settings). */
+export interface SyncSettings {
+  items_per_source: number;
+  default_items_per_source: number;
+  min_items_per_source: number;
+  max_items_per_source: number;
+  items_per_base: number;
+  large_sync_items: number;
+  embedding: { model: string; usd_per_million_tokens: number; tokens_per_item: number };
+  token_budget: { limit: number; used: number; left: number } | null;
+  can_edit: boolean;
+  updated_at?: string;
+  updated_by?: string;
 }
 
 export interface SourceSummary {
@@ -400,6 +437,10 @@ export const knowledge = {
     request<{ source: Source; setup: WebhookSetup | null; visibility_note: string }>(`/api/knowledge/${e(kbId)}/sources`, post(input)),
   updateSource: (kbId: string, id: string, patch: { name?: string; selection?: Selected[]; options?: Record<string, unknown>; paused?: boolean }) =>
     request<{ source: Source }>(`/api/knowledge/${e(kbId)}/sources/${e(id)}`, put(patch)),
+  /** Starts a large first sync that waits for an admin (admins and owners). */
+  approveSource: (kbId: string, id: string) => request<{ source: Source }>(`/api/knowledge/${e(kbId)}/sources/${e(id)}/approve`, { method: "POST" }),
+  syncSettings: () => request<SyncSettings>("/api/knowledge/settings"),
+  saveSyncSettings: (input: { items_per_source: number }) => request<SyncSettings>("/api/knowledge/settings", put(input)),
   syncSource: (kbId: string, id: string) => request<{ source: Source }>(`/api/knowledge/${e(kbId)}/sources/${e(id)}/sync`, { method: "POST" }),
   /** "Sign in again": switches the source to your sign-in, or answers where to send the sign-in window first. */
   signInSource: (kbId: string, id: string) =>
@@ -430,13 +471,28 @@ export function sourceKindLabel(key: string | undefined | null): string {
   return (KIND_LABEL as Record<string, string>)[key] ?? key;
 }
 
-/** The truncation line for a source: imports have their own limit and a way past it. */
-export function truncatedLine(kind: string, limits: Pick<KnowledgeLimits, "max_items_per_import"> | null | undefined): string {
-  if (IMPORT_KINDS.includes(kind)) {
-    const n = (limits?.max_items_per_import ?? 0).toLocaleString();
-    return `This import has more than ${n} documents; only the first ones are searchable. Connect the knowledge base in place instead to search all of it.`;
+/**
+ * The line a source shows when it covers more than it keeps: plain numbers,
+ * never silent. `limit_reason` "base" is the knowledge base's own cap across
+ * its sources; anything else is the team's per-source limit.
+ */
+export function truncatedLine(
+  s: Pick<Source, "kind" | "items"> & Partial<Pick<Source, "total" | "listed" | "item_limit" | "limit_reason">>,
+  limits?: Pick<KnowledgeLimits, "max_items_per_source" | "max_items_per_import" | "items_per_base"> | null,
+): string {
+  const fallback = IMPORT_KINDS.includes(s.kind) ? limits?.max_items_per_import : limits?.max_items_per_source;
+  const limit = s.item_limit || s.listed || fallback || s.items;
+  const noun = itemWord(s.kind, 2).replace(/^2 /, "");
+  const n = limit.toLocaleString();
+  const head =
+    s.total && s.total > limit
+      ? `Holds ${n} of ${s.total.toLocaleString()} ${noun}; the rest aren't searchable.`
+      : `Holds ${n} ${noun}; there are more than ${n}, and the rest aren't searchable.`;
+  if (s.limit_reason === "base") {
+    const cap = limits?.items_per_base ? ` of ${limits.items_per_base.toLocaleString()} synced items` : "";
+    return `${head} This knowledge base is at its own cap${cap} across its sources.`;
   }
-  return "Only the first 1,000 are kept. Choose fewer pages to keep everything.";
+  return `${head} That is your team's limit per source.`;
 }
 
 /** A reader entry from what a person typed: an email is a person, anything else a role. */
@@ -493,14 +549,71 @@ function ago(iso: string, now: number): string {
   return `${d} day${d === 1 ? "" : "s"} ago`;
 }
 
+/** Short token counts: "3.9M", "250K", "900". */
+export function shortTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(n % 1_000 === 0 || n >= 100_000 ? 0 : 1)}K`;
+  return `${Math.round(n)}`;
+}
+
+/** Dollars for an estimate: "$0.08", "under $0.01". */
+export function usd(n: number): string {
+  if (n > 0 && n < 0.01) return "under $0.01";
+  return `$${n.toFixed(n >= 100 ? 0 : 2)}`;
+}
+
+type Counted = Pick<Source, "status" | "progress" | "items" | "last_success_at"> & Partial<Pick<Source, "total" | "listed">>;
+
+/**
+ * How far a running sync is, as numbers people can check: on a first sync,
+ * documents searchable of all the selection covers ("265 of 4,812"); later,
+ * the changes brought in so far ("3 of 12"). Never the limit as a total.
+ */
+export function syncCount(s: Counted): { done: number; total: number; first: boolean } | null {
+  if (s.status !== "syncing") return null;
+  const p = s.progress;
+  const fetching = p && p.phase === "fetching" && p.total > 0;
+  if (!s.last_success_at) {
+    const total = s.total || s.listed || 0;
+    if (total > 0) return { done: Math.min(s.items, total), total, first: true };
+    if (fetching) return { done: Math.min(p.done, p.total), total: p.total, first: true };
+    return null;
+  }
+  if (fetching) return { done: Math.min(p.done, p.total), total: p.total, first: false };
+  return null;
+}
+
+/** The sync button while a sync runs: the same numbers as the card, or a plain "Syncing…". */
+export function syncingLabel(s: Counted): string {
+  const c = syncCount(s);
+  return c ? `Syncing (${c.done.toLocaleString()} of ${c.total.toLocaleString()})` : "Syncing…";
+}
+
+/** The estimate a large first sync waits on, in one sentence. */
+export function estimateLine(kind: string, e: SyncEstimate): string {
+  const left = e.token_left === null || e.token_left === undefined ? "" : ` ${shortTokens(Math.max(0, e.token_left))} tokens are left this month.`;
+  return `About ${itemWord(kind, e.items)} to embed: about ${shortTokens(e.tokens)} tokens (about ${usd(e.usd)}). This counts against your team's monthly token limit.${left}`;
+}
+
 /** Where a source is, in one plain line. */
-export function sourceHealth(s: Pick<Source, "status" | "paused" | "progress" | "last_success_at" | "error" | "kind">, now = Date.now()): Health {
+export function sourceHealth(
+  s: Pick<Source, "status" | "paused" | "progress" | "last_success_at" | "error" | "kind"> & Partial<Pick<Source, "items" | "total" | "listed" | "estimate">>,
+  now = Date.now(),
+): Health {
   const label = KIND_LABEL[s.kind] ?? "the app";
   if (s.status === "error") return { tone: "attention", words: s.error?.fix || `Reconnect ${label} to keep it up to date.` };
+  if (s.status === "approval") {
+    return { tone: "queued", words: s.estimate ? estimateLine(s.kind, s.estimate) : "A large first sync is waiting for an admin to start it." };
+  }
   if (s.status === "syncing") {
     const p = s.progress;
-    if (p && p.phase === "fetching" && p.total > 0) return { tone: "live", words: `Bringing in ${Math.min(p.done, p.total)} of ${p.total}` };
+    if (p && p.phase === "waiting") return { tone: "live", words: `${label} asked us to slow down. Continuing in a moment.` };
     if (p && p.phase === "removing") return { tone: "live", words: "Removing pages that were deleted" };
+    const c = syncCount({ status: s.status, progress: p, items: s.items ?? 0, total: s.total, listed: s.listed, last_success_at: s.last_success_at });
+    if (c) {
+      const n = `${c.done.toLocaleString()} of ${c.total.toLocaleString()}`;
+      return { tone: "live", words: c.first ? `Syncing (${n})` : `Bringing in ${n} change${c.total === 1 ? "" : "s"}` };
+    }
     return { tone: "live", words: s.last_success_at ? "Checking for changes" : "Getting started" };
   }
   if (s.paused) return { tone: "muted", words: `Paused. Changes in ${label} aren't brought in.` };
@@ -537,6 +650,10 @@ export function fixLabel(s: Pick<Source, "error" | "kind">): string | null {
       return s.kind === "archive" ? "Upload a newer export" : "Choose pages again";
     case "retry":
       return "Try again";
+    // The team's monthly token limit is reached: the fix says what to do,
+    // and the card links to the budget settings for admins.
+    case "budget":
+      return null;
     default:
       return null;
   }

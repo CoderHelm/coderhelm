@@ -133,9 +133,9 @@ test.describe("knowledge base page", () => {
     const db = newBackend("first_sync");
     await mockKnowledge(page, db);
     await page.goto("/knowledge/base/?id=kb_dw");
-    await expect(page.getByTestId("base-status")).toHaveText("Syncing 350 of 1,000");
-    await expect(page.getByTestId("tile-pages")).toContainText("Bringing in 350 of 1,000");
-    await expect(page.getByTestId("source-health")).toContainText("Bringing in 350 of 1000");
+    await expect(page.getByTestId("base-status")).toHaveText("Syncing (350 of 1,000)");
+    await expect(page.getByTestId("tile-pages")).toContainText("Syncing (350 of 1,000)");
+    await expect(page.getByTestId("source-health")).toContainText("Syncing (350 of 1,000)");
     await shot(page, "first-sync-1280");
     // Two polls: each is the sources route; the base with every item is never read again.
     await expect.poll(() => db.calls.filter((c) => c === "GET /api/knowledge/kb_dw/sources").length, { timeout: 10_000 }).toBeGreaterThanOrEqual(2);

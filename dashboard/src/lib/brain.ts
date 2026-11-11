@@ -53,6 +53,12 @@ export interface KnowledgeLimits {
   max_items_per_import?: number;
   /** The largest archive (.zip) an import takes. */
   max_archive_bytes?: number;
+  /** Items one synced source keeps (the team's setting). */
+  max_items_per_source?: number;
+  /** The default per-source limit. */
+  default_items_per_source?: number;
+  /** Synced items one knowledge base holds across its sources. */
+  items_per_base?: number;
 }
 
 export interface BaseInput {

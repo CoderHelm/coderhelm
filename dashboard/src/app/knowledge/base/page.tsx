@@ -15,6 +15,7 @@ import { SourceLogo } from "@/components/knowledge/logos";
 import { Picker } from "@/components/knowledge/picker";
 import { ConnectionRow, type ConnectionActions } from "@/components/knowledge/connections";
 import { Ask } from "@/components/knowledge/ask";
+import { SyncLimits } from "@/components/knowledge/sync-limits";
 import { Content } from "@/components/knowledge/content";
 import { History } from "@/components/knowledge/history";
 import { Usage } from "@/components/knowledge/usage";
@@ -87,6 +88,7 @@ function BaseView() {
   const [asked, setAsked] = useState<{ q: string; at: number } | null>(null);
   const [wantStatus, setWantStatus] = useState<{ status: ItemState | ""; at: number } | null>(null);
   const [limits, setLimits] = useState<KnowledgeLimits | null>(null);
+  const [limitsOpen, setLimitsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [flow, setFlow] = useState<{ open: boolean; start: AddKind | null }>({ open: false, start: null });
   const [settings, setSettings] = useState(false);
@@ -283,6 +285,16 @@ function BaseView() {
     }
   };
 
+  const approve = async (s: PageSource) => {
+    try {
+      const r = await knowledge.approveSource(id, s.id);
+      setSources((cur) => cur.map((x) => (x.id === s.id ? { ...x, ...r.source } : x)));
+      toast(`Started. Bringing in ${KIND_LABEL[s.kind]} now.`);
+    } catch (e) {
+      toast(errorMessage(e, "Couldn't start the sync."), "error");
+    }
+  };
+
   const pause = async (s: PageSource, paused: boolean) => {
     try {
       const r = await knowledge.updateSource(id, s.id, { paused });
@@ -433,6 +445,8 @@ function BaseView() {
     onPause: pause,
     onRemove: removeSource,
     onNewExport: pickArchive,
+    onApprove: approve,
+    onRaiseLimit: () => setLimitsOpen(true),
   };
   // Files go only to bases kept here.
   const canUpload = canManage && !inPlace;
@@ -767,6 +781,7 @@ function BaseView() {
           />
         </Modal>
       )}
+      <SyncLimits open={limitsOpen} onOpenChange={setLimitsOpen} onSaved={() => load()} />
     </Page>
   );
 }
